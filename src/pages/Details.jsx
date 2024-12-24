@@ -89,13 +89,13 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20 px-4">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Quality Inspection Details</h1>
+    <div className="min-h-screen bg-gray-300 pt-20 px-4">
+      <div className="max-w-xl mx-auto">
+        <h1 className="text-3xl font-bold text-center text-gray-900 mb-8">Quality Inspection Details</h1>
         
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md">
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+            <label className="block text-m font-medium text-gray-700 mb-1">Date</label>
             <DatePicker
               selected={formData.date}
               onChange={(date) => !isSubmitted && setFormData(prev => ({ ...prev, date }))}
@@ -106,7 +106,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Factory</label>
+            <label className="block text-m font-medium text-gray-700 mb-1">Factory</label>
             <select
               value={formData.factory}
               onChange={(e) => !isSubmitted && setFormData(prev => ({ ...prev, factory: e.target.value }))}
@@ -122,7 +122,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Line No</label>
+            <label className="block text-m font-medium text-gray-700 mb-1">Line No</label>
             <input
               type="text"
               value={formData.lineNo}
@@ -134,7 +134,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Style Code</label>
+            <label className="block text-m font-medium text-gray-700 mb-1">Style Code</label>
             <select
               value={formData.styleCode}
               onChange={(e) => handleStyleCodeChange(e.target.value)}
@@ -150,7 +150,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Style Digit</label>
+            <label className="block text-m font-medium text-gray-700 mb-1">Style Digit</label>
             <input
               type="text"
               value={formData.styleDigit}
@@ -162,7 +162,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+            <label className="block text-m font-medium text-gray-700 mb-1">Customer</label>
             <input
               type="text"
               value={formData.customer}
@@ -172,7 +172,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
           </div>
 
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">MO No</label>
+            <label className="block text-m font-medium text-gray-700 mb-1">MO No</label>
             <input
               type="text"
               value={formData.moNo}
@@ -180,13 +180,14 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
               className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
             />
           </div>
-
+        <center>
           <button
             type="submit"
-            className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="w-half  bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
           >
             {isSubmitted ? 'Continue to Inspection' : 'Submit Details'}
           </button>
+          </center>
         </form>
       </div>
     </div>

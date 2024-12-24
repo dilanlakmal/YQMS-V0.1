@@ -117,7 +117,8 @@ function Login({ onLogin }) {
   <div className="flex-1 hidden lg:flex items-center justify-center p-12 bg-black">
     <div className="max-w-2xl text-center">
       <img
-        src="https://cdn.sanity.io/images/ztw74qc4/production/91213435f1cf5293b2105aea50d48c3df854ce68-1200x664.jpg?w=1536&fit=max&auto=format"
+        // src="https://cdn.sanity.io/images/ztw74qc4/production/91213435f1cf5293b2105aea50d48c3df854ce68-1200x664.jpg?w=1536&fit=max&auto=format"
+        src= "/Quality.webp"
         alt="Quality Management"
         className="w-full rounded-lg shadow-lg mb-8"
       />

@@ -239,7 +239,7 @@ function Inspection({
       const summaryContent = `
         <div style="font-size: 14px; margin-bottom: 20px;">
           <h2 style="text-align: center; margin-bottom: 20px;">Summary</h2>
-          <table border="1" style="width: 100%; border-collapse: collapse;">
+          <table border="1" style="width: 100%; border-separate: separate;">
             <thead>
               <tr>
                 <th style="padding: 8px; text-align: center; background-color: #f2f2f2;">Total Defects</th>

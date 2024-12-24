@@ -23,12 +23,19 @@ function Header({ inspectionData, editable = false }) {
 
   const data = editable ? editedData : inspectionData;
 
+  function formatText(text) {
+    return text
+      .replace(/([a-z])([A-Z])/g, '$1 $2') // Add space before capital letters
+      .replace(/\b\w/g, char => char.toUpperCase()); // Capitalize first letter of each word
+  }
+
+  
   return (
     <div className="overflow-x-auto bg-white p-2 rounded-lg shadow mb-2">
       <div className="flex space-x-4 text-sm">
         {Object.entries(data).map(([key, value]) => (
-          <div key={key}>
-            <span className="font-large">{key}: </span>
+          <div  key={key}>
+            <span className="font-bold">{formatText(key)}: </span>
             {editable ? (
               <input
                 type="text"
@@ -47,5 +54,6 @@ function Header({ inspectionData, editable = false }) {
     </div>
   );
 }
+
 
 export default Header;
