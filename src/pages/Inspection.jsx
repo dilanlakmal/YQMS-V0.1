@@ -160,19 +160,51 @@ function Inspection({
       const defectRatio =
         checkedQuantity > 0 ? (defectPieces / checkedQuantity) * 100 : 0;
 
+      const currentTime = new Date();
+      const timestamp = currentTime.toTimeString().split(" ")[0]; // Format: HH:MM:SS
+
       const headerContent = `
         <div style="font-size: 14px; margin-bottom: 20px;">
           <h2 style="text-align: center; margin-bottom: 20px;">Inspection Details</h2>
-          <p><strong>Date:</strong> ${new Date(
-            inspectionData.date
-          ).toLocaleDateString()}</p>
-          <p><strong>Factory:</strong> ${inspectionData.factory}</p>
-          <p><strong>Line No:</strong> ${inspectionData.lineNo}</p>
-          <p><strong>Style:</strong> ${inspectionData.styleCode} ${
+          <table border="1" style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr>
+                <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Field</th>
+                <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding: 8px;">Date</td>
+                <td style="padding: 8px;">${new Date(
+                  inspectionData.date
+                ).toLocaleDateString()}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px;">Factory</td>
+                <td style="padding: 8px;">${inspectionData.factory}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px;">Line No</td>
+                <td style="padding: 8px;">${inspectionData.lineNo}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px;">Style</td>
+                <td style="padding: 8px;">${inspectionData.styleCode} ${
         inspectionData.styleDigit
-      }</p>
-          <p><strong>MO No:</strong> ${inspectionData.moNo}</p>
-          <p><strong>Customer:</strong> ${inspectionData.customer}</p>
+      }</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px;">MO No</td>
+                <td style="padding: 8px;">${inspectionData.moNo}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px;">Customer</td>
+                <td style="padding: 8px;">${inspectionData.customer}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="font-size: 12px; text-align: right;">Downloaded at: ${timestamp}</p>
         </div>
       `;
 
@@ -237,7 +269,7 @@ function Inspection({
       `;
 
       const contentToPrint = `
-        <div style="font-family: Arial, sans-serif;">
+        <div style="font-family: Arial, sans-serif; margin: 20px;">
           <h1 style="text-align: center; font-size: 20px; margin-top: 40px;">QC Inspection Report</h1>
           ${headerContent}
           ${defectContent}
@@ -249,11 +281,12 @@ function Inspection({
       element.innerHTML = contentToPrint;
 
       const opt = {
-        margin: 1,
+        margin: [0.5, 1], // Top and bottom margins set
         filename: "inspection-report.pdf",
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: { scale: 2 },
         jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+        pagebreak: { mode: ["avoid-all"] },
       };
 
       await html2pdf().set(opt).from(element).save();
@@ -261,42 +294,6 @@ function Inspection({
       console.error("Error generating PDF:", error);
     }
   };
-
-  /*
-  const handleDownloadPDF = async () => {
-    try {
-      const element = document.createElement("div");
-      element.innerHTML = `
-        <h1 style="text-align: center; margin-bottom: 20px;">Inspection Report</h1>
-        <div class="inspection-data">
-          <h2>Inspection Details</h2>
-          ${document.querySelector(".inspection-content")?.innerHTML || ""}
-        </div>
-        <div class="summary-data">
-          <h2>Summary</h2>
-          ${document.querySelector(".summary-content")?.innerHTML || ""}
-        </div>
-        <div class="logs-data">
-          <h2>Inspection Logs</h2>
-          ${document.querySelector(".logs-content")?.innerHTML || ""}
-        </div>
-      `;
-
-      const opt = {
-        margin: 1,
-        filename: "inspection-report.pdf",
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
-      };
-
-      await html2pdf().set(opt).from(element).save();
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-    }
-  };
-
-  */
 
   const handleSubmit = () => {
     onSubmit();
