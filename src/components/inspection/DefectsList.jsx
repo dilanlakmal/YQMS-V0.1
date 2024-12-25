@@ -61,8 +61,13 @@ function DefectsList({
                 {defects[index]}
               </div>
             )}
+            <img
+              src={defect.imageUrl}
+              alt={defect.name}
+              className="mb-2 w-auto h-16 object-cover"
+            />
 
-            <div className="mb-2 text-sm">{defect}</div>
+            <div className="mb-2 text-sm">{defect.name}</div>
 
             {currentDefectCount[index] > 0 && (
               <div className="absolute bottom-2 left-2 text-sm font-medium">
@@ -108,7 +113,12 @@ function DefectsList({
             !isPlaying ? "opacity-50 cursor-not-allowed" : ""
           }`}
         >
-          <span className="text-sm flex-grow">{defect}</span>
+          <img
+            src={defect.imageUrl}
+            alt={defect.name}
+            className="w-16 h-16 object-cover mr-4"
+          />
+          <span className="text-sm flex-grow">{defect.name}</span>
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <button

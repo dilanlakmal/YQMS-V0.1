@@ -143,13 +143,13 @@ function Return({
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
       <div className="fixed top-16 left-0 right-0 bg-white z-40">
-        <div className="max-w-7xl mx-auto px-4 pt-2 pb-0">
+        <div className="max-w-8xl mx-auto px-4 pt-2 pb-0">
           <Header inspectionData={savedState?.inspectionData} />
         </div>
       </div>
 
-      <div className="fixed top-28 left-0 right-0 bg-white shadow-md z-30">
-        <div className="max-w-7xl mx-auto px-4 pt-2 pb-1 flex items-center justify-between">
+      <div className="fixed top-30 left-0 right-0 bg-white shadow-md z-30">
+        <div className="max-w-8xl mx-auto px-4 pt-2 pb-1 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <ViewToggle
               view={view}
@@ -163,11 +163,11 @@ function Return({
 
       <div className="max-auto mx-auto px-4 pt-14 pb-52">
         <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-2 flex items-top justify-center pt-52">
+          <div className="col-span-2 flex items-center justify-center">
             <button
               onClick={handlePassReturn}
               disabled={!isPlaying || isReturnComplete || hasDefectSelected}
-              className={`fixed w-44 h-40 py-0 rounded font-medium text-2xl ${
+              className={`w-full h-full py-0 rounded font-medium ${
                 isPlaying && !isReturnComplete && !hasDefectSelected
                   ? "bg-green-500 text-white"
                   : "bg-gray-300 text-gray-600"
@@ -194,7 +194,7 @@ function Return({
               isReturnView={true}
             />
           </div>
-          <div className="col-span-2 flex items-top justify-center pt-52">
+          <div className="col-span-2 flex items-center justify-center">
             <button
               onClick={handleRejectReturn}
               disabled={
@@ -202,7 +202,7 @@ function Return({
                 isReturnComplete ||
                 !Object.values(currentDefectCount).some((count) => count > 0)
               }
-              className={`fixed w-44 h-40 py-0 rounded font-medium text-2xl ${
+              className={`w-full h-full py-0 rounded font-medium ${
                 isPlaying &&
                 !isReturnComplete &&
                 Object.values(currentDefectCount).some((count) => count > 0)

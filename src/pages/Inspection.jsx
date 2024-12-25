@@ -309,7 +309,7 @@ function Inspection({
           </div>
         </div>
 
-        <div className="fixed top-28 left-0 right-0 bg-white shadow-md z-20">
+        <div className="fixed top-30 left-0 right-0 bg-white shadow-md z-20">
           <div className="max-w-8xl mx-auto px-4 pt-2 pb-1 flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <ViewToggle
@@ -350,11 +350,11 @@ function Inspection({
 
         <div className="max-w-auto mx-auto px-4 pt-14 pb-52">
           <div className="grid grid-cols-12 gap-4">
-            <div className="col-span-2 flex items-top justify-center pt-56 ">
+            <div className="col-span-2 flex items-center justify-center">
               <button
                 onClick={handlePass}
                 disabled={!isPlaying || hasDefectSelected}
-                className={`fixed w-40 h-40 py-0 rounded font-medium text-2xl ${
+                className={`w-full h-full py-0 rounded font-medium ${
                   isPlaying && !hasDefectSelected
                     ? "bg-green-500 text-white"
                     : "bg-gray-300 text-gray-600"
@@ -383,14 +383,14 @@ function Inspection({
                 onDefectSelect={setHasDefectSelected}
               />
             </div>
-            <div className="col-span-2 flex items-top justify-center pt-56">
+            <div className="col-span-2 flex items-center justify-center">
               <button
                 onClick={handleReject}
                 disabled={
                   !isPlaying ||
                   !Object.values(currentDefectCount).some((count) => count > 0)
                 }
-                className={`fixed w-40 h-40 py-0 rounded font-medium text-2xl ${
+                className={`w-full h-full py-0 rounded font-medium ${
                   isPlaying &&
                   Object.values(currentDefectCount).some((count) => count > 0)
                     ? "bg-red-500 text-white"
