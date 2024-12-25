@@ -25,7 +25,7 @@ function Summary({
           <div className="mt-1 text-2xl font-bold text-center">{goodOutput}</div>
         </div>
         <div className="border-r">
-          <label className="block text-sm font-medium text-gray-700 text-center">Defect Pieces</label>
+          <label className="block text-sm font-medium text-gray-700 text-center">Defect Garments</label>
           <div className="mt-1 text-2xl font-bold text-center">{defectPieces}</div>
         </div>
         <div className="border-r">

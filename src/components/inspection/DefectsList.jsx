@@ -45,7 +45,7 @@ function DefectsList({
 
   if (view === "grid") {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-0.5">
         {defectItems.map((defect, index) => (
           <div
             key={index}
@@ -64,7 +64,7 @@ function DefectsList({
             <img
               src={defect.imageUrl}
               alt={defect.name}
-              className="mb-2 w-auto h-16 object-cover"
+              className="mb-2 w-auto h-12 object-cover"
             />
 
             <div className="mb-2 text-sm">{defect.name}</div>

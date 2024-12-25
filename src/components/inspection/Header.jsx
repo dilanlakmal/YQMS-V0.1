@@ -32,7 +32,7 @@ function Header({ inspectionData, editable = false }) {
   
   return (
     <div className="overflow-x-auto bg-white pt-2 pb-3 rounded-lg mb-2git ">
-      <div className="flex space-x-4 text-sm items-center">
+      <div className="flex space-x-4 text-xs items-center">
         {Object.entries(data).map(([key, value]) => (
           <div  key={key} className='text-center border-r border-b border-gray-300 pr-4 pt-2 pb-2'>
             <span className="font-bold">{formatText(key)}: </span>
