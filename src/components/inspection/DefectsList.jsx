@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { defectsList } from "../../constants/defects";
+import { getDefectImage } from "../../constants/defectUtils";
 
 function DefectsList({
   view,
@@ -62,7 +63,7 @@ function DefectsList({
               </div>
             )}
             <img
-              src={defect.imageUrl}
+              src={getDefectImage(defect.id)}
               alt={defect.name}
               className="mb-2 w-auto h-12 object-cover"
             />
@@ -114,7 +115,7 @@ function DefectsList({
           }`}
         >
           <img
-            src={defect.imageUrl}
+            src={getDefectImage(defect.id)}
             alt={defect.name}
             className="w-16 h-16 object-cover mr-4"
           />

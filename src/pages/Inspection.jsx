@@ -14,7 +14,9 @@ import { defectsList } from "../constants/defects";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faDownload } from "@fortawesome/free-solid-svg-icons";
 
+
 function Inspection({
+ 
   savedState,
   onStateChange,
   onLogEntry,
@@ -134,6 +136,7 @@ function Inspection({
 
     setCurrentDefectCount({});
   };
+ 
 
   const handleDownloadPDF = async () => {
     try {
