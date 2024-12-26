@@ -157,43 +157,45 @@ function DefectsList({
   );
 
   const renderControls = () => (
-    <div className="flex flex-wrap gap-4 mb-4">
-      <div className="flex flex-wrap gap-2 flex-grow">
-        <button
-          onClick={clearFilters}
-          className={`px-3 py-1 rounded text-sm ${
-            selectedLetters.size === 0 && !isCommonSelected
-              ? "bg-indigo-600 text-white"
-              : "bg-gray-200 hover:bg-gray-300"
-          }`}
-        >
-          All
-        </button>
-        {uniqueLetters.map((letter) => (
+    <div className="flex gap-4 mb-4">
+      <div className="flex-none">{renderSortDropdown()}</div>
+      <div className="flex-1">
+        <div className="flex flex-wrap gap-2">
           <button
-            key={letter}
-            onClick={() => handleLetterFilter(letter)}
+            onClick={clearFilters}
             className={`px-3 py-1 rounded text-sm ${
-              selectedLetters.has(letter)
+              selectedLetters.size === 0 && !isCommonSelected
                 ? "bg-indigo-600 text-white"
                 : "bg-gray-200 hover:bg-gray-300"
             }`}
           >
-            {letter}
+            All
           </button>
-        ))}
-        <button
-          onClick={handleCommonFilter}
-          className={`px-3 py-1 rounded text-sm ${
-            isCommonSelected
-              ? "bg-indigo-600 text-white"
-              : "bg-gray-200 hover:bg-gray-300"
-          }`}
-        >
-          Common
-        </button>
+          {uniqueLetters.map((letter) => (
+            <button
+              key={letter}
+              onClick={() => handleLetterFilter(letter)}
+              className={`px-3 py-1 rounded text-sm ${
+                selectedLetters.has(letter)
+                  ? "bg-indigo-600 text-white"
+                  : "bg-gray-200 hover:bg-gray-300"
+              }`}
+            >
+              {letter}
+            </button>
+          ))}
+          <button
+            onClick={handleCommonFilter}
+            className={`px-3 py-1 rounded text-sm ${
+              isCommonSelected
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-200 hover:bg-gray-300"
+            }`}
+          >
+            Common
+          </button>
+        </div>
       </div>
-      {renderSortDropdown()}
     </div>
   );
 
