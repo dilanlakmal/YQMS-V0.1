@@ -148,7 +148,7 @@ function Return({
         </div>
       </div>
 
-      <div className="fixed top-30 left-0 right-0 bg-white shadow-md z-30">
+      <div className="fixed top-28 left-0 right-0 bg-white shadow-md z-20">
         <div className="max-w-8xl mx-auto px-4 pt-2 pb-1 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <ViewToggle

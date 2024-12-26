@@ -343,7 +343,7 @@ function Inspection({
 
               <button
                 onClick={handleSubmit}
-                className="px-6 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-green-700"
               >
                 Submit
               </button>
@@ -353,11 +353,11 @@ function Inspection({
 
         <div className="max-w-auto mx-auto px-4 pt-14 pb-52">
           <div className="grid grid-cols-12 gap-4">
-            <div className="col-span-2 flex items-center justify-center">
+            <div className="col-span-2 flex items-top justify-center pt-20">
               <button
                 onClick={handlePass}
                 disabled={!isPlaying || hasDefectSelected}
-                className={`w-full h-full py-0 rounded font-medium ${
+                className={`fixed w-40 h-96 py-0 rounded font-medium ${
                   isPlaying && !hasDefectSelected
                     ? "bg-green-500 text-white"
                     : "bg-gray-300 text-gray-600"
