@@ -1,11 +1,40 @@
-import { defectImages } from './defectImages';
-
-// Base defect list with images
-export const baseDefects = Object.entries(defectImages).map(([id, imageUrl]) => ({
-  id,
-  imageUrl,
-}));
-
+export const defectImages = {
+  "Accessories defects": "/qcc.png",
+  "Broken Stitching": "/qcc.png",
+  "Chalk marks/pencil marks": "/chalk.png",
+  "Color-Shading / shaded parts": "/color.png",
+  "Cracked seam": "/qcc.png",
+  "Cut damage": "/cut.png",
+  "Defective Stitching": "/stitches.png",
+  "Dirty Mark - Others": "/qcc.png",
+  "Drop Stitch": "/qcc.png",
+  "Embroidery/Applique-Others (Heat transfer / printing defects)": "/qcc.png",
+  "Fullness": "/qcc.png",
+  "Insecure backstitch": "/qcc.png",
+  "Join Stitching - Misalign": "/qcc.png",
+  "Knitted Defects - Others": "/qcc.png",
+  "Needle Holes": "/qcc.png",
+  "Oil Spots": "/qcc.png",
+  "Others": "/qcc.png",
+  "Pleated Seam": "/qcc.png",
+  "Poor Neck Shape": "/qcc.png",
+  "Poor color matching against standard": "/qcc.png",
+  "Poor pressing / Ironing": "/qcc.png",
+  "Raw Edge": "/qcc.png",
+  "SPI (Stitch density: Too Loose / Tight)": "/qcc.png",
+  "Seam Waviness": "/qcc.png",
+  "Seam puckering": "/qcc.png",
+  "Skipped stitches": "/qcc.png",
+  "Sticker/label : Damaged/Incorrect": "/qcc.png",
+  "Stitching- Bar tacks: missing": "/qcc.png",
+  "Stitching-Seam slippage": "/qcc.png",
+  "Stitching-Seam-Open": "/qcc.png",
+  "Trimming & Thread: Untrimmed": "/qcc.png",
+  "Twisted seam / Seam Rolling": "/qcc.png",
+  "Uneven seam": "/qcc.png",
+  "Workmanship-Slanted/Uncentered": "/qcc.png",
+  "Zipper Defects": "/qcc.png",
+};
 export const defectsList = {
   english: [
     { id: "Accessories defects", name: "Acessories defects"},
@@ -158,3 +187,20 @@ export const defectsList = {
     { id: "Zipper Defects", name: "Zipper Defects \\ បញ្ហារូត \\拉链问题"},
   ],
 };
+
+// Common defects indices (based on the most frequently occurring defects)
+export const commonDefects = {
+  english: [0, 1, 2, 5], // Indices of common defects in the english array
+  khmer: [0, 1, 2, 5], // Indices of common defects in the khmer array
+  chinese: [0, 1, 2, 5], // Indices of common defects in the chinese array
+  all: [0, 1, 2, 5], // Indices of common defects in the all array
+};
+
+// Type1 defects indices (based on the most frequently occurring defects)
+export const TypeOneDefects = {
+  english: [10, 11, 12], // Indices of Type 1 defects in the english array
+  khmer: [10, 11, 12], // Indices of Type 1 defects in the khmer array
+  chinese: [10, 11, 12], // Indices of Type 1 defects in the chinese array
+  all: [10, 11, 12], // Indices of Type 1 defects in the all array
+};
+

@@ -1,4 +1,4 @@
-import { defectImages } from './defectImages';
+import { defectImages } from './defects';
 
 /**
  * Get the image URL for a defect ID

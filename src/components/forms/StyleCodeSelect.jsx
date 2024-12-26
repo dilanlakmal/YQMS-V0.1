@@ -1,4 +1,4 @@
-import { styleCodes } from '../../constants/defects';
+import { styleCodes } from '../../constants/styleCodes';
 
 function StyleCodeSelect({ value, onChange, onCustomerChange }) {
   const handleChange = (e) => {
