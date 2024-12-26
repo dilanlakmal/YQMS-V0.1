@@ -269,7 +269,7 @@ function Inspection({
       `;
 
       const contentToPrint = `
-        <div style="font-family: Arial, sans-serif; margin: 20px;">
+        <div style="font-family: Arial, sans-serif;">
           <h1 style="text-align: center; font-size: 20px; margin-top: 40px;">QC Inspection Report</h1>
           ${headerContent}
           ${defectContent}
@@ -281,12 +281,11 @@ function Inspection({
       element.innerHTML = contentToPrint;
 
       const opt = {
-        margin: [0.5, 1], // Top and bottom margins set
+        margin: 1,
         filename: "inspection-report.pdf",
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: { scale: 2 },
         jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
-        pagebreak: { mode: ["avoid-all"] },
       };
 
       await html2pdf().set(opt).from(element).save();

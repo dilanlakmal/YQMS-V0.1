@@ -149,6 +149,14 @@ export const defectsList = {
   ],
 };
 
+// Common defects indices (based on the most frequently occurring defects)
+export const commonDefects = {
+  english: [0, 1, 2, 5], // Indices of common defects in the english array
+  khmer: [0, 1, 2, 5], // Indices of common defects in the khmer array
+  chinese: [0, 1, 2, 5], // Indices of common defects in the chinese array
+  all: [0, 1, 2, 5], // Indices of common defects in the all array
+};
+
 export const factories = [
   "CJ2",
   "Combo H/Some",
