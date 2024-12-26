@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
-import { defectsList, commonDefects } from "../../constants/defects";
+import {
+  defectsList,
+  commonDefects,
+  TypeOneDefects,
+} from "../../constants/defects";
 import { ArrowDownAZ, ArrowDownZA, ArrowDownWideNarrow } from "lucide-react";
 
 function DefectsList({
@@ -20,6 +24,7 @@ function DefectsList({
   const [selectedLetters, setSelectedLetters] = useState(new Set());
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [isCommonSelected, setIsCommonSelected] = useState(false);
+  const [isTypeOneSelected, setIsTypeOneSelected] = useState(false);
 
   // Get unique first letters from defect names
   const uniqueLetters = [
@@ -37,16 +42,43 @@ function DefectsList({
       return newSet;
     });
     setIsCommonSelected(false);
+    setIsTypeOneSelected(false);
   };
 
+  /*
   const handleCommonFilter = () => {
     setIsCommonSelected((prev) => !prev);
+    setSelectedLetters(new Set());
+  };
+
+  const handleTypeOneFilter = () => {
+    setIsTypeOneSelected((prev) => !prev);
+    setSelectedLetters(new Set());
+  };
+  */
+
+  const handleCommonFilter = () => {
+    setIsCommonSelected((prev) => {
+      const newValue = !prev;
+      if (newValue) setIsTypeOneSelected(false); // Reset Type 1
+      return newValue;
+    });
+    setSelectedLetters(new Set());
+  };
+
+  const handleTypeOneFilter = () => {
+    setIsTypeOneSelected((prev) => {
+      const newValue = !prev;
+      if (newValue) setIsCommonSelected(false); // Reset Common
+      return newValue;
+    });
     setSelectedLetters(new Set());
   };
 
   const clearFilters = () => {
     setSelectedLetters(new Set());
     setIsCommonSelected(false);
+    setIsTypeOneSelected(false);
   };
 
   // Process defects based on sorting and filtering
@@ -56,6 +88,8 @@ function DefectsList({
     // Apply filters
     if (isCommonSelected) {
       indices = indices.filter((i) => commonDefects[language].includes(i));
+    } else if (isTypeOneSelected) {
+      indices = indices.filter((i) => TypeOneDefects[language].includes(i));
     } else if (selectedLetters.size > 0) {
       indices = indices.filter((i) =>
         selectedLetters.has(defectItems[i].charAt(0).toUpperCase())
@@ -164,7 +198,9 @@ function DefectsList({
           <button
             onClick={clearFilters}
             className={`px-3 py-1 rounded text-sm ${
-              selectedLetters.size === 0 && !isCommonSelected
+              selectedLetters.size === 0 &&
+              !isCommonSelected &&
+              !isTypeOneSelected
                 ? "bg-indigo-600 text-white"
                 : "bg-gray-200 hover:bg-gray-300"
             }`}
@@ -193,6 +229,17 @@ function DefectsList({
             }`}
           >
             Common
+          </button>
+
+          <button
+            onClick={handleTypeOneFilter}
+            className={`px-3 py-1 rounded text-sm ${
+              isTypeOneSelected
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-200 hover:bg-gray-300"
+            }`}
+          >
+            Type 1
           </button>
         </div>
       </div>

@@ -157,6 +157,14 @@ export const commonDefects = {
   all: [0, 1, 2, 5], // Indices of common defects in the all array
 };
 
+// Type1 defects indices (based on the most frequently occurring defects)
+export const TypeOneDefects = {
+  english: [10, 11, 12], // Indices of Type 1 defects in the english array
+  khmer: [10, 11, 12], // Indices of Type 1 defects in the khmer array
+  chinese: [10, 11, 12], // Indices of Type 1 defects in the chinese array
+  all: [10, 11, 12], // Indices of Type 1 defects in the all array
+};
+
 export const factories = [
   "CJ2",
   "Combo H/Some",
