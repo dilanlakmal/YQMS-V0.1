@@ -3,6 +3,7 @@ import {
   defectsList,
   commonDefects,
   TypeOneDefects,
+  defectIcons,
 } from "../../constants/defects";
 import { ArrowDownAZ, ArrowDownZA, ArrowDownWideNarrow } from "lucide-react";
 

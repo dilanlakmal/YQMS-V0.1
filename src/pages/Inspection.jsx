@@ -38,6 +38,11 @@ function Inspection({
   const [defectPieces, setDefectPieces] = useState(
     savedState?.defectPieces || 0
   );
+
+  const [returnDefectQty, setReturnDefectQty] = useState(
+    savedState?.returnDefectQty || 0
+  );
+
   const [hasDefectSelected, setHasDefectSelected] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -55,6 +60,7 @@ function Inspection({
       checkedQuantity,
       goodOutput,
       defectPieces,
+      returnDefectQty,
       language,
       view,
       hasDefectSelected,
@@ -65,6 +71,7 @@ function Inspection({
     checkedQuantity,
     goodOutput,
     defectPieces,
+    returnDefectQty,
     language,
     view,
     hasDefectSelected,
@@ -411,6 +418,7 @@ function Inspection({
               checkedQuantity={checkedQuantity}
               goodOutput={goodOutput}
               defectPieces={defectPieces}
+              returnDefectQty={returnDefectQty}
             />
           </div>
         </div>
@@ -424,6 +432,7 @@ function Inspection({
         checkedQuantity={checkedQuantity}
         goodOutput={goodOutput}
         defectPieces={defectPieces}
+        returnDefectQty={returnDefectQty}
         language={language}
       />
     </div>
