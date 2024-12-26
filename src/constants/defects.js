@@ -204,6 +204,8 @@ export const styleCodes = [
 ];
 */
 
+/*
+
 import {
   Shirt,
   Scissors,
@@ -280,6 +282,7 @@ export const defectIcons = [
   AlignHorizontalSpaceAround, // Workmanship-Slanted
   ZipperIcon, // Zipper Defects
 ];
+*/
 
 export const defectsList = {
   english: [
