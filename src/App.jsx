@@ -5,7 +5,9 @@ import {
   Navigate,
 } from "react-router-dom";
 import { useState, useEffect } from "react";
-import Login from "./pages/Login";
+import Login from "./pages/auth/Login";
+import ForgotPassword from "./pages/auth/ForgotPassword"; // Import ForgotPassword component
+import Register from "./pages/auth/Register"; // Import Register component
 import Home from "./pages/Home";
 import Details from "./pages/Details";
 import Inspection from "./pages/Inspection";
@@ -215,6 +217,14 @@ function App() {
                 )
               }
             />
+            <Route
+              path="/register"
+              element={<Register />} // Add Register route
+            />
+            <Route
+              path="/forgot-password"
+              element={<ForgotPassword />} // Add ForgotPassword route
+            />
             {isAuthenticated ? (
               <>
                 <Route path="/home" element={<Home />} />
@@ -288,6 +298,9 @@ function App() {
           </Routes>
         </div>
       </div>
+      
+        
+        
     </Router>
   );
 }

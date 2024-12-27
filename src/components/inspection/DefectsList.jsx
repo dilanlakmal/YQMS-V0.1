@@ -165,7 +165,7 @@ function DefectsList({ view, language, defects, onDefectUpdate, onLogEntry, isPl
   if (view === "grid") {
     return (
       <div className="space-y-4">
-          {renderControls()}
+         {renderControls()}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1">
         {processedIndices.map((index) => {
           const defect = defectItems[index];

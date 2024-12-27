@@ -72,7 +72,7 @@ function Login({ onLogin }) {
           />
         </div>
         <div className="text-right">
-          <a href="#" className="text-s text-gray-600 hover:text-blue-600">
+          <a href="/ForgotPassword" className="text-s text-gray-600 hover:text-blue-600">
             Forgot password?
           </a>
         </div>
@@ -105,7 +105,7 @@ function Login({ onLogin }) {
         </button>
         <p className="text-center text-sm text-gray-600">
           Don't have an account?{" "}
-          <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
+          <a href="/pages/auth/Register" className="font-medium text-blue-600 hover:text-blue-500">
             Register
           </a>
         </p>
