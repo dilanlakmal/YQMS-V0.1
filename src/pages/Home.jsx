@@ -5,7 +5,7 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-50 to-gray-100 py-20 px-6">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-8xl mx-auto">
         <h3 className="text-3xl font-extrabold text-blue-900 mb-12 text-left drop-shadow-md">
           Welcome to Quality Data Managment System
         </h3>

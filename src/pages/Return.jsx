@@ -152,13 +152,13 @@ function Return({
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
       <div className="fixed top-16 left-0 right-0 bg-white z-40">
-        <div className="max-w-7xl mx-auto px-4 pt-2 pb-0">
+        <div className="max-w-8xl mx-auto px-4 pt-2 pb-0">
           <Header inspectionData={savedState?.inspectionData} />
         </div>
       </div>
 
       <div className="fixed top-28 left-0 right-0 bg-white shadow-md z-30">
-        <div className="max-w-7xl mx-auto px-4 pt-2 pb-1 flex items-center justify-between">
+        <div className="max-w-8xl mx-auto px-4 pt-2 pb-1 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <ViewToggle
               view={view}
@@ -170,7 +170,7 @@ function Return({
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 pt-14 pb-52">
+      <div className="max-w-8xl mx-auto px-4 pt-14 pb-52">
         <div className="grid grid-cols-12 gap-4">
           <div className="col-span-2 flex items-center justify-center">
             <button
@@ -226,7 +226,7 @@ function Return({
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white shadow-md z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="max-w-8xl mx-auto px-4 py-4">
           <Summary
             defects={inspectionState?.defects || {}}
             checkedQuantity={checkedQuantity}
