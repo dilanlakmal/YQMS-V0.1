@@ -1,14 +1,19 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import Login from './pages/Login';
-import Home from './pages/Home';
-import Details from './pages/Details';
-import Inspection from './pages/Inspection';
-import Return from './pages/Return';
-import Profile from './pages/Profile';
-import Logs from './pages/Logs';
-import Navbar from './components/layout/Navbar';
-import './App.css';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { useState, useEffect } from "react";
+import Login from "./pages/Login";
+import Home from "./pages/Home";
+import Details from "./pages/Details";
+import Inspection from "./pages/Inspection";
+import Return from "./pages/Return";
+import Profile from "./pages/Profile";
+import Logs from "./pages/Logs";
+import Navbar from "./components/layout/Navbar";
+import "./App.css";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -19,7 +24,7 @@ function App() {
     details: null,
     logs: [],
     startTime: null,
-    lastActionTime: null
+    lastActionTime: null,
   });
   const [timer, setTimer] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -29,7 +34,7 @@ function App() {
     let interval;
     if (isPlaying) {
       interval = setInterval(() => {
-        setTimer(prev => prev + 1);
+        setTimer((prev) => prev + 1);
       }, 1000);
     }
     return () => clearInterval(interval);
@@ -38,24 +43,48 @@ function App() {
   // Update return state when inspection state changes
   useEffect(() => {
     if (inspectionState) {
-      setReturnState(prev => ({
+      setReturnState((prev) => ({
         ...prev,
         checkedQuantity: inspectionState.checkedQuantity,
         goodOutput: inspectionState.goodOutput,
-        defectPieces: inspectionState.defectPieces
+        defectPieces: inspectionState.defectPieces,
+        returnDefectQty: prev.returnDefectQty ?? 0, // Preserve returnDefectQty if not explicitly updated
       }));
     }
   }, [inspectionState]);
 
   // Update inspection state when return state changes goodOutput
+  /*
   useEffect(() => {
     if (returnState && returnState.goodOutput !== inspectionState?.goodOutput) {
-      setInspectionState(prev => ({
+      setInspectionState((prev) => ({
         ...prev,
-        goodOutput: returnState.goodOutput
+        goodOutput: returnState.goodOutput,
       }));
     }
   }, [returnState?.goodOutput]);
+  */
+
+  // Update inspection state when return state changes goodOutput or returnDefectQty
+  useEffect(() => {
+    if (returnState) {
+      // Check if goodOutput has changed and update inspectionState
+      if (returnState.goodOutput !== inspectionState?.goodOutput) {
+        setInspectionState((prev) => ({
+          ...prev,
+          goodOutput: returnState.goodOutput,
+        }));
+      }
+
+      // Check if returnDefectQty has changed and update inspectionState
+      if (returnState.returnDefectQty !== inspectionState?.returnDefectQty) {
+        setInspectionState((prev) => ({
+          ...prev,
+          returnDefectQty: returnState.returnDefectQty,
+        }));
+      }
+    }
+  }, [returnState?.goodOutput, returnState?.returnDefectQty]);
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -73,7 +102,7 @@ function App() {
       details: null,
       logs: [],
       startTime: null,
-      lastActionTime: null
+      lastActionTime: null,
     });
     setDetailsSubmitted(false);
     setTimer(0);
@@ -89,20 +118,20 @@ function App() {
       checkedQuantity: 0,
       goodOutput: 0,
       defectPieces: 0,
-      language: 'english',
-      view: 'list',
-      hasDefectSelected: false
+      language: "english",
+      view: "list",
+      hasDefectSelected: false,
     };
 
     setInspectionState(initialState);
     setReturnState({
       ...initialState,
       returnDefects: {},
-      returnDefectQty: 0
+      returnDefectQty: 0,
     });
-    setLogsState(prev => ({
+    setLogsState((prev) => ({
       ...prev,
-      details
+      details,
     }));
     setDetailsSubmitted(true);
   };
@@ -121,25 +150,25 @@ function App() {
 
     const newEntry = {
       ...entry,
-      inspectionTime: inspectionTime.toFixed(2)
+      inspectionTime: inspectionTime.toFixed(2),
     };
 
-    setLogsState(prev => ({
+    setLogsState((prev) => ({
       ...prev,
       logs: [...prev.logs, newEntry],
-      lastActionTime: currentTime
+      lastActionTime: currentTime,
     }));
   };
 
   const handlePlayPause = () => {
     const currentTime = new Date();
     setIsPlaying(!isPlaying);
-    
+
     if (!inspectionStartTime) {
       setInspectionStartTime(currentTime);
-      setLogsState(prev => ({
+      setLogsState((prev) => ({
         ...prev,
-        startTime: currentTime.getTime()
+        startTime: currentTime.getTime(),
       }));
     }
   };
@@ -149,23 +178,23 @@ function App() {
   };
 
   const handleInspectionStateChange = (newState) => {
-    setInspectionState(prev => ({
+    setInspectionState((prev) => ({
       ...prev,
-      ...newState
+      ...newState,
     }));
   };
 
   const handleReturnStateChange = (newState) => {
-    setReturnState(prev => ({
+    setReturnState((prev) => ({
       ...prev,
-      ...newState
+      ...newState,
     }));
-    
+
     // Update goodOutput in inspection state if it changed in return state
     if (newState.goodOutput !== inspectionState?.goodOutput) {
-      setInspectionState(prev => ({
+      setInspectionState((prev) => ({
         ...prev,
-        goodOutput: newState.goodOutput
+        goodOutput: newState.goodOutput,
       }));
     }
   };
@@ -174,44 +203,46 @@ function App() {
     <Router>
       <div className="min-h-screen bg-gray-50">
         {isAuthenticated && <Navbar onLogout={handleLogout} />}
-        <div className={isAuthenticated ? 'pt-16' : ''}>
+        <div className={isAuthenticated ? "pt-16" : ""}>
           <Routes>
-            <Route 
-              path="/" 
+            <Route
+              path="/"
               element={
                 isAuthenticated ? (
                   <Navigate to="/home" replace />
                 ) : (
                   <Login onLogin={handleLogin} />
                 )
-              } 
+              }
             />
             {isAuthenticated ? (
               <>
                 <Route path="/home" element={<Home />} />
-                <Route 
-                  path="/details" 
+                <Route
+                  path="/details"
                   element={
-                    <Details 
+                    <Details
                       onDetailsSubmit={handleDetailsSubmit}
                       isSubmitted={detailsSubmitted}
                       savedDetails={logsState.details}
                     />
-                  } 
+                  }
                 />
-                <Route 
-                  path="/inspection" 
+                <Route
+                  path="/inspection"
                   element={
                     detailsSubmitted ? (
-                      <Inspection 
+                      <Inspection
                         savedState={inspectionState}
                         onStateChange={handleInspectionStateChange}
                         onLogEntry={handleLogEntry}
-                        onStartTime={(time) => setLogsState(prev => ({
-                          ...prev,
-                          startTime: time,
-                          lastActionTime: time
-                        }))}
+                        onStartTime={(time) =>
+                          setLogsState((prev) => ({
+                            ...prev,
+                            startTime: time,
+                            lastActionTime: time,
+                          }))
+                        }
                         onSubmit={handleSubmit}
                         timer={timer}
                         isPlaying={isPlaying}
@@ -222,11 +253,11 @@ function App() {
                     )
                   }
                 />
-                <Route 
-                  path="/return" 
+                <Route
+                  path="/return"
                   element={
                     detailsSubmitted ? (
-                      <Return 
+                      <Return
                         savedState={returnState}
                         onStateChange={handleReturnStateChange}
                         onLogEntry={handleLogEntry}
@@ -239,15 +270,15 @@ function App() {
                     )
                   }
                 />
-                <Route 
-                  path="/logs" 
+                <Route
+                  path="/logs"
                   element={
                     detailsSubmitted ? (
                       <Logs logsState={logsState} />
                     ) : (
                       <Navigate to="/details" replace />
                     )
-                  } 
+                  }
                 />
                 <Route path="/profile" element={<Profile />} />
               </>
