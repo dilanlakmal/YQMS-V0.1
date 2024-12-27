@@ -112,7 +112,6 @@ function DefectsList({ view, language, defects, onDefectUpdate, onLogEntry, isPl
       timestamp: new Date().getTime(),
     });
   };
-
   const renderSortDropdown = () => (
     <div className="relative">
       <button onClick={() => setShowSortDropdown(!showSortDropdown)} className="px-4 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-600 flex items-center space-x-2">
@@ -135,6 +134,7 @@ function DefectsList({ view, language, defects, onDefectUpdate, onLogEntry, isPl
       )}
     </div>
   );
+  
 
   const renderControls = () => (
     <div className="flex gap-4 mb-4">
@@ -165,8 +165,8 @@ function DefectsList({ view, language, defects, onDefectUpdate, onLogEntry, isPl
   if (view === "grid") {
     return (
       <div className="space-y-4">
-        {renderControls()}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-0.5">
+          {renderControls()}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1">
         {processedIndices.map((index) => {
           const defect = defectItems[index];
           return (

@@ -1,19 +1,23 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import DatePicker from 'react-datepicker';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { FACTORIES, STYLE_CODES, getCustomerByStyleCode } from '../constants/data';
+import {
+  FACTORIES,
+  STYLE_CODES,
+  getCustomerByStyleCode,
+} from "../constants/data";
 
 function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     date: new Date(),
-    factory: '',
-    lineNo: '',
-    styleCode: '',
-    styleDigit: '',
-    customer: '',
-    moNo: ''
+    factory: "",
+    lineNo: "",
+    styleCode: "",
+    styleDigit: "",
+    customer: "",
+    moNo: "",
   });
 
   useEffect(() => {
@@ -23,69 +27,74 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
   }, [savedDetails]);
 
   const validateStyleDigit = (value) => {
-    const cleanValue = value.replace(/[^0-9a-zA-Z-]/g, '');
+    const cleanValue = value.replace(/[^0-9a-zA-Z-]/g, "");
     const isOnlyNumbers = /^\d+$/.test(cleanValue);
-    
+
     if (isOnlyNumbers) {
       if (cleanValue.length > 5) return cleanValue.slice(0, 5);
       if (cleanValue.length < 3) return cleanValue;
       return cleanValue;
     }
-    
+
     return cleanValue;
   };
 
   const handleStyleCodeChange = (code) => {
     if (isSubmitted) return;
     const customer = getCustomerByStyleCode(code);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       styleCode: code,
       customer,
-      moNo: `${code}${prev.styleDigit}`
+      moNo: `${code}${prev.styleDigit}`,
     }));
   };
 
   const handleStyleDigitChange = (value) => {
     if (isSubmitted) return;
     const validatedValue = validateStyleDigit(value);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       styleDigit: validatedValue,
-      moNo: `${prev.styleCode}${validatedValue}`
+      moNo: `${prev.styleCode}${validatedValue}`,
     }));
   };
 
   const handleLineNoChange = (value) => {
     if (isSubmitted) return;
-    const cleanValue = value.toUpperCase().replace(/\s+/g, '');
-    setFormData(prev => ({
+    const cleanValue = value.toUpperCase().replace(/\s+/g, "");
+    setFormData((prev) => ({
       ...prev,
-      lineNo: cleanValue
+      lineNo: cleanValue,
     }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     if (isSubmitted) {
-      navigate('/inspection');
+      navigate("/inspection");
       return;
     }
 
     const isOnlyNumbers = /^\d+$/.test(formData.styleDigit);
     if (isOnlyNumbers && formData.styleDigit.length < 3) {
-      alert('Style digit must be at least 3 digits when using numbers only');
+      alert("Style digit must be at least 3 digits when using numbers only");
       return;
     }
 
-    if (!formData.factory || !formData.lineNo || !formData.styleCode || !formData.styleDigit) {
-      alert('Please fill in all required fields');
+    if (
+      !formData.factory ||
+      !formData.lineNo ||
+      !formData.styleCode ||
+      !formData.styleDigit
+    ) {
+      alert("Please fill in all required fields");
       return;
     }
 
     onDetailsSubmit(formData);
-    navigate('/inspection');
+    navigate("/inspection");
   };
 
   return (
@@ -98,8 +107,12 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
             <label className="block text-m font-medium text-gray-700 mb-1">Date</label>
             <DatePicker
               selected={formData.date}
-              onChange={(date) => !isSubmitted && setFormData(prev => ({ ...prev, date }))}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-md ${isSubmitted ? 'bg-gray-100' : ''}`}
+              onChange={(date) =>
+                !isSubmitted && setFormData((prev) => ({ ...prev, date }))
+              }
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md ${
+                isSubmitted ? "bg-gray-100" : ""
+              }`}
               dateFormat="yyyy-MM-dd"
               disabled={isSubmitted}
             />
@@ -109,14 +122,21 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
             <label className="block text-m font-medium text-gray-700 mb-1">Factory</label>
             <select
               value={formData.factory}
-              onChange={(e) => !isSubmitted && setFormData(prev => ({ ...prev, factory: e.target.value }))}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-md ${isSubmitted ? 'bg-gray-100' : ''}`}
+              onChange={(e) =>
+                !isSubmitted &&
+                setFormData((prev) => ({ ...prev, factory: e.target.value }))
+              }
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md ${
+                isSubmitted ? "bg-gray-100" : ""
+              }`}
               disabled={isSubmitted}
               required
             >
               <option value="">Select Factory</option>
-              {FACTORIES.map(factory => (
-                <option key={factory} value={factory}>{factory}</option>
+              {FACTORIES.map((factory) => (
+                <option key={factory} value={factory}>
+                  {factory}
+                </option>
               ))}
             </select>
           </div>
@@ -127,7 +147,9 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
               type="text"
               value={formData.lineNo}
               onChange={(e) => handleLineNoChange(e.target.value)}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-md ${isSubmitted ? 'bg-gray-100' : ''}`}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md ${
+                isSubmitted ? "bg-gray-100" : ""
+              }`}
               disabled={isSubmitted}
               required
             />
@@ -138,13 +160,17 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
             <select
               value={formData.styleCode}
               onChange={(e) => handleStyleCodeChange(e.target.value)}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-md ${isSubmitted ? 'bg-gray-100' : ''}`}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md ${
+                isSubmitted ? "bg-gray-100" : ""
+              }`}
               disabled={isSubmitted}
               required
             >
               <option value="">Select Style Code</option>
               {STYLE_CODES.map(({ code }) => (
-                <option key={code} value={code}>{code}</option>
+                <option key={code} value={code}>
+                  {code}
+                </option>
               ))}
             </select>
           </div>
@@ -155,7 +181,9 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
               type="text"
               value={formData.styleDigit}
               onChange={(e) => handleStyleDigitChange(e.target.value)}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-md ${isSubmitted ? 'bg-gray-100' : ''}`}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md ${
+                isSubmitted ? "bg-gray-100" : ""
+              }`}
               disabled={isSubmitted}
               required
             />
@@ -185,7 +213,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
             type="submit"
             className="w-half  bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
           >
-            {isSubmitted ? 'Continue to Inspection' : 'Submit Details'}
+            {isSubmitted ? "Continue to Inspection" : "Submit Details"}
           </button>
           </center>
         </form>

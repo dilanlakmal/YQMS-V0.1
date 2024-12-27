@@ -30,9 +30,18 @@ function Return({
   const [defectPieces, setDefectPieces] = useState(
     inspectionState?.defectPieces || 0
   );
+
+  /*
   const [returnDefectQty, setReturnDefectQty] = useState(
     savedState?.returnDefectQty || 0
   );
+
+  */
+
+  const [returnDefectQty, setReturnDefectQty] = useState(
+    savedState?.returnDefectQty || inspectionState?.returnDefectQty || 0
+  );
+
   const [hasDefectSelected, setHasDefectSelected] = useState(false);
 
   const isReturnComplete = goodOutput >= checkedQuantity;
@@ -217,7 +226,7 @@ function Return({
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white shadow-md z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="max-w-8xl mx-auto px-4 py-4">
           <Summary
             defects={inspectionState?.defects || {}}
             checkedQuantity={checkedQuantity}

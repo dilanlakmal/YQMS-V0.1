@@ -40,6 +40,11 @@ function Inspection({
   const [defectPieces, setDefectPieces] = useState(
     savedState?.defectPieces || 0
   );
+
+  const [returnDefectQty, setReturnDefectQty] = useState(
+    savedState?.returnDefectQty || 0
+  );
+
   const [hasDefectSelected, setHasDefectSelected] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -57,6 +62,7 @@ function Inspection({
       checkedQuantity,
       goodOutput,
       defectPieces,
+      returnDefectQty,
       language,
       view,
       hasDefectSelected,
@@ -67,6 +73,7 @@ function Inspection({
     checkedQuantity,
     goodOutput,
     defectPieces,
+    returnDefectQty,
     language,
     view,
     hasDefectSelected,
@@ -351,13 +358,13 @@ function Inspection({
           </div>
         </div>
 
-        <div className="max-w-auto mx-auto px-4 pt-14 pb-52">
+        <div className="max-w-7xl mx-auto px-4 pt-14 pb-52">
           <div className="grid grid-cols-12 gap-4">
-            <div className="col-span-2 flex items-top justify-center pt-20">
+            <div className="col-span-2 flex items-top justify-center pt-1">
               <button
                 onClick={handlePass}
                 disabled={!isPlaying || hasDefectSelected}
-                className={`fixed w-40 h-96 py-0 rounded font-medium ${
+                className={`fixed w-40 h-208 py-0 rounded font-medium ${
                   isPlaying && !hasDefectSelected
                     ? "bg-green-500 text-white"
                     : "bg-gray-300 text-gray-600"
@@ -386,14 +393,14 @@ function Inspection({
                 onDefectSelect={setHasDefectSelected}
               />
             </div>
-            <div className="col-span-2 flex items-center justify-center">
+            <div className="col-span-2 flex items-top justify-center pt-1">
               <button
                 onClick={handleReject}
                 disabled={
                   !isPlaying ||
                   !Object.values(currentDefectCount).some((count) => count > 0)
                 }
-                className={`w-full h-full py-0 rounded font-medium ${
+                className={`fixed w-40 h-208 py-0 rounded font-medium  ${
                   isPlaying &&
                   Object.values(currentDefectCount).some((count) => count > 0)
                     ? "bg-red-500 text-white"
@@ -415,6 +422,7 @@ function Inspection({
               checkedQuantity={checkedQuantity}
               goodOutput={goodOutput}
               defectPieces={defectPieces}
+              returnDefectQty={returnDefectQty}
             />
           </div>
         </div>
@@ -428,6 +436,7 @@ function Inspection({
         checkedQuantity={checkedQuantity}
         goodOutput={goodOutput}
         defectPieces={defectPieces}
+        returnDefectQty={returnDefectQty}
         language={language}
       />
     </div>

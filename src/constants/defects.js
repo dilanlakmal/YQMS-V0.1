@@ -188,19 +188,23 @@ export const defectsList = {
   ],
 };
 
-// Common defects indices (based on the most frequently occurring defects)
+// Common indices for all languages
+export const commonDefectIndices = [0, 1, 2, 5];
+export const typeOneDefectIndices = [10, 11, 12];
+
+// Simplified common defects object
 export const commonDefects = {
-  english: [0, 1, 2, 5], // Indices of common defects in the english array
-  khmer: [0, 1, 2, 5], // Indices of common defects in the khmer array
-  chinese: [0, 1, 2, 5], // Indices of common defects in the chinese array
-  all: [0, 1, 2, 5], // Indices of common defects in the all array
+  english: commonDefectIndices,
+  khmer: commonDefectIndices,
+  chinese: commonDefectIndices,
+  all: commonDefectIndices,
 };
 
-// Type1 defects indices (based on the most frequently occurring defects)
+// Simplified type one defects object
 export const TypeOneDefects = {
-  english: [10, 11, 12], // Indices of Type 1 defects in the english array
-  khmer: [10, 11, 12], // Indices of Type 1 defects in the khmer array
-  chinese: [10, 11, 12], // Indices of Type 1 defects in the chinese array
-  all: [10, 11, 12], // Indices of Type 1 defects in the all array
+  english: typeOneDefectIndices,
+  khmer: typeOneDefectIndices,
+  chinese: typeOneDefectIndices,
+  all: typeOneDefectIndices,
 };
 

@@ -15,6 +15,7 @@ function Home() {
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* QC Inspection Card */}
           <div
             onClick={() => navigate("/details")}
             className="group bg-white p-8 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
@@ -30,8 +31,9 @@ function Home() {
             </p>
           </div>
 
+          {/* QA Audit Card */}
           <div
-            // onClick={() => navigate("/details")}
+            onClick={() => navigate("/details-audit")}
             className="group bg-white p-8 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
           >
              <div className="flex flex-col items-center justify-center mb-6  w-20 h-20  bg-[url('/qaa.png')] bg-cover bg-center">
