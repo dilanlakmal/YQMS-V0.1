@@ -31,7 +31,7 @@ function Header({ inspectionData, editable = false }) {
 
   
   return (
-    <div className="overflow-x-auto bg-white pt-2 pb-1 rounded-lg mb-2git ">
+    <div className="overflow-x-auto bg-white pt-2 pb-1 rounded-lg ">
       <div className="flex space-x-4 text-xs items-center">
         {Object.entries(data).map(([key, value]) => (
           <div  key={key} className='text-center border-r border-b border-gray-300 pr-4 pt-2 pb-2'>

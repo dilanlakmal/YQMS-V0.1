@@ -7,7 +7,7 @@ export const defectImages = {
   "Cut damage": "/IMG/cut.png",
   "Defective Stitching": "/IMG/stitches.png",
   "Dirty Mark - Others": "/IMG/qcc.png",
-  "Drop Stitch": "/qcc.png",
+  "Drop Stitch": "/IMG/qcc.png",
   "Embroidery/Applique-Others (Heat transfer / printing defects)": "/IMG/qcc.png",
   "Fullness": "/IMG/qcc.png",
   "Insecure backstitch": "/IMG/qcc.png",

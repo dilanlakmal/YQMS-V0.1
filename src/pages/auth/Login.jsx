@@ -24,7 +24,7 @@ function Login({ onLogin }) {
       </div>
       <div className="flex justify-center items-center mb-8">
       <img
-        src={`/logo.jpg`}
+        src={`/IMG/logo.jpg`}
         alt="Loading"
         className="h-32 w-32 rounded-full"
       />
@@ -85,26 +85,26 @@ function Login({ onLogin }) {
           Log in
         </button>
         </center>
-        <div className="relative">
+        {/* <div className="relative">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-300"></div>
           </div>
           <div className="relative flex justify-center text-sm">
             <span className="px-2 bg-gray-50 text-gray-500">Or continue</span>
           </div>
-        </div>
-        <button
+        </div> */}
+        {/* <button
           type="button"
           className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
           <img
-            src="/logo.jpg"
+            src="/IMG/logo.jpg"
             alt="Yai"
             className="h-5 w-5 mr-2"
           />
           Log in with YAi Credentials
-        </button>
-        <p className="text-center text-sm text-gray-600">
+        </button> */}
+        <p className="text-center text-s text-gray-600">
           Don't have an account?{" "}
           <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500">
             Register
@@ -119,7 +119,7 @@ function Login({ onLogin }) {
     <div className="max-w-2xl text-center">
       <img
         // src="https://cdn.sanity.io/images/ztw74qc4/production/91213435f1cf5293b2105aea50d48c3df854ce68-1200x664.jpg?w=1536&fit=max&auto=format"
-        src= "/Quality.webp"
+        src= "/IMG/Quality.webp"
         alt="Quality Management"
         className="w-full rounded-lg shadow-lg mb-8"
       />

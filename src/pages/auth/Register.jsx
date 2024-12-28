@@ -7,25 +7,43 @@ import Button from "../../components/layout/Button";
 
 const Register = () => {
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
+    emp_id: "",
+    eng_name: "",
+    kh_name: "",
     password: "",
     confirmPassword: "",
   });
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
+    let transformedValue = value;
+  
+    if (name === 'emp_id') {
+      transformedValue = value.toUpperCase().replace(/\s/g, '');
+    }
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
   };
+  const validateForm = () => {
+    if (!formData.eng_name && !formData.kh_name) {
+      setError('Please fill at least one of the name fields.');
+      return false;
+    }
+    setError('');
+    return true;
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Handle registration logic here
+    if (validateForm()) {
+      // Proceed with form submission
+      console.log('Form submitted:', formData);
+    }
   };
-
+  
   return (
     <AuthLayout
       title="Create Account"
@@ -37,40 +55,39 @@ const Register = () => {
       </Link>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-2 gap-4">
-          <FormInput
-            label="First Name"
-            id="firstName"
-            name="firstName"
+      {error && <div className="text-red-500 mb-4">{error}</div>}
+      <FormInput
+            label="Employee ID"
+            id="emp_id"
+            name="emp_id"
             type="text"
             required
-            placeholder="First Name"
-            value={formData.firstName}
+            placeholder="Employee ID"
+            value={formData.emp_id}
             onChange={handleChange}
           />
+
           <FormInput
-            label="Last Name"
-            id="lastName"
-            name="lastName"
+            label="Name (English)"
+            id="eng_name"
+            name="eng_name"
             type="text"
-            required
-            placeholder="Last Name"
-            value={formData.lastName}
+         
+            placeholder="English Name"
+            value={formData.eng_name}
             onChange={handleChange}
           />
-        </div>
-
-        <FormInput
-          label="Email Address"
-          id="email"
-          name="email"
-          type="email"
-          required
-          placeholder="Enter your email"
-          value={formData.email}
-          onChange={handleChange}
-        />
-
+           <FormInput
+            label="Name (Khmer)"
+            id="kh_name"
+            name="kh_name"
+            type="text"
+           
+            placeholder="Khmer Name"
+            value={formData.kh_name}
+            onChange={handleChange}
+          />
+          
         <FormInput
           label="Password"
           id="password"
@@ -93,7 +110,7 @@ const Register = () => {
           onChange={handleChange}
         />
 
-        <Button type="submit">Create Account</Button>
+        <Button type="submit">Register</Button>
 
         <p className="text-center text-sm text-gray-600">
           Already have an account?{" "}

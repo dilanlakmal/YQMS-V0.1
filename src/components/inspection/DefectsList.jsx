@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { defectsList, commonDefects, TypeOneDefects } from "../../constants/QC Inspection/defects";
 import { getDefectImage } from "../../constants/QC Inspection/defectUtils";
 import { ArrowDownAZ, ArrowDownZA, ArrowDownWideNarrow } from "lucide-react";
+import { faFilter } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+
 
 function DefectsList({ view, language, defects, onDefectUpdate, onLogEntry, isPlaying, onDefectSelect, currentDefectCount, onCurrentDefectUpdate, isReturnView = false }) {
   const defectItems = defectsList[language] || [];
@@ -10,6 +13,7 @@ function DefectsList({ view, language, defects, onDefectUpdate, onLogEntry, isPl
   const [sortType, setSortType] = useState("none");
   const [selectedLetters, setSelectedLetters] = useState(new Set());
   const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [isCommonSelected, setIsCommonSelected] = useState(false);
   const [isTypeOneSelected, setIsTypeOneSelected] = useState(false);
 
@@ -114,7 +118,7 @@ function DefectsList({ view, language, defects, onDefectUpdate, onLogEntry, isPl
   };
   const renderSortDropdown = () => (
     <div className="relative">
-      <button onClick={() => setShowSortDropdown(!showSortDropdown)} className="px-4 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-600 flex items-center space-x-2">
+      <button onClick={() => setShowSortDropdown(!showSortDropdown)} className="px-3 py-2 rounded text-sm bg-indigo-700 text-white rounded hover:bg-indigo-600 flex items-center space-x-2">
         {sortType === "count-desc" ? <ArrowDownWideNarrow size={20} /> : sortType === "alpha-desc" ? <ArrowDownZA size={20} /> : <ArrowDownAZ size={20} />}
       </button>
       {showSortDropdown && (
@@ -134,21 +138,55 @@ function DefectsList({ view, language, defects, onDefectUpdate, onLogEntry, isPl
       )}
     </div>
   );
-  
+  const renderFilterLetter = () => (
+    <div className="relative">
+      {showFilterDropdown && (
+        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50">
+          <div className="py-1">
+            {uniqueLetters.map((letter) => (
+              <button key={letter} onClick={() => handleLetterFilter(letter)} className={`px-2 mr-1 ml-1 mb-1 py-1 rounded text-xs ${selectedLetters.has(letter) ? "bg-indigo-600 text-white" : "bg-gray-200 hover:bg-gray-300"}`}>
+                {letter}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+  const renderFilterDropdown = () => (
+    <div className="relative inline-block text-left">
+      <button
+        onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+        className="px-3 py-2 rounded text-sm bg-gray-200 hover:bg-gray-300 flex items-center"
+      >
+        <FontAwesomeIcon icon={faFilter} className="mr-2" />
+      </button>
+      {renderFilterLetter()}
+    </div>
+  );
 
   const renderControls = () => (
     <div className="flex gap-4 mb-4">
       <div className="flex-none">{renderSortDropdown()}</div>
       <div className="flex-1">
         <div className="flex flex-wrap gap-2">
+        
           <button onClick={clearFilters} className={`px-3 py-1 rounded text-sm ${selectedLetters.size === 0 && !isCommonSelected && !isTypeOneSelected ? "bg-indigo-600 text-white" : "bg-gray-200 hover:bg-gray-300"}`}>
             All
           </button>
-          {uniqueLetters.map((letter) => (
+          {renderFilterDropdown()}
+          {/* <button key={letter}
+        onClick={() => handleLetterFilter(letter)} className={` px-2 mr-1 ml-1 mb-1 py-1 rounded text-xs ${selectedLetters.has(letter) ? "bg-indigo-600 text-white" : "bg-gray-200 hover:bg-gray-300"}`}
+       
+      >
+          <FontAwesomeIcon icon={faFilter} className="mr-2" />
+        Filter
+      </button> */}
+          {/* {uniqueLetters.map((letter) => (
             <button key={letter} onClick={() => handleLetterFilter(letter)} className={`px-3 py-1 rounded text-sm ${selectedLetters.has(letter) ? "bg-indigo-600 text-white" : "bg-gray-200 hover:bg-gray-300"}`}>
               {letter}
             </button>
-          ))}
+          ))} */}
           <button onClick={handleCommonFilter} className={`px-3 py-1 rounded text-sm ${isCommonSelected ? "bg-indigo-600 text-white" : "bg-gray-200 hover:bg-gray-300"}`}>
             Common
           </button>

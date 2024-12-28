@@ -358,13 +358,15 @@ function Inspection({
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 pt-14 pb-52">
+        <div className="max-w-8xl mx-auto px-4 pt-14 pb-52">
           <div className="grid grid-cols-12 gap-4">
-            <div className="col-span-2 flex items-top justify-center pt-1">
+            <div className="col-span-2 flex items-center justify-center pt-1">
+            {/* col-span-2 flex items-top justify-center pt-1 */}
               <button
                 onClick={handlePass}
                 disabled={!isPlaying || hasDefectSelected}
-                className={`fixed w-40 h-208 py-0 rounded font-medium ${
+                className={`w-full h-full py-0 rounded font-medium ${
+                  // w-40 h-208 py-0 rounded font-medium
                   isPlaying && !hasDefectSelected
                     ? "bg-green-500 text-white"
                     : "bg-gray-300 text-gray-600"
@@ -393,14 +395,14 @@ function Inspection({
                 onDefectSelect={setHasDefectSelected}
               />
             </div>
-            <div className="col-span-2 flex items-top justify-center pt-1">
+            <div className="col-span-2 flex items-center justify-center pt-1">
               <button
                 onClick={handleReject}
                 disabled={
                   !isPlaying ||
                   !Object.values(currentDefectCount).some((count) => count > 0)
                 }
-                className={`fixed w-40 h-208 py-0 rounded font-medium  ${
+                className={` w-full h-full py-0 rounded font-medium  ${
                   isPlaying &&
                   Object.values(currentDefectCount).some((count) => count > 0)
                     ? "bg-red-500 text-white"

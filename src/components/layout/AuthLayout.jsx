@@ -12,7 +12,7 @@ const AuthLayout = ({ children, title, subtitle }) => {
           </div>
           <div className="flex justify-center items-center mb-8">
           <img
-            src={`/logo.jpg`}
+            src={`/IMG/logo.jpg`}
             alt="Loading"
             className="h-32 w-32 rounded-full"
           />
@@ -34,7 +34,7 @@ const AuthLayout = ({ children, title, subtitle }) => {
       <div className="flex-1 hidden lg:flex items-center justify-center p-12 bg-black">
         <div className="max-w-2xl text-center">
           <img
-            src="/Quality.webp"
+            src="/IMG/Quality.webp"
             alt="Quality Management"
             className="w-full rounded-lg shadow-lg mb-8"
           />
