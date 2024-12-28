@@ -6,5 +6,5 @@ import { defectImages } from './defects';
  * @returns {string} The image URL for the defect
  */
 export const getDefectImage = (defectId) => {
-  return defectImages[defectId] || "/qcc.png";
+  return defectImages[defectId] || "/IMG/qcc.png";
 };

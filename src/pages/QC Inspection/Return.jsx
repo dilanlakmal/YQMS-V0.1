@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "../components/inspection/Header";
-import ViewToggle from "../components/inspection/ViewToggle";
-import DefectsList from "../components/inspection/DefectsList";
-import Summary from "../components/inspection/Summary";
-import { defectsList } from "../constants/defects";
+import Header from "../../components/inspection/Header";
+import ViewToggle from "../../components/inspection/ViewToggle";
+import DefectsList from "../../components/inspection/DefectsList";
+import Summary from "../../components/inspection/Summary";
+import { defectsList } from "../../constants/QC Inspection/defects";
 
 function Return({
   savedState,

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ClipboardList } from "lucide-react";
+import { Link } from "react-router-dom";
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState("");
@@ -72,9 +73,9 @@ function Login({ onLogin }) {
           />
         </div>
         <div className="text-right">
-          <a href="/ForgotPassword" className="text-s text-gray-600 hover:text-blue-600">
+          <Link to="/forgot-password" className="text-s text-blue-600 hover:text-blue-600">
             Forgot password?
-          </a>
+          </Link>
         </div>
         <center>
         <button
@@ -105,9 +106,9 @@ function Login({ onLogin }) {
         </button>
         <p className="text-center text-sm text-gray-600">
           Don't have an account?{" "}
-          <a href="/pages/auth/Register" className="font-medium text-blue-600 hover:text-blue-500">
+          <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500">
             Register
-          </a>
+          </Link>
         </p>
       </form>
     </div>

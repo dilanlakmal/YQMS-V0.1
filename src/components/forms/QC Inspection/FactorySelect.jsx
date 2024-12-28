@@ -1,4 +1,4 @@
-import { factories } from '../../constants/factories';
+import { factories } from '../../../constants/QC Inspection/factories';
 
 function FactorySelect({ value, onChange }) {
   return (

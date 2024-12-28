@@ -31,10 +31,10 @@ const Register = () => {
       title="Create Account"
       subtitle="Join YQMS to manage your quality control processes"
     >
-      <a href="/" className="flex items-center text-gray-600 mb-8">
+      <Link to="/" className="flex items-left text-gray-600 mb-8">
         <ArrowLeft className="h-5 w-5 mr-2" />
         Back to Login
-      </a>
+      </Link>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-2 gap-4">
@@ -97,9 +97,9 @@ const Register = () => {
 
         <p className="text-center text-sm text-gray-600">
           Already have an account?{" "}
-          <a href="/" className="font-medium text-blue-600 hover:text-blue-500">
+          <Link to="/" className="font-medium text-blue-600 hover:text-blue-500">
             Log in
-          </a>
+          </Link>
         </p>
       </form>
     </AuthLayout>

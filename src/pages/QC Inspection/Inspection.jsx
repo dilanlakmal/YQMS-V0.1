@@ -1,16 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import html2pdf from "html2pdf.js";
-import Header from "../components/inspection/Header";
-import ViewToggle from "../components/inspection/ViewToggle";
-import DefectsList from "../components/inspection/DefectsList";
-import Summary from "../components/inspection/Summary";
-import PlayPauseButton from "../components/inspection/PlayPauseButton";
-import PreviewModal from "../components/inspection/PreviewModal";
-import PreviewHeader from "../components/inspection/preview/PreviewHeader";
-import PreviewDefects from "../components/inspection/preview/PreviewDefects";
-import PreviewSummary from "../components/inspection/preview/PreviewSummary";
-import { defectsList } from "../constants/defects";
+import Header from "../../components/inspection/Header";
+import ViewToggle from "../../components/inspection/ViewToggle";
+import DefectsList from "../../components/inspection/DefectsList";
+import Summary from "../../components/inspection/Summary";
+import PlayPauseButton from "../../components/inspection/PlayPauseButton";
+import PreviewModal from "../../components/inspection/PreviewModal";
+import PreviewHeader from "../../components/inspection/preview/PreviewHeader";
+import PreviewDefects from "../../components/inspection/preview/PreviewDefects";
+import PreviewSummary from "../../components/inspection/preview/PreviewSummary";
+import { defectsList } from "../../constants/QC Inspection/defects";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faDownload } from "@fortawesome/free-solid-svg-icons";
 

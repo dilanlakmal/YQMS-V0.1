@@ -20,7 +20,7 @@ function Home() {
             onClick={() => navigate("/details")}
             className="group bg-white p-8 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
           >
-            <div className="flex flex-col items-center justify-center mb-6  w-20 h-20  bg-[url('/qcc.png')] bg-cover bg-center">
+            <div className="flex flex-col items-center justify-center mb-6  w-20 h-20  bg-[url('/IMG/qcc.png')] bg-cover bg-center">
               
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-4 group-hover:text-blue-600">
@@ -36,7 +36,7 @@ function Home() {
             onClick={() => navigate("/details-audit")}
             className="group bg-white p-8 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
           >
-             <div className="flex flex-col items-center justify-center mb-6  w-20 h-20  bg-[url('/qaa.png')] bg-cover bg-center">
+             <div className="flex flex-col items-center justify-center mb-6  w-20 h-20  bg-[url('/IMG/qaa.png')] bg-cover bg-center">
               
               </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-4 group-hover:text-green-600">

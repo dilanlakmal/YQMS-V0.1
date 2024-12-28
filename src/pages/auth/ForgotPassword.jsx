@@ -52,9 +52,9 @@ const ForgotPassword = () => {
           <p className="text-gray-600 mb-6">
             We've sent password reset instructions to {email}
           </p>
-          <a href="/" className="text-blue-600 hover:text-blue-500 font-medium">
+          <Link to="/" className="text-blue-600 hover:text-blue-500 font-medium">
             Back to Login
-          </a>
+          </Link>
         </div>
       )}
     </AuthLayout>

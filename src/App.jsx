@@ -6,14 +6,14 @@ import {
 } from "react-router-dom";
 import { useState, useEffect } from "react";
 import Login from "./pages/auth/Login";
-import ForgotPassword from "./pages/auth/ForgotPassword"; // Import ForgotPassword component
-import Register from "./pages/auth/Register"; // Import Register component
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import Register from "./pages/auth/Register"; 
 import Home from "./pages/Home";
-import Details from "./pages/Details";
-import Inspection from "./pages/Inspection";
-import Return from "./pages/Return";
-import Profile from "./pages/Profile";
-import Logs from "./pages/Logs";
+import Details from "./pages/QC Inspection/Details";
+import Inspection from "./pages/QC Inspection/Inspection";
+import Return from "./pages/QC Inspection/Return";
+import Profile from "./pages/auth/Profile";
+import Logs from "./pages/QC Inspection/Logs";
 import Navbar from "./components/layout/Navbar";
 import "./App.css";
 
@@ -207,6 +207,14 @@ function App() {
         {isAuthenticated && <Navbar onLogout={handleLogout} />}
         <div className={isAuthenticated ? "pt-16" : ""}>
           <Routes>
+          <Route
+              path="/register"
+              element={<Register />} // Add Register route
+            />
+            <Route
+              path="/forgot-password"
+              element={<ForgotPassword />} // Add ForgotPassword route
+            />
             <Route
               path="/"
               element={
@@ -217,14 +225,7 @@ function App() {
                 )
               }
             />
-            <Route
-              path="/register"
-              element={<Register />} // Add Register route
-            />
-            <Route
-              path="/forgot-password"
-              element={<ForgotPassword />} // Add ForgotPassword route
-            />
+           
             {isAuthenticated ? (
               <>
                 <Route path="/home" element={<Home />} />

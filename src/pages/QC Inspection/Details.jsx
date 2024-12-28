@@ -6,7 +6,7 @@ import {
   FACTORIES,
   STYLE_CODES,
   getCustomerByStyleCode,
-} from "../constants/data";
+} from "../../constants/QC Inspection/data";
 
 function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
   const navigate = useNavigate();

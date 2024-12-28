@@ -10,6 +10,14 @@ const AuthLayout = ({ children, title, subtitle }) => {
             <ClipboardList className="h-12 w-12 text-blue-600" />
             <h1 className="ml-2 text-4xl font-bold text-blue-600">YQMS</h1>
           </div>
+          <div className="flex justify-center items-center mb-8">
+          <img
+            src={`/logo.jpg`}
+            alt="Loading"
+            className="h-32 w-32 rounded-full"
+          />
+        </div>
+   
 
           {(title || subtitle) && (
             <div className="text-center mb-8">

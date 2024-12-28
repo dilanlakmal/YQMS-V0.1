@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { defectsList, commonDefects, TypeOneDefects } from "../../constants/defects";
-import { getDefectImage } from "../../constants/defectUtils";
+import { defectsList, commonDefects, TypeOneDefects } from "../../constants/QC Inspection/defects";
+import { getDefectImage } from "../../constants/QC Inspection/defectUtils";
 import { ArrowDownAZ, ArrowDownZA, ArrowDownWideNarrow } from "lucide-react";
 
 function DefectsList({ view, language, defects, onDefectUpdate, onLogEntry, isPlaying, onDefectSelect, currentDefectCount, onCurrentDefectUpdate, isReturnView = false }) {
