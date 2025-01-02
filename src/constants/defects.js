@@ -1,171 +1,256 @@
-import { defectImages } from "./defectimages";
+// Import the defect images
+import { defectImages, defaultDefectImage } from "./defectimages";
 
-// Helper function to create defect objects with images
-const createDefectObject = (name, index) => ({
-  name,
-  imageUrl: defectImages[index] || "/assets/Img/default-defect.jpg",
-});
+// Define all defects with names in all languages and corresponding images
+const allDefects = [
+  {
+    english: "Accessories defects",
+    khmer: "បញ្ហាផ្លាក",
+    chinese: "物料问题",
+    image: "assets/Img/accessories-defects.jpg",
+  },
+  {
+    english: "Broken Stitching",
+    khmer: "ដាច់អំបោះ",
+    chinese: "斷線",
+    image: "assets/Img/broken-stitching.jpg",
+  },
+  {
+    english: "Chalk marks/pencil marks",
+    khmer: "ស្នាមដីស/ខ្មៅដៃ",
+    chinese: "粉/笔印",
+    image: "assets/Img/chalk-marks-pencil-marks.jpg",
+  },
+  {
+    english: "Color-Shading / shaded parts",
+    khmer: "ខុសពណ៏រលោះ",
+    chinese: "色差",
+    image: "assets/Img/color-shading-shaded-parts.jpg",
+  },
+  {
+    english: "Cracked seam",
+    khmer: "រលោះអំបោះ",
+    chinese: "爆縫",
+    image: "assets/Img/cracked-seam.jpg",
+  },
+  {
+    english: "Cut damage",
+    khmer: "កាត់រហែក",
+    chinese: "剪烂",
+    image: "assets/Img/cut-damage.jpg",
+  },
+  {
+    english: "Defective Stitching",
+    khmer: "អត់បានដេរ",
+    chinese: "漏車縫/漏空",
+    image: "assets/Img/defective-stitching.jpg",
+  },
+  {
+    english: "Dirty Mark - Others",
+    khmer: "ប្រឡាក់",
+    chinese: "髒污",
+    image: "assets/Img/dirty-mark-others.jpg",
+  },
+  {
+    english: "Drop Stitch",
+    khmer: "ធ្លាក់ទឹក",
+    chinese: "落坑",
+    image: "assets/Img/drop-stitch.jpg",
+  },
+  {
+    english: "Embroidery/Applique-Others (Heat transfer / printing defects)",
+    khmer: "ព្រីននិងប៉ាក់",
+    chinese: "燙畫/印花/繡花",
+    image:
+      "assets/Img/embroidery-applique-others-heat-transfer-printing-defects.jpg",
+  },
+  {
+    english: "Fullness",
+    khmer: "ដកសាច់",
+    chinese: "鼓起",
+    image: "assets/Img/fullness.jpg",
+  },
+  {
+    english: "Insecure backstitch",
+    khmer: "ដេរអត់ជាប់ថ្នេរ",
+    chinese: "不牢固",
+    image: "assets/Img/insecure-backstitch.jpg",
+  },
+  {
+    english: "Join Stiching - Misalign",
+    khmer: "តូចធំ",
+    chinese: "平车压线有大小",
+    image: "assets/Img/join-stitching-misalign.jpg",
+  },
+  {
+    english: "Knitted Defects - Others",
+    khmer: "ឆ្នូតក្រណាត់",
+    chinese: "布疵",
+    image: "assets/Img/knitted-defects-others.jpg",
+  },
+  {
+    english: "Needle Holes",
+    khmer: "ធ្លុះរន្ធ",
+    chinese: "破洞 (包括針洞)",
+    image: "assets/Img/needle-holes.jpg",
+  },
+  {
+    english: "Oil Spots",
+    khmer: "ប្រឡាក់ប្រេង",
+    chinese: "油漬",
+    image: "assets/Img/oil-spots.jpg",
+  },
+  {
+    english: "Others",
+    khmer: "អាវកែផ្សេងៗ",
+    chinese: "其它返工",
+    image: "assets/Img/others.jpg",
+  },
+  {
+    english: "Pleated Seam",
+    khmer: "ដេរគៀប",
+    chinese: "打折",
+    image: "assets/Img/pleated-seam.jpg",
+  },
+  {
+    english: "Poor Neck Shape",
+    khmer: "ខូចរាងក",
+    chinese: "领型不良",
+    image: "assets/Img/poor-neck-shape.jpg",
+  },
+  {
+    english: "Poor color matching against standard",
+    khmer: "ខុសពណ៌ពីគំរូ",
+    chinese: "染色不正確 - 次品/廢品",
+    image: "assets/Img/poor-color-matching-against-standard.jpg",
+  },
+  {
+    english: "Poor pressing / Ironing",
+    khmer: "អ៊ុតអត់ស្អាត",
+    chinese: "熨燙不良",
+    image: "assets/Img/poor-pressing-ironing.jpg",
+  },
+  {
+    english: "Raw Edge",
+    khmer: "សល់ជាយ/ព្រុយ",
+    chinese: "毛边",
+    image: "assets/Img/raw-edge.jpg",
+  },
+  {
+    english: "SPI (Stitch density: Too Loose / Tight)",
+    khmer: "ថ្នេរតឹង/ធូរពេក",
+    chinese: "针距: 线紧/线松",
+    image: "assets/Img/spi-stitch-density-too-loose-tight.jpg",
+  },
+  {
+    english: "Seam Waviness",
+    khmer: "រលក",
+    chinese: "波浪",
+    image: "assets/Img/seam-waviness.jpg",
+  },
+  {
+    english: "Seam puckering",
+    khmer: "ជ្រួញ",
+    chinese: "起皺",
+    image: "assets/Img/seam-puckering.jpg",
+  },
+  {
+    english: "Skipped stitches",
+    khmer: "លោតអៅបោះ",
+    chinese: "跳线",
+    image: "assets/Img/skipped-stitches.jpg",
+  },
+  {
+    english: "Sticker/label : Damaged/Incorrect",
+    khmer: "ដេរខុសសេរីនិងដេរខុសផ្លាក",
+    chinese: "错码/车错嘜头",
+    image: "assets/Img/sticker-label-damaged-incorrect.jpg",
+  },
+  {
+    english: "Stitching- Bar tacks: missing",
+    khmer: "ភ្លេចបាតិះ",
+    chinese: "漏打枣 / 钮门",
+    image: "assets/Img/stitching-bar-tacks-missing.jpg",
+  },
+  {
+    english: "Stitching-Seam slippage",
+    khmer: "ធ្លាក់ថ្នេរ",
+    chinese: "缝合线滑移缺陷",
+    image: "assets/Img/stitching-seam-slippage.jpg",
+  },
+  {
+    english: "Stitching-Seam-Open",
+    khmer: "រហែកថ្នេរ",
+    chinese: "爆縫",
+    image: "assets/Img/stitching-seam-open.jpg",
+  },
+  {
+    english: "Trimming & Thread: Untrimmed",
+    khmer: "ព្រុយ",
+    chinese: "线头",
+    image: "assets/Img/trimming-thread-untrimmed.jpg",
+  },
+  {
+    english: "Twisted seam / Seam Rolling",
+    khmer: "ដេររមួល",
+    chinese: "扭/变形",
+    image: "assets/Img/twisted-seam-seam-rolling.jpg",
+  },
+  {
+    english: "Uneven seam",
+    khmer: "ដេរអត់ស្មើ",
+    chinese: "不对称 / 长短不齐",
+    image: "assets/Img/uneven-seam.jpg",
+  },
+  {
+    english: "Workmanship-Slanted/Uncentered",
+    khmer: "មិនចំកណ្តាល",
+    chinese: "斜/不正中",
+    image: "assets/Img/workmanship-slanted-uncentered.jpg",
+  },
+  {
+    english: "Zipper Defects",
+    khmer: "បញ្ហារូត",
+    chinese: "拉链问题",
+    image: "assets/Img/zipper-defects.jpg",
+  },
+];
 
-// Create arrays of defect objects with corresponding images
-const createDefectList = (names) =>
-  names.map((name, index) => createDefectObject(name, index));
+// Create language-specific lists
+const englishDefects = allDefects.map((defect) => defect.english);
+const khmerDefects = allDefects.map((defect) => defect.khmer);
+const chineseDefects = allDefects.map((defect) => defect.chinese);
+const allDefectsCombined = allDefects.map(
+  (defect) => `${defect.english} \\ ${defect.khmer} \\ ${defect.chinese}`
+);
 
+// Export the defects list for each language
 export const defectsList = {
-  english: [
-    "Acessories defects",
-    "Broken Stitching",
-    "Chalk marks/pencil marks",
-    "Color-Shading /  shaded parts",
-    "Cracked  seam",
-    "Cut damage",
-    "Defective Stitching",
-    "Dirty Mark - Others",
-    "Drop Stich",
-    "Embroidery/Applique-Others (Heat transfer / printing defects)",
-    "Fullness",
-    "Insecure backstitch",
-    "Join Stiching - Misalign",
-    "Knitted Defects - Others",
-    "Needle Holes",
-    "Oil Spots",
-    "Others",
-    "Pleated Seam",
-    "Poor Neck Shape",
-    "Poor color matching against standard",
-    "Poor pressing / Ironing",
-    "Raw Edge",
-    "SPI (Stitch density: Too Loose / Tight)",
-    "Seam Waviness",
-    "Seam puckering",
-    "Skipped stitches",
-    "Sticker/label : Damaged/Incorrect",
-    "Stitching- Bar tacks: missing",
-    "Stitching-Seam slippage",
-    "Stitching-Seam-Open",
-    "Trimming & Thread: Untrimmed",
-    "Twisted seam / Seam Rolling",
-    "Uneven seam",
-    "Workmanship-Slanted/Uncentered",
-    "Zipper Defects",
-  ],
-  khmer: [
-    "បញ្ហាផ្លាក",
-    "ដាច់អំបោះ",
-    "ស្នាមដីស/ខ្មៅដៃ",
-    "ខុសពណ៏រលោះ",
-    "រលោះអំបោះ",
-    "កាត់រហែក",
-    "អត់បានដេរ",
-    "ប្រឡាក់",
-    "ធ្លាក់ទឹក",
-    "ព្រីននិងប៉ាក់",
-    "ដកសាច់",
-    "ដេរអត់ជាប់ថ្នេរ",
-    "តូចធំ",
-    "ឆ្នូតក្រណាត់",
-    "ធ្លុះរន្ធ",
-    "ប្រឡាក់ប្រេង",
-    "អាវកែផ្សេងៗ",
-    "ដេរគៀប",
-    "ខូចរាងក",
-    "ខុសពណ៌ពីគំរូ",
-    "អ៊ុតអត់ស្អាត",
-    "សល់ជាយ/ព្រុយ",
-    "ថ្នេរតឹង/ធូរពេក",
-    "រលក",
-    "ជ្រួញ",
-    "លោតអៅបោះ",
-    "ដេរខុសសេរីនិងដេរខុសផ្លាក",
-    "ភ្លេចបាតិះ",
-    "ធ្លាក់ថ្នេរ",
-    "រហែកថ្នេរ",
-    "ព្រុយ",
-    "ដេររមួល",
-    "ដេរអត់ស្មើ",
-    "មិនចំកណ្តាល",
-    "បញ្ហារូត",
-  ],
-  chinese: [
-    "物料问题",
-    "斷線",
-    "粉/笔印",
-    "色差",
-    "爆縫",
-    "剪烂",
-    "漏車縫/漏空",
-    "髒污",
-    "落坑",
-    "燙畫/印花/繡花",
-    "鼓起",
-    "不牢固",
-    "平车压线有大小",
-    "布疵",
-    "破洞 (包括針洞)",
-    "油漬",
-    "其它返工",
-    "打折",
-    "领型不良",
-    "染色不正確 - 次品/廢品",
-    "熨燙不良",
-    "毛邊",
-    "針距: 線緊/線鬆",
-    "波浪",
-    "起皺",
-    "跳線",
-    "錯碼/車錯嘜頭",
-    "漏打枣 / 钮门",
-    "缝合线滑移缺陷",
-    "爆縫",
-    "線頭",
-    "扭/變形",
-    "不對稱 / 長短不齊",
-    "斜/不正中",
-    "拉链问题",
-  ],
-  all: [
-    "Acessories defects \\ បញ្ហាផ្លាក \\物料问题",
-    "Broken Stitching \\ ដាច់អំបោះ  \\斷線",
-    "Chalk marks/pencil marks \\ ស្នាមដីស/ខ្មៅដៃ \\粉/笔印",
-    "Color-Shading /  shaded parts \\ ខុសពណ៏ \\色差",
-    "Cracked  seam \\ រលោះអំបោះ \\爆縫",
-    "Cut damage \\ កាត់រហែក \\剪烂",
-    "Defective Stitching \\  អត់បានដេរ \\ 漏車縫/漏空",
-    "Dirty Mark - Others \\ ប្រឡាក់  \\ 髒污",
-    "Drop Stich \\ ធ្លាក់ទឹក \\落坑",
-    "Embroidery/Applique-Others (Heat transfer / printing defects) \\ ព្រីននិងប៉ាក់ \\燙畫/印花/繡花",
-    "Fullness \\ ដកសាច់ \\鼓起",
-    "Insecure backstitch \\  ដេរអត់ជាប់ \\不牢固",
-    "Join Stiching - Misalign \\ ថ្នេរតូចធំ \\平车压线有大小",
-    "Knitted Defects - Others \\ ឆ្នូតក្រណាត់ \\布疵",
-    "Needle Holes \\  ធ្លុះរន្ធ \\ 破洞 (包括針洞)",
-    "Oil Spots \\ ប្រឡាក់ប្រេង \\油漬",
-    "Others \\ អាវកែផ្សេងៗ \\其它返工",
-    "Pleated Seam \\ ដេរគៀប \\打折",
-    "Poor Neck Shape \\ ខូចរាងក \\领型不良",
-    "Poor color matching against standard \\ ខុសពណ៌ពីគំរូ \\ 染色不正確 - 次品/廢品",
-    "Poor pressing / Ironing \\ អ៊ុតអត់ស្អាត \\熨燙不良",
-    "Raw Edge \\  សល់ជាយ/ព្រុយ \\ 毛邊",
-    "SPI (Stitch density: Too Loose / Tight) \\ ថ្នេរតឹង/ធូរពេក \\ 針距: 線緊/線鬆",
-    "Seam Waviness \\ រលក \\波浪",
-    "Seam puckering \\  ជ្រួញ \\起皺",
-    "Skipped stitches \\ លោតអៅបោះ  \\ 跳線",
-    "Sticker/label : Damaged/Incorrect \\ ដេរខុសសេរីនិងដេរខុសផ្លាក \\ 錯碼/車錯嘜頭",
-    "Stitching- Bar tacks: missing \\ ភ្លេចបាតិះ \\漏打枣 / 钮门",
-    "Stitching-Seam slippage \\ ធ្លាក់ថ្នេរ \\缝合线滑移缺陷",
-    "Stitching-Seam-Open \\ រហែកថ្នេរ \\爆縫",
-    "Trimming & Thread: Untrimmed \\ ព្រុយ \\ 線頭",
-    "Twisted seam / Seam Rolling \\ ដេររមួល \\扭/變形",
-    "Uneven seam \\ ដេរអត់ស្មើ \\不對稱 / 長短不齊",
-    "Workmanship-Slanted/Uncentered \\ មិនចំកណ្តាល \\斜/不正中",
-    "Zipper Defects \\ បញ្ហារូត \\拉链问题",
-  ],
+  english: englishDefects.map((name, index) => ({
+    name: name,
+    imageUrl: allDefects[index].image,
+  })),
+  khmer: khmerDefects.map((name, index) => ({
+    name: name,
+    imageUrl: allDefects[index].image,
+  })),
+  chinese: chineseDefects.map((name, index) => ({
+    name: name,
+    imageUrl: allDefects[index].image,
+  })),
+  all: allDefectsCombined.map((name, index) => ({
+    name: name,
+    imageUrl: allDefects[index].image,
+  })),
 };
 
-// Common indices for all languages
-export const commonDefectIndices = [0, 1, 2, 5];
-export const typeOneDefectIndices = [10, 11, 12];
+// Common defects indices
+export const commonDefectIndices = [0, 1, 2, 5]; // Adjust indices as needed
 
-// Simplified common defects object
+// Type One defects indices
+export const typeOneDefectIndices = [10, 11, 12]; // Adjust indices as needed
+
+// Export common and type one defects lists
 export const commonDefects = {
   english: commonDefectIndices,
   khmer: commonDefectIndices,
@@ -173,7 +258,6 @@ export const commonDefects = {
   all: commonDefectIndices,
 };
 
-// Simplified type one defects object
 export const TypeOneDefects = {
   english: typeOneDefectIndices,
   khmer: typeOneDefectIndices,
@@ -181,6 +265,7 @@ export const TypeOneDefects = {
   all: typeOneDefectIndices,
 };
 
+// Export factories and style codes as before
 export const factories = [
   "CJ2",
   "Combo H/Some",

@@ -38,3 +38,6 @@ export const defectImages = {
   34: "/assets/Img/zipper-defects.jpg",
   // Add more images following the same pattern
 };
+
+// Default image to use when no specific image is available
+export const defaultDefectImage = "/assets/Img/default-defect.jpg";

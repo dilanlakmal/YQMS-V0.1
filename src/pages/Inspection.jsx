@@ -7,9 +7,6 @@ import DefectsList from "../components/inspection/DefectsList";
 import Summary from "../components/inspection/Summary";
 import PlayPauseButton from "../components/inspection/PlayPauseButton";
 import PreviewModal from "../components/inspection/PreviewModal";
-import PreviewHeader from "../components/inspection/preview/PreviewHeader";
-import PreviewDefects from "../components/inspection/preview/PreviewDefects";
-import PreviewSummary from "../components/inspection/preview/PreviewSummary";
 import { defectsList } from "../constants/defects";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faDownload } from "@fortawesome/free-solid-svg-icons";
@@ -38,11 +35,9 @@ function Inspection({
   const [defectPieces, setDefectPieces] = useState(
     savedState?.defectPieces || 0
   );
-
   const [returnDefectQty, setReturnDefectQty] = useState(
     savedState?.returnDefectQty || 0
   );
-
   const [hasDefectSelected, setHasDefectSelected] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -126,7 +121,7 @@ function Inspection({
     const currentDefects = Object.entries(currentDefectCount)
       .filter(([_, count]) => count > 0)
       .map(([index, count]) => ({
-        name: defectsList[language][index],
+        name: defectsList[language][index].name, // Access the 'name' property
         count,
         timestamp: currentTime.getTime(),
       }));
@@ -144,19 +139,19 @@ function Inspection({
 
   const handleDownloadPDF = async () => {
     try {
-      const inspectionData = savedState?.inspectionData; // Assuming you have this data
-      const defectItems = defectsList[language]; // Defect items from your constants
+      const inspectionData = savedState?.inspectionData;
+      const defectItems = defectsList[language];
       const defectEntries = Object.entries(defects)
         .filter(([_, count]) => count > 0)
         .map(([index, count]) => ({
-          name: defectItems[index],
+          name: defectItems[index].name, // Access the 'name' property
           count,
           rate:
             checkedQuantity > 0
               ? ((count / checkedQuantity) * 100).toFixed(2)
               : "0.00",
         }))
-        .sort((a, b) => b.count - a.count); // Sort defects by count
+        .sort((a, b) => b.count - a.count);
 
       const totalDefects = Object.values(defects).reduce(
         (sum, count) => sum + count,
@@ -168,7 +163,7 @@ function Inspection({
         checkedQuantity > 0 ? (defectPieces / checkedQuantity) * 100 : 0;
 
       const currentTime = new Date();
-      const timestamp = currentTime.toTimeString().split(" ")[0]; // Format: HH:MM:SS
+      const timestamp = currentTime.toTimeString().split(" ")[0];
 
       const headerContent = `
         <div style="font-size: 14px; margin-bottom: 20px;">
