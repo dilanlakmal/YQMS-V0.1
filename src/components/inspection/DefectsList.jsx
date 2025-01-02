@@ -14,6 +14,7 @@ import {
   defectsList,
   commonDefects,
   TypeOneDefects,
+  TypeTwoDefects,
 } from "../../constants/defects";
 import { defectImages, defaultDefectImage } from "../../constants/defectimages";
 
@@ -36,6 +37,7 @@ function DefectsList({
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [isCommonSelected, setIsCommonSelected] = useState(false);
   const [isTypeOneSelected, setIsTypeOneSelected] = useState(false);
+  const [isTypeTwoSelected, setIsTypeTwoSelected] = useState(false);
   const [selectedDefectIndex, setSelectedDefectIndex] = useState(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
@@ -44,13 +46,27 @@ function DefectsList({
   // let uniqueLetters = [];
   // if (language !== "all") {
   //   uniqueLetters = [
-  //     ...new Set(defectItems.map((item) => item.name.charAt(0).toUpperCase())),
+  //     ...new Set(
+  //       defectItems
+  //         .filter((item) => item.name && item.name.length > 0)
+  //         .map((item) => item.name.charAt(0).toUpperCase())
+  //     ),
   //   ].sort();
   // }
 
-  // Get unique first letters from defect names for languages other than 'all'
+  // Get unique first letters from defect names
   let uniqueLetters = [];
-  if (language !== "all") {
+  if (language === "all") {
+    // Extract the first letter of the English part (before the first backslash)
+    uniqueLetters = [
+      ...new Set(
+        defectItems
+          .filter((item) => item.name && item.name.length > 0)
+          .map((item) => item.name.split(" \\ ")[0].charAt(0).toUpperCase())
+      ),
+    ].sort();
+  } else {
+    // For other languages, use the first letter of the defect name
     uniqueLetters = [
       ...new Set(
         defectItems
@@ -72,12 +88,14 @@ function DefectsList({
     });
     setIsCommonSelected(false);
     setIsTypeOneSelected(false);
+    setIsTypeTwoSelected(false);
   };
 
   const handleCommonFilter = () => {
     setIsCommonSelected((prev) => {
       const newValue = !prev;
       if (newValue) setIsTypeOneSelected(false);
+      if (newValue) setIsTypeTwoSelected(false);
       return newValue;
     });
     setSelectedLetters(new Set());
@@ -87,6 +105,17 @@ function DefectsList({
     setIsTypeOneSelected((prev) => {
       const newValue = !prev;
       if (newValue) setIsCommonSelected(false);
+      if (newValue) setIsTypeTwoSelected(false);
+      return newValue;
+    });
+    setSelectedLetters(new Set());
+  };
+
+  const handleTypeTwoFilter = () => {
+    setIsTypeTwoSelected((prev) => {
+      const newValue = !prev;
+      if (newValue) setIsCommonSelected(false);
+      if (newValue) setIsTypeOneSelected(false);
       return newValue;
     });
     setSelectedLetters(new Set());
@@ -96,6 +125,7 @@ function DefectsList({
     setSelectedLetters(new Set());
     setIsCommonSelected(false);
     setIsTypeOneSelected(false);
+    setIsTypeTwoSelected(false);
   };
 
   const getProcessedDefects = () => {
@@ -105,10 +135,16 @@ function DefectsList({
       indices = indices.filter((i) => commonDefects[language].includes(i));
     } else if (isTypeOneSelected) {
       indices = indices.filter((i) => TypeOneDefects[language].includes(i));
-    } else if (selectedLetters.size > 0 && language !== "all") {
-      indices = indices.filter((i) =>
-        selectedLetters.has(defectItems[i].name.charAt(0).toUpperCase())
-      );
+    } else if (isTypeTwoSelected) {
+      indices = indices.filter((i) => TypeTwoDefects[language].includes(i));
+    } else if (selectedLetters.size > 0) {
+      indices = indices.filter((i) => {
+        const defectName =
+          language === "all"
+            ? defectItems[i].name.split(" \\ ")[0] // Extract English part for "All" language
+            : defectItems[i].name;
+        return selectedLetters.has(defectName.charAt(0).toUpperCase());
+      });
     }
 
     switch (sortType) {
@@ -133,6 +169,44 @@ function DefectsList({
       (index) => !currentDefectCount[index] || currentDefectCount[index] > 0
     );
   };
+
+  // const getProcessedDefects = () => {
+  //   let indices = Array.from({ length: defectItems.length }, (_, i) => i);
+
+  //   if (isCommonSelected) {
+  //     indices = indices.filter((i) => commonDefects[language].includes(i));
+  //   } else if (isTypeOneSelected) {
+  //     indices = indices.filter((i) => TypeOneDefects[language].includes(i));
+  //   } else if (isTypeTwoSelected) {
+  //     indices = indices.filter((i) => TypeTwoDefects[language].includes(i));
+  //   } else if (selectedLetters.size > 0 && language !== "all") {
+  //     indices = indices.filter((i) =>
+  //       selectedLetters.has(defectItems[i].name.charAt(0).toUpperCase())
+  //     );
+  //   }
+
+  //   switch (sortType) {
+  //     case "alpha-asc":
+  //       indices.sort((a, b) =>
+  //         defectItems[a].name.localeCompare(defectItems[b].name)
+  //       );
+  //       break;
+  //     case "alpha-desc":
+  //       indices.sort((a, b) =>
+  //         defectItems[b].name.localeCompare(defectItems[a].name)
+  //       );
+  //       break;
+  //     case "count-desc":
+  //       indices.sort((a, b) => (defects[b] || 0) - (defects[a] || 0));
+  //       break;
+  //     default:
+  //       break;
+  //   }
+
+  //   return indices.filter(
+  //     (index) => !currentDefectCount[index] || currentDefectCount[index] > 0
+  //   );
+  // };
 
   useEffect(() => {
     const hasActiveDefects = Object.values(currentDefectCount).some(
@@ -234,7 +308,8 @@ function DefectsList({
             className={`px-3 py-1 rounded text-sm ${
               selectedLetters.size === 0 &&
               !isCommonSelected &&
-              !isTypeOneSelected
+              !isTypeOneSelected &&
+              !isTypeTwoSelected
                 ? "bg-indigo-600 text-white"
                 : "bg-gray-200 hover:bg-gray-300"
             }`}
@@ -273,6 +348,16 @@ function DefectsList({
             }`}
           >
             Type 1
+          </button>
+          <button
+            onClick={handleTypeTwoFilter}
+            className={`px-3 py-1 rounded text-sm ${
+              isTypeTwoSelected
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-200 hover:bg-gray-300"
+            }`}
+          >
+            Type 2
           </button>
         </div>
       </div>
@@ -375,13 +460,11 @@ function DefectsList({
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {processedIndices.map((index) => renderGridItem(index))}
         </div>
-
         <ImageUploadDialog
           isOpen={showUploadDialog}
           onClose={() => setShowUploadDialog(false)}
           onUpload={handleImageUpload}
         />
-
         <ImagePreviewDialog
           isOpen={showPreviewDialog}
           onClose={() => setShowPreviewDialog(false)}

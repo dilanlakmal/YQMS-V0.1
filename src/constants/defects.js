@@ -250,6 +250,9 @@ export const commonDefectIndices = [0, 1, 2, 5]; // Adjust indices as needed
 // Type One defects indices
 export const typeOneDefectIndices = [10, 11, 12]; // Adjust indices as needed
 
+// Type One defects indices
+export const typeTwoDefectIndices = [15, 16, 17]; // Adjust indices as needed
+
 // Export common and type one defects lists
 export const commonDefects = {
   english: commonDefectIndices,
@@ -263,6 +266,13 @@ export const TypeOneDefects = {
   khmer: typeOneDefectIndices,
   chinese: typeOneDefectIndices,
   all: typeOneDefectIndices,
+};
+
+export const TypeTwoDefects = {
+  english: typeTwoDefectIndices,
+  khmer: typeTwoDefectIndices,
+  chinese: typeTwoDefectIndices,
+  all: typeTwoDefectIndices,
 };
 
 // Export factories and style codes as before
