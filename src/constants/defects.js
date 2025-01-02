@@ -1,3 +1,15 @@
+import { defectImages } from "./defectimages";
+
+// Helper function to create defect objects with images
+const createDefectObject = (name, index) => ({
+  name,
+  imageUrl: defectImages[index] || "/assets/Img/default-defect.jpg",
+});
+
+// Create arrays of defect objects with corresponding images
+const createDefectList = (names) =>
+  names.map((name, index) => createDefectObject(name, index));
+
 export const defectsList = {
   english: [
     "Acessories defects",

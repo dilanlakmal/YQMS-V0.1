@@ -1,10 +1,48 @@
+// import { useState, useEffect } from "react";
+// import {
+//   defectsList,
+//   commonDefects,
+//   TypeOneDefects,
+// } from "../../constants/defects";
+// import { ArrowDownAZ, ArrowDownZA, ArrowDownWideNarrow } from "lucide-react";
+
+// function DefectsList({
+//   view,
+//   language,
+//   defects,
+//   onDefectUpdate,
+//   onLogEntry,
+//   isPlaying,
+//   onDefectSelect,
+//   currentDefectCount,
+//   onCurrentDefectUpdate,
+//   isReturnView = false,
+// }) {
+//   const defectItems = defectsList[language];
+//   const [activeCell, setActiveCell] = useState(null);
+//   const [sortType, setSortType] = useState("none");
+//   const [selectedLetters, setSelectedLetters] = useState(new Set());
+//   const [showSortDropdown, setShowSortDropdown] = useState(false);
+//   const [isCommonSelected, setIsCommonSelected] = useState(false);
+//   const [isTypeOneSelected, setIsTypeOneSelected] = useState(false);
+
 import { useState, useEffect } from "react";
+import {
+  ArrowDownAZ,
+  ArrowDownZA,
+  ArrowDownWideNarrow,
+  Minus,
+  Plus,
+  Upload,
+  Info,
+} from "lucide-react";
+import { ImageUploadDialog } from "./ImageUploadDialog";
+import { ImagePreviewDialog } from "./ImagePreviewDialog";
 import {
   defectsList,
   commonDefects,
   TypeOneDefects,
 } from "../../constants/defects";
-import { ArrowDownAZ, ArrowDownZA, ArrowDownWideNarrow } from "lucide-react";
 
 function DefectsList({
   view,
@@ -25,6 +63,9 @@ function DefectsList({
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [isCommonSelected, setIsCommonSelected] = useState(false);
   const [isTypeOneSelected, setIsTypeOneSelected] = useState(false);
+  const [selectedDefectIndex, setSelectedDefectIndex] = useState(null);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
 
   // Get unique first letters from defect names
   const uniqueLetters = [
@@ -45,22 +86,24 @@ function DefectsList({
     setIsTypeOneSelected(false);
   };
 
-  /*
-  const handleCommonFilter = () => {
-    setIsCommonSelected((prev) => !prev);
-    setSelectedLetters(new Set());
-  };
-
-  const handleTypeOneFilter = () => {
-    setIsTypeOneSelected((prev) => !prev);
-    setSelectedLetters(new Set());
-  };
-  */
+  // const handleLetterFilter = (letter) => {
+  //   setSelectedLetters((prev) => {
+  //     const newSet = new Set(prev);
+  //     if (newSet.has(letter)) {
+  //       newSet.delete(letter);
+  //     } else {
+  //       newSet.add(letter);
+  //     }
+  //     return newSet;
+  //   });
+  //   setIsCommonSelected(false);
+  //   setIsTypeOneSelected(false);
+  // };
 
   const handleCommonFilter = () => {
     setIsCommonSelected((prev) => {
       const newValue = !prev;
-      if (newValue) setIsTypeOneSelected(false); // Reset Type 1
+      if (newValue) setIsTypeOneSelected(false);
       return newValue;
     });
     setSelectedLetters(new Set());
@@ -69,7 +112,7 @@ function DefectsList({
   const handleTypeOneFilter = () => {
     setIsTypeOneSelected((prev) => {
       const newValue = !prev;
-      if (newValue) setIsCommonSelected(false); // Reset Common
+      if (newValue) setIsCommonSelected(false);
       return newValue;
     });
     setSelectedLetters(new Set());
@@ -81,11 +124,9 @@ function DefectsList({
     setIsTypeOneSelected(false);
   };
 
-  // Process defects based on sorting and filtering
   const getProcessedDefects = () => {
     let indices = Array.from({ length: defectItems.length }, (_, i) => i);
 
-    // Apply filters
     if (isCommonSelected) {
       indices = indices.filter((i) => commonDefects[language].includes(i));
     } else if (isTypeOneSelected) {
@@ -96,7 +137,6 @@ function DefectsList({
       );
     }
 
-    // Apply sorting
     switch (sortType) {
       case "alpha-asc":
         indices.sort((a, b) => defectItems[a].localeCompare(defectItems[b]));
@@ -111,7 +151,9 @@ function DefectsList({
         break;
     }
 
-    return indices;
+    return indices.filter(
+      (index) => !currentDefectCount[index] || currentDefectCount[index] > 0
+    );
   };
 
   useEffect(() => {
@@ -134,10 +176,43 @@ function DefectsList({
     onCurrentDefectUpdate(index, newValue);
     onLogEntry?.({
       type: isIncrement ? "defect-add" : "defect-remove",
-      defectName: defectItems[index],
+      defectName: defectItems[index].name,
       count: isIncrement ? 1 : -1,
       timestamp: new Date().getTime(),
     });
+  };
+
+  // const handleDefectChange = (index, isIncrement) => {
+  //   if (!isPlaying) return;
+
+  //   const currentValue = currentDefectCount[index] || 0;
+  //   if (!isIncrement && currentValue === 0) return;
+
+  //   const newValue = isIncrement
+  //     ? currentValue + 1
+  //     : Math.max(0, currentValue - 1);
+
+  //   onCurrentDefectUpdate(index, newValue);
+  //   onLogEntry?.({
+  //     type: isIncrement ? "defect-add" : "defect-remove",
+  //     defectName: defectItems[index],
+  //     count: isIncrement ? 1 : -1,
+  //     timestamp: new Date().getTime(),
+  //   });
+  // };
+
+  const handleImageUpload = (images) => {
+    // Handle the uploaded images
+    console.log("Uploaded images for defect:", selectedDefectIndex, images);
+    // You can implement the database storage logic here later
+  };
+
+  const getDefectItemStyle = (index) => {
+    const isSelected = currentDefectCount[index] > 0;
+    return {
+      border: isSelected ? "2px solid #ef4444" : "1px solid #e5e7eb",
+      transition: "all 0.2s ease-in-out",
+    };
   };
 
   const renderSortDropdown = () => (
@@ -230,7 +305,6 @@ function DefectsList({
           >
             Common
           </button>
-
           <button
             onClick={handleTypeOneFilter}
             className={`px-3 py-1 rounded text-sm ${
@@ -246,6 +320,86 @@ function DefectsList({
     </div>
   );
 
+  const renderGridItem = (index) => (
+    <div
+      key={index}
+      style={getDefectItemStyle(index)}
+      className={`relative flex flex-col h-64 rounded-lg bg-white shadow-sm hover:shadow-md transition-all ${
+        !isPlaying ? "opacity-50 cursor-not-allowed" : ""
+      }`}
+    >
+      {/* Control Icons - Always visible */}
+      <div className="absolute top-2 left-2 flex space-x-2 z-10">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDefectChange(index, false);
+          }}
+          className="w-8 h-8 flex items-center justify-center bg-white rounded-full shadow hover:bg-gray-100 disabled:opacity-50"
+          disabled={!isPlaying || !currentDefectCount[index]}
+        >
+          <Minus size={16} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDefectChange(index, true);
+          }}
+          className="w-8 h-8 flex items-center justify-center bg-white rounded-full shadow hover:bg-gray-100"
+          disabled={!isPlaying}
+        >
+          <Plus size={16} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedDefectIndex(index);
+            setShowUploadDialog(true);
+          }}
+          className="w-8 h-8 flex items-center justify-center bg-white rounded-full shadow hover:bg-gray-100"
+          disabled={!isPlaying}
+        >
+          <Upload size={16} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedDefectIndex(index);
+            setShowPreviewDialog(true);
+          }}
+          className="w-8 h-8 flex items-center justify-center bg-white rounded-full shadow hover:bg-gray-100"
+        >
+          <Info size={16} />
+        </button>
+      </div>
+
+      {/* Image Container */}
+      <div className="flex-1 w-full bg-gray-100 rounded-t-lg overflow-hidden">
+        <img
+          src={defectItems[index].imageUrl}
+          alt={defectItems[index].name}
+          className="w-full h-full object-cover"
+        />
+      </div>
+
+      {/* Defect Name and Count */}
+      <div className="p-3 border-t">
+        <div className="text-sm font-medium">{defectItems[index].name}</div>
+        {currentDefectCount[index] > 0 && (
+          <div className="absolute bottom-2 right-2 text-sm font-medium">
+            {currentDefectCount[index]}
+          </div>
+        )}
+      </div>
+
+      {defects[index] > 0 && (
+        <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm">
+          {defects[index]}
+        </div>
+      )}
+    </div>
+  );
+
   const processedIndices = getProcessedDefects();
 
   if (view === "grid") {
@@ -253,59 +407,164 @@ function DefectsList({
       <div className="space-y-4">
         {renderControls()}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {processedIndices.map((index) => (
-            <div
-              key={index}
-              className={`relative p-4 border rounded-lg bg-white shadow-sm cursor-pointer select-none hover:shadow-md transition-shadow ${
-                !isPlaying ? "opacity-50 cursor-not-allowed" : ""
-              }`}
-              onClick={() => isPlaying && handleDefectChange(index, true)}
-              onMouseEnter={() => setActiveCell(index)}
-              onMouseLeave={() => setActiveCell(null)}
-            >
-              {defects[index] > 0 && (
-                <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm">
-                  {defects[index]}
-                </div>
-              )}
-
-              <div className="mb-2 text-sm">{defectItems[index]}</div>
-
-              {currentDefectCount[index] > 0 && (
-                <div className="absolute bottom-2 left-2 text-sm font-medium">
-                  {currentDefectCount[index]}
-                </div>
-              )}
-
-              {activeCell === index && isPlaying && (
-                <div className="absolute top-2 right-2 flex space-x-1">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDefectChange(index, false);
-                    }}
-                    className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300"
-                    disabled={!currentDefectCount[index]}
-                  >
-                    -
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDefectChange(index, true);
-                    }}
-                    className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300"
-                  >
-                    +
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
+          {getProcessedDefects().map(renderGridItem)}
         </div>
+
+        <ImageUploadDialog
+          isOpen={showUploadDialog}
+          onClose={() => setShowUploadDialog(false)}
+          onUpload={handleImageUpload}
+        />
+
+        <ImagePreviewDialog
+          isOpen={showPreviewDialog}
+          onClose={() => setShowPreviewDialog(false)}
+          imageUrl={
+            selectedDefectIndex !== null
+              ? defectItems[selectedDefectIndex].imageUrl
+              : ""
+          }
+        />
       </div>
     );
   }
+
+  // if (view === "grid") {
+  //   return (
+  //     <div className="space-y-4">
+  //       {renderControls()}
+  //       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+  //         {processedIndices.map((index) => (
+  //           <div
+  //             key={index}
+  //             style={getDefectItemStyle(index)}
+  //             className={`relative flex flex-col h-48 rounded-lg bg-white shadow-sm cursor-pointer select-none hover:shadow-md transition-all ${
+  //               !isPlaying ? "opacity-50 cursor-not-allowed" : ""
+  //             }`}
+  //             onClick={() => isPlaying && handleDefectChange(index, true)}
+  //             onMouseEnter={() => setActiveCell(index)}
+  //             onMouseLeave={() => setActiveCell(null)}
+  //           >
+  //             {/* Image Container */}
+  //             <div className="flex-1 w-full bg-gray-100 rounded-t-lg">
+  //               {/* Image will be added here */}
+  //               <img
+  //                 src={
+  //                   defectItems[index].imageUrl ||
+  //                   "https://via.placeholder.com/150"
+  //                 }
+  //                 alt={defectItems[index]}
+  //                 className="w-full h-full object-cover rounded-t-lg"
+  //               />
+  //             </div>
+
+  //             {/* Defect Name and Controls Container */}
+  //             <div className="relative p-3 border-t">
+  //               <div className="text-sm font-medium">{defectItems[index]}</div>
+
+  //               {currentDefectCount[index] > 0 && (
+  //                 <div className="absolute bottom-2 left-2 text-sm font-medium">
+  //                   {currentDefectCount[index]}
+  //                 </div>
+  //               )}
+
+  //               {defects[index] > 0 && (
+  //                 <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm">
+  //                   {defects[index]}
+  //                 </div>
+  //               )}
+
+  //               {activeCell === index && isPlaying && (
+  //                 <div className="absolute top-2 right-2 flex space-x-1">
+  //                   <button
+  //                     onClick={(e) => {
+  //                       e.stopPropagation();
+  //                       handleDefectChange(index, false);
+  //                     }}
+  //                     className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300"
+  //                     disabled={!currentDefectCount[index]}
+  //                   >
+  //                     -
+  //                   </button>
+  //                   <button
+  //                     onClick={(e) => {
+  //                       e.stopPropagation();
+  //                       handleDefectChange(index, true);
+  //                     }}
+  //                     className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300"
+  //                   >
+  //                     +
+  //                   </button>
+  //                 </div>
+  //               )}
+  //             </div>
+  //           </div>
+  //         ))}
+  //       </div>
+  //     </div>
+  //   );
+  // }
+
+  // original grid view
+  // if (view === "grid") {
+  //   return (
+  //     <div className="space-y-4">
+  //       {renderControls()}
+  //       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+  //         {processedIndices.map((index) => (
+  //           <div
+  //             key={index}
+  //             style={getDefectItemStyle(index)}
+  //             className={`relative flex flex-col h-48 rounded-lg bg-white shadow-sm cursor-pointer select-none hover:shadow-md transition-all ${
+  //               !isPlaying ? "opacity-50 cursor-not-allowed" : ""
+  //             }`}
+  //             onClick={() => isPlaying && handleDefectChange(index, true)}
+  //             onMouseEnter={() => setActiveCell(index)}
+  //             onMouseLeave={() => setActiveCell(null)}
+  //           >
+  //             {defects[index] > 0 && (
+  //               <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm">
+  //                 {defects[index]}
+  //               </div>
+  //             )}
+
+  //             <div className="mb-2 text-sm">{defectItems[index]}</div>
+
+  //             {currentDefectCount[index] > 0 && (
+  //               <div className="absolute bottom-2 left-2 text-sm font-medium">
+  //                 {currentDefectCount[index]}
+  //               </div>
+  //             )}
+
+  //             {activeCell === index && isPlaying && (
+  //               <div className="absolute top-2 right-2 flex space-x-1">
+  //                 <button
+  //                   onClick={(e) => {
+  //                     e.stopPropagation();
+  //                     handleDefectChange(index, false);
+  //                   }}
+  //                   className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300"
+  //                   disabled={!currentDefectCount[index]}
+  //                 >
+  //                   -
+  //                 </button>
+  //                 <button
+  //                   onClick={(e) => {
+  //                     e.stopPropagation();
+  //                     handleDefectChange(index, true);
+  //                   }}
+  //                   className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300"
+  //                 >
+  //                   +
+  //                 </button>
+  //               </div>
+  //             )}
+  //           </div>
+  //         ))}
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="space-y-4">
@@ -314,6 +573,7 @@ function DefectsList({
         {processedIndices.map((index) => (
           <div
             key={index}
+            style={getDefectItemStyle(index)}
             className={`flex justify-between items-center p-4 bg-white rounded-lg shadow-sm ${
               !isPlaying ? "opacity-50 cursor-not-allowed" : ""
             }`}
