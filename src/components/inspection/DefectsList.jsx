@@ -41,6 +41,8 @@ function DefectsList({
   const [selectedDefectIndex, setSelectedDefectIndex] = useState(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  // Add a state to store defect images
+  const [defectImages, setDefectImages] = useState({});
 
   // // Get unique first letters from defect names for languages other than 'all'
   // let uniqueLetters = [];
@@ -170,44 +172,6 @@ function DefectsList({
     );
   };
 
-  // const getProcessedDefects = () => {
-  //   let indices = Array.from({ length: defectItems.length }, (_, i) => i);
-
-  //   if (isCommonSelected) {
-  //     indices = indices.filter((i) => commonDefects[language].includes(i));
-  //   } else if (isTypeOneSelected) {
-  //     indices = indices.filter((i) => TypeOneDefects[language].includes(i));
-  //   } else if (isTypeTwoSelected) {
-  //     indices = indices.filter((i) => TypeTwoDefects[language].includes(i));
-  //   } else if (selectedLetters.size > 0 && language !== "all") {
-  //     indices = indices.filter((i) =>
-  //       selectedLetters.has(defectItems[i].name.charAt(0).toUpperCase())
-  //     );
-  //   }
-
-  //   switch (sortType) {
-  //     case "alpha-asc":
-  //       indices.sort((a, b) =>
-  //         defectItems[a].name.localeCompare(defectItems[b].name)
-  //       );
-  //       break;
-  //     case "alpha-desc":
-  //       indices.sort((a, b) =>
-  //         defectItems[b].name.localeCompare(defectItems[a].name)
-  //       );
-  //       break;
-  //     case "count-desc":
-  //       indices.sort((a, b) => (defects[b] || 0) - (defects[a] || 0));
-  //       break;
-  //     default:
-  //       break;
-  //   }
-
-  //   return indices.filter(
-  //     (index) => !currentDefectCount[index] || currentDefectCount[index] > 0
-  //   );
-  // };
-
   useEffect(() => {
     const hasActiveDefects = Object.values(currentDefectCount).some(
       (count) => count > 0
@@ -234,10 +198,18 @@ function DefectsList({
     });
   };
 
-  const handleImageUpload = (images) => {
-    // Handle the uploaded images
-    console.log("Uploaded images for defect:", selectedDefectIndex, images);
-    // You can implement the database storage logic here later
+  // const handleImageUpload = (images) => {
+  //   // Handle the uploaded images
+  //   console.log("Uploaded images for defect:", selectedDefectIndex, images);
+  //   // You can implement the database storage logic here later
+  // };
+
+  // Update the handleImageUpload function
+  const handleImageUpload = (index, images) => {
+    setDefectImages((prev) => ({
+      ...prev,
+      [index]: images,
+    }));
   };
 
   const getDefectItemStyle = (index) => {
@@ -460,10 +432,16 @@ function DefectsList({
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {processedIndices.map((index) => renderGridItem(index))}
         </div>
+        {/* <ImageUploadDialog
+          isOpen={showUploadDialog}
+          onClose={() => setShowUploadDialog(false)}
+          onUpload={handleImageUpload}
+        /> */}
         <ImageUploadDialog
           isOpen={showUploadDialog}
           onClose={() => setShowUploadDialog(false)}
           onUpload={handleImageUpload}
+          selectedDefectIndex={selectedDefectIndex}
         />
         <ImagePreviewDialog
           isOpen={showPreviewDialog}
