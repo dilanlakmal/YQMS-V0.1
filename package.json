@@ -15,6 +15,8 @@
     "@headlessui/react": "^1.7.18",
     "autoprefixer": "^10.4.18",
     "chart.js": "^4.4.7",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "chartjs-plugin-zoom": "^2.2.0",
     "html2pdf.js": "^0.10.1",
     "jspdf": "^2.5.1",
     "lucide-react": "^0.344.0",

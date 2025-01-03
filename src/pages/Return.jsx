@@ -84,12 +84,15 @@ function Return({
 
   const handlePassReturn = () => {
     if (!isPlaying || isReturnComplete || hasDefectSelected) return;
+    const currentTime = new Date();
+
     setGoodOutput((prev) => Math.min(prev + 1, checkedQuantity));
 
     onLogEntry?.({
       type: "pass-return",
       status: "Pass Return",
-      timestamp: new Date().getTime(),
+      timestamp: timer, //new Date().getTime(),
+      actualtime: currentTime.getTime(),
       defectDetails: [],
     });
 
@@ -126,14 +129,15 @@ function Return({
       .map(([index, count]) => ({
         name: defectsList[language][index].name, // Access the 'name' property
         count,
-        timestamp: currentTime,
+        timestamp: timer,
       }));
 
     onLogEntry?.({
       type: "reject-return",
       status: "Reject Return",
       defectDetails: currentDefects,
-      timestamp: currentTime,
+      timestamp: timer, //currentTime,
+      actualtime: currentTime,
     });
 
     setCurrentDefectCount({});

@@ -576,6 +576,8 @@ function App() {
                         savedState={inspectionState}
                         defects={inspectionState?.defects || {}}
                         checkedQuantity={inspectionState?.checkedQuantity || 0}
+                        logsState={logsState} // Pass logsState
+                        timer={timer} // Pass the timer
                       />
                     ) : (
                       <Navigate to="/details" replace />
