@@ -86,6 +86,7 @@ function Inspection({
     if (!isPlaying || hasDefectSelected) return;
 
     const currentTime = new Date();
+
     setCheckedQuantity((prev) => prev + 1);
     setGoodOutput((prev) => prev + 1);
 
@@ -145,45 +146,6 @@ function Inspection({
 
     setCurrentDefectCount({});
   };
-
-  // const handleReject = () => {
-  //   if (
-  //     !isPlaying ||
-  //     !Object.values(currentDefectCount).some((count) => count > 0)
-  //   )
-  //     return;
-
-  //   const currentTime = new Date();
-  //   setCheckedQuantity((prev) => prev + 1);
-  //   setDefectPieces((prev) => prev + 1);
-
-  //   Object.entries(currentDefectCount).forEach(([index, count]) => {
-  //     if (count > 0) {
-  //       setDefects((prev) => ({
-  //         ...prev,
-  //         [index]: (prev[index] || 0) + count,
-  //       }));
-  //     }
-  //   });
-
-  //   const currentDefects = Object.entries(currentDefectCount)
-  //     .filter(([_, count]) => count > 0)
-  //     .map(([index, count]) => ({
-  //       name: defectsList[language][index].name, // Access the 'name' property
-  //       count,
-  //       timestamp: currentTime.getTime(),
-  //     }));
-
-  //   onLogEntry?.({
-  //     type: "reject",
-  //     garmentNo: checkedQuantity + 1,
-  //     status: "Reject",
-  //     defectDetails: currentDefects,
-  //     timestamp: currentTime.getTime(),
-  //   });
-
-  //   setCurrentDefectCount({});
-  // };
 
   const handleDownloadPDF = async () => {
     try {

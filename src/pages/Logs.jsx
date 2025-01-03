@@ -13,6 +13,15 @@ function Logs({ logsState }) {
     )}:${String(secs).padStart(2, "0")}`;
   };
 
+  const formatedTime = (timestamp) => {
+    return new Date(timestamp).toLocaleTimeString("en-US", {
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
   const calculateInspectionTime = (log, index) => {
     if (index === 0) {
       return log.timestamp - 0;
@@ -63,7 +72,7 @@ function Logs({ logsState }) {
           <div className="mt-4 border-t pt-4">
             <p>
               <span className="font-medium">Start Inspection Time:</span>{" "}
-              {startTime ? formatTime(startTime) : "N/A"}
+              {startTime ? formatedTime(startTime) : "N/A"}
             </p>
           </div>
         </div>
@@ -106,7 +115,9 @@ function Logs({ logsState }) {
                           ))
                         : "-"}
                     </td>
-                    <td className="px-4 py-2">{formatTime(log.actualtime)}</td>
+                    <td className="px-4 py-2">
+                      {formatedTime(log.actualtime)}
+                    </td>
                     <td className="px-4 py-2">{formatTime(log.timestamp)}</td>
                     <td className="px-4 py-2">{log.status}</td>
                     <td className="px-4 py-2">
