@@ -27,6 +27,18 @@ import {
   faClock,
 } from "@fortawesome/free-solid-svg-icons";
 
+// Import category indices from defects.js
+import {
+  typeFabricDefectIndices,
+  typeWorkmanshipDefectIndices,
+  typeCleanlinessDefectIndices,
+  typeEmbellishmentDefectIndices,
+  typeMeasurementDefectIndices,
+  typeWashingDefectIndices,
+  typeFinishingDefectIndices,
+  typeMiscellaneousDefectIndices,
+} from "../constants/defects";
+
 // Register Chart.js components
 ChartJS.register(
   CategoryScale,
@@ -243,6 +255,58 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
       ? ((defectPieces / checkedQuantity) * 100).toFixed(2)
       : 0;
 
+  // Calculate defect rate by category
+  const categories = [
+    { name: "Fabric", indices: typeFabricDefectIndices },
+    { name: "Workmanship", indices: typeWorkmanshipDefectIndices },
+    { name: "Cleanliness", indices: typeCleanlinessDefectIndices },
+    { name: "Embellishment", indices: typeEmbellishmentDefectIndices },
+    { name: "Measurement", indices: typeMeasurementDefectIndices },
+    { name: "Washing", indices: typeWashingDefectIndices },
+    { name: "Finishing", indices: typeFinishingDefectIndices },
+    { name: "Miscellaneous", indices: typeMiscellaneousDefectIndices },
+  ];
+
+  const categoryDefectRates = categories.map(({ name, indices }) => {
+    const categoryDefects = Object.entries(defects)
+      .filter(([index]) => {
+        const isInCategory = indices.includes(Number(index)); // Explicitly convert to number
+        console.log(
+          `Defect Index: ${index}, Category Indices: ${indices}, Included: ${isInCategory}`
+        );
+        return isInCategory;
+      })
+      .reduce((sum, [_, count]) => sum + count, 0);
+
+    const defectRate =
+      checkedQuantity > 0
+        ? ((categoryDefects / checkedQuantity) * 100).toFixed(2)
+        : 0;
+
+    return {
+      category: name,
+      defectQty: categoryDefects, // Defect quantity specific to the category
+      defectRate,
+    };
+  });
+
+  //   const categoryDefectRates = categories.map(({ name, indices }) => {
+  //     const categoryDefects = Object.entries(defects)
+  //       .filter(([index]) => indices.includes(parseInt(index)))
+  //       .reduce((sum, [_, count]) => sum + count, 0);
+
+  //     const defectRate =
+  //       checkedQuantity > 0
+  //         ? ((categoryDefects / checkedQuantity) * 100).toFixed(2)
+  //         : 0;
+
+  //     return {
+  //       category: name,
+  //       totalDefects: categoryDefects,
+  //       defectRate,
+  //     };
+  //   });
+
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
       <div className="max-w-8xl mx-auto px-4 pt-4">
@@ -378,6 +442,42 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
               <Line data={getLineChartData()} options={lineChartOptions} />
             </div>
           </div>
+        </div>
+        {/* Category Defect Rates Table */}
+        <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold mb-4">
+            Defect Rate by Category
+          </h2>
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Category
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total Defect Qty
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Defect Rate (%)
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {categoryDefectRates.map(({ category, defectRate }) => (
+                <tr key={category}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {category}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {totalDefects}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {defectRate}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
