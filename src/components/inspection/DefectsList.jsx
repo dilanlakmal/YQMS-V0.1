@@ -15,6 +15,14 @@ import {
   commonDefects,
   TypeOneDefects,
   TypeTwoDefects,
+  FabricDefects,
+  WorkmanshipDefects,
+  CleanlinessDefects,
+  EmbellishmentDefects,
+  MeasurementDefects,
+  WashingDefects,
+  FinishingDefects,
+  MiscellaneousDefects,
 } from "../../constants/defects";
 import { defectImages, defaultDefectImage } from "../../constants/defectimages";
 
@@ -38,6 +46,14 @@ function DefectsList({
   const [isCommonSelected, setIsCommonSelected] = useState(false);
   const [isTypeOneSelected, setIsTypeOneSelected] = useState(false);
   const [isTypeTwoSelected, setIsTypeTwoSelected] = useState(false);
+  const [isFabricSelected, setIsFabricSelected] = useState(false);
+  const [isWorkmanshipSelected, setIsWorkmanshipSelected] = useState(false);
+  const [isCleanlinessSelected, setIsCleanlinessSelected] = useState(false);
+  const [isEmbellishmentSelected, setIsEmbellishmentSelected] = useState(false);
+  const [isMeasurementSelected, setIsMeasurementSelected] = useState(false);
+  const [isWashingSelected, setIsWashingSelected] = useState(false);
+  const [isFinishingSelected, setIsFinishingSelected] = useState(false);
+  const [isMiscellaneousSelected, setIsMiscellaneousSelected] = useState(false);
   const [selectedDefectIndex, setSelectedDefectIndex] = useState(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
@@ -80,14 +96,21 @@ function DefectsList({
     setIsCommonSelected(false);
     setIsTypeOneSelected(false);
     setIsTypeTwoSelected(false);
+    setIsFabricSelected(false);
+    setIsWorkmanshipSelected(false);
+    setIsCleanlinessSelected(false);
+    setIsEmbellishmentSelected(false);
+    setIsMeasurementSelected(false);
+    setIsWashingSelected(false);
+    setIsFinishingSelected(false);
+    setIsMiscellaneousSelected(false);
   };
 
   // Handle Common filter
   const handleCommonFilter = () => {
     setIsCommonSelected((prev) => {
       const newValue = !prev;
-      if (newValue) setIsTypeOneSelected(false);
-      if (newValue) setIsTypeTwoSelected(false);
+      if (newValue) clearAllTypeSelections();
       return newValue;
     });
     setSelectedLetters(new Set());
@@ -97,8 +120,7 @@ function DefectsList({
   const handleTypeOneFilter = () => {
     setIsTypeOneSelected((prev) => {
       const newValue = !prev;
-      if (newValue) setIsCommonSelected(false);
-      if (newValue) setIsTypeTwoSelected(false);
+      if (newValue) clearAllTypeSelections();
       return newValue;
     });
     setSelectedLetters(new Set());
@@ -108,19 +130,111 @@ function DefectsList({
   const handleTypeTwoFilter = () => {
     setIsTypeTwoSelected((prev) => {
       const newValue = !prev;
-      if (newValue) setIsCommonSelected(false);
-      if (newValue) setIsTypeOneSelected(false);
+      if (newValue) clearAllTypeSelections();
       return newValue;
     });
     setSelectedLetters(new Set());
   };
 
-  // Clear all filters
-  const clearFilters = () => {
+  // Handle Fabric filter
+  const handleFabricFilter = () => {
+    setIsFabricSelected((prev) => {
+      const newValue = !prev;
+      if (newValue) clearAllTypeSelections();
+      return newValue;
+    });
     setSelectedLetters(new Set());
+  };
+
+  // Handle Workmanship filter
+  const handleWorkmanshipFilter = () => {
+    setIsWorkmanshipSelected((prev) => {
+      const newValue = !prev;
+      if (newValue) clearAllTypeSelections();
+      return newValue;
+    });
+    setSelectedLetters(new Set());
+  };
+
+  // Handle Cleanliness filter
+  const handleCleanlinessFilter = () => {
+    setIsCleanlinessSelected((prev) => {
+      const newValue = !prev;
+      if (newValue) clearAllTypeSelections();
+      return newValue;
+    });
+    setSelectedLetters(new Set());
+  };
+
+  // Handle Embellishment filter
+  const handleEmbellishmentFilter = () => {
+    setIsEmbellishmentSelected((prev) => {
+      const newValue = !prev;
+      if (newValue) clearAllTypeSelections();
+      return newValue;
+    });
+    setSelectedLetters(new Set());
+  };
+
+  // Handle Measurement filter
+  const handleMeasurementFilter = () => {
+    setIsMeasurementSelected((prev) => {
+      const newValue = !prev;
+      if (newValue) clearAllTypeSelections();
+      return newValue;
+    });
+    setSelectedLetters(new Set());
+  };
+
+  // Handle Washing filter
+  const handleWashingFilter = () => {
+    setIsWashingSelected((prev) => {
+      const newValue = !prev;
+      if (newValue) clearAllTypeSelections();
+      return newValue;
+    });
+    setSelectedLetters(new Set());
+  };
+
+  // Handle Finishing filter
+  const handleFinishingFilter = () => {
+    setIsFinishingSelected((prev) => {
+      const newValue = !prev;
+      if (newValue) clearAllTypeSelections();
+      return newValue;
+    });
+    setSelectedLetters(new Set());
+  };
+
+  // Handle Miscellaneous filter
+  const handleMiscellaneousFilter = () => {
+    setIsMiscellaneousSelected((prev) => {
+      const newValue = !prev;
+      if (newValue) clearAllTypeSelections();
+      return newValue;
+    });
+    setSelectedLetters(new Set());
+  };
+
+  // Clear all type selections
+  const clearAllTypeSelections = () => {
     setIsCommonSelected(false);
     setIsTypeOneSelected(false);
     setIsTypeTwoSelected(false);
+    setIsFabricSelected(false);
+    setIsWorkmanshipSelected(false);
+    setIsCleanlinessSelected(false);
+    setIsEmbellishmentSelected(false);
+    setIsMeasurementSelected(false);
+    setIsWashingSelected(false);
+    setIsFinishingSelected(false);
+    setIsMiscellaneousSelected(false);
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSelectedLetters(new Set());
+    clearAllTypeSelections();
   };
 
   // Get processed defects based on filters and sorting
@@ -133,6 +247,26 @@ function DefectsList({
       indices = indices.filter((i) => TypeOneDefects[language].includes(i));
     } else if (isTypeTwoSelected) {
       indices = indices.filter((i) => TypeTwoDefects[language].includes(i));
+    } else if (isFabricSelected) {
+      indices = indices.filter((i) => FabricDefects[language].includes(i));
+    } else if (isWorkmanshipSelected) {
+      indices = indices.filter((i) => WorkmanshipDefects[language].includes(i));
+    } else if (isCleanlinessSelected) {
+      indices = indices.filter((i) => CleanlinessDefects[language].includes(i));
+    } else if (isEmbellishmentSelected) {
+      indices = indices.filter((i) =>
+        EmbellishmentDefects[language].includes(i)
+      );
+    } else if (isMeasurementSelected) {
+      indices = indices.filter((i) => MeasurementDefects[language].includes(i));
+    } else if (isWashingSelected) {
+      indices = indices.filter((i) => WashingDefects[language].includes(i));
+    } else if (isFinishingSelected) {
+      indices = indices.filter((i) => FinishingDefects[language].includes(i));
+    } else if (isMiscellaneousSelected) {
+      indices = indices.filter((i) =>
+        MiscellaneousDefects[language].includes(i)
+      );
     } else if (selectedLetters.size > 0) {
       indices = indices.filter((i) => {
         const defectName =
@@ -142,7 +276,6 @@ function DefectsList({
         return selectedLetters.has(defectName.charAt(0).toUpperCase());
       });
     }
-
     switch (sortType) {
       case "alpha-asc":
         indices.sort((a, b) =>
@@ -308,7 +441,15 @@ function DefectsList({
               selectedLetters.size === 0 &&
               !isCommonSelected &&
               !isTypeOneSelected &&
-              !isTypeTwoSelected
+              !isTypeTwoSelected &&
+              !isFabricSelected &&
+              !isWorkmanshipSelected &&
+              !isCleanlinessSelected &&
+              !isEmbellishmentSelected &&
+              !isMeasurementSelected &&
+              !isWashingSelected &&
+              !isFinishingSelected &&
+              !isMiscellaneousSelected
                 ? "bg-indigo-600 text-white"
                 : "bg-gray-200 hover:bg-gray-300"
             }`}
@@ -344,6 +485,86 @@ function DefectsList({
             }`}
           >
             Type 2
+          </button>
+          <button
+            onClick={handleFabricFilter}
+            className={`px-3 py-1 rounded text-sm ${
+              isFabricSelected
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-200 hover:bg-gray-300"
+            }`}
+          >
+            Fabric
+          </button>
+          <button
+            onClick={handleWorkmanshipFilter}
+            className={`px-3 py-1 rounded text-sm ${
+              isWorkmanshipSelected
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-200 hover:bg-gray-300"
+            }`}
+          >
+            Workmanship
+          </button>
+          <button
+            onClick={handleCleanlinessFilter}
+            className={`px-3 py-1 rounded text-sm ${
+              isCleanlinessSelected
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-200 hover:bg-gray-300"
+            }`}
+          >
+            Cleanliness
+          </button>
+          <button
+            onClick={handleEmbellishmentFilter}
+            className={`px-3 py-1 rounded text-sm ${
+              isEmbellishmentSelected
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-200 hover:bg-gray-300"
+            }`}
+          >
+            Embellishment
+          </button>
+          <button
+            onClick={handleMeasurementFilter}
+            className={`px-3 py-1 rounded text-sm ${
+              isMeasurementSelected
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-200 hover:bg-gray-300"
+            }`}
+          >
+            Measurement
+          </button>
+          <button
+            onClick={handleWashingFilter}
+            className={`px-3 py-1 rounded text-sm ${
+              isWashingSelected
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-200 hover:bg-gray-300"
+            }`}
+          >
+            Washing
+          </button>
+          <button
+            onClick={handleFinishingFilter}
+            className={`px-3 py-1 rounded text-sm ${
+              isFinishingSelected
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-200 hover:bg-gray-300"
+            }`}
+          >
+            Finishing
+          </button>
+          <button
+            onClick={handleMiscellaneousFilter}
+            className={`px-3 py-1 rounded text-sm ${
+              isMiscellaneousSelected
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-200 hover:bg-gray-300"
+            }`}
+          >
+            Miscellaneous
           </button>
         </div>
       </div>
