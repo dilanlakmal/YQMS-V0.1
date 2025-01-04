@@ -41,20 +41,8 @@ function DefectsList({
   const [selectedDefectIndex, setSelectedDefectIndex] = useState(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
-  // Add a state to store defect images
+  const [showLetterDropdown, setShowLetterDropdown] = useState(false); // State for letter dropdown
   const [defectImages, setDefectImages] = useState({});
-
-  // // Get unique first letters from defect names for languages other than 'all'
-  // let uniqueLetters = [];
-  // if (language !== "all") {
-  //   uniqueLetters = [
-  //     ...new Set(
-  //       defectItems
-  //         .filter((item) => item.name && item.name.length > 0)
-  //         .map((item) => item.name.charAt(0).toUpperCase())
-  //     ),
-  //   ].sort();
-  // }
 
   // Get unique first letters from defect names
   let uniqueLetters = [];
@@ -78,6 +66,7 @@ function DefectsList({
     ].sort();
   }
 
+  // Handle letter filter selection
   const handleLetterFilter = (letter) => {
     setSelectedLetters((prev) => {
       const newSet = new Set(prev);
@@ -93,6 +82,7 @@ function DefectsList({
     setIsTypeTwoSelected(false);
   };
 
+  // Handle Common filter
   const handleCommonFilter = () => {
     setIsCommonSelected((prev) => {
       const newValue = !prev;
@@ -103,6 +93,7 @@ function DefectsList({
     setSelectedLetters(new Set());
   };
 
+  // Handle Type 1 filter
   const handleTypeOneFilter = () => {
     setIsTypeOneSelected((prev) => {
       const newValue = !prev;
@@ -113,6 +104,7 @@ function DefectsList({
     setSelectedLetters(new Set());
   };
 
+  // Handle Type 2 filter
   const handleTypeTwoFilter = () => {
     setIsTypeTwoSelected((prev) => {
       const newValue = !prev;
@@ -123,6 +115,7 @@ function DefectsList({
     setSelectedLetters(new Set());
   };
 
+  // Clear all filters
   const clearFilters = () => {
     setSelectedLetters(new Set());
     setIsCommonSelected(false);
@@ -130,6 +123,7 @@ function DefectsList({
     setIsTypeTwoSelected(false);
   };
 
+  // Get processed defects based on filters and sorting
   const getProcessedDefects = () => {
     let indices = Array.from({ length: defectItems.length }, (_, i) => i);
 
@@ -198,12 +192,6 @@ function DefectsList({
     });
   };
 
-  // const handleImageUpload = (images) => {
-  //   // Handle the uploaded images
-  //   console.log("Uploaded images for defect:", selectedDefectIndex, images);
-  //   // You can implement the database storage logic here later
-  // };
-
   // Update the handleImageUpload function
   const handleImageUpload = (index, images) => {
     setDefectImages((prev) => ({
@@ -212,6 +200,7 @@ function DefectsList({
     }));
   };
 
+  // Style for defect items based on selection
   const getDefectItemStyle = (index) => {
     const isSelected = currentDefectCount[index] > 0;
     return {
@@ -220,6 +209,7 @@ function DefectsList({
     };
   };
 
+  // Render the sort dropdown
   const renderSortDropdown = () => (
     <div className="relative">
       <button
@@ -270,9 +260,46 @@ function DefectsList({
     </div>
   );
 
+  // Render the letter filter dropdown
+  const renderLetterDropdown = () => (
+    <div className="relative">
+      <button
+        onClick={() => setShowLetterDropdown(!showLetterDropdown)}
+        className={`px-4 py-2 rounded flex items-center space-x-2 ${
+          selectedLetters.size > 0
+            ? "bg-green-600 text-white" // Green background if any letter is selected
+            : "bg-indigo-700 text-white" // Default indigo background
+        } hover:bg-indigo-600`} // Hover color remains indigo
+      >
+        A..z
+      </button>
+      {showLetterDropdown && (
+        <div className="absolute right-0 mt-2 w-72 bg-white rounded-md shadow-lg z-50 p-4">
+          <div className="grid grid-cols-7 gap-2">
+            {uniqueLetters.map((letter) => (
+              <button
+                key={letter}
+                onClick={() => handleLetterFilter(letter)}
+                className={`w-8 h-8 flex items-center justify-center rounded-md text-sm font-medium tracking-wide ${
+                  selectedLetters.has(letter)
+                    ? "bg-indigo-600 text-white"
+                    : "bg-gray-200 hover:bg-gray-300"
+                }`}
+              >
+                {letter}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // Render the controls (sort dropdown, letter dropdown, and other filters)
   const renderControls = () => (
     <div className="flex gap-4 mb-4">
       <div className="flex-none">{renderSortDropdown()}</div>
+      <div className="flex-none">{renderLetterDropdown()}</div>
       <div className="flex-1">
         <div className="flex flex-wrap gap-2">
           <button
@@ -288,19 +315,6 @@ function DefectsList({
           >
             All
           </button>
-          {uniqueLetters.map((letter) => (
-            <button
-              key={letter}
-              onClick={() => handleLetterFilter(letter)}
-              className={`px-3 py-1 rounded text-sm ${
-                selectedLetters.has(letter)
-                  ? "bg-indigo-600 text-white"
-                  : "bg-gray-200 hover:bg-gray-300"
-              }`}
-            >
-              {letter}
-            </button>
-          ))}
           <button
             onClick={handleCommonFilter}
             className={`px-3 py-1 rounded text-sm ${
@@ -336,6 +350,7 @@ function DefectsList({
     </div>
   );
 
+  // Render the grid view
   const renderGridItem = (index) => (
     <div
       key={index}
@@ -432,11 +447,6 @@ function DefectsList({
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {processedIndices.map((index) => renderGridItem(index))}
         </div>
-        {/* <ImageUploadDialog
-          isOpen={showUploadDialog}
-          onClose={() => setShowUploadDialog(false)}
-          onUpload={handleImageUpload}
-        /> */}
         <ImageUploadDialog
           isOpen={showUploadDialog}
           onClose={() => setShowUploadDialog(false)}
