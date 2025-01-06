@@ -123,6 +123,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
   };
 
   // Add data labels to the bar chart
+
   const barChartOptions = {
     responsive: true,
     maintainAspectRatio: false, // Allow custom height and width
@@ -147,17 +148,29 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
           display: true,
           text: "Defect Rate (%)",
         },
+        ticks: {
+          padding: 20, // Add padding to the top of the y-axis
+        },
+        suggestedMax: Math.max(...barChartData.datasets[0].data) + 10, // Add 10% buffer
       },
       x: {
         title: {
           display: true,
           text: "Defect Name",
         },
+        ticks: {
+          autoSkip: false, // Ensure all labels are shown
+          maxRotation: barChartData.labels.length > 8 ? 60 : 0, // Rotate labels if defect names > 8
+          minRotation: barChartData.labels.length > 8 ? 60 : 0, // Rotate labels if defect names > 8
+        },
+        grid: {
+          display: false, // Hide grid lines for the x-axis
+        },
       },
     },
   };
 
-  //   // Prepare data for the line chart (defect rate vs. time)
+  // Prepare data for the line chart (defect rate vs. time)
 
   const getLineChartData = () => {
     // Filter logs for both "pass" and "reject" actions
@@ -177,12 +190,21 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
         .slice(0, index + 1)
         .filter((entry) => entry.type === "reject")
         .reduce((sum, entry) => {
-          // Sum the temporary defect counts for each rejection
-          const defectCounts = entry.defectDetails?.reduce(
-            (defectSum, detail) => defectSum + detail.count,
-            0
-          );
-          return sum + (defectCounts || 0);
+          // Sum the defect counts for the selected defect (if any)
+          if (selectedDefect) {
+            const defectCount =
+              entry.defectDetails?.find(
+                (detail) => detail.name === selectedDefect
+              )?.count || 0;
+            return sum + defectCount;
+          } else {
+            // Sum all defect counts if no specific defect is selected
+            const defectCounts = entry.defectDetails?.reduce(
+              (defectSum, detail) => defectSum + detail.count,
+              0
+            );
+            return sum + (defectCounts || 0);
+          }
         }, 0);
 
       const defectRate = (cumulativeDefects / cumulativeChecked) * 100;
@@ -219,22 +241,6 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
           return formatTime(seconds); // HH:MM:SS
       }
     });
-
-    let dataValues;
-    if (selectedDefect) {
-      // If a specific defect is selected, filter the defect rates
-      dataValues = cumulativeData.map((data, index) => {
-        const defectDetails = sortedLogs[index].defectDetails || [];
-        const defectCount = defectDetails.reduce((sum, detail) => {
-          return detail.name === selectedDefect ? sum + detail.count : sum;
-        }, 0);
-        const defectRate = (defectCount / data.cumulativeChecked) * 100;
-        return defectRate;
-      });
-    } else {
-      // Total defect rate
-      dataValues = cumulativeData.map((data) => data.defectRate);
-    }
 
     return {
       labels,
@@ -475,17 +481,30 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
                 ))}
               </select>
             </div>
+            {/* Scrollable container for the bar chart */}
             <div
               style={{
-                height: `${Math.max(300, barChartData.labels.length * 30)}px`,
-                width: "80%",
+                overflowX: defectEntries.length > 8 ? "auto" : "hidden", // Show scrollbar only if defect names > 10
+                height: "400px", // Fixed height for the chart container
+                width: "100%", // Full width of the parent container
               }}
             >
-              <Bar
-                data={barChartData}
-                options={barChartOptions}
-                plugins={[ChartDataLabels]}
-              />
+              {/* Bar chart with dynamic width */}
+              <div
+                style={{
+                  width:
+                    defectEntries.length > 8
+                      ? `${barChartData.labels.length * 100}px`
+                      : "100%", // Set dynamic width if defect names > 10
+                  height: "100%", // Full height of the container
+                }}
+              >
+                <Bar
+                  data={barChartData}
+                  options={barChartOptions}
+                  plugins={[ChartDataLabels]}
+                />
+              </div>
             </div>
           </div>
 
