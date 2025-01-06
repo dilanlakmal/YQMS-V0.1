@@ -181,25 +181,51 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
     // Sort logs by timestamp
     const sortedLogs = relevantLogs.sort((a, b) => a.timestamp - b.timestamp);
 
-    // Calculate cumulative checked quantity and cumulative defect quantity
-    const cumulativeData = sortedLogs.map((log, index) => {
-      const cumulativeChecked = index + 1; // Since each log entry represents a checked garment
+    // Calculate the total time range in minutes or hours based on the filter
+    const totalTimeInSeconds =
+      sortedLogs[sortedLogs.length - 1]?.timestamp || 0;
+    const totalTimeInMinutes = Math.ceil(totalTimeInSeconds / 60);
+    const totalTimeInHours = Math.ceil(totalTimeInSeconds / 3600);
 
-      // Calculate cumulative defects up to this point
-      let cumulativeDefects = sortedLogs
-        .slice(0, index + 1)
-        .filter((entry) => entry.type === "reject")
-        .reduce((sum, entry) => {
-          // Sum the defect counts for the selected defect (if any)
+    // Initialize cumulative data
+    const cumulativeData = [];
+    let cumulativeChecked = 0;
+    let cumulativeDefects = 0;
+
+    // Iterate through each time unit (minute or hour)
+    for (
+      let i = 0;
+      i <=
+      (timeFilter === "min"
+        ? totalTimeInMinutes
+        : timeFilter === "hr"
+        ? totalTimeInHours
+        : totalTimeInSeconds);
+      i++
+    ) {
+      const currentTimeUnit =
+        timeFilter === "min" ? i * 60 : timeFilter === "hr" ? i * 3600 : i;
+
+      // Find all logs up to the current time unit
+      const logsUpToCurrentTime = sortedLogs.filter(
+        (log) => log.timestamp <= currentTimeUnit
+      );
+
+      // Calculate cumulative checked and defect quantities
+      cumulativeChecked = logsUpToCurrentTime.length;
+      cumulativeDefects = logsUpToCurrentTime
+        .filter((log) => log.type === "reject")
+        .reduce((sum, log) => {
           if (selectedDefect) {
+            // Filter defect details for the selected defect
             const defectCount =
-              entry.defectDetails?.find(
+              log.defectDetails?.find(
                 (detail) => detail.name === selectedDefect
               )?.count || 0;
             return sum + defectCount;
           } else {
-            // Sum all defect counts if no specific defect is selected
-            const defectCounts = entry.defectDetails?.reduce(
+            // Sum all defects if no specific defect is selected
+            const defectCounts = log.defectDetails?.reduce(
               (defectSum, detail) => defectSum + detail.count,
               0
             );
@@ -207,18 +233,23 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
           }
         }, 0);
 
-      const defectRate = (cumulativeDefects / cumulativeChecked) * 100;
+      // Calculate defect rate
+      const defectRate =
+        cumulativeChecked > 0
+          ? (cumulativeDefects / cumulativeChecked) * 100
+          : 0;
 
-      return {
-        timestamp: log.timestamp, // Use the timestamp in seconds
+      // Add data point for the current time unit
+      cumulativeData.push({
+        timestamp: currentTimeUnit,
         cumulativeChecked,
         cumulativeDefects,
         defectRate,
-        isReject: log.type === "reject", // Add this flag
-      };
-    });
+        isReject: logsUpToCurrentTime.some((log) => log.type === "reject"), // Flag for rejections
+      });
+    }
 
-    // Debugging: Log cumulative values and defect rate only when data changes
+    // Debugging: Log cumulative values and defect rate
     useEffect(() => {
       cumulativeData.forEach((data) => {
         console.log(
@@ -228,10 +259,11 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
             `Defect Rate: ${data.defectRate.toFixed(2)}%`
         );
       });
-    }, [cumulativeData]); // Only run when cumulativeData changes
+    }, [cumulativeData]);
 
+    // Generate labels based on the time filter
     const labels = cumulativeData.map((data) => {
-      const seconds = data.timestamp; // Use the timestamp in seconds
+      const seconds = data.timestamp;
       switch (timeFilter) {
         case "hr":
           return Math.floor(seconds / 3600); // Hours
