@@ -157,22 +157,44 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
     },
   };
 
-  // Prepare data for the line chart (defect rate vs. time)
-  const getLineChartData = () => {
-    const cumulativeData = logsState.logs
-      .filter((log) => log.type === "reject") // Only include "Reject" logs
-      .map((log) => {
-        const cumulativeChecked = log.cumulativeChecked; // Cumulative checked quantity
-        const cumulativeDefects = log.cumulativeDefects; // Cumulative defect quantity
-        const defectRate = (cumulativeDefects / cumulativeChecked) * 100; // Defect rate in percentage
+  //   // Prepare data for the line chart (defect rate vs. time)
 
-        return {
-          timestamp: log.timestamp, // Use the timestamp in seconds
-          cumulativeChecked,
-          cumulativeDefects,
-          defectRate,
-        };
-      });
+  const getLineChartData = () => {
+    // Filter logs for both "pass" and "reject" actions
+    const relevantLogs = logsState.logs.filter(
+      (log) => log.type === "pass" || log.type === "reject"
+    );
+
+    // Sort logs by timestamp
+    const sortedLogs = relevantLogs.sort((a, b) => a.timestamp - b.timestamp);
+
+    // Calculate cumulative checked quantity and cumulative defect quantity
+    const cumulativeData = sortedLogs.map((log, index) => {
+      const cumulativeChecked = index + 1; // Since each log entry represents a checked garment
+
+      // Calculate cumulative defects up to this point
+      let cumulativeDefects = sortedLogs
+        .slice(0, index + 1)
+        .filter((entry) => entry.type === "reject")
+        .reduce((sum, entry) => {
+          // Sum the temporary defect counts for each rejection
+          const defectCounts = entry.defectDetails?.reduce(
+            (defectSum, detail) => defectSum + detail.count,
+            0
+          );
+          return sum + (defectCounts || 0);
+        }, 0);
+
+      const defectRate = (cumulativeDefects / cumulativeChecked) * 100;
+
+      return {
+        timestamp: log.timestamp, // Use the timestamp in seconds
+        cumulativeChecked,
+        cumulativeDefects,
+        defectRate,
+        isReject: log.type === "reject", // Add this flag
+      };
+    });
 
     // Debugging: Log cumulative values and defect rate only when data changes
     useEffect(() => {
@@ -198,7 +220,21 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
       }
     });
 
-    const data = cumulativeData.map((data) => data.defectRate);
+    let dataValues;
+    if (selectedDefect) {
+      // If a specific defect is selected, filter the defect rates
+      dataValues = cumulativeData.map((data, index) => {
+        const defectDetails = sortedLogs[index].defectDetails || [];
+        const defectCount = defectDetails.reduce((sum, detail) => {
+          return detail.name === selectedDefect ? sum + detail.count : sum;
+        }, 0);
+        const defectRate = (defectCount / data.cumulativeChecked) * 100;
+        return defectRate;
+      });
+    } else {
+      // Total defect rate
+      dataValues = cumulativeData.map((data) => data.defectRate);
+    }
 
     return {
       labels,
@@ -207,7 +243,11 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
           label: selectedDefect
             ? `Defect Rate for ${selectedDefect}`
             : "Total Defect Rate",
-          data,
+          data: cumulativeData.map((data) => ({
+            x: data.timestamp,
+            y: data.defectRate,
+            isReject: data.isReject,
+          })),
           borderColor: "rgba(255, 99, 132, 1)",
           backgroundColor: "rgba(255, 99, 132, 0.2)",
           borderWidth: 2,
@@ -239,6 +279,16 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
           mode: "x", // Pan only on the X-axis
         },
       },
+      datalabels: {
+        display: (context) => context.dataset.data[context.dataIndex].isReject,
+        formatter: (value, context) => {
+          return parseFloat(value.y).toFixed(1); // One decimal place
+        },
+        color: "black",
+        font: {
+          weight: "bold",
+        },
+      },
     },
     scales: {
       y: {
@@ -249,7 +299,10 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
         },
         ticks: {
           callback: (value) => `${value}%`, // Display Y-axis values as percentages
+          padding: 20, // Add padding to the top of the y-axis
         },
+        // Set a maximum value for the y-axis to ensure labels fit
+        suggestedMax: Math.max(...barChartData.datasets[0].data) + 10, // Add 10% buffer
       },
       x: {
         title: {
@@ -422,7 +475,12 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
                 ))}
               </select>
             </div>
-            <div style={{ height: "300px", width: "80%" }}>
+            <div
+              style={{
+                height: `${Math.max(300, barChartData.labels.length * 30)}px`,
+                width: "80%",
+              }}
+            >
               <Bar
                 data={barChartData}
                 options={barChartOptions}

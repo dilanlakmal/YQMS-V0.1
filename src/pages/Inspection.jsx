@@ -112,24 +112,32 @@ function Inspection({
     setCheckedQuantity((prev) => prev + 1);
     setDefectPieces((prev) => prev + 1);
 
+    // Calculate the total defects for this rejection
+    const totalDefectsForThisRejection = Object.values(
+      currentDefectCount
+    ).reduce((sum, count) => sum + count, 0);
+
+    // Update the defects state with the temporary counts
     Object.entries(currentDefectCount).forEach(([index, count]) => {
       if (count > 0) {
         setDefects((prev) => ({
           ...prev,
-          [index]: (prev[index] || 0) + count,
+          [index]: (prev[index] || 0) + count, // Add temporary count to the total defect count
         }));
       }
     });
 
+    // Prepare defect details for logging
     const currentDefects = Object.entries(currentDefectCount)
       .filter(([_, count]) => count > 0)
       .map(([index, count]) => ({
         name: defectsList[language][index].name,
-        count,
+        count, // Temporary count for this defect
         timestamp: timer, // Use the timer value (in seconds) as the timestamp
-        actualtime: currentTime.getTime(), //formatTime(actualTimeInSeconds),
+        actualtime: currentTime.getTime(),
       }));
 
+    // Log the rejection with cumulative defect details
     onLogEntry?.({
       type: "reject",
       garmentNo: checkedQuantity + 1,
@@ -138,12 +146,12 @@ function Inspection({
       timestamp: timer, // Use the timer value (in seconds) as the timestamp
       actualtime: currentTime.getTime(),
       cumulativeChecked: checkedQuantity + 1, // Cumulative checked quantity
-      cumulativeDefects: Object.values(defects).reduce(
-        (sum, count) => sum + count,
-        0
-      ), // Cumulative defect quantity
+      cumulativeDefects:
+        Object.values(defects).reduce((sum, count) => sum + count, 0) +
+        totalDefectsForThisRejection, // Cumulative defect quantity including this rejection
     });
 
+    // Reset the temporary defect counts
     setCurrentDefectCount({});
   };
 
