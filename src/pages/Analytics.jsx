@@ -16,6 +16,7 @@ import { Bar, Line } from "react-chartjs-2";
 import { defectsList } from "../constants/defects";
 import "chartjs-adapter-date-fns"; // For time formatting
 import zoomPlugin from "chartjs-plugin-zoom"; // For zoom in/out
+import ChartDataLabels from "chartjs-plugin-datalabels"; // For data labels
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faExclamationCircle,
@@ -50,13 +51,27 @@ ChartJS.register(
   LineElement,
   PointElement,
   TimeScale,
-  zoomPlugin
+  zoomPlugin,
+  ChartDataLabels // Register the datalabels plugin
 );
 
 function Analytics({ savedState, defects, checkedQuantity, logsState }) {
   const { inspectionData } = savedState || {};
   const [selectedDefect, setSelectedDefect] = useState(null); // State for selected defect filter
   const [timeFilter, setTimeFilter] = useState("time"); // State for time filter (HR, Min, Time)
+  const [selectedCategory, setSelectedCategory] = useState(null); // State for selected category filter
+
+  // Calculate defect rate by category
+  const categories = [
+    { name: "Fabric", indices: typeFabricDefectIndices },
+    { name: "Workmanship", indices: typeWorkmanshipDefectIndices },
+    { name: "Cleanliness", indices: typeCleanlinessDefectIndices },
+    { name: "Embellishment", indices: typeEmbellishmentDefectIndices },
+    { name: "Measurement", indices: typeMeasurementDefectIndices },
+    { name: "Washing", indices: typeWashingDefectIndices },
+    { name: "Finishing", indices: typeFinishingDefectIndices },
+    { name: "Miscellaneous", indices: typeMiscellaneousDefectIndices },
+  ];
 
   // Format time to HH:MM:SS
   const formatTime = (seconds) => {
@@ -69,14 +84,29 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
     )}:${String(secs).padStart(2, "0")}`;
   };
 
-  // Calculate defect rates for the bar chart
   const defectEntries = Object.entries(defects)
-    .filter(([_, count]) => count > 0)
+    .filter(([index, count]) => {
+      // If no category is selected, include all defects
+      if (!selectedCategory) return count > 0;
+
+      // Get the indices for the selected category
+      const categoryIndices = categories.find(
+        (cat) => cat.name === selectedCategory
+      )?.indices;
+
+      // Include defects that belong to the selected category
+      return count > 0 && categoryIndices?.includes(Number(index));
+    })
     .map(([index, count]) => ({
       name: defectsList.english[index].name,
       rate:
         checkedQuantity > 0 ? ((count / checkedQuantity) * 100).toFixed(2) : 0,
-    }));
+    }))
+    .map((entry) => ({
+      ...entry,
+      rate: parseFloat(entry.rate), // Convert rate to a number
+    }))
+    .sort((a, b) => b.rate - a.rate); // Sort by defect rate in descending order
 
   // Prepare data for the bar chart
   const barChartData = {
@@ -98,9 +128,13 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
     maintainAspectRatio: false, // Allow custom height and width
     plugins: {
       datalabels: {
-        anchor: "end",
-        align: "top",
-        formatter: (value) => `${value}%`, // Display defect rate as a percentage
+        anchor: "end", // Position the label at the end of the bar
+        align: "top", // Align the label to the top of the bar
+        formatter: (value) => `${value}%`, // Format the label as a percentage
+        color: "black", // Label text color
+        font: {
+          weight: "bold", // Make the label text bold
+        },
       },
       legend: {
         display: false, // Hide legend for bar chart
@@ -255,18 +289,6 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
       ? ((defectPieces / checkedQuantity) * 100).toFixed(2)
       : 0;
 
-  // Calculate defect rate by category
-  const categories = [
-    { name: "Fabric", indices: typeFabricDefectIndices },
-    { name: "Workmanship", indices: typeWorkmanshipDefectIndices },
-    { name: "Cleanliness", indices: typeCleanlinessDefectIndices },
-    { name: "Embellishment", indices: typeEmbellishmentDefectIndices },
-    { name: "Measurement", indices: typeMeasurementDefectIndices },
-    { name: "Washing", indices: typeWashingDefectIndices },
-    { name: "Finishing", indices: typeFinishingDefectIndices },
-    { name: "Miscellaneous", indices: typeMiscellaneousDefectIndices },
-  ];
-
   const categoryDefectRates = categories.map(({ name, indices }) => {
     const categoryDefects = Object.entries(defects)
       .filter(([index]) => {
@@ -285,27 +307,9 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
 
     return {
       category: name,
-      defectQty: categoryDefects, // Defect quantity specific to the category
       defectRate,
     };
   });
-
-  //   const categoryDefectRates = categories.map(({ name, indices }) => {
-  //     const categoryDefects = Object.entries(defects)
-  //       .filter(([index]) => indices.includes(parseInt(index)))
-  //       .reduce((sum, [_, count]) => sum + count, 0);
-
-  //     const defectRate =
-  //       checkedQuantity > 0
-  //         ? ((categoryDefects / checkedQuantity) * 100).toFixed(2)
-  //         : 0;
-
-  //     return {
-  //       category: name,
-  //       totalDefects: categoryDefects,
-  //       defectRate,
-  //     };
-  //   });
 
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
@@ -400,11 +404,30 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
         <div className="mt-8">
           {/* Bar Chart */}
           <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-            <h2 className="text-xl font-semibold mb-4">
-              Defect Rate by Defect Name
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold mb-4">
+                Defect Rate by Defect Name
+              </h2>
+              {/* Category Filter Dropdown */}
+              <select
+                value={selectedCategory || ""}
+                onChange={(e) => setSelectedCategory(e.target.value || null)}
+                className="p-2 border border-gray-300 rounded-md shadow-sm"
+              >
+                <option value="">All Categories</option>
+                {categories.map(({ name }) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div style={{ height: "300px", width: "80%" }}>
-              <Bar data={barChartData} options={barChartOptions} />
+              <Bar
+                data={barChartData}
+                options={barChartOptions}
+                plugins={[ChartDataLabels]}
+              />
             </div>
           </div>
 
@@ -455,9 +478,6 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
                   Category
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total Defect Qty
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Defect Rate (%)
                 </th>
               </tr>
@@ -467,9 +487,6 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
                 <tr key={category}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {category}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {totalDefects}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {defectRate}%
