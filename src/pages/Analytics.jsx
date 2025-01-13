@@ -541,6 +541,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
           </div>
 
           {/* Line Chart */}
+
           <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Defect Rate Over Time</h2>
@@ -570,11 +571,27 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
                 </select>
               </div>
             </div>
-            <div style={{ height: "400px", width: "100%" }}>
-              <Line data={getLineChartData()} options={lineChartOptions} />
+            {/* Scrollable container for the line chart */}
+            <div
+              style={{
+                overflowX: "auto", // Enable horizontal scrolling
+                height: "400px", // Fixed height for the chart container
+                width: "100%", // Full width of the parent container
+              }}
+            >
+              {/* Line chart with dynamic width */}
+              <div
+                style={{
+                  minWidth: `${getLineChartData().labels.length * 50}px`, // Dynamic width based on the number of labels
+                  height: "100%", // Full height of the container
+                }}
+              >
+                <Line data={getLineChartData()} options={lineChartOptions} />
+              </div>
             </div>
           </div>
         </div>
+
         {/* Category Defect Rates Table */}
         <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold mb-4">
