@@ -12,7 +12,8 @@ function Return({
   onLogEntry,
   timer,
   isPlaying,
-  inspectionState,
+  sharedState = {},
+  onUpdateSharedState = () => {},
 }) {
   const navigate = useNavigate();
   const [view, setView] = useState("list");
@@ -21,17 +22,36 @@ function Return({
     savedState?.returnDefects || {}
   );
   const [currentDefectCount, setCurrentDefectCount] = useState({});
+  // const [defects, setDefects] = useState(sharedState?.cumulativeDefects || {});
+
+  const [defects, setDefects] = useState(() => {
+    if (sharedState.defectArray) {
+      // Convert defectArray back to the original format
+      return sharedState.defectArray.reduce((acc, defect) => {
+        // Find the index in defectsList that matches the defect name
+        const index = Object.entries(defectsList.english).findIndex(
+          ([_, value]) => value.name === defect.name
+        );
+        if (index !== -1) {
+          acc[index] = defect.count;
+        }
+        return acc;
+      }, {});
+    }
+    return {};
+  });
+
   const [checkedQuantity, setCheckedQuantity] = useState(
-    inspectionState?.checkedQuantity || 0
+    sharedState?.cumulativeChecked || 0
   );
   const [goodOutput, setGoodOutput] = useState(
-    inspectionState?.goodOutput || 0
+    sharedState?.cumulativeGoodOutput || 0
   );
   const [defectPieces, setDefectPieces] = useState(
-    inspectionState?.defectPieces || 0
+    sharedState?.cumulativeDefectPieces || 0
   );
   const [returnDefectQty, setReturnDefectQty] = useState(
-    savedState?.returnDefectQty || inspectionState?.returnDefectQty || 0
+    savedState?.returnDefectQty || 0
   );
   const [hasDefectSelected, setHasDefectSelected] = useState(false);
 
@@ -44,12 +64,25 @@ function Return({
   }, [savedState, navigate]);
 
   useEffect(() => {
-    if (inspectionState) {
-      setCheckedQuantity(inspectionState.checkedQuantity);
-      setGoodOutput(inspectionState.goodOutput);
-      setDefectPieces(inspectionState.defectPieces);
+    if (sharedState) {
+      setCheckedQuantity(sharedState.cumulativeChecked || 0);
+      // Update defects when sharedState.defectArray changes
+      if (sharedState.defectArray) {
+        const newDefects = sharedState.defectArray.reduce((acc, defect) => {
+          const index = Object.entries(defectsList.english).findIndex(
+            ([_, value]) => value.name === defect.name
+          );
+          if (index !== -1) {
+            acc[index] = defect.count;
+          }
+          return acc;
+        }, {});
+        setDefects(newDefects);
+      }
+      setGoodOutput(sharedState.cumulativeGoodOutput || 0);
+      setDefectPieces(sharedState.cumulativeDefectPieces || 0);
     }
-  }, [inspectionState]);
+  }, [sharedState]);
 
   useEffect(() => {
     onStateChange?.({
@@ -107,65 +140,48 @@ function Return({
     if (!isPlaying || isReturnComplete || hasDefectSelected) return;
 
     const currentTime = new Date();
+    const newGoodOutput = Math.min(goodOutput + 1, checkedQuantity);
 
-    setGoodOutput((prev) => Math.min(prev + 1, checkedQuantity));
+    onUpdateSharedState({
+      cumulativeGoodOutput: newGoodOutput,
+      returnDefectArray: Object.entries(returnDefects).map(
+        ([index, count]) => ({
+          name: defectsList["english"][index].name,
+          count: count,
+        })
+      ),
+    });
 
-    // Prepare cumulative return defect array
-    const returnDefectArray = Object.entries(returnDefects).map(
-      ([index, count]) => ({
-        name: defectsList["english"][index].name, // Defect name in English
-        count: count + (currentDefectCount[index] || 0), // Cumulative count including current entry
-      })
-    );
-
-    // Prepare data for onLogEntry
-    const logEntryData = {
+    const qcData = {
       type: "pass-return",
       status: "Pass Return",
       timestamp: timer,
       actualtime: currentTime.getTime(),
-      defectDetails: [], // Empty for pass
-      checkedQty: 0, // Current entry
-      goodOutput: 1, // Current entry
-      defectQty: 0, // Current entry
-      defectPieces: 0, // Current entry
-      defectArray: inspectionState?.defectArray || [], // Keep the same as previous record
-      cumulativeChecked: inspectionState?.cumulativeChecked,
-      cumulativeDefects: inspectionState?.cumulativeDefects,
-      cumulativeGoodOutput: inspectionState?.cumulativeGoodOutput + 1, // Cumulative good output
-      cumulativeDefectPieces: inspectionState?.cumulativeDefectPieces, // Cumulative defect pieces
-
-      returnDefectList: [], // Empty for pass
-      returnDefectArray: returnDefectArray, // Maintain the same state as previous record
-      returnDefectQty: 0, // Current entry
-      cumulativeReturnDefectQty: returnDefectQty, // Cumulative return defect quantity
+      defectDetails: [],
+      checkedQty: 0,
+      goodOutput: 1,
+      defectQty: 0,
+      defectPieces: 0,
+      defectArray: sharedState.defectArray || [],
+      cumulativeChecked: checkedQuantity,
+      cumulativeDefects: sharedState.cumulativeDefects || 0,
+      cumulativeGoodOutput: newGoodOutput,
+      cumulativeDefectPieces: defectPieces,
+      returnDefectList: [],
+      returnDefectArray: Object.entries(returnDefects).map(
+        ([index, count]) => ({
+          name: defectsList["english"][index].name,
+          count: count,
+        })
+      ),
+      returnDefectQty: 0,
+      cumulativeReturnDefectQty: returnDefectQty,
     };
 
-    // Call onLogEntry
-    onLogEntry?.(logEntryData);
-
-    // Save to MongoDB
-    saveQCDataToBackend(logEntryData);
-
-    setCurrentDefectCount({});
+    saveQCDataToBackend(qcData);
+    setGoodOutput(newGoodOutput);
+    onLogEntry?.(qcData);
   };
-
-  // const handlePassReturn = () => {
-  //   if (!isPlaying || isReturnComplete || hasDefectSelected) return;
-  //   const currentTime = new Date();
-
-  //   setGoodOutput((prev) => Math.min(prev + 1, checkedQuantity));
-
-  //   onLogEntry?.({
-  //     type: "pass-return",
-  //     status: "Pass Return",
-  //     timestamp: timer, //new Date().getTime(),
-  //     actualtime: currentTime.getTime(),
-  //     defectDetails: [],
-  //   });
-
-  //   setCurrentDefectCount({});
-  // };
 
   const handleRejectReturn = () => {
     if (
@@ -180,75 +196,73 @@ function Return({
       (sum, count) => sum + count,
       0
     );
-    setReturnDefectQty((prev) => prev + totalNewDefects);
+    const newReturnDefectQty = returnDefectQty + totalNewDefects;
 
-    // Prepare return defect details in English
+    onUpdateSharedState({
+      returnDefectQty: newReturnDefectQty,
+      cumulativeReturnDefectQty: newReturnDefectQty,
+      returnDefectArray: Object.entries(returnDefects).map(
+        ([index, count]) => ({
+          name: defectsList["english"][index].name,
+          count: count + (currentDefectCount[index] || 0),
+        })
+      ),
+    });
+
     const returnDefectList = Object.entries(currentDefectCount)
       .filter(([_, count]) => count > 0)
       .map(([index, count]) => ({
-        name: defectsList["english"][index].name, // Defect name in English
+        name: defectsList["english"][index].name,
         count,
       }));
 
-    // Prepare cumulative return defect array
-    const returnDefectArray = Object.entries(returnDefects).map(
-      ([index, count]) => ({
-        name: defectsList["english"][index].name, // Defect name in English
-        count: count + (currentDefectCount[index] || 0), // Cumulative count including current entry
-      })
-    );
+    const mergedReturnDefectArray = Object.entries(returnDefects)
+      .map(([index, count]) => ({
+        name: defectsList["english"][index].name,
+        count: count + (currentDefectCount[index] || 0),
+      }))
+      .concat(
+        Object.entries(currentDefectCount)
+          .filter(([index]) => !returnDefects[index])
+          .map(([index, count]) => ({
+            name: defectsList["english"][index].name,
+            count,
+          }))
+      )
+      .reduce((acc, defect) => {
+        const existingDefect = acc.find((d) => d.name === defect.name);
+        if (existingDefect) {
+          existingDefect.count += defect.count;
+        } else {
+          acc.push(defect);
+        }
+        return acc;
+      }, []);
 
-    // Add defects from currentDefectCount that are not in returnDefects
-    Object.entries(currentDefectCount).forEach(([index, count]) => {
-      if (!returnDefects[index]) {
-        returnDefectArray.push({
-          name: defectsList["english"][index].name, // Defect name in English
-          count: count, // Current count for this defect
-        });
-      }
-    });
-
-    // Ensure defect names are unique and sum counts for duplicates
-    const mergedReturnDefectArray = returnDefectArray.reduce((acc, defect) => {
-      const existingDefect = acc.find((d) => d.name === defect.name);
-      if (existingDefect) {
-        existingDefect.count += defect.count; // Sum counts for the same defect name
-      } else {
-        acc.push(defect); // Add new defect to the array
-      }
-      return acc;
-    }, []);
-
-    // Prepare data for onLogEntry
-    const logEntryData = {
+    const qcData = {
       type: "reject-return",
       status: "Reject Return",
       timestamp: timer,
       actualtime: currentTime.getTime(),
-      defectDetails: [], // Empty for reject
-      checkedQty: 0, // Current entry
-      goodOutput: 0, // Current entry
-      defectQty: 0, // Current entry
-      defectPieces: 0, // Current entry
-      defectArray: inspectionState?.defectArray || [], // Keep the same as previous record
-      cumulativeChecked: inspectionState?.cumulativeChecked,
-      cumulativeDefects: inspectionState?.cumulativeDefects,
-      cumulativeGoodOutput: inspectionState?.cumulativeGoodOutput, // Cumulative good output
-      cumulativeDefectPieces: inspectionState?.cumulativeDefectPieces, // Cumulative defect pieces
-
-      returnDefectList: returnDefectList, // Return defect list for the current entry
-      returnDefectArray: mergedReturnDefectArray, // Cumulative return defect array
-      returnDefectQty: totalNewDefects, // Sum of return defect counts for this entry
-      cumulativeReturnDefectQty: returnDefectQty + totalNewDefects, // Cumulative return defect quantity
+      defectDetails: [],
+      checkedQty: 0,
+      goodOutput: 0,
+      defectQty: 0,
+      defectPieces: 0,
+      defectArray: sharedState.defectArray || [],
+      cumulativeChecked: checkedQuantity,
+      cumulativeDefects: sharedState.cumulativeDefects || 0,
+      cumulativeGoodOutput: goodOutput,
+      cumulativeDefectPieces: defectPieces,
+      returnDefectList: returnDefectList,
+      returnDefectArray: mergedReturnDefectArray,
+      returnDefectQty: totalNewDefects,
+      cumulativeReturnDefectQty: newReturnDefectQty,
     };
 
-    // Call onLogEntry
-    onLogEntry?.(logEntryData);
+    saveQCDataToBackend(qcData);
+    setReturnDefectQty(newReturnDefectQty);
 
-    // Save to MongoDB
-    saveQCDataToBackend(logEntryData);
-
-    // Update the return defects state with the temporary counts
     Object.entries(currentDefectCount).forEach(([index, count]) => {
       if (count > 0) {
         setReturnDefects((prev) => ({
@@ -259,51 +273,9 @@ function Return({
     });
 
     setCurrentDefectCount({});
+    onLogEntry?.(qcData);
+    setHasDefectSelected(false);
   };
-
-  // const handleRejectReturn = () => {
-  //   if (
-  //     !isPlaying ||
-  //     isReturnComplete ||
-  //     !Object.values(currentDefectCount).some((count) => count > 0)
-  //   )
-  //     return;
-
-  //   const currentTime = new Date().getTime();
-  //   const totalNewDefects = Object.values(currentDefectCount).reduce(
-  //     (sum, count) => sum + count,
-  //     0
-  //   );
-  //   setReturnDefectQty((prev) => prev + totalNewDefects);
-
-  //   // Update return-specific defects
-  //   Object.entries(currentDefectCount).forEach(([index, count]) => {
-  //     if (count > 0) {
-  //       setReturnDefects((prev) => ({
-  //         ...prev,
-  //         [index]: (prev[index] || 0) + count,
-  //       }));
-  //     }
-  //   });
-
-  //   const currentDefects = Object.entries(currentDefectCount)
-  //     .filter(([_, count]) => count > 0)
-  //     .map(([index, count]) => ({
-  //       name: defectsList[language][index].name, // Access the 'name' property
-  //       count,
-  //       timestamp: timer,
-  //     }));
-
-  //   onLogEntry?.({
-  //     type: "reject-return",
-  //     status: "Reject Return",
-  //     defectDetails: currentDefects,
-  //     timestamp: timer, //currentTime,
-  //     actualtime: currentTime,
-  //   });
-
-  //   setCurrentDefectCount({});
-  // };
 
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
@@ -352,6 +324,11 @@ function Return({
               }}
               onCurrentDefectUpdate={(index, value) => {
                 setCurrentDefectCount((prev) => ({ ...prev, [index]: value }));
+                setHasDefectSelected(
+                  Object.values({ ...currentDefectCount, [index]: value }).some(
+                    (count) => count > 0
+                  )
+                );
               }}
               onLogEntry={onLogEntry}
               isPlaying={isPlaying && !isReturnComplete}
@@ -384,7 +361,7 @@ function Return({
       <div className="fixed bottom-0 left-0 right-0 bg-white shadow-md z-40">
         <div className="max-w-8xl mx-auto px-4 py-4">
           <Summary
-            defects={inspectionState?.defects || {}}
+            defects={defects}
             checkedQuantity={checkedQuantity}
             goodOutput={goodOutput}
             defectPieces={defectPieces}

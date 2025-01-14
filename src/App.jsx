@@ -13,12 +13,23 @@ import Return from "./pages/Return";
 import Profile from "./pages/Profile";
 import Logs from "./pages/Logs";
 import Navbar from "./components/layout/Navbar";
-import Analytics from "./pages/Analytics"; // Import the Analytics component
+import Analytics from "./pages/Analytics";
 import "./App.css";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [detailsSubmitted, setDetailsSubmitted] = useState(false);
+  const [sharedState, setSharedState] = useState({
+    cumulativeChecked: 0,
+    cumulativeDefects: 0,
+    cumulativeGoodOutput: 0,
+    cumulativeDefectPieces: 0,
+    returnDefectList: [],
+    returnDefectArray: [],
+    returnDefectQty: 0,
+    cumulativeReturnDefectQty: 0,
+    defectArray: [],
+  });
   const [inspectionState, setInspectionState] = useState(null);
   const [returnState, setReturnState] = useState(null);
   const [logsState, setLogsState] = useState({
@@ -41,39 +52,12 @@ function App() {
     return () => clearInterval(interval);
   }, [isPlaying]);
 
-  // Update return state when inspection state changes
-  useEffect(() => {
-    if (inspectionState) {
-      setReturnState((prev) => ({
-        ...prev,
-        checkedQuantity: inspectionState.checkedQuantity,
-        goodOutput: inspectionState.goodOutput,
-        defectPieces: inspectionState.defectPieces,
-        returnDefectQty: prev.returnDefectQty ?? 0, // Preserve returnDefectQty if not explicitly updated
-      }));
-    }
-  }, [inspectionState]);
-
-  // Update inspection state when return state changes goodOutput or returnDefectQty
-  useEffect(() => {
-    if (returnState) {
-      // Check if goodOutput has changed and update inspectionState
-      if (returnState.goodOutput !== inspectionState?.goodOutput) {
-        setInspectionState((prev) => ({
-          ...prev,
-          goodOutput: returnState.goodOutput,
-        }));
-      }
-
-      // Check if returnDefectQty has changed and update inspectionState
-      if (returnState.returnDefectQty !== inspectionState?.returnDefectQty) {
-        setInspectionState((prev) => ({
-          ...prev,
-          returnDefectQty: returnState.returnDefectQty,
-        }));
-      }
-    }
-  }, [returnState?.goodOutput, returnState?.returnDefectQty]);
+  const handleUpdateSharedState = (newState) => {
+    setSharedState((prev) => ({
+      ...prev,
+      ...newState,
+    }));
+  };
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -87,6 +71,17 @@ function App() {
   const resetAllStates = () => {
     setInspectionState(null);
     setReturnState(null);
+    setSharedState({
+      cumulativeChecked: 0,
+      cumulativeDefects: 0,
+      cumulativeGoodOutput: 0,
+      cumulativeDefectPieces: 0,
+      returnDefectList: [],
+      returnDefectArray: [],
+      returnDefectQty: 0,
+      cumulativeReturnDefectQty: 0,
+      defectArray: [],
+    });
     setLogsState({
       details: null,
       logs: [],
@@ -130,10 +125,8 @@ function App() {
     let inspectionTime;
 
     if (logsState.logs.length === 0) {
-      // First entry - calculate time from inspection start
       inspectionTime = (currentTime - inspectionStartTime.getTime()) / 60000;
     } else {
-      // Subsequent entries - calculate time from last action
       inspectionTime = (currentTime - logsState.lastActionTime) / 60000;
     }
 
@@ -178,7 +171,6 @@ function App() {
       ...prev,
       ...newState,
     }));
-
     // Update goodOutput in inspection state if it changed in return state
     if (newState.goodOutput !== inspectionState?.goodOutput) {
       setInspectionState((prev) => ({
@@ -236,6 +228,8 @@ function App() {
                         timer={timer}
                         isPlaying={isPlaying}
                         onPlayPause={handlePlayPause}
+                        sharedState={sharedState}
+                        onUpdateSharedState={handleUpdateSharedState}
                       />
                     ) : (
                       <Navigate to="/details" replace />
@@ -252,7 +246,8 @@ function App() {
                         onLogEntry={handleLogEntry}
                         timer={timer}
                         isPlaying={isPlaying}
-                        inspectionState={inspectionState}
+                        sharedState={sharedState}
+                        onUpdateSharedState={handleUpdateSharedState}
                       />
                     ) : (
                       <Navigate to="/details" replace />
@@ -270,7 +265,6 @@ function App() {
                   }
                 />
                 <Route path="/profile" element={<Profile />} />
-                {/* Add the Analytics route */}
                 <Route
                   path="/analytics"
                   element={
@@ -279,8 +273,8 @@ function App() {
                         savedState={inspectionState}
                         defects={inspectionState?.defects || {}}
                         checkedQuantity={inspectionState?.checkedQuantity || 0}
-                        logsState={logsState} // Pass logsState
-                        timer={timer} // Pass the timer
+                        logsState={logsState}
+                        timer={timer}
                       />
                     ) : (
                       <Navigate to="/details" replace />

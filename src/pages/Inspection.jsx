@@ -1,8 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import html2pdf from "html2pdf.js";
-import * as XLSX from "xlsx";
-import fs from "fs"; // Node.js file system module
 import Header from "../components/inspection/Header";
 import ViewToggle from "../components/inspection/ViewToggle";
 import DefectsList from "../components/inspection/DefectsList";
@@ -12,10 +9,7 @@ import PreviewModal from "../components/inspection/PreviewModal";
 import { defectsList } from "../constants/defects";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faDownload } from "@fortawesome/free-solid-svg-icons";
-import FormatTime from "../components/formatting/FormatTime";
-import HandleDownloadPDF from "../components/handlefunc/HandleDownloadPDF"; // Import the new component
-import HandlePass from "../components/handlefunc/HandlePass"; // Import HandlePass
-import HandleReject from "../components/handlefunc/HandleReject"; // Import HandleReject
+import HandleDownloadPDF from "../components/handlefunc/HandleDownloadPDF";
 
 function Inspection({
   savedState,
@@ -26,6 +20,8 @@ function Inspection({
   timer,
   isPlaying,
   onPlayPause,
+  sharedState = {},
+  onUpdateSharedState = () => {},
 }) {
   const navigate = useNavigate();
   const [view, setView] = useState(savedState?.view || "list");
@@ -40,9 +36,6 @@ function Inspection({
   const [goodOutput, setGoodOutput] = useState(savedState?.goodOutput || 0);
   const [defectPieces, setDefectPieces] = useState(
     savedState?.defectPieces || 0
-  );
-  const [returnDefectQty, setReturnDefectQty] = useState(
-    savedState?.returnDefectQty || 0
   );
   const [hasDefectSelected, setHasDefectSelected] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -61,7 +54,6 @@ function Inspection({
       checkedQuantity,
       goodOutput,
       defectPieces,
-      returnDefectQty,
       language,
       view,
       hasDefectSelected,
@@ -72,21 +64,10 @@ function Inspection({
     checkedQuantity,
     goodOutput,
     defectPieces,
-    returnDefectQty,
     language,
     view,
     hasDefectSelected,
   ]);
-
-  const formatTime = (seconds) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${String(hrs).padStart(2, "0")}:${String(mins).padStart(
-      2,
-      "0"
-    )}:${String(secs).padStart(2, "0")}`;
-  };
 
   const saveQCDataToBackend = async (qcData) => {
     try {
@@ -113,52 +94,52 @@ function Inspection({
     if (!isPlaying || hasDefectSelected) return;
 
     const currentTime = new Date();
+    const newCheckedQuantity = checkedQuantity + 1;
+    const newGoodOutput = goodOutput + 1;
 
-    setCheckedQuantity((prev) => prev + 1);
-    setGoodOutput((prev) => prev + 1);
-
-    // Prepare data for onLogEntry (unchanged)
-    const logEntryData = {
-      type: "pass",
-      garmentNo: checkedQuantity + 1,
-      status: "Pass",
-      timestamp: timer,
-      actualtime: currentTime.getTime(),
-      defectDetails: [],
-    };
-
-    // Call onLogEntry (unchanged)
-    onLogEntry?.(logEntryData);
-
-    // Prepare defect array with cumulative counts
-    const defectArray = Object.entries(defects).map(([index, count]) => ({
-      name: defectsList["english"][index].name, // Defect name in English
-      count: count, // Cumulative count for this defect
-    }));
-
-    // Prepare data for MongoDB
-    const qcData = {
-      ...logEntryData, // Use the same data as onLogEntry
-      checkedQty: 1,
-      goodOutput: 1,
-      defectQty: 0,
-      defectPieces: 0,
-      defectArray: defectArray, // Include the defect array
-      cumulativeChecked: checkedQuantity + 1,
+    // Update shared state
+    onUpdateSharedState({
+      cumulativeChecked: newCheckedQuantity,
+      cumulativeGoodOutput: newGoodOutput,
       cumulativeDefects: Object.values(defects).reduce(
         (sum, count) => sum + count,
         0
       ),
-      cumulativeGoodOutput: goodOutput + 1, // Cumulative good output
-      cumulativeDefectPieces: defectPieces, // Cumulative defect pieces
-      returnDefectList: [], // Empty for pass
-      returnDefectArray: [], // Maintain the same state as previous record
-      returnDefectQty: 0, // Current entry
-      cumulativeReturnDefectQty: 0, // Cumulative return defect quantity
+      cumulativeDefectPieces: defectPieces,
+    });
+
+    const qcData = {
+      type: "pass",
+      garmentNo: newCheckedQuantity,
+      status: "Pass",
+      timestamp: timer,
+      actualtime: currentTime.getTime(),
+      defectDetails: [],
+      checkedQty: 1,
+      goodOutput: 1,
+      defectQty: 0,
+      defectPieces: 0,
+      defectArray: Object.entries(defects).map(([index, count]) => ({
+        name: defectsList["english"][index].name,
+        count: count,
+      })),
+      cumulativeChecked: newCheckedQuantity,
+      cumulativeDefects: Object.values(defects).reduce(
+        (sum, count) => sum + count,
+        0
+      ),
+      cumulativeGoodOutput: newGoodOutput,
+      cumulativeDefectPieces: defectPieces,
+      returnDefectList: [],
+      returnDefectArray: sharedState.returnDefectArray || [],
+      returnDefectQty: 0,
+      cumulativeReturnDefectQty: sharedState.cumulativeReturnDefectQty || 0,
     };
 
-    // Save to MongoDB
     saveQCDataToBackend(qcData);
+    setCheckedQuantity(newCheckedQuantity);
+    setGoodOutput(newGoodOutput);
+    onLogEntry?.(qcData);
   };
 
   const handleReject = () => {
@@ -169,17 +150,13 @@ function Inspection({
       return;
 
     const currentTime = new Date();
-    const timestamp = timer;
-
-    setCheckedQuantity((prev) => prev + 1);
-    setDefectPieces((prev) => prev + 1);
-
-    // Calculate the total defects for this rejection
+    const newCheckedQuantity = checkedQuantity + 1;
     const totalDefectsForThisRejection = Object.values(
       currentDefectCount
     ).reduce((sum, count) => sum + count, 0);
+    const newDefectPieces = defectPieces + 1;
 
-    // Prepare defect details for logging
+    // Create current defects array
     const currentDefects = Object.entries(currentDefectCount)
       .filter(([_, count]) => count > 0)
       .map(([index, count]) => ({
@@ -189,74 +166,72 @@ function Inspection({
         actualtime: currentTime.getTime(),
       }));
 
-    // Prepare data for onLogEntry (unchanged)
-    const logEntryData = {
+    // Create a map of all defects (previous + current) by defect name
+    const defectMap = new Map();
+
+    // Add previous defects to the map
+    Object.entries(defects).forEach(([index, count]) => {
+      const defectName = defectsList["english"][index].name;
+      defectMap.set(defectName, (defectMap.get(defectName) || 0) + count);
+    });
+
+    // Add current defects to the map
+    Object.entries(currentDefectCount)
+      .filter(([_, count]) => count > 0)
+      .forEach(([index, count]) => {
+        const defectName = defectsList["english"][index].name;
+        defectMap.set(defectName, (defectMap.get(defectName) || 0) + count);
+      });
+
+    // Convert map to array format
+    const mergedDefectArray = Array.from(defectMap.entries()).map(
+      ([name, count]) => ({
+        name,
+        count,
+      })
+    );
+
+    // Calculate total defects including current rejection
+    const totalDefects =
+      Object.values(defects).reduce((sum, count) => sum + count, 0) +
+      totalDefectsForThisRejection;
+
+    // Update shared state with current values
+    onUpdateSharedState({
+      cumulativeChecked: newCheckedQuantity,
+      cumulativeDefects: totalDefects,
+      cumulativeGoodOutput: goodOutput,
+      cumulativeDefectPieces: newDefectPieces,
+      defectArray: mergedDefectArray,
+      currentDefectQty: totalDefects,
+    });
+
+    const qcData = {
       type: "reject",
-      garmentNo: checkedQuantity + 1,
+      garmentNo: newCheckedQuantity,
       status: "Reject",
       defectDetails: currentDefects,
       timestamp: timer,
       actualtime: currentTime.getTime(),
-      cumulativeChecked: checkedQuantity + 1,
-      cumulativeDefects:
-        Object.values(defects).reduce((sum, count) => sum + count, 0) +
-        totalDefectsForThisRejection,
-    };
-
-    // Call onLogEntry (unchanged)
-    onLogEntry?.(logEntryData);
-
-    // Merge defects and currentDefectCount to create defectArray
-    const defectArray = Object.entries(defects).map(([index, count]) => ({
-      name: defectsList["english"][index].name, // Defect name in English
-      count: count + (currentDefectCount[index] || 0), // Cumulative count including current entry
-    }));
-
-    // Add defects from currentDefectCount that are not in defects
-    Object.entries(currentDefectCount).forEach(([index, count]) => {
-      if (!defects[index]) {
-        defectArray.push({
-          name: defectsList["english"][index].name, // Defect name in English
-          count: count, // Current count for this defect
-        });
-      }
-    });
-
-    // Ensure defect names are unique and sum counts for duplicates
-    const mergedDefectArray = defectArray.reduce((acc, defect) => {
-      const existingDefect = acc.find((d) => d.name === defect.name);
-      if (existingDefect) {
-        existingDefect.count += defect.count; // Sum counts for the same defect name
-      } else {
-        acc.push(defect); // Add new defect to the array
-      }
-      return acc;
-    }, []);
-
-    // Prepare data for MongoDB
-    const qcData = {
-      ...logEntryData, // Use the same data as onLogEntry
       checkedQty: 1,
-      goodOutput: 0, // No change for reject
-      defectQty: totalDefectsForThisRejection, // Sum of selected defect counts for this entry
-      defectPieces: 1, // Increment defect pieces for this entry
-      defectArray: mergedDefectArray, // Include the merged defect array
-      cumulativeChecked: checkedQuantity + 1,
-      cumulativeDefects:
-        Object.values(defects).reduce((sum, count) => sum + count, 0) +
-        totalDefectsForThisRejection,
-      cumulativeGoodOutput: goodOutput, // Cumulative good output
-      cumulativeDefectPieces: defectPieces + 1, // Cumulative defect pieces
-      returnDefectList: [], // Empty for pass
-      returnDefectArray: [], // Maintain the same state as previous record
-      returnDefectQty: 0, // Current entry
-      cumulativeReturnDefectQty: 0, // Cumulative return defect quantity
+      goodOutput: 0,
+      defectQty: totalDefectsForThisRejection,
+      defectPieces: 1,
+      defectArray: mergedDefectArray,
+      cumulativeChecked: newCheckedQuantity,
+      cumulativeDefects: totalDefects,
+      cumulativeGoodOutput: goodOutput,
+      cumulativeDefectPieces: newDefectPieces,
+      returnDefectList: [],
+      returnDefectArray: sharedState.returnDefectArray || [],
+      returnDefectQty: 0,
+      cumulativeReturnDefectQty: sharedState.cumulativeReturnDefectQty || 0,
     };
 
-    // Save to MongoDB
     saveQCDataToBackend(qcData);
+    setCheckedQuantity(newCheckedQuantity);
+    setDefectPieces(newDefectPieces);
 
-    // Update the defects state with the temporary counts
     Object.entries(currentDefectCount).forEach(([index, count]) => {
       if (count > 0) {
         setDefects((prev) => ({
@@ -266,8 +241,8 @@ function Inspection({
       }
     });
 
-    // Reset the temporary defect counts
     setCurrentDefectCount({});
+    onLogEntry?.(qcData);
   };
 
   const handleSubmit = () => {
@@ -295,7 +270,7 @@ function Inspection({
               <PlayPauseButton
                 isPlaying={isPlaying}
                 onToggle={onPlayPause}
-                timer={timer} //{formatTime(timer)}
+                timer={timer}
               />
             </div>
 
@@ -314,7 +289,7 @@ function Inspection({
                 goodOutput={goodOutput}
                 defectPieces={defectPieces}
                 language={language}
-                defectsList={defectsList} // Pass defectsList as a prop
+                defectsList={defectsList}
               />
 
               <button
@@ -392,7 +367,7 @@ function Inspection({
               checkedQuantity={checkedQuantity}
               goodOutput={goodOutput}
               defectPieces={defectPieces}
-              returnDefectQty={returnDefectQty}
+              returnDefectQty={sharedState.returnDefectQty || 0}
             />
           </div>
         </div>
@@ -406,7 +381,7 @@ function Inspection({
         checkedQuantity={checkedQuantity}
         goodOutput={goodOutput}
         defectPieces={defectPieces}
-        returnDefectQty={returnDefectQty}
+        returnDefectQty={sharedState.returnDefectQty || 0}
         language={language}
       />
     </div>
