@@ -1,7 +1,19 @@
+import { useState } from "react";
+
 function Logs({ logsState }) {
   const { details, logs, startTime } = logsState;
 
-  const formatTime = (timestamp) => {
+  const formatTime = (seconds) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${String(hrs).padStart(2, "0")}:${String(mins).padStart(
+      2,
+      "0"
+    )}:${String(secs).padStart(2, "0")}`;
+  };
+
+  const formatedTime = (timestamp) => {
     return new Date(timestamp).toLocaleTimeString("en-US", {
       hour12: false,
       hour: "2-digit",
@@ -10,7 +22,21 @@ function Logs({ logsState }) {
     });
   };
 
-  const filteredLogs = logs.filter((log) => log.status && log.status !== "");
+  const calculateInspectionTime = (log, index) => {
+    if (index === 0) {
+      return log.timestamp - 0;
+    } else {
+      return log.timestamp - statusLogs[index - 1].timestamp;
+    }
+  };
+
+  const statusLogs = logs.filter(
+    (log) =>
+      log.status === "Pass" ||
+      log.status === "Reject" ||
+      log.status === "Pass Return" ||
+      log.status === "Reject Return"
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20">
@@ -46,7 +72,7 @@ function Logs({ logsState }) {
           <div className="mt-4 border-t pt-4">
             <p>
               <span className="font-medium">Start Inspection Time:</span>{" "}
-              {startTime ? formatTime(startTime) : "N/A"}
+              {startTime ? formatedTime(startTime) : "N/A"}
             </p>
           </div>
         </div>
@@ -63,18 +89,21 @@ function Logs({ logsState }) {
                     Defect Details
                   </th>
                   <th className="px-4 py-2 text-left font-medium text-gray-500">
-                    Timestamp
+                    Actual Timestamp
+                  </th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500">
+                    Working Timestamp
                   </th>
                   <th className="px-4 py-2 text-left font-medium text-gray-500">
                     Status
                   </th>
                   <th className="px-4 py-2 text-left font-medium text-gray-500">
-                    Inspection Time (min)
+                    Inspection Time (s | min)
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredLogs.map((log, index) => (
+                {statusLogs.map((log, index) => (
                   <tr key={index}>
                     <td className="px-4 py-2">{log.garmentNo}</td>
                     <td className="px-4 py-2">
@@ -86,9 +115,16 @@ function Logs({ logsState }) {
                           ))
                         : "-"}
                     </td>
+                    <td className="px-4 py-2">
+                      {formatedTime(log.actualtime)}
+                    </td>
                     <td className="px-4 py-2">{formatTime(log.timestamp)}</td>
                     <td className="px-4 py-2">{log.status}</td>
-                    <td className="px-4 py-2">{log.inspectionTime}</td>
+                    <td className="px-4 py-2">
+                      {calculateInspectionTime(log, index)}s (
+                      {(calculateInspectionTime(log, index) / 60).toFixed(2)}
+                      min)
+                    </td>
                   </tr>
                 ))}
               </tbody>

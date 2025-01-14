@@ -66,6 +66,26 @@ function Navbar({ onLogout }) {
             >
               Logs
             </Link>
+            <Link
+              to="/defect-images"
+              className={`inline-flex items-center px-1 pt-1 ${
+                location.pathname === "/defect-images"
+                  ? "text-indigo-600 border-b-2 border-indigo-600"
+                  : "text-gray-900 hover:text-indigo-600"
+              }`}
+            >
+              Defect Images
+            </Link>
+            <Link
+              to="/analytics"
+              className={`inline-flex items-center px-1 pt-1 ${
+                location.pathname === "/analytics"
+                  ? "text-indigo-600 border-b-2 border-indigo-600"
+                  : "text-gray-900 hover:text-indigo-600"
+              }`}
+            >
+              Analytics
+            </Link>
           </div>
 
           <div className="flex items-center">

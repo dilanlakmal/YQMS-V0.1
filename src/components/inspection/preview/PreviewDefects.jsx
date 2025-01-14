@@ -1,13 +1,16 @@
-import { defectsList } from '../../../constants/QC Inspection/defects';
+import { defectsList } from "../../../constants/defects";
 
 function PreviewDefects({ defects, language, checkedQuantity }) {
   const defectItems = defectsList[language];
   const defectEntries = Object.entries(defects)
     .filter(([_, count]) => count > 0)
     .map(([index, count]) => ({
-      name: defectItems[index],
+      name: defectItems[index].name,
       count,
-      rate: checkedQuantity > 0 ? (count / checkedQuantity * 100).toFixed(2) : '0.00'
+      rate:
+        checkedQuantity > 0
+          ? ((count / checkedQuantity) * 100).toFixed(2)
+          : "0.00",
     }))
     .sort((a, b) => b.count - a.count); // Sort by count in descending order
 

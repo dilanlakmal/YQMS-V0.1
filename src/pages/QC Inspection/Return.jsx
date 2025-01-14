@@ -30,18 +30,9 @@ function Return({
   const [defectPieces, setDefectPieces] = useState(
     inspectionState?.defectPieces || 0
   );
-
-  /*
-  const [returnDefectQty, setReturnDefectQty] = useState(
-    savedState?.returnDefectQty || 0
-  );
-
-  */
-
   const [returnDefectQty, setReturnDefectQty] = useState(
     savedState?.returnDefectQty || inspectionState?.returnDefectQty || 0
   );
-
   const [hasDefectSelected, setHasDefectSelected] = useState(false);
 
   const isReturnComplete = goodOutput >= checkedQuantity;
@@ -52,7 +43,6 @@ function Return({
     }
   }, [savedState, navigate]);
 
-  // Keep in sync with inspection state
   useEffect(() => {
     if (inspectionState) {
       setCheckedQuantity(inspectionState.checkedQuantity);
@@ -94,12 +84,15 @@ function Return({
 
   const handlePassReturn = () => {
     if (!isPlaying || isReturnComplete || hasDefectSelected) return;
+    const currentTime = new Date();
+
     setGoodOutput((prev) => Math.min(prev + 1, checkedQuantity));
 
     onLogEntry?.({
       type: "pass-return",
       status: "Pass Return",
-      timestamp: new Date().getTime(),
+      timestamp: timer, //new Date().getTime(),
+      actualtime: currentTime.getTime(),
       defectDetails: [],
     });
 
@@ -134,16 +127,17 @@ function Return({
     const currentDefects = Object.entries(currentDefectCount)
       .filter(([_, count]) => count > 0)
       .map(([index, count]) => ({
-        name: defectsList[language][index],
+        name: defectsList[language][index].name, // Access the 'name' property
         count,
-        timestamp: currentTime,
+        timestamp: timer,
       }));
 
     onLogEntry?.({
       type: "reject-return",
       status: "Reject Return",
       defectDetails: currentDefects,
-      timestamp: currentTime,
+      timestamp: timer, //currentTime,
+      actualtime: currentTime,
     });
 
     setCurrentDefectCount({});
