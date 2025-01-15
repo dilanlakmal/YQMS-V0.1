@@ -117,6 +117,15 @@ function Return({
     )}:${String(secs).padStart(2, "0")}`;
   };
 
+  // Convert the date field to an ISO string
+  const headerData = {
+    ...savedState?.inspectionData,
+    date:
+      savedState?.inspectionData?.date instanceof Date
+        ? savedState.inspectionData.date.toISOString()
+        : savedState?.inspectionData?.date,
+  };
+
   const saveQCDataToBackend = async (qcData) => {
     try {
       const response = await fetch("http://localhost:5001/api/save-qc-data", {
@@ -155,7 +164,9 @@ function Return({
     });
 
     const qcData = {
+      headerData,
       type: "pass-return",
+      garmentNo: null,
       status: "Pass Return",
       timestamp: timer,
       actualtime: currentTime.getTime(),
@@ -244,7 +255,9 @@ function Return({
       }, []);
 
     const qcData = {
+      headerData,
       type: "reject-return",
+      garmentNo: null,
       status: "Reject Return",
       timestamp: timer,
       actualtime: currentTime.getTime(),

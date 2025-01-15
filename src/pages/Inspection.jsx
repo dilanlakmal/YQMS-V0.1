@@ -71,8 +71,18 @@ function Inspection({
     hasDefectSelected,
   ]);
 
+  // Convert the date field to an ISO string
+  const headerData = {
+    ...savedState?.inspectionData,
+    date:
+      savedState?.inspectionData?.date instanceof Date
+        ? savedState.inspectionData.date.toISOString()
+        : savedState?.inspectionData?.date,
+  };
+
   const saveQCDataToBackend = async (qcData) => {
     try {
+      console.log("Sending QC Data to Backend:", qcData); // Debugging line
       const response = await fetch("http://localhost:5001/api/save-qc-data", {
         method: "POST",
         headers: {
@@ -87,6 +97,7 @@ function Inspection({
 
       const result = await response.json();
       console.log(result.message);
+      console.log("Response from backend:", result); // Debugging line
     } catch (error) {
       console.error("Error saving QC data:", error);
     }
@@ -94,6 +105,8 @@ function Inspection({
 
   const handlePass = () => {
     if (!isPlaying || hasDefectSelected) return;
+
+    // console.log("Header Data (Pass):", savedState?.inspectionData); // Debugging line
 
     const currentTime = new Date();
     const newCheckedQuantity = checkedQuantity + 1;
@@ -111,6 +124,7 @@ function Inspection({
     });
 
     const qcData = {
+      headerData,
       type: "pass",
       garmentNo: newCheckedQuantity,
       status: "Pass",
@@ -139,6 +153,8 @@ function Inspection({
       returnDefectQty: 0,
       cumulativeReturnDefectQty: sharedState.cumulativeReturnDefectQty || 0,
     };
+
+    // console.log("QC Data to be sent:", qcData); // Debugging line
 
     saveQCDataToBackend(qcData);
     setCheckedQuantity(newCheckedQuantity);
@@ -211,6 +227,7 @@ function Inspection({
     });
 
     const qcData = {
+      headerData,
       type: "reject",
       garmentNo: newCheckedQuantity,
       status: "Reject",
