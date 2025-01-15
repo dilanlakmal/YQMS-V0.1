@@ -5,6 +5,8 @@ import ViewToggle from "../components/inspection/ViewToggle";
 import DefectsList from "../components/inspection/DefectsList";
 import Summary from "../components/inspection/Summary";
 import { defectsList } from "../constants/defects";
+import FormatTime from "../components/formatting/FormatTime";
+import { formatTimeString } from "../components/formatting/FormatedTime";
 
 function Return({
   savedState,
@@ -157,6 +159,8 @@ function Return({
       status: "Pass Return",
       timestamp: timer,
       actualtime: currentTime.getTime(),
+      formattedTimestamp: FormatTime({ seconds: timer }),
+      formattedActualTime: formatTimeString(currentTime.getTime()),
       defectDetails: [],
       checkedQty: 0,
       goodOutput: 1,
@@ -244,6 +248,8 @@ function Return({
       status: "Reject Return",
       timestamp: timer,
       actualtime: currentTime.getTime(),
+      formattedTimestamp: FormatTime({ seconds: timer }),
+      formattedActualTime: formatTimeString(currentTime.getTime()),
       defectDetails: [],
       checkedQty: 0,
       goodOutput: 0,

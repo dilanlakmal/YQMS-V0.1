@@ -23,7 +23,9 @@ const qcDataSchema = new mongoose.Schema({
   garmentNo: Number,
   status: String,
   timestamp: Number,
+  formattedTimestamp: String, // Store formatted HH:MM:SS
   actualtime: Number,
+  formattedActualTime: String, // Store formatted HH:MM:SS
   defectDetails: Array,
   checkedQty: Number, // New field
   goodOutput: Number, // New field

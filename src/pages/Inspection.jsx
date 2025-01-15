@@ -10,6 +10,8 @@ import { defectsList } from "../constants/defects";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faDownload } from "@fortawesome/free-solid-svg-icons";
 import HandleDownloadPDF from "../components/handlefunc/HandleDownloadPDF";
+import FormatTime from "../components/formatting/FormatTime";
+import { formatTimeString } from "../components/formatting/FormatedTime";
 
 function Inspection({
   savedState,
@@ -114,6 +116,8 @@ function Inspection({
       status: "Pass",
       timestamp: timer,
       actualtime: currentTime.getTime(),
+      formattedTimestamp: FormatTime({ seconds: timer }),
+      formattedActualTime: formatTimeString(currentTime.getTime()),
       defectDetails: [],
       checkedQty: 1,
       goodOutput: 1,
@@ -213,6 +217,8 @@ function Inspection({
       defectDetails: currentDefects,
       timestamp: timer,
       actualtime: currentTime.getTime(),
+      formattedTimestamp: FormatTime({ seconds: timer }),
+      formattedActualTime: formatTimeString(currentTime.getTime()),
       checkedQty: 1,
       goodOutput: 0,
       defectQty: totalDefectsForThisRejection,
