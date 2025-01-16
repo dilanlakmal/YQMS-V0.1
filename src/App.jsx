@@ -14,6 +14,7 @@ import Profile from "./pages/Profile";
 import Logs from "./pages/Logs";
 import Navbar from "./components/layout/Navbar";
 import Analytics from "./pages/Analytics";
+import Dashboard from "./pages/Dashboard"; // Import the Dashboard component
 import "./App.css";
 
 function App() {
@@ -281,6 +282,8 @@ function App() {
                     )
                   }
                 />
+                {/* Add the Dashboard route */}
+                <Route path="/dashboard" element={<Dashboard />} />
               </>
             ) : (
               <Route path="*" element={<Navigate to="/" replace />} />

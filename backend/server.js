@@ -6,25 +6,21 @@ import bodyParser from "body-parser";
 const app = express();
 const PORT = 5001;
 
-// Middleware
 app.use(cors());
 app.use(bodyParser.json());
 
-// MongoDB Connection
 const mongoURI = "mongodb://localhost:27017/ym_prod";
 mongoose
   .connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log("MongoDB connected to ym_prod database"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-// Define a Schema for QC Data
 const qcDataSchema = new mongoose.Schema(
   {
     headerData: {
       type: Object,
       required: true,
       transform: function (doc, ret) {
-        // Convert Date objects to ISO strings
         for (let key in ret) {
           if (ret[key] instanceof Date) {
             ret[key] = ret[key].toISOString();
@@ -33,11 +29,10 @@ const qcDataSchema = new mongoose.Schema(
         return ret;
       },
     },
-    type: { type: String, required: true }, // "pass" or "reject"
+    type: { type: String, required: true },
     garmentNo: {
       type: Number,
       required: function () {
-        // Only required if type is "pass" or "reject"
         return !this.type.includes("return");
       },
     },
@@ -62,40 +57,232 @@ const qcDataSchema = new mongoose.Schema(
     cumulativeReturnDefectQty: { type: Number, required: true },
   },
   {
-    collection: "qc1_data", // Explicitly set collection name
+    collection: "qc1_data",
   }
 );
-// Create a model for the "qc1_data" collection
+
 const QCData = mongoose.model("qc1_data", qcDataSchema);
 
-// API Endpoint to Save QC Data
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.get("/api/dashboard-stats", async (req, res) => {
+  try {
+    const { factory, lineNo, moNo, customer, timeInterval } = req.query;
+    let matchQuery = {};
+
+    // Apply filters if provided
+    if (factory) matchQuery["headerData.factory"] = factory;
+    if (lineNo) matchQuery["headerData.lineNo"] = lineNo;
+    if (moNo) matchQuery["headerData.moNo"] = moNo;
+    if (customer) matchQuery["headerData.customer"] = customer;
+
+    // Get unique filter values
+    const filterValues = await QCData.aggregate([
+      {
+        $group: {
+          _id: null,
+          factories: { $addToSet: "$headerData.factory" },
+          lineNos: { $addToSet: "$headerData.lineNo" },
+          moNos: { $addToSet: "$headerData.moNo" },
+          customers: { $addToSet: "$headerData.customer" },
+        },
+      },
+    ]);
+
+    // Get overall stats
+    const stats = await QCData.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: null,
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$defectQty" },
+          totalDefectPieces: { $sum: "$defectPieces" },
+          totalReturnDefectQty: { $sum: "$returnDefectQty" },
+          totalGoodOutput: { $sum: "$goodOutput" },
+          latestHeaderData: { $last: "$headerData" },
+        },
+      },
+    ]);
+
+    // Get defect rate by line
+    const defectRateByLine = await QCData.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: "$headerData.lineNo",
+          checkedQty: { $sum: "$checkedQty" },
+          defectQty: { $sum: "$defectQty" },
+        },
+      },
+      {
+        $project: {
+          lineNo: "$_id",
+          defectRate: {
+            $multiply: [
+              { $divide: ["$defectQty", { $max: ["$checkedQty", 1] }] },
+              100,
+            ],
+          },
+        },
+      },
+      { $sort: { defectRate: -1 } },
+    ]);
+
+    // Get defect rate by MO
+    const defectRateByMO = await QCData.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: "$headerData.moNo",
+          checkedQty: { $sum: "$checkedQty" },
+          defectQty: { $sum: "$defectQty" },
+        },
+      },
+      {
+        $project: {
+          moNo: "$_id",
+          defectRate: {
+            $multiply: [
+              { $divide: ["$defectQty", { $max: ["$checkedQty", 1] }] },
+              100,
+            ],
+          },
+        },
+      },
+      { $sort: { defectRate: -1 } },
+    ]);
+
+    // Get defect rate by customer
+    const defectRateByCustomer = await QCData.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: "$headerData.customer",
+          checkedQty: { $sum: "$checkedQty" },
+          defectQty: { $sum: "$defectQty" },
+        },
+      },
+      {
+        $project: {
+          customer: "$_id",
+          defectRate: {
+            $multiply: [
+              { $divide: ["$defectQty", { $max: ["$checkedQty", 1] }] },
+              100,
+            ],
+          },
+        },
+      },
+      { $sort: { defectRate: -1 } },
+    ]);
+
+    // Get top defects
+    const topDefects = await QCData.aggregate([
+      { $match: matchQuery },
+      { $unwind: "$defectArray" },
+      {
+        $group: {
+          _id: "$defectArray.name",
+          count: { $sum: "$defectArray.count" },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    // Get time-series data
+    const timeSeriesData = await QCData.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: "$formattedTimestamp",
+          checkedQty: { $sum: "$checkedQty" },
+          defectQty: { $sum: "$defectQty" },
+        },
+      },
+      {
+        $project: {
+          timestamp: "$_id",
+          defectRate: {
+            $multiply: [
+              { $divide: ["$defectQty", { $max: ["$checkedQty", 1] }] },
+              100,
+            ],
+          },
+        },
+      },
+      { $sort: { timestamp: 1 } },
+    ]);
+
+    const dashboardData = stats[0] || {
+      totalCheckedQty: 0,
+      totalDefectQty: 0,
+      totalDefectPieces: 0,
+      totalReturnDefectQty: 0,
+      totalGoodOutput: 0,
+      latestHeaderData: {},
+    };
+
+    const totalInspected = dashboardData.totalCheckedQty || 0;
+
+    res.json({
+      filters: filterValues[0] || {
+        factories: [],
+        lineNos: [],
+        moNos: [],
+        customers: [],
+      },
+      headerInfo: dashboardData.latestHeaderData,
+      stats: {
+        checkedQty: dashboardData.totalCheckedQty || 0,
+        defectQty: dashboardData.totalDefectQty || 0,
+        defectPieces: dashboardData.totalDefectPieces || 0,
+        returnDefectQty: dashboardData.totalReturnDefectQty || 0,
+        goodOutput: dashboardData.totalGoodOutput || 0,
+        defectRatio: totalInspected
+          ? ((dashboardData.totalDefectQty / totalInspected) * 100).toFixed(2)
+          : 0,
+        defectRate: totalInspected
+          ? ((dashboardData.totalDefectPieces / totalInspected) * 100).toFixed(
+              2
+            )
+          : 0,
+      },
+      defectRateByLine,
+      defectRateByMO,
+      defectRateByCustomer,
+      topDefects,
+      timeSeriesData,
+    });
+  } catch (error) {
+    console.error("Error fetching dashboard stats:", error);
+    res.status(500).json({ message: "Failed to fetch dashboard stats" });
+  }
+});
+
 app.post("/api/save-qc-data", async (req, res) => {
   try {
-    // Sanitize and prepare the data
     const sanitizedData = {
       ...req.body,
       headerData: {
         ...req.body.headerData,
-        // Ensure date is properly formatted if it exists
         date: req.body.headerData.date
           ? new Date(req.body.headerData.date).toISOString()
           : undefined,
       },
     };
 
-    // console.log("Sanitized QC Data:", sanitizedData);
-
     const qcData = new QCData(sanitizedData);
     const savedData = await qcData.save();
 
-    // console.log("Data saved successfully:", savedData);
     res.status(201).json({
       message: "QC data saved successfully",
       data: savedData,
     });
   } catch (error) {
     console.error("Error saving QC data:", error);
-    // Send more detailed error information
     res.status(500).json({
       message: "Failed to save QC data",
       error: error.message,
@@ -109,7 +296,6 @@ app.post("/api/save-qc-data", async (req, res) => {
   }
 });
 
-// Start the Server
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });

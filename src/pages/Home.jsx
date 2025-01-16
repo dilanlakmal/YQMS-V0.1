@@ -15,6 +15,35 @@ function Home() {
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* QC Dashboard */}
+          <div
+            onClick={() => navigate("/dashboard")}
+            className="group bg-white p-8 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
+          >
+            <div className="flex items-center justify-center mb-6 bg-blue-100 w-16 h-16 rounded-full group-hover:bg-blue-600">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-8 h-8 text-blue-600 group-hover:text-white"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 2c4.418 0 8 3.582 8 8s-3.582 8-8 8-8-3.582-8-8 3.582-8 8-8zm0 4.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm-2 8.5h4v1H10v-1zm5.5-3l2.5 2.5"
+                />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4 group-hover:text-blue-600">
+              QC Dashboard
+            </h2>
+            <p className="text-gray-600 group-hover:text-gray-800">
+              Click here to see Live Dashboard.
+            </p>
+          </div>
+
           {/* QC Inspection Card */}
           <div
             onClick={() => navigate("/details")}
