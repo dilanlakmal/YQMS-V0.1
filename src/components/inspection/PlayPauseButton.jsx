@@ -1,4 +1,6 @@
-import { FaPlay, FaPause } from 'react-icons/fa';
+// src/components/inspection/PlayPauseButton.jsx
+import { FaPlay, FaPause } from "react-icons/fa";
+import FormatTime from "../formatting/FormatTime"; // Import FormatTime
 
 function PlayPauseButton({ isPlaying, onToggle, timer }) {
   return (
@@ -6,15 +8,15 @@ function PlayPauseButton({ isPlaying, onToggle, timer }) {
       <button
         onClick={onToggle}
         className={`flex items-center space-x-2 px-4 py-2 rounded font-medium ${
-          isPlaying ? 'bg-yellow-400' : 'bg-gray-200'
+          isPlaying ? "bg-yellow-400" : "bg-gray-200"
         }`}
       >
         {isPlaying ? <FaPause /> : <FaPlay />}
-        <span>{isPlaying ? 'Pause' : 'Play'}</span>
+        <span>{isPlaying ? "Pause" : "Play"}</span>
       </button>
-      {timer && (
+      {timer !== undefined && (
         <div className="text-xl font-mono">
-          {timer}
+          <FormatTime seconds={timer} /> {/* Use FormatTime component */}
         </div>
       )}
     </div>

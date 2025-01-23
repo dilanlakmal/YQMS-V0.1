@@ -1,15 +1,35 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { ClipboardList } from "lucide-react";
 import { Link } from "react-router-dom";
+import axios from "axios";
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async  (e) => {
     e.preventDefault();
+    // if (username && password) {
+    //   onLogin();
+    // }
+
     if (username && password) {
-      onLogin();
+      try {
+        const response = await axios.post("http://localhost:5001/api/login", { username, password });
+        if (response.status === 200) {
+          const token = response.data.token;
+          if (rememberMe) {
+            localStorage.setItem("token", token);
+          } else {
+            sessionStorage.setItem("token", token);
+          }
+          onLogin(token);
+        }
+      } catch (error) {
+        setError("Invalid username or password");
+      }
     }
   };
 
@@ -72,6 +92,19 @@ function Login({ onLogin }) {
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
+        <div className="flex items-center">
+              <input
+                id="rememberMe"
+                name="rememberMe"
+                type="checkbox"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
+              <label htmlFor="rememberMe" className="ml-2 block text-s text-gray-900">
+                Remember me
+              </label>
+            </div>
         <div className="text-right">
           <Link to="/forgot-password" className="text-s text-blue-600 hover:text-blue-600">
             Forgot password?

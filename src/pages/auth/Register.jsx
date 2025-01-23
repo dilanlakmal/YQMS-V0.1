@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import AuthLayout from "../../components/layout/AuthLayout";
 import FormInput from "../../components/layout/FormInput";
 import Button from "../../components/layout/Button";
+import axios from "axios";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -13,37 +14,59 @@ const Register = () => {
     password: "",
     confirmPassword: "",
   });
+
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     let transformedValue = value;
-  
+
     if (name === 'emp_id') {
       transformedValue = value.toUpperCase().replace(/\s/g, '');
     }
+
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: transformedValue,
     });
   };
+
   const validateForm = () => {
     if (!formData.eng_name && !formData.kh_name) {
       setError('Please fill at least one of the name fields.');
       return false;
     }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match.');
+      return false;
+    }
+
     setError('');
     return true;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (validateForm()) {
-      // Proceed with form submission
-      console.log('Form submitted:', formData);
+      try {
+        console.log("Form data being sent:", formData);
+        const response = await axios.post("http://localhost:5001/api/register", formData);
+        if (response.status === 201) {
+          setSuccess('User registered successfully.');
+          setTimeout(() => {
+            navigate('/');
+          }, 2000);
+        }
+      } catch (error) {
+        console.error("Error response from server:", error.response);
+        setError(error.response?.data?.message || 'Failed to register user.');
+      }
     }
   };
-  
+
   return (
     <AuthLayout
       title="Create Account"
@@ -53,41 +76,37 @@ const Register = () => {
         <ArrowLeft className="h-5 w-5 mr-2" />
         Back to Login
       </Link>
-
       <form onSubmit={handleSubmit} className="space-y-6">
-      {error && <div className="text-red-500 mb-4">{error}</div>}
-      <FormInput
-            label="Employee ID"
-            id="emp_id"
-            name="emp_id"
-            type="text"
-            required
-            placeholder="Employee ID"
-            value={formData.emp_id}
-            onChange={handleChange}
-          />
-
-          <FormInput
-            label="Name (English)"
-            id="eng_name"
-            name="eng_name"
-            type="text"
-         
-            placeholder="English Name"
-            value={formData.eng_name}
-            onChange={handleChange}
-          />
-           <FormInput
-            label="Name (Khmer)"
-            id="kh_name"
-            name="kh_name"
-            type="text"
-           
-            placeholder="Khmer Name"
-            value={formData.kh_name}
-            onChange={handleChange}
-          />
-          
+        {error && <div className="text-red-500 mb-4">{error}</div>}
+        {success && <div className="text-green-500 mb-4">{success}</div>}
+        <FormInput
+          label="Employee ID"
+          id="emp_id"
+          name="emp_id"
+          type="text"
+          required
+          placeholder="Employee ID"
+          value={formData.emp_id}
+          onChange={handleChange}
+        />
+        <FormInput
+          label="Name (English)"
+          id="eng_name"
+          name="eng_name"
+          type="text"
+          placeholder="English Name"
+          value={formData.eng_name}
+          onChange={handleChange}
+        />
+        <FormInput
+          label="Name (Khmer)"
+          id="kh_name"
+          name="kh_name"
+          type="text"
+          placeholder="Khmer Name"
+          value={formData.kh_name}
+          onChange={handleChange}
+        />
         <FormInput
           label="Password"
           id="password"
@@ -98,7 +117,6 @@ const Register = () => {
           value={formData.password}
           onChange={handleChange}
         />
-
         <FormInput
           label="Confirm Password"
           id="confirmPassword"
@@ -109,9 +127,7 @@ const Register = () => {
           value={formData.confirmPassword}
           onChange={handleChange}
         />
-
         <Button type="submit">Register</Button>
-
         <p className="text-center text-sm text-gray-600">
           Already have an account?{" "}
           <Link to="/" className="font-medium text-blue-600 hover:text-blue-500">

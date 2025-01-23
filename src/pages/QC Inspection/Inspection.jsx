@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import html2pdf from "html2pdf.js";
+import * as XLSX from "xlsx";
+import fs from "fs"; // Node.js file system module
 import Header from "../../components/inspection/Header";
 import ViewToggle from "../../components/inspection/ViewToggle";
 import DefectsList from "../../components/inspection/DefectsList";
@@ -10,6 +12,10 @@ import PreviewModal from "../../components/inspection/PreviewModal";
 import { defectsList } from "../../constants/defects";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faDownload } from "@fortawesome/free-solid-svg-icons";
+import FormatTime from "../../components/formatting/FormatTime";
+import HandleDownloadPDF from "../../components/handlefunc/HandleDownloadPDF"; // Import the new component
+import HandlePass from "../../components/handlefunc/HandlePass"; // Import HandlePass
+import HandleReject from "../../components/handlefunc/HandleReject"; // Import HandleReject
 
 
 function Inspection({
@@ -84,6 +90,27 @@ function Inspection({
     )}:${String(secs).padStart(2, "0")}`;
   };
 
+  const saveQCDataToBackend = async (qcData) => {
+    try {
+      const response = await fetch("http://localhost:5001/api/save-qc-data", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(qcData),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save QC data");
+      }
+
+      const result = await response.json();
+      console.log(result.message);
+    } catch (error) {
+      console.error("Error saving QC data:", error);
+    }
+  };
+
   const handlePass = () => {
     if (!isPlaying || hasDefectSelected) return;
 
@@ -92,14 +119,48 @@ function Inspection({
     setCheckedQuantity((prev) => prev + 1);
     setGoodOutput((prev) => prev + 1);
 
-    onLogEntry?.({
+    // Prepare data for onLogEntry (unchanged)
+    const logEntryData = {
       type: "pass",
       garmentNo: checkedQuantity + 1,
       status: "Pass",
       timestamp: timer,
-      actualtime: currentTime.getTime(), //formatTime(actualTimeInSeconds),
+      actualtime: currentTime.getTime(),
       defectDetails: [],
-    });
+    };
+
+    // Call onLogEntry (unchanged)
+    onLogEntry?.(logEntryData);
+
+    // Prepare defect array with cumulative counts
+    const defectArray = Object.entries(defects).map(([index, count]) => ({
+      name: defectsList["english"][index].name, // Defect name in English
+      count: count, // Cumulative count for this defect
+    }));
+
+    // Prepare data for MongoDB
+    const qcData = {
+      ...logEntryData, // Use the same data as onLogEntry
+      checkedQty: 1,
+      goodOutput: 1,
+      defectQty: 0,
+      defectPieces: 0,
+      defectArray: defectArray, // Include the defect array
+      cumulativeChecked: checkedQuantity + 1,
+      cumulativeDefects: Object.values(defects).reduce(
+        (sum, count) => sum + count,
+        0
+      ),
+      cumulativeGoodOutput: goodOutput + 1, // Cumulative good output
+      cumulativeDefectPieces: defectPieces, // Cumulative defect pieces
+      returnDefectList: [], // Empty for pass
+      returnDefectArray: [], // Maintain the same state as previous record
+      returnDefectQty: 0, // Current entry
+      cumulativeReturnDefectQty: 0, // Cumulative return defect quantity
+    };
+
+    // Save to MongoDB
+    saveQCDataToBackend(qcData);
   };
 
   const handleReject = () => {
@@ -110,7 +171,8 @@ function Inspection({
       return;
 
     const currentTime = new Date();
-    const timestamp = timer; // Use the timer value (in seconds) as the timestamp
+    const timestamp = timer;
+
     setCheckedQuantity((prev) => prev + 1);
     setDefectPieces((prev) => prev + 1);
 
@@ -123,32 +185,85 @@ function Inspection({
     const currentDefects = Object.entries(currentDefectCount)
       .filter(([_, count]) => count > 0)
       .map(([index, count]) => ({
-        name: defectsList[language][index].name, // Defect name
-        count, // Temporary count for this defect
-        timestamp: timer, // Use the timer value (in seconds) as the timestamp
+        name: defectsList["english"][index].name,
+        count,
+        timestamp: timer,
         actualtime: currentTime.getTime(),
       }));
 
-    // Log the rejection with cumulative defect details
-    onLogEntry?.({
+    // Prepare data for onLogEntry (unchanged)
+    const logEntryData = {
       type: "reject",
       garmentNo: checkedQuantity + 1,
       status: "Reject",
-      defectDetails: currentDefects, // Include defect-specific details
-      timestamp: timer, // Use the timer value (in seconds) as the timestamp
+      defectDetails: currentDefects,
+      timestamp: timer,
       actualtime: currentTime.getTime(),
-      cumulativeChecked: checkedQuantity + 1, // Cumulative checked quantity
+      cumulativeChecked: checkedQuantity + 1,
       cumulativeDefects:
         Object.values(defects).reduce((sum, count) => sum + count, 0) +
-        totalDefectsForThisRejection, // Cumulative defect quantity including this rejection
+        totalDefectsForThisRejection,
+    };
+
+    // Call onLogEntry (unchanged)
+    onLogEntry?.(logEntryData);
+
+    // Merge defects and currentDefectCount to create defectArray
+    const defectArray = Object.entries(defects).map(([index, count]) => ({
+      name: defectsList["english"][index].name, // Defect name in English
+      count: count + (currentDefectCount[index] || 0), // Cumulative count including current entry
+    }));
+
+    // Add defects from currentDefectCount that are not in defects
+    Object.entries(currentDefectCount).forEach(([index, count]) => {
+      if (!defects[index]) {
+        defectArray.push({
+          name: defectsList["english"][index].name, // Defect name in English
+          count: count, // Current count for this defect
+        });
+      }
     });
+
+    // Ensure defect names are unique and sum counts for duplicates
+    const mergedDefectArray = defectArray.reduce((acc, defect) => {
+      const existingDefect = acc.find((d) => d.name === defect.name);
+      if (existingDefect) {
+        existingDefect.count += defect.count; // Sum counts for the same defect name
+      } else {
+        acc.push(defect); // Add new defect to the array
+      }
+      return acc;
+    }, []);
+
+    // Prepare data for MongoDB
+    const qcData = {
+      ...logEntryData, // Use the same data as onLogEntry
+      checkedQty: 1,
+      goodOutput: 0, // No change for reject
+      defectQty: totalDefectsForThisRejection, // Sum of selected defect counts for this entry
+      defectPieces: 1, // Increment defect pieces for this entry
+      defectArray: mergedDefectArray, // Include the merged defect array
+      cumulativeChecked: checkedQuantity + 1,
+      cumulativeDefects:
+        Object.values(defects).reduce((sum, count) => sum + count, 0) +
+        totalDefectsForThisRejection,
+      cumulativeGoodOutput: goodOutput, // Cumulative good output
+      cumulativeDefectPieces: defectPieces + 1, // Cumulative defect pieces
+      returnDefectList: [], // Empty for pass
+      returnDefectArray: [], // Maintain the same state as previous record
+      returnDefectQty: 0, // Current entry
+      cumulativeReturnDefectQty: 0, // Cumulative return defect quantity
+    };
+
+    // Save to MongoDB
+    saveQCDataToBackend(qcData);
 
     // Update the defects state with the temporary counts
     Object.entries(currentDefectCount).forEach(([index, count]) => {
       if (count > 0) {
         setDefects((prev) => ({
           ...prev,
-          [index]: (prev[index] || 0) + count, // Add temporary count to the total defect count
+          [index]: (prev[index] || 0) + count,
         }));
       }
     });
@@ -157,166 +272,6 @@ function Inspection({
     setCurrentDefectCount({});
   };
  
-
-  const handleDownloadPDF = async () => {
-    try {
-      const inspectionData = savedState?.inspectionData;
-      const defectItems = defectsList[language];
-      const defectEntries = Object.entries(defects)
-        .filter(([_, count]) => count > 0)
-        .map(([index, count]) => ({
-          name: defectItems[index].name, // Access the 'name' property
-          count,
-          rate:
-            checkedQuantity > 0
-              ? ((count / checkedQuantity) * 100).toFixed(2)
-              : "0.00",
-        }))
-        .sort((a, b) => b.count - a.count);
-
-      const totalDefects = Object.values(defects).reduce(
-        (sum, count) => sum + count,
-        0
-      );
-      const defectRate =
-        checkedQuantity > 0 ? (totalDefects / checkedQuantity) * 100 : 0;
-      const defectRatio =
-        checkedQuantity > 0 ? (defectPieces / checkedQuantity) * 100 : 0;
-
-      const currentTime = new Date();
-      const timestamp = currentTime.toTimeString().split(" ")[0];
-
-      const headerContent = `
-        <div style="font-size: 14px; margin-bottom: 20px;">
-          <h2 style="text-align: center; margin-bottom: 20px;">Inspection Details</h2>
-          <table border="1" style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-            <thead>
-              <tr>
-                <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Field</th>
-                <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style="padding: 8px;">Date</td>
-                <td style="padding: 8px;">${new Date(
-                  inspectionData.date
-                ).toLocaleDateString()}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px;">Factory</td>
-                <td style="padding: 8px;">${inspectionData.factory}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px;">Line No</td>
-                <td style="padding: 8px;">${inspectionData.lineNo}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px;">Style</td>
-                <td style="padding: 8px;">${inspectionData.styleCode} ${
-        inspectionData.styleDigit
-      }</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px;">MO No</td>
-                <td style="padding: 8px;">${inspectionData.moNo}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px;">Customer</td>
-                <td style="padding: 8px;">${inspectionData.customer}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p style="font-size: 12px; text-align: right;">Downloaded at: ${timestamp}</p>
-        </div>
-      `;
-
-      const defectContent = `
-        <div style="font-size: 14px; margin-bottom: 20px;">
-          <h2 style="text-align: center; margin-bottom: 20px;">Defect Details</h2>
-          <table border="1" style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-            <thead>
-              <tr>
-                <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Defect Type</th>
-                <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Quantity</th>
-                <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Defect Rate</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${defectEntries
-                .map(
-                  ({ name, count, rate }) => `
-                <tr>
-                  <td style="padding: 8px; text-align: left;">${name}</td>
-                  <td style="padding: 8px; text-align: left;">${count}</td>
-                  <td style="padding: 8px; text-align: left;">${rate}%</td>
-                </tr>
-              `
-                )
-                .join("")}
-            </tbody>
-          </table>
-        </div>
-      `;
-
-      const summaryContent = `
-        <div style="font-size: 14px; margin-bottom: 20px;">
-          <h2 style="text-align: center; margin-bottom: 20px;">Summary</h2>
-          <table border="1" style="width: 100%; border-separate: separate;">
-            <thead>
-              <tr>
-                <th style="padding: 8px; text-align: center; background-color: #f2f2f2;">Total Defects</th>
-                <th style="padding: 8px; text-align: center; background-color: #f2f2f2;">Checked Quantity</th>
-                <th style="padding: 8px; text-align: center; background-color: #f2f2f2;">Good Output</th>
-                <th style="padding: 8px; text-align: center; background-color: #f2f2f2;">Defect Pieces</th>
-                <th style="padding: 8px; text-align: center; background-color: #f2f2f2;">Defect Rate</th>
-                <th style="padding: 8px; text-align: center; background-color: #f2f2f2;">Defect Ratio</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style="padding: 8px; text-align: center;">${totalDefects}</td>
-                <td style="padding: 8px; text-align: center;">${checkedQuantity}</td>
-                <td style="padding: 8px; text-align: center;">${goodOutput}</td>
-                <td style="padding: 8px; text-align: center;">${defectPieces}</td>
-                <td style="padding: 8px; text-align: center;">${defectRate.toFixed(
-                  2
-                )}%</td>
-                <td style="padding: 8px; text-align: center;">${defectRatio.toFixed(
-                  2
-                )}%</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      `;
-
-      const contentToPrint = `
-        <div style="font-family: Arial, sans-serif; margin: 20px;">
-          <h1 style="text-align: center; font-size: 20px; margin-top: 40px;">QC Inspection Report</h1>
-          ${headerContent}
-          ${defectContent}
-          ${summaryContent}
-        </div>
-      `;
-
-      const element = document.createElement("div");
-      element.innerHTML = contentToPrint;
-
-      const opt = {
-        margin: [0.5, 1], // Top and bottom margins set
-        filename: "inspection-report.pdf",
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
-        pagebreak: { mode: ["avoid-all"] },
-      };
-
-      await html2pdf().set(opt).from(element).save();
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-    }
-  };
 
   const handleSubmit = () => {
     onSubmit();
@@ -343,7 +298,7 @@ function Inspection({
               <PlayPauseButton
                 isPlaying={isPlaying}
                 onToggle={onPlayPause}
-                timer={formatTime(timer)}
+                timer={timer} //{formatTime(timer)}
               />
             </div>
 
@@ -354,12 +309,16 @@ function Inspection({
               >
                 <FontAwesomeIcon icon={faEye} size="lg" />
               </button>
-              <button
-                onClick={handleDownloadPDF}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-500 flex items-center justify-center"
-              >
-                <FontAwesomeIcon icon={faDownload} size="lg" />
-              </button>
+
+              <HandleDownloadPDF
+                savedState={savedState}
+                defects={defects}
+                checkedQuantity={checkedQuantity}
+                goodOutput={goodOutput}
+                defectPieces={defectPieces}
+                language={language}
+                defectsList={defectsList} // Pass defectsList as a prop
+              />
 
               <button
                 onClick={handleSubmit}
@@ -408,7 +367,8 @@ function Inspection({
                 onDefectSelect={setHasDefectSelected}
               />
             </div>
-            <div className="col-span-2 flex items-center justify-center pt-1">
+
+            <div className="col-span-2 flex items-center justify-center">
               <button
                 onClick={handleReject}
                 disabled={
