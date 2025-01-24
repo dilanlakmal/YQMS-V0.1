@@ -128,7 +128,7 @@ function Dashboard() {
   useEffect(() => {
     fetchDashboardData();
     // Increase refresh interval to reduce flickering
-    const interval = setInterval(fetchDashboardData, 5000); // Changed to 5 seconds
+    const interval = setInterval(fetchDashboardData, 12000); // Changed to 12 seconds
     return () => clearInterval(interval);
   }, [filters, timeInterval]);
 
