@@ -58,6 +58,9 @@ const qcDataSchema = new mongoose.Schema(
     selectedMono: String,
     buyer: String,
     orderQty: Number,
+    factoryname: String,
+    custStyle: String,
+    country: String,
     color: String,
     size: String,
   },
@@ -179,6 +182,10 @@ app.get("/api/order-details/:mono", async (req, res) => {
     const response = {
       engName: order.EngName,
       totalQty: order.TotalQty,
+      // Add new fields here
+      factoryname: order.Factory || "", // New field
+      custStyle: order.CustStyle || "", // New field
+      country: order.Country || "", // New field
       colors: Array.from(colorMap.values()).map((c) => c.originalColor),
       colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
         acc[curr.originalColor.toLowerCase()] = Array.from(curr.sizes);
