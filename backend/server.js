@@ -131,7 +131,7 @@ app.get("/api/search-mono", async (req, res) => {
           },
         },
         {
-          $limit: 10,
+          $limit: 100,
         },
       ])
       .toArray();
@@ -195,7 +195,7 @@ app.get("/api/order-details/:mono", async (req, res) => {
 
     res.json(response);
   } catch (error) {
-    console.error("Error fetching order details:", error);
+    // console.error("Error fetching order details:", error);
     res.status(500).json({ error: "Failed to fetch order details" });
   }
 });

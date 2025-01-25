@@ -56,9 +56,9 @@ function MonoSearch({
 
   return (
     <div className="mb-4 relative" ref={searchRef}>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        MONo Search
-      </label>
+      {/* <label className="block text-sm font-medium text-gray-700 mb-1">
+        ...
+      </label> */}
       <div className="relative">
         <input
           type="text"
@@ -80,7 +80,7 @@ function MonoSearch({
       </div>
 
       {isDropdownOpen && suggestions.length > 0 && (
-        <ul className="absolute z-10 w-full bg-white border border-t-0 border-gray-300 rounded-b-md shadow-lg">
+        <ul className="absolute z-10 w-full bg-white border border-t-0 border-gray-300 rounded-b-md shadow-lg max-h-80 overflow-y-auto">
           {suggestions.map((mono) => (
             <li
               key={mono}

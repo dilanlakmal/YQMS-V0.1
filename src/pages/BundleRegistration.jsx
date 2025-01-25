@@ -31,6 +31,8 @@ function BundleRegistration() {
 
   const [colors, setColors] = useState([]);
   const [sizes, setSizes] = useState([]);
+  const [hasColors, setHasColors] = useState(false); // Track if colors are available
+  const [hasSizes, setHasSizes] = useState(false); // Track if sizes are available
 
   // Fetch order details when MONo is selected
   useEffect(() => {
@@ -50,11 +52,25 @@ function BundleRegistration() {
           factoryInfo: data.factoryname,
           custStyle: data.custStyle,
           country: data.country,
+          color: "", // Reset color when MONo changes
+          size: "", // Reset size when MONo changes
         }));
 
-        setColors(data.colors);
+        // Check if colors are available
+        if (data.colors && data.colors.length > 0) {
+          setColors(data.colors);
+          setHasColors(true); // Set hasColors to true if colors are available
+          setHasSizes(false); // Reset hasSizes when colors are available
+        } else {
+          setColors([]);
+          setHasColors(false); // Set hasColors to false if no colors are available
+          setHasSizes(false); // Set hasSizes to false if no colors are available
+        }
       } catch (error) {
         console.error("Error fetching order details:", error);
+        setColors([]);
+        setHasColors(false);
+        setHasSizes(false); // Set hasSizes to false on error
       }
     };
 
@@ -71,9 +87,19 @@ function BundleRegistration() {
           `http://localhost:5001/api/order-sizes/${formData.selectedMono}/${formData.color}`
         );
         const data = await response.json();
-        setSizes(data);
+
+        // Check if sizes are available
+        if (data && data.length > 0) {
+          setSizes(data);
+          setHasSizes(true); // Set hasSizes to true if sizes are available
+        } else {
+          setSizes([]);
+          setHasSizes(false); // Set hasSizes to false if no sizes are available
+        }
       } catch (error) {
         console.error("Error fetching sizes:", error);
+        setSizes([]);
+        setHasSizes(false); // Set hasSizes to false on error
       }
     };
 
@@ -170,7 +196,7 @@ function BundleRegistration() {
                     size: "",
                   }))
                 }
-                placeholder="Search MONo..."
+                placeholder="Search Last 3 Digits of MONo..."
                 showSearchIcon={true}
                 closeOnOutsideClick={true} // Close dropdown when clicking outside
               />
@@ -239,20 +265,24 @@ function BundleRegistration() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Color
               </label>
-              <select
-                value={formData.color}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, color: e.target.value }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">Select Color</option>
-                {colors.map((color) => (
-                  <option key={color} value={color}>
-                    {color}
-                  </option>
-                ))}
-              </select>
+              {hasColors ? (
+                <select
+                  value={formData.color}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, color: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                >
+                  <option value="">Select Color</option>
+                  {colors.map((color) => (
+                    <option key={color} value={color}>
+                      {color}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-sm text-gray-500">No Colors Available</p>
+              )}
             </div>
 
             {/* Size */}
@@ -260,20 +290,28 @@ function BundleRegistration() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Size
               </label>
-              <select
-                value={formData.size}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, size: e.target.value }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">Select Size</option>
-                {sizes.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
+              {hasColors ? (
+                hasSizes ? (
+                  <select
+                    value={formData.size}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, size: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="">Select Size</option>
+                    {sizes.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-sm text-gray-500">No Sizes Available</p>
+                )
+              ) : (
+                <p className="text-sm text-gray-500">No Colors Available</p>
+              )}
             </div>
 
             {/* Count */}
