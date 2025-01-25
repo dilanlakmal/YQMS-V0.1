@@ -1,9 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
-function MonoSearch({ value, onChange, onSelect, disabled }) {
+function MonoSearch({
+  value,
+  onSelect,
+  placeholder,
+  showSearchIcon,
+  closeOnOutsideClick,
+}) {
   const [suggestions, setSuggestions] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const searchRef = useRef(null);
 
   useEffect(() => {
     const handler = setTimeout(async () => {
@@ -15,19 +23,39 @@ function MonoSearch({ value, onChange, onSelect, disabled }) {
           );
           const data = await response.json();
           setSuggestions(data);
+          setIsDropdownOpen(true);
         } catch (error) {
           console.error("Search failed:", error);
         } finally {
           setIsLoading(false);
         }
+      } else {
+        setSuggestions([]);
+        setIsDropdownOpen(false);
       }
     }, 300);
 
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (closeOnOutsideClick) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [closeOnOutsideClick]);
+
   return (
-    <div className="mb-4 relative">
+    <div className="mb-4 relative" ref={searchRef}>
       <label className="block text-sm font-medium text-gray-700 mb-1">
         MONo Search
       </label>
@@ -40,12 +68,9 @@ function MonoSearch({ value, onChange, onSelect, disabled }) {
             setSearchTerm(digits);
           }}
           className={`w-full px-3 py-2 border ${
-            suggestions.length > 0 ? "rounded-t-md" : "rounded-md"
-          } border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-            disabled ? "bg-gray-100 cursor-not-allowed" : ""
-          }`}
-          placeholder="Enter last 3 digits"
-          disabled={disabled}
+            isDropdownOpen ? "rounded-t-md" : "rounded-md"
+          } border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+          placeholder={placeholder}
         />
         {isLoading && (
           <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
@@ -54,7 +79,7 @@ function MonoSearch({ value, onChange, onSelect, disabled }) {
         )}
       </div>
 
-      {suggestions.length > 0 && (
+      {isDropdownOpen && suggestions.length > 0 && (
         <ul className="absolute z-10 w-full bg-white border border-t-0 border-gray-300 rounded-b-md shadow-lg">
           {suggestions.map((mono) => (
             <li
@@ -64,6 +89,7 @@ function MonoSearch({ value, onChange, onSelect, disabled }) {
                 onSelect(mono);
                 setSuggestions([]);
                 setSearchTerm("");
+                setIsDropdownOpen(false);
               }}
             >
               <span className="font-mono">{mono}</span>

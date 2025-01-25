@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FaTimes } from "react-icons/fa"; // Import the X icon
 
 function NumberPad({ onClose, onInput }) {
   const [inputValue, setInputValue] = useState("");
@@ -18,7 +19,15 @@ function NumberPad({ onClose, onInput }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-lg">
+      <div className="bg-white p-6 rounded-lg shadow-lg relative">
+        {/* Close button (X icon) */}
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+        >
+          <FaTimes className="w-6 h-6" />
+        </button>
+
         <div className="mb-4">
           <input
             type="text"
@@ -45,7 +54,12 @@ function NumberPad({ onClose, onInput }) {
           </button>
           <button
             onClick={handleSubmit}
-            className="col-span-2 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
+            disabled={!inputValue} // Disable submit button if input is empty
+            className={`col-span-2 px-4 py-2 ${
+              inputValue
+                ? "bg-green-500 hover:bg-green-600"
+                : "bg-gray-300 cursor-not-allowed"
+            } text-white rounded-md`}
           >
             Submit
           </button>

@@ -39,13 +39,17 @@ export default function QRCodePreview({ isOpen, onClose, qrData }) {
 
                 <div className="mt-4 space-y-2">
                   <p>
-                    <strong>MONo:</strong> {qrData?.mono}
-                  </p>
-                  <p>
                     <strong>Factory:</strong> {qrData?.factory}
                   </p>
                   <p>
+                    <strong>MONo:</strong> {qrData?.mono}
+                  </p>
+
+                  <p>
                     <strong>Buyer:</strong> {qrData?.buyer}
+                  </p>
+                  <p>
+                    <strong>Line No:</strong> {qrData?.lineNo}
                   </p>
                   <p>
                     <strong>Order Qty:</strong> {qrData?.orderQty}
