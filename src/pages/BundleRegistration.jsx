@@ -1,0 +1,1174 @@
+// import { useState, useEffect } from "react";
+// import { useNavigate } from "react-router-dom";
+// import DatePicker from "react-datepicker";
+// import "react-datepicker/dist/react-datepicker.css";
+// import MonoSearch from "../components/forms/MonoSearch";
+// import QRCodePreview from "../components/forms/QRCodePreview";
+// import NumberPad from "../components/forms/NumberPad"; // Custom component for number pad
+
+// function BundleRegistration() {
+//   const navigate = useNavigate();
+//   const [qrData, setQrData] = useState(null);
+//   const [showQRPreview, setShowQRPreview] = useState(false);
+//   const [showNumberPad, setShowNumberPad] = useState(false);
+//   const [numberPadTarget, setNumberPadTarget] = useState(null); // Tracks which field is using the number pad
+//   const [formData, setFormData] = useState({
+//     date: new Date(),
+//     selectedMono: "",
+//     buyer: "",
+//     orderQty: "",
+//     factoryInfo: "",
+//     custStyle: "",
+//     country: "",
+//     color: "",
+//     size: "",
+//     bundleQty: "",
+//     lineNo: "",
+//   });
+
+//   const [colors, setColors] = useState([]);
+//   const [sizes, setSizes] = useState([]);
+
+//   // Fetch order details when MONo is selected
+//   useEffect(() => {
+//     const fetchOrderDetails = async () => {
+//       if (!formData.selectedMono) return;
+
+//       try {
+//         const response = await fetch(
+//           `http://localhost:5001/api/order-details/${formData.selectedMono}`
+//         );
+//         const data = await response.json();
+
+//         setFormData((prev) => ({
+//           ...prev,
+//           buyer: data.engName,
+//           orderQty: data.totalQty,
+//           factoryInfo: data.factoryname,
+//           custStyle: data.custStyle,
+//           country: data.country,
+//         }));
+
+//         setColors(data.colors);
+//       } catch (error) {
+//         console.error("Error fetching order details:", error);
+//       }
+//     };
+
+//     fetchOrderDetails();
+//   }, [formData.selectedMono]);
+
+//   // Fetch sizes when color is selected
+//   useEffect(() => {
+//     const fetchSizes = async () => {
+//       if (!formData.selectedMono || !formData.color) return;
+
+//       try {
+//         const response = await fetch(
+//           `http://localhost:5001/api/order-sizes/${formData.selectedMono}/${formData.color}`
+//         );
+//         const data = await response.json();
+//         setSizes(data);
+//       } catch (error) {
+//         console.error("Error fetching sizes:", error);
+//       }
+//     };
+
+//     fetchSizes();
+//   }, [formData.selectedMono, formData.color]);
+
+//   // Handle number pad input
+//   const handleNumberPadInput = (value) => {
+//     if (numberPadTarget === "bundleQty") {
+//       setFormData((prev) => ({
+//         ...prev,
+//         bundleQty: value,
+//       }));
+//     } else if (numberPadTarget === "lineNo") {
+//       setFormData((prev) => ({
+//         ...prev,
+//         lineNo: value,
+//       }));
+//     }
+//   };
+
+//   // Validate Line No for YM factory
+//   const validateLineNo = () => {
+//     if (formData.factoryInfo === "YM") {
+//       const lineNo = parseInt(formData.lineNo);
+//       return lineNo >= 1 && lineNo <= 30;
+//     }
+//     return true; // No validation for other factories
+//   };
+
+//   // Generate QR code
+//   const handleGenerateQR = () => {
+//     if (!validateLineNo()) {
+//       alert("Invalid Line No. It must be between 1 and 30 for YM factory.");
+//       return;
+//     }
+
+//     const data = {
+//       mono: formData.selectedMono,
+//       factory: formData.factoryInfo,
+//       buyer: formData.buyer,
+//       orderQty: formData.orderQty,
+//       color: formData.color,
+//       size: formData.size,
+//       bundleQty: formData.bundleQty,
+//       lineNo: formData.lineNo,
+//     };
+//     setQrData(data);
+//   };
+
+//   // Print QR code (placeholder for now)
+//   const handlePrintQR = () => {
+//     alert("Print QR code functionality will be implemented here.");
+//   };
+
+//   return (
+//     <div className="min-h-screen bg-gray-50 pt-20 px-4">
+//       <div className="max-w-4xl mx-auto">
+//         <h1 className="text-3xl font-bold text-gray-900 mb-8">
+//           Bundle Registration
+//         </h1>
+
+//         <div className="bg-white p-6 rounded-lg shadow-md">
+//           {/* Date Picker */}
+//           <div className="mb-6">
+//             <label className="block text-sm font-medium text-gray-700 mb-1">
+//               Date
+//             </label>
+//             <DatePicker
+//               selected={formData.date}
+//               onChange={(date) => setFormData((prev) => ({ ...prev, date }))}
+//               className="w-full px-3 py-2 border border-gray-300 rounded-md"
+//               dateFormat="yyyy-MM-dd"
+//             />
+//           </div>
+
+//           {/* MONo Search */}
+//           <div className="mb-6">
+//             <label className="block text-sm font-medium text-gray-700 mb-1">
+//               Search MONo
+//             </label>
+//             <MonoSearch
+//               value={formData.selectedMono}
+//               onSelect={(mono) =>
+//                 setFormData((prev) => ({
+//                   ...prev,
+//                   selectedMono: mono,
+//                   color: "",
+//                   size: "",
+//                 }))
+//               }
+//             />
+//           </div>
+
+//           {/* Selected MONo */}
+//           {formData.selectedMono && (
+//             <div className="mb-6 p-2 bg-gray-50 rounded-md">
+//               <p className="text-sm font-medium">
+//                 Selected MONo:{" "}
+//                 <span className="ml-2 font-bold text-blue-600">
+//                   {formData.selectedMono}
+//                 </span>
+//               </p>
+//             </div>
+//           )}
+
+//           {/* Customer Style, Buyer, Country, Factory, Order Qty */}
+//           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Customer Style
+//               </label>
+//               <input
+//                 type="text"
+//                 value={formData.custStyle}
+//                 readOnly
+//                 className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+//               />
+//             </div>
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Buyer
+//               </label>
+//               <input
+//                 type="text"
+//                 value={formData.buyer}
+//                 readOnly
+//                 className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+//               />
+//             </div>
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Country
+//               </label>
+//               <input
+//                 type="text"
+//                 value={formData.country}
+//                 readOnly
+//                 className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+//               />
+//             </div>
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Factory
+//               </label>
+//               <input
+//                 type="text"
+//                 value={formData.factoryInfo}
+//                 readOnly
+//                 className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+//               />
+//             </div>
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Order Qty
+//               </label>
+//               <input
+//                 type="text"
+//                 value={formData.orderQty}
+//                 readOnly
+//                 className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+//               />
+//             </div>
+//           </div>
+
+//           {/* Color and Size */}
+//           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Color
+//               </label>
+//               <select
+//                 value={formData.color}
+//                 onChange={(e) =>
+//                   setFormData((prev) => ({ ...prev, color: e.target.value }))
+//                 }
+//                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
+//               >
+//                 <option value="">Select Color</option>
+//                 {colors.map((color) => (
+//                   <option key={color} value={color}>
+//                     {color}
+//                   </option>
+//                 ))}
+//               </select>
+//             </div>
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Size
+//               </label>
+//               <select
+//                 value={formData.size}
+//                 onChange={(e) =>
+//                   setFormData((prev) => ({ ...prev, size: e.target.value }))
+//                 }
+//                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
+//               >
+//                 <option value="">Select Size</option>
+//                 {sizes.map((size) => (
+//                   <option key={size} value={size}>
+//                     {size}
+//                   </option>
+//                 ))}
+//               </select>
+//             </div>
+//           </div>
+
+//           {/* Bundle Qty */}
+//           <div className="mb-6">
+//             <label className="block text-sm font-medium text-gray-700 mb-1">
+//               Bundle Qty
+//             </label>
+//             <input
+//               type="text"
+//               value={formData.bundleQty}
+//               onClick={() => {
+//                 setNumberPadTarget("bundleQty");
+//                 setShowNumberPad(true);
+//               }}
+//               readOnly
+//               className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
+//             />
+//           </div>
+
+//           {/* Line No */}
+//           <div className="mb-6">
+//             <label className="block text-sm font-medium text-gray-700 mb-1">
+//               Line No
+//             </label>
+//             <input
+//               type="text"
+//               value={formData.lineNo}
+//               onClick={() => {
+//                 if (formData.factoryInfo === "YM") {
+//                   setNumberPadTarget("lineNo");
+//                   setShowNumberPad(true);
+//                 }
+//               }}
+//               readOnly={formData.factoryInfo === "YM"}
+//               className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
+//             />
+//           </div>
+
+//           {/* QR Code Controls */}
+//           <div className="flex justify-between mt-6">
+//             <div className="space-x-4">
+//               <button
+//                 type="button"
+//                 onClick={handleGenerateQR}
+//                 disabled={
+//                   !formData.selectedMono ||
+//                   !formData.color ||
+//                   !formData.size ||
+//                   !formData.bundleQty ||
+//                   !formData.lineNo
+//                 }
+//                 className={`px-4 py-2 rounded-md ${
+//                   formData.selectedMono &&
+//                   formData.color &&
+//                   formData.size &&
+//                   formData.bundleQty &&
+//                   formData.lineNo
+//                     ? "bg-blue-500 text-white hover:bg-blue-600"
+//                     : "bg-gray-300 text-gray-500 cursor-not-allowed"
+//                 }`}
+//               >
+//                 Generate QR Code
+//               </button>
+
+//               {qrData && (
+//                 <button
+//                   type="button"
+//                   onClick={handlePrintQR}
+//                   className="px-4 py-2 rounded-md bg-green-500 text-white hover:bg-green-600"
+//                 >
+//                   Print QR Code
+//                 </button>
+//               )}
+//             </div>
+
+//             {qrData && (
+//               <button
+//                 type="button"
+//                 onClick={() => setShowQRPreview(true)}
+//                 className="px-4 py-2 rounded-md bg-indigo-500 text-white hover:bg-indigo-600"
+//               >
+//                 Preview QR Code
+//               </button>
+//             )}
+//           </div>
+//         </div>
+
+//         {/* Number Pad Modal */}
+//         {showNumberPad && (
+//           <NumberPad
+//             onClose={() => setShowNumberPad(false)}
+//             onInput={handleNumberPadInput}
+//           />
+//         )}
+
+//         {/* QR Code Preview Modal */}
+//         <QRCodePreview
+//           isOpen={showQRPreview}
+//           onClose={() => setShowQRPreview(false)}
+//           qrData={qrData}
+//         />
+//       </div>
+//     </div>
+//   );
+// }
+
+// export default BundleRegistration;
+
+// import { useState, useEffect } from "react";
+// import { useNavigate } from "react-router-dom";
+// import DatePicker from "react-datepicker";
+// import "react-datepicker/dist/react-datepicker.css";
+// import MonoSearch from "../components/forms/MonoSearch";
+// import QRCodePreview from "../components/forms/QRCodePreview";
+// import NumberPad from "../components/forms/NumberPad"; // For YM factory
+// import NumLetterPad from "../components/forms/NumLetterPad"; // New component for other factories
+// import { FaQrcode, FaPrint, FaEye } from "react-icons/fa"; // Icons for buttons
+
+// function BundleRegistration() {
+//   const navigate = useNavigate();
+//   const [qrData, setQrData] = useState(null);
+//   const [showQRPreview, setShowQRPreview] = useState(false);
+//   const [showNumberPad, setShowNumberPad] = useState(false);
+//   const [numberPadTarget, setNumberPadTarget] = useState(null); // Tracks which field is using the number pad
+//   const [formData, setFormData] = useState({
+//     date: new Date(),
+//     selectedMono: "",
+//     buyer: "",
+//     orderQty: "",
+//     factoryInfo: "",
+//     custStyle: "",
+//     country: "",
+//     color: "",
+//     size: "",
+//     bundleQty: "",
+//     lineNo: "",
+//   });
+
+//   const [colors, setColors] = useState([]);
+//   const [sizes, setSizes] = useState([]);
+
+//   // Fetch order details when MONo is selected
+//   useEffect(() => {
+//     const fetchOrderDetails = async () => {
+//       if (!formData.selectedMono) return;
+
+//       try {
+//         const response = await fetch(
+//           `http://localhost:5001/api/order-details/${formData.selectedMono}`
+//         );
+//         const data = await response.json();
+
+//         setFormData((prev) => ({
+//           ...prev,
+//           buyer: data.engName,
+//           orderQty: data.totalQty,
+//           factoryInfo: data.factoryname,
+//           custStyle: data.custStyle,
+//           country: data.country,
+//         }));
+
+//         setColors(data.colors);
+//       } catch (error) {
+//         console.error("Error fetching order details:", error);
+//       }
+//     };
+
+//     fetchOrderDetails();
+//   }, [formData.selectedMono]);
+
+//   // Fetch sizes when color is selected
+//   useEffect(() => {
+//     const fetchSizes = async () => {
+//       if (!formData.selectedMono || !formData.color) return;
+
+//       try {
+//         const response = await fetch(
+//           `http://localhost:5001/api/order-sizes/${formData.selectedMono}/${formData.color}`
+//         );
+//         const data = await response.json();
+//         setSizes(data);
+//       } catch (error) {
+//         console.error("Error fetching sizes:", error);
+//       }
+//     };
+
+//     fetchSizes();
+//   }, [formData.selectedMono, formData.color]);
+
+//   // Handle number pad input
+//   const handleNumberPadInput = (value) => {
+//     if (numberPadTarget === "bundleQty") {
+//       setFormData((prev) => ({
+//         ...prev,
+//         bundleQty: value,
+//       }));
+//     } else if (numberPadTarget === "lineNo") {
+//       setFormData((prev) => ({
+//         ...prev,
+//         lineNo: value,
+//       }));
+//     }
+//   };
+
+//   // Validate Line No for YM factory
+//   const validateLineNo = () => {
+//     if (formData.factoryInfo === "YM") {
+//       const lineNo = parseInt(formData.lineNo);
+//       return lineNo >= 1 && lineNo <= 30;
+//     }
+//     return true; // No validation for other factories
+//   };
+
+//   // Generate QR code
+//   const handleGenerateQR = () => {
+//     if (!validateLineNo()) {
+//       alert("Invalid Line No. It must be between 1 and 30 for YM factory.");
+//       return;
+//     }
+
+//     const data = {
+//       mono: formData.selectedMono,
+//       factory: formData.factoryInfo,
+//       buyer: formData.buyer,
+//       orderQty: formData.orderQty,
+//       color: formData.color,
+//       size: formData.size,
+//       bundleQty: formData.bundleQty,
+//       lineNo: formData.lineNo,
+//     };
+//     setQrData(data);
+//   };
+
+//   // Print QR code (placeholder for now)
+//   const handlePrintQR = () => {
+//     alert("Print QR code functionality will be implemented here.");
+//   };
+
+//   return (
+//     <div className="min-h-screen bg-gray-50 pt-20 px-4">
+//       <div className="max-w-4xl mx-auto">
+//         <h1 className="text-3xl font-bold text-gray-900 mb-8">
+//           Bundle Registration
+//         </h1>
+
+//         <div className="bg-white p-6 rounded-lg shadow-md">
+//           {/* MONo Search and Date Picker */}
+//           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Search MONo
+//               </label>
+//               <MonoSearch
+//                 value={formData.selectedMono}
+//                 onSelect={(mono) =>
+//                   setFormData((prev) => ({
+//                     ...prev,
+//                     selectedMono: mono,
+//                     color: "",
+//                     size: "",
+//                   }))
+//                 }
+//                 placeholder="Search MONo..."
+//                 showSearchIcon={true}
+//               />
+//             </div>
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Date
+//               </label>
+//               <DatePicker
+//                 selected={formData.date}
+//                 onChange={(date) => setFormData((prev) => ({ ...prev, date }))}
+//                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
+//                 dateFormat="yyyy-MM-dd"
+//               />
+//             </div>
+//           </div>
+
+//           {/* Selected MONo */}
+//           {formData.selectedMono && (
+//             <div className="mb-6 p-2 bg-gray-50 rounded-md">
+//               <p className="text-sm font-medium">
+//                 Selected MONo:{" "}
+//                 <span className="ml-2 font-bold text-blue-600">
+//                   {formData.selectedMono}
+//                 </span>
+//               </p>
+//             </div>
+//           )}
+
+//           {/* Customer Style, Buyer, Country, Factory, Order Qty */}
+//           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Customer Style
+//               </label>
+//               <input
+//                 type="text"
+//                 value={formData.custStyle}
+//                 readOnly
+//                 className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+//               />
+//             </div>
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Buyer
+//               </label>
+//               <input
+//                 type="text"
+//                 value={formData.buyer}
+//                 readOnly
+//                 className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+//               />
+//             </div>
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Country
+//               </label>
+//               <input
+//                 type="text"
+//                 value={formData.country}
+//                 readOnly
+//                 className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+//               />
+//             </div>
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Factory
+//               </label>
+//               <input
+//                 type="text"
+//                 value={formData.factoryInfo}
+//                 readOnly
+//                 className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+//               />
+//             </div>
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Order Qty
+//               </label>
+//               <input
+//                 type="text"
+//                 value={formData.orderQty}
+//                 readOnly
+//                 className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+//               />
+//             </div>
+//           </div>
+
+//           {/* Color and Size */}
+//           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Color
+//               </label>
+//               <select
+//                 value={formData.color}
+//                 onChange={(e) =>
+//                   setFormData((prev) => ({ ...prev, color: e.target.value }))
+//                 }
+//                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
+//               >
+//                 <option value="">Select Color</option>
+//                 {colors.map((color) => (
+//                   <option key={color} value={color}>
+//                     {color}
+//                   </option>
+//                 ))}
+//               </select>
+//             </div>
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Size
+//               </label>
+//               <select
+//                 value={formData.size}
+//                 onChange={(e) =>
+//                   setFormData((prev) => ({ ...prev, size: e.target.value }))
+//                 }
+//                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
+//               >
+//                 <option value="">Select Size</option>
+//                 {sizes.map((size) => (
+//                   <option key={size} value={size}>
+//                     {size}
+//                   </option>
+//                 ))}
+//               </select>
+//             </div>
+//           </div>
+
+//           {/* Bundle Qty and Line No */}
+//           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Bundle Qty
+//               </label>
+//               <input
+//                 type="text"
+//                 value={formData.bundleQty}
+//                 onClick={() => {
+//                   setNumberPadTarget("bundleQty");
+//                   setShowNumberPad(true);
+//                 }}
+//                 readOnly
+//                 className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
+//               />
+//             </div>
+//             <div>
+//               <label className="block text-sm font-medium text-gray-700 mb-1">
+//                 Line No
+//               </label>
+//               <input
+//                 type="text"
+//                 value={formData.lineNo}
+//                 onClick={() => {
+//                   setNumberPadTarget("lineNo");
+//                   setShowNumberPad(true);
+//                 }}
+//                 readOnly
+//                 className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
+//               />
+//             </div>
+//           </div>
+
+//           {/* QR Code Controls */}
+//           <div className="flex justify-end mt-6 space-x-4">
+//             <button
+//               type="button"
+//               onClick={handleGenerateQR}
+//               disabled={
+//                 !formData.selectedMono ||
+//                 !formData.color ||
+//                 !formData.size ||
+//                 !formData.bundleQty ||
+//                 !formData.lineNo
+//               }
+//               className={`px-4 py-2 rounded-md flex items-center ${
+//                 formData.selectedMono &&
+//                 formData.color &&
+//                 formData.size &&
+//                 formData.bundleQty &&
+//                 formData.lineNo
+//                   ? "bg-blue-500 text-white hover:bg-blue-600"
+//                   : "bg-gray-300 text-gray-500 cursor-not-allowed"
+//               }`}
+//             >
+//               <FaQrcode className="mr-2" /> Generate QR
+//             </button>
+
+//             {qrData && (
+//               <>
+//                 <button
+//                   type="button"
+//                   onClick={() => setShowQRPreview(true)}
+//                   className="px-4 py-2 rounded-md bg-indigo-500 text-white hover:bg-indigo-600 flex items-center"
+//                 >
+//                   <FaEye className="mr-2" /> Preview QR
+//                 </button>
+//                 <button
+//                   type="button"
+//                   onClick={handlePrintQR}
+//                   className="px-4 py-2 rounded-md bg-green-500 text-white hover:bg-green-600 flex items-center"
+//                 >
+//                   <FaPrint className="mr-2" /> Print QR
+//                 </button>
+//               </>
+//             )}
+//           </div>
+//         </div>
+
+//         {/* Number Pad Modal */}
+//         {showNumberPad && (
+//           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center pt-20">
+//             {formData.factoryInfo === "YM" ? (
+//               <NumberPad
+//                 onClose={() => setShowNumberPad(false)}
+//                 onInput={handleNumberPadInput}
+//               />
+//             ) : (
+//               <NumLetterPad
+//                 onClose={() => setShowNumberPad(false)}
+//                 onInput={handleNumberPadInput}
+//               />
+//             )}
+//           </div>
+//         )}
+
+//         {/* QR Code Preview Modal */}
+//         <QRCodePreview
+//           isOpen={showQRPreview}
+//           onClose={() => setShowQRPreview(false)}
+//           qrData={qrData}
+//         />
+//       </div>
+//     </div>
+//   );
+// }
+
+// export default BundleRegistration;
+
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import MonoSearch from "../components/forms/MonoSearch";
+import QRCodePreview from "../components/forms/QRCodePreview";
+import NumberPad from "../components/forms/NumberPad"; // For Bundle Qty and YM factory Line No
+import NumLetterPad from "../components/forms/NumLetterPad"; // For non-YM factory Line No
+import { FaQrcode, FaPrint, FaEye } from "react-icons/fa"; // Icons for buttons
+
+function BundleRegistration() {
+  const navigate = useNavigate();
+  const [qrData, setQrData] = useState(null);
+  const [showQRPreview, setShowQRPreview] = useState(false);
+  const [showNumberPad, setShowNumberPad] = useState(false);
+  const [numberPadTarget, setNumberPadTarget] = useState(null); // Tracks which field is using the number pad
+  const [formData, setFormData] = useState({
+    date: new Date(),
+    selectedMono: "",
+    buyer: "",
+    orderQty: "",
+    factoryInfo: "",
+    custStyle: "",
+    country: "",
+    color: "",
+    size: "",
+    bundleQty: "",
+    lineNo: "",
+  });
+
+  const [colors, setColors] = useState([]);
+  const [sizes, setSizes] = useState([]);
+
+  // Fetch order details when MONo is selected
+  useEffect(() => {
+    const fetchOrderDetails = async () => {
+      if (!formData.selectedMono) return;
+
+      try {
+        const response = await fetch(
+          `http://localhost:5001/api/order-details/${formData.selectedMono}`
+        );
+        const data = await response.json();
+
+        setFormData((prev) => ({
+          ...prev,
+          buyer: data.engName,
+          orderQty: data.totalQty,
+          factoryInfo: data.factoryname,
+          custStyle: data.custStyle,
+          country: data.country,
+        }));
+
+        setColors(data.colors);
+      } catch (error) {
+        console.error("Error fetching order details:", error);
+      }
+    };
+
+    fetchOrderDetails();
+  }, [formData.selectedMono]);
+
+  // Fetch sizes when color is selected
+  useEffect(() => {
+    const fetchSizes = async () => {
+      if (!formData.selectedMono || !formData.color) return;
+
+      try {
+        const response = await fetch(
+          `http://localhost:5001/api/order-sizes/${formData.selectedMono}/${formData.color}`
+        );
+        const data = await response.json();
+        setSizes(data);
+      } catch (error) {
+        console.error("Error fetching sizes:", error);
+      }
+    };
+
+    fetchSizes();
+  }, [formData.selectedMono, formData.color]);
+
+  // Handle number pad input
+  const handleNumberPadInput = (value) => {
+    if (numberPadTarget === "bundleQty") {
+      setFormData((prev) => ({
+        ...prev,
+        bundleQty: value,
+      }));
+    } else if (numberPadTarget === "lineNo") {
+      setFormData((prev) => ({
+        ...prev,
+        lineNo: value,
+      }));
+    }
+  };
+
+  // Validate Line No for YM factory
+  const validateLineNo = () => {
+    if (formData.factoryInfo === "YM") {
+      const lineNo = parseInt(formData.lineNo);
+      return lineNo >= 1 && lineNo <= 30;
+    }
+    return true; // No validation for other factories
+  };
+
+  // Generate QR code
+  const handleGenerateQR = () => {
+    if (!validateLineNo()) {
+      alert("Invalid Line No. It must be between 1 and 30 for YM factory.");
+      return;
+    }
+
+    const data = {
+      mono: formData.selectedMono,
+      factory: formData.factoryInfo,
+      buyer: formData.buyer,
+      orderQty: formData.orderQty,
+      color: formData.color,
+      size: formData.size,
+      bundleQty: formData.bundleQty,
+      lineNo: formData.lineNo,
+    };
+    setQrData(data);
+  };
+
+  // Print QR code (placeholder for now)
+  const handlePrintQR = () => {
+    alert("Print QR code functionality will be implemented here.");
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 pt-20 px-4">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">
+          Bundle Registration
+        </h1>
+
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          {/* Date Picker and MONo Search */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date
+              </label>
+              <DatePicker
+                selected={formData.date}
+                onChange={(date) => setFormData((prev) => ({ ...prev, date }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                dateFormat="yyyy-MM-dd"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Search MONo
+              </label>
+              <MonoSearch
+                value={formData.selectedMono}
+                onSelect={(mono) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    selectedMono: mono,
+                    color: "",
+                    size: "",
+                  }))
+                }
+                placeholder="Search MONo..."
+                showSearchIcon={true}
+              />
+            </div>
+          </div>
+
+          {/* Selected MONo */}
+          {formData.selectedMono && (
+            <div className="mb-6 p-2 bg-gray-50 rounded-md">
+              <p className="text-sm font-medium">
+                Selected MONo:{" "}
+                <span className="ml-2 font-bold text-blue-600">
+                  {formData.selectedMono}
+                </span>
+              </p>
+            </div>
+          )}
+
+          {/* Customer Style, Buyer, Country, Factory, Order Qty */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Customer Style
+              </label>
+              <input
+                type="text"
+                value={formData.custStyle}
+                readOnly
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Buyer
+              </label>
+              <input
+                type="text"
+                value={formData.buyer}
+                readOnly
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Country
+              </label>
+              <input
+                type="text"
+                value={formData.country}
+                readOnly
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Factory
+              </label>
+              <input
+                type="text"
+                value={formData.factoryInfo}
+                readOnly
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Order Qty
+              </label>
+              <input
+                type="text"
+                value={formData.orderQty}
+                readOnly
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md"
+              />
+            </div>
+          </div>
+
+          {/* Color and Size */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Color
+              </label>
+              <select
+                value={formData.color}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, color: e.target.value }))
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="">Select Color</option>
+                {colors.map((color) => (
+                  <option key={color} value={color}>
+                    {color}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Size
+              </label>
+              <select
+                value={formData.size}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, size: e.target.value }))
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="">Select Size</option>
+                {sizes.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Bundle Qty and Line No */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Bundle Qty
+              </label>
+              <input
+                type="text"
+                value={formData.bundleQty}
+                onClick={() => {
+                  setNumberPadTarget("bundleQty");
+                  setShowNumberPad(true);
+                }}
+                readOnly
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Line No
+              </label>
+              <input
+                type="text"
+                value={formData.lineNo}
+                onClick={() => {
+                  setNumberPadTarget("lineNo");
+                  setShowNumberPad(true);
+                }}
+                readOnly
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {/* QR Code Controls */}
+          <div className="flex justify-end mt-6 space-x-4">
+            <button
+              type="button"
+              onClick={handleGenerateQR}
+              disabled={
+                !formData.selectedMono ||
+                !formData.color ||
+                !formData.size ||
+                !formData.bundleQty ||
+                !formData.lineNo
+              }
+              className={`px-4 py-2 rounded-md flex items-center ${
+                formData.selectedMono &&
+                formData.color &&
+                formData.size &&
+                formData.bundleQty &&
+                formData.lineNo
+                  ? "bg-blue-500 text-white hover:bg-blue-600"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
+            >
+              <FaQrcode className="mr-2" /> Generate QR
+            </button>
+
+            {qrData && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowQRPreview(true)}
+                  className="px-4 py-2 rounded-md bg-indigo-500 text-white hover:bg-indigo-600 flex items-center"
+                >
+                  <FaEye className="mr-2" /> Preview QR
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePrintQR}
+                  className="px-4 py-2 rounded-md bg-green-500 text-white hover:bg-green-600 flex items-center"
+                >
+                  <FaPrint className="mr-2" /> Print QR
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Number Pad Modal */}
+        {showNumberPad && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center pt-20">
+            {numberPadTarget === "bundleQty" ||
+            formData.factoryInfo === "YM" ? (
+              <NumberPad
+                onClose={() => setShowNumberPad(false)}
+                onInput={handleNumberPadInput}
+              />
+            ) : (
+              <NumLetterPad
+                onClose={() => setShowNumberPad(false)}
+                onInput={handleNumberPadInput}
+              />
+            )}
+          </div>
+        )}
+
+        {/* QR Code Preview Modal */}
+        <QRCodePreview
+          isOpen={showQRPreview}
+          onClose={() => setShowQRPreview(false)}
+          qrData={qrData}
+        />
+      </div>
+    </div>
+  );
+}
+
+export default BundleRegistration;
