@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
-import { QRCodeSVG } from "qrcode.react"; // Changed import
+import { QRCodeSVG } from "qrcode.react";
 
 export default function QRCodePreview({ isOpen, onClose, qrData }) {
   return (
@@ -34,43 +34,47 @@ export default function QRCodePreview({ isOpen, onClose, qrData }) {
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900"
                 >
-                  Production QR Code
+                  Production QR Codes
                 </Dialog.Title>
 
-                <div className="mt-4 space-y-2">
-                  <p>
-                    <strong>Factory:</strong> {qrData?.factory}
-                  </p>
-                  <p>
-                    <strong>MONo:</strong> {qrData?.mono}
-                  </p>
-
-                  <p>
-                    <strong>Buyer:</strong> {qrData?.buyer}
-                  </p>
-                  <p>
-                    <strong>Line No:</strong> {qrData?.lineNo}
-                  </p>
-                  <p>
-                    <strong>Order Qty:</strong> {qrData?.orderQty}
-                  </p>
-                  <p>
-                    <strong>Color:</strong> {qrData?.color}
-                  </p>
-                  <p>
-                    <strong>Size:</strong> {qrData?.size}
-                  </p>
-                </div>
-
-                <div className="mt-4 flex justify-center">
-                  {qrData && (
-                    <QRCodeSVG // Changed component name
-                      value={JSON.stringify(qrData)}
-                      size={256}
-                      level="H"
-                      includeMargin={true}
-                    />
-                  )}
+                <div className="mt-4 space-y-4">
+                  {qrData.map((data, index) => (
+                    <div key={index} className="space-y-2">
+                      <p>
+                        <strong>Bundle ID:</strong> {data.bundle_id}
+                      </p>
+                      <p>
+                        <strong>Factory:</strong> {data.factory}
+                      </p>
+                      <p>
+                        <strong>MONo:</strong> {data.selectedMono}
+                      </p>
+                      <p>
+                        <strong>Buyer:</strong> {data.buyer}
+                      </p>
+                      <p>
+                        <strong>Line No:</strong> {data.lineNo}
+                      </p>
+                      <p>
+                        <strong>Order Qty:</strong> {data.orderQty}
+                      </p>
+                      <p>
+                        <strong>Color:</strong> {data.color}
+                      </p>
+                      <p>
+                        <strong>Size:</strong> {data.size}
+                      </p>
+                      <div className="flex justify-center">
+                        <QRCodeSVG
+                          value={JSON.stringify(data)}
+                          size={256}
+                          level="H"
+                          includeMargin={true}
+                        />
+                      </div>
+                      <hr className="my-4" />
+                    </div>
+                  ))}
                 </div>
 
                 <div className="mt-4 flex justify-end">

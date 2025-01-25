@@ -10,7 +10,7 @@ import { FaQrcode, FaPrint, FaEye } from "react-icons/fa"; // Icons for buttons
 
 function BundleRegistration() {
   const navigate = useNavigate();
-  const [qrData, setQrData] = useState(null);
+  const [qrData, setQrData] = useState([]); // Array to hold multiple QR codes
   const [showQRPreview, setShowQRPreview] = useState(false);
   const [showNumberPad, setShowNumberPad] = useState(false);
   const [numberPadTarget, setNumberPadTarget] = useState(null); // Tracks which field is using the number pad
@@ -135,25 +135,61 @@ function BundleRegistration() {
     return true; // No validation for other factories
   };
 
-  // Generate QR code
-  const handleGenerateQR = () => {
+  // Generate QR code and save bundle data
+  const handleGenerateQR = async () => {
     if (!validateLineNo()) {
       alert("Invalid Line No. It must be between 1 and 30 for YM factory.");
       return;
     }
 
-    const data = {
-      mono: formData.selectedMono,
-      factory: formData.factoryInfo,
-      buyer: formData.buyer,
-      orderQty: formData.orderQty,
-      color: formData.color,
-      size: formData.size,
-      bundleQty: formData.bundleQty,
-      lineNo: formData.lineNo,
-      count: formData.count, // Include count in QR data
-    };
-    setQrData(data);
+    const bundleQty = parseInt(formData.bundleQty);
+    const bundleData = [];
+
+    for (let i = 1; i <= bundleQty; i++) {
+      const bundleId = `${formData.date.toISOString().split("T")[0]}:${
+        formData.selectedMono
+      }:${formData.color}:${formData.size}:${i}`;
+
+      const bundleRecord = {
+        bundle_id: bundleId,
+        date: formData.date.toLocaleDateString("en-US"), // Format as MM/DD/YYYY
+        selectedMono: formData.selectedMono,
+        custStyle: formData.custStyle,
+        buyer: formData.buyer,
+        country: formData.country,
+        orderQty: formData.orderQty,
+        factory: formData.factoryInfo,
+        lineNo: formData.lineNo,
+        color: formData.color,
+        size: formData.size,
+        count: formData.count,
+        totalBundleQty: bundleQty,
+      };
+
+      bundleData.push(bundleRecord);
+    }
+
+    // Save bundle data to MongoDB
+    try {
+      const response = await fetch(
+        "http://localhost:5001/api/save-bundle-data",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bundleData }),
+        }
+      );
+
+      if (response.ok) {
+        setQrData(bundleData); // Set QR data for preview
+        setShowQRPreview(true); // Show QR preview
+      } else {
+        alert("Failed to save bundle data.");
+      }
+    } catch (error) {
+      console.error("Error saving bundle data:", error);
+      alert("Failed to save bundle data.");
+    }
   };
 
   // Print QR code (placeholder for now)

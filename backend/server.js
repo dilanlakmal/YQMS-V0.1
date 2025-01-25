@@ -71,8 +71,51 @@ const qcDataSchema = new mongoose.Schema(
 
 const QCData = mongoose.model("qc1_data", qcDataSchema);
 
+// Schema for qc2_orderdata collection
+const qc2OrderDataSchema = new mongoose.Schema(
+  {
+    bundle_id: { type: String, required: true },
+    date: { type: String, required: true },
+    selectedMono: { type: String, required: true },
+    custStyle: { type: String, required: true },
+    buyer: { type: String, required: true },
+    country: { type: String, required: true },
+    orderQty: { type: Number, required: true },
+    factory: { type: String, required: true },
+    lineNo: { type: String, required: true },
+    color: { type: String, required: true },
+    size: { type: String, required: true },
+    count: { type: String, required: true },
+    totalBundleQty: { type: Number, required: true },
+  },
+  { collection: "qc2_orderdata" }
+);
+
+const QC2OrderData = mongoose.model("qc2_orderdata", qc2OrderDataSchema);
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
+});
+
+// Save bundle data to MongoDB
+app.post("/api/save-bundle-data", async (req, res) => {
+  try {
+    const { bundleData } = req.body;
+
+    // Save each bundle record
+    const savedRecords = await QC2OrderData.insertMany(bundleData);
+
+    res.status(201).json({
+      message: "Bundle data saved successfully",
+      data: savedRecords,
+    });
+  } catch (error) {
+    console.error("Error saving bundle data:", error);
+    res.status(500).json({
+      message: "Failed to save bundle data",
+      error: error.message,
+    });
+  }
 });
 
 // Update the MONo search endpoint to handle complex pattern matching
