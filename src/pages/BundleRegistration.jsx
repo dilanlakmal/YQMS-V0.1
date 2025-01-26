@@ -4,16 +4,17 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import MonoSearch from "../components/forms/MonoSearch";
 import QRCodePreview from "../components/forms/QRCodePreview";
-import NumberPad from "../components/forms/NumberPad"; // For Bundle Qty and YM factory Line No
-import NumLetterPad from "../components/forms/NumLetterPad"; // For non-YM factory Line No
-import { FaQrcode, FaPrint, FaEye } from "react-icons/fa"; // Icons for buttons
+import NumberPad from "../components/forms/NumberPad";
+import NumLetterPad from "../components/forms/NumLetterPad";
+import { FaQrcode, FaPrint, FaEye } from "react-icons/fa";
 
 function BundleRegistration() {
   const navigate = useNavigate();
   const [qrData, setQrData] = useState([]); // Array to hold multiple QR codes
   const [showQRPreview, setShowQRPreview] = useState(false);
   const [showNumberPad, setShowNumberPad] = useState(false);
-  const [numberPadTarget, setNumberPadTarget] = useState(null); // Tracks which field is using the number pad
+  const [numberPadTarget, setNumberPadTarget] = useState(null);
+  const [isGenerateDisabled, setIsGenerateDisabled] = useState(false); // To disable Generate QR button
   const [formData, setFormData] = useState({
     date: new Date(),
     selectedMono: "",
@@ -26,13 +27,13 @@ function BundleRegistration() {
     size: "",
     bundleQty: "",
     lineNo: "",
-    count: "10", // Default value for Count
+    count: "10",
   });
 
   const [colors, setColors] = useState([]);
   const [sizes, setSizes] = useState([]);
-  const [hasColors, setHasColors] = useState(false); // Track if colors are available
-  const [hasSizes, setHasSizes] = useState(false); // Track if sizes are available
+  const [hasColors, setHasColors] = useState(false);
+  const [hasSizes, setHasSizes] = useState(false);
 
   // Fetch order details when MONo is selected
   useEffect(() => {
@@ -52,25 +53,24 @@ function BundleRegistration() {
           factoryInfo: data.factoryname,
           custStyle: data.custStyle,
           country: data.country,
-          color: "", // Reset color when MONo changes
-          size: "", // Reset size when MONo changes
+          color: "",
+          size: "",
         }));
 
-        // Check if colors are available
         if (data.colors && data.colors.length > 0) {
           setColors(data.colors);
-          setHasColors(true); // Set hasColors to true if colors are available
-          setHasSizes(false); // Reset hasSizes when colors are available
+          setHasColors(true);
+          setHasSizes(false);
         } else {
           setColors([]);
-          setHasColors(false); // Set hasColors to false if no colors are available
-          setHasSizes(false); // Set hasSizes to false if no colors are available
+          setHasColors(false);
+          setHasSizes(false);
         }
       } catch (error) {
         console.error("Error fetching order details:", error);
         setColors([]);
         setHasColors(false);
-        setHasSizes(false); // Set hasSizes to false on error
+        setHasSizes(false);
       }
     };
 
@@ -88,18 +88,17 @@ function BundleRegistration() {
         );
         const data = await response.json();
 
-        // Check if sizes are available
         if (data && data.length > 0) {
           setSizes(data);
-          setHasSizes(true); // Set hasSizes to true if sizes are available
+          setHasSizes(true);
         } else {
           setSizes([]);
-          setHasSizes(false); // Set hasSizes to false if no sizes are available
+          setHasSizes(false);
         }
       } catch (error) {
         console.error("Error fetching sizes:", error);
         setSizes([]);
-        setHasSizes(false); // Set hasSizes to false on error
+        setHasSizes(false);
       }
     };
 
@@ -132,7 +131,7 @@ function BundleRegistration() {
       const lineNo = parseInt(formData.lineNo);
       return lineNo >= 1 && lineNo <= 30;
     }
-    return true; // No validation for other factories
+    return true;
   };
 
   // Generate QR code and save bundle data
@@ -142,36 +141,56 @@ function BundleRegistration() {
       return;
     }
 
-    const bundleQty = parseInt(formData.bundleQty);
-    const bundleData = [];
+    const { date, selectedMono, color, size, lineNo } = formData;
 
-    for (let i = 1; i <= bundleQty; i++) {
-      const bundleId = `${formData.date.toISOString().split("T")[0]}:${
-        formData.selectedMono
-      }:${formData.color}:${formData.size}:${i}`;
-
-      const bundleRecord = {
-        bundle_id: bundleId,
-        date: formData.date.toLocaleDateString("en-US"), // Format as MM/DD/YYYY
-        selectedMono: formData.selectedMono,
-        custStyle: formData.custStyle,
-        buyer: formData.buyer,
-        country: formData.country,
-        orderQty: formData.orderQty,
-        factory: formData.factoryInfo,
-        lineNo: formData.lineNo,
-        color: formData.color,
-        size: formData.size,
-        count: formData.count,
-        totalBundleQty: bundleQty,
-      };
-
-      bundleData.push(bundleRecord);
-    }
-
-    // Save bundle data to MongoDB
+    // Check if bundle_id already exists and get the largest number
     try {
       const response = await fetch(
+        "http://localhost:5001/api/check-bundle-id",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: date.toISOString().split("T")[0],
+            lineNo,
+            selectedMono,
+            color,
+            size,
+          }),
+        }
+      );
+
+      const { largestNumber } = await response.json();
+
+      const bundleQty = parseInt(formData.bundleQty);
+      const bundleData = [];
+
+      for (let i = 1; i <= bundleQty; i++) {
+        const bundleId = `${
+          date.toISOString().split("T")[0]
+        }:${lineNo}:${selectedMono}:${color}:${size}:${largestNumber + i}`;
+
+        const bundleRecord = {
+          bundle_id: bundleId,
+          date: date.toLocaleDateString("en-US"), // Format as MM/DD/YYYY
+          selectedMono,
+          custStyle: formData.custStyle,
+          buyer: formData.buyer,
+          country: formData.country,
+          orderQty: formData.orderQty,
+          factory: formData.factoryInfo,
+          lineNo,
+          color,
+          size,
+          count: formData.count,
+          totalBundleQty: bundleQty,
+        };
+
+        bundleData.push(bundleRecord);
+      }
+
+      // Save bundle data to MongoDB
+      const saveResponse = await fetch(
         "http://localhost:5001/api/save-bundle-data",
         {
           method: "POST",
@@ -180,9 +199,9 @@ function BundleRegistration() {
         }
       );
 
-      if (response.ok) {
+      if (saveResponse.ok) {
         setQrData(bundleData); // Set QR data for preview
-        setShowQRPreview(true); // Show QR preview
+        setIsGenerateDisabled(true); // Disable Generate QR button
       } else {
         alert("Failed to save bundle data.");
       }
@@ -192,8 +211,15 @@ function BundleRegistration() {
     }
   };
 
-  // Print QR code (placeholder for now)
+  // Print QR code and clear form data
   const handlePrintQR = () => {
+    setFormData((prev) => ({
+      ...prev,
+      color: "",
+      size: "",
+      bundleQty: "",
+    }));
+    setIsGenerateDisabled(false); // Re-enable Generate QR button
     alert("Print QR code functionality will be implemented here.");
   };
 
@@ -234,7 +260,7 @@ function BundleRegistration() {
                 }
                 placeholder="Search Last 3 Digits of MONo..."
                 showSearchIcon={true}
-                closeOnOutsideClick={true} // Close dropdown when clicking outside
+                closeOnOutsideClick={true}
               />
             </div>
           </div>
@@ -392,6 +418,7 @@ function BundleRegistration() {
                 type="button"
                 onClick={handleGenerateQR}
                 disabled={
+                  isGenerateDisabled ||
                   !formData.selectedMono ||
                   !formData.color ||
                   !formData.size ||
@@ -406,13 +433,13 @@ function BundleRegistration() {
                   formData.bundleQty &&
                   formData.lineNo &&
                   formData.count
-                    ? "bg-blue-500 text-white hover:bg-blue-600"
+                    ? "bg-green-500 text-white hover:bg-green-600"
                     : "bg-gray-300 text-gray-500 cursor-not-allowed"
                 }`}
               >
                 <FaQrcode className="mr-2" /> Generate QR
               </button>
-              {qrData && (
+              {qrData.length > 0 && (
                 <>
                   <button
                     type="button"

@@ -118,6 +118,38 @@ app.post("/api/save-bundle-data", async (req, res) => {
   }
 });
 
+// Check if bundle_id already exists and get the largest number
+app.post("/api/check-bundle-id", async (req, res) => {
+  try {
+    const { date, lineNo, selectedMono, color, size } = req.body;
+
+    // Find all bundle IDs matching the criteria
+    const existingBundles = await QC2OrderData.find({
+      bundle_id: {
+        $regex: `^${date}:${lineNo}:${selectedMono}:${color}:${size}`,
+      },
+    });
+
+    // Extract the largest number from the bundle IDs
+    let largestNumber = 0;
+    existingBundles.forEach((bundle) => {
+      const parts = bundle.bundle_id.split(":");
+      const number = parseInt(parts[parts.length - 1]);
+      if (number > largestNumber) {
+        largestNumber = number;
+      }
+    });
+
+    res.status(200).json({ largestNumber });
+  } catch (error) {
+    console.error("Error checking bundle ID:", error);
+    res.status(500).json({
+      message: "Failed to check bundle ID",
+      error: error.message,
+    });
+  }
+});
+
 // Update the MONo search endpoint to handle complex pattern matching
 app.get("/api/search-mono", async (req, res) => {
   try {

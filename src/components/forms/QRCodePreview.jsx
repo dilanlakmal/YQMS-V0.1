@@ -37,7 +37,7 @@ export default function QRCodePreview({ isOpen, onClose, qrData }) {
                   Production QR Codes
                 </Dialog.Title>
 
-                <div className="mt-4 space-y-4">
+                <div className="mt-4 space-y-4 h-96 overflow-y-auto">
                   {qrData.map((data, index) => (
                     <div key={index} className="space-y-2">
                       <p>
