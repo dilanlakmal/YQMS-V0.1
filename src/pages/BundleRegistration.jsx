@@ -6,15 +6,23 @@ import MonoSearch from "../components/forms/MonoSearch";
 import QRCodePreview from "../components/forms/QRCodePreview";
 import NumberPad from "../components/forms/NumberPad";
 import NumLetterPad from "../components/forms/NumLetterPad";
-import { FaQrcode, FaPrint, FaEye } from "react-icons/fa";
+import { FaQrcode, FaPrint, FaEye, FaList } from "react-icons/fa";
 
 function BundleRegistration() {
   const navigate = useNavigate();
-  const [qrData, setQrData] = useState([]); // Array to hold multiple QR codes
+  const [qrData, setQrData] = useState([]);
   const [showQRPreview, setShowQRPreview] = useState(false);
   const [showNumberPad, setShowNumberPad] = useState(false);
   const [numberPadTarget, setNumberPadTarget] = useState(null);
-  const [isGenerateDisabled, setIsGenerateDisabled] = useState(false); // To disable Generate QR button
+  const [isGenerateDisabled, setIsGenerateDisabled] = useState(false);
+  const [activeTab, setActiveTab] = useState("registration");
+  const [dataRecords, setDataRecords] = useState([]);
+  const [isSubCon, setIsSubCon] = useState(false); // State for Sub Con option
+  const [subConName, setSubConName] = useState(""); // State for Sub Con dropdown
+
+  // Hardcoded Sub Con names
+  const subConNames = ["Sunicon", "Elite", "SYD"];
+
   const [formData, setFormData] = useState({
     date: new Date(),
     selectedMono: "",
@@ -143,7 +151,6 @@ function BundleRegistration() {
 
     const { date, selectedMono, color, size, lineNo } = formData;
 
-    // Check if bundle_id already exists and get the largest number
     try {
       const response = await fetch(
         "http://localhost:5001/api/check-bundle-id",
@@ -172,7 +179,7 @@ function BundleRegistration() {
 
         const bundleRecord = {
           bundle_id: bundleId,
-          date: date.toLocaleDateString("en-US"), // Format as MM/DD/YYYY
+          date: date.toLocaleDateString("en-US"),
           selectedMono,
           custStyle: formData.custStyle,
           buyer: formData.buyer,
@@ -184,6 +191,7 @@ function BundleRegistration() {
           size,
           count: formData.count,
           totalBundleQty: bundleQty,
+          subCon: isSubCon ? subConName : "No", // Add Sub Con data
         };
 
         bundleData.push(bundleRecord);
@@ -201,9 +209,11 @@ function BundleRegistration() {
 
       if (saveResponse.ok) {
         const savedData = await saveResponse.json();
-        setQrData(savedData.data); // Now contains random IDs from server
-        // setQrData(bundleData); // Set QR data for preview
+        setQrData(savedData.data);
         setIsGenerateDisabled(true); // Disable Generate QR button
+
+        // Add the new records to the dataRecords state
+        setDataRecords((prevRecords) => [...prevRecords, ...savedData.data]);
       } else {
         alert("Failed to save bundle data.");
       }
@@ -226,89 +236,114 @@ function BundleRegistration() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20 px-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gray-50 pt-20 px-8">
+      <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">
           Bundle Registration
         </h1>
 
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          {/* Date Picker and MONo Search */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date
-              </label>
-              <DatePicker
-                selected={formData.date}
-                onChange={(date) => setFormData((prev) => ({ ...prev, date }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                dateFormat="yyyy-MM-dd"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Search MONo
-              </label>
-              <MonoSearch
-                value={formData.selectedMono}
-                onSelect={(mono) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    selectedMono: mono,
-                    color: "",
-                    size: "",
-                  }))
-                }
-                placeholder="Search Last 3 Digits of MONo..."
-                showSearchIcon={true}
-                closeOnOutsideClick={true}
-              />
-            </div>
-          </div>
+        {/* Tabs */}
+        <div className="flex space-x-4 mb-6">
+          <button
+            onClick={() => setActiveTab("registration")}
+            className={`px-4 py-2 rounded-md ${
+              activeTab === "registration"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            Registration
+          </button>
+          <button
+            onClick={() => setActiveTab("data")}
+            className={`px-4 py-2 rounded-md ${
+              activeTab === "data"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            Data
+          </button>
+        </div>
 
-          {/* Selected MONo and Order Details */}
-          {formData.selectedMono && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-md">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">
-                Order Details
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-700">
-                    <span className="font-bold">Selected MONo:</span>{" "}
-                    {formData.selectedMono}
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    <span className="font-bold">Customer Style:</span>{" "}
-                    {formData.custStyle}
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    <span className="font-bold">Buyer:</span> {formData.buyer}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-700">
-                    <span className="font-bold">Country:</span>{" "}
-                    {formData.country}
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    <span className="font-bold">Order Qty:</span>{" "}
-                    {formData.orderQty}
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    <span className="font-bold">Factory:</span>{" "}
-                    {formData.factoryInfo}
-                  </p>
-                </div>
+        {activeTab === "registration" ? (
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            {/* Date Picker and MONo Search */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date
+                </label>
+                <DatePicker
+                  selected={formData.date}
+                  onChange={(date) =>
+                    setFormData((prev) => ({ ...prev, date }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  dateFormat="yyyy-MM-dd"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Search MONo
+                </label>
+                <MonoSearch
+                  value={formData.selectedMono}
+                  onSelect={(mono) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      selectedMono: mono,
+                      color: "",
+                      size: "",
+                    }))
+                  }
+                  placeholder="Search Last 3 Digits of MONo..."
+                  showSearchIcon={true}
+                  closeOnOutsideClick={true}
+                />
               </div>
             </div>
-          )}
 
-          {/* Line No, Color, Size, Count, and Bundle Qty */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {/* Selected MONo and Order Details */}
+            {formData.selectedMono && (
+              <div className="mb-6 p-4 bg-gray-50 rounded-md">
+                <h2 className="text-lg font-bold text-gray-800 mb-4">
+                  Order Details
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-bold">Selected MONo:</span>{" "}
+                      {formData.selectedMono}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-bold">Customer Style:</span>{" "}
+                      {formData.custStyle}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-bold">Buyer:</span> {formData.buyer}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-bold">Country:</span>{" "}
+                      {formData.country}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-bold">Order Qty:</span>{" "}
+                      {formData.orderQty}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-bold">Factory:</span>{" "}
+                      {formData.factoryInfo}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Line No */}
-            <div>
+            <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Line No
               </label>
@@ -324,144 +359,226 @@ function BundleRegistration() {
               />
             </div>
 
-            {/* Color */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Color
-              </label>
-              {hasColors ? (
-                <select
-                  value={formData.color}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, color: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  <option value="">Select Color</option>
-                  {colors.map((color) => (
-                    <option key={color} value={color}>
-                      {color}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p className="text-sm text-gray-500">No Colors Available</p>
-              )}
-            </div>
-
-            {/* Size */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Size
-              </label>
-              {hasColors ? (
-                hasSizes ? (
+            {/* Color and Size in one line */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Color
+                </label>
+                {hasColors ? (
                   <select
-                    value={formData.size}
+                    value={formData.color}
                     onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, size: e.target.value }))
+                      setFormData((prev) => ({
+                        ...prev,
+                        color: e.target.value,
+                      }))
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
-                    <option value="">Select Size</option>
-                    {sizes.map((size) => (
-                      <option key={size} value={size}>
-                        {size}
+                    <option value="">Select Color</option>
+                    {colors.map((color) => (
+                      <option key={color} value={color}>
+                        {color}
                       </option>
                     ))}
                   </select>
                 ) : (
-                  <p className="text-sm text-gray-500">No Sizes Available</p>
-                )
-              ) : (
-                <p className="text-sm text-gray-500">No Colors Available</p>
-              )}
+                  <p className="text-sm text-gray-500">No Colors Available</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Size
+                </label>
+                {hasColors ? (
+                  hasSizes ? (
+                    <select
+                      value={formData.size}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          size: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    >
+                      <option value="">Select Size</option>
+                      {sizes.map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-sm text-gray-500">No Sizes Available</p>
+                  )
+                ) : (
+                  <p className="text-sm text-gray-500">No Colors Available</p>
+                )}
+              </div>
             </div>
 
-            {/* Count */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Count
-              </label>
-              <input
-                type="text"
-                value={formData.count}
-                onClick={() => {
-                  setNumberPadTarget("count");
-                  setShowNumberPad(true);
-                }}
-                readOnly
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
-              />
+            {/* Count and Bundle Qty in one line */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Count
+                </label>
+                <input
+                  type="text"
+                  value={formData.count}
+                  onClick={() => {
+                    setNumberPadTarget("count");
+                    setShowNumberPad(true);
+                  }}
+                  readOnly
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Bundle Qty
+                </label>
+                <input
+                  type="text"
+                  value={formData.bundleQty}
+                  onClick={() => {
+                    setNumberPadTarget("bundleQty");
+                    setShowNumberPad(true);
+                  }}
+                  readOnly
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
+                />
+              </div>
             </div>
 
-            {/* Bundle Qty */}
-            <div>
+            {/* Sub Con (Yes/No) */}
+            <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Bundle Qty
+                Sub Con (Yes/No)
               </label>
-              <input
-                type="text"
-                value={formData.bundleQty}
-                onClick={() => {
-                  setNumberPadTarget("bundleQty");
-                  setShowNumberPad(true);
-                }}
-                readOnly
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
-              />
+              <div className="flex items-center space-x-4">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={isSubCon}
+                    onChange={(e) => setIsSubCon(e.target.checked)}
+                    className="mr-2"
+                  />
+                  Yes
+                </label>
+                {isSubCon && (
+                  <select
+                    value={subConName}
+                    onChange={(e) => setSubConName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="">Select Sub Con</option>
+                    {subConNames.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            {/* QR Code Controls */}
+            <div className="flex justify-between mt-6">
+              <div className="flex space-x-4">
+                <button
+                  type="button"
+                  onClick={handleGenerateQR}
+                  disabled={
+                    isGenerateDisabled ||
+                    !formData.selectedMono ||
+                    !formData.color ||
+                    !formData.size ||
+                    !formData.bundleQty ||
+                    !formData.lineNo ||
+                    !formData.count
+                  }
+                  className={`px-4 py-2 rounded-md flex items-center ${
+                    formData.selectedMono &&
+                    formData.color &&
+                    formData.size &&
+                    formData.bundleQty &&
+                    formData.lineNo &&
+                    formData.count
+                      ? "bg-green-500 text-white hover:bg-green-600"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  <FaQrcode className="mr-2" /> Generate QR
+                </button>
+                {qrData.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowQRPreview(true)}
+                      className="px-4 py-2 rounded-md bg-indigo-500 text-white hover:bg-indigo-600 flex items-center"
+                    >
+                      <FaEye className="mr-2" /> Preview QR
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handlePrintQR}
+                      className="px-4 py-2 rounded-md bg-green-500 text-white hover:bg-green-600 flex items-center"
+                    >
+                      <FaPrint className="mr-2" /> Print QR
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-
-          {/* QR Code Controls */}
-          <div className="flex justify-between mt-6">
-            <div className="flex space-x-4">
-              <button
-                type="button"
-                onClick={handleGenerateQR}
-                disabled={
-                  isGenerateDisabled ||
-                  !formData.selectedMono ||
-                  !formData.color ||
-                  !formData.size ||
-                  !formData.bundleQty ||
-                  !formData.lineNo ||
-                  !formData.count
-                }
-                className={`px-4 py-2 rounded-md flex items-center ${
-                  formData.selectedMono &&
-                  formData.color &&
-                  formData.size &&
-                  formData.bundleQty &&
-                  formData.lineNo &&
-                  formData.count
-                    ? "bg-green-500 text-white hover:bg-green-600"
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                }`}
-              >
-                <FaQrcode className="mr-2" /> Generate QR
-              </button>
-              {qrData.length > 0 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setShowQRPreview(true)}
-                    className="px-4 py-2 rounded-md bg-indigo-500 text-white hover:bg-indigo-600 flex items-center"
-                  >
-                    <FaEye className="mr-2" /> Preview QR
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handlePrintQR}
-                    className="px-4 py-2 rounded-md bg-green-500 text-white hover:bg-green-600 flex items-center"
-                  >
-                    <FaPrint className="mr-2" /> Print QR
-                  </button>
-                </>
-              )}
+        ) : (
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">Data</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead>
+                  <tr>
+                    <th className="px-4 py-2">Record ID</th>
+                    <th className="px-4 py-2">MONo</th>
+                    <th className="px-4 py-2">Customer Style</th>
+                    <th className="px-4 py-2">Buyer</th>
+                    <th className="px-4 py-2">Country</th>
+                    <th className="px-4 py-2">Order Qty</th>
+                    <th className="px-4 py-2">Factory</th>
+                    <th className="px-4 py-2">Line No</th>
+                    <th className="px-4 py-2">Color</th>
+                    <th className="px-4 py-2">Size</th>
+                    <th className="px-4 py-2">Count</th>
+                    <th className="px-4 py-2">Total Bundle Qty</th>
+                    <th className="px-4 py-2">Sub Con</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dataRecords.map((record, index) => (
+                    <tr key={index}>
+                      <td className="px-4 py-2">{index + 1}</td>
+                      <td className="px-4 py-2">{record.selectedMono}</td>
+                      <td className="px-4 py-2">{record.custStyle}</td>
+                      <td className="px-4 py-2">{record.buyer}</td>
+                      <td className="px-4 py-2">{record.country}</td>
+                      <td className="px-4 py-2">{record.orderQty}</td>
+                      <td className="px-4 py-2">{record.factory}</td>
+                      <td className="px-4 py-2">{record.lineNo}</td>
+                      <td className="px-4 py-2">{record.color}</td>
+                      <td className="px-4 py-2">{record.size}</td>
+                      <td className="px-4 py-2">{record.count}</td>
+                      <td className="px-4 py-2">{record.totalBundleQty}</td>
+                      <td className="px-4 py-2">{record.subCon}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Number Pad Modal */}
         {showNumberPad && (
