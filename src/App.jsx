@@ -17,6 +17,7 @@ import Analytics from "./pages/Analytics";
 import Dashboard from "./pages/Dashboard"; // Import the Dashboard component
 import BundleRegistration from "./pages/BundleRegistration"; // Import the BundleRegistration component
 import "./App.css";
+import QC2InspectionPage from "./pages/QC2Inspection"; // Import the QC2InspectionPage component
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -289,6 +290,8 @@ function App() {
                   path="/bundle-registration"
                   element={<BundleRegistration />}
                 />
+                {/* Add the QC2 Inspection route */}
+                <Route path="/qc2-inspection" element={<QC2InspectionPage />} />
               </>
             ) : (
               <Route path="*" element={<Navigate to="/" replace />} />

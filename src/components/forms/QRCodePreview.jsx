@@ -3,6 +3,9 @@ import { Dialog, Transition } from "@headlessui/react";
 import { QRCodeSVG } from "qrcode.react";
 
 export default function QRCodePreview({ isOpen, onClose, qrData }) {
+  // Ensure qrData is always an array
+  const data = Array.isArray(qrData) ? qrData : [];
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-10" onClose={onClose}>
@@ -40,9 +43,12 @@ export default function QRCodePreview({ isOpen, onClose, qrData }) {
                 <div className="mt-4 space-y-4 h-96 overflow-y-auto">
                   {qrData.map((data, index) => (
                     <div key={index} className="space-y-2">
-                      <p>
+                      {/* <p>
+                        <strong>Random ID:</strong> {data.bundle_random_id}
+                      </p> */}
+                      {/* <p>
                         <strong>Bundle ID:</strong> {data.bundle_id}
-                      </p>
+                      </p> */}
                       <p>
                         <strong>Factory:</strong> {data.factory}
                       </p>
@@ -64,9 +70,13 @@ export default function QRCodePreview({ isOpen, onClose, qrData }) {
                       <p>
                         <strong>Size:</strong> {data.size}
                       </p>
+                      <p>
+                        <strong>Count:</strong> {data.count}
+                      </p>
                       <div className="flex justify-center">
                         <QRCodeSVG
-                          value={JSON.stringify(data)}
+                          value={data.bundle_random_id} // Only encode the random ID
+                          // value={JSON.stringify(data)}
                           size={256}
                           level="H"
                           includeMargin={true}

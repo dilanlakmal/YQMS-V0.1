@@ -6,14 +6,35 @@ import bodyParser from "body-parser";
 const app = express();
 const PORT = 5001;
 
-app.use(cors());
+//app.use(cors());
 app.use(bodyParser.json());
+app.use(
+  cors({
+    origin: ["http://localhost:3001", "https://localhost:3001"], // Allow both HTTP and HTTPS, // Update with your frontend URL
+    methods: ["GET", "POST", "PUT"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 const mongoURI = "mongodb://localhost:27017/ym_prod";
 mongoose
   .connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log("MongoDB connected to ym_prod database"))
   .catch((err) => console.error("MongoDB connection error:", err));
+
+// Add this function in server.js (before routes)
+const generateRandomId = async () => {
+  let randomId;
+  let isUnique = false;
+
+  while (!isUnique) {
+    randomId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+    const existing = await QC2OrderData.findOne({ bundle_random_id: randomId });
+    if (!existing) isUnique = true;
+  }
+
+  return randomId;
+};
 
 const qcDataSchema = new mongoose.Schema(
   {
@@ -74,6 +95,7 @@ const QCData = mongoose.model("qc1_data", qcDataSchema);
 // Schema for qc2_orderdata collection
 const qc2OrderDataSchema = new mongoose.Schema(
   {
+    bundle_random_id: { type: String, required: true, unique: true },
     bundle_id: { type: String, required: true },
     date: { type: String, required: true },
     selectedMono: { type: String, required: true },
@@ -101,9 +123,19 @@ app.get("/api/health", (req, res) => {
 app.post("/api/save-bundle-data", async (req, res) => {
   try {
     const { bundleData } = req.body;
+    const savedRecords = [];
 
     // Save each bundle record
-    const savedRecords = await QC2OrderData.insertMany(bundleData);
+    for (const bundle of bundleData) {
+      const randomId = await generateRandomId();
+      const newBundle = new QC2OrderData({
+        ...bundle,
+        bundle_random_id: randomId,
+      });
+      await newBundle.save();
+      savedRecords.push(newBundle);
+    }
+    // const savedRecords = await QC2OrderData.insertMany(bundleData);
 
     res.status(201).json({
       message: "Bundle data saved successfully",
@@ -115,6 +147,24 @@ app.post("/api/save-bundle-data", async (req, res) => {
       message: "Failed to save bundle data",
       error: error.message,
     });
+  }
+});
+
+// New Endpoint to Get Bundle by Random ID
+app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
+  try {
+    const bundle = await QC2OrderData.findOne({
+      bundle_random_id: req.params.randomId,
+    });
+
+    if (!bundle) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+
+    res.json(bundle);
+  } catch (error) {
+    console.error("Error fetching bundle:", error);
+    res.status(500).json({ error: "Failed to fetch bundle" });
   }
 });
 

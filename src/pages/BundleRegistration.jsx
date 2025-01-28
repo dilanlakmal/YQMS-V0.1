@@ -200,7 +200,9 @@ function BundleRegistration() {
       );
 
       if (saveResponse.ok) {
-        setQrData(bundleData); // Set QR data for preview
+        const savedData = await saveResponse.json();
+        setQrData(savedData.data); // Now contains random IDs from server
+        // setQrData(bundleData); // Set QR data for preview
         setIsGenerateDisabled(true); // Disable Generate QR button
       } else {
         alert("Failed to save bundle data.");

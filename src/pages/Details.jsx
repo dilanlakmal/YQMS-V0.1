@@ -10,7 +10,6 @@ import {
 import MonoSearch from "../components/forms/MonoSearch";
 import StyleCodeSelect from "../components/forms/StyleCodeSelect";
 import StyleDigitInput from "../components/forms/StyleDigitInput";
-import QRCodePreview from "../components/forms/QRCodePreview";
 
 function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
   const navigate = useNavigate();
@@ -18,8 +17,6 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
   const [rightActive, setRightActive] = useState(false);
   const [colors, setColors] = useState([]);
   const [sizes, setSizes] = useState([]);
-  const [qrData, setQrData] = useState(null);
-  const [showQRPreview, setShowQRPreview] = useState(false);
 
   const [formData, setFormData] = useState({
     date: new Date(),
@@ -143,22 +140,6 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
       ...prev,
       lineNo: cleanValue,
     }));
-  };
-
-  const handleGenerateQR = () => {
-    const data = {
-      mono: formData.selectedMono,
-      factory: formData.factoryInfo,
-      buyer: formData.buyer,
-      orderQty: formData.orderQty,
-      color: formData.color,
-      size: formData.size,
-    };
-    setQrData(data);
-  };
-
-  const handlePreviewQR = () => {
-    setShowQRPreview(true);
   };
 
   const handleSubmit = (e) => {
@@ -480,35 +461,8 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
             </div>
           </div>
 
-          {/* QR Code Controls */}
-          <div className="flex justify-between mt-6">
-            <div className="space-x-4">
-              <button
-                type="button"
-                onClick={handleGenerateQR}
-                disabled={
-                  !formData.selectedMono || !formData.color || !formData.size
-                }
-                className={`px-4 py-2 rounded-md ${
-                  formData.selectedMono && formData.color && formData.size
-                    ? "bg-blue-500 text-white hover:bg-blue-600"
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                }`}
-              >
-                Generate QR Code
-              </button>
-
-              {qrData && (
-                <button
-                  type="button"
-                  onClick={handlePreviewQR}
-                  className="px-4 py-2 rounded-md bg-green-500 text-white hover:bg-green-600"
-                >
-                  Preview QR Code
-                </button>
-              )}
-            </div>
-
+          {/* Submit Button */}
+          <div className="flex justify-end mt-6">
             <button
               type="submit"
               className="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -517,12 +471,6 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
             </button>
           </div>
         </form>
-
-        <QRCodePreview
-          isOpen={showQRPreview}
-          onClose={() => setShowQRPreview(false)}
-          qrData={qrData}
-        />
       </div>
     </div>
   );
