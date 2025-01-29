@@ -15,6 +15,22 @@ function Home() {
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* QC Dashboard */}
+          <div
+            onClick={() => navigate("/dashboard")}
+            className="group bg-white p-8 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
+          >
+            <div className="flex flex-col items-center justify-center mb-6  w-20 h-20  bg-[url('/IMG/dash.png')] bg-cover bg-center">
+              
+              </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4 group-hover:text-blue-600">
+              QC Dashboard
+            </h2>
+            <p className="text-gray-600 group-hover:text-gray-800">
+              Click here to see Live Dashboard.
+            </p>
+          </div>
+
           {/* QC Inspection Card */}
           <div
             onClick={() => navigate("/details")}

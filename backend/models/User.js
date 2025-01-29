@@ -1,29 +1,26 @@
 import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema({
-    emp_id: String,
-    emp_code: String,
-    eng_name: String,
-    kh_name: String,
-    name: String,
-    email: String,
-    password: String,
-    roles: [String],
-    sub_roles: [String],
-    job_title: String,
-    sup_code: String,
-    working_status: String,
-    dept_name: String,
-    sect_name: String,
-    profile: String,
-    device_token: Object,
-    remember_token: String,
-    face_id: String,
-    created_at: Date,
-    updated_at: Date,
-  });
-  
-  const User = mongoose.model("User", userSchema);
+  emp_id: { type: String, required: true },
+  emp_code: { type: String },
+  eng_name: { type: String },
+  kh_name: { type: String },
+  name: { type: String, required: true },
+  email: { type: String },
+  password: { type: String },
+  roles: { type: [String], default: [] }, // Define roles as an array of strings
+  sub_roles: { type: [String], default: [] }, // Define sub_roles as an array of strings
+  job_title: { type: String },
+  sup_code: { type: String },
+  working_status: { type: String },
+  dept_name: { type: String },
+  sect_name: { type: String },
+  profile: { type: String },
+  device_token: { type: Map, of: String }, // Use Map for device_token
+  remember_token: { type: String },
+  face_id: { type: String },
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now },
+});
 
-  export default User;
-  
+export default (connection) => connection.model("User", userSchema);

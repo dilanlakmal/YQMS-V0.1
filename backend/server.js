@@ -1,73 +1,327 @@
 import express from "express";
+import path from 'path';
+import { fileURLToPath } from 'url';
 import mongoose from "mongoose";
 import cors from "cors";
 import bodyParser from "body-parser";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import User from "./models/User.js";
-
+import multer from "multer";
+import fs from 'fs';
+import createUserModel from "./models/User.js";
+import createQCDataModel from "./models/qc1_data.js";
+import axios from 'axios';
 
 const app = express();
 const PORT = 5001;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Middleware
 app.use(cors());
-app.use(bodyParser.json ({ limit: '50mb' }) ); 
+app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+app.use('/storage', express.static(path.join(__dirname, 'storage/app/public')));
 
-// MongoDB Connection
-const mongoURI = "mongodb://localhost:27017/ym_prod";
-mongoose
-  //  .connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .connect(mongoURI)
-  .then(() => console.log("MongoDB connected to ym_prod database"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+const ymProdConnection = mongoose.createConnection("mongodb://localhost:27017/ym_prod");
+const mainUserConnection = mongoose.createConnection("mongodb://127.0.0.1:27017/eco_development");
 
-// Define a Schema for QC Data
-const qcDataSchema = new mongoose.Schema({
-  type: String, // "pass" or "reject"
-  garmentNo: Number,
-  status: String,
-  timestamp: Number,
-  actualtime: Number,
-  defectDetails: Array,
-  checkedQty: Number, // New field
-  goodOutput: Number, // New field
-  defectQty: Number, // New field
-  defectPieces: Number, // New field
-  defectArray: Array, // New field
-  cumulativeChecked: Number,
-  cumulativeDefects: Number,
-  cumulativeGoodOutput: Number, // Cumulative good output
-  cumulativeDefectPieces: Number, // Cumulative defect pieces
-  returnDefectList: Array, // Changed from Number to Array
-  returnDefectArray: Array, // Changed from Number to Array
-  returnDefectQty: Number,
-  cumulativeReturnDefectQty: Number,
+// Log connection status
+ymProdConnection.on('connected', () => console.log("Connected to ym_prod database"));
+ymProdConnection.on('error', (err) => console.error("ym_prod connection error:", err));
+mainUserConnection.on('connected', () => console.log("Connected to eco_development database"));
+mainUserConnection.on('error', (err) => console.error("eco_development connection error:", err));
+
+// Define model on connections
+const UserMain = createUserModel(mainUserConnection);
+const QCData = createQCDataModel(ymProdConnection);
+
+// Ensure connections are established before starting the server
+// Promise.all([
+//   ymProdConnection.asPromise(),
+//   mainUserConnection.asPromise(),
+// ])
+  
+
+// Set storage engine
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const userId = req.userId; // Assuming userId is set in the request object
+    const dir = `./storage/app/public/profiles/${userId}`;
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}${path.extname(file.originalname)}`);
+  },
 });
-// Create a model for the "qc1_data" collection
-const QCData = mongoose.model("qc1_data", qcDataSchema);
 
-// API Endpoint to Save QC Data
+
+// Initialize upload
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5000000 }, // Limit file size to 5MB
+  fileFilter: (req, file, cb) => {
+    checkFileType(file, cb);
+  },
+}).single('profile');
+
+// Check file type
+function checkFileType(file, cb) {
+  // Allowed ext
+  const filetypes = /jpeg|jpg|png|gif/;
+  // Check ext
+  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+  // Check mime
+  const mimetype = filetypes.test(file.mimetype);
+  if (mimetype && extname) {
+    return cb(null, true);
+  } else {
+    cb('Error: Images Only!');
+  }
+}
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.get("/api/dashboard-stats", async (req, res) => {
+  try {
+    const { factory, lineNo, moNo, customer, timeInterval } = req.query;
+    let matchQuery = {};
+
+    // Apply filters if provided
+    if (factory) matchQuery["headerData.factory"] = factory;
+    if (lineNo) matchQuery["headerData.lineNo"] = lineNo;
+    if (moNo) matchQuery["headerData.moNo"] = moNo;
+    if (customer) matchQuery["headerData.customer"] = customer;
+
+    // Get unique filter values
+    const filterValues = await QCData.aggregate([
+      {
+        $group: {
+          _id: null,
+          factories: { $addToSet: "$headerData.factory" },
+          lineNos: { $addToSet: "$headerData.lineNo" },
+          moNos: { $addToSet: "$headerData.moNo" },
+          customers: { $addToSet: "$headerData.customer" },
+        },
+      },
+    ]);
+
+    // Get overall stats
+    const stats = await QCData.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: null,
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$defectQty" },
+          totalDefectPieces: { $sum: "$defectPieces" },
+          totalReturnDefectQty: { $sum: "$returnDefectQty" },
+          totalGoodOutput: { $sum: "$goodOutput" },
+          latestHeaderData: { $last: "$headerData" },
+        },
+      },
+    ]);
+
+    // Get defect rate by line
+    const defectRateByLine = await QCData.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: "$headerData.lineNo",
+          checkedQty: { $sum: "$checkedQty" },
+          defectQty: { $sum: "$defectQty" },
+        },
+      },
+      {
+        $project: {
+          lineNo: "$_id",
+          defectRate: {
+            $multiply: [
+              { $divide: ["$defectQty", { $max: ["$checkedQty", 1] }] },
+              100,
+            ],
+          },
+        },
+      },
+      { $sort: { defectRate: -1 } },
+    ]);
+
+    // Get defect rate by MO
+    const defectRateByMO = await QCData.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: "$headerData.moNo",
+          checkedQty: { $sum: "$checkedQty" },
+          defectQty: { $sum: "$defectQty" },
+        },
+      },
+      {
+        $project: {
+          moNo: "$_id",
+          defectRate: {
+            $multiply: [
+              { $divide: ["$defectQty", { $max: ["$checkedQty", 1] }] },
+              100,
+            ],
+          },
+        },
+      },
+      { $sort: { defectRate: -1 } },
+    ]);
+
+    // Get defect rate by customer
+    const defectRateByCustomer = await QCData.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: "$headerData.customer",
+          checkedQty: { $sum: "$checkedQty" },
+          defectQty: { $sum: "$defectQty" },
+        },
+      },
+      {
+        $project: {
+          customer: "$_id",
+          defectRate: {
+            $multiply: [
+              { $divide: ["$defectQty", { $max: ["$checkedQty", 1] }] },
+              100,
+            ],
+          },
+        },
+      },
+      { $sort: { defectRate: -1 } },
+    ]);
+
+    // Get top defects
+    const topDefects = await QCData.aggregate([
+      { $match: matchQuery },
+      { $unwind: "$defectArray" },
+      {
+        $group: {
+          _id: "$defectArray.name",
+          count: { $sum: "$defectArray.count" },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    // Get time-series data
+    const timeSeriesData = await QCData.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: "$formattedTimestamp",
+          checkedQty: { $sum: "$checkedQty" },
+          defectQty: { $sum: "$defectQty" },
+        },
+      },
+      {
+        $project: {
+          timestamp: "$_id",
+          defectRate: {
+            $multiply: [
+              { $divide: ["$defectQty", { $max: ["$checkedQty", 1] }] },
+              100,
+            ],
+          },
+        },
+      },
+      { $sort: { timestamp: 1 } },
+    ]);
+
+    const dashboardData = stats[0] || {
+      totalCheckedQty: 0,
+      totalDefectQty: 0,
+      totalDefectPieces: 0,
+      totalReturnDefectQty: 0,
+      totalGoodOutput: 0,
+      latestHeaderData: {},
+    };
+
+    const totalInspected = dashboardData.totalCheckedQty || 0;
+
+    res.json({
+      filters: filterValues[0] || {
+        factories: [],
+        lineNos: [],
+        moNos: [],
+        customers: [],
+      },
+      headerInfo: dashboardData.latestHeaderData,
+      stats: {
+        checkedQty: dashboardData.totalCheckedQty || 0,
+        defectQty: dashboardData.totalDefectQty || 0,
+        defectPieces: dashboardData.totalDefectPieces || 0,
+        returnDefectQty: dashboardData.totalReturnDefectQty || 0,
+        goodOutput: dashboardData.totalGoodOutput || 0,
+        defectRatio: totalInspected
+          ? ((dashboardData.totalDefectQty / totalInspected) * 100).toFixed(2)
+          : 0,
+        defectRate: totalInspected
+          ? ((dashboardData.totalDefectPieces / totalInspected) * 100).toFixed(2)
+          : 0,
+      },
+      defectRateByLine,
+      defectRateByMO,
+      defectRateByCustomer,
+      topDefects,
+      timeSeriesData,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch dashboard stats" });
+  }
+});
+
 app.post("/api/save-qc-data", async (req, res) => {
   try {
-    const qcData = new QCData(req.body);
-    await qcData.save();
-    res.status(201).json({ message: "QC data saved successfully" });
+    const sanitizedData = {
+      ...req.body,
+      headerData: {
+        ...req.body.headerData,
+        date: req.body.headerData.date
+          ? new Date(req.body.headerData.date).toISOString()
+          : undefined,
+      },
+    };
+    const qcData = new QCData(sanitizedData);
+    const savedData = await qcData.save();
+    res.status(201).json({
+      message: "QC data saved successfully",
+      data: savedData,
+    });
   } catch (error) {
-    console.error("Error saving QC data:", error);
-    res.status(500).json({ message: "Failed to save QC data" });
+    res.status(500).json({
+      message: "Failed to save QC data",
+      error: error.message,
+      details: error.errors
+        ? Object.keys(error.errors).map((key) => ({
+            field: key,
+            message: error.errors[key].message,
+          }))
+        : undefined,
+    });
   }
 });
 
 // Login Endpoint
 app.post("/api/login", async (req, res) => {
   try {
-    console.log("Login attempt received:", { username: req.body.username });
     const { username, password, rememberMe } = req.body;
+    // Debug: Print the received username and password
+    console.log("Login attempt:", { username, password });
+
+    // Ensure connections are established
+    if (!mainUserConnection.readyState) {
+      console.log("Database not connected");
+      return res.status(500).json({ message: "Database not connected" });
+    }
 
     // Find user by email or other fields
-    const user = await User.findOne({
+    const user = await UserMain.findOne({
       $or: [{ email: username }, { name: username }, { emp_id: username }],
     });
 
@@ -76,15 +330,14 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid username or password" });
     }
 
-    console.log("Stored hashed password:", user.password);
+    // Debug: Print the retrieved user object
+    console.log("User found:", user);
 
     // Ensure compatibility with $2y$ bcrypt hashes
     const isPasswordValid = await bcrypt.compare(
       password.trim(),
       user.password.replace("$2y$", "$2b$")
     );
-
-    console.log("Password comparison result:", isPasswordValid);
 
     if (!isPasswordValid) {
       console.log("Invalid password");
@@ -96,7 +349,6 @@ app.post("/api/login", async (req, res) => {
       const newHashedPassword = await bcrypt.hash(password.trim(), 10);
       user.password = newHashedPassword;
       await user.save();
-      console.log("Rehashed password for user:", user.emp_id);
     }
 
     // Generate JWT token
@@ -115,51 +367,47 @@ app.post("/api/login", async (req, res) => {
         name: user.name,
         email: user.email,
         roles: user.roles,
+        sub_roles: user.sub_roles,
       },
     });
   } catch (error) {
     console.error("Login error:", error);
-    res.status(500).json({ message: "Failed to log in" });
+    res.status(500).json({ message: "Failed to log in", error: error.message });
   }
 });
-
 
 // Registration Endpoint
 app.post("/api/register", async (req, res) => {
   try {
-    console.log("Registration request received:", req.body);
     const { emp_id, eng_name, kh_name, password, confirmPassword } = req.body;
 
     if (!emp_id || !eng_name || !password || !confirmPassword) {
-      console.log("Validation error: Missing required fields");
       return res.status(400).json({
         message: "Employee ID, name, and password are required",
       });
     }
 
     if (password !== confirmPassword) {
-      console.log("Validation error: Passwords do not match");
       return res.status(400).json({
         message: "Passwords do not match",
       });
     }
 
-    const existingUser = await User.findOne({ emp_id });
+    const existingUser = await UserMain.findOne({ emp_id });
+
     if (existingUser) {
-      console.log("Validation error: Employee ID already registered");
       return res.status(400).json({
         message: "Employee ID already registered",
       });
     }
 
-    const saltRounds = 12; 
+    const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
-    console.log("Hashed password during registration:", hashedPassword);
 
-    const newUser = new User({
+    const newUser = new UserMain({
       emp_id,
       eng_name,
-      name: eng_name, 
+      name: eng_name,
       kh_name: kh_name || "",
       password: hashedPassword,
       created_at: new Date(),
@@ -167,11 +415,11 @@ app.post("/api/register", async (req, res) => {
     });
 
     await newUser.save();
+
     res.status(201).json({
       message: "User registered successfully",
     });
   } catch (error) {
-    console.error("Error registering user:", error);
     res.status(500).json({
       message: "Failed to register user",
       error: error.message,
@@ -184,39 +432,43 @@ app.get('/api/user-profile', async (req, res) => {
   try {
     const token = req.headers.authorization.split(' ')[1];
     const decoded = jwt.verify(token, 'your_jwt_secret');
-    const user = await User.findById(decoded.userId);
+    const user = await UserMain.findById(decoded.userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     res.status(200).json({
+      emp_id: user.emp_id,
       name: user.name,
       dept_name: user.dept_name,
-      sec_name: user.sec_name,
+      sect_name: user.sect_name,
       profile: user.profile,
     });
   } catch (error) {
-    console.error('Error fetching user profile:', error);
-    res.status(500).json({ message: 'Failed to fetch user profile' });
+    res.status(500).json({ message: 'Failed to fetch user profile', error: error.message });
   }
 });
 
-// Update User Profile Endpoint
-app.put('/api/user-profile', async (req, res) => {
+app.put('/api/user-profile', upload, async (req, res) => {
   try {
     const token = req.headers.authorization.split(' ')[1];
     const decoded = jwt.verify(token, 'your_jwt_secret');
     const userId = decoded.userId;
 
     const updatedProfile = {
+      emp_id: req.body.emp_id,
       name: req.body.name,
       dept_name: req.body.dept_name,
-      sec_name: req.body.sect_name,
-      profile: req.body.profile,
+      sect_name: req.body.sect_name,
+      profile: req.file ? `profiles/${userId}/${req.file.filename}` : req.body.profile, // Save file path
     };
 
-    const user = await User.findByIdAndUpdate(userId, updatedProfile, { new: true });
+    console.log('Updated Profile:', updatedProfile);
+
+    const user = await UserMain.findByIdAndUpdate(userId, updatedProfile, { new: true });
+
+    console.log('Updated User:', user);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -225,7 +477,7 @@ app.put('/api/user-profile', async (req, res) => {
     res.status(200).json({ message: 'Profile updated successfully', user });
   } catch (error) {
     console.error('Error updating user profile:', error);
-    res.status(500).json({ message: 'Failed to update user profile' });
+    res.status(500).json({ message: 'Failed to update user profile', error: error.message });
   }
 });
 

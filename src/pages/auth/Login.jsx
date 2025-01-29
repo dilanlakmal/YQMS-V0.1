@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ClipboardList } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate  } from "react-router-dom";
 import axios from "axios";
 
 function Login({ onLogin }) {
@@ -8,6 +8,10 @@ function Login({ onLogin }) {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  
 
   const handleSubmit = async  (e) => {
     e.preventDefault();
@@ -20,12 +24,17 @@ function Login({ onLogin }) {
         const response = await axios.post("http://localhost:5001/api/login", { username, password });
         if (response.status === 200) {
           const token = response.data.token;
+          localStorage.setItem('token', token);
+          const user = response.data.user;
           if (rememberMe) {
-            localStorage.setItem("token", token);
+            localStorage.setItem('token', token);
+            localStorage.setItem('user', JSON.stringify(user));
           } else {
             sessionStorage.setItem("token", token);
+            sessionStorage.setItem("user", JSON.stringify(user));
           }
           onLogin(token);
+          navigate('/home');
         }
       } catch (error) {
         setError("Invalid username or password");
