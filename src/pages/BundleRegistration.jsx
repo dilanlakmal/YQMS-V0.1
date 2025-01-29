@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -6,6 +6,8 @@ import MonoSearch from "../components/forms/MonoSearch";
 import QRCodePreview from "../components/forms/QRCodePreview";
 import NumberPad from "../components/forms/NumberPad";
 import NumLetterPad from "../components/forms/NumLetterPad";
+import BluetoothComponent from "../components/forms/Bluetooth";
+import SubConSelection from "../components/forms/SubConSelection";
 import { FaQrcode, FaPrint, FaEye, FaList } from "react-icons/fa";
 
 function BundleRegistration() {
@@ -17,11 +19,9 @@ function BundleRegistration() {
   const [isGenerateDisabled, setIsGenerateDisabled] = useState(false);
   const [activeTab, setActiveTab] = useState("registration");
   const [dataRecords, setDataRecords] = useState([]);
-  const [isSubCon, setIsSubCon] = useState(false); // State for Sub Con option
-  const [subConName, setSubConName] = useState(""); // State for Sub Con dropdown
-
-  // Hardcoded Sub Con names
-  const subConNames = ["Sunicon", "Elite", "SYD"];
+  const [isSubCon, setIsSubCon] = useState(false);
+  const [subConName, setSubConName] = useState("");
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const [formData, setFormData] = useState({
     date: new Date(),
@@ -38,10 +38,17 @@ function BundleRegistration() {
     count: "10",
   });
 
+  // Reference to Bluetooth component
+  const bluetoothComponentRef = useRef();
+
+  // Hardcoded Sub Con names
+
   const [colors, setColors] = useState([]);
   const [sizes, setSizes] = useState([]);
   const [hasColors, setHasColors] = useState(false);
   const [hasSizes, setHasSizes] = useState(false);
+
+  const subConNames = ["Sunicon", "Elite", "SYD"];
 
   // Fetch order details when MONo is selected
   useEffect(() => {
@@ -191,7 +198,8 @@ function BundleRegistration() {
           size,
           count: formData.count,
           totalBundleQty: bundleQty,
-          subCon: isSubCon ? subConName : "No", // Add Sub Con data
+          sub_con: isSubCon ? "Yes" : "No",
+          sub_con_factory: isSubCon ? subConName : "",
         };
 
         bundleData.push(bundleRecord);
@@ -224,16 +232,55 @@ function BundleRegistration() {
   };
 
   // Print QR code and clear form data
-  const handlePrintQR = () => {
-    setFormData((prev) => ({
-      ...prev,
-      color: "",
-      size: "",
-      bundleQty: "",
-    }));
-    setIsGenerateDisabled(false); // Re-enable Generate QR button
-    alert("Print QR code functionality will be implemented here.");
+  // Handle print QR codes
+  const handlePrintQR = async () => {
+    if (!bluetoothComponentRef.current) {
+      alert("Bluetooth component not initialized");
+      return;
+    }
+
+    // const { isConnected, printData } = bluetoothComponentRef.current;
+    if (!bluetoothComponentRef.current.isConnected) {
+      alert("Please connect to a printer first");
+      return;
+    }
+
+    try {
+      setIsPrinting(true);
+
+      // Print each QR code in sequence
+      for (const data of qrData) {
+        await bluetoothComponentRef.current.printData(data);
+      }
+
+      // Clear form data after successful printing
+      setFormData((prev) => ({
+        ...prev,
+        color: "",
+        size: "",
+        bundleQty: "",
+      }));
+      setIsGenerateDisabled(false);
+
+      alert("QR codes printed successfully!");
+    } catch (error) {
+      console.error("Print error:", error);
+      alert("Failed to print QR codes. Please check printer connection.");
+    } finally {
+      setIsPrinting(false);
+    }
   };
+
+  // const handlePrintQR = () => {
+  //   setFormData((prev) => ({
+  //     ...prev,
+  //     color: "",
+  //     size: "",
+  //     bundleQty: "",
+  //   }));
+  //   setIsGenerateDisabled(false); // Re-enable Generate QR button
+  //   alert("Print QR code functionality will be implemented here.");
+  // };
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20 px-8">
@@ -282,6 +329,9 @@ function BundleRegistration() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   dateFormat="yyyy-MM-dd"
                 />
+              </div>
+              <div className="flex items-end">
+                <BluetoothComponent ref={bluetoothComponentRef} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -454,36 +504,12 @@ function BundleRegistration() {
             </div>
 
             {/* Sub Con (Yes/No) */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sub Con (Yes/No)
-              </label>
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={isSubCon}
-                    onChange={(e) => setIsSubCon(e.target.checked)}
-                    className="mr-2"
-                  />
-                  Yes
-                </label>
-                {isSubCon && (
-                  <select
-                    value={subConName}
-                    onChange={(e) => setSubConName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="">Select Sub Con</option>
-                    {subConNames.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            </div>
+            <SubConSelection
+              isSubCon={isSubCon}
+              setIsSubCon={setIsSubCon}
+              subConName={subConName}
+              setSubConName={setSubConName}
+            />
 
             {/* QR Code Controls */}
             <div className="flex justify-between mt-6">
@@ -525,10 +551,23 @@ function BundleRegistration() {
                     <button
                       type="button"
                       onClick={handlePrintQR}
+                      disabled={isPrinting}
+                      className={`px-4 py-2 rounded-md flex items-center ${
+                        isPrinting
+                          ? "bg-gray-400 cursor-not-allowed"
+                          : "bg-green-500 hover:bg-green-600"
+                      } text-white`}
+                    >
+                      <FaPrint className="mr-2" />
+                      {isPrinting ? "Printing..." : "Print QR"}
+                    </button>
+                    {/* <button
+                      type="button"
+                      onClick={handlePrintQR}
                       className="px-4 py-2 rounded-md bg-green-500 text-white hover:bg-green-600 flex items-center"
                     >
                       <FaPrint className="mr-2" /> Print QR
-                    </button>
+                    </button> */}
                   </>
                 )}
               </div>
@@ -538,40 +577,100 @@ function BundleRegistration() {
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-lg font-bold text-gray-800 mb-4">Data</h2>
             <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead>
+              <table className="min-w-full divide-y divide-gray-200 border border-gray-200">
+                <thead className="bg-sky-100">
                   <tr>
-                    <th className="px-4 py-2">Record ID</th>
-                    <th className="px-4 py-2">MONo</th>
-                    <th className="px-4 py-2">Customer Style</th>
-                    <th className="px-4 py-2">Buyer</th>
-                    <th className="px-4 py-2">Country</th>
-                    <th className="px-4 py-2">Order Qty</th>
-                    <th className="px-4 py-2">Factory</th>
-                    <th className="px-4 py-2">Line No</th>
-                    <th className="px-4 py-2">Color</th>
-                    <th className="px-4 py-2">Size</th>
-                    <th className="px-4 py-2">Count</th>
-                    <th className="px-4 py-2">Total Bundle Qty</th>
-                    <th className="px-4 py-2">Sub Con</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Record ID
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      MONo
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Customer Style
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Buyer
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Country
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Order Qty
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Factory
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Line No
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Color
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Size
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Count
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Total Bundle Qty
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Sub Con
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Sub Con Factory
+                    </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="bg-white divide-y divide-gray-200">
                   {dataRecords.map((record, index) => (
-                    <tr key={index}>
-                      <td className="px-4 py-2">{index + 1}</td>
-                      <td className="px-4 py-2">{record.selectedMono}</td>
-                      <td className="px-4 py-2">{record.custStyle}</td>
-                      <td className="px-4 py-2">{record.buyer}</td>
-                      <td className="px-4 py-2">{record.country}</td>
-                      <td className="px-4 py-2">{record.orderQty}</td>
-                      <td className="px-4 py-2">{record.factory}</td>
-                      <td className="px-4 py-2">{record.lineNo}</td>
-                      <td className="px-4 py-2">{record.color}</td>
-                      <td className="px-4 py-2">{record.size}</td>
-                      <td className="px-4 py-2">{record.count}</td>
-                      <td className="px-4 py-2">{record.totalBundleQty}</td>
-                      <td className="px-4 py-2">{record.subCon}</td>
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {index + 1}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.selectedMono}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.custStyle}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.buyer}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.country}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.orderQty}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.factory}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.lineNo}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.color}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.size}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.count}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.totalBundleQty}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.sub_con}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.sub_con === "Yes"
+                          ? record.sub_con_factory
+                          : "N/A"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -604,6 +703,7 @@ function BundleRegistration() {
           isOpen={showQRPreview}
           onClose={() => setShowQRPreview(false)}
           qrData={qrData}
+          onPrint={handlePrintQR}
         />
       </div>
     </div>

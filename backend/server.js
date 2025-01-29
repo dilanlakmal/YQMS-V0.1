@@ -109,6 +109,10 @@ const qc2OrderDataSchema = new mongoose.Schema(
     size: { type: String, required: true },
     count: { type: String, required: true },
     totalBundleQty: { type: Number, required: true },
+    sub_con: { type: String, default: "No" }, // New field
+    sub_con_factory: { type: String, default: "N/A" }, // New field
+    updated_date_seperator: { type: String, required: true },
+    updated_time_seperator: { type: String, required: true },
   },
   { collection: "qc2_orderdata" }
 );
@@ -128,9 +132,34 @@ app.post("/api/save-bundle-data", async (req, res) => {
     // Save each bundle record
     for (const bundle of bundleData) {
       const randomId = await generateRandomId();
+
+      const now = new Date();
+
+      // Format timestamps
+      const updated_date_seperator = now.toLocaleDateString("en-US", {
+        month: "2-digit",
+        day: "2-digit",
+        year: "numeric",
+      });
+
+      const updated_time_seperator = now.toLocaleTimeString("en-US", {
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
       const newBundle = new QC2OrderData({
         ...bundle,
         bundle_random_id: randomId,
+        factory: bundle.factory || "N/A", // Handle null factory
+        custStyle: bundle.custStyle || "N/A", // Handle null custStyle
+        country: bundle.country || "N/A", // Handle null country
+        sub_con: bundle.sub_con || "No",
+        sub_con_factory:
+          bundle.sub_con === "Yes" ? bundle.sub_con_factory || "" : "N/A",
+        updated_date_seperator,
+        updated_time_seperator,
       });
       await newBundle.save();
       savedRecords.push(newBundle);
@@ -308,9 +337,9 @@ app.get("/api/order-details/:mono", async (req, res) => {
       engName: order.EngName,
       totalQty: order.TotalQty,
       // Add new fields here
-      factoryname: order.Factory || "", // New field
-      custStyle: order.CustStyle || "", // New field
-      country: order.Country || "", // New field
+      factoryname: order.Factory || "N/A", // New field
+      custStyle: order.CustStyle || "N/A", // New field
+      country: order.Country || "N/A", // New field
       colors: Array.from(colorMap.values()).map((c) => c.originalColor),
       colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
         acc[curr.originalColor.toLowerCase()] = Array.from(curr.sizes);

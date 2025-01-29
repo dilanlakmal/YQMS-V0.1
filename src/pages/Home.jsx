@@ -154,6 +154,34 @@ function Home() {
             <h2 className="text-2xl font-bold text-blue-900 mb-4">
               Data Analytics
             </h2>
+            {/* Download Data Card */}
+            <div
+              onClick={() => navigate("/dashboard")}
+              className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
+            >
+              <div className="flex items-center justify-center mb-4 bg-blue-100 w-12 h-12 rounded-full group-hover:bg-blue-600">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-6 h-6 text-blue-600 group-hover:text-white"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-600">
+                Download Data
+              </h2>
+              <p className="text-sm text-gray-600 group-hover:text-gray-800">
+                Click here to Download Data.
+              </p>
+            </div>
             {/* Live Dashboard Card */}
             <div
               onClick={() => navigate("/dashboard")}
