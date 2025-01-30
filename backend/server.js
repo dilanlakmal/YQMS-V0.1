@@ -119,6 +119,31 @@ const qc2OrderDataSchema = new mongoose.Schema(
 
 const QC2OrderData = mongoose.model("qc2_orderdata", qc2OrderDataSchema);
 
+// Ironing Schema
+const ironingSchema = new mongoose.Schema(
+  {
+    ironing_record_id: Number,
+    task_no: { type: Number, default: 53 },
+    ironing_bundle_id: { type: String, required: true, unique: true },
+    ironing_updated_date: String,
+    ironing_update_time: String,
+    bundle_id: String,
+    selectedMono: String,
+    custStyle: String,
+    buyer: String,
+    country: String,
+    factory: String,
+    lineNo: String,
+    color: String,
+    size: String,
+    count: String,
+    totalBundleQty: Number,
+  },
+  { collection: "ironing" }
+);
+
+const Ironing = mongoose.model("Ironing", ironingSchema);
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
@@ -422,6 +447,33 @@ async function fetchOrderDetails(mono) {
     }, {}),
   };
 }
+
+// Check if ironing record exists
+app.get("/api/check-ironing-exists/:bundleId", async (req, res) => {
+  try {
+    const record = await Ironing.findOne({
+      ironing_bundle_id: req.params.bundleId,
+    });
+    res.json({ exists: !!record });
+  } catch (error) {
+    res.status(500).json({ error: "Error checking record" });
+  }
+});
+
+// Save ironing record
+app.post("/api/save-ironing", async (req, res) => {
+  try {
+    const newRecord = new Ironing(req.body);
+    await newRecord.save();
+    res.status(201).json({ message: "Record saved successfully" });
+  } catch (error) {
+    if (error.code === 11000) {
+      res.status(400).json({ error: "Duplicate record found" });
+    } else {
+      res.status(500).json({ error: "Failed to save record" });
+    }
+  }
+});
 
 app.get("/api/dashboard-stats", async (req, res) => {
   try {

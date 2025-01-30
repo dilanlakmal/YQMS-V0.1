@@ -22,6 +22,7 @@ function Home() {
             <h2 className="text-2xl font-bold text-blue-900 mb-4">
               Order Data
             </h2>
+
             {/* Bundle Registration Card */}
             <div
               onClick={() => navigate("/bundle-registration")}
@@ -48,6 +49,90 @@ function Home() {
               </h2>
               <p className="text-sm text-gray-600 group-hover:text-gray-800">
                 Click here to register orders for QC2 Inspection.
+              </p>
+            </div>
+            {/* Ironing Card */}
+            <div
+              onClick={() => navigate("/ironing")}
+              className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
+            >
+              <div className="flex items-center justify-center mb-4 bg-blue-100 w-12 h-12 rounded-full group-hover:bg-blue-600">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-6 h-6 text-blue-600 group-hover:text-white"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 14h13.5a3 3 0 002.98-2.64l.54-4.32A2 2 0 0018 5H6a3 3 0 00-3 3v6zM5 18h14"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-600">
+                Ironing
+              </h2>
+              <p className="text-sm text-gray-600 group-hover:text-gray-800">
+                Click here to register orders for Ironing
+              </p>
+            </div>
+            {/* Washing Card */}
+            <div
+              onClick={() => navigate("/washing")}
+              className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
+            >
+              <div className="flex items-center justify-center mb-4 bg-blue-100 w-12 h-12 rounded-full group-hover:bg-blue-600">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-6 h-6 text-blue-600 group-hover:text-white"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4 12h16M4 6h16M4 18h16M5 3h14M5 21h14"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-600">
+                Washing
+              </h2>
+              <p className="text-sm text-gray-600 group-hover:text-gray-800">
+                Click here to register orders for Washing
+              </p>
+            </div>
+            {/* Dyeing Card */}
+            <div
+              onClick={() => navigate("/dyeing")}
+              className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
+            >
+              <div className="flex items-center justify-center mb-4 bg-blue-100 w-12 h-12 rounded-full group-hover:bg-blue-600">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-6 h-6 text-blue-600 group-hover:text-white"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 2C7.03 2 3 6.03 3 11c0 5 4 9 9 9s9-4 9-9c0-4.97-4.03-9-9-9zM7 12h10"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-600">
+                Dyeing
+              </h2>
+              <p className="text-sm text-gray-600 group-hover:text-gray-800">
+                Click here to register orders for Dyeing
               </p>
             </div>
           </div>
@@ -82,7 +167,7 @@ function Home() {
                 QC1 Inspection
               </h2>
               <p className="text-sm text-gray-600 group-hover:text-gray-800">
-                Begin a new QC1 Endline Inspection Reports here.
+                Begin a new QC1 Endline Inspection here.
               </p>
             </div>
 
