@@ -51,34 +51,7 @@ function Home() {
                 Click here to register orders for QC2 Inspection.
               </p>
             </div>
-            {/* Ironing Card */}
-            <div
-              onClick={() => navigate("/ironing")}
-              className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
-            >
-              <div className="flex items-center justify-center mb-4 bg-blue-100 w-12 h-12 rounded-full group-hover:bg-blue-600">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="w-6 h-6 text-blue-600 group-hover:text-white"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 14h13.5a3 3 0 002.98-2.64l.54-4.32A2 2 0 0018 5H6a3 3 0 00-3 3v6zM5 18h14"
-                  />
-                </svg>
-              </div>
-              <h2 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-600">
-                Ironing
-              </h2>
-              <p className="text-sm text-gray-600 group-hover:text-gray-800">
-                Click here to register orders for Ironing
-              </p>
-            </div>
+
             {/* Washing Card */}
             <div
               onClick={() => navigate("/washing")}
@@ -133,6 +106,34 @@ function Home() {
               </h2>
               <p className="text-sm text-gray-600 group-hover:text-gray-800">
                 Click here to register orders for Dyeing
+              </p>
+            </div>
+            {/* Ironing Card */}
+            <div
+              onClick={() => navigate("/ironing")}
+              className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
+            >
+              <div className="flex items-center justify-center mb-4 bg-blue-100 w-12 h-12 rounded-full group-hover:bg-blue-600">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-6 h-6 text-blue-600 group-hover:text-white"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 14h13.5a3 3 0 002.98-2.64l.54-4.32A2 2 0 0018 5H6a3 3 0 00-3 3v6zM5 18h14"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-600">
+                Ironing
+              </h2>
+              <p className="text-sm text-gray-600 group-hover:text-gray-800">
+                Click here to register orders for Ironing
               </p>
             </div>
           </div>

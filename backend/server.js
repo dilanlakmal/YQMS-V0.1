@@ -98,6 +98,7 @@ const qc2OrderDataSchema = new mongoose.Schema(
     bundle_random_id: { type: String, required: true, unique: true },
     bundle_id: { type: String, required: true },
     date: { type: String, required: true },
+    department: { type: String, required: true },
     selectedMono: { type: String, required: true },
     custStyle: { type: String, required: true },
     buyer: { type: String, required: true },
@@ -180,6 +181,7 @@ app.post("/api/save-bundle-data", async (req, res) => {
         factory: bundle.factory || "N/A", // Handle null factory
         custStyle: bundle.custStyle || "N/A", // Handle null custStyle
         country: bundle.country || "N/A", // Handle null country
+        department: bundle.department,
         sub_con: bundle.sub_con || "No",
         sub_con_factory:
           bundle.sub_con === "Yes" ? bundle.sub_con_factory || "" : "N/A",
