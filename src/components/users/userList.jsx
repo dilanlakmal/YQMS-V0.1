@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-
+import EditUserModal from './editUser'; 
 const UserList = () => {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
@@ -8,9 +8,13 @@ const UserList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [usersPerPage] = useState(10);
   const [error, setError] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [roles, setRoles] = useState([]);
 
   useEffect(() => {
     fetchUsers();
+    fetchRoles();
   }, []);
 
   useEffect(() => {
@@ -26,6 +30,20 @@ const UserList = () => {
     } catch (error) {
       console.error('Error fetching users:', error);
       setError('Failed to fetch users. Please try again later.');
+    }
+  };
+
+  const fetchRoles = async () => {
+    try {
+      const response = await axios.get('http://localhost:5001/roles'); // Adjust the URL as needed
+      setRoles(response.data);
+    } catch (error) {
+      if (error.response && error.response.status === 404) {
+        console.error('Roles endpoint not found:', error);
+        setRoles([]); // Set roles to an empty array if the endpoint is not found
+      } else {
+        console.error('Error fetching roles:', error);
+      }
     }
   };
 
@@ -59,13 +77,34 @@ const UserList = () => {
     // Redirect to add user page or open a modal
   };
 
+  const handleEdit = (user) => {
+    setSelectedUser(user);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedUser(null);
+  };
+
+  const handleUpdateUser = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    try {
+      await axios.put(`http://localhost:5001/users/${selectedUser._id}`, formData);
+      fetchUsers();
+      handleCloseModal();
+    } catch (error) {
+      console.error('Error updating user:', error);
+      setError('Failed to update user. Please try again later.');
+    }
+  };
+
   // Pagination logic
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
-
   const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
-
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const nextPage = () => {
@@ -84,22 +123,17 @@ const UserList = () => {
     const pageNumbers = [];
     const maxPageNumbersToShow = 10;
     const halfPageNumbersToShow = Math.floor(maxPageNumbersToShow / 2);
-
     let startPage = Math.max(1, currentPage - halfPageNumbersToShow);
     let endPage = Math.min(totalPages, currentPage + halfPageNumbersToShow);
-
     if (currentPage <= halfPageNumbersToShow) {
       endPage = Math.min(totalPages, maxPageNumbersToShow);
     }
-
     if (currentPage + halfPageNumbersToShow >= totalPages) {
       startPage = Math.max(1, totalPages - maxPageNumbersToShow + 1);
     }
-
     for (let i = startPage; i <= endPage; i++) {
       pageNumbers.push(i);
     }
-
     return pageNumbers;
   };
 
@@ -107,7 +141,7 @@ const UserList = () => {
     <div className="container mx-auto p-4">
       <div className="mb-4 flex justify-between items-center">
         <form onSubmit={(e) => e.preventDefault()} className="flex w-full">
-        <div className="relative w-2/4">
+          <div className="relative w-2/4">
             <input
               type="text"
               placeholder="Search here..."
@@ -133,12 +167,6 @@ const UserList = () => {
               </svg>
             </div>
           </div>
-          {/* <button
-            type="submit"
-            className="p-2 w-24 bg-blue-500 text-white rounded-lg hover:bg-blue-600 ml-2"
-          >
-            Search
-          </button> */}
         </form>
         <button
           onClick={handleAddUser}
@@ -152,21 +180,21 @@ const UserList = () => {
         <table className="min-w-full bg-white border border-gray-200">
           <thead>
             <tr>
-              <th className="px-4 py-2 border-b">Name</th>
-              <th className="px-4 py-2 border-b">Full Name</th>
-              <th className="px-4 py-2 border-b">Department</th>
-              <th className="px-4 py-2 border-b">Created At</th>
-              <th className="px-4 py-2 border-b">Action</th>
+              <th className="px-4 py-2 border bg-blue-50">Name</th>
+              <th className="px-4 py-2 border bg-blue-50">Full Name</th>
+              <th className="px-4 py-2 border bg-blue-50">Department</th>
+              <th className="px-4 py-2 border bg-blue-50">Created At</th>
+              <th className="px-4 py-2 border bg-blue-50">Action</th>
             </tr>
           </thead>
           <tbody>
             {currentUsers.map(user => (
               <tr key={user._id} className="hover:bg-gray-100">
-                <td className="px-4 py-2 border-b">{user.name} <br /> {user.emp_id}</td>
-                <td className="px-4 py-2 border-b">{user.eng_name}<br /> {user.kh_name}</td>
-                <td className="px-4 py-2 border-b">{user.dept_name} <br /> {user.sect_name}</td>
-                <td className="px-4 py-2 border-b">{new Date(user.created_at).toLocaleDateString()}</td>
-                <td className="px-4 py-2 border-b">
+                <td className="px-4 py-2 border">{user.name} <br /> {user.emp_id}</td>
+                <td className="px-4 py-2 border">{user.eng_name}<br /> {user.kh_name}</td>
+                <td className="px-4 py-2 border">{user.dept_name} <br /> {user.sect_name}</td>
+                <td className="px-4 py-2 border">{new Date(user.created_at).toLocaleDateString()}</td>
+                <td className="px-4 py-2 border">
                   <button
                     onClick={() => handleEdit(user)}
                     className="px-4 py-2 mr-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
@@ -237,6 +265,14 @@ const UserList = () => {
           </ul>
         </nav>
       </div>
+
+      <EditUserModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        user={selectedUser}
+        roles={roles}
+        onSubmit={handleUpdateUser}
+      />
     </div>
   );
 };

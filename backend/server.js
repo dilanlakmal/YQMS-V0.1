@@ -10,6 +10,7 @@ import multer from "multer";
 import fs from 'fs';
 import createUserModel from "./models/User.js";
 import createQCDataModel from "./models/qc1_data.js";
+import createRoleModel from "./models/Role.js";
 import axios from 'axios';
 
 const app = express();
@@ -35,6 +36,7 @@ mainUserConnection.on('error', (err) => console.error("eco_development connectio
 // Define model on connections
 const UserMain = createUserModel(mainUserConnection);
 const QCData = createQCDataModel(ymProdConnection);
+const Role = createRoleModel(ymProdConnection);
 
 // Ensure connections are established before starting the server
 // Promise.all([
@@ -130,6 +132,33 @@ app.delete('/users/:id', async (req, res) => {
     res.status(500).json({ message: 'Failed to delete user' });
   }
 });
+
+app.get('/roles', async (req, res) => {
+  try {
+    const roles = await Role.find();
+    res.json(roles);
+  } catch (error) {
+    console.error('Error fetching roles:', error);
+    res.status(500).json({ error: 'Failed to fetch roles' });
+  }
+});
+
+app.put('/users/:id', async (req, res) => {
+  try {
+    const { name, email, roles, sub_roles, keywords, password } = req.body;
+    const updatedUser = { name, email, roles, sub_roles, keywords };
+    if (password) {
+      const saltRounds = 12;
+      updatedUser.password = await bcrypt.hash(password, saltRounds); // Ensure you hash the password before saving
+    }
+    const user = await UserMain.findByIdAndUpdate(req.params.id, updatedUser, { new: true });
+    res.json(user);
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ message: 'Failed to update user' });
+  }
+});
+
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
