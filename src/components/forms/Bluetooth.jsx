@@ -1294,7 +1294,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const writeToCharacteristic = async (data) => {
-    const CHUNK_SIZE = 512; // Bluetooth LE typically has a limit around 512 bytes
+    const CHUNK_SIZE = 20; // Bluetooth LE typically has a limit around 512 bytes
     for (let i = 0; i < data.length; i += CHUNK_SIZE) {
       const chunk = data.slice(i, i + CHUNK_SIZE);
       console.log("Writing chunk to characteristic:", chunk);
@@ -1454,3 +1454,102 @@ const BluetoothComponent = forwardRef((props, ref) => {
 BluetoothComponent.displayName = "BluetoothComponent";
 
 export default BluetoothComponent;
+
+//electorn.js code
+
+// import React, { useState, forwardRef, useImperativeHandle } from "react";
+// import { Bluetooth, Printer, AlertCircle } from "lucide-react";
+
+// const BluetoothComponent = forwardRef((props, ref) => {
+//   const [isConnected, setIsConnected] = useState(false);
+//   const [connectionStatus, setConnectionStatus] = useState("");
+//   const [printerName, setPrinterName] = useState("");
+
+//   // Expose methods to parent component
+//   useImperativeHandle(ref, () => ({
+//     isConnected,
+//     printData: async (data) => {
+//       if (!isConnected) {
+//         throw new Error("Printer not connected");
+//       }
+//       return window.electron.printData(data);
+//     },
+//   }));
+
+//   const handleConnect = async () => {
+//     try {
+//       if (isConnected) {
+//         await window.electron.disconnectPrinter();
+//         setIsConnected(false);
+//         setConnectionStatus("Disconnected");
+//         return;
+//       }
+
+//       setConnectionStatus("Searching for printers...");
+
+//       // Add timeout for printer discovery
+//       const connectionResult = await Promise.race([
+//         window.electron.connectPrinter(),
+//         new Promise((_, reject) =>
+//           setTimeout(() => reject(new Error("Connection timeout (30s)")), 30000)
+//         ),
+//       ]);
+
+//       if (connectionResult.success) {
+//         setIsConnected(true);
+//         setPrinterName(connectionResult.printerName);
+//         setConnectionStatus(`Connected to ${connectionResult.printerName}`);
+//       } else {
+//         throw new Error(connectionResult.error || "Failed to connect");
+//       }
+//     } catch (error) {
+//       setConnectionStatus(error.message);
+//       setIsConnected(false);
+//       console.error("Connection error:", error);
+//     }
+//   };
+
+//   return (
+//     <div className="relative">
+//       <button
+//         onClick={handleConnect}
+//         className={`p-2 rounded-full transition-colors flex items-center gap-2 ${
+//           isConnected
+//             ? "bg-green-100 text-green-600"
+//             : "bg-gray-100 text-gray-400"
+//         }`}
+//         title={isConnected ? "Connected to printer" : "Connect to printer"}
+//       >
+//         <Bluetooth className="w-5 h-5" />
+//         <Printer className="w-5 h-5" />
+//       </button>
+
+//       {connectionStatus && (
+//         <div
+//           className={`absolute top-full mt-2 w-48 p-2 rounded-md shadow-lg z-50 text-sm
+//           ${
+//             isConnected
+//               ? "bg-green-50 text-green-700"
+//               : "bg-white text-gray-700"
+//           }`}
+//         >
+//           <div className="flex items-center gap-2">
+//             {isConnected ? (
+//               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+//             ) : (
+//               <AlertCircle className="w-4 h-4 text-gray-400" />
+//             )}
+//             <span>{connectionStatus}</span>
+//           </div>
+//           {printerName && (
+//             <div className="mt-1 text-xs text-gray-500">{printerName}</div>
+//           )}
+//         </div>
+//       )}
+//     </div>
+//   );
+// });
+
+// BluetoothComponent.displayName = "BluetoothComponent";
+
+// export default BluetoothComponent;

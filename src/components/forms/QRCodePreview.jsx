@@ -112,10 +112,17 @@ import { QRCodeSVG } from "qrcode.react";
 export default function QRCodePreview({ isOpen, onClose, qrData, onPrint }) {
   const data = Array.isArray(qrData) ? qrData : [];
 
+  // Modify the handlePrint function:
   const handlePrint = async () => {
     try {
       if (onPrint) {
-        await onPrint(data);
+        // Print each QR code individually
+        for (const item of data) {
+          await onPrint({
+            ...item,
+            bundle_id: item.bundle_random_id, // Ensure correct field is used
+          });
+        }
       }
     } catch (error) {
       console.error("Print error:", error);

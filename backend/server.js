@@ -160,8 +160,361 @@ app.put('/users/:id', async (req, res) => {
 });
 
 
+// Ironing Schema
+const ironingSchema = new mongoose.Schema(
+  {
+    ironing_record_id: Number,
+    task_no: { type: Number, default: 53 },
+    ironing_bundle_id: { type: String, required: true, unique: true },
+    ironing_updated_date: String,
+    ironing_update_time: String,
+    bundle_id: String,
+    selectedMono: String,
+    custStyle: String,
+    buyer: String,
+    country: String,
+    factory: String,
+    lineNo: String,
+    color: String,
+    size: String,
+    count: String,
+    totalBundleQty: Number,
+  },
+  { collection: "ironing" }
+);
+
+const Ironing = mongoose.model("Ironing", ironingSchema);
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
+});
+
+// Save bundle data to MongoDB
+app.post("/api/save-bundle-data", async (req, res) => {
+  try {
+    const { bundleData } = req.body;
+    const savedRecords = [];
+
+    // Save each bundle record
+    for (const bundle of bundleData) {
+      const randomId = await generateRandomId();
+
+      const now = new Date();
+
+      // Format timestamps
+      const updated_date_seperator = now.toLocaleDateString("en-US", {
+        month: "2-digit",
+        day: "2-digit",
+        year: "numeric",
+      });
+
+      const updated_time_seperator = now.toLocaleTimeString("en-US", {
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+      const newBundle = new QC2OrderData({
+        ...bundle,
+        bundle_random_id: randomId,
+        factory: bundle.factory || "N/A", // Handle null factory
+        custStyle: bundle.custStyle || "N/A", // Handle null custStyle
+        country: bundle.country || "N/A", // Handle null country
+        department: bundle.department,
+        sub_con: bundle.sub_con || "No",
+        sub_con_factory:
+          bundle.sub_con === "Yes" ? bundle.sub_con_factory || "" : "N/A",
+        updated_date_seperator,
+        updated_time_seperator,
+      });
+      await newBundle.save();
+      savedRecords.push(newBundle);
+    }
+    // const savedRecords = await QC2OrderData.insertMany(bundleData);
+
+    res.status(201).json({
+      message: "Bundle data saved successfully",
+      data: savedRecords,
+    });
+  } catch (error) {
+    console.error("Error saving bundle data:", error);
+    res.status(500).json({
+      message: "Failed to save bundle data",
+      error: error.message,
+    });
+  }
+});
+
+// New Endpoint to Get Bundle by Random ID
+app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
+  try {
+    const bundle = await QC2OrderData.findOne({
+      bundle_random_id: req.params.randomId,
+    });
+
+    if (!bundle) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+
+    res.json(bundle);
+  } catch (error) {
+    console.error("Error fetching bundle:", error);
+    res.status(500).json({ error: "Failed to fetch bundle" });
+  }
+});
+
+// Check if bundle_id already exists and get the largest number
+app.post("/api/check-bundle-id", async (req, res) => {
+  try {
+    const { date, lineNo, selectedMono, color, size } = req.body;
+
+    // Find all bundle IDs matching the criteria
+    const existingBundles = await QC2OrderData.find({
+      bundle_id: {
+        $regex: `^${date}:${lineNo}:${selectedMono}:${color}:${size}`,
+      },
+    });
+
+    // Extract the largest number from the bundle IDs
+    let largestNumber = 0;
+    existingBundles.forEach((bundle) => {
+      const parts = bundle.bundle_id.split(":");
+      const number = parseInt(parts[parts.length - 1]);
+      if (number > largestNumber) {
+        largestNumber = number;
+      }
+    });
+
+    res.status(200).json({ largestNumber });
+  } catch (error) {
+    console.error("Error checking bundle ID:", error);
+    res.status(500).json({
+      message: "Failed to check bundle ID",
+      error: error.message,
+    });
+  }
+});
+
+// Update the MONo search endpoint to handle complex pattern matching
+app.get("/api/search-mono", async (req, res) => {
+  try {
+    const digits = req.query.digits;
+    const collection = mongoose.connection.db.collection("dt_orders");
+
+    // More robust regex pattern to match last 3 digits before any non-digit characters
+    const regexPattern = new RegExp(
+      `(\\d{3})(?=\\D*$)|(\\d{3}$)|(?<=\\D)(\\d{3})(?=\\D)`,
+      "i"
+    );
+
+    const results = await collection
+      .aggregate([
+        {
+          $addFields: {
+            matchParts: {
+              $regexFind: {
+                input: "$Order_No",
+                regex: regexPattern,
+              },
+            },
+          },
+        },
+        {
+          $match: {
+            $or: [
+              { "matchParts.match": { $regex: new RegExp(`${digits}$`, "i") } },
+              { "matchParts.match": { $regex: new RegExp(`^${digits}`, "i") } },
+            ],
+          },
+        },
+        {
+          $project: {
+            Order_No: 1,
+            numericMatch: {
+              $substr: [
+                { $ifNull: ["$matchParts.match", ""] },
+                { $subtract: [{ $strLenCP: "$matchParts.match" }, 3] },
+                3,
+              ],
+            },
+          },
+        },
+        {
+          $match: {
+            numericMatch: digits,
+          },
+        },
+        {
+          $group: {
+            _id: "$Order_No",
+            count: { $sum: 1 },
+          },
+        },
+        {
+          $limit: 100,
+        },
+      ])
+      .toArray();
+
+    res.json(results.map((r) => r._id));
+  } catch (error) {
+    console.error("Error searching MONo:", error);
+    res.status(500).json({ error: "Failed to search MONo" });
+  }
+});
+
+// Updated order details endpoint
+app.get("/api/order-details/:mono", async (req, res) => {
+  try {
+    const collection = mongoose.connection.db.collection("dt_orders");
+    const order = await collection.findOne({
+      Order_No: req.params.mono,
+    });
+
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    // Process colors with sizes
+    const colorMap = new Map();
+    order.OrderColors.forEach((colorObj) => {
+      const colorKey = colorObj.Color.toLowerCase().trim();
+      const originalColor = colorObj.Color.trim();
+
+      if (!colorMap.has(colorKey)) {
+        colorMap.set(colorKey, {
+          originalColor,
+          sizes: new Set(),
+        });
+      }
+
+      // Process sizes for this color
+      colorObj.OrderQty.forEach((sizeEntry) => {
+        // Get the size name (first key in the object)
+        const sizeName = Object.keys(sizeEntry)[0];
+        const quantity = sizeEntry[sizeName];
+
+        if (quantity > 0) {
+          const cleanSize = sizeName.split(";")[0].trim();
+          colorMap.get(colorKey).sizes.add(cleanSize);
+        }
+      });
+    });
+
+    const response = {
+      engName: order.EngName,
+      totalQty: order.TotalQty,
+      // Add new fields here
+      factoryname: order.Factory || "N/A", // New field
+      custStyle: order.CustStyle || "N/A", // New field
+      country: order.Country || "N/A", // New field
+      colors: Array.from(colorMap.values()).map((c) => c.originalColor),
+      colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
+        acc[curr.originalColor.toLowerCase()] = Array.from(curr.sizes);
+        return acc;
+      }, {}),
+    };
+
+    res.json(response);
+  } catch (error) {
+    // console.error("Error fetching order details:", error);
+    res.status(500).json({ error: "Failed to fetch order details" });
+  }
+});
+
+// Updated order sizes endpoint
+app.get("/api/order-sizes/:mono/:color", async (req, res) => {
+  try {
+    const collection = mongoose.connection.db.collection("dt_orders");
+    const order = await collection.findOne({
+      Order_No: req.params.mono,
+    });
+
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    // Find the matching color object (case-insensitive)
+    const colorObj = order.OrderColors.find(
+      (c) => c.Color.toLowerCase() === req.params.color.toLowerCase().trim()
+    );
+
+    if (!colorObj) return res.json([]);
+
+    // Extract sizes with quantity > 0
+    const sizes = colorObj.OrderQty.map((entry) => {
+      const sizeName = Object.keys(entry)[0];
+      return entry[sizeName] > 0 ? sizeName.split(";")[0].trim() : null;
+    })
+      .filter((size) => size !== null)
+      .filter((size, index, self) => self.indexOf(size) === index); // Remove duplicates
+
+    res.json(sizes);
+  } catch (error) {
+    console.error("Error fetching sizes:", error);
+    res.status(500).json({ error: "Failed to fetch sizes" });
+  }
+});
+
+async function fetchOrderDetails(mono) {
+  const collection = mongoose.connection.db.collection("dt_orders");
+  const order = await collection.findOne({ Order_No: mono });
+
+  const colorMap = new Map();
+  order.OrderColors.forEach((c) => {
+    const key = c.Color.toLowerCase().trim();
+    if (!colorMap.has(key)) {
+      colorMap.set(key, {
+        originalColor: c.Color.trim(),
+        sizes: new Map(),
+      });
+    }
+
+    c.OrderQty.forEach((q) => {
+      if (q.Quantity > 0) {
+        const sizeParts = q.Size.split(";");
+        const cleanSize = sizeParts[0].trim();
+        const sizeKey = cleanSize.toLowerCase();
+        if (!colorMap.get(key).sizes.has(sizeKey)) {
+          colorMap.get(key).sizes.set(sizeKey, cleanSize);
+        }
+      }
+    });
+  });
+
+  return {
+    engName: order.EngName,
+    totalQty: order.TotalQty,
+    colors: Array.from(colorMap.values()).map((c) => c.originalColor),
+    colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
+      acc[curr.originalColor.toLowerCase()] = Array.from(curr.sizes.values());
+      return acc;
+    }, {}),
+  };
+}
+
+// Check if ironing record exists
+app.get("/api/check-ironing-exists/:bundleId", async (req, res) => {
+  try {
+    const record = await Ironing.findOne({
+      ironing_bundle_id: req.params.bundleId,
+    });
+    res.json({ exists: !!record });
+  } catch (error) {
+    res.status(500).json({ error: "Error checking record" });
+  }
+});
+
+// Save ironing record
+app.post("/api/save-ironing", async (req, res) => {
+  try {
+    const newRecord = new Ironing(req.body);
+    await newRecord.save();
+    res.status(201).json({ message: "Record saved successfully" });
+  } catch (error) {
+    if (error.code === 11000) {
+      res.status(400).json({ error: "Duplicate record found" });
+    } else {
+      res.status(500).json({ error: "Failed to save record" });
+    }
+  }
 });
 
 app.get("/api/dashboard-stats", async (req, res) => {

@@ -18,89 +18,88 @@ function NumLetterPad({ onClose, onInput }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md relative">
-        {/* Close button (X icon) */}
-        <button
-          onClick={onClose}
-          className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-        >
-          <FaTimes className="w-6 h-6" />
-        </button>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center">
+      <div className="bg-white w-full max-w-lg rounded-t-2xl p-4 shadow-lg animate-slide-up">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium">Enter Details</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 p-2"
+          >
+            <FaTimes className="w-6 h-6" />
+          </button>
+        </div>
 
         <div className="mb-4">
           <input
             type="text"
             value={inputValue}
             readOnly
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-right text-2xl"
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-right text-2xl font-medium"
           />
         </div>
 
-        {/* English Letters (3x10 Grid) */}
-        <div className="grid grid-cols-10 gap-2 mb-4">
-          {Array.from({ length: 26 }, (_, i) =>
-            String.fromCharCode(65 + i)
-          ).map((letter) => (
-            <button
-              key={letter}
-              onClick={() => handleInputClick(letter)}
-              className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300"
-            >
-              {letter}
-            </button>
-          ))}
-        </div>
+        <div className="space-y-2">
+          {/* Letters */}
+          <div className="grid grid-cols-10 gap-1">
+            {Array.from({ length: 26 }, (_, i) =>
+              String.fromCharCode(65 + i)
+            ).map((letter) => (
+              <button
+                key={letter}
+                onClick={() => handleInputClick(letter)}
+                className="p-2 bg-gray-100 rounded hover:bg-gray-200 active:bg-gray-300 text-sm"
+              >
+                {letter}
+              </button>
+            ))}
+          </div>
 
-        {/* Numbers (1x10 Grid) */}
-        <div className="grid grid-cols-10 gap-2 mb-4">
-          {Array.from({ length: 10 }, (_, i) => i.toString()).map((number) => (
-            <button
-              key={number}
-              onClick={() => handleInputClick(number)}
-              className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300"
-            >
-              {number}
-            </button>
-          ))}
-        </div>
+          {/* Numbers */}
+          <div className="grid grid-cols-10 gap-1">
+            {Array.from({ length: 10 }, (_, i) => i.toString()).map(
+              (number) => (
+                <button
+                  key={number}
+                  onClick={() => handleInputClick(number)}
+                  className="p-2 bg-gray-100 rounded hover:bg-gray-200 active:bg-gray-300 text-sm"
+                >
+                  {number}
+                </button>
+              )
+            )}
+          </div>
 
-        {/* Symbols (1x10 Grid) */}
-        <div className="grid grid-cols-10 gap-2 mb-4">
-          {["/", "\\", "-"].map((symbol) => (
+          {/* Symbols and Controls */}
+          <div className="grid grid-cols-10 gap-1">
+            {["/", "\\", "-"].map((symbol) => (
+              <button
+                key={symbol}
+                onClick={() => handleInputClick(symbol)}
+                className="p-2 bg-gray-100 rounded hover:bg-gray-200 active:bg-gray-300 text-sm"
+              >
+                {symbol}
+              </button>
+            ))}
+            <div className="col-span-4"></div>
             <button
-              key={symbol}
-              onClick={() => handleInputClick(symbol)}
-              className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300"
+              onClick={handleBackspace}
+              className="col-span-2 p-2 bg-red-100 text-red-600 rounded hover:bg-red-200 active:bg-red-300 text-sm"
             >
-              {symbol}
+              ← Delete
             </button>
-          ))}
-          {/* Fill remaining columns with empty divs */}
-          {Array.from({ length: 7 }).map((_, i) => (
-            <div key={i}></div>
-          ))}
-        </div>
-
-        {/* Controls (Delete and Submit in 1x10 Grid) */}
-        <div className="grid grid-cols-10 gap-2">
-          <button
-            onClick={handleBackspace}
-            className="col-span-5 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
-          >
-            ← Delete
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!inputValue} // Disable submit button if input is empty
-            className={`col-span-5 px-4 py-2 ${
-              inputValue
-                ? "bg-green-500 hover:bg-green-600"
-                : "bg-gray-300 cursor-not-allowed"
-            } text-white rounded-md`}
-          >
-            Submit
-          </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!inputValue}
+              className={`col-span-2 p-2 text-white rounded text-sm ${
+                inputValue
+                  ? "bg-blue-500 hover:bg-blue-600"
+                  : "bg-gray-300 cursor-not-allowed"
+              }`}
+            >
+              Done
+            </button>
+          </div>
         </div>
       </div>
     </div>

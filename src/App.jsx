@@ -328,6 +328,7 @@ import BundleRegistration from "./pages/BundleRegistration";
 import QC2InspectionPage from "./pages/QC2Inspection";
 import UserList from "./components/users/userList";
 import "./App.css";
+import IroningPage from "./pages/Ironing";
 
 // Create a context for Bluetooth functionality
 export const BluetoothContext = createContext(null);
@@ -611,6 +612,7 @@ function App() {
                   path="/bundle-registration"
                   element={<BundleRegistration />}
                 />
+                <Route path="/ironing" element={<IroningPage />} />
                 <Route path="/qc2-inspection" element={<QC2InspectionPage />} />
               </>
             ) : (

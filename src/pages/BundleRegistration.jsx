@@ -25,6 +25,7 @@ function BundleRegistration() {
 
   const [formData, setFormData] = useState({
     date: new Date(),
+    department: "",
     selectedMono: "",
     buyer: "",
     orderQty: "",
@@ -49,6 +50,16 @@ function BundleRegistration() {
   const [hasSizes, setHasSizes] = useState(false);
 
   const subConNames = ["Sunicon", "Elite", "SYD"];
+
+  // Add useEffect to handle department change
+  useEffect(() => {
+    if (formData.department === "Sub-con") {
+      setIsSubCon(true);
+    } else {
+      setIsSubCon(false);
+      setSubConName("");
+    }
+  }, [formData.department]);
 
   // Fetch order details when MONo is selected
   useEffect(() => {
@@ -187,6 +198,7 @@ function BundleRegistration() {
         const bundleRecord = {
           bundle_id: bundleId,
           date: date.toLocaleDateString("en-US"),
+          department: formData.department,
           selectedMono,
           custStyle: formData.custStyle,
           buyer: formData.buyer,
@@ -232,29 +244,83 @@ function BundleRegistration() {
   };
 
   // Print QR code and clear form data
-  // Handle print QR codes
+  // Handle print QR codes usinf eletron.js
+
+  // const handlePrintQR = async () => {
+  //   if (!bluetoothComponentRef.current) {
+  //     alert("Bluetooth component not initialized");
+  //     return;
+  //   }
+
+  //   try {
+  //     setIsPrinting(true);
+
+  //     // Verify connection before printing
+  //     if (!bluetoothComponentRef.current.isConnected) {
+  //       alert("Please connect to printer first");
+  //       return;
+  //     }
+
+  //     // Batch print with error handling
+  //     const printPromises = qrData.map(async (data, index) => {
+  //       try {
+  //         console.log(`Printing bundle ${index + 1}/${qrData.length}`);
+  //         await bluetoothComponentRef.current.printData({
+  //           ...data,
+  //           bundle_id: data.bundle_random_id,
+  //         });
+  //         return { success: true, index };
+  //       } catch (error) {
+  //         console.error(`Failed to print bundle ${index + 1}:`, error);
+  //         return { success: false, index, error };
+  //       }
+  //     });
+
+  //     const results = await Promise.all(printPromises);
+  //     const failedPrints = results.filter((r) => !r.success);
+
+  //     if (failedPrints.length > 0) {
+  //       throw new Error(
+  //         `Failed to print ${failedPrints.length} bundles. ` +
+  //           `Check console for details.`
+  //       );
+  //     }
+
+  //     // Clear form only if all prints succeeded
+  //     setFormData((prev) => ({
+  //       ...prev,
+  //       color: "",
+  //       size: "",
+  //       bundleQty: "",
+  //     }));
+  //     setIsGenerateDisabled(false);
+
+  //     alert("All QR codes printed successfully!");
+  //   } catch (error) {
+  //     alert(`Print failed: ${error.message}`);
+  //   } finally {
+  //     setIsPrinting(false);
+  //   }
+  // };
+
   const handlePrintQR = async () => {
     if (!bluetoothComponentRef.current) {
       alert("Bluetooth component not initialized");
       return;
     }
 
-    // const { isConnected, printData } = bluetoothComponentRef.current;
-    if (!bluetoothComponentRef.current.isConnected) {
-      alert("Please connect to a printer first");
-      return;
-    }
-
     try {
       setIsPrinting(true);
 
-      // Print each QR code in sequence
+      // Print each QR code sequentially
       for (const data of qrData) {
-        console.log("Printing data:", data);
-        await bluetoothComponentRef.current.printData(data);
+        await bluetoothComponentRef.current.printData({
+          ...data,
+          bundle_id: data.bundle_random_id, // Use the correct field for QR content
+        });
       }
 
-      // Clear form data after successful printing
+      // Clear form after successful print
       setFormData((prev) => ({
         ...prev,
         color: "",
@@ -265,22 +331,48 @@ function BundleRegistration() {
 
       alert("QR codes printed successfully!");
     } catch (error) {
-      console.error("Print error:", error);
-      alert("Failed to print QR codes. Please check printer connection.");
+      alert(`Print failed: ${error.message}`);
     } finally {
       setIsPrinting(false);
     }
   };
 
-  // const handlePrintQR = () => {
-  //   setFormData((prev) => ({
-  //     ...prev,
-  //     color: "",
-  //     size: "",
-  //     bundleQty: "",
-  //   }));
-  //   setIsGenerateDisabled(false); // Re-enable Generate QR button
-  //   alert("Print QR code functionality will be implemented here.");
+  // const handlePrintQR = async () => {
+  //   if (!bluetoothComponentRef.current) {
+  //     alert("Bluetooth component not initialized");
+  //     return;
+  //   }
+
+  //   // const { isConnected, printData } = bluetoothComponentRef.current;
+  //   if (!bluetoothComponentRef.current.isConnected) {
+  //     alert("Please connect to a printer first");
+  //     return;
+  //   }
+
+  //   try {
+  //     setIsPrinting(true);
+
+  //     // Print each QR code in sequence
+  //     for (const data of qrData) {
+  //       await bluetoothComponentRef.current.printData(data);
+  //     }
+
+  //     // Clear form data after successful printing
+  //     setFormData((prev) => ({
+  //       ...prev,
+  //       color: "",
+  //       size: "",
+  //       bundleQty: "",
+  //     }));
+  //     setIsGenerateDisabled(false);
+
+  //     alert("QR codes printed successfully!");
+  //   } catch (error) {
+  //     console.error("Print error:", error);
+  //     alert("Failed to print QR codes. Please check printer connection.");
+  //   } finally {
+  //     setIsPrinting(false);
+  //   }
   // };
 
   return (
@@ -333,6 +425,27 @@ function BundleRegistration() {
               </div>
               <div className="flex items-end">
                 <BluetoothComponent ref={bluetoothComponentRef} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Department
+                </label>
+                <select
+                  value={formData.department}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      department: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                >
+                  <option value="">Select Department</option>
+                  <option value="QC1 Endline">QC1 Endline</option>
+                  <option value="Washing">Washing</option>
+                  <option value="Dyeing">Dyeing</option>
+                  <option value="Sub-con">Sub-con</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -504,13 +617,44 @@ function BundleRegistration() {
               </div>
             </div>
 
+            {/* Sub Con Selection - Modified to show only when department is not Sub-con */}
+            {formData.department !== "Sub-con" && (
+              <SubConSelection
+                isSubCon={isSubCon}
+                setIsSubCon={setIsSubCon}
+                subConName={subConName}
+                setSubConName={setSubConName}
+              />
+            )}
+
+            {/* When department is Sub-con, show forced Sub-con selection */}
+            {formData.department === "Sub-con" && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Sub-con Factory
+                </label>
+                <select
+                  value={subConName}
+                  onChange={(e) => setSubConName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                >
+                  <option value="">Select Sub-con Factory</option>
+                  {subConNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Sub Con (Yes/No) */}
-            <SubConSelection
+            {/* <SubConSelection
               isSubCon={isSubCon}
               setIsSubCon={setIsSubCon}
               subConName={subConName}
               setSubConName={setSubConName}
-            />
+            /> */}
 
             {/* QR Code Controls */}
             <div className="flex justify-between mt-6">

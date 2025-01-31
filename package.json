@@ -8,6 +8,9 @@
     "build": "vite build",
     "server": "node backend/server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
+    "electron": "wait-port http://localhost:5173 && electron electron.js",
+    "electron:serve": "concurrently -k \"npm run dev\" \"npm run electron\"",
+    "electron:build": "vite build && electron-builder",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
@@ -55,6 +58,8 @@
     "@types/react-dom": "^18.2.21",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^8.2.2",
+    "electron": "^34.0.2",
+    "electron-builder": "^25.1.8",
     "eslint": "^8.57.0",
     "eslint-plugin-react": "^7.34.0",
     "eslint-plugin-react-hooks": "^4.6.0",
@@ -64,8 +69,7 @@
     "husky": "^8.0.3",
     "jest": "^29.7.0",
     "lint-staged": "^15.0.0",
-    "url-loader": "^4.1.1",
-    "vite": "^5.4.14",
-    "vite-plugin-env-compatible": "^2.0.1"
+    "vite": "^5.4.11",
+    "wait-port": "^1.1.0"
   }
 }
