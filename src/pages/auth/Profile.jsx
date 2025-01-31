@@ -10,7 +10,6 @@ function Profile() {
     sect_name: '',
     image: '',
   });
-
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
@@ -21,7 +20,6 @@ function Profile() {
         if (!token) {
           throw new Error('No token found in localStorage');
         }
-
         const response = await axios.get('http://localhost:5001/api/user-profile', {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -29,7 +27,6 @@ function Profile() {
         });
 
         const userData = response.data;
-
         setProfile({
           emp_id: userData.emp_id || '',
           name: userData.name || '',
@@ -98,9 +95,13 @@ function Profile() {
                 {profile.image ? (
                   typeof profile.image === 'string' ? (
                     <img
-                    src={profile.image.startsWith('data:image') ? profile.image : `http://localhost:5001/storage/${profile.image}`}
+                      src={profile.image.startsWith('data:image') ? profile.image : `http://localhost:5001/public/storage/${profile.image}`}
                       alt="Profile"
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.log('Failed to load image:', e.currentTarget.src);
+                        e.currentTarget.src = '/IMG/default-profile.png'; // Fallback to default icon
+                      }}
                     />
                   ) : (
                     <img
@@ -124,7 +125,6 @@ function Profile() {
               <div className="mt-2 text-sm text-center text-gray-600 text-xl">Click to change photo</div>
             </div>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
             <div>
               <label className="block text-xl text-sm font-medium text-gray-700">Employee ID</label>
@@ -135,7 +135,6 @@ function Profile() {
                 className="mt-4 block text-x w-full border border rounded-md border-gray-300 bg-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               />
             </div>
-
             <div>
               <label className="block text-xl text-sm font-medium text-gray-700">Name</label>
               <input
@@ -145,7 +144,6 @@ function Profile() {
                 className="mt-4 block text-x w-full border border rounded-md border-gray-300 bg-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               />
             </div>
-
             <div>
               <label className="block text-xl font-medium text-gray-700">Department</label>
               <input
@@ -155,7 +153,6 @@ function Profile() {
                 className="mt-4 block text-x w-full border border rounded-md border-gray-300 bg-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               />
             </div>
-
             <div>
               <label className="block text-xl font-medium text-gray-700">Section Name</label>
               <input
@@ -166,7 +163,6 @@ function Profile() {
               />
             </div>
           </div>
-
           <div className="flex justify-center">
             <button
               type="submit"

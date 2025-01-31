@@ -20,7 +20,8 @@ const __dirname = path.dirname(__filename);
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
-app.use('/storage', express.static(path.join(__dirname, 'storage/app/public')));
+app.use('/storage', express.static(path.join(__dirname, 'storage')));
+// app.use('/storage', express.static(path.join(__dirname, '../storage/app/public')));
 
 const ymProdConnection = mongoose.createConnection("mongodb://localhost:27017/ym_prod");
 const mainUserConnection = mongoose.createConnection("mongodb://127.0.0.1:27017/eco_development");
@@ -46,7 +47,7 @@ const QCData = createQCDataModel(ymProdConnection);
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const userId = req.userId; // Assuming userId is set in the request object
-    const dir = `./storage/app/public/profiles/${userId}`;
+    const dir = `profiles/${userId}`;
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
@@ -54,6 +55,14 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}${path.extname(file.originalname)}`);
   },
 });
+
+
+// const storage = multer.diskStorage({
+//   destination: '../storage/app/public',
+//   filename: (req, file, cb) => {
+//     cb(null, `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`);
+//   },
+// });
 
 
 // Initialize upload
@@ -79,6 +88,48 @@ function checkFileType(file, cb) {
     cb('Error: Images Only!');
   }
 }
+
+// User routes
+app.get('/users', async (req, res) => {
+  try {
+    const users = await UserMain.find();
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ message: 'Failed to fetch users' });
+  }
+});
+
+app.post('/users', async (req, res) => {
+  try {
+    const user = new UserMain(req.body);
+    await user.save();
+    res.json(user);
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ message: 'Failed to create user' });
+  }
+});
+
+app.put('/users/:id', async (req, res) => {
+  try {
+    const user = await UserMain.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(user);
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ message: 'Failed to update user' });
+  }
+});
+
+app.delete('/users/:id', async (req, res) => {
+  try {
+    await UserMain.findByIdAndDelete(req.params.id);
+    res.json({ message: 'User deleted' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Failed to delete user' });
+  }
+});
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -461,7 +512,8 @@ app.put('/api/user-profile', upload, async (req, res) => {
       name: req.body.name,
       dept_name: req.body.dept_name,
       sect_name: req.body.sect_name,
-      profile: req.file ? `profiles/${userId}/${req.file.filename}` : req.body.profile, // Save file path
+      profile: req.file ? `../public/storage/${req.file.filename}` : req.body.profile,
+      // profile: req.file ? `../storage/app/public/profiles/${userId}/${req.file.filename}` : req.body.profile, // Save file path
     };
 
     console.log('Updated Profile:', updatedProfile);

@@ -32,14 +32,18 @@ function Navbar({ onLogout }) {
         });
 
         // Construct the full profile URL if profile exists
+        
         let profileUrl = null;
         if (response.data.profile) {
           if (response.data.profile.startsWith('data:image')) {
             profileUrl = response.data.profile; // Base64 image
           } else {
-            profileUrl = `http://localhost:5001/storage/${response.data.profile}`; // URL path
+            profileUrl = `http://localhost:5001/public/storage/${response.data.profile}`; // URL path
           }
         }
+
+        console.log('Profile URL:', profileUrl); // Log the profile URL
+
         // Update user state with merged data
         const updatedUser = {
           ...userData,
@@ -82,6 +86,7 @@ function Navbar({ onLogout }) {
     { path: '/logs', label: 'Logs' },
     { path: '/defect-images', label: 'Defect Images' },
     { path: '/analytics', label: 'Analytics' },
+    { path: '/userList', label: 'User Management' },
   ];
 
   if (loading) {
