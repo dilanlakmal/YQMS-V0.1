@@ -12,7 +12,7 @@ import createUserModel from "./models/User.js";
 import createQCDataModel from "./models/qc1_data.js";
 import createRoleModel from "./models/Role.js";
 import createIroningModel from "./models/Ironing.js";
-import createQc2OrderdategModel from "./models/qc2_orderdate.js";
+import createQc2OrderDataModel from "./models/qc2_orderdata.js";
 import axios from 'axios';
 
 const app = express();
@@ -40,7 +40,7 @@ const UserMain = createUserModel(mainUserConnection);
 const QCData = createQCDataModel(ymProdConnection);
 const Role = createRoleModel(ymProdConnection);
 const Ironing = createIroningModel(ymProdConnection);
-const QC2OrderData = createQc2OrderdategModel(ymProdConnection);
+const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
 
 // Set storage engine
 const storage = multer.diskStorage({
@@ -752,61 +752,79 @@ app.post("/api/save-qc-data", async (req, res) => {
   }
 });
 
+app.post("/api/refresh-token", async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(401).json({ message: "Refresh token is required" });
+    }
+
+    jwt.verify(refreshToken, "your_refresh_token_secret", (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: "Invalid refresh token" });
+      }
+
+      const accessToken = jwt.sign(
+        { userId: decoded.userId },
+        "your_jwt_secret",
+        { expiresIn: "1h" }
+      );
+
+      res.status(200).json({ accessToken });
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to refresh token", error: error.message });
+  }
+});
+
 // Login Endpoint
 app.post("/api/login", async (req, res) => {
   try {
     const { username, password, rememberMe } = req.body;
-    // Debug: Print the received username and password
-    console.log("Login attempt:", { username, password });
 
-    // Ensure connections are established
     if (!mainUserConnection.readyState) {
-      console.log("Database not connected");
       return res.status(500).json({ message: "Database not connected" });
     }
 
-    // Find user by email or other fields
     const user = await UserMain.findOne({
       $or: [{ email: username }, { name: username }, { emp_id: username }],
     });
 
     if (!user) {
-      console.log("User not found");
       return res.status(401).json({ message: "Invalid username or password" });
     }
 
-    // Debug: Print the retrieved user object
-    console.log("User found:", user);
-
-    // Ensure compatibility with $2y$ bcrypt hashes
     const isPasswordValid = await bcrypt.compare(
       password.trim(),
       user.password.replace("$2y$", "$2b$")
     );
 
     if (!isPasswordValid) {
-      console.log("Invalid password");
       return res.status(401).json({ message: "Invalid username or password" });
     }
 
-    // Rehash password to $2b$ standard for consistency
     if (user.password.startsWith("$2y$")) {
       const newHashedPassword = await bcrypt.hash(password.trim(), 10);
       user.password = newHashedPassword;
       await user.save();
     }
 
-    // Generate JWT token
-    const expiresIn = rememberMe ? "7d" : "1h";
-    const token = jwt.sign(
+    const accessToken = jwt.sign(
       { userId: user._id, email: user.email, name: user.name },
       "your_jwt_secret",
-      { expiresIn }
+      { expiresIn: "1h" }
+    );
+
+    const refreshToken = jwt.sign(
+      { userId: user._id },
+      "your_refresh_token_secret",
+      { expiresIn: "30d" }
     );
 
     res.status(200).json({
       message: "Login successful",
-      token,
+      accessToken,
+      refreshToken,
       user: {
         emp_id: user.emp_id,
         name: user.name,

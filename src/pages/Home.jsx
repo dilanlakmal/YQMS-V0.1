@@ -1,7 +1,27 @@
+import React, { useState } from 'react';
 import { useNavigate } from "react-router-dom";
+import { useAuth } from '../components/authentication//AuthContext';
 
 function Home() {
   const navigate = useNavigate();
+  const { user, roles } = useAuth();
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const hasRole = (requiredRole) => {
+    return user && user.roles && user.roles.includes(requiredRole);
+  };
+
+  const handleNavigation = (path, requiredRole) => {
+    if (hasRole(requiredRole)) {
+      navigate(path);
+    } else {
+      setErrorMessage('Unauthorized Access');
+      setTimeout(() => {
+        setErrorMessage('');
+        window.location.reload();
+      }, 3000);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-50 to-gray-100 py-20 px-20">
@@ -15,6 +35,12 @@ function Home() {
           monitoring
         </p>
 
+        {errorMessage && (
+          <div className="bg-red-500 text-white text-center py-2 mb-4 rounded">
+            {errorMessage}
+          </div>
+        )}
+
         {/* Grid with 4 columns */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Column 1: Order Data */}
@@ -25,7 +51,7 @@ function Home() {
 
             {/* Bundle Registration Card */}
             <div
-              onClick={() => navigate("/bundle-registration")}
+              onClick={() =>handleNavigation("/bundle-registration","admin")}
               className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="flex flex-col items-center justify-center mb-6  w-12 h-12  bg-[url('/IMG/bundle.avif')] bg-cover bg-center">
@@ -41,7 +67,7 @@ function Home() {
 
             {/* Washing Card */}
             <div
-              onClick={() => navigate("/washing")}
+              onClick={() => handleNavigation("/washing","admin")}
               className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
             >
                <div className="flex flex-col items-center justify-center mb-6  w-12 h-12  bg-[url('/IMG/washing.jpg')] bg-cover bg-center">
@@ -56,7 +82,7 @@ function Home() {
             </div>
             {/* Dyeing Card */}
             <div
-              onClick={() => navigate("/dyeing")}
+              onClick={() => handleNavigation("/dyeing", "admin")}
               className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="flex flex-col items-center justify-center mb-6  w-12 h-12  bg-[url('/IMG/dyeing.png')] bg-cover bg-center">
@@ -71,7 +97,7 @@ function Home() {
             </div>
             {/* Ironing Card */}
             <div
-              onClick={() => navigate("/ironing")}
+              onClick={() => handleNavigation("/ironing", "admin")}
               className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="flex flex-col items-center justify-center mb-6  w-12 h-12  bg-[url('/IMG/iorning.avif')] bg-cover bg-center">
@@ -93,7 +119,7 @@ function Home() {
             </h2>
             {/* QC1 Inspection Card */}
             <div
-              onClick={() => navigate("/details")}
+              onClick={() => handleNavigation("/details", "qc1")}
               className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="flex flex-col items-center justify-center mb-6  w-12 h-12  bg-[url('/IMG/qcc.png')] bg-cover bg-center">
@@ -109,7 +135,7 @@ function Home() {
 
             {/* QC2 Inspection Card */}
             <div
-              onClick={() => navigate("/qc2-inspection")}
+              onClick={() => handleNavigation("/qc2-inspection", "qc2")}
               className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="flex flex-col items-center justify-center mb-6  w-12 h-12  bg-[url('/IMG/qc2.png')] bg-cover bg-center">
@@ -129,7 +155,7 @@ function Home() {
             <h2 className="text-2xl font-bold text-blue-900 mb-4 text-center">QA Audit</h2>
             {/* QA Audit Card */}
             <div
-              onClick={() => navigate("/audit")}
+              onClick={() => handleNavigation("/audit", "qa")}
               className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="flex flex-col items-center justify-center mb-6  w-12 h-12  bg-[url('/IMG/qaa.png')] bg-cover bg-center">
@@ -151,7 +177,7 @@ function Home() {
             </h2>
             {/* Download Data Card */}
             <div
-              onClick={() => navigate("/dashboard")}
+              onClick={() => handleNavigation("/dashboard" , "admin")}
               className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="flex flex-col items-center justify-center mb-6  w-12 h-12  bg-[url('/IMG/download.jpg')] bg-cover bg-center">
@@ -166,7 +192,7 @@ function Home() {
             </div>
             {/* Live Dashboard Card */}
             <div
-              onClick={() => navigate("/dashboard")}
+              onClick={() => handleNavigation("/dashboard", "admin")}
               className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="flex flex-col items-center justify-center mb-6  w-12 h-12  bg-[url('/IMG/dash.png')] bg-cover bg-center">

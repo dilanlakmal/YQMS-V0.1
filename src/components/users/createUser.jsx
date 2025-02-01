@@ -2,10 +2,18 @@ import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import { useAuth } from '../../components/authentication/AuthContext.jsx';
 
 const MySwal = withReactContent(Swal);
 
-const CreateUserModal = ({ isOpen, onClose, roles, onSubmit, existingUserIds = [] }) => {
+const CreateUserModal = ({
+  isOpen,
+  onClose,
+  roles,
+  onSubmit,
+  existingUserIds = [], // Use default parameter
+}) => {
+  const { hashPassword } = useAuth();
   const [formData, setFormData] = useState({
     emp_id: '',
     name: '',
@@ -66,37 +74,30 @@ const CreateUserModal = ({ isOpen, onClose, roles, onSubmit, existingUserIds = [
     }
   };
 
-  const hashPassword = async (password) => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hash = await crypto.subtle.digest('SHA-256', data);
-    return btoa(String.fromCharCode(...new Uint8Array(hash)));
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (Array.isArray(existingUserIds) && existingUserIds.includes(formData.emp_id)) {
-        MySwal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Employee ID already exists. Please use a different ID.',
-        }).then(() => {
-          // Clear the form data
-          setFormData({
-            emp_id: '',
-            name: '',
-            email: '',
-            roles: [],
-            sub_roles: [],
-            keywords: '',
-            password: '',
-          });
-          // Close the modal
-          onClose();
+      MySwal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Employee ID already exists. Please use a different ID.',
+      }).then(() => {
+        // Clear the form data
+        setFormData({
+          emp_id: '',
+          name: '',
+          email: '',
+          roles: [],
+          sub_roles: [],
+          keywords: '',
+          password: '',
         });
-        return;
-      }
+        // Close the modal
+        onClose();
+      });
+      return;
+    }
 
     try {
       const hashedPassword = await hashPassword(formData.password);
@@ -384,10 +385,6 @@ CreateUserModal.propTypes = {
   ).isRequired,
   onSubmit: PropTypes.func.isRequired,
   existingUserIds: PropTypes.arrayOf(PropTypes.string),
-};
-
-CreateUserModal.defaultProps = {
-  existingUserIds: [],
 };
 
 export default CreateUserModal;

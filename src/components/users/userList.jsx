@@ -79,7 +79,6 @@ const UserList = () => {
     }
   };
 
-
   const handleAddUser = () => {
     setIsCreateModalOpen(true);
   };
@@ -123,6 +122,7 @@ const UserList = () => {
     try {
       const response = await axios.post('http://localhost:5001/users', newUser);
       setUsers([...users, response.data]);
+      handleCloseCreateModal();
       return response;
     } catch (error) {
       if (error.response && error.response.status === 400) {
@@ -132,24 +132,12 @@ const UserList = () => {
     }
   };
 
-  // const handleCreateUser = async (newUser) => {
-  //   try {
-  //     console.log('Creating user with data:', newUser); // Log the data being sent
-  //     await axios.post('http://localhost:5001/users', newUser);
-  //     fetchUsers();
-  //     handleCloseCreateModal();
-  //   } catch (error) {
-  //     console.error('Error creating user:', error.response ? error.response.data : error.message);
-  //     setError('Failed to create user. Please try again later.');
-  //   }
-  // };
-  
-
   // Pagination logic
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
   const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const nextPage = () => {
@@ -170,15 +158,19 @@ const UserList = () => {
     const halfPageNumbersToShow = Math.floor(maxPageNumbersToShow / 2);
     let startPage = Math.max(1, currentPage - halfPageNumbersToShow);
     let endPage = Math.min(totalPages, currentPage + halfPageNumbersToShow);
+
     if (currentPage <= halfPageNumbersToShow) {
       endPage = Math.min(totalPages, maxPageNumbersToShow);
     }
+
     if (currentPage + halfPageNumbersToShow >= totalPages) {
       startPage = Math.max(1, totalPages - maxPageNumbersToShow + 1);
     }
+
     for (let i = startPage; i <= endPage; i++) {
       pageNumbers.push(i);
     }
+
     return pageNumbers;
   };
 
@@ -312,7 +304,6 @@ const UserList = () => {
           </ul>
         </nav>
       </div>
-
       <EditUserModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
@@ -320,7 +311,6 @@ const UserList = () => {
         roles={roles}
         onSubmit={handleUpdateUser}
       />
-
       <CreateUserModal
         isOpen={isCreateModalOpen}
         onClose={handleCloseCreateModal}
@@ -328,13 +318,14 @@ const UserList = () => {
         onSubmit={handleCreateUser}
         existingUserIds={existingUserIds}
       />
-
-      <DeleteUserModal
-        isOpen={isDeleteModalOpen}
-        onClose={handleCloseDeleteModal}
-        user={selectedUser}
-        onDelete={handleDelete}
-      />
+      {isDeleteModalOpen && selectedUser && (
+        <DeleteUserModal
+          isOpen={isDeleteModalOpen}
+          onClose={handleCloseDeleteModal}
+          user={selectedUser}
+          onDelete={handleDelete}
+        />
+      )}
     </div>
   );
 };
