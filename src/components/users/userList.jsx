@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import EditUserModal from './editUser'; 
+import EditUserModal from './editUser';
+import CreateUserModal from './createUser';
+import DeleteUserModal from './deleteUser';
+
 const UserList = () => {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
@@ -9,6 +12,8 @@ const UserList = () => {
   const [usersPerPage] = useState(10);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [roles, setRoles] = useState([]);
 
@@ -67,14 +72,16 @@ const UserList = () => {
     try {
       await axios.delete(`http://localhost:5001/users/${id}`);
       fetchUsers();
+      handleCloseDeleteModal();
     } catch (error) {
       console.error('Error deleting user:', error);
       setError('Failed to delete user. Please try again later.');
     }
   };
 
+
   const handleAddUser = () => {
-    // Redirect to add user page or open a modal
+    setIsCreateModalOpen(true);
   };
 
   const handleEdit = (user) => {
@@ -82,16 +89,28 @@ const UserList = () => {
     setIsModalOpen(true);
   };
 
+  const handleDeleteUser = (user) => {
+    setSelectedUser(user);
+    setIsDeleteModalOpen(true);
+  };
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedUser(null);
   };
 
-  const handleUpdateUser = async (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
+  const handleCloseCreateModal = () => {
+    setIsCreateModalOpen(false);
+  };
+
+  const handleCloseDeleteModal = () => {
+    setIsDeleteModalOpen(false);
+    setSelectedUser(null);
+  };
+
+  const handleUpdateUser = async (updatedUser) => {
     try {
-      await axios.put(`http://localhost:5001/users/${selectedUser._id}`, formData);
+      await axios.put(`http://localhost:5001/users/${updatedUser._id}`, updatedUser);
       fetchUsers();
       handleCloseModal();
     } catch (error) {
@@ -99,6 +118,32 @@ const UserList = () => {
       setError('Failed to update user. Please try again later.');
     }
   };
+
+  const handleCreateUser = async (newUser) => {
+    try {
+      const response = await axios.post('http://localhost:5001/users', newUser);
+      setUsers([...users, response.data]);
+      return response;
+    } catch (error) {
+      if (error.response && error.response.status === 400) {
+        throw new Error(error.response.data.message);
+      }
+      throw error;
+    }
+  };
+
+  // const handleCreateUser = async (newUser) => {
+  //   try {
+  //     console.log('Creating user with data:', newUser); // Log the data being sent
+  //     await axios.post('http://localhost:5001/users', newUser);
+  //     fetchUsers();
+  //     handleCloseCreateModal();
+  //   } catch (error) {
+  //     console.error('Error creating user:', error.response ? error.response.data : error.message);
+  //     setError('Failed to create user. Please try again later.');
+  //   }
+  // };
+  
 
   // Pagination logic
   const indexOfLastUser = currentPage * usersPerPage;
@@ -136,6 +181,8 @@ const UserList = () => {
     }
     return pageNumbers;
   };
+
+  const existingUserIds = users.map(user => user.emp_id);
 
   return (
     <div className="container mx-auto p-4">
@@ -197,12 +244,12 @@ const UserList = () => {
                 <td className="px-4 py-2 border">
                   <button
                     onClick={() => handleEdit(user)}
-                    className="px-4 py-2 mr-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                    className="px-4 py-2 mr-5 bg-green-500 text-white rounded-lg hover:bg-green-600"
                   >
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDelete(user._id)}
+                    onClick={() => handleDeleteUser(user)}
                     className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
                   >
                     Delete
@@ -272,6 +319,21 @@ const UserList = () => {
         user={selectedUser}
         roles={roles}
         onSubmit={handleUpdateUser}
+      />
+
+      <CreateUserModal
+        isOpen={isCreateModalOpen}
+        onClose={handleCloseCreateModal}
+        roles={roles}
+        onSubmit={handleCreateUser}
+        existingUserIds={existingUserIds}
+      />
+
+      <DeleteUserModal
+        isOpen={isDeleteModalOpen}
+        onClose={handleCloseDeleteModal}
+        user={selectedUser}
+        onDelete={handleDelete}
       />
     </div>
   );

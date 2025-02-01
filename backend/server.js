@@ -104,9 +104,36 @@ app.get('/users', async (req, res) => {
 
 app.post('/users', async (req, res) => {
   try {
-    const user = new UserMain(req.body);
-    await user.save();
-    res.json(user);
+    const { emp_id, name, email, roles, sub_roles, keywords, password } = req.body;
+
+    // Log the incoming request body
+    console.log('Request body:', req.body);
+
+    // Check if the emp_id already exists
+    const existingUser = await UserMain.findOne({ emp_id });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Employee ID already exists. Please use a different ID.' });
+    }
+
+    // Hash the password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create a new user
+    const newUser = new UserMain({
+      emp_id,
+      name,
+      email,
+      roles,
+      sub_roles,
+      keywords,
+      password: hashedPassword,
+    });
+
+    // Save the user to the database
+    await newUser.save();
+
+    res.status(201).json(newUser);
   } catch (error) {
     console.error('Error creating user:', error);
     res.status(500).json({ message: 'Failed to create user' });
@@ -146,11 +173,21 @@ app.get('/roles', async (req, res) => {
 app.put('/users/:id', async (req, res) => {
   try {
     const { name, email, roles, sub_roles, keywords, password } = req.body;
-    const updatedUser = { name, email, roles, sub_roles, keywords };
+    const updatedUser = { name, email, keywords };
+
+    if (roles) {
+      updatedUser.roles = [...new Set(roles)]; // Remove duplicates
+    }
+
+    if (sub_roles) {
+      updatedUser.sub_roles = [...new Set(sub_roles)]; // Remove duplicates
+    }
+
     if (password) {
       const saltRounds = 12;
       updatedUser.password = await bcrypt.hash(password, saltRounds); // Ensure you hash the password before saving
     }
+
     const user = await UserMain.findByIdAndUpdate(req.params.id, updatedUser, { new: true });
     res.json(user);
   } catch (error) {
@@ -158,7 +195,6 @@ app.put('/users/:id', async (req, res) => {
     res.status(500).json({ message: 'Failed to update user' });
   }
 });
-
 
 // Ironing Schema
 const ironingSchema = new mongoose.Schema(

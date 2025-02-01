@@ -1,16 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import bcrypt from 'bcryptjs';
 
 const EditUserModal = ({ isOpen, onClose, user, roles, onSubmit }) => {
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [selectedSubRoles, setSelectedSubRoles] = useState([]);
+  const [resetPassword, setResetPassword] = useState(false);
 
   useEffect(() => {
     if (user) {
-      setSelectedRoles(user.roles || []);
-      setSelectedSubRoles(user.sub_roles || []);
+      const existingRoles = user.roles.filter(role => roles.some(r => r.value === role));
+      const existingSubRoles = user.sub_roles.filter(subRole => 
+        roles.some(role => 
+          role.sub_roles && role.sub_roles.some(sr => sr.value === subRole)
+        )
+      );
+
+      setSelectedRoles(existingRoles);
+      setSelectedSubRoles(existingSubRoles);
     }
-  }, [user]);
+  }, [user, roles]);
 
   const handleRoleChange = (roleValue) => {
     setSelectedRoles((prevSelectedRoles) =>
@@ -46,19 +55,23 @@ const EditUserModal = ({ isOpen, onClose, user, roles, onSubmit }) => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     const updatedUser = {
       ...user,
       name: formData.get('name'),
       email: formData.get('email'),
-      roles: selectedRoles,
-      sub_roles: selectedSubRoles.concat(formData.getAll('types[]')),
+      roles: [...new Set(selectedRoles)],
+      sub_roles: [...new Set(selectedSubRoles.concat(formData.getAll('types[]')))],
       keywords: formData.get('keywords').split(',').map((keyword) => keyword.trim()),
     };
-    if (formData.get('reset_password')) {
-      updatedUser.password = formData.get('password');
+
+    if (resetPassword) {
+      const password = formData.get('password');
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      updatedUser.password = hashedPassword;
     }
     onSubmit(updatedUser);
   };
@@ -225,17 +238,25 @@ const EditUserModal = ({ isOpen, onClose, user, roles, onSubmit }) => {
               </div>
               <div className="col-span-2">
                 <label className="inline-flex w-full mb-2 items-center cursor-pointer">
-                  <input type="checkbox" name="reset_password" className="sr-only peer" />
+                  <input
+                    type="checkbox"
+                    name="reset_password"
+                    className="sr-only peer"
+                    checked={resetPassword}
+                    onChange={() => setResetPassword(!resetPassword)}
+                  />
                   <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                   <span className="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Reset Password</span>
                 </label>
-                <input
-                  type="password"
-                  name="password"
-                  id="password"
-                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
-                  placeholder="Enter new password"
-                />
+                {resetPassword && (
+                  <input
+                    type="password"
+                    name="password"
+                    id="password"
+                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                    placeholder="Enter new password"
+                  />
+                )}
               </div>
             </div>
             <button
