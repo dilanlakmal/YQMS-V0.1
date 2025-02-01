@@ -11,6 +11,7 @@ import fs from 'fs';
 import createUserModel from "./models/User.js";
 import createQCDataModel from "./models/qc1_data.js";
 import createRoleModel from "./models/Role.js";
+import createIroningModel from "./models/Ironing.js";
 import axios from 'axios';
 
 const app = express();
@@ -37,13 +38,7 @@ mainUserConnection.on('error', (err) => console.error("eco_development connectio
 const UserMain = createUserModel(mainUserConnection);
 const QCData = createQCDataModel(ymProdConnection);
 const Role = createRoleModel(ymProdConnection);
-
-// Ensure connections are established before starting the server
-// Promise.all([
-//   ymProdConnection.asPromise(),
-//   mainUserConnection.asPromise(),
-// ])
-  
+const Ironing = createIroningModel(ymProdConnection);
 
 // Set storage engine
 const storage = multer.diskStorage({
@@ -57,15 +52,6 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}${path.extname(file.originalname)}`);
   },
 });
-
-
-// const storage = multer.diskStorage({
-//   destination: '../storage/app/public',
-//   filename: (req, file, cb) => {
-//     cb(null, `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`);
-//   },
-// });
-
 
 // Initialize upload
 const upload = multer({
@@ -195,31 +181,6 @@ app.put('/users/:id', async (req, res) => {
     res.status(500).json({ message: 'Failed to update user' });
   }
 });
-
-// Ironing Schema
-const ironingSchema = new mongoose.Schema(
-  {
-    ironing_record_id: Number,
-    task_no: { type: Number, default: 53 },
-    ironing_bundle_id: { type: String, required: true, unique: true },
-    ironing_updated_date: String,
-    ironing_update_time: String,
-    bundle_id: String,
-    selectedMono: String,
-    custStyle: String,
-    buyer: String,
-    country: String,
-    factory: String,
-    lineNo: String,
-    color: String,
-    size: String,
-    count: String,
-    totalBundleQty: Number,
-  },
-  { collection: "ironing" }
-);
-
-const Ironing = mongoose.model("Ironing", ironingSchema);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });

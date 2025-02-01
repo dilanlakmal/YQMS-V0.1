@@ -39,6 +39,14 @@ const qcDataSchema = new mongoose.Schema(
     returnDefectArray: { type: Array, default: [] },
     returnDefectQty: { type: Number, required: true },
     cumulativeReturnDefectQty: { type: Number, required: true },
+    selectedMono: String,
+    buyer: String,
+    orderQty: Number,
+    factoryname: String,
+    custStyle: String,
+    country: String,
+    color: String,
+    size: String,
   },
 );
 
