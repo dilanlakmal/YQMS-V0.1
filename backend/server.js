@@ -12,6 +12,7 @@ import createUserModel from "./models/User.js";
 import createQCDataModel from "./models/qc1_data.js";
 import createRoleModel from "./models/Role.js";
 import createIroningModel from "./models/Ironing.js";
+import createQc2OrderdategModel from "./models/qc2_orderdate.js";
 import axios from 'axios';
 
 const app = express();
@@ -39,6 +40,7 @@ const UserMain = createUserModel(mainUserConnection);
 const QCData = createQCDataModel(ymProdConnection);
 const Role = createRoleModel(ymProdConnection);
 const Ironing = createIroningModel(ymProdConnection);
+const QC2OrderData = createQc2OrderdategModel(ymProdConnection);
 
 // Set storage engine
 const storage = multer.diskStorage({
@@ -76,6 +78,19 @@ function checkFileType(file, cb) {
     cb('Error: Images Only!');
   }
 }
+
+const generateRandomId = async () => {
+  let randomId;
+  let isUnique = false;
+
+  while (!isUnique) {
+    randomId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+    const existing = await QC2OrderData.findOne({ bundle_random_id: randomId });
+    if (!existing) isUnique = true;
+  }
+
+  return randomId;
+};
 
 // User routes
 app.get('/users', async (req, res) => {
