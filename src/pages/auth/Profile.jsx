@@ -16,9 +16,9 @@ function Profile() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
         if (!token) {
-          throw new Error('No token found in localStorage');
+          throw new Error('No token found in localStorage or sessionStorage');
         }
         const response = await axios.get('http://localhost:5001/api/user-profile', {
           headers: {

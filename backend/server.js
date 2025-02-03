@@ -943,7 +943,7 @@ app.put('/api/user-profile', upload, async (req, res) => {
 
     res.status(200).json({ message: 'Profile updated successfully', user });
   } catch (error) {
-    // console.error('Error updating user profile:', error);
+    console.error('Error updating user profile:', error);
     res.status(500).json({ message: 'Failed to update user profile', error: error.message });
   }
 });
