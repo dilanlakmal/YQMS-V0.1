@@ -52,7 +52,9 @@ function Navbar({ onLogout }) {
           eng_name: userData.eng_name,
           profile: profileUrl,
           dept_name: response.data.dept_name || '',
-          sec_name: response.data.sec_name || ''
+          sec_name: response.data.sec_name || '',
+          roles: response.data.roles || [],
+          subRoles: response.data.sub_roles || [],
         };
 
         setUser(updatedUser);
@@ -78,21 +80,91 @@ function Navbar({ onLogout }) {
     navigate('/');
   };
 
-  const navLinks = [
-    { path: '/home', label: 'Home' },
-    { path: '/details', label: 'Details' },
-    { path: '/inspection', label: 'Inspection' },
-    { path: '/return', label: 'Return' },
-    { path: '/logs', label: 'Logs' },
-    { path: '/defect-images', label: 'Defect Images' },
-    { path: '/analytics', label: 'Analytics' },
-    { path: '/userList', label: 'User Management' },
-  ];
+  // const navLinks = [
+  //   { path: '/home', label: 'Home' },
+  //   { path: '/details', label: 'Details' },
+  //   { path: '/inspection', label: 'Inspection' },
+  //   { path: '/return', label: 'Return' },
+  //   { path: '/logs', label: 'Logs' },
+  //   { path: '/defect-images', label: 'Defect Images' },
+  //   { path: '/analytics', label: 'Analytics' },
+  //   { path: '/userList', label: 'User Management' },
+  // ];
 
+  const roleBasedNavLinks = {
+    admin_user: [
+      { path: '/home', label: 'Home' },
+      { path: '/details', label: 'Details' },
+      { path: '/inspection', label: 'Inspection' },
+      { path: '/return', label: 'Return' },
+      { path: '/logs', label: 'Logs' },
+      { path: '/defect-images', label: 'Defect Images' },
+      { path: '/analytics', label: 'Analytics' },
+      { path: '/userList', label: 'User Management' },
+    ],
+    ironingWorker: [
+      { path: '/home', label: 'Home' },
+      { path: '/details', label: 'Details' },
+      { path: '/inspection', label: 'Inspection' },
+    ],
+    sewingSupervisor: [
+      { path: '/home', label: 'Home' },
+      { path: '/details', label: 'Details' },
+      { path: '/inspection', label: 'Inspection' },
+      { path: '/logs', label: 'Logs' },
+    ],
+    separator: [
+      { path: '/home', label: 'Home' },
+      { path: '/details', label: 'Details' },
+    ],
+    washingWorker: [
+      { path: '/home', label: 'Home' },
+      { path: '/details', label: 'Details' },
+      { path: '/inspection', label: 'Inspection' },
+    ],
+    finishingChief: [
+      { path: '/home', label: 'Home' },
+      { path: '/details', label: 'Details' },
+      { path: '/inspection', label: 'Inspection' },
+      { path: '/return', label: 'Return' },
+    ],
+    qaManager: [
+      { path: '/home', label: 'Home' },
+      { path: '/details', label: 'Details' },
+      { path: '/inspection', label: 'Inspection' },
+      { path: '/return', label: 'Return' },
+      { path: '/logs', label: 'Logs' },
+      { path: '/defect-images', label: 'Defect Images' },
+      { path: '/analytics', label: 'Analytics' },
+    ],
+    qaSupervisor: [
+      { path: '/home', label: 'Home' },
+      { path: '/details', label: 'Details' },
+      { path: '/inspection', label: 'Inspection' },
+      { path: '/return', label: 'Return' },
+      { path: '/logs', label: 'Logs' },
+    ],
+  };
+
+  const getNavLinksForUser = (roles, sub_roles) => {
+    const links = [];
+    const allRoles = [...roles, ...sub_roles];
+    allRoles.forEach((role) => {
+      if (roleBasedNavLinks[role]) {
+        links.push(...roleBasedNavLinks[role]);
+      }
+    });
+    // Remove duplicate links
+    return [...new Map(links.map((link) => [link.path, link])).values()];
+  };
+  
   if (loading) {
     return <div>Loading...</div>;
   }
+  
+  const navLinks = user ? getNavLinksForUser(user.roles, user.sub_roles) : [];
 
+  
   return (
     <nav className="bg-white shadow-md fixed top-0 left-0 right-0 z-50">
       <div className="max-w-8xl mx-auto px-4">

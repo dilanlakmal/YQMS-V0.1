@@ -7,14 +7,17 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [roles, setRoles] = useState([]);
+  const [sub_roles, setSubRoles] = useState([]);
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const userResponse = await axios.get('/api/user'); // Adjust the endpoint as necessary
-        const rolesResponse = await axios.get('/api/roles'); // Adjust the endpoint as necessary
+        const userResponse = await axios.get('/api/user'); 
+        const rolesResponse = await axios.get('/api/roles'); 
+        const subRolesResponse = await axios.get('/api/sub_roles');
         setUser(userResponse.data);
         setRoles(rolesResponse.data);
+        setSubRoles(subRolesResponse.data);
       } catch (error) {
         console.error('Error fetching user data and roles:', error);
       }
@@ -31,7 +34,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, roles, hashPassword }}>
+    <AuthContext.Provider value={{ user, roles,sub_roles, hashPassword }}>
       {children}
     </AuthContext.Provider>
   );

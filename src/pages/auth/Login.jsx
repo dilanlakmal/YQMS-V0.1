@@ -13,7 +13,6 @@ function Login({ onLogin }) {
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
-    console.log('Retrieved token on page load:', token); // Log the token to verify it
     if (token) {
       authenticateUser(token);
     }
@@ -21,7 +20,6 @@ function Login({ onLogin }) {
 
   const authenticateUser = async (token) => {
     try {
-      console.log('Authenticating with token:', token); // Log the token to verify it
       const response = await axios.get("http://localhost:5001/api/user-profile", {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -32,7 +30,6 @@ function Login({ onLogin }) {
         navigate('/home');
       }
     } catch (error) {
-      console.error('Error authenticating user:', error);
       localStorage.removeItem('accessToken');
       sessionStorage.removeItem('accessToken');
       navigate('/login');
@@ -46,7 +43,7 @@ function Login({ onLogin }) {
         const response = await axios.post("http://localhost:5001/api/login", { username, password, rememberMe });
         if (response.status === 200) {
           const { accessToken, refreshToken, user } = response.data;
-          console.log('Storing tokens:', { accessToken, refreshToken }); // Log the tokens to verify them
+          
           if (rememberMe) {
             localStorage.setItem('accessToken', accessToken);
             localStorage.setItem('refreshToken', refreshToken);
@@ -75,7 +72,6 @@ function Login({ onLogin }) {
       const response = await axios.post("http://localhost:5001/api/refresh-token", { refreshToken });
       if (response.status === 200) {
         const { accessToken } = response.data;
-        console.log('Refreshing token:', accessToken); // Log the new access token
         if (localStorage.getItem('refreshToken')) {
           localStorage.setItem('accessToken', accessToken);
         } else {
@@ -86,7 +82,6 @@ function Login({ onLogin }) {
         navigate('/login');
       }
     } catch (error) {
-      console.error('Error refreshing token:', error);
       navigate('/login');
     }
   };
