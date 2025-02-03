@@ -14,17 +14,16 @@ function Navbar({ onLogout }) {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
         const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
         if (!token) {
-          console.log('No token found');
+          // console.log('No token found');
           setLoading(false);
           return;
         }
 
         // Set initial user data
         setUser(userData);
-
         const response = await axios.get('http://localhost:5001/api/user-profile', {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -32,7 +31,6 @@ function Navbar({ onLogout }) {
         });
 
         // Construct the full profile URL if profile exists
-        
         let profileUrl = null;
         if (response.data.profile) {
           if (response.data.profile.startsWith('data:image')) {
@@ -42,8 +40,7 @@ function Navbar({ onLogout }) {
           }
         }
 
-        console.log('Profile URL:', profileUrl); // Log the profile URL
-
+        // console.log('Profile URL:', profileUrl); 
         // Update user state with merged data
         const updatedUser = {
           ...userData,
@@ -60,7 +57,7 @@ function Navbar({ onLogout }) {
         setUser(updatedUser);
         setProfileSrc(profileUrl); // Set the profileSrc state with the constructed URL
       } catch (error) {
-        console.error('Error fetching user profile:', error);
+        // console.error('Error fetching user profile:', error);
         const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
         setUser(userData);
       } finally {
@@ -72,24 +69,15 @@ function Navbar({ onLogout }) {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
-    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('accessToken');
+    sessionStorage.removeItem('refreshToken');
     sessionStorage.removeItem('user');
     onLogout();
-    navigate('/');
+    navigate('/login'); // Ensure the user is redirected to the login page
   };
-
-  // const navLinks = [
-  //   { path: '/home', label: 'Home' },
-  //   { path: '/details', label: 'Details' },
-  //   { path: '/inspection', label: 'Inspection' },
-  //   { path: '/return', label: 'Return' },
-  //   { path: '/logs', label: 'Logs' },
-  //   { path: '/defect-images', label: 'Defect Images' },
-  //   { path: '/analytics', label: 'Analytics' },
-  //   { path: '/userList', label: 'User Management' },
-  // ];
 
   const roleBasedNavLinks = {
     admin_user: [
@@ -157,14 +145,13 @@ function Navbar({ onLogout }) {
     // Remove duplicate links
     return [...new Map(links.map((link) => [link.path, link])).values()];
   };
-  
+
   if (loading) {
     return <div>Loading...</div>;
   }
-  
+
   const navLinks = user ? getNavLinksForUser(user.roles, user.sub_roles) : [];
 
-  
   return (
     <nav className="bg-white shadow-md fixed top-0 left-0 right-0 z-50">
       <div className="max-w-8xl mx-auto px-4">
@@ -201,11 +188,11 @@ function Navbar({ onLogout }) {
                       className="h-8 w-8 rounded-full object-cover"
                       src={profileSrc}
                       alt={user ? user.name || user.eng_name : 'User'}
-                      onError={(e) => {
-                        console.log('Failed to load image:', profileSrc);
-                        console.log('Image element:', e.currentTarget);
-                        setProfileSrc('/IMG/default-profile.png'); // Fallback to default icon
-                      }}
+                      // onError={(e) => {
+                        // console.log('Failed to load image:', profileSrc);
+                      //   console.log('Image element:', e.currentTarget);
+                      //   setProfileSrc('/IMG/default-profile.png'); // Fallback to default icon
+                      // }}
                     />
                   ) : (
                     <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">

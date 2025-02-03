@@ -781,7 +781,6 @@ app.post("/api/refresh-token", async (req, res) => {
 app.post("/api/login", async (req, res) => {
   try {
     const { username, password, rememberMe } = req.body;
-
     if (!mainUserConnection.readyState) {
       return res.status(500).json({ message: "Database not connected" });
     }
@@ -821,6 +820,9 @@ app.post("/api/login", async (req, res) => {
       { expiresIn: "30d" }
     );
 
+    // console.log('Access Token:', accessToken); 
+    // console.log('Refresh Token:', refreshToken); 
+
     res.status(200).json({
       message: "Login successful",
       accessToken,
@@ -834,10 +836,11 @@ app.post("/api/login", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Login error:", error);
+    // console.error("Login error:", error);
     res.status(500).json({ message: "Failed to log in", error: error.message });
   }
 });
+
 
 // Registration Endpoint
 app.post("/api/register", async (req, res) => {
@@ -928,11 +931,11 @@ app.put('/api/user-profile', upload, async (req, res) => {
       // profile: req.file ? `../storage/app/public/profiles/${userId}/${req.file.filename}` : req.body.profile, // Save file path
     };
 
-    console.log('Updated Profile:', updatedProfile);
+    // console.log('Updated Profile:', updatedProfile);
 
     const user = await UserMain.findByIdAndUpdate(userId, updatedProfile, { new: true });
 
-    console.log('Updated User:', user);
+    // console.log('Updated User:', user);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -940,7 +943,7 @@ app.put('/api/user-profile', upload, async (req, res) => {
 
     res.status(200).json({ message: 'Profile updated successfully', user });
   } catch (error) {
-    console.error('Error updating user profile:', error);
+    // console.error('Error updating user profile:', error);
     res.status(500).json({ message: 'Failed to update user profile', error: error.message });
   }
 });

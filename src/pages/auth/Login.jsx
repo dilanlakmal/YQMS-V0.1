@@ -25,6 +25,7 @@ function Login({ onLogin }) {
           'Authorization': `Bearer ${token}`
         }
       });
+
       if (response.status === 200) {
         onLogin(token);
         navigate('/home');
@@ -41,9 +42,10 @@ function Login({ onLogin }) {
     if (username && password) {
       try {
         const response = await axios.post("http://localhost:5001/api/login", { username, password, rememberMe });
+
         if (response.status === 200) {
           const { accessToken, refreshToken, user } = response.data;
-          
+
           if (rememberMe) {
             localStorage.setItem('accessToken', accessToken);
             localStorage.setItem('refreshToken', refreshToken);
@@ -53,6 +55,7 @@ function Login({ onLogin }) {
             sessionStorage.setItem('refreshToken', refreshToken);
             sessionStorage.setItem('user', JSON.stringify(user));
           }
+
           onLogin(accessToken);
           navigate('/home');
         }
@@ -68,8 +71,10 @@ function Login({ onLogin }) {
       navigate('/login');
       return;
     }
+
     try {
       const response = await axios.post("http://localhost:5001/api/refresh-token", { refreshToken });
+
       if (response.status === 200) {
         const { accessToken } = response.data;
         if (localStorage.getItem('refreshToken')) {
@@ -77,6 +82,7 @@ function Login({ onLogin }) {
         } else {
           sessionStorage.setItem('accessToken', accessToken);
         }
+
         authenticateUser(accessToken);
       } else {
         navigate('/login');
@@ -90,6 +96,7 @@ function Login({ onLogin }) {
     const interval = setInterval(refreshToken, 30 * 60 * 1000); // Refresh token every 30 minutes
     return () => clearInterval(interval);
   }, []);
+
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-gray-50">

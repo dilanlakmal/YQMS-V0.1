@@ -593,6 +593,8 @@ function App() {
                 />
                 <Route path="/userList" element={<UserList />} />
                 <Route path="/profile" element={<Profile />} />
+                {/* <Route path="/login" element={<Login onLogin={handleLogin} />} />
+                <Route path="/home" element={<Home />} /> */}
                 <Route
                   path="/analytics"
                   element={
