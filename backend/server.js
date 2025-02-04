@@ -42,16 +42,40 @@ const Role = createRoleModel(ymProdConnection);
 const Ironing = createIroningModel(ymProdConnection);
 const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
 
+const authenticateUser = (req, res, next) => {
+  try {
+    const token = req.headers.authorization.split(' ')[1];
+    const decodedToken = jwt.verify(token, 'your_jwt_secret');
+    req.userId = decodedToken.userId; // Set the userId in the request object
+    next();
+  } catch (error) {
+    res.status(401).json({ message: 'Authentication failed', error: error.message });
+  }
+};
+
+const generateRandomString = (length) => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return result;
+};
+
 // Set storage engine
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const userId = req.userId; // Assuming userId is set in the request object
-    const dir = `profiles/${userId}`;
+    const userId = req.userId; 
+    if (!userId) {
+      return cb(new Error('User ID is not defined'));
+    }
+    const dir = `../public/storage/profiles/${userId}`;
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}${path.extname(file.originalname)}`);
+    const randomString = generateRandomString(32);
+    cb(null, `${randomString}${path.extname(file.originalname)}`);
   },
 });
 
@@ -923,6 +947,7 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
+
 // Fetch User Profile Endpoint
 app.get('/api/user-profile', async (req, res) => {
   try {
@@ -946,18 +971,19 @@ app.get('/api/user-profile', async (req, res) => {
   }
 });
 
-app.put('/api/user-profile', upload, async (req, res) => {
+app.put('/api/user-profile',authenticateUser, upload, async (req, res) => {
   try {
     const token = req.headers.authorization.split(' ')[1];
     const decoded = jwt.verify(token, 'your_jwt_secret');
     const userId = decoded.userId;
+    
 
     const updatedProfile = {
       emp_id: req.body.emp_id,
       name: req.body.name,
       dept_name: req.body.dept_name,
       sect_name: req.body.sect_name,
-      profile: req.file ? `../public/storage/${req.file.filename}` : req.body.profile,
+      profile: req.file ? `profiles/${userId}/${req.file.filename}` : req.body.profile,
       // profile: req.file ? `../storage/app/public/profiles/${userId}/${req.file.filename}` : req.body.profile, // Save file path
     };
 

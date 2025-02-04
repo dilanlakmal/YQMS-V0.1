@@ -36,7 +36,7 @@ function Navbar({ onLogout }) {
           if (response.data.profile.startsWith('data:image')) {
             profileUrl = response.data.profile; // Base64 image
           } else {
-            profileUrl = `http://localhost:5001/public/storage/${response.data.profile}`; // URL path
+            profileUrl = `http://localhost:5001/${response.data.profile}`;
           }
         }
 

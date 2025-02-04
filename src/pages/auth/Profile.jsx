@@ -10,6 +10,7 @@ function Profile() {
     sect_name: '',
     image: '',
   });
+
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
@@ -20,6 +21,7 @@ function Profile() {
         if (!token) {
           throw new Error('No token found in localStorage or sessionStorage');
         }
+
         const response = await axios.get('http://localhost:5001/api/user-profile', {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -27,6 +29,7 @@ function Profile() {
         });
 
         const userData = response.data;
+
         setProfile({
           emp_id: userData.emp_id || '',
           name: userData.name || '',
@@ -52,9 +55,9 @@ function Profile() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
       if (!token) {
-        throw new Error('No token found in localStorage');
+        throw new Error('No token found in localStorage or sessionStorage');
       }
 
       const formData = new FormData();
@@ -92,10 +95,10 @@ function Profile() {
           <div className="flex justify-center mb-6">
             <div className="relative place-items-center">
               <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-200">
-                {profile.image ? (
+              {profile.image ? (
                   typeof profile.image === 'string' ? (
                     <img
-                      src={profile.image.startsWith('data:image') ? profile.image : `http://localhost:5001/public/storage/${profile.image}`}
+                      src={profile.image.startsWith('data:image') ? profile.image : `http://localhost:5001/${profile.image}`}
                       alt="Profile"
                       className="w-full h-full object-cover"
                       onError={(e) => {
