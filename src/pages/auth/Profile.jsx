@@ -29,6 +29,7 @@ function Profile() {
         });
 
         const userData = response.data;
+        console.log('Fetched user data:', userData);
 
         setProfile({
           emp_id: userData.emp_id || '',
@@ -98,11 +99,10 @@ function Profile() {
               {profile.image ? (
                   typeof profile.image === 'string' ? (
                     <img
-                      src={profile.image.startsWith('data:image') ? profile.image : `http://localhost:5001/${profile.image}`}
+                    src={`http://localhost:5001${profile.image}`}
                       alt="Profile"
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        console.log('Failed to load image:', e.currentTarget.src);
                         e.currentTarget.src = '/IMG/default-profile.png'; // Fallback to default icon
                       }}
                     />

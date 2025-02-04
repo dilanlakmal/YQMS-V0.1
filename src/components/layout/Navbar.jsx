@@ -188,11 +188,9 @@ function Navbar({ onLogout }) {
                       className="h-8 w-8 rounded-full object-cover"
                       src={profileSrc}
                       alt={user ? user.name || user.eng_name : 'User'}
-                      // onError={(e) => {
-                        // console.log('Failed to load image:', profileSrc);
-                      //   console.log('Image element:', e.currentTarget);
-                      //   setProfileSrc('/IMG/default-profile.png'); // Fallback to default icon
-                      // }}
+                      onError={() => {
+                        setProfileSrc('/IMG/default-profile.png'); // Fallback to default icon
+                      }}
                     />
                   ) : (
                     <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">

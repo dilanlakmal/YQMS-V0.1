@@ -23,7 +23,7 @@ const __dirname = path.dirname(__filename);
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
-app.use('/storage', express.static(path.join(__dirname, 'storage')));
+app.use('/public', express.static(path.join(__dirname, '../public')));
 // app.use('/storage', express.static(path.join(__dirname, '../storage/app/public')));
 
 const ymProdConnection = mongoose.createConnection("mongodb://localhost:27017/ym_prod");
@@ -964,7 +964,7 @@ app.get('/api/user-profile', async (req, res) => {
       name: user.name,
       dept_name: user.dept_name,
       sect_name: user.sect_name,
-      profile: user.profile,
+      profile: user.profile ? `/public/storage/profiles/${decoded.userId}/${path.basename(user.profile)}` : null,
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch user profile', error: error.message });
