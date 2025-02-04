@@ -29,7 +29,7 @@ function Profile() {
         });
 
         const userData = response.data;
-        console.log('Fetched user data:', userData);
+        // console.log('Fetched user data:', userData);
 
         setProfile({
           emp_id: userData.emp_id || '',

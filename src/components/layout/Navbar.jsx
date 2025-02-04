@@ -36,7 +36,7 @@ function Navbar({ onLogout }) {
           if (response.data.profile.startsWith('data:image')) {
             profileUrl = response.data.profile; // Base64 image
           } else {
-            profileUrl = `http://localhost:5001/${response.data.profile}`;
+            profileUrl = `http://localhost:5001${response.data.profile}`;
           }
         }
 
@@ -55,7 +55,7 @@ function Navbar({ onLogout }) {
         };
 
         setUser(updatedUser);
-        setProfileSrc(profileUrl); // Set the profileSrc state with the constructed URL
+        setProfileSrc(profileUrl); 
       } catch (error) {
         // console.error('Error fetching user profile:', error);
         const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
@@ -76,7 +76,7 @@ function Navbar({ onLogout }) {
     sessionStorage.removeItem('refreshToken');
     sessionStorage.removeItem('user');
     onLogout();
-    navigate('/login'); // Ensure the user is redirected to the login page
+    navigate('/login'); 
   };
 
   const roleBasedNavLinks = {
