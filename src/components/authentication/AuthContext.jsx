@@ -1,44 +1,63 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import axios from 'axios';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [roles, setRoles] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUserData = async () => {
+    const fetchUser = async () => {
       try {
-        const userResponse = await axios.get('/api/user'); 
-        const rolesResponse = await axios.get('/api/roles'); 
-        setUser(userResponse.data);
-        setRoles(rolesResponse.data);
+        const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+        if (!token) {
+          setLoading(false);
+          return;
+        }
+
+        const response = await axios.post('http://localhost:5001/api/get-user-data', { token });
+
+        const userData = {
+          ...response.data,
+          roles: response.data.roles || [],
+          sub_roles: response.data.sub_roles || [],
+        };
+
+        setUser(userData);
       } catch (error) {
-        console.error('Error fetching user data and roles:', error);
+        console.error('Error fetching user data:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchUserData();
+    fetchUser();
   }, []);
 
-  const hashPassword = async (password) => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hash = await crypto.subtle.digest('SHA-256', data);
-    return btoa(String.fromCharCode(...new Uint8Array(hash)));
-  };
+  // useEffect(() => {
+  //   const fetchUserData = async () => {
+  //     try {
+  //       const token = localStorage.getItem('accessToken'); 
+  //       if (token) {
+  //         const response = await axios.post('/api/get-user-data', { token });
+  //         setUser(response.data);
+  //       }
+  //     } catch (error) {
+  //       console.error('Failed to fetch user data:', error);
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
+
+  //   fetchUserData();
+  // }, []);
 
   return (
-    <AuthContext.Provider value={{ user, roles, hashPassword }}>
+    <AuthContext.Provider value={{ user, loading }}>
       {children}
     </AuthContext.Provider>
   );
-};
-
-AuthProvider.propTypes = {
-  children: PropTypes.node.isRequired,
 };
 
 export const useAuth = () => useContext(AuthContext);

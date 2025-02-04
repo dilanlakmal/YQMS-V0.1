@@ -1,39 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '../components/authentication/AuthContext';
 
 function Home() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (!loading) {
+      // User object is available here
+    }
+  }, [user, loading]);
 
   const hasRole = (requiredRoles) => {
     if (!user || !user.roles) {
-      console.log('No user or roles found');
       return false;
     }
 
-    const allRoles = [...user.roles, ...user.sub_roles];
-    console.log('User roles:', allRoles); 
-    console.log('Required roles:', requiredRoles); 
+    const allRoles = [...user.roles, ...(user.sub_roles || [])];
     const hasRequiredRole = requiredRoles.some(role => allRoles.includes(role));
-    console.log('Has required role:', hasRequiredRole); 
     return hasRequiredRole;
   };
 
   const handleNavigation = (path, requiredRoles) => {
-    console.log('Navigating to:', path); 
     if (hasRole(requiredRoles)) {
       navigate(path);
     } else {
-      console.log('Unauthorized Access'); 
       setErrorMessage('Unauthorized Access');
       setTimeout(() => {
         setErrorMessage('');
-        window.location.reload();
-      }, 3000);
+      }, 1000);
     }
   };
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-50 to-gray-100 py-20 px-20">

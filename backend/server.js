@@ -197,6 +197,34 @@ app.put('/users/:id', async (req, res) => {
   }
 });
 
+app.post('/api/get-user-data', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ message: 'Token is required' });
+    }
+
+    const decoded = jwt.verify(token, 'your_jwt_secret');
+    const user = await UserMain.findById(decoded.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({
+      emp_id: user.emp_id,
+      name: user.name,
+      dept_name: user.dept_name,
+      sect_name: user.sect_name,
+      profile: user.profile,
+      roles: user.roles, 
+      sub_roles: user.sub_roles, 
+    });
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    res.status(500).json({ message: 'Failed to fetch user data', error: error.message });
+  }
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
@@ -751,6 +779,8 @@ app.post("/api/save-qc-data", async (req, res) => {
     });
   }
 });
+
+
 
 app.post("/api/refresh-token", async (req, res) => {
   try {
