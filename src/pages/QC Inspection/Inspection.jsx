@@ -6,7 +6,7 @@ import DefectsList from "../../components/inspection/DefectsList";
 import Summary from "../../components/inspection/Summary";
 import PlayPauseButton from "../../components/inspection/PlayPauseButton";
 import PreviewModal from "../../components/inspection/PreviewModal";
-import { defectsList } from "../../constants/defects";
+import { defectsList } from "../../constants/QC Inspection/defects";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faDownload } from "@fortawesome/free-solid-svg-icons";
 import HandleDownloadPDF from "../../components/handlefunc/HandleDownloadPDF";

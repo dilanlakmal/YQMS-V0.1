@@ -13,7 +13,7 @@ import {
   TimeScale,
 } from "chart.js";
 import { Bar, Line } from "react-chartjs-2";
-import { defectsList } from "../constants/defects";
+import { defectsList } from "../constants/QC Inspection/defects";
 import "chartjs-adapter-date-fns"; // For time formatting
 import zoomPlugin from "chartjs-plugin-zoom"; // For zoom in/out
 import ChartDataLabels from "chartjs-plugin-datalabels"; // For data labels
@@ -38,7 +38,7 @@ import {
   typeWashingDefectIndices,
   typeFinishingDefectIndices,
   typeMiscellaneousDefectIndices,
-} from "../constants/defects";
+} from "../constants/QC Inspection/defects";
 
 // Register Chart.js components
 ChartJS.register(

@@ -1,11 +1,11 @@
-import { styleCodes } from '../../../constants/QC Inspection/styleCodes';
+import { STYLE_CODES } from '../../../constants/QC Inspection/styleCode&factory';
 
 function StyleCodeSelect({ value, onChange, onCustomerChange }) {
   const handleChange = (e) => {
     const selectedCode = e.target.value;
     onChange(selectedCode);
     
-    const customer = styleCodes.find(style => style.code === selectedCode)?.customer || '';
+    const customer = STYLE_CODES.find(style => style.code === selectedCode)?.customer || '';
     onCustomerChange(customer);
   };
 
@@ -20,7 +20,7 @@ function StyleCodeSelect({ value, onChange, onCustomerChange }) {
         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
       >
         <option value="">Select Style Code</option>
-        {styleCodes.map(({ code }) => (
+        {STYLE_CODES.map(({ code }) => (
           <option key={code} value={code}>
             {code}
           </option>

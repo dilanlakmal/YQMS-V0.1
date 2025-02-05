@@ -4,7 +4,7 @@ import Header from "../../components/inspection/Header";
 import ViewToggle from "../../components/inspection/ViewToggle";
 import DefectsList from "../../components/inspection/DefectsList";
 import Summary from "../../components/inspection/Summary";
-import { defectsList } from "../../constants/defects";
+import { defectsList } from "../../constants/QC Inspection/defects";
 import FormatTime from "../../components/formatting/FormatTime";
 import { formatTimeString } from "../../components/formatting/FormatedTime";
 

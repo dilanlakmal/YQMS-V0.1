@@ -23,8 +23,8 @@ import {
   WashingDefects,
   FinishingDefects,
   MiscellaneousDefects,
-} from "../../constants/defects";
-import { defectImages, defaultDefectImage } from "../../constants/defectimages";
+} from "../../constants/QC Inspection/defects";
+import { defectImages, defaultDefectImage } from "../../constants/QC Inspection/defectimages";
 
 function DefectsList({
   view,

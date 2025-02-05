@@ -1,4 +1,4 @@
-import { factories } from '../../../constants/QC Inspection/factories';
+import { FACTORIES } from '../../../constants/QC Inspection/styleCode&factory';
 
 function FactorySelect({ value, onChange }) {
   return (
@@ -12,7 +12,7 @@ function FactorySelect({ value, onChange }) {
         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-400 focus:border-indigo-300"
       >
         <option value="">Select Factory</option>
-        {factories.map((factory) => (
+        {FACTORIES.map((factory) => (
           <option key={factory} value={factory}>
             {factory}
           </option>

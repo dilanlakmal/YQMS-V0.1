@@ -1,4 +1,4 @@
-import { defectsList } from "../../../constants/defects";
+import { defectsList } from "../../../constants/QC Inspection/defects";
 
 function PreviewDefects({ defects, language, checkedQuantity }) {
   const defectItems = defectsList[language];

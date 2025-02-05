@@ -6,7 +6,7 @@ import {
   FACTORIES,
   STYLE_CODES,
   getCustomerByStyleCode,
-} from "../../constants/QC Inspection/data";
+} from "../../constants/QC Inspection/styleCode&factory";
 import MonoSearch from "../../components/forms/MonoSearch";
 import StyleCodeSelect from "../../components/forms/QC Inspection/StyleCodeSelect";
 import StyleDigitInput from "../../components/forms/QC Inspection/StyleDigitInput";
