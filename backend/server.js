@@ -1,7 +1,7 @@
+import bodyParser from "body-parser";
+import cors from "cors";
 import express from "express";
 import mongoose from "mongoose";
-import cors from "cors";
-import bodyParser from "body-parser";
 
 const app = express();
 const PORT = 5001;
@@ -10,7 +10,7 @@ const PORT = 5001;
 app.use(bodyParser.json());
 app.use(
   cors({
-    origin: ["http://localhost:3001", "https://localhost:3001"], // Allow both HTTP and HTTPS, // Update with your frontend URL
+    origin: "*", //["http://localhost:3001", "https://localhost:3001"], // Allow both HTTP and HTTPS, // Update with your frontend URL
     methods: ["GET", "POST", "PUT"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
@@ -108,6 +108,11 @@ const qc2OrderDataSchema = new mongoose.Schema(
     lineNo: { type: String, required: true },
     color: { type: String, required: true },
     size: { type: String, required: true },
+    colorCode: { type: String, required: true },
+    chnColor: { type: String, required: true },
+    colorKey: { type: Number, required: true },
+    sizeOrderQty: { type: Number, required: true },
+    planCutQty: { type: Number, required: true },
     count: { type: String, required: true },
     totalBundleQty: { type: Number, required: true },
     sub_con: { type: String, default: "No" }, // New field
@@ -324,7 +329,7 @@ app.get("/api/search-mono", async (req, res) => {
   }
 });
 
-// Updated order details endpoint
+// Update /api/order-details endpoint
 app.get("/api/order-details/:mono", async (req, res) => {
   try {
     const collection = mongoose.connection.db.collection("dt_orders");
@@ -334,7 +339,6 @@ app.get("/api/order-details/:mono", async (req, res) => {
 
     if (!order) return res.status(404).json({ error: "Order not found" });
 
-    // Process colors with sizes
     const colorMap = new Map();
     order.OrderColors.forEach((colorObj) => {
       const colorKey = colorObj.Color.toLowerCase().trim();
@@ -343,19 +347,23 @@ app.get("/api/order-details/:mono", async (req, res) => {
       if (!colorMap.has(colorKey)) {
         colorMap.set(colorKey, {
           originalColor,
-          sizes: new Set(),
+          colorCode: colorObj.ColorCode,
+          chnColor: colorObj.ChnColor,
+          colorKey: colorObj.ColorKey,
+          sizes: new Map(),
         });
       }
 
-      // Process sizes for this color
       colorObj.OrderQty.forEach((sizeEntry) => {
-        // Get the size name (first key in the object)
         const sizeName = Object.keys(sizeEntry)[0];
         const quantity = sizeEntry[sizeName];
+        const cleanSize = sizeName.split(";")[0].trim();
 
         if (quantity > 0) {
-          const cleanSize = sizeName.split(";")[0].trim();
-          colorMap.get(colorKey).sizes.add(cleanSize);
+          colorMap.get(colorKey).sizes.set(cleanSize, {
+            orderQty: quantity,
+            planCutQty: colorObj.CutQty?.[sizeName]?.PlanCutQty || 0,
+          });
         }
       });
     });
@@ -363,55 +371,156 @@ app.get("/api/order-details/:mono", async (req, res) => {
     const response = {
       engName: order.EngName,
       totalQty: order.TotalQty,
-      // Add new fields here
-      factoryname: order.Factory || "N/A", // New field
-      custStyle: order.CustStyle || "N/A", // New field
-      country: order.Country || "N/A", // New field
-      colors: Array.from(colorMap.values()).map((c) => c.originalColor),
+      factoryname: order.Factory || "N/A",
+      custStyle: order.CustStyle || "N/A",
+      country: order.Country || "N/A",
+      colors: Array.from(colorMap.values()).map((c) => ({
+        original: c.originalColor,
+        code: c.colorCode,
+        chn: c.chnColor,
+        key: c.colorKey,
+      })),
       colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
-        acc[curr.originalColor.toLowerCase()] = Array.from(curr.sizes);
+        acc[curr.originalColor.toLowerCase()] = {
+          sizes: Array.from(curr.sizes.keys()),
+          details: Array.from(curr.sizes.entries()).map(([size, data]) => ({
+            size,
+            orderQty: data.orderQty,
+            planCutQty: data.planCutQty,
+          })),
+        };
         return acc;
       }, {}),
     };
 
     res.json(response);
   } catch (error) {
-    // console.error("Error fetching order details:", error);
     res.status(500).json({ error: "Failed to fetch order details" });
   }
 });
 
-// Updated order sizes endpoint
+// // Updated order details endpoint
+// app.get("/api/order-details/:mono", async (req, res) => {
+//   try {
+//     const collection = mongoose.connection.db.collection("dt_orders");
+//     const order = await collection.findOne({
+//       Order_No: req.params.mono,
+//     });
+
+//     if (!order) return res.status(404).json({ error: "Order not found" });
+
+//     // Process colors with sizes
+//     const colorMap = new Map();
+//     order.OrderColors.forEach((colorObj) => {
+//       const colorKey = colorObj.Color.toLowerCase().trim();
+//       const originalColor = colorObj.Color.trim();
+
+//       if (!colorMap.has(colorKey)) {
+//         colorMap.set(colorKey, {
+//           originalColor,
+//           sizes: new Set(),
+//         });
+//       }
+
+//       // Process sizes for this color
+//       colorObj.OrderQty.forEach((sizeEntry) => {
+//         // Get the size name (first key in the object)
+//         const sizeName = Object.keys(sizeEntry)[0];
+//         const quantity = sizeEntry[sizeName];
+
+//         if (quantity > 0) {
+//           const cleanSize = sizeName.split(";")[0].trim();
+//           colorMap.get(colorKey).sizes.add(cleanSize);
+//         }
+//       });
+//     });
+
+//     const response = {
+//       engName: order.EngName,
+//       totalQty: order.TotalQty,
+//       // Add new fields here
+//       factoryname: order.Factory || "N/A", // New field
+//       custStyle: order.CustStyle || "N/A", // New field
+//       country: order.Country || "N/A", // New field
+//       colors: Array.from(colorMap.values()).map((c) => c.originalColor),
+//       colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
+//         acc[curr.originalColor.toLowerCase()] = Array.from(curr.sizes);
+//         return acc;
+//       }, {}),
+//     };
+
+//     res.json(response);
+//   } catch (error) {
+//     // console.error("Error fetching order details:", error);
+//     res.status(500).json({ error: "Failed to fetch order details" });
+//   }
+// });
+
+// Update /api/order-sizes endpoint
 app.get("/api/order-sizes/:mono/:color", async (req, res) => {
   try {
     const collection = mongoose.connection.db.collection("dt_orders");
-    const order = await collection.findOne({
-      Order_No: req.params.mono,
-    });
+    const order = await collection.findOne({ Order_No: req.params.mono });
 
     if (!order) return res.status(404).json({ error: "Order not found" });
 
-    // Find the matching color object (case-insensitive)
     const colorObj = order.OrderColors.find(
       (c) => c.Color.toLowerCase() === req.params.color.toLowerCase().trim()
     );
 
     if (!colorObj) return res.json([]);
 
-    // Extract sizes with quantity > 0
-    const sizes = colorObj.OrderQty.map((entry) => {
-      const sizeName = Object.keys(entry)[0];
-      return entry[sizeName] > 0 ? sizeName.split(";")[0].trim() : null;
-    })
-      .filter((size) => size !== null)
-      .filter((size, index, self) => self.indexOf(size) === index); // Remove duplicates
+    const sizesWithDetails = colorObj.OrderQty.filter(
+      (entry) => entry[Object.keys(entry)[0]] > 0
+    )
+      .map((entry) => {
+        const sizeName = Object.keys(entry)[0];
+        const cleanSize = sizeName.split(";")[0].trim();
+        return {
+          size: cleanSize,
+          orderQty: entry[sizeName],
+          planCutQty: colorObj.CutQty?.[sizeName]?.PlanCutQty || 0,
+        };
+      })
+      .filter((v, i, a) => a.findIndex((t) => t.size === v.size) === i);
 
-    res.json(sizes);
+    res.json(sizesWithDetails);
   } catch (error) {
-    console.error("Error fetching sizes:", error);
     res.status(500).json({ error: "Failed to fetch sizes" });
   }
 });
+
+// // Updated order sizes endpoint
+// app.get("/api/order-sizes/:mono/:color", async (req, res) => {
+//   try {
+//     const collection = mongoose.connection.db.collection("dt_orders");
+//     const order = await collection.findOne({
+//       Order_No: req.params.mono,
+//     });
+
+//     if (!order) return res.status(404).json({ error: "Order not found" });
+
+//     // Find the matching color object (case-insensitive)
+//     const colorObj = order.OrderColors.find(
+//       (c) => c.Color.toLowerCase() === req.params.color.toLowerCase().trim()
+//     );
+
+//     if (!colorObj) return res.json([]);
+
+//     // Extract sizes with quantity > 0
+//     const sizes = colorObj.OrderQty.map((entry) => {
+//       const sizeName = Object.keys(entry)[0];
+//       return entry[sizeName] > 0 ? sizeName.split(";")[0].trim() : null;
+//     })
+//       .filter((size) => size !== null)
+//       .filter((size, index, self) => self.indexOf(size) === index); // Remove duplicates
+
+//     res.json(sizes);
+//   } catch (error) {
+//     console.error("Error fetching sizes:", error);
+//     res.status(500).json({ error: "Failed to fetch sizes" });
+//   }
+// });
 
 async function fetchOrderDetails(mono) {
   const collection = mongoose.connection.db.collection("dt_orders");

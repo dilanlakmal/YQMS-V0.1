@@ -1187,6 +1187,532 @@
 
 // export default BluetoothComponent;
 
+// import React, {
+//   useState,
+//   useEffect,
+//   forwardRef,
+//   useImperativeHandle,
+// } from "react";
+// import { Bluetooth, Printer, AlertCircle } from "lucide-react";
+
+// const BluetoothComponent = forwardRef((props, ref) => {
+//   const [isConnected, setIsConnected] = useState(false);
+//   const [isScanning, setIsScanning] = useState(false);
+//   const [selectedDevice, setSelectedDevice] = useState(null);
+//   const [showDeviceList, setShowDeviceList] = useState(false);
+//   const [connectionStatus, setConnectionStatus] = useState("");
+//   const [server, setServer] = useState(null);
+//   const [characteristic, setCharacteristic] = useState(null);
+
+//   // Gainscha printer service UUIDs
+//   const PRINTER_SERVICE = "fda50693-a4e2-4fb1-afcf-c6eb07647825"; // "000018f0-0000-1000-8000-00805f9b34fb";
+//   const PRINTER_CHARACTERISTIC = "fda50693-a4e2-4fb1-afcf-c6eb07647825"; // "00002af1-0000-1000-8000-00805f9b34fb";
+
+//   // Expose methods to parent component
+//   useImperativeHandle(ref, () => ({
+//     isConnected,
+//     selectedDevice,
+//     printData: async (data) => {
+//       if (!selectedDevice || !isConnected) {
+//         throw new Error("Printer not connected");
+//       }
+//       return await printData(data);
+//     },
+//   }));
+
+//   const scanForDevices = async () => {
+//     try {
+//       setIsScanning(true);
+//       setShowDeviceList(true);
+//       setConnectionStatus("Scanning for devices...");
+
+//       if (!navigator.bluetooth) {
+//         throw new Error("Bluetooth not supported");
+//       }
+
+//       const device = await navigator.bluetooth.requestDevice({
+//         filters: [
+//           {
+//             namePrefix: "GP-", // Filter for Gainscha printers
+//           },
+//         ],
+//         optionalServices: [PRINTER_SERVICE],
+//       });
+
+//       console.log("Device selected:", device.name);
+//       setConnectionStatus("Device selected, connecting...");
+
+//       const gattServer = await device.gatt.connect();
+//       console.log("Connected to GATT server");
+
+//       const service = await gattServer.getPrimaryService(PRINTER_SERVICE);
+//       console.log("Got printer service");
+
+//       const printerCharacteristic = await service.getCharacteristic(
+//         PRINTER_CHARACTERISTIC
+//       );
+//       console.log("Got printer characteristic");
+
+//       setServer(gattServer);
+//       setCharacteristic(printerCharacteristic);
+//       setSelectedDevice(device);
+//       setIsConnected(true);
+//       setConnectionStatus("Ready to print");
+
+//       device.addEventListener("gattserverdisconnected", handleDisconnection);
+//     } catch (error) {
+//       console.error("Bluetooth Error:", error);
+//       setConnectionStatus(error.message);
+//       setIsConnected(false);
+//       setSelectedDevice(null);
+//       setCharacteristic(null);
+//     } finally {
+//       setIsScanning(false);
+//     }
+//   };
+
+//   const handleDisconnection = () => {
+//     console.log("Device disconnected");
+//     setIsConnected(false);
+//     setSelectedDevice(null);
+//     setServer(null);
+//     setCharacteristic(null);
+//     setConnectionStatus("Disconnected");
+//   };
+
+//   const handleClick = () => {
+//     if (isConnected) {
+//       if (server?.connected) {
+//         server.disconnect();
+//       }
+//       handleDisconnection();
+//     } else {
+//       scanForDevices();
+//     }
+//   };
+
+//   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+//   const writeToCharacteristic = async (data) => {
+//     const CHUNK_SIZE = 20; // Bluetooth LE typically has a limit around 512 bytes
+//     for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+//       const chunk = data.slice(i, i + CHUNK_SIZE);
+//       await characteristic.writeValue(chunk);
+//       await sleep(50); // Give the printer time to process each chunk
+//     }
+//   };
+
+//   const printData = async (printData) => {
+//     if (!selectedDevice || !isConnected || !characteristic) {
+//       throw new Error("Printer not connected");
+//     }
+
+//     try {
+//       // Initialize printer
+//       const initCommands = new Uint8Array([
+//         0x1b,
+//         0x40, // Initialize printer
+//         0x1b,
+//         0x61,
+//         0x01, // Center alignment
+//       ]);
+//       await writeToCharacteristic(initCommands);
+//       await sleep(100);
+
+//       // Print text data
+//       const textEncoder = new TextEncoder();
+//       const textData = textEncoder.encode(
+//         `Factory: ${printData.factory}\n` +
+//           `MO: ${printData.selectedMono}\n` +
+//           `Buyer: ${printData.buyer}\n` +
+//           `Line: ${printData.lineNo}\n` +
+//           `Color: ${printData.color}\n` +
+//           `Size: ${printData.size}\n\n`
+//       );
+//       await writeToCharacteristic(textData);
+//       await sleep(200);
+
+//       // QR Code commands
+//       const qrSetup = new Uint8Array([
+//         0x1d,
+//         0x28,
+//         0x6b,
+//         0x04,
+//         0x00,
+//         0x31,
+//         0x41,
+//         0x32,
+//         0x00, // Select QR model
+//         0x1d,
+//         0x28,
+//         0x6b,
+//         0x03,
+//         0x00,
+//         0x31,
+//         0x43,
+//         0x05, // Set QR size
+//         0x1d,
+//         0x28,
+//         0x6b,
+//         0x03,
+//         0x00,
+//         0x31,
+//         0x45,
+//         0x31, // Set error correction
+//       ]);
+//       await writeToCharacteristic(qrSetup);
+//       await sleep(100);
+
+//       // QR Code data
+//       const qrData = textEncoder.encode(printData.bundle_id);
+//       const qrHeader = new Uint8Array([
+//         0x1d,
+//         0x28,
+//         0x6b,
+//         qrData.length + 3,
+//         0x00,
+//         0x31,
+//         0x50,
+//         0x30,
+//       ]);
+//       await writeToCharacteristic(qrHeader);
+//       await writeToCharacteristic(qrData);
+//       await sleep(100);
+
+//       // Print QR Code
+//       const printQR = new Uint8Array([
+//         0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30,
+//       ]);
+//       await writeToCharacteristic(printQR);
+//       await sleep(500);
+
+//       // Feed and cut
+//       const endCommands = new Uint8Array([
+//         0x1b,
+//         0x4a,
+//         0x40, // Feed paper
+//         0x1d,
+//         0x56,
+//         0x42,
+//         0x00, // Cut paper
+//       ]);
+//       await writeToCharacteristic(endCommands);
+//       await sleep(200);
+
+//       return true;
+//     } catch (error) {
+//       console.error("Print error:", error);
+//       setConnectionStatus("Print error: " + error.message);
+//       throw error;
+//     }
+//   };
+
+//   return (
+//     <div className="relative">
+//       <button
+//         onClick={handleClick}
+//         className={`p-2 rounded-full transition-colors flex items-center gap-2 ${
+//           isConnected
+//             ? "bg-green-100 text-green-600"
+//             : "bg-gray-100 text-gray-400"
+//         }`}
+//         title={isConnected ? "Connected to printer" : "Connect to printer"}
+//       >
+//         <Bluetooth className={`w-5 h-5 ${isScanning ? "animate-pulse" : ""}`} />
+//         <Printer className="w-5 h-5" />
+//       </button>
+
+//       {connectionStatus && (
+//         <div
+//           className={`absolute top-full mt-2 w-48 p-2 rounded-md shadow-lg z-50 text-sm
+//           ${
+//             isConnected
+//               ? "bg-green-50 text-green-700"
+//               : "bg-white text-gray-700"
+//           }`}
+//         >
+//           <div className="flex items-center gap-2">
+//             {isConnected ? (
+//               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+//             ) : (
+//               <AlertCircle className="w-4 h-4 text-gray-400" />
+//             )}
+//             <span>{connectionStatus}</span>
+//           </div>
+//           {selectedDevice && (
+//             <div className="mt-1 text-xs text-gray-500">
+//               {selectedDevice.name || "Unknown Device"}
+//             </div>
+//           )}
+//         </div>
+//       )}
+//     </div>
+//   );
+// });
+
+// BluetoothComponent.displayName = "BluetoothComponent";
+
+// export default BluetoothComponent;
+
+// import React, {
+//   useState,
+//   useEffect,
+//   forwardRef,
+//   useImperativeHandle,
+// } from "react";
+// import { Bluetooth, Printer, AlertCircle } from "lucide-react";
+
+// const BluetoothComponent = forwardRef((props, ref) => {
+//   const [isConnected, setIsConnected] = useState(false);
+//   const [isScanning, setIsScanning] = useState(false);
+//   const [selectedDevice, setSelectedDevice] = useState(null);
+//   const [connectionStatus, setConnectionStatus] = useState("");
+//   const [writeCharacteristic, setWriteCharacteristic] = useState(null);
+//   const [printerType, setPrinterType] = useState("unknown");
+
+//   // Niimbot B50W service UUIDs
+//   const NIIMBOT_SERVICE = "49535343-fe7d-4ae5-8fa9-9fafd205e455";
+//   const NIIMBOT_WRITE_CHARACTERISTIC = "49535343-8841-43f4-a8d4-ecbe34729bb3";
+
+//   // Gainscha printer service UUIDs
+//   const GAINSCHA_SERVICE = "000018f0-0000-1000-8000-00805f9b34fb";
+//   const GAINSCHA_CHARACTERISTIC = "00002af1-0000-1000-8000-00805f9b34fb";
+
+//   useImperativeHandle(ref, () => ({
+//     isConnected,
+//     selectedDevice,
+//     printData: async (data) => {
+//       if (!selectedDevice || !isConnected) {
+//         throw new Error("Printer not connected");
+//       }
+//       return await printData(data);
+//     },
+//   }));
+
+//   const detectPrinterType = (deviceName) => {
+//     if (deviceName?.startsWith("GP-")) return "gainscha";
+//     if (deviceName?.startsWith("B50W-")) return "niimbot";
+//     return "unknown";
+//   };
+
+//   const scanForDevices = async () => {
+//     try {
+//       setIsScanning(true);
+//       setConnectionStatus("Scanning for devices...");
+
+//       const device = await navigator.bluetooth.requestDevice({
+//         filters: [{ namePrefix: "GP-" }, { namePrefix: "B50W-" }],
+//         optionalServices: [NIIMBOT_SERVICE, GAINSCHA_SERVICE],
+//       });
+
+//       const detectedType = detectPrinterType(device.name);
+//       setPrinterType(detectedType);
+//       setConnectionStatus(`Connecting to ${detectedType} printer...`);
+
+//       const server = await device.gatt.connect();
+//       let service, characteristic;
+
+//       if (detectedType === "niimbot") {
+//         service = await server.getPrimaryService(NIIMBOT_SERVICE);
+//         characteristic = await service.getCharacteristic(
+//           NIIMBOT_WRITE_CHARACTERISTIC
+//         );
+//       } else {
+//         // Gainscha
+//         service = await server.getPrimaryService(GAINSCHA_SERVICE);
+//         characteristic = await service.getCharacteristic(
+//           GAINSCHA_CHARACTERISTIC
+//         );
+//       }
+
+//       setWriteCharacteristic(characteristic);
+//       setSelectedDevice(device);
+//       setIsConnected(true);
+//       setConnectionStatus(`Connected to ${device.name}`);
+
+//       device.addEventListener("gattserverdisconnected", handleDisconnection);
+//     } catch (error) {
+//       console.error("Bluetooth Error:", error);
+//       setConnectionStatus(error.message);
+//       setIsConnected(false);
+//       setSelectedDevice(null);
+//       setWriteCharacteristic(null);
+//     } finally {
+//       setIsScanning(false);
+//     }
+//   };
+
+//   const handleDisconnection = () => {
+//     setIsConnected(false);
+//     setSelectedDevice(null);
+//     setWriteCharacteristic(null);
+//     setConnectionStatus("Disconnected");
+//   };
+
+//   const handleClick = () => {
+//     isConnected ? handleDisconnection() : scanForDevices();
+//   };
+
+//   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+//   const writeToPrinter = async (data) => {
+//     const CHUNK_SIZE = printerType === "niimbot" ? 16 : 20;
+//     const DELAY = printerType === "niimbot" ? 300 : 50;
+
+//     for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+//       const chunk = data.slice(i, i + CHUNK_SIZE);
+//       await writeCharacteristic.writeValue(chunk);
+//       await sleep(DELAY);
+//     }
+//   };
+
+//   const printData = async (printData) => {
+//     if (!isConnected || !writeCharacteristic) {
+//       throw new Error("Printer not connected");
+//     }
+
+//     try {
+//       // Common initialization
+//       const initCommands = new Uint8Array([0x1b, 0x40]);
+//       await writeToPrinter(initCommands);
+
+//       if (printerType === "niimbot") {
+//         // Niimbot specific setup
+//         const niimbotSetup = new Uint8Array([
+//           0x1b,
+//           0x61,
+//           0x01, // Center alignment
+//           0x1d,
+//           0x57,
+//           0x4c,
+//           0x00, // Label width = 50mm
+//           0x1d,
+//           0x57,
+//           0x48,
+//           0x00, // Label height = 30mm
+//           0x1b,
+//           0x45,
+//           0x01, // Bold ON
+//         ]);
+//         await writeToPrinter(niimbotSetup);
+//       } else {
+//         // Gainscha alignment
+//         const gainschaAlignment = new Uint8Array([0x1b, 0x61, 0x01]);
+//         await writeToPrinter(gainschaAlignment);
+//       }
+
+//       await sleep(100);
+
+//       // Print text data
+//       const textEncoder = new TextEncoder();
+//       const textData = textEncoder.encode(
+//         `Factory: ${printData.factory}\n` +
+//           `MO: ${printData.selectedMono}\n` +
+//           `Buyer: ${printData.buyer}\n` +
+//           `Line: ${printData.lineNo}\n` +
+//           `Color: ${printData.color}\n` +
+//           `Size: ${printData.size}\n\n`
+//       );
+//       await writeToPrinter(textData);
+//       await sleep(200);
+
+//       // QR Code implementation (works for both printers)
+//       const qrSetup = new Uint8Array([
+//         0x1d, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00, 0x1d, 0x28, 0x6b,
+//         0x03, 0x00, 0x31, 0x43, 0x05, 0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45,
+//         0x31,
+//       ]);
+//       await writeToPrinter(qrSetup);
+//       await sleep(100);
+
+//       const qrData = textEncoder.encode(printData.bundle_id);
+//       const qrHeader = new Uint8Array([
+//         0x1d,
+//         0x28,
+//         0x6b,
+//         qrData.length + 3,
+//         0x00,
+//         0x31,
+//         0x50,
+//         0x30,
+//       ]);
+//       await writeToPrinter(qrHeader);
+//       await writeToPrinter(qrData);
+//       await sleep(100);
+
+//       const printQR = new Uint8Array([
+//         0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30,
+//       ]);
+//       await writeToPrinter(printQR);
+//       await sleep(500);
+
+//       // Common ending commands
+//       const endCommands = new Uint8Array([
+//         0x1b,
+//         0x4a,
+//         0x40, // Feed paper
+//         0x1d,
+//         0x56,
+//         0x42,
+//         0x00, // Cut paper
+//       ]);
+//       await writeToPrinter(endCommands);
+
+//       return true;
+//     } catch (error) {
+//       console.error("Print error:", error);
+//       setConnectionStatus("Print error: " + error.message);
+//       throw error;
+//     }
+//   };
+
+//   // Keep your existing JSX return here
+//   return (
+//     <div className="relative">
+//       <button
+//         onClick={handleClick}
+//         className={`p-2 rounded-full transition-colors flex items-center gap-2 ${
+//           isConnected
+//             ? "bg-green-100 text-green-600"
+//             : "bg-gray-100 text-gray-400"
+//         }`}
+//         title={isConnected ? "Connected to printer" : "Connect to printer"}
+//       >
+//         <Bluetooth className={`w-5 h-5 ${isScanning ? "animate-pulse" : ""}`} />
+//         <Printer className="w-5 h-5" />
+//       </button>
+
+//       {connectionStatus && (
+//         <div
+//           className={`absolute top-full mt-2 w-48 p-2 rounded-md shadow-lg z-50 text-sm ${
+//             isConnected
+//               ? "bg-green-50 text-green-700"
+//               : "bg-white text-gray-700"
+//           }`}
+//         >
+//           <div className="flex items-center gap-2">
+//             {isConnected ? (
+//               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+//             ) : (
+//               <AlertCircle className="w-4 h-4 text-gray-400" />
+//             )}
+//             <span>{connectionStatus}</span>
+//           </div>
+//           {selectedDevice && (
+//             <div className="mt-1 text-xs text-gray-500">
+//               {selectedDevice.name || "Unknown Device"}
+//             </div>
+//           )}
+//         </div>
+//       )}
+//     </div>
+//   );
+// });
+
+// BluetoothComponent.displayName = "BluetoothComponent";
+
+// export default BluetoothComponent;
+
 import React, {
   useState,
   useEffect,
@@ -1195,145 +1721,185 @@ import React, {
 } from "react";
 import { Bluetooth, Printer, AlertCircle } from "lucide-react";
 
+// Printer-specific configurations
+const PRINTER_CONFIG = {
+  niimbot: {
+    serviceUUID: "49535343-fe7d-4ae5-8fa9-9fafd205e455",
+    writeUUID: "49535343-8841-43f4-a8d4-ecbe34729bb3",
+    chunkSize: 16,
+    delay: 300,
+    encoding: "cp437", // Niimbot typically uses CP437 encoding
+  },
+  gainscha: {
+    serviceUUID: "000018f0-0000-1000-8000-00805f9b34fb",
+    writeUUID: "00002af1-0000-1000-8000-00805f9b34fb",
+    chunkSize: 20,
+    delay: 50,
+    encoding: "gbk", // Gainscha often uses GBK encoding for Chinese characters
+  },
+};
+
 const BluetoothComponent = forwardRef((props, ref) => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState(null);
-  const [showDeviceList, setShowDeviceList] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState("");
-  const [server, setServer] = useState(null);
-  const [characteristic, setCharacteristic] = useState(null);
+  const [state, setState] = useState({
+    isConnected: false,
+    isScanning: false,
+    selectedDevice: null,
+    connectionStatus: "",
+    printerType: null,
+    characteristic: null,
+  });
 
-  // Gainscha printer service UUIDs
-  const PRINTER_SERVICE = "000018f0-0000-1000-8000-00805f9b34fb";
-  const PRINTER_CHARACTERISTIC = "00002af1-0000-1000-8000-00805f9b34fb";
-
-  // Expose methods to parent component
   useImperativeHandle(ref, () => ({
-    isConnected,
-    selectedDevice,
+    isConnected: state.isConnected,
+    selectedDevice: state.selectedDevice,
     printData: async (data) => {
-      if (!selectedDevice || !isConnected) {
-        throw new Error("Printer not connected");
-      }
-      return await printData(data);
+      if (!state.isConnected) throw new Error("Printer not connected");
+      return await handlePrint(data);
     },
   }));
 
-  const scanForDevices = async () => {
+  const detectPrinterType = (deviceName) => {
+    if (deviceName?.startsWith("GP-")) return "gainscha";
+    if (deviceName?.startsWith("B50W-")) return "niimbot";
+    return null;
+  };
+
+  const updateState = (newState) => {
+    setState((prev) => ({ ...prev, ...newState }));
+  };
+
+  const connectPrinter = async () => {
     try {
-      setIsScanning(true);
-      setShowDeviceList(true);
-      setConnectionStatus("Scanning for devices...");
-
-      if (!navigator.bluetooth) {
-        throw new Error("Bluetooth not supported");
-      }
-
-      const device = await navigator.bluetooth.requestDevice({
-        filters: [
-          {
-            namePrefix: "GP-", // Filter for Gainscha printers
-          },
-        ],
-        optionalServices: [PRINTER_SERVICE],
+      updateState({
+        isScanning: true,
+        connectionStatus: "Scanning for devices...",
       });
 
-      console.log("Device selected:", device.name);
-      setConnectionStatus("Device selected, connecting...");
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: "GP-" }, { namePrefix: "B50W-" }],
+        optionalServices: Object.values(PRINTER_CONFIG).map(
+          (c) => c.serviceUUID
+        ),
+      });
 
-      const gattServer = await device.gatt.connect();
-      console.log("Connected to GATT server");
+      const printerType = detectPrinterType(device.name);
+      if (!printerType) throw new Error("Unsupported printer");
 
-      const service = await gattServer.getPrimaryService(PRINTER_SERVICE);
-      console.log("Got printer service");
+      updateState({
+        connectionStatus: `Connecting to ${printerType} printer...`,
+        printerType,
+      });
 
-      const printerCharacteristic = await service.getCharacteristic(
-        PRINTER_CHARACTERISTIC
-      );
-      console.log("Got printer characteristic");
+      const server = await device.gatt.connect();
+      const { serviceUUID, writeUUID } = PRINTER_CONFIG[printerType];
+      const service = await server.getPrimaryService(serviceUUID);
+      const characteristic = await service.getCharacteristic(writeUUID);
 
-      setServer(gattServer);
-      setCharacteristic(printerCharacteristic);
-      setSelectedDevice(device);
-      setIsConnected(true);
-      setConnectionStatus("Ready to print");
+      device.addEventListener("gattserverdisconnected", handleDisconnect);
 
-      device.addEventListener("gattserverdisconnected", handleDisconnection);
+      updateState({
+        isConnected: true,
+        isScanning: false,
+        selectedDevice: device,
+        characteristic,
+        connectionStatus: `Connected to ${device.name}`,
+      });
     } catch (error) {
       console.error("Bluetooth Error:", error);
-      setConnectionStatus(error.message);
-      setIsConnected(false);
-      setSelectedDevice(null);
-      setCharacteristic(null);
-    } finally {
-      setIsScanning(false);
+      handleDisconnect(error.message);
     }
   };
 
-  const handleDisconnection = () => {
-    console.log("Device disconnected");
-    setIsConnected(false);
-    setSelectedDevice(null);
-    setServer(null);
-    setCharacteristic(null);
-    setConnectionStatus("Disconnected");
+  const handleDisconnect = (errorMessage = "Disconnected") => {
+    state.selectedDevice?.gatt?.disconnect();
+    updateState({
+      isConnected: false,
+      isScanning: false,
+      selectedDevice: null,
+      characteristic: null,
+      connectionStatus: errorMessage,
+    });
   };
 
-  const handleClick = () => {
-    if (isConnected) {
-      if (server?.connected) {
-        server.disconnect();
-      }
-      handleDisconnection();
-    } else {
-      scanForDevices();
-    }
+  const encodeText = (text, encoding) => {
+    const encoder = new TextEncoder(encoding, {
+      NONSTANDARD_allowLegacyEncoding: true,
+    });
+    return encoder.encode(text);
   };
 
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const sendChunkedData = async (data) => {
+    const { printerType, characteristic } = state;
+    const { chunkSize, delay } = PRINTER_CONFIG[printerType];
 
-  const writeToCharacteristic = async (data) => {
-    const CHUNK_SIZE = 20; // Bluetooth LE typically has a limit around 512 bytes
-    for (let i = 0; i < data.length; i += CHUNK_SIZE) {
-      const chunk = data.slice(i, i + CHUNK_SIZE);
+    for (let i = 0; i < data.length; i += chunkSize) {
+      const chunk = data.slice(i, i + chunkSize);
       await characteristic.writeValue(chunk);
-      await sleep(50); // Give the printer time to process each chunk
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   };
 
-  const printData = async (printData) => {
-    if (!selectedDevice || !isConnected || !characteristic) {
-      throw new Error("Printer not connected");
-    }
+  const handlePrint = async (printData) => {
+    const { printerType, characteristic } = state;
+    if (!characteristic) throw new Error("Printer not ready");
 
     try {
-      // Initialize printer
-      const initCommands = new Uint8Array([
-        0x1b,
-        0x40, // Initialize printer
-        0x1b,
-        0x61,
-        0x01, // Center alignment
-      ]);
-      await writeToCharacteristic(initCommands);
-      await sleep(100);
+      // Common initialization
+      await sendChunkedData(new Uint8Array([0x1b, 0x40])); // Initialize printer
+
+      // Printer-specific setup
+      const config = PRINTER_CONFIG[printerType];
+      let setupCommands = [];
+
+      if (printerType === "niimbot") {
+        setupCommands = [
+          0x1b,
+          0x61,
+          0x01, // Center alignment
+          0x1d,
+          0x57,
+          0x4c,
+          0x00, // Label width
+          0x1d,
+          0x57,
+          0x48,
+          0x00, // Label height
+          0x1b,
+          0x45,
+          0x01, // Bold on
+        ];
+      } else {
+        setupCommands = [
+          0x1b,
+          0x61,
+          0x01, // Center alignment
+          0x1d,
+          0x57,
+          0x80,
+          0x01, // Paper width 400 pixels
+        ];
+      }
+
+      await sendChunkedData(new Uint8Array(setupCommands));
+      await sendChunkedData(encodeText("\n\n", config.encoding));
 
       // Print text data
-      const textEncoder = new TextEncoder();
-      const textData = textEncoder.encode(
-        `Factory: ${printData.factory}\n` +
-          `MO: ${printData.selectedMono}\n` +
-          `Buyer: ${printData.buyer}\n` +
-          `Line: ${printData.lineNo}\n` +
-          `Color: ${printData.color}\n` +
-          `Size: ${printData.size}\n\n`
-      );
-      await writeToCharacteristic(textData);
-      await sleep(200);
+      const textLines = [
+        `Factory: ${printData.factory}`,
+        `MO: ${printData.selectedMono}`,
+        `Buyer: ${printData.buyer}`,
+        `Line: ${printData.lineNo}`,
+        `Color: ${printData.color}`,
+        `Size: ${printData.size}\n\n`,
+      ];
 
-      // QR Code commands
-      const qrSetup = new Uint8Array([
+      for (const line of textLines) {
+        const encoded = encodeText(line + "\n", config.encoding);
+        await sendChunkedData(encoded);
+      }
+
+      // Print QR Code
+      const qrCommands = [
         0x1d,
         0x28,
         0x6b,
@@ -1342,7 +1908,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
         0x31,
         0x41,
         0x32,
-        0x00, // Select QR model
+        0x00, // Set QR code size
         0x1d,
         0x28,
         0x6b,
@@ -1350,59 +1916,34 @@ const BluetoothComponent = forwardRef((props, ref) => {
         0x00,
         0x31,
         0x43,
-        0x05, // Set QR size
+        0x08, // Set QR code error correction
+        0x1d,
+        0x28,
+        0x6b,
+        printerType === "niimbot" ? 0x03 : 0x04,
+        0x00,
+        0x31,
+        0x50,
+        0x30, // Store QR data
+        ...encodeText(printData.bundle_id, config.encoding),
         0x1d,
         0x28,
         0x6b,
         0x03,
         0x00,
         0x31,
-        0x45,
-        0x31, // Set error correction
-      ]);
-      await writeToCharacteristic(qrSetup);
-      await sleep(100);
+        0x51,
+        0x30, // Print QR code
+      ];
 
-      // QR Code data
-      const qrData = textEncoder.encode(printData.bundle_id);
-      const qrHeader = new Uint8Array([
-        0x1d,
-        0x28,
-        0x6b,
-        qrData.length + 3,
-        0x00,
-        0x31,
-        0x50,
-        0x30,
-      ]);
-      await writeToCharacteristic(qrHeader);
-      await writeToCharacteristic(qrData);
-      await sleep(100);
-
-      // Print QR Code
-      const printQR = new Uint8Array([
-        0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30,
-      ]);
-      await writeToCharacteristic(printQR);
-      await sleep(500);
-
-      // Feed and cut
-      const endCommands = new Uint8Array([
-        0x1b,
-        0x4a,
-        0x40, // Feed paper
-        0x1d,
-        0x56,
-        0x42,
-        0x00, // Cut paper
-      ]);
-      await writeToCharacteristic(endCommands);
-      await sleep(200);
+      await sendChunkedData(new Uint8Array(qrCommands));
+      await sendChunkedData(new Uint8Array([0x1b, 0x4a, 0x40])); // Feed paper
+      await sendChunkedData(new Uint8Array([0x1d, 0x56, 0x42, 0x00])); // Cut paper
 
       return true;
     } catch (error) {
-      console.error("Print error:", error);
-      setConnectionStatus("Print error: " + error.message);
+      console.error("Print Error:", error);
+      handleDisconnect("Print failed: " + error.message);
       throw error;
     }
   };
@@ -1410,38 +1951,41 @@ const BluetoothComponent = forwardRef((props, ref) => {
   return (
     <div className="relative">
       <button
-        onClick={handleClick}
+        onClick={() =>
+          state.isConnected ? handleDisconnect() : connectPrinter()
+        }
         className={`p-2 rounded-full transition-colors flex items-center gap-2 ${
-          isConnected
+          state.isConnected
             ? "bg-green-100 text-green-600"
             : "bg-gray-100 text-gray-400"
         }`}
-        title={isConnected ? "Connected to printer" : "Connect to printer"}
+        disabled={state.isScanning}
       >
-        <Bluetooth className={`w-5 h-5 ${isScanning ? "animate-pulse" : ""}`} />
+        <Bluetooth
+          className={`w-5 h-5 ${state.isScanning ? "animate-pulse" : ""}`}
+        />
         <Printer className="w-5 h-5" />
       </button>
 
-      {connectionStatus && (
+      {state.connectionStatus && (
         <div
-          className={`absolute top-full mt-2 w-48 p-2 rounded-md shadow-lg z-50 text-sm
-          ${
-            isConnected
+          className={`absolute top-full mt-2 w-64 p-2 rounded-md shadow-lg z-50 text-sm ${
+            state.isConnected
               ? "bg-green-50 text-green-700"
               : "bg-white text-gray-700"
           }`}
         >
           <div className="flex items-center gap-2">
-            {isConnected ? (
+            {state.isConnected ? (
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             ) : (
               <AlertCircle className="w-4 h-4 text-gray-400" />
             )}
-            <span>{connectionStatus}</span>
+            <span>{state.connectionStatus}</span>
           </div>
-          {selectedDevice && (
+          {state.selectedDevice && (
             <div className="mt-1 text-xs text-gray-500">
-              {selectedDevice.name || "Unknown Device"}
+              {state.selectedDevice.name}
             </div>
           )}
         </div>
@@ -1451,7 +1995,6 @@ const BluetoothComponent = forwardRef((props, ref) => {
 });
 
 BluetoothComponent.displayName = "BluetoothComponent";
-
 export default BluetoothComponent;
 
 //electorn.js code

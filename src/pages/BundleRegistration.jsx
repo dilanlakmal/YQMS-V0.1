@@ -1,14 +1,14 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import MonoSearch from "../components/forms/MonoSearch";
-import QRCodePreview from "../components/forms/QRCodePreview";
-import NumberPad from "../components/forms/NumberPad";
-import NumLetterPad from "../components/forms/NumLetterPad";
+import { FaEye, FaPrint, FaQrcode } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 import BluetoothComponent from "../components/forms/Bluetooth";
+import MonoSearch from "../components/forms/MonoSearch";
+import NumLetterPad from "../components/forms/NumLetterPad";
+import NumberPad from "../components/forms/NumberPad";
+import QRCodePreview from "../components/forms/QRCodePreview";
 import SubConSelection from "../components/forms/SubConSelection";
-import { FaQrcode, FaPrint, FaEye, FaList } from "react-icons/fa";
 
 function BundleRegistration() {
   const navigate = useNavigate();
@@ -37,6 +37,11 @@ function BundleRegistration() {
     bundleQty: "",
     lineNo: "",
     count: "10",
+    colorCode: "",
+    chnColor: "",
+    colorKey: "",
+    sizeOrderQty: "",
+    planCutQty: "",
   });
 
   // Reference to Bluetooth component
@@ -80,7 +85,12 @@ function BundleRegistration() {
           custStyle: data.custStyle,
           country: data.country,
           color: "",
+          colorCode: "",
+          chnColor: "",
+          colorKey: "",
           size: "",
+          sizeOrderQty: "",
+          planCutQty: "",
         }));
 
         if (data.colors && data.colors.length > 0) {
@@ -207,7 +217,12 @@ function BundleRegistration() {
           factory: formData.factoryInfo,
           lineNo,
           color,
+          colorCode: formData.colorCode,
+          chnColor: formData.chnColor,
+          colorKey: formData.colorKey,
           size,
+          sizeOrderQty: formData.sizeOrderQty,
+          planCutQty: formData.planCutQty,
           count: formData.count,
           totalBundleQty: bundleQty,
           sub_con: isSubCon ? "Yes" : "No",
@@ -243,66 +258,6 @@ function BundleRegistration() {
     }
   };
 
-  // Print QR code and clear form data
-  // Handle print QR codes usinf eletron.js
-
-  // const handlePrintQR = async () => {
-  //   if (!bluetoothComponentRef.current) {
-  //     alert("Bluetooth component not initialized");
-  //     return;
-  //   }
-
-  //   try {
-  //     setIsPrinting(true);
-
-  //     // Verify connection before printing
-  //     if (!bluetoothComponentRef.current.isConnected) {
-  //       alert("Please connect to printer first");
-  //       return;
-  //     }
-
-  //     // Batch print with error handling
-  //     const printPromises = qrData.map(async (data, index) => {
-  //       try {
-  //         console.log(`Printing bundle ${index + 1}/${qrData.length}`);
-  //         await bluetoothComponentRef.current.printData({
-  //           ...data,
-  //           bundle_id: data.bundle_random_id,
-  //         });
-  //         return { success: true, index };
-  //       } catch (error) {
-  //         console.error(`Failed to print bundle ${index + 1}:`, error);
-  //         return { success: false, index, error };
-  //       }
-  //     });
-
-  //     const results = await Promise.all(printPromises);
-  //     const failedPrints = results.filter((r) => !r.success);
-
-  //     if (failedPrints.length > 0) {
-  //       throw new Error(
-  //         `Failed to print ${failedPrints.length} bundles. ` +
-  //           `Check console for details.`
-  //       );
-  //     }
-
-  //     // Clear form only if all prints succeeded
-  //     setFormData((prev) => ({
-  //       ...prev,
-  //       color: "",
-  //       size: "",
-  //       bundleQty: "",
-  //     }));
-  //     setIsGenerateDisabled(false);
-
-  //     alert("All QR codes printed successfully!");
-  //   } catch (error) {
-  //     alert(`Print failed: ${error.message}`);
-  //   } finally {
-  //     setIsPrinting(false);
-  //   }
-  // };
-
   const handlePrintQR = async () => {
     if (!bluetoothComponentRef.current) {
       alert("Bluetooth component not initialized");
@@ -336,44 +291,6 @@ function BundleRegistration() {
       setIsPrinting(false);
     }
   };
-
-  // const handlePrintQR = async () => {
-  //   if (!bluetoothComponentRef.current) {
-  //     alert("Bluetooth component not initialized");
-  //     return;
-  //   }
-
-  //   // const { isConnected, printData } = bluetoothComponentRef.current;
-  //   if (!bluetoothComponentRef.current.isConnected) {
-  //     alert("Please connect to a printer first");
-  //     return;
-  //   }
-
-  //   try {
-  //     setIsPrinting(true);
-
-  //     // Print each QR code in sequence
-  //     for (const data of qrData) {
-  //       await bluetoothComponentRef.current.printData(data);
-  //     }
-
-  //     // Clear form data after successful printing
-  //     setFormData((prev) => ({
-  //       ...prev,
-  //       color: "",
-  //       size: "",
-  //       bundleQty: "",
-  //     }));
-  //     setIsGenerateDisabled(false);
-
-  //     alert("QR codes printed successfully!");
-  //   } catch (error) {
-  //     console.error("Print error:", error);
-  //     alert("Failed to print QR codes. Please check printer connection.");
-  //   } finally {
-  //     setIsPrinting(false);
-  //   }
-  // };
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20 px-8">
@@ -467,7 +384,6 @@ function BundleRegistration() {
                 />
               </div>
             </div>
-
             {/* Selected MONo and Order Details */}
             {formData.selectedMono && (
               <div className="mb-6 p-4 bg-gray-50 rounded-md">
@@ -505,7 +421,6 @@ function BundleRegistration() {
                 </div>
               </div>
             )}
-
             {/* Line No */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -522,7 +437,6 @@ function BundleRegistration() {
                 className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
               />
             </div>
-
             {/* Color and Size in one line */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
@@ -532,18 +446,27 @@ function BundleRegistration() {
                 {hasColors ? (
                   <select
                     value={formData.color}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const selectedColor = colors.find(
+                        (c) => c.original === e.target.value
+                      );
                       setFormData((prev) => ({
                         ...prev,
                         color: e.target.value,
-                      }))
-                    }
+                        colorCode: selectedColor?.code || "",
+                        chnColor: selectedColor?.chn || "",
+                        colorKey: selectedColor?.key || "",
+                        size: "",
+                        sizeOrderQty: "",
+                        planCutQty: "",
+                      }));
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
                     <option value="">Select Color</option>
                     {colors.map((color) => (
-                      <option key={color} value={color}>
-                        {color}
+                      <option key={color.original} value={color.original}>
+                        {color.original}
                       </option>
                     ))}
                   </select>
@@ -557,20 +480,26 @@ function BundleRegistration() {
                 </label>
                 {hasColors ? (
                   hasSizes ? (
+                    // Update the size dropdown and selection handler
                     <select
                       value={formData.size}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const selectedSize = sizes.find(
+                          (s) => s.size === e.target.value
+                        );
                         setFormData((prev) => ({
                           ...prev,
                           size: e.target.value,
-                        }))
-                      }
+                          sizeOrderQty: selectedSize?.orderQty || 0,
+                          planCutQty: selectedSize?.planCutQty || 0,
+                        }));
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     >
                       <option value="">Select Size</option>
-                      {sizes.map((size) => (
-                        <option key={size} value={size}>
-                          {size}
+                      {sizes.map((sizeObj) => (
+                        <option key={sizeObj.size} value={sizeObj.size}>
+                          {sizeObj.size}
                         </option>
                       ))}
                     </select>
@@ -582,7 +511,21 @@ function BundleRegistration() {
                 )}
               </div>
             </div>
-
+            {/* Size Order Qty and Plan Cut Qty */}
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              {formData.sizeOrderQty > 0 && (
+                <div className="p-2 bg-blue-50 rounded-md">
+                  <span className="text-sm font-medium">Size Order Qty: </span>
+                  <span className="text-sm">{formData.sizeOrderQty}</span>
+                </div>
+              )}
+              {formData.planCutQty > 0 && (
+                <div className="p-2 bg-green-50 rounded-md">
+                  <span className="text-sm font-medium">Plan Cut Qty: </span>
+                  <span className="text-sm">{formData.planCutQty}</span>
+                </div>
+              )}
+            </div>
             {/* Count and Bundle Qty in one line */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
@@ -616,7 +559,6 @@ function BundleRegistration() {
                 />
               </div>
             </div>
-
             {/* Sub Con Selection - Modified to show only when department is not Sub-con */}
             {formData.department !== "Sub-con" && (
               <SubConSelection
@@ -626,7 +568,6 @@ function BundleRegistration() {
                 setSubConName={setSubConName}
               />
             )}
-
             {/* When department is Sub-con, show forced Sub-con selection */}
             {formData.department === "Sub-con" && (
               <div className="mb-6">
@@ -647,15 +588,6 @@ function BundleRegistration() {
                 </select>
               </div>
             )}
-
-            {/* Sub Con (Yes/No) */}
-            {/* <SubConSelection
-              isSubCon={isSubCon}
-              setIsSubCon={setIsSubCon}
-              subConName={subConName}
-              setSubConName={setSubConName}
-            /> */}
-
             {/* QR Code Controls */}
             <div className="flex justify-between mt-6">
               <div className="flex space-x-4">
@@ -729,6 +661,9 @@ function BundleRegistration() {
                       Record ID
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Department
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       MONo
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
@@ -774,6 +709,9 @@ function BundleRegistration() {
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {index + 1}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.department}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {record.selectedMono}
