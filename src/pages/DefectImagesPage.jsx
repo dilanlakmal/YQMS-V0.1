@@ -2,18 +2,19 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { defectsList } from "../constants/defects";
 
-function DefectImagesPage({ defectImages }) {
+function DefectImagesPage() {
   const navigate = useNavigate();
   const [defectsWithImages, setDefectsWithImages] = useState([]);
 
   useEffect(() => {
     // Map defect names to their images
-    const defects = defectsList["all"].map((defect, index) => ({
+    const defects = defectsList["all"].map((defect) => ({
       name: defect.name,
-      images: defectImages[index] || [],
+      imageUrl: defect.imageUrl,
     }));
+
     setDefectsWithImages(defects);
-  }, [defectImages]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20">
@@ -39,14 +40,11 @@ function DefectImagesPage({ defectImages }) {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-2">
-                      {defect.images.map((image, i) => (
-                        <img
-                          key={i}
-                          src={URL.createObjectURL(image)}
-                          alt={`Defect ${index} Image ${i}`}
-                          className="w-24 h-24 object-cover rounded"
-                        />
-                      ))}
+                      <img
+                        src={defect.imageUrl}
+                        alt={`Defect ${index} Image`}
+                        className="w-24 h-24 object-cover rounded"
+                      />
                     </div>
                   </td>
                 </tr>
