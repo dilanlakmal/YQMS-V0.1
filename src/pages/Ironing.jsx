@@ -274,6 +274,9 @@ const IroningPage = () => {
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Task No
                     </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Department
+                    </th>
                     {/* <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Bundle ID
                     </th> */}
@@ -323,6 +326,9 @@ const IroningPage = () => {
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {record.task_no}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.department}
                       </td>
                       {/* <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {record.ironing_bundle_id}
