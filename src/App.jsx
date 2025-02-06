@@ -305,27 +305,28 @@
 
 // export default App;
 
+import { createContext, useEffect, useState } from "react";
 import {
+  Navigate,
+  Route,
   BrowserRouter as Router,
   Routes,
-  Route,
-  Navigate,
 } from "react-router-dom";
-import { useState, useEffect, createContext } from "react";
-import Login from "./pages/Login";
-import Home from "./pages/Home";
-import Details from "./pages/Details";
-import Inspection from "./pages/Inspection";
-import Return from "./pages/Return";
-import Profile from "./pages/Profile";
-import Logs from "./pages/Logs";
+import "./App.css";
 import Navbar from "./components/layout/Navbar";
 import Analytics from "./pages/Analytics";
-import Dashboard from "./pages/Dashboard";
 import BundleRegistration from "./pages/BundleRegistration";
-import QC2InspectionPage from "./pages/QC2Inspection";
-import "./App.css";
+import Dashboard from "./pages/Dashboard";
+import Details from "./pages/Details";
+import DownloadData from "./pages/DownloadData";
+import Home from "./pages/Home";
+import Inspection from "./pages/Inspection";
 import IroningPage from "./pages/Ironing";
+import Login from "./pages/Login";
+import Logs from "./pages/Logs";
+import Profile from "./pages/Profile";
+import QC2InspectionPage from "./pages/QC2Inspection";
+import Return from "./pages/Return";
 
 // Create a context for Bluetooth functionality
 export const BluetoothContext = createContext(null);
@@ -601,6 +602,7 @@ function App() {
                 />
                 <Route path="/ironing" element={<IroningPage />} />
                 <Route path="/qc2-inspection" element={<QC2InspectionPage />} />
+                <Route path="/download-data" element={<DownloadData />} />
               </>
             ) : (
               <Route path="*" element={<Navigate to="/" replace />} />

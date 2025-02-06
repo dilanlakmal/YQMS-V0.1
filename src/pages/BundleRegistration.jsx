@@ -22,6 +22,7 @@ function BundleRegistration() {
   const [isSubCon, setIsSubCon] = useState(false);
   const [subConName, setSubConName] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
+  const [totalBundleQty, setTotalBundleQty] = useState(0);
 
   const [formData, setFormData] = useState({
     date: new Date(),
@@ -55,6 +56,7 @@ function BundleRegistration() {
   const [hasSizes, setHasSizes] = useState(false);
 
   const subConNames = ["Sunicon", "Elite", "SYD"];
+  const [estimatedTotal, setEstimatedTotal] = useState(null);
 
   // Add useEffect to handle department change
   useEffect(() => {
@@ -93,6 +95,14 @@ function BundleRegistration() {
           planCutQty: "",
         }));
 
+        const totalResponse = await fetch(
+          `http://localhost:5001/api/total-bundle-qty/${formData.selectedMono}`
+        );
+        if (!totalResponse.ok)
+          throw new Error("Failed to fetch total bundle quantity");
+        const totalData = await totalResponse.json();
+        setTotalBundleQty(totalData.total);
+
         if (data.colors && data.colors.length > 0) {
           setColors(data.colors);
           setHasColors(true);
@@ -127,6 +137,18 @@ function BundleRegistration() {
         if (data && data.length > 0) {
           setSizes(data);
           setHasSizes(true);
+
+          // Fetch total garments count for the selected MONo, Color, and Size
+          const totalCountResponse = await fetch(
+            `http://localhost:5001/api/total-garments-count/${formData.selectedMono}/${formData.color}/${data[0].size}`
+          );
+          const totalCountData = await totalCountResponse.json();
+          const totalGarmentsCount = totalCountData.totalCount;
+
+          setFormData((prev) => ({
+            ...prev,
+            totalGarmentsCount, // Add this line
+          }));
         } else {
           setSizes([]);
           setHasSizes(false);
@@ -140,6 +162,72 @@ function BundleRegistration() {
 
     fetchSizes();
   }, [formData.selectedMono, formData.color]);
+
+  // Fetch total garments count for the selected MONo, Color, and Size
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (formData.selectedMono && formData.color && formData.size) {
+        try {
+          const response = await fetch(
+            `http://localhost:5001/api/total-garments-count/${formData.selectedMono}/${formData.color}/${formData.size}`
+          );
+          const data = await response.json();
+          setFormData((prev) => ({
+            ...prev,
+            totalGarmentsCount: data.totalCount,
+          }));
+        } catch (error) {
+          console.error("Error fetching updated total:", error);
+        }
+      }
+    }, 500); // Update every 0.5 seconds
+
+    return () => clearInterval(interval);
+  }, [formData.selectedMono, formData.color, formData.size]);
+
+  // Add this useEffect for real-time total bundle quantity updates
+  useEffect(() => {
+    const fetchTotalBundleQty = async () => {
+      if (!formData.selectedMono) return;
+
+      try {
+        const response = await fetch(
+          `http://localhost:5001/api/total-bundle-qty/${formData.selectedMono}`
+        );
+        const data = await response.json();
+        setTotalBundleQty(data.total);
+      } catch (error) {
+        console.error("Error fetching total bundle quantity:", error);
+      }
+    };
+
+    // Fetch immediately when component mounts or selectedMono changes
+    fetchTotalBundleQty();
+
+    // Set up interval to fetch every 0.5 seconds
+    const interval = setInterval(fetchTotalBundleQty, 500);
+
+    // Cleanup interval on component unmount or selectedMono change
+    return () => clearInterval(interval);
+  }, [formData.selectedMono]);
+
+  // Calculate estimated total
+
+  useEffect(() => {
+    if (
+      formData.totalGarmentsCount === undefined ||
+      formData.count === "" ||
+      formData.bundleQty === ""
+    ) {
+      setEstimatedTotal(null);
+      return;
+    }
+    const newEstimatedTotal =
+      formData.totalGarmentsCount +
+      parseInt(formData.count) * parseInt(formData.bundleQty);
+    setEstimatedTotal(newEstimatedTotal);
+  }, [formData.totalGarmentsCount, formData.count, formData.bundleQty]);
 
   // Handle number pad input
   const handleNumberPadInput = (value) => {
@@ -178,6 +266,8 @@ function BundleRegistration() {
     }
 
     const { date, selectedMono, color, size, lineNo } = formData;
+
+    if (formData.totalGarmentsCount > formData.planCutQty) return;
 
     try {
       const response = await fetch(
@@ -224,7 +314,8 @@ function BundleRegistration() {
           sizeOrderQty: formData.sizeOrderQty,
           planCutQty: formData.planCutQty,
           count: formData.count,
-          totalBundleQty: bundleQty,
+          bundleQty: formData.bundleQty,
+          totalBundleQty: 1, // This is always 1 for each record, becuase when user Generate QR, it's for one bundle
           sub_con: isSubCon ? "Yes" : "No",
           sub_con_factory: isSubCon ? subConName : "",
         };
@@ -246,9 +337,25 @@ function BundleRegistration() {
         const savedData = await saveResponse.json();
         setQrData(savedData.data);
         setIsGenerateDisabled(true); // Disable Generate QR button
+        // Reset bundleQty in form data
+        setFormData((prev) => ({
+          ...prev,
+          bundleQty: "",
+        }));
 
-        // Add the new records to the dataRecords state
+        // After successful save, update the client's data records
         setDataRecords((prevRecords) => [...prevRecords, ...savedData.data]);
+
+        // Fetch and update totalBundleQty IMMEDIATELY after saving
+        try {
+          const totalResponse = await fetch(
+            `http://localhost:5001/api/total-bundle-qty/${formData.selectedMono}`
+          );
+          const totalData = await totalResponse.json();
+          setTotalBundleQty(totalData.total);
+        } catch (error) {
+          console.error("Error updating total bundle quantity:", error);
+        }
       } else {
         alert("Failed to save bundle data.");
       }
@@ -261,6 +368,7 @@ function BundleRegistration() {
   const handlePrintQR = async () => {
     if (!bluetoothComponentRef.current) {
       alert("Bluetooth component not initialized");
+      setIsGenerateDisabled(false); // Enable Generate QR immediately if Bluetooth isn't ready
       return;
     }
 
@@ -278,15 +386,14 @@ function BundleRegistration() {
       // Clear form after successful print
       setFormData((prev) => ({
         ...prev,
-        color: "",
-        size: "",
         bundleQty: "",
       }));
-      setIsGenerateDisabled(false);
+      setIsGenerateDisabled(false); // Enable Generate QR after successful print
 
       alert("QR codes printed successfully!");
     } catch (error) {
       alert(`Print failed: ${error.message}`);
+      setIsGenerateDisabled(false); // Re-enable Generate QR on print failure
     } finally {
       setIsPrinting(false);
     }
@@ -526,6 +633,19 @@ function BundleRegistration() {
                 </div>
               )}
             </div>
+            {/* Display Total Garments Count */}
+            {formData.totalGarmentsCount !== undefined && (
+              <div
+                className={`mt-2 text-sm ${
+                  formData.totalGarmentsCount > formData.planCutQty
+                    ? "text-red-500"
+                    : "text-green-500"
+                }`}
+              >
+                Total Garments Count: {formData.totalGarmentsCount}
+              </div>
+            )}
+
             {/* Count and Bundle Qty in one line */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
@@ -557,6 +677,11 @@ function BundleRegistration() {
                   readOnly
                   className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
                 />
+                {formData.selectedMono && (
+                  <p className="mt-2 text-sm text-gray-700">
+                    Total Registered Bundle Qty: {totalBundleQty}
+                  </p>
+                )}
               </div>
             </div>
             {/* Sub Con Selection - Modified to show only when department is not Sub-con */}
@@ -588,6 +713,21 @@ function BundleRegistration() {
                 </select>
               </div>
             )}
+
+            {formData.planCutQty !== undefined && estimatedTotal !== null && (
+              <div
+                className={`mt-2 text-sm ${
+                  estimatedTotal > formData.planCutQty
+                    ? "text-red-500"
+                    : "text-green-500"
+                }`}
+              >
+                {estimatedTotal > formData.planCutQty
+                  ? `⚠️ Actual Cut Qty (${estimatedTotal}) exceeds Plan Cut Qty (${formData.planCutQty}). Please adjust values.`
+                  : `✅ Actual Cut Qty (${estimatedTotal}) is within Plan Cut Qty (${formData.planCutQty}).`}
+              </div>
+            )}
+
             {/* QR Code Controls */}
             <div className="flex justify-between mt-6">
               <div className="flex space-x-4">
@@ -601,7 +741,9 @@ function BundleRegistration() {
                     !formData.size ||
                     !formData.bundleQty ||
                     !formData.lineNo ||
-                    !formData.count
+                    !formData.count ||
+                    (estimatedTotal !== null &&
+                      estimatedTotal > formData.planCutQty)
                   }
                   className={`px-4 py-2 rounded-md flex items-center ${
                     formData.selectedMono &&
@@ -610,12 +752,20 @@ function BundleRegistration() {
                     formData.bundleQty &&
                     formData.lineNo &&
                     formData.count
-                      ? "bg-green-500 text-white hover:bg-green-600"
+                      ? (estimatedTotal !== null &&
+                        estimatedTotal > formData.planCutQty
+                          ? "bg-red-500"
+                          : "bg-green-500") + " text-white"
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
+
+                    // formData.count
+                    //   ? "bg-green-500 text-white hover:bg-green-600"
+                    //   : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
                 >
                   <FaQrcode className="mr-2" /> Generate QR
                 </button>
+
                 {qrData.length > 0 && (
                   <>
                     <button
@@ -676,7 +826,7 @@ function BundleRegistration() {
                       Country
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Order Qty
+                      Total Order Qty
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Factory
@@ -688,7 +838,16 @@ function BundleRegistration() {
                       Color
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Color-Chi
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Size
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Order Cut Qty
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Plan Cut Qty
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Count
@@ -738,13 +897,22 @@ function BundleRegistration() {
                         {record.color}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.chnColor}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {record.size}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.sizeOrderQty}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.planCutQty}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {record.count}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.totalBundleQty}
+                        {record.bundleQty}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {record.sub_con}

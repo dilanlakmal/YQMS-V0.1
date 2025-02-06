@@ -97,6 +97,7 @@ const qc2OrderDataSchema = new mongoose.Schema(
   {
     bundle_random_id: { type: String, required: true, unique: true },
     bundle_id: { type: String, required: true },
+    task_no: { type: Number, default: 52 },
     date: { type: String, required: true },
     department: { type: String, required: true },
     selectedMono: { type: String, required: true },
@@ -113,7 +114,8 @@ const qc2OrderDataSchema = new mongoose.Schema(
     colorKey: { type: Number, required: true },
     sizeOrderQty: { type: Number, required: true },
     planCutQty: { type: Number, required: true },
-    count: { type: String, required: true },
+    count: { type: Number, required: true },
+    bundleQty: { type: Number, required: true },
     totalBundleQty: { type: Number, required: true },
     sub_con: { type: String, default: "No" }, // New field
     sub_con_factory: { type: String, default: "N/A" }, // New field
@@ -399,63 +401,6 @@ app.get("/api/order-details/:mono", async (req, res) => {
   }
 });
 
-// // Updated order details endpoint
-// app.get("/api/order-details/:mono", async (req, res) => {
-//   try {
-//     const collection = mongoose.connection.db.collection("dt_orders");
-//     const order = await collection.findOne({
-//       Order_No: req.params.mono,
-//     });
-
-//     if (!order) return res.status(404).json({ error: "Order not found" });
-
-//     // Process colors with sizes
-//     const colorMap = new Map();
-//     order.OrderColors.forEach((colorObj) => {
-//       const colorKey = colorObj.Color.toLowerCase().trim();
-//       const originalColor = colorObj.Color.trim();
-
-//       if (!colorMap.has(colorKey)) {
-//         colorMap.set(colorKey, {
-//           originalColor,
-//           sizes: new Set(),
-//         });
-//       }
-
-//       // Process sizes for this color
-//       colorObj.OrderQty.forEach((sizeEntry) => {
-//         // Get the size name (first key in the object)
-//         const sizeName = Object.keys(sizeEntry)[0];
-//         const quantity = sizeEntry[sizeName];
-
-//         if (quantity > 0) {
-//           const cleanSize = sizeName.split(";")[0].trim();
-//           colorMap.get(colorKey).sizes.add(cleanSize);
-//         }
-//       });
-//     });
-
-//     const response = {
-//       engName: order.EngName,
-//       totalQty: order.TotalQty,
-//       // Add new fields here
-//       factoryname: order.Factory || "N/A", // New field
-//       custStyle: order.CustStyle || "N/A", // New field
-//       country: order.Country || "N/A", // New field
-//       colors: Array.from(colorMap.values()).map((c) => c.originalColor),
-//       colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
-//         acc[curr.originalColor.toLowerCase()] = Array.from(curr.sizes);
-//         return acc;
-//       }, {}),
-//     };
-
-//     res.json(response);
-//   } catch (error) {
-//     // console.error("Error fetching order details:", error);
-//     res.status(500).json({ error: "Failed to fetch order details" });
-//   }
-// });
-
 // Update /api/order-sizes endpoint
 app.get("/api/order-sizes/:mono/:color", async (req, res) => {
   try {
@@ -490,37 +435,47 @@ app.get("/api/order-sizes/:mono/:color", async (req, res) => {
   }
 });
 
-// // Updated order sizes endpoint
-// app.get("/api/order-sizes/:mono/:color", async (req, res) => {
-//   try {
-//     const collection = mongoose.connection.db.collection("dt_orders");
-//     const order = await collection.findOne({
-//       Order_No: req.params.mono,
-//     });
+// Bundle Qty Endpoint
+app.get("/api/total-bundle-qty/:mono", async (req, res) => {
+  try {
+    const mono = req.params.mono;
+    const total = await QC2OrderData.aggregate([
+      { $match: { selectedMono: mono } }, // Match documents with the given MONo
+      {
+        $group: {
+          _id: null, // Group all matched documents
+          total: { $sum: "$totalBundleQty" }, // Correct sum using field reference with $
+        },
+      },
+    ]);
+    res.json({ total: total[0]?.total || 0 }); // Return the summed total or 0 if no documents
+  } catch (error) {
+    console.error("Error fetching total bundle quantity:", error);
+    res.status(500).json({ error: "Failed to fetch total bundle quantity" });
+  }
+});
 
-//     if (!order) return res.status(404).json({ error: "Order not found" });
+// Endpoint to get total garments count for a specific MONo, Color, and Size
+app.get("/api/total-garments-count/:mono/:color/:size", async (req, res) => {
+  try {
+    const { mono, color, size } = req.params;
 
-//     // Find the matching color object (case-insensitive)
-//     const colorObj = order.OrderColors.find(
-//       (c) => c.Color.toLowerCase() === req.params.color.toLowerCase().trim()
-//     );
+    const totalCount = await QC2OrderData.aggregate([
+      { $match: { selectedMono: mono, color: color, size: size } },
+      {
+        $group: {
+          _id: null,
+          totalCount: { $sum: "$count" }, // Sum the count field
+        },
+      },
+    ]);
 
-//     if (!colorObj) return res.json([]);
-
-//     // Extract sizes with quantity > 0
-//     const sizes = colorObj.OrderQty.map((entry) => {
-//       const sizeName = Object.keys(entry)[0];
-//       return entry[sizeName] > 0 ? sizeName.split(";")[0].trim() : null;
-//     })
-//       .filter((size) => size !== null)
-//       .filter((size, index, self) => self.indexOf(size) === index); // Remove duplicates
-
-//     res.json(sizes);
-//   } catch (error) {
-//     console.error("Error fetching sizes:", error);
-//     res.status(500).json({ error: "Failed to fetch sizes" });
-//   }
-// });
+    res.json({ totalCount: totalCount[0]?.totalCount || 0 }); // Return total count or 0
+  } catch (error) {
+    console.error("Error fetching total garments count:", error);
+    res.status(500).json({ error: "Failed to fetch total garments count" });
+  }
+});
 
 async function fetchOrderDetails(mono) {
   const collection = mongoose.connection.db.collection("dt_orders");
@@ -913,6 +868,156 @@ app.post("/api/save-qc-data", async (req, res) => {
           }))
         : undefined,
     });
+  }
+});
+
+// Helper function to format date to MM/DD/YYYY
+const formatDate = (date) => {
+  const d = new Date(date);
+  return `${(d.getMonth() + 1).toString().padStart(2, "0")}/${d
+    .getDate()
+    .toString()
+    .padStart(2, "0")}/${d.getFullYear()}`;
+};
+
+// New endpoint to get unique values for filters
+app.get("/api/unique-values", async (req, res) => {
+  try {
+    const uniqueValues = await QC2OrderData.aggregate([
+      {
+        $group: {
+          _id: null,
+          moNos: { $addToSet: "$selectedMono" },
+          styleNos: { $addToSet: "$custStyle" },
+          lineNos: { $addToSet: "$lineNo" },
+          colors: { $addToSet: "$color" },
+          sizes: { $addToSet: "$size" },
+          buyers: { $addToSet: "$buyer" },
+        },
+      },
+    ]);
+
+    const result = uniqueValues[0] || {
+      moNos: [],
+      styleNos: [],
+      lineNos: [],
+      colors: [],
+      sizes: [],
+      buyers: [],
+    };
+
+    delete result._id;
+    Object.keys(result).forEach((key) => {
+      result[key] = result[key].filter(Boolean).sort();
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching unique values:", error);
+    res.status(500).json({ error: "Failed to fetch unique values" });
+  }
+});
+
+// Updated endpoint to get filtered data
+app.get("/api/download-data", async (req, res) => {
+  try {
+    let {
+      startDate,
+      endDate,
+      type,
+      taskNo,
+      moNo,
+      styleNo,
+      lineNo,
+      color,
+      size,
+      buyer,
+      page = 1,
+      limit = 50,
+    } = req.query;
+
+    // Convert page and limit to numbers
+    page = parseInt(page);
+    limit = parseInt(limit);
+    const skip = (page - 1) * limit;
+
+    // Format dates to match the stored format (MM/DD/YYYY)
+    if (startDate) {
+      startDate = formatDate(new Date(startDate));
+    }
+    if (endDate) {
+      endDate = formatDate(new Date(endDate));
+    }
+
+    // Build match query
+    const matchQuery = {};
+
+    // Determine collection and date field based on type/taskNo
+    const isIroning = type === "Ironing" || taskNo === "53";
+    const collection = isIroning ? Ironing : QC2OrderData;
+    const dateField = isIroning
+      ? "ironing_updated_date"
+      : "updated_date_seperator";
+
+    // Date range filter
+    if (startDate || endDate) {
+      matchQuery[dateField] = {};
+      if (startDate) matchQuery[dateField].$gte = startDate;
+      if (endDate) matchQuery[dateField].$lte = endDate;
+    }
+
+    // Add other filters if they exist
+    if (moNo) matchQuery.selectedMono = moNo;
+    if (styleNo) matchQuery.custStyle = styleNo;
+    if (lineNo) matchQuery.lineNo = lineNo;
+    if (color) matchQuery.color = color;
+    if (size) matchQuery.size = size;
+    if (buyer) matchQuery.buyer = buyer;
+
+    // Add task number filter
+    if (taskNo) {
+      matchQuery.task_no = parseInt(taskNo);
+    }
+
+    console.log("Match Query:", matchQuery); // For debugging
+
+    // Get total count
+    const total = await collection.countDocuments(matchQuery);
+
+    // Get paginated data
+    const data = await collection
+      .find(matchQuery)
+      .sort({ [dateField]: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    console.log("Found records:", data.length); // For debugging
+
+    // Transform data for consistent response
+    const transformedData = data.map((item) => ({
+      date: item[dateField],
+      type: isIroning ? "Ironing" : "QC2 Order Data",
+      taskNo: isIroning ? "53" : "52",
+      selectedMono: item.selectedMono,
+      custStyle: item.custStyle,
+      lineNo: item.lineNo,
+      color: item.color,
+      size: item.size,
+      buyer: item.buyer,
+      bundle_id: isIroning ? item.ironing_bundle_id : item.bundle_id,
+    }));
+
+    res.json({
+      data: transformedData,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (error) {
+    console.error("Error fetching download data:", error);
+    res.status(500).json({ error: "Failed to fetch download data" });
   }
 });
 

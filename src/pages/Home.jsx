@@ -242,7 +242,7 @@ function Home() {
             </h2>
             {/* Download Data Card */}
             <div
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/download-data")}
               className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="flex items-center justify-center mb-4 bg-blue-100 w-12 h-12 rounded-full group-hover:bg-blue-600">
