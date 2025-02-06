@@ -97,7 +97,7 @@ function Home() {
               onClick={() => handleNavigation("/ironing", ["admin_user"])}
               className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
             >
-              <div className="flex flex-col items-center justify-center mb-6  w-12 h-12  bg-[url('/IMG/iorning.avif')] bg-cover bg-center"></div>
+              <div className="flex flex-col items-center justify-center mb-6  w-12 h-12  bg-[url('/IMG/ironing.png')] bg-cover bg-center"></div>
               <h2 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-600">
                 Ironing
               </h2>
@@ -142,7 +142,7 @@ function Home() {
               className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="flex flex-col items-center justify-center mb-6  w-12 h-12  bg-[url('/IMG/qaa.png')] bg-cover bg-center"></div>
-              <h2 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-green-600">
+              <h2 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-600">
                 QA Audit
               </h2>
               <p className="text-sm text-gray-600 group-hover:text-gray-800">
