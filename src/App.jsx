@@ -305,31 +305,33 @@
 
 // export default App;
 
+import { createContext, useEffect, useState } from "react";
 import {
+  Navigate,
+  Route,
   BrowserRouter as Router,
   Routes,
-  Route,
-  Navigate,
 } from "react-router-dom";
-import { useState, useEffect, createContext } from "react";
+import "./App.css";
+import Navbar from "./components/layout/Navbar";
+import Analytics from "./pages/Analytics";
+import BundleRegistration from "./pages/BundleRegistration";
+import Dashboard from "./pages/Dashboard";
+import Details from "./pages/QC Inspection/Details";
+import DownloadData from "./pages/DownloadData";
+import Home from "./pages/Home";
+import Inspection from "./pages/QC Inspection/Inspection";
+import IroningPage from "./pages/Ironing";
 import Login from "./pages/auth/Login";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import Register from "./pages/auth/Register"; 
-import Home from "./pages/Home";
-import Details from "./pages/QC Inspection/Details";
-import Inspection from "./pages/QC Inspection/Inspection";
-import Return from "./pages/QC Inspection/Return";
-import Profile from "./pages/auth/Profile";
 import Logs from "./pages/QC Inspection/Logs";
-import Navbar from "./components/layout/Navbar";
-import Analytics from "./pages/Analytics";
-import Dashboard from "./pages/Dashboard";
-import BundleRegistration from "./pages/BundleRegistration";
-import QC2InspectionPage from "./pages/QC2Inspection";
+import Profile from "./pages/auth/Profile";
 import UserList from "./components/users/userList";
-import "./App.css";
-import IroningPage from "./pages/Ironing";
+import QC2InspectionPage from "./pages/QC2Inspection";
+import Return from "./pages/QC Inspection/Return";
 import { AuthProvider } from './components/authentication/AuthContext.jsx';
+
 
 // Create a context for Bluetooth functionality
 export const BluetoothContext = createContext(null);
@@ -618,6 +620,7 @@ function App() {
                 />
                 <Route path="/ironing" element={<IroningPage />} />
                 <Route path="/qc2-inspection" element={<QC2InspectionPage />} />
+                <Route path="/download-data" element={<DownloadData />} />
               </>
             ) : (
               <Route path="*" element={<Navigate to="/" replace />} />
