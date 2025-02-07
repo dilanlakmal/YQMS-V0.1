@@ -48,6 +48,7 @@ const qcDataSchema = new mongoose.Schema(
     color: String,
     size: String,
   },
+  { collection: "qc1_data" }
 );
 
 export default (connection) => connection.model("qc1_data", qcDataSchema);

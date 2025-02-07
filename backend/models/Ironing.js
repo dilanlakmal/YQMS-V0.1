@@ -19,6 +19,7 @@ const ironingSchema = new mongoose.Schema(
     count: String,
     totalBundleQty: Number,
   },
+  { collection: "ironing" }
 );
 
 export default (connection) => connection.model("Ironing", ironingSchema);

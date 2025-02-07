@@ -22,6 +22,7 @@ const qc2OrderDataSchema = new mongoose.Schema(
       updated_date_seperator: { type: String, required: true },
       updated_time_seperator: { type: String, required: true },
     },
+   {collection:"qc2_orderdata"}
   );
 
   export default (connection) => connection.model("qc2_orderdata", qc2OrderDataSchema);

@@ -23,8 +23,7 @@ const __dirname = path.dirname(__filename);
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use('/public', express.static(path.join(__dirname, '../public')));
-// app.use('/storage', express.static(path.join(__dirname, '../storage/app/public')));
-//app.use(cors());
+
 app.use(bodyParser.json());
 app.use(
   cors({
@@ -1139,6 +1138,7 @@ app.get("/api/download-data", async (req, res) => {
     page = parseInt(page);
     limit = parseInt(limit);
     const skip = (page - 1) * limit;
+    
 
     // Format dates to match the stored format (MM/DD/YYYY)
     if (startDate) {
@@ -1156,7 +1156,7 @@ app.get("/api/download-data", async (req, res) => {
     const collection = isIroning ? Ironing : QC2OrderData;
     const dateField = isIroning
       ? "ironing_updated_date"
-      : "updated_date_seperator";
+      : "updated_date_separator";
 
     // Date range filter
     if (startDate || endDate) {
@@ -1178,7 +1178,7 @@ app.get("/api/download-data", async (req, res) => {
       matchQuery.task_no = parseInt(taskNo);
     }
 
-    console.log("Match Query:", matchQuery); // For debugging
+    console.log("Match Query:", JSON.stringify(matchQuery, null, 2)); // For debugging
 
     // Get total count
     const total = await collection.countDocuments(matchQuery);
