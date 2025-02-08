@@ -55,6 +55,7 @@ const UserList = () => {
   const filterUsers = () => {
     const filtered = users.filter(user =>
       (user.name && user.name.toLowerCase().includes(search.toLowerCase())) ||
+      (user.emp_id && user.emp_id.toLowerCase().includes(search.toLowerCase())) ||
       (user.eng_name && user.eng_name.toLowerCase().includes(search.toLowerCase())) ||
       (user.kh_name && user.kh_name.toLowerCase().includes(search.toLowerCase())) ||
       (user.dept_name && user.dept_name.toLowerCase().includes(search.toLowerCase())) ||
@@ -222,6 +223,7 @@ const UserList = () => {
               <th className="px-4 py-2 border bg-blue-50">Name</th>
               <th className="px-4 py-2 border bg-blue-50">Full Name</th>
               <th className="px-4 py-2 border bg-blue-50">Department</th>
+              <th className="px-4 py-2 border bg-blue-50">Job Title</th>
               <th className="px-4 py-2 border bg-blue-50">Created At</th>
               <th className="px-4 py-2 border bg-blue-50">Action</th>
             </tr>
@@ -232,6 +234,7 @@ const UserList = () => {
                 <td className="px-4 py-2 border">{user.name} <br /> {user.emp_id}</td>
                 <td className="px-4 py-2 border">{user.eng_name}<br /> {user.kh_name}</td>
                 <td className="px-4 py-2 border">{user.dept_name} <br /> {user.sect_name}</td>
+                <td className="px-4 py-2 border">{user.job_title}</td>
                 <td className="px-4 py-2 border">{new Date(user.created_at).toLocaleDateString()}</td>
                 <td className="px-4 py-2 border">
                   <button

@@ -61,6 +61,7 @@ const EditUserModal = ({ isOpen, onClose, user, roles, onSubmit }) => {
     const updatedUser = {
       ...user,
       name: formData.get('name'),
+      job_title: formData.get('job_title'),
       email: formData.get('email'),
       roles: [...new Set(selectedRoles)],
       sub_roles: [...new Set(selectedSubRoles.concat(formData.getAll('types[]')))],
@@ -127,6 +128,20 @@ const EditUserModal = ({ isOpen, onClose, user, roles, onSubmit }) => {
                   name="name"
                   id="name"
                   defaultValue={user.name}
+                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                  placeholder="Enter username"
+                  required
+                />
+              </div>
+              <div className="col-span-2">
+                <label htmlFor="name" className="mb-2 text-left block text-sm font-medium text-gray-700 dark:text-gray-300">
+                 Job Title
+                </label>
+                <input
+                  type="text"
+                  name="job_title"
+                  id="job_title"
+                  defaultValue={user.job_title}
                   className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
                   placeholder="Enter username"
                   required
@@ -289,6 +304,7 @@ EditUserModal.propTypes = {
   onClose: PropTypes.func.isRequired,
   user: PropTypes.shape({
     name: PropTypes.string.isRequired,
+    job_title: PropTypes.string,
     email: PropTypes.string,
     roles: PropTypes.arrayOf(PropTypes.string).isRequired,
     sub_roles: PropTypes.arrayOf(PropTypes.string),

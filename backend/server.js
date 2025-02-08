@@ -33,10 +33,12 @@ app.use(
   })
 );
 
-const ymProdConnection = mongoose.createConnection("mongodb://localhost:27017/ym_prod");
-const mainUserConnection = mongoose.createConnection("mongodb://127.0.0.1:27017/eco_development");
+// const ymProdConnection = mongoose.createConnection("mongodb://localhost:27017/ym_prod");
+// const mainUserConnection = mongoose.createConnection("mongodb://127.0.0.1:27017/eco_development");
+const mainUserConnection = mongoose.createConnection("mongodb://yasomi:Yasomi%40YM2025@192.167.1.10:29000/ym_eco_board?authSource=admin");
+const ymProdConnection = mongoose.createConnection("mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin");
 
-// Log connection status
+// // Log connection status
 ymProdConnection.on('connected', () => console.log("Connected to ym_prod database"));
 ymProdConnection.on('error', (err) => console.error("ym_prod connection error:", err));
 mainUserConnection.on('connected', () => console.log("Connected to eco_development database"));

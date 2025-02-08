@@ -145,13 +145,18 @@ function DownloadData() {
     }));
   };
 
-  const formatDate = (date) => {
-    const d = new Date(date);
-    return `${(d.getMonth() + 1).toString().padStart(2, "0")}/${d
-      .getDate()
-      .toString()
-      .padStart(2, "0")}/${d.getFullYear()}`;
-  };
+  function formatDate(dateString) {
+    console.log('Original date string:', dateString); // Log the original date string
+    const date = new Date(dateString);
+    if (isNaN(date)) {
+      console.error('Invalid date:', dateString); // Log the invalid date string
+      return 'Invalid Date';
+    }
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+    const year = date.getFullYear();
+    return `${month}/${day}/${year}`;
+  }
 
   const handleSearch = async () => {
     setLoading(true);
