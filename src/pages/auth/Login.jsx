@@ -58,6 +58,7 @@ function Login({ onLogin }) {
 
           onLogin(accessToken);
           navigate('/home');
+          console.log('User Login:',response);
         }
       } catch (error) {
         setError("Invalid username or password");
@@ -121,6 +122,11 @@ function Login({ onLogin }) {
             </p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+              <div className="text-red-500 text-center mb-4">
+                {error}
+              </div>
+            )}
             <div>
               <label
                 htmlFor="username"

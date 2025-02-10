@@ -33,6 +33,8 @@ app.use(
   })
 );
 
+//-----------------------------DATABASE CONNECTIONS------------------------------------------------//
+
 // const ymProdConnection = mongoose.createConnection("mongodb://localhost:27017/ym_prod");
 // const mainUserConnection = mongoose.createConnection("mongodb://127.0.0.1:27017/eco_development");
 const mainUserConnection = mongoose.createConnection("mongodb://yasomi:Yasomi%40YM2025@192.167.1.10:29000/ym_eco_board?authSource=admin");
@@ -51,6 +53,9 @@ const Role = createRoleModel(ymProdConnection);
 const Ironing = createIroningModel(ymProdConnection);
 const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
 
+//-----------------------------END DATABASE CONNECTIONS------------------------------------------------//
+
+//-----------------------------USER AUTH LOGIN------------------------------------------------//
 const authenticateUser = (req, res, next) => {
   try {
     const token = req.headers.authorization.split(' ')[1];
@@ -62,6 +67,9 @@ const authenticateUser = (req, res, next) => {
   }
 };
 
+//-----------------------------END USER AUTH LOGIN------------------------------------------------//
+
+//-----------------------------USER PROFILE SAVE------------------------------------------------//
 const generateRandomString = (length) => {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
@@ -112,6 +120,8 @@ function checkFileType(file, cb) {
   }
 }
 
+//-----------------------------END USER PROFILE SAVE------------------------------------------------//
+
 const generateRandomId = async () => {
   let randomId;
   let isUnique = false;
@@ -124,6 +134,7 @@ const generateRandomId = async () => {
 
   return randomId;
 };
+//----------------------------------------------USER MANAGEMENT FUNCTION-------------------------------------------//
 
 // User routes
 app.get('/users', async (req, res) => {
@@ -257,6 +268,8 @@ app.post('/api/get-user-data', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch user data', error: error.message });
   }
 });
+
+//-----------------------------END USER MANAGEMENT FUNCTION------------------------------------------------//
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -870,7 +883,7 @@ app.post("/api/save-qc-data", async (req, res) => {
   }
 });
 
-
+//-----------------------------USER FUNCTION------------------------------------------------//
 
 app.post("/api/refresh-token", async (req, res) => {
   try {
@@ -897,6 +910,8 @@ app.post("/api/refresh-token", async (req, res) => {
   }
 });
 
+
+
 // Login Endpoint
 app.post("/api/login", async (req, res) => {
   try {
@@ -913,6 +928,8 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid username or password" });
     }
 
+    console.log('user details:', user);
+
     const isPasswordValid = await bcrypt.compare(
       password.trim(),
       user.password.replace("$2y$", "$2b$")
@@ -927,6 +944,7 @@ app.post("/api/login", async (req, res) => {
       user.password = newHashedPassword;
       await user.save();
     }
+    console.log('user:', isPasswordValid);
 
     const accessToken = jwt.sign(
       { userId: user._id, email: user.email, name: user.name },
@@ -1070,8 +1088,11 @@ app.put('/api/user-profile',authenticateUser, upload, async (req, res) => {
   }
 });
 
+//-----------------------------END USER FUNCTION------------------------------------------------//
+
 // Start the Server
 // Helper function to format date to MM/DD/YYYY
+
 const formatDate = (date) => {
   const d = new Date(date);
   return `${(d.getMonth() + 1).toString().padStart(2, "0")}/${d
@@ -1140,7 +1161,6 @@ app.get("/api/download-data", async (req, res) => {
     page = parseInt(page);
     limit = parseInt(limit);
     const skip = (page - 1) * limit;
-    
 
     // Format dates to match the stored format (MM/DD/YYYY)
     if (startDate) {
@@ -1156,9 +1176,7 @@ app.get("/api/download-data", async (req, res) => {
     // Determine collection and date field based on type/taskNo
     const isIroning = type === "Ironing" || taskNo === "53";
     const collection = isIroning ? Ironing : QC2OrderData;
-    const dateField = isIroning
-      ? "ironing_updated_date"
-      : "updated_date_separator";
+    const dateField = isIroning ? "ironing_updated_date" : "updated_date_seperator";
 
     // Date range filter
     if (startDate || endDate) {
@@ -1196,18 +1214,21 @@ app.get("/api/download-data", async (req, res) => {
     console.log("Found records:", data.length); // For debugging
 
     // Transform data for consistent response
-    const transformedData = data.map((item) => ({
-      date: item[dateField],
-      type: isIroning ? "Ironing" : "QC2 Order Data",
-      taskNo: isIroning ? "53" : "52",
-      selectedMono: item.selectedMono,
-      custStyle: item.custStyle,
-      lineNo: item.lineNo,
-      color: item.color,
-      size: item.size,
-      buyer: item.buyer,
-      bundle_id: isIroning ? item.ironing_bundle_id : item.bundle_id,
-    }));
+    const transformedData = data.map((item) => {
+      const date = item[dateField]; // Log the date field
+      return {
+        date: date,
+        type: isIroning ? "Ironing" : "QC2 Order Data",
+        taskNo: isIroning ? "53" : "52",
+        selectedMono: item.selectedMono,
+        custStyle: item.custStyle,
+        lineNo: item.lineNo,
+        color: item.color,
+        size: item.size,
+        buyer: item.buyer,
+        bundle_id: isIroning ? item.ironing_bundle_id : item.bundle_id,
+      };
+    });
 
     res.json({
       data: transformedData,

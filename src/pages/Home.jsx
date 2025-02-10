@@ -8,7 +8,7 @@ function Home() {
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading && user) {
       // User object is available here
     }
   }, [user, loading]);

@@ -78,14 +78,12 @@ function DownloadData() {
   const [colorOptions, setColorOptions] = useState([]);
   const [sizeOptions, setSizeOptions] = useState([]);
   const [buyerOptions, setBuyerOptions] = useState([]);
-
   const [data, setData] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage, setRecordsPerPage] = useState(50);
   const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(0);
-
   const [dropdownStates, setDropdownStates] = useState({
     moNo: false,
     styleNo: false,
@@ -95,9 +93,22 @@ function DownloadData() {
     buyer: false,
   });
 
+  const [headerDropdownStates, setHeaderDropdownStates] = useState({
+    date: false,
+    type: false,
+    taskNo: false,
+    moNo: false,
+    styleNo: false,
+    lineNo: false,
+    color: false,
+    size: false,
+    buyer: false,
+    bundleId: false,
+  });
+
   const [filters, setFilters] = useState({
-    date: [],
-    type: [],
+    date: [''],
+    type: [''],
     taskNo: [],
     moNo: [],
     styleNo: [],
@@ -139,22 +150,49 @@ function DownloadData() {
   };
 
   const toggleDropdown = (field) => {
-    setDropdownStates((prev) => ({
-      ...prev,
-      [field]: !prev[field],
-    }));
+    setDropdownStates({
+      moNo: false,
+      styleNo: false,
+      lineNo: false,
+      color: false,
+      size: false,
+      buyer: false,
+      [field]: !dropdownStates[field],
+    });
+  };
+
+  const toggleHeaderDropdown = (field) => {
+    setHeaderDropdownStates({
+      date: false,
+      type: false,
+      taskNo: false,
+      moNo: false,
+      styleNo: false,
+      lineNo: false,
+      color: false,
+      size: false,
+      buyer: false,
+      bundleId: false,
+      [field]: !headerDropdownStates[field],
+    });
   };
 
   function formatDate(dateString) {
-    console.log('Original date string:', dateString); // Log the original date string
+    if (!dateString) {
+      console.log('Date string is null or undefined');
+      return ''; // Return an empty string if the date is null or undefined
+    }
+
     const date = new Date(dateString);
     if (isNaN(date)) {
       console.error('Invalid date:', dateString); // Log the invalid date string
       return 'Invalid Date';
     }
+
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are zero-based
     const year = date.getFullYear();
+
     return `${month}/${day}/${year}`;
   }
 
@@ -179,7 +217,12 @@ function DownloadData() {
       const response = await fetch(`${API_BASE_URL}/api/download-data?${params}`);
       if (!response.ok) throw new Error('Failed to fetch data');
       const result = await response.json();
-      setData(result.data);
+      console.log('Received Data:', result.data);
+      const validatedData = result.data.map(item => ({
+        ...item,
+        date: item.date ? formatDate(item.date) : 'Invalid Date'
+      }));
+      setData(validatedData);
       setTotalRecords(result.total);
       setTotalPages(result.totalPages);
     } catch (error) {
@@ -222,6 +265,23 @@ function DownloadData() {
     }));
   };
 
+  const applyFilters = (data, filters) => {
+    return data.filter(item => {
+      return (
+        (!filters.date[0] || item.date === filters.date[0]) &&
+        (!filters.type[0] || item.type === filters.type[0]) &&
+        (!filters.taskNo.length || filters.taskNo.includes(item.taskNo)) &&
+        (!filters.moNo.length || filters.moNo.includes(item.moNo)) &&
+        (!filters.styleNo.length || filters.styleNo.includes(item.styleNo)) &&
+        (!filters.lineNo.length || filters.lineNo.includes(item.lineNo)) &&
+        (!filters.color.length || filters.color.includes(item.color)) &&
+        (!filters.size.length || filters.size.includes(item.size)) &&
+        (!filters.buyer.length || filters.buyer.includes(item.buyer)) &&
+        (!filters.bundleId.length || filters.bundleId.includes(item.bundleId))
+      );
+    });
+  };
+
   const renderPagination = () => {
     const pages = [];
     const maxVisiblePages = 5;
@@ -230,7 +290,6 @@ function DownloadData() {
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
-
     if (startPage > 1) {
       pages.push(
         <button
@@ -249,7 +308,6 @@ function DownloadData() {
         );
       }
     }
-
     for (let i = startPage; i <= endPage; i++) {
       pages.push(
         <button
@@ -263,7 +321,6 @@ function DownloadData() {
         </button>
       );
     }
-
     if (endPage < totalPages) {
       if (endPage < totalPages - 1) {
         pages.push(
@@ -282,20 +339,19 @@ function DownloadData() {
         </button>
       );
     }
-
     return pages;
   };
 
   const renderFilterDropdown = (field, options) => (
     <div className="relative">
       <button
-        onClick={() => toggleDropdown(field)}
+        onClick={() => toggleHeaderDropdown(field)}
         className="flex items-center space-x-1 focus:outline-none"
       >
         <Filter className="h-4 w-4" />
       </button>
-      {dropdownStates[field] && (
-        <div className="absolute z-10 w-48 mt-2 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+      {headerDropdownStates[field] && (
+        <div className="absolute z-20 w-48 mt-2 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
           {options.map((option, idx) => (
             <div key={idx} className="px-4 py-2 hover:bg-gray-100 cursor-pointer">
               <label className="flex items-center space-x-2">
@@ -307,6 +363,7 @@ function DownloadData() {
                       ? [...filters[field], option]
                       : filters[field].filter((item) => item !== option);
                     handleFilterChange(field, newFilters);
+                    handleSearch(); // Trigger search when an option is selected
                   }}
                 />
                 <span>{option}</span>
@@ -421,9 +478,9 @@ function DownloadData() {
                     className="w-full px-3 py-2 border rounded-md"
                     placeholder={`${label}...`}
                   />
-                  <Search className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+                  <Search className="                    absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
                   {dropdownStates[label.toLowerCase().replace(' ', '')] && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                    <div className="absolute z-20 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
                       {options
                         .filter((opt) => opt.toLowerCase().includes(value.toLowerCase()))
                         .map((opt, idx) => (
@@ -433,6 +490,7 @@ function DownloadData() {
                             onClick={() => {
                               setter(opt);
                               toggleDropdown(label.toLowerCase().replace(' ', ''));
+                              handleSearch(); // Trigger search when an option is selected
                             }}
                           >
                             {opt}
@@ -454,133 +512,133 @@ function DownloadData() {
                 {loading ? 'Searching...' : 'Search'}
               </button>
               {data.length > 0 && (
-                   <>
-                     <ExcelDownloadButton
-                       data={data}
-                       filters={{
-                         taskNo: tabData[activeTab].taskNo,
-                         type: tabData[activeTab].type,
-                         moNo: tabData[activeTab].moNo,
-                         styleNo: tabData[activeTab].styleNo,
-                         lineNo: tabData[activeTab].lineNo,
-                         color: tabData[activeTab].color,
-                         size: tabData[activeTab].size,
-                       }}
-                     />
-                     <PDFDownloadButton
-                       data={data}
-                       filters={{
-                         taskNo: tabData[activeTab].taskNo,
-                         type: tabData[activeTab].type,
-                         moNo: tabData[activeTab].moNo,
-                         styleNo: tabData[activeTab].styleNo,
-                         lineNo: tabData[activeTab].lineNo,
-                         color: tabData[activeTab].color,
-                         size: tabData[activeTab].size,
-                       }}
-                     />
-                   </>
-                 )}
-               </div>
-               <div className="flex items-center space-x-2">
-                 <span className="text-sm text-gray-600">Records per page:</span>
-                 <select
-                   value={recordsPerPage}
-                   onChange={(e) => {
-                     setRecordsPerPage(Number(e.target.value));
-                     setCurrentPage(1);
-                   }}
-                   className="border rounded-md px-2 py-1"
-                 >
-                   {RECORDS_PER_PAGE_OPTIONS.map((option) => (
-                     <option key={option} value={option}>
-                       {option}
-                     </option>
-                   ))}
-                 </select>
-               </div>
-             </div>
-             {/* Data Table */}
-             <div className="overflow-x-auto">
-               <div className="inline-block min-w-full align-middle">
-                 <div className="overflow-hidden border rounded-lg">
-                   <table className="min-w-full divide-y divide-gray-200">
-                     <thead className="bg-gray-50">
-                       <tr>
-                         {[
-                           { label: 'Date', field: 'date', options: [] },
-                           { label: 'Type', field: 'type', options: DATA_TYPES },
-                           { label: 'Task No', field: 'taskNo', options: ['52', '53'] },
-                           { label: 'MO No', field: 'moNo', options: moNoOptions },
-                           { label: 'Style No', field: 'styleNo', options: styleNoOptions },
-                           { label: 'Line No', field: 'lineNo', options: lineNoOptions },
-                           { label: 'Color', field: 'color', options: colorOptions },
-                           { label: 'Size', field: 'size', options: sizeOptions },
-                           { label: 'Buyer', field: 'buyer', options: buyerOptions },
-                           { label: 'Bundle ID', field: 'bundleId', options: [] },
-                         ].map(({ label, field, options }) => (
-                           <th
-                             key={field}
-                             className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                           >
-                             <div className="flex items-center space-x-2">
-                               <span>{label}</span>
-                               {renderFilterDropdown(field, options)}
-                             </div>
-                           </th>
-                         ))}
-                       </tr>
-                     </thead>
-                     <tbody className="bg-white divide-y divide-gray-200">
-                       {loading ? (
-                         <tr>
-                           <td colSpan="10" className="text-center py-4">
-                             Loading...
-                           </td>
-                         </tr>
-                       ) : data.length === 0 ? (
-                         <tr>
-                           <td colSpan="10" className="text-center py-4">
-                             No data found
-                           </td>
-                         </tr>
-                       ) : (
-                         data.map((item, index) => (
-                           <tr key={index}>
-                             <td className="px-6 py-4 whitespace-nowrap">{formatDate(item.date)}</td>
-                             <td className="px-6 py-4 whitespace-nowrap">{item.type}</td>
-                             <td className="px-6 py-4 whitespace-nowrap">{item.taskNo}</td>
-                             <td className="px-6 py-4 whitespace-nowrap">{item.selectedMono}</td>
-                             <td className="px-6 py-4 whitespace-nowrap">{item.custStyle}</td>
-                             <td className="px-6 py-4 whitespace-nowrap">{item.lineNo}</td>
-                             <td className="px-6 py-4 whitespace-nowrap">{item.color}</td>
-                             <td className="px-6 py-4 whitespace-nowrap">{item.size}</td>
-                             <td className="px-6 py-4 whitespace-nowrap">{item.buyer}</td>
-                             <td className="px-6 py-4 whitespace-nowrap">{item.bundle_id}</td>
-                           </tr>
-                         ))
-                       )}
-                     </tbody>
-                   </table>
-                 </div>
-               </div>
-             </div>
-             {/* Pagination */}
-             {totalPages > 0 && (
-               <div className="mt-4 flex justify-between items-center">
-                 <div className="text-sm text-gray-700">
-                   Showing{' '}
-                   {Math.min((currentPage - 1) * recordsPerPage + 1, totalRecords)} to{' '}
-                   {Math.min(currentPage * recordsPerPage, totalRecords)} of {totalRecords} results
-                 </div>
-                 <div className="flex space-x-2">{renderPagination()}</div>
-               </div>
-             )}
-           </div>
-         </div>
-       </div>
-     );
-   }
+                <>
+                  <ExcelDownloadButton
+                    data={data}
+                    filters={{
+                      taskNo: tabData[activeTab].taskNo,
+                      type: tabData[activeTab].type,
+                      moNo: tabData[activeTab].moNo,
+                      styleNo: tabData[activeTab].styleNo,
+                      lineNo: tabData[activeTab].lineNo,
+                      color: tabData[activeTab].color,
+                      size: tabData[activeTab].size,
+                    }}
+                  />
+                  <PDFDownloadButton
+                    data={data}
+                    filters={{
+                      taskNo: tabData[activeTab].taskNo,
+                      type: tabData[activeTab].type,
+                      moNo: tabData[activeTab].moNo,
+                      styleNo: tabData[activeTab].styleNo,
+                      lineNo: tabData[activeTab].lineNo,
+                      color: tabData[activeTab].color,
+                      size: tabData[activeTab].size,
+                    }}
+                  />
+                </>
+              )}
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">Records per page:</span>
+              <select
+                value={recordsPerPage}
+                onChange={(e) => {
+                  setRecordsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="border rounded-md px-2 py-1"
+              >
+                {RECORDS_PER_PAGE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {/* Data Table */}
+          <div className="overflow-x-auto">
+            <div className="inline-block min-w-full align-middle">
+              <div className="overflow-hidden border rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {[
+                        { label: 'Date', field: 'date', options: [] },
+                        { label: 'Type', field: 'type', options: DATA_TYPES },
+                        { label: 'Task No', field: 'taskNo', options: ['52', '53'] },
+                        { label: 'MO No', field: 'moNo', options: moNoOptions },
+                        { label: 'Style No', field: 'styleNo', options: styleNoOptions },
+                        { label: 'Line No', field: 'lineNo', options: lineNoOptions },
+                        { label: 'Color', field: 'color', options: colorOptions },
+                        { label: 'Size', field: 'size', options: sizeOptions },
+                        { label: 'Buyer', field: 'buyer', options: buyerOptions },
+                        { label: 'Bundle ID', field: 'bundleId', options: [] },
+                      ].map(({ label, field, options }) => (
+                        <th
+                          key={field}
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <span>{label}</span>
+                            {renderFilterDropdown(field, options)}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {loading ? (
+                      <tr>
+                        <td colSpan="10" className="text-center py-4">
+                          Loading...
+                        </td>
+                      </tr>
+                    ) : data.length === 0 ? (
+                      <tr>
+                        <td colSpan="10" className="text-center py-4">
+                          No data found
+                        </td>
+                      </tr>
+                    ) : (
+                      applyFilters(data, filters).map((item, index) => (
+                        <tr key={index}>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.date}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.type}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.taskNo}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.selectedMono}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.custStyle}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.lineNo}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.color}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.size}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.buyer}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.bundle_id}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          {/* Pagination */}
+          {totalPages > 0 && (
+            <div className="mt-4 flex justify-between items-center">
+              <div className="text-sm text-gray-700">
+                Showing{' '}
+                {Math.min((currentPage - 1) * recordsPerPage + 1, totalRecords)} to{' '}
+                {Math.min(currentPage * recordsPerPage, totalRecords)} of {totalRecords} results
+              </div>
+              <div className="flex space-x-2">{renderPagination()}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-   export default DownloadData;
+export default DownloadData;
 
