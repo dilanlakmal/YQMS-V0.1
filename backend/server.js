@@ -2,6 +2,9 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import express from "express";
 import mongoose from "mongoose";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import createUserModel from "./models/User.js";
 
 const app = express();
 const PORT = 5001;
@@ -18,9 +21,13 @@ app.use(
 
 const mongoURI = "mongodb://localhost:27017/ym_prod";
 mongoose
-  .connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .connect(mongoURI)
   .then(() => console.log("MongoDB connected to ym_prod database"))
   .catch((err) => console.error("MongoDB connection error:", err));
+
+const mainUserConnection = mongoose.createConnection("mongodb://yasomi:Yasomi%40YM2025@192.167.1.10:29000/ym_eco_board?authSource=admin");
+
+const UserMain = createUserModel(mainUserConnection);
 
 // Add this function in server.js (before routes)
 const generateRandomId = async () => {
@@ -1021,6 +1028,109 @@ app.get("/api/download-data", async (req, res) => {
   }
 });
 
+const authenticateUser = (req, res, next) => {
+  try {
+    const token = req.headers.authorization.split(' ')[1];
+    const decodedToken = jwt.verify(token, 'your_jwt_secret');
+    req.userId = decodedToken.userId; // Set the userId in the request object
+    next();
+  } catch (error) {
+    res.status(401).json({ message: 'Authentication failed', error: error.message });
+  }
+};
+
+app.post("/api/refresh-token", async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(401).json({ message: "Refresh token is required" });
+    }
+
+    jwt.verify(refreshToken, "your_refresh_token_secret", (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: "Invalid refresh token" });
+      }
+
+      const accessToken = jwt.sign(
+        { userId: decoded.userId },
+        "your_jwt_secret",
+        { expiresIn: "1h" }
+      );
+
+      res.status(200).json({ accessToken });
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to refresh token", error: error.message });
+  }
+});
+
+// Login Endpoint
+app.post("/api/login", async (req, res) => {
+  try {
+    const { username, password, rememberMe } = req.body;
+    if (!mainUserConnection.readyState) {
+      return res.status(500).json({ message: "Database not connected" });
+    }
+
+    const user = await UserMain.findOne({
+      $or: [{ email: username }, { name: username }, { emp_id: username }],
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid username or password" });
+    }
+
+    console.log('user details:', user);
+
+    const isPasswordValid = await bcrypt.compare(
+      password.trim(),
+      user.password.replace("$2y$", "$2b$")
+    );
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Invalid username or password" });
+    }
+
+    if (user.password.startsWith("$2y$")) {
+      const newHashedPassword = await bcrypt.hash(password.trim(), 10);
+      user.password = newHashedPassword;
+      await user.save();
+    }
+    console.log('user:', isPasswordValid);
+
+    const accessToken = jwt.sign(
+      { userId: user._id, email: user.email, name: user.name },
+      "your_jwt_secret",
+      { expiresIn: "1h" }
+    );
+
+    const refreshToken = jwt.sign(
+      { userId: user._id },
+      "your_refresh_token_secret",
+      { expiresIn: "30d" }
+    );
+
+    console.log('Access Token:', accessToken); 
+    console.log('Refresh Token:', refreshToken); 
+
+    res.status(200).json({
+      message: "Login successful",
+      accessToken,
+      refreshToken,
+      user: {
+        emp_id: user.emp_id,
+        name: user.name,
+        email: user.email,
+        roles: user.roles,
+        sub_roles: user.sub_roles,
+      },
+    });
+  } catch (error) {
+    // console.error("Login error:", error);
+    res.status(500).json({ message: "Failed to log in", error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });

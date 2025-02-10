@@ -322,11 +322,15 @@ import DownloadData from "./pages/DownloadData";
 import Home from "./pages/Home";
 import Inspection from "./pages/Inspection";
 import IroningPage from "./pages/Ironing";
-import Login from "./pages/Login";
+import Login from "./pages/auth/Login";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import Register from "./pages/auth/Register"; 
 import Logs from "./pages/Logs";
-import Profile from "./pages/Profile";
+import Profile from "./pages/auth/Profile";
+import UserList from "./components/users/userList";
 import QC2InspectionPage from "./pages/QC2Inspection";
 import Return from "./pages/Return";
+import { AuthProvider } from './components/authentication/AuthContext.jsx';
 
 // Create a context for Bluetooth functionality
 export const BluetoothContext = createContext(null);
@@ -495,6 +499,7 @@ function App() {
   };
 
   return (
+    <AuthProvider>
     <Router>
       <div className="min-h-screen bg-gray-50">
         {isAuthenticated && <Navbar onLogout={handleLogout} />}
@@ -578,6 +583,7 @@ function App() {
                     )
                   }
                 />
+                <Route path="/userList" element={<UserList />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route
                   path="/analytics"
@@ -611,6 +617,7 @@ function App() {
         </div>
       </div>
     </Router>
+    </AuthProvider>
   );
 }
 

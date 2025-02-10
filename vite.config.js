@@ -7,14 +7,22 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3001,
-    open: true,
-    https: {
-      key: fs.readFileSync(
-        "/Users/dilanlakmal/Downloads/YQMS-Latest-main/localhost-key.pem"
-      ),
-      cert: fs.readFileSync(
-        "/Users/dilanlakmal/Downloads/YQMS-Latest-main/localhost.pem"
-      ),
-    },
-  },
-});
+    open: true
+  }
+})
+
+// export default defineConfig({
+//   plugins: [react()],
+//   server: {
+//     port: 3001,
+//     open: true,
+//     https: {
+//       key: fs.readFileSync(
+//         "/Users/dilanlakmal/Downloads/YQMS-Latest-main/localhost-key.pem"
+//       ),
+//       cert: fs.readFileSync(
+//         "/Users/dilanlakmal/Downloads/YQMS-Latest-main/localhost.pem"
+//       ),
+//     },
+//   },
+// });
