@@ -1,10 +1,25 @@
+import bcrypt from "bcrypt";
 import bodyParser from "body-parser";
 import cors from "cors";
 import express from "express";
+import fs from "fs";
+import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
+import multer from "multer";
+import path from "path";
+import { fileURLToPath } from "url";
+import createRoleModel from "./models/Role.js";
+import createUserModel from "./models/User.js";
 
 const app = express();
 const PORT = 5001;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.use(bodyParser.json({ limit: "50mb" }));
+app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
+app.use("/public", express.static(path.join(__dirname, "../public")));
 
 //app.use(cors());
 app.use(bodyParser.json());
@@ -16,11 +31,27 @@ app.use(
   })
 );
 
-const mongoURI = "mongodb://localhost:27017/ym_prod";
+const mongoURI =
+  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"; //"mongodb://localhost:27017/ym_prod";
 mongoose
-  .connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .connect(mongoURI) //{ ,useNewUrlParser: true, useUnifiedTopology: true }
   .then(() => console.log("MongoDB connected to ym_prod database"))
   .catch((err) => console.error("MongoDB connection error:", err));
+
+const mainUserConnection = mongoose.createConnection(
+  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
+);
+
+mainUserConnection.on("connected", () =>
+  console.log("Connected to users collection")
+);
+mainUserConnection.on("error", (err) =>
+  console.error("unexpected error:", err)
+);
+
+// Define model on connections
+const UserMain = createUserModel(mainUserConnection);
+const Role = createRoleModel(mainUserConnection);
 
 // Add this function in server.js (before routes)
 const generateRandomId = async () => {
@@ -1006,6 +1037,8 @@ app.get("/api/download-data", async (req, res) => {
       size: item.size,
       buyer: item.buyer,
       bundle_id: isIroning ? item.ironing_bundle_id : item.bundle_id,
+      factory: item.factory,
+      count: item.count,
     }));
 
     res.json({
@@ -1020,6 +1053,577 @@ app.get("/api/download-data", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch download data" });
   }
 });
+
+/* ------------------------------
+   NEW SCHEMAS & ENDPOINTS
+------------------------------ */
+
+// Schema for qc2_inspection_pass_bundle with header fields as separate fields
+const qc2InspectionPassBundleSchema = new mongoose.Schema(
+  {
+    bundleNo: { type: String, required: true }, // extracted from bundleData.bundle_id
+    moNo: { type: String, required: true }, // from bundleData.selectedMono
+    custStyle: { type: String, required: true }, // from bundleData.custStyle
+    color: { type: String, required: true }, // from bundleData.color
+    size: { type: String, required: true }, // from bundleData.size
+    lineNo: { type: String, required: true }, // from bundleData.lineNo
+    department: { type: String, required: true }, // from bundleData.department
+    checkedQty: { type: Number, required: true }, // e.g. bundleData.count
+    totalPass: { type: Number, required: true },
+    totalRejects: { type: Number, required: true },
+    defectQty: { type: Number, required: true },
+    defectArray: [
+      {
+        defectName: { type: String, required: true },
+        totalCount: { type: Number, required: true },
+      },
+    ],
+    inspection_time: { type: String, required: true }, // "HH:MM:SS"
+    inspection_date: { type: String, required: true }, // "MM/DD/YYYY"
+  },
+  { collection: "qc2_inspection_pass_bundle" }
+);
+
+const QC2InspectionPassBundle = mongoose.model(
+  "qc2_inspection_pass_bundle",
+  qc2InspectionPassBundleSchema
+);
+
+// Schema for qc2_reworks with separate header fields
+const qc2ReworksSchema = new mongoose.Schema(
+  {
+    bundleNo: { type: String, required: true },
+    moNo: { type: String, required: true },
+    custStyle: { type: String, required: true },
+    color: { type: String, required: true },
+    size: { type: String, required: true },
+    lineNo: { type: String, required: true },
+    department: { type: String, required: true },
+    reworkGarments: [
+      {
+        defectName: { type: String, required: true },
+        count: { type: Number, required: true },
+        time: { type: String, required: true }, // "HH:MM:SS"
+      },
+    ],
+  },
+  { collection: "qc2_reworks" }
+);
+
+const QC2Reworks = mongoose.model("qc2_reworks", qc2ReworksSchema);
+
+// Endpoint to save inspection pass bundle data
+app.post("/api/inspection-pass-bundle", async (req, res) => {
+  try {
+    const {
+      bundleNo,
+      moNo,
+      custStyle,
+      color,
+      size,
+      lineNo,
+      department,
+      checkedQty,
+      totalPass,
+      totalRejects,
+      defectQty,
+      defectArray,
+      inspection_time,
+      inspection_date,
+    } = req.body;
+
+    const newRecord = new QC2InspectionPassBundle({
+      bundleNo,
+      moNo,
+      custStyle,
+      color,
+      size,
+      lineNo,
+      department,
+      checkedQty,
+      totalPass,
+      totalRejects,
+      defectQty,
+      defectArray,
+      inspection_time,
+      inspection_date,
+    });
+
+    await newRecord.save();
+    res.status(201).json({
+      message: "Inspection pass bundle saved successfully",
+      data: newRecord,
+    });
+  } catch (error) {
+    console.error("Error saving inspection pass bundle:", error);
+    res.status(500).json({
+      message: "Failed to save inspection pass bundle",
+      error: error.message,
+    });
+  }
+});
+
+// Endpoint to save reworks (reject garment) data
+app.post("/api/reworks", async (req, res) => {
+  try {
+    const {
+      bundleNo,
+      moNo,
+      custStyle,
+      color,
+      size,
+      lineNo,
+      department,
+      reworkGarments,
+    } = req.body;
+
+    const newRecord = new QC2Reworks({
+      bundleNo,
+      moNo,
+      custStyle,
+      color,
+      size,
+      lineNo,
+      department,
+      reworkGarments,
+    });
+    await newRecord.save();
+    res.status(201).json({
+      message: "Reworks data saved successfully",
+      data: newRecord,
+    });
+  } catch (error) {
+    console.error("Error saving reworks data:", error);
+    res.status(500).json({
+      message: "Failed to save reworks data",
+      error: error.message,
+    });
+  }
+});
+
+/* ------------------------------
+   User Auth ENDPOINTS - START
+------------------------------ */
+
+const authenticateUser = (req, res, next) => {
+  try {
+    const token = req.headers.authorization.split(" ")[1];
+    const decodedToken = jwt.verify(token, "your_jwt_secret");
+    req.userId = decodedToken.userId; // Set the userId in the request object
+    next();
+  } catch (error) {
+    res
+      .status(401)
+      .json({ message: "Authentication failed", error: error.message });
+  }
+};
+
+const generateRandomString = (length) => {
+  const characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return result;
+};
+
+// Set storage engine
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const userId = req.userId;
+    if (!userId) {
+      return cb(new Error("User ID is not defined"));
+    }
+    const dir = `../public/storage/profiles/${userId}`;
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const randomString = generateRandomString(32);
+    cb(null, `${randomString}${path.extname(file.originalname)}`);
+  },
+});
+
+// Initialize upload
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5000000 }, // Limit file size to 5MB
+  fileFilter: (req, file, cb) => {
+    checkFileType(file, cb);
+  },
+}).single("profile");
+
+// Check file type
+function checkFileType(file, cb) {
+  // Allowed ext
+  const filetypes = /jpeg|jpg|png|gif/;
+  // Check ext
+  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+  // Check mime
+  const mimetype = filetypes.test(file.mimetype);
+  if (mimetype && extname) {
+    return cb(null, true);
+  } else {
+    cb("Error: Images Only!");
+  }
+}
+
+// User routes
+app.get("/users", async (req, res) => {
+  try {
+    const users = await UserMain.find();
+    res.json(users);
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ message: "Failed to fetch users" });
+  }
+});
+
+app.post("/users", async (req, res) => {
+  try {
+    const { emp_id, name, email, roles, sub_roles, keywords, password } =
+      req.body;
+
+    // Log the incoming request body
+    console.log("Request body:", req.body);
+
+    // Check if the emp_id already exists
+    const existingUser = await UserMain.findOne({ emp_id });
+    if (existingUser) {
+      return res.status(400).json({
+        message: "Employee ID already exists. Please use a different ID.",
+      });
+    }
+
+    // Hash the password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create a new user
+    const newUser = new UserMain({
+      emp_id,
+      name,
+      email,
+      roles,
+      sub_roles,
+      keywords,
+      password: hashedPassword,
+    });
+
+    // Save the user to the database
+    await newUser.save();
+
+    res.status(201).json(newUser);
+  } catch (error) {
+    console.error("Error creating user:", error);
+    res.status(500).json({ message: "Failed to create user" });
+  }
+});
+
+app.put("/users/:id", async (req, res) => {
+  try {
+    const user = await UserMain.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+    });
+    res.json(user);
+  } catch (error) {
+    console.error("Error updating user:", error);
+    res.status(500).json({ message: "Failed to update user" });
+  }
+});
+
+app.delete("/users/:id", async (req, res) => {
+  try {
+    await UserMain.findByIdAndDelete(req.params.id);
+    res.json({ message: "User deleted" });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ message: "Failed to delete user" });
+  }
+});
+
+app.get("/roles", async (req, res) => {
+  try {
+    const roles = await Role.find();
+    res.json(roles);
+  } catch (error) {
+    console.error("Error fetching roles:", error);
+    res.status(500).json({ error: "Failed to fetch roles" });
+  }
+});
+
+app.put("/users/:id", async (req, res) => {
+  try {
+    const { name, email, roles, sub_roles, keywords, password } = req.body;
+    const updatedUser = { name, email, keywords };
+
+    if (roles) {
+      updatedUser.roles = [...new Set(roles)]; // Remove duplicates
+    }
+
+    if (sub_roles) {
+      updatedUser.sub_roles = [...new Set(sub_roles)]; // Remove duplicates
+    }
+
+    if (password) {
+      const saltRounds = 12;
+      updatedUser.password = await bcrypt.hash(password, saltRounds); // Ensure you hash the password before saving
+    }
+
+    const user = await UserMain.findByIdAndUpdate(req.params.id, updatedUser, {
+      new: true,
+    });
+    res.json(user);
+  } catch (error) {
+    console.error("Error updating user:", error);
+    res.status(500).json({ message: "Failed to update user" });
+  }
+});
+
+app.post("/api/get-user-data", async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ message: "Token is required" });
+    }
+
+    const decoded = jwt.verify(token, "your_jwt_secret");
+    const user = await UserMain.findById(decoded.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      emp_id: user.emp_id,
+      name: user.name,
+      dept_name: user.dept_name,
+      sect_name: user.sect_name,
+      profile: user.profile,
+      roles: user.roles,
+      sub_roles: user.sub_roles,
+    });
+  } catch (error) {
+    console.error("Error fetching user data:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch user data", error: error.message });
+  }
+});
+
+app.post("/api/refresh-token", async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(401).json({ message: "Refresh token is required" });
+    }
+
+    jwt.verify(refreshToken, "your_refresh_token_secret", (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: "Invalid refresh token" });
+      }
+
+      const accessToken = jwt.sign(
+        { userId: decoded.userId },
+        "your_jwt_secret",
+        { expiresIn: "1h" }
+      );
+
+      res.status(200).json({ accessToken });
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Failed to refresh token", error: error.message });
+  }
+});
+
+// Login Endpoint
+app.post("/api/login", async (req, res) => {
+  try {
+    const { username, password, rememberMe } = req.body;
+    if (!mainUserConnection.readyState) {
+      return res.status(500).json({ message: "Database not connected" });
+    }
+
+    const user = await UserMain.findOne({
+      $or: [{ email: username }, { name: username }, { emp_id: username }],
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid username or password" });
+    }
+    console.log("User Details", user);
+
+    const isPasswordValid = await bcrypt.compare(
+      password.trim(),
+      user.password.replace("$2y$", "$2b$")
+    );
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Invalid username or password" });
+    }
+
+    if (user.password.startsWith("$2y$")) {
+      const newHashedPassword = await bcrypt.hash(password.trim(), 10);
+      user.password = newHashedPassword;
+      await user.save();
+    }
+
+    const accessToken = jwt.sign(
+      { userId: user._id, email: user.email, name: user.name },
+      "your_jwt_secret",
+      { expiresIn: "1h" }
+    );
+
+    const refreshToken = jwt.sign(
+      { userId: user._id },
+      "your_refresh_token_secret",
+      { expiresIn: "30d" }
+    );
+
+    console.log("Access Token:", accessToken);
+    console.log("Refresh Token:", refreshToken);
+
+    res.status(200).json({
+      message: "Login successful",
+      accessToken,
+      refreshToken,
+      user: {
+        emp_id: user.emp_id,
+        name: user.name,
+        email: user.email,
+        roles: user.roles,
+        sub_roles: user.sub_roles,
+      },
+    });
+  } catch (error) {
+    // console.error("Login error:", error);
+    res.status(500).json({ message: "Failed to log in", error: error.message });
+  }
+});
+
+// Registration Endpoint
+app.post("/api/register", async (req, res) => {
+  try {
+    const { emp_id, eng_name, kh_name, password, confirmPassword } = req.body;
+
+    if (!emp_id || !eng_name || !password || !confirmPassword) {
+      return res.status(400).json({
+        message: "Employee ID, name, and password are required",
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        message: "Passwords do not match",
+      });
+    }
+
+    const existingUser = await UserMain.findOne({ emp_id });
+
+    if (existingUser) {
+      return res.status(400).json({
+        message: "Employee ID already registered",
+      });
+    }
+
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    const newUser = new UserMain({
+      emp_id,
+      eng_name,
+      name: eng_name,
+      kh_name: kh_name || "",
+      password: hashedPassword,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+
+    await newUser.save();
+
+    res.status(201).json({
+      message: "User registered successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to register user",
+      error: error.message,
+    });
+  }
+});
+
+// Fetch User Profile Endpoint
+app.get("/api/user-profile", async (req, res) => {
+  try {
+    const token = req.headers.authorization.split(" ")[1];
+    const decoded = jwt.verify(token, "your_jwt_secret");
+    const user = await UserMain.findById(decoded.userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      emp_id: user.emp_id,
+      name: user.name,
+      dept_name: user.dept_name,
+      sect_name: user.sect_name,
+      profile: user.profile
+        ? `/public/storage/profiles/${decoded.userId}/${path.basename(
+            user.profile
+          )}`
+        : null,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Failed to fetch user profile", error: error.message });
+  }
+});
+
+app.put("/api/user-profile", authenticateUser, upload, async (req, res) => {
+  try {
+    const token = req.headers.authorization.split(" ")[1];
+    const decoded = jwt.verify(token, "your_jwt_secret");
+    const userId = decoded.userId;
+
+    const updatedProfile = {
+      emp_id: req.body.emp_id,
+      name: req.body.name,
+      dept_name: req.body.dept_name,
+      sect_name: req.body.sect_name,
+      profile: req.file
+        ? `profiles/${userId}/${req.file.filename}`
+        : req.body.profile,
+      // profile: req.file ? `../storage/app/public/profiles/${userId}/${req.file.filename}` : req.body.profile, // Save file path
+    };
+
+    // console.log('Updated Profile:', updatedProfile);
+
+    const user = await UserMain.findByIdAndUpdate(userId, updatedProfile, {
+      new: true,
+    });
+
+    // console.log('Updated User:', user);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ message: "Profile updated successfully", user });
+  } catch (error) {
+    console.error("Error updating user profile:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to update user profile", error: error.message });
+  }
+});
+
+/* ------------------------------
+   ENDPOINTS - END
+------------------------------ */
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);

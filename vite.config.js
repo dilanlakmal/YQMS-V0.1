@@ -1,11 +1,11 @@
-import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import fs from "fs";
-import path from "path";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: "0.0.0.0", // This will allow you to access the server from another device
     port: 3001,
     open: true,
     https: {

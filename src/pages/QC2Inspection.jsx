@@ -1,525 +1,69 @@
-// import React, { useState } from "react";
-// import { QrCode, AlertCircle, Package, Loader2 } from "lucide-react";
-// import Scanner from "../components/forms/Scanner";
-
-// const QC2InspectionPage = () => {
-//   const [error, setError] = useState(null);
-//   const [bundleData, setBundleData] = useState(null);
-//   const [loading, setLoading] = useState(false);
-
-//   const fetchBundleData = async (randomId) => {
-//     try {
-//       setLoading(true);
-//       const response = await fetch(
-//         `http://localhost:5001/api/bundle-by-random-id/${randomId}`
-//       );
-//       if (!response.ok) {
-//         throw new Error("Bundle not found");
-//       }
-//       const data = await response.json();
-//       setBundleData(data);
-//       setError(null);
-//     } catch (err) {
-//       setError(err.message || "Failed to fetch bundle data");
-//       setBundleData(null);
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   const handleScanSuccess = (decodedText) => {
-//     fetchBundleData(decodedText);
-//   };
-
-//   const handleScanError = (errorMessage) => {
-//     setError(errorMessage);
-//   };
-
-//   const formatDate = (dateString) => {
-//     return new Date(dateString).toLocaleDateString("en-US", {
-//       year: "numeric",
-//       month: "short",
-//       day: "numeric",
-//     });
-//   };
-
-//   return (
-//     <div className="min-h-screen bg-gray-100">
-//       <div className="max-w-4xl mx-auto p-6">
-//         <div className="text-center mb-8">
-//           <div className="flex items-center justify-center gap-2 mb-4">
-//             <QrCode className="w-8 h-8 text-blue-600" />
-//             <h1 className="text-3xl font-bold text-gray-800">
-//               QC2 Bundle Scanner
-//             </h1>
-//           </div>
-//           <p className="text-gray-600">
-//             Scan the QR code on the bundle to retrieve inspection details
-//           </p>
-//         </div>
-
-//         {error && (
-//           <div className="mb-6 p-4 bg-red-100 border border-red-200 rounded-lg flex items-center gap-2">
-//             <AlertCircle className="w-5 h-5 text-red-500" />
-//             <p className="text-red-700">{error}</p>
-//           </div>
-//         )}
-
-//         <div className="bg-white p-6 rounded-lg shadow-lg">
-//           <Scanner
-//             onScanSuccess={handleScanSuccess}
-//             onScanError={handleScanError}
-//           />
-
-//           {loading && (
-//             <div className="flex items-center justify-center gap-2 text-blue-600">
-//               <Loader2 className="w-5 h-5 animate-spin" />
-//               <p>Loading bundle data...</p>
-//             </div>
-//           )}
-
-//           {bundleData && (
-//             <div className="mt-6 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-//               <div className="flex items-start gap-4">
-//                 <Package className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
-//                 <div className="flex-grow">
-//                   <h2 className="text-xl font-semibold text-gray-800 mb-4">
-//                     Bundle Details
-//                   </h2>
-
-//                   <div className="grid grid-cols-2 gap-4">
-//                     <div>
-//                       <p className="text-sm text-gray-600">Bundle ID</p>
-//                       <p className="font-medium">{bundleData.bundle_id}</p>
-//                     </div>
-//                     <div>
-//                       <p className="text-sm text-gray-600">Date</p>
-//                       <p className="font-medium">
-//                         {formatDate(bundleData.date)}
-//                       </p>
-//                     </div>
-//                     <div>
-//                       <p className="text-sm text-gray-600">MO Number</p>
-//                       <p className="font-medium">{bundleData.selectedMono}</p>
-//                     </div>
-//                     <div>
-//                       <p className="text-sm text-gray-600">Style</p>
-//                       <p className="font-medium">{bundleData.custStyle}</p>
-//                     </div>
-//                     <div>
-//                       <p className="text-sm text-gray-600">Buyer</p>
-//                       <p className="font-medium">{bundleData.buyer}</p>
-//                     </div>
-//                     <div>
-//                       <p className="text-sm text-gray-600">Country</p>
-//                       <p className="font-medium">{bundleData.country}</p>
-//                     </div>
-//                     <div>
-//                       <p className="text-sm text-gray-600">Factory</p>
-//                       <p className="font-medium">{bundleData.factory}</p>
-//                     </div>
-//                     <div>
-//                       <p className="text-sm text-gray-600">Line No</p>
-//                       <p className="font-medium">{bundleData.lineNo}</p>
-//                     </div>
-//                     <div>
-//                       <p className="text-sm text-gray-600">Color</p>
-//                       <p className="font-medium">{bundleData.color}</p>
-//                     </div>
-//                     <div>
-//                       <p className="text-sm text-gray-600">Size</p>
-//                       <p className="font-medium">{bundleData.size}</p>
-//                     </div>
-//                     <div>
-//                       <p className="text-sm text-gray-600">Count</p>
-//                       <p className="font-medium">{bundleData.count}</p>
-//                     </div>
-//                     <div>
-//                       <p className="text-sm text-gray-600">Bundle Quantity</p>
-//                       <p className="font-medium">{bundleData.totalBundleQty}</p>
-//                     </div>
-//                   </div>
-//                 </div>
-//               </div>
-//             </div>
-//           )}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default QC2InspectionPage;
-
-// import React, { useState } from "react";
-// import { QrCode, AlertCircle, Package, Loader2, Send } from "lucide-react";
-// import Scanner from "../components/forms/Scanner";
-// import DefectBox from "../components/inspection/DefectBox";
-
-// const QC2InspectionPage = () => {
-//   const [error, setError] = useState(null);
-//   const [bundleData, setBundleData] = useState(null);
-//   const [loading, setLoading] = useState(false);
-//   const [currentDefectCount, setCurrentDefectCount] = useState({});
-//   const [language, setLanguage] = useState("en");
-//   const [submitting, setSubmitting] = useState(false);
-
-//   const fetchBundleData = async (randomId) => {
-//     try {
-//       setLoading(true);
-//       const response = await fetch(
-//         `http://localhost:5001/api/bundle-by-random-id/${randomId}`
-//       );
-//       if (!response.ok) throw new Error("Bundle not found");
-//       const data = await response.json();
-//       setBundleData(data);
-//       setError(null);
-//     } catch (err) {
-//       setError(err.message || "Failed to fetch bundle data");
-//       setBundleData(null);
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   const handleSubmit = async () => {
-//     try {
-//       setSubmitting(true);
-//       const response = await fetch("http://localhost:5001/api/save-defects", {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({
-//           bundleId: bundleData.bundle_id,
-//           defects: currentDefectCount,
-//           language,
-//         }),
-//       });
-
-//       if (!response.ok) throw new Error("Failed to save defects");
-//       // Reset after successful submission
-//       setCurrentDefectCount({});
-//       setBundleData(null);
-//     } catch (err) {
-//       setError(err.message);
-//     } finally {
-//       setSubmitting(false);
-//     }
-//   };
-
-//   return (
-//     <div className="min-h-screen bg-gray-100">
-//       <div className="max-w-6xl mx-auto p-6">
-//         <div className="text-center mb-8">
-//           <div className="flex items-center justify-center gap-2 mb-4">
-//             <QrCode className="w-8 h-8 text-blue-600" />
-//             <h1 className="text-3xl font-bold text-gray-800">
-//               QC2 Bundle Scanner
-//             </h1>
-//           </div>
-//           <p className="text-gray-600">
-//             Scan the QR code on the bundle to start inspection
-//           </p>
-//         </div>
-
-//         {error && (
-//           <div className="mb-6 p-4 bg-red-100 rounded-lg flex items-center gap-2">
-//             <AlertCircle className="w-5 h-5 text-red-500" />
-//             <p className="text-red-700">{error}</p>
-//           </div>
-//         )}
-
-//         <div className="bg-white p-6 rounded-lg shadow-lg">
-//           <Scanner
-//             onScanSuccess={(text) => fetchBundleData(text)}
-//             onScanError={(err) => setError(err)}
-//           />
-
-//           {loading && (
-//             <div className="flex items-center justify-center gap-2 my-4">
-//               <Loader2 className="w-5 h-5 animate-spin" />
-//               <p>Loading bundle details...</p>
-//             </div>
-//           )}
-
-//           {bundleData && (
-//             <>
-//               <div className="mt-6 p-6 bg-blue-50 rounded-lg">
-//                 <div className="flex items-start gap-4">
-//                   <Package className="w-6 h-6 text-blue-600 mt-1" />
-//                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 flex-grow">
-//                     {Object.entries({
-//                       "Bundle ID": bundleData.bundle_id,
-//                       "MO Number": bundleData.selectedMono,
-//                       Style: bundleData.custStyle,
-//                       Color: bundleData.color,
-//                       Size: bundleData.size,
-//                       Quantity: bundleData.totalBundleQty,
-//                     }).map(([label, value]) => (
-//                       <div key={label}>
-//                         <p className="text-sm text-gray-600">{label}</p>
-//                         <p className="font-medium">{value}</p>
-//                       </div>
-//                     ))}
-//                   </div>
-//                 </div>
-//               </div>
-
-//               <DefectBox
-//                 language={language}
-//                 currentDefectCount={currentDefectCount}
-//                 onDefectUpdate={setCurrentDefectCount}
-//                 onLanguageChange={setLanguage}
-//               />
-
-//               <div className="mt-6 flex justify-end">
-//                 <button
-//                   onClick={handleSubmit}
-//                   disabled={
-//                     submitting ||
-//                     Object.values(currentDefectCount).every((c) => c === 0)
-//                   }
-//                   className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-//                 >
-//                   {submitting ? (
-//                     <Loader2 className="w-4 h-4 animate-spin" />
-//                   ) : (
-//                     <Send className="w-4 h-4" />
-//                   )}
-//                   Submit Inspection
-//                 </button>
-//               </div>
-//             </>
-//           )}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default QC2InspectionPage;
-
-// import React, { useState, useEffect } from "react";
-// import {
-//   QrCode,
-//   AlertCircle,
-//   Package,
-//   Loader2,
-//   CheckCircle,
-//   XCircle,
-// } from "lucide-react";
-// import Scanner from "../components/forms/Scanner";
-// import DefectBox from "../components/inspection/DefectBox";
-
-// const QC2InspectionPage = () => {
-//   const [error, setError] = useState(null);
-//   const [bundleData, setBundleData] = useState(null);
-//   const [loading, setLoading] = useState(false);
-//   const [defects, setDefects] = useState({});
-//   const [language, setLanguage] = useState("english");
-//   const [totalPass, setTotalPass] = useState(0);
-//   const [totalRejects, setTotalRejects] = useState(0);
-
-//   useEffect(() => {
-//     if (bundleData) {
-//       setTotalPass(bundleData.count || 0);
-//       setTotalRejects(0);
-//     }
-//   }, [bundleData]);
-
-//   const fetchBundleData = async (randomId) => {
-//     try {
-//       setLoading(true);
-//       const response = await fetch(
-//         `http://localhost:5001/api/bundle-by-random-id/${randomId}`
-//       );
-//       if (!response.ok) throw new Error("Bundle not found");
-//       const data = await response.json();
-//       setBundleData(data);
-//       setError(null);
-//     } catch (err) {
-//       setError(err.message || "Failed to fetch bundle data");
-//       setBundleData(null);
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   const handlePassBundle = () => {
-//     // Reset inspection
-//     setBundleData(null);
-//     setDefects({});
-//   };
-
-//   const handleRejectBundle = () => {
-//     if (totalPass > 0) {
-//       setTotalPass((prev) => prev - 1);
-//       setTotalRejects((prev) => prev + 1);
-//     }
-//   };
-
-//   const hasDefects = Object.values(defects).some((count) => count > 0);
-
-//   return (
-//     <div className="min-h-screen bg-gray-100">
-//       <div className="max-w-7xl mx-auto p-6">
-//         <div className="text-center mb-8">
-//           <div className="flex items-center justify-center gap-2 mb-4">
-//             <QrCode className="w-8 h-8 text-blue-600" />
-//             <h1 className="text-3xl font-bold text-gray-800">
-//               QC2 Bundle Scanner
-//             </h1>
-//           </div>
-//           <p className="text-gray-600">
-//             Scan the QR code on the bundle to start inspection
-//           </p>
-//         </div>
-
-//         {error && (
-//           <div className="mb-6 p-4 bg-red-100 rounded-lg flex items-center gap-2">
-//             <AlertCircle className="w-5 h-5 text-red-500" />
-//             <p className="text-red-700">{error}</p>
-//           </div>
-//         )}
-
-//         <div className="bg-white p-6 rounded-lg shadow-lg">
-//           {!bundleData && (
-//             <Scanner
-//               onScanSuccess={fetchBundleData}
-//               onScanError={(err) => setError(err)}
-//             />
-//           )}
-
-//           {loading && (
-//             <div className="flex items-center justify-center gap-2 my-4">
-//               <Loader2 className="w-5 h-5 animate-spin" />
-//               <p>Loading bundle details...</p>
-//             </div>
-//           )}
-
-//           {bundleData && (
-//             <>
-//               <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-//                 <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-//                   <div>
-//                     <p className="text-sm text-gray-600">Total Pass</p>
-//                     <p className="text-2xl font-bold text-green-600">
-//                       {totalPass}
-//                     </p>
-//                   </div>
-//                   <div>
-//                     <p className="text-sm text-gray-600">Total Rejects</p>
-//                     <p className="text-2xl font-bold text-red-600">
-//                       {totalRejects}
-//                     </p>
-//                   </div>
-//                   <div>
-//                     <p className="text-sm text-gray-600">Bundle ID</p>
-//                     <p className="font-medium">{bundleData.bundle_id}</p>
-//                   </div>
-//                   <div>
-//                     <p className="text-sm text-gray-600">MO No</p>
-//                     <p className="font-medium">{bundleData.selectedMono}</p>
-//                   </div>
-//                   <div>
-//                     <p className="text-sm text-gray-600">Cust. Style</p>
-//                     <p className="font-medium">{bundleData.custStyle}</p>
-//                   </div>
-//                   <div>
-//                     <p className="text-sm text-gray-600">Color</p>
-//                     <p className="font-medium">{bundleData.color}</p>
-//                   </div>
-//                   <div>
-//                     <p className="text-sm text-gray-600">Size</p>
-//                     <p className="font-medium">{bundleData.size}</p>
-//                   </div>
-//                   <div>
-//                     <p className="text-sm text-gray-600">Line No</p>
-//                     <p className="font-medium">{bundleData.lineNo}</p>
-//                   </div>
-//                   <div>
-//                     <p className="text-sm text-gray-600">Checked Qty</p>
-//                     <p className="font-medium">{bundleData.count}</p>
-//                   </div>
-//                 </div>
-//               </div>
-
-//               <DefectBox
-//                 language={language}
-//                 currentDefectCount={defects}
-//                 onDefectUpdate={setDefects}
-//                 onLanguageChange={setLanguage}
-//               />
-
-//               <div className="mt-6 flex justify-between">
-//                 <button
-//                   onClick={handleRejectBundle}
-//                   disabled={!hasDefects}
-//                   className={`px-6 py-2 rounded flex items-center gap-2 ${
-//                     hasDefects
-//                       ? "bg-red-600 hover:bg-red-700 text-white"
-//                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
-//                   }`}
-//                 >
-//                   <XCircle className="w-5 h-5" />
-//                   Reject Bundle
-//                 </button>
-
-//                 <button
-//                   onClick={handlePassBundle}
-//                   className={`px-6 py-2 rounded flex items-center gap-2 ${
-//                     hasDefects
-//                       ? "bg-yellow-500 hover:bg-yellow-600"
-//                       : "bg-green-600 hover:bg-green-700"
-//                   } text-white`}
-//                 >
-//                   <CheckCircle className="w-5 h-5" />
-//                   {hasDefects ? "Pass with Defects" : "Pass Bundle"}
-//                 </button>
-//               </div>
-//             </>
-//           )}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default QC2InspectionPage;
-
-import React, { useState, useEffect } from "react";
 import {
-  QrCode,
   AlertCircle,
-  Package,
-  Loader2,
+  ArrowLeft,
+  ArrowUpDown,
   CheckCircle,
-  XCircle,
   Filter,
+  Globe,
+  Menu,
+  QrCode,
+  Tag,
+  XCircle,
 } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import Scanner from "../components/forms/Scanner";
 import DefectBox from "../components/inspection/DefectBox";
+import { defectsList } from "../constants/defects";
 
 const QC2InspectionPage = () => {
+  // Bundle, defect, and scanning states
   const [error, setError] = useState(null);
   const [bundleData, setBundleData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [tempDefects, setTempDefects] = useState({});
   const [confirmedDefects, setConfirmedDefects] = useState({});
-  const [language, setLanguage] = useState("english");
+  const [bundlePassed, setBundlePassed] = useState(false);
+  const [rejectedOnce, setRejectedOnce] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [totalPass, setTotalPass] = useState(0);
   const [totalRejects, setTotalRejects] = useState(0);
-  const [activeFilter, setActiveFilter] = useState("all");
-  const [showFilters, setShowFilters] = useState(false);
 
+  // Tab and view state
+  const [activeTab, setActiveTab] = useState("first"); // "first", "return", "data", "dashboard"
+  const [inDefectWindow, setInDefectWindow] = useState(false);
+
+  // Sort option (for DefectBox) and dropdown toggle
+  const [sortOption, setSortOption] = useState("alphaAsc");
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+
+  // Left Navigation Panel states and filters
+  const [navOpen, setNavOpen] = useState(false);
+  const [language, setLanguage] = useState("english");
+  const [defectTypeFilter, setDefectTypeFilter] = useState("all"); // "all", "common", "type1", "type2"
+  const [categoryFilter, setCategoryFilter] = useState(""); // e.g. "fabric", etc.
+
+  // Whenever bundleData is set, initialize header values and switch into defect window mode.
   useEffect(() => {
     if (bundleData) {
       setTotalPass(bundleData.count || 0);
       setTotalRejects(0);
       setConfirmedDefects({});
       setTempDefects({});
+      setBundlePassed(false);
+      setRejectedOnce(false);
+      setInDefectWindow(true);
+      setScanning(false);
     }
   }, [bundleData]);
 
+  //If the user selects any defect (i.e. tempDefects nonzero), then reset rejectedOnce.
+  useEffect(() => {
+    if (Object.values(tempDefects).some((count) => count > 0) && rejectedOnce) {
+      setRejectedOnce(false);
+    }
+  }, [tempDefects, rejectedOnce]);
+
+  // API call to fetch bundle data (e.g. after scanning a QR code)
   const fetchBundleData = async (randomId) => {
     try {
       setLoading(true);
@@ -529,6 +73,8 @@ const QC2InspectionPage = () => {
       if (!response.ok) throw new Error("Bundle not found");
       const data = await response.json();
       setBundleData(data);
+      setInDefectWindow(true);
+      setScanning(false);
       setError(null);
     } catch (err) {
       setError(err.message || "Failed to fetch bundle data");
@@ -538,214 +84,512 @@ const QC2InspectionPage = () => {
     }
   };
 
-  const handlePassBundle = () => {
-    setBundleData(null);
-    setTempDefects({});
+  const handlePassBundle = async () => {
+    const hasDefects = Object.values(tempDefects).some((count) => count > 0);
+    if (hasDefects && !rejectedOnce) return; // Button is disabled if there are temporary defects not yet rejected
+
+    // Build defectArray from confirmedDefects using defect indices to get English names
+    const englishDefectItems = defectsList["english"];
+    const defectArray = Object.keys(confirmedDefects).map((key) => ({
+      defectName: englishDefectItems[key]?.name || "",
+      totalCount: confirmedDefects[key],
+    }));
+
+    // Get current time and date
+    const now = new Date();
+    const inspection_time = now.toLocaleTimeString("en-US", { hour12: false });
+    const inspection_date = now.toLocaleDateString("en-US");
+
+    // Build payload with separate header fields extracted from bundleData
+    const payload = {
+      bundleNo: getBundleNumber(bundleData.bundle_id),
+      moNo: bundleData.selectedMono,
+      custStyle: bundleData.custStyle,
+      color: bundleData.color,
+      size: bundleData.size,
+      lineNo: bundleData.lineNo,
+      department: bundleData.department,
+      checkedQty: bundleData.count,
+      totalPass: totalPass,
+      totalRejects: totalRejects,
+      defectQty: defectQty,
+      defectArray,
+      inspection_time,
+      inspection_date,
+    };
+
+    try {
+      const response = await fetch(
+        "http://localhost:5001/api/inspection-pass-bundle",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!response.ok)
+        throw new Error("Failed to save inspection pass bundle");
+      const data = await response.json();
+      console.log("Inspection pass bundle saved:", data);
+    } catch (err) {
+      console.error(err);
+    }
+
+    // Reset states and return to scanner view
+    setTotalPass(0);
+    setTotalRejects(0);
     setConfirmedDefects({});
+    setTempDefects({});
+    setBundlePassed(true);
+    setRejectedOnce(false);
+    setBundleData(null);
+    setInDefectWindow(false);
+    setScanning(true);
   };
 
-  const handleRejectBundle = () => {
-    if (totalPass > 0) {
-      // Merge temporary defects with confirmed defects
-      const newConfirmedDefects = { ...confirmedDefects };
-      Object.keys(tempDefects).forEach((key) => {
-        newConfirmedDefects[key] =
-          (newConfirmedDefects[key] || 0) + tempDefects[key];
+  const handleReturnBundle = async () => {
+    const hasDefects = Object.values(tempDefects).some((count) => count > 0);
+    if (totalPass > 0 && hasDefects) {
+      const newConfirmed = { ...confirmedDefects };
+      // Capture current temporary defects before clearing
+      const currentTempDefects = { ...tempDefects };
+      Object.keys(currentTempDefects).forEach((key) => {
+        newConfirmed[key] = (newConfirmed[key] || 0) + currentTempDefects[key];
       });
-
-      setConfirmedDefects(newConfirmedDefects);
+      setConfirmedDefects(newConfirmed);
       setTempDefects({});
       setTotalPass((prev) => prev - 1);
       setTotalRejects((prev) => prev + 1);
+      setRejectedOnce(true);
+
+      // Build ReworkGarments array using defect indices to get English names
+      const englishDefectItems = defectsList["english"];
+      const now = new Date();
+      const currentTime = now.toLocaleTimeString("en-US", { hour12: false });
+      const reworkGarments = Object.keys(currentTempDefects).map((key) => ({
+        defectName: englishDefectItems[key]?.name || "",
+        count: currentTempDefects[key],
+        time: currentTime,
+      }));
+
+      // Build payload with separate header fields
+      const payload = {
+        bundleNo: getBundleNumber(bundleData.bundle_id),
+        moNo: bundleData.selectedMono,
+        custStyle: bundleData.custStyle,
+        color: bundleData.color,
+        size: bundleData.size,
+        lineNo: bundleData.lineNo,
+        department: bundleData.department,
+        reworkGarments,
+      };
+
+      try {
+        const response = await fetch("http://localhost:5001/api/reworks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw new Error("Failed to save reworks data");
+        const data = await response.json();
+        console.log("Reworks data saved:", data);
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
-  const handleDefectUpdate = (newDefects) => {
-    setTempDefects(newDefects);
+  // "Start Scanner" button handler (only one button in First Inspection tab)
+  const handleStartScanner = () => {
+    setScanning(true);
+    setInDefectWindow(false);
   };
 
+  // Helper to extract bundle number from bundleData.bundle_id
   const getBundleNumber = (bundleId) => {
     const parts = bundleId?.split(":") || [];
     return parts[parts.length - 1] || "";
   };
 
+  // Calculate total defect quantity.
   const defectQty = Object.values(confirmedDefects).reduce((a, b) => a + b, 0);
-  const hasTempDefects = Object.values(tempDefects).some((count) => count > 0);
+  const hasDefects = Object.values(tempDefects).some((count) => count > 0);
+
+  // Determine active filter for DefectBox.
+  const activeFilter = categoryFilter || defectTypeFilter;
+
+  // Options for Category filter (8 buttons)
+  const categoryOptions = [
+    "fabric",
+    "workmanship",
+    "cleanliness",
+    "embellishment",
+    "measurement",
+    "washing",
+    "finishing",
+    "miscellaneous",
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="flex items-center justify-between mb-8">
+    <div className="flex h-screen">
+      {/* LEFT NAVIGATION PANEL */}
+      <div
+        className={`${
+          navOpen ? "w-64" : "w-16"
+        } bg-gray-800 text-white h-screen p-2 transition-all duration-300`}
+      >
+        <div className="flex items-center justify-center mb-4">
           <button
-            onClick={handleRejectBundle}
-            disabled={!hasTempDefects}
-            className={`px-6 py-2 rounded flex items-center gap-2 ${
-              hasTempDefects
-                ? "bg-red-600 hover:bg-red-700 text-white"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
+            onClick={() => setNavOpen(!navOpen)}
+            className="p-2 focus:outline-none"
           >
-            <XCircle className="w-5 h-5" />
-            Reject Bundle
-          </button>
-
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <QrCode className="w-8 h-8 text-blue-600" />
-              <h1 className="text-3xl font-bold text-gray-800">
-                QC2 Bundle Scanner
-              </h1>
-            </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-700"
-            >
-              <Filter className="w-5 h-5" />
-              {showFilters ? "Hide Filters" : "Show Filters"}
-            </button>
-          </div>
-
-          <button
-            onClick={handlePassBundle}
-            className={`px-6 py-2 rounded flex items-center gap-2 ${
-              hasTempDefects
-                ? "bg-yellow-500 hover:bg-yellow-600"
-                : "bg-green-600 hover:bg-green-700"
-            } text-white`}
-          >
-            <CheckCircle className="w-5 h-5" />
-            {hasTempDefects ? "Pass with Defects" : "Pass Bundle"}
+            {navOpen ? <ArrowLeft /> : <Menu />}
           </button>
         </div>
-
-        {showFilters && (
-          <div className="mb-4 p-4 bg-white rounded-lg shadow flex flex-wrap gap-4">
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="px-4 py-2 border rounded"
-            >
-              <option value="english">English</option>
-              <option value="khmer">Khmer</option>
-              <option value="chinese">Chinese</option>
-              <option value="all">All Languages</option>
-            </select>
-
-            <div className="flex flex-wrap gap-2">
-              {[
-                "all",
-                "common",
-                "type1",
-                "type2",
-                "fabric",
-                "workmanship",
-                "cleanliness",
-                "embellishment",
-                "measurement",
-                "washing",
-                "finishing",
-                "miscellaneous",
-              ].map((filter) => (
+        {navOpen && (
+          <div className="space-y-6">
+            {/* Language Filter */}
+            <div>
+              <div className="flex items-center mb-1">
+                <Globe className="w-5 h-5 mr-1" />
+                <span className="font-medium">Language</span>
+              </div>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="w-full p-1 text-black rounded"
+              >
+                <option value="english">English</option>
+                <option value="khmer">Khmer</option>
+                <option value="chinese">Chinese</option>
+                <option value="all">All Languages</option>
+              </select>
+            </div>
+            {/* Defect Type Filter (4 buttons) */}
+            <div>
+              <div className="flex items-center mb-1">
+                <Filter className="w-5 h-5 mr-1" />
+                <span className="font-medium">Defect Type</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                {["all", "common", "type1", "type2"].map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => {
+                      setDefectTypeFilter(type);
+                      setCategoryFilter("");
+                    }}
+                    className={`p-1 text-sm rounded border ${
+                      defectTypeFilter === type && !categoryFilter
+                        ? "bg-blue-600"
+                        : "bg-gray-700"
+                    }`}
+                  >
+                    {type.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Category Filter (8 buttons, single select) */}
+            <div>
+              <div className="flex items-center mb-1">
+                <Tag className="w-5 h-5 mr-1" />
+                <span className="font-medium">Category</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                {categoryOptions.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      setCategoryFilter(cat === categoryFilter ? "" : cat);
+                      setDefectTypeFilter("all");
+                    }}
+                    className={`p-1 text-sm rounded border ${
+                      categoryFilter === cat ? "bg-blue-600" : "bg-gray-700"
+                    }`}
+                  >
+                    {cat.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Sort Filter */}
+            <div>
+              <div className="flex items-center mb-1">
+                <ArrowUpDown className="w-5 h-5 mr-1" />
+                <span className="font-medium">Sort</span>
+              </div>
+              <div className="relative">
                 <button
-                  key={filter}
-                  onClick={() => setActiveFilter(filter)}
-                  className={`px-3 py-1 rounded capitalize ${
-                    activeFilter === filter
+                  onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+                  className="w-full p-1 rounded bg-gray-700 text-left text-sm"
+                >
+                  {sortOption === "alphaAsc"
+                    ? "A-Z"
+                    : sortOption === "alphaDesc"
+                    ? "Z-A"
+                    : sortOption === "countDesc"
+                    ? "Count (High-Low)"
+                    : "Select Sort"}
+                </button>
+                {sortDropdownOpen && (
+                  <div className="absolute z-10 mt-1 w-full bg-white text-black rounded shadow p-2">
+                    <button
+                      onClick={() => {
+                        setSortOption("alphaAsc");
+                        setSortDropdownOpen(false);
+                      }}
+                      className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
+                    >
+                      A-Z
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSortOption("alphaDesc");
+                        setSortDropdownOpen(false);
+                      }}
+                      className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
+                    >
+                      Z-A
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSortOption("countDesc");
+                        setSortDropdownOpen(false);
+                      }}
+                      className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
+                    >
+                      Count (High-Low)
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* RIGHT MAIN CONTENT */}
+      <div className={`${navOpen ? "w-3/4" : "w-11/12"} flex flex-col`}>
+        {/* TAB BAR – visible only when NOT in defect window mode */}
+        {!inDefectWindow && (
+          <div className="bg-gray-200 p-2">
+            <div className="flex space-x-4">
+              {["first", "return", "data", "dashboard"].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 rounded ${
+                    activeTab === tab
                       ? "bg-blue-600 text-white"
-                      : "bg-gray-200"
+                      : "bg-white text-black"
                   }`}
                 >
-                  {filter.replace(/([A-Z])/g, " $1").trim()}
+                  {tab === "first"
+                    ? "First Inspection"
+                    : tab === "return"
+                    ? "Return Inspection"
+                    : tab === "data"
+                    ? "Data"
+                    : "Dashboard"}
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-100 rounded-lg flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-red-500" />
-            <p className="text-red-700">{error}</p>
-          </div>
-        )}
-
-        <div className="bg-white p-6 rounded-lg shadow-lg">
-          {!bundleData && (
-            <Scanner
-              onScanSuccess={fetchBundleData}
-              onScanError={(err) => setError(err)}
-            />
-          )}
-
-          {loading && (
-            <div className="flex items-center justify-center gap-2 my-4">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <p>Loading bundle details...</p>
+        {/* MAIN CONTENT AREA */}
+        <div className="flex-grow overflow-hidden bg-gray-50">
+          {activeTab !== "first" ? (
+            <div className="h-full flex items-center justify-center">
+              <p className="text-gray-500">Coming Soon</p>
             </div>
-          )}
-
-          {bundleData && (
+          ) : (
             <>
-              <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Total Pass</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {totalPass}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Total Rejects</p>
-                    <p className="text-2xl font-bold text-red-600">
-                      {totalRejects}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Defect Qty</p>
-                    <p className="text-2xl font-bold text-orange-600">
-                      {defectQty}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Bundle No</p>
-                    <p className="font-medium">
-                      {getBundleNumber(bundleData.bundle_id)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">MO No</p>
-                    <p className="font-medium">{bundleData.selectedMono}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Cust. Style</p>
-                    <p className="font-medium">{bundleData.custStyle}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Color</p>
-                    <p className="font-medium">{bundleData.color}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Size</p>
-                    <p className="font-medium">{bundleData.size}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Line No</p>
-                    <p className="font-medium">{bundleData.lineNo}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Checked Qty</p>
-                    <p className="font-medium">{bundleData.count}</p>
-                  </div>
+              {!inDefectWindow ? (
+                // Start Scanner View (only one button)
+                <div className="flex flex-col items-center justify-center h-full p-4">
+                  {!scanning && (
+                    <button
+                      onClick={handleStartScanner}
+                      className="px-6 py-3 rounded bg-blue-600 hover:bg-blue-700 text-white mb-4"
+                    >
+                      Start Inspetion
+                    </button>
+                  )}
+                  {scanning && (
+                    <div className="w-full max-w-2xl h-96">
+                      <Scanner
+                        onScanSuccess={fetchBundleData}
+                        onScanError={(err) => setError(err)}
+                      />
+                    </div>
+                  )}
                 </div>
-              </div>
+              ) : (
+                // Defect Window View: Fixed header area and scrollable defect box.
+                <>
+                  {/* FIXED HEADER AREA */}
+                  <div className="p-2 bg-blue-100 border-b">
+                    <div className="flex items-center">
+                      {/* Return Bundle Button (left) */}
+                      <div className="w-1/6 h-32 flex justify-center">
+                        <button
+                          onClick={handleReturnBundle}
+                          disabled={!hasDefects}
+                          className={`px-4 py-2 rounded ${
+                            !hasDefects
+                              ? "bg-gray-300 cursor-not-allowed"
+                              : "bg-red-600 hover:bg-red-700 text-white"
+                          }`}
+                        >
+                          Rejects Garment
+                        </button>
+                      </div>
 
-              <DefectBox
-                language={language}
-                currentDefectCount={{ ...confirmedDefects, ...tempDefects }}
-                onDefectUpdate={handleDefectUpdate}
-                activeFilter={activeFilter}
-                confirmedDefects={confirmedDefects}
-              />
+                      {/* HEADER DATA & 4 CARD VISUALS (center) */}
+                      <div className="w-4/6 mx-4">
+                        {/* Horizontal scrolling header data */}
+                        <div className="overflow-x-auto whitespace-nowrap h-12 border-b mb-2">
+                          <div className="flex space-x-4 items-center">
+                            <div>
+                              <span className="text-xs">Bundle No: </span>
+                              <span className="text-xs font-bold">
+                                {getBundleNumber(bundleData.bundle_id)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs">MO No: </span>
+                              <span className="text-xs font-bold">
+                                {bundleData.selectedMono}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs">Cust. Style: </span>
+                              <span className="text-xs font-bold">
+                                {bundleData.custStyle}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs">Color: </span>
+                              <span className="text-xs font-bold">
+                                {bundleData.color}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs">Size: </span>
+                              <span className="text-xs font-bold">
+                                {bundleData.size}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs">Line No: </span>
+                              <span className="text-xs font-bold">
+                                {bundleData.lineNo}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs">Department: </span>
+                              <span className="text-xs font-bold">
+                                {bundleData.department}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 4 Card Visuals */}
+                        <div className="flex justify-between">
+                          <div className="flex-1 mx-1 bg-gray-100 rounded p-2 flex items-center">
+                            <QrCode className="w-5 h-5 mr-2" />
+                            <div className="hidden md:block">
+                              <div className="text-xs">Checked Qty</div>
+                              <div className="text-xl font-bold">
+                                {bundleData.count}
+                              </div>
+                            </div>
+                            <div className="block md:hidden">
+                              <div className="text-xl font-bold">
+                                {bundleData.count}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex-1 mx-1 bg-gray-100 rounded p-2 flex items-center">
+                            <CheckCircle className="w-5 h-5 mr-2 text-green-600" />
+                            <div className="hidden md:block">
+                              <div className="text-xs">Total Pass</div>
+                              <div className="text-xl font-bold text-green-600">
+                                {totalPass}
+                              </div>
+                            </div>
+                            <div className="block md:hidden">
+                              <div className="text-xl font-bold text-green-600">
+                                {totalPass}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex-1 mx-1 bg-gray-100 rounded p-2 flex items-center">
+                            <XCircle className="w-5 h-5 mr-2 text-red-600" />
+                            <div className="hidden md:block">
+                              <div className="text-xs">Total Rejects</div>
+                              <div className="text-xl font-bold text-red-600">
+                                {totalRejects}
+                              </div>
+                            </div>
+                            <div className="block md:hidden">
+                              <div className="text-xl font-bold text-red-600">
+                                {totalRejects}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex-1 mx-1 bg-gray-100 rounded p-2 flex items-center">
+                            <AlertCircle className="w-5 h-5 mr-2 text-orange-600" />
+                            <div className="hidden md:block">
+                              <div className="text-xs">Defect Qty</div>
+                              <div className="text-xl font-bold text-orange-600">
+                                {defectQty}
+                              </div>
+                            </div>
+                            <div className="block md:hidden">
+                              <div className="text-xl font-bold text-orange-600">
+                                {defectQty}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Pass Bundle Button (right) */}
+                      <div className="w-1/6 h-32 flex justify-center">
+                        <button
+                          onClick={handlePassBundle}
+                          disabled={hasDefects && !rejectedOnce}
+                          className={`px-4 py-2 rounded ${
+                            hasDefects && !rejectedOnce
+                              ? "bg-gray-300 cursor-not-allowed"
+                              : totalRejects > 0
+                              ? "bg-yellow-500 hover:bg-yellow-600"
+                              : "bg-green-600 hover:bg-green-700"
+                          } text-white`}
+                        >
+                          Pass Bundle
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SCROLLABLE DEFECT BOX – only this area scrolls vertically */}
+                  <div className="h-[calc(100vh-200px)] overflow-y-auto p-4">
+                    <DefectBox
+                      language={language}
+                      tempDefects={tempDefects}
+                      onDefectUpdate={setTempDefects}
+                      activeFilter={activeFilter}
+                      confirmedDefects={confirmedDefects}
+                      sortOption={sortOption}
+                    />
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>

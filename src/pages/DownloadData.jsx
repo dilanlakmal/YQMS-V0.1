@@ -438,6 +438,8 @@ function DownloadData() {
                       "Size",
                       "Buyer",
                       "Bundle ID",
+                      "Factory",
+                      "Count",
                     ].map((header) => (
                       <th
                         key={header}
@@ -493,6 +495,12 @@ function DownloadData() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {item.bundle_id}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {item.factory}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {item.count}
                         </td>
                       </tr>
                     ))
