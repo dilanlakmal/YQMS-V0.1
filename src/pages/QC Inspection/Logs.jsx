@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 function Logs({ logsState }) {
   const { details, logs, startTime } = logsState;
 

@@ -6,7 +6,7 @@ import axios from 'axios';
 
 function Navbar({ onLogout }) {
   const [user, setUser] = useState(null);
-  const [profileSrc, setProfileSrc] = useState(null);
+  const [facePhotoSrc, setFacePhotoSrc] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,12 +17,10 @@ function Navbar({ onLogout }) {
         const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
         const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
         if (!token) {
-          // console.log('No token found');
           setLoading(false);
           return;
         }
 
-        // Set initial user data
         setUser(userData);
         const response = await axios.get('http://localhost:5001/api/user-profile', {
           headers: {
@@ -30,24 +28,21 @@ function Navbar({ onLogout }) {
           },
         });
 
-        // Construct the full profile URL if profile exists
-        let profileUrl = null;
-        if (response.data.profile) {
-          if (response.data.profile.startsWith('data:image')) {
-            profileUrl = response.data.profile; // Base64 image
-          } else {
-            profileUrl = `http://localhost:5001${response.data.profile}`;
-          }
-        }
+        // let facePhotoUrl = null;
+        // if (response.data.face_photo) {
+        //   if (response.data.face_photo.startsWith('data:image')) {
+        //     facePhotoUrl = response.data.face_photo;
+        //   } else {
+        //     facePhotoUrl = `http://localhost:5001${response.data.face_photo}`;
+        //   }
+        // }
 
-        // console.log('Profile URL:', profileUrl); 
-        // Update user state with merged data
         const updatedUser = {
           ...userData,
           ...response.data,
           name: response.data.name || userData.name || userData.eng_name,
           eng_name: userData.eng_name,
-          profile: profileUrl,
+          face_photo: response.data.face_photo,
           dept_name: response.data.dept_name || '',
           sec_name: response.data.sec_name || '',
           roles: response.data.roles || [],
@@ -55,9 +50,8 @@ function Navbar({ onLogout }) {
         };
 
         setUser(updatedUser);
-        setProfileSrc(profileUrl); 
+        setFacePhotoSrc(response.data.face_photo);
       } catch (error) {
-        // console.error('Error fetching user profile:', error);
         const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
         setUser(userData);
       } finally {
@@ -76,7 +70,7 @@ function Navbar({ onLogout }) {
     sessionStorage.removeItem('refreshToken');
     sessionStorage.removeItem('user');
     onLogout();
-    navigate('/login'); 
+    navigate('/login');
   };
 
   const roleBasedNavLinks = {
@@ -142,7 +136,6 @@ function Navbar({ onLogout }) {
         links.push(...roleBasedNavLinks[role]);
       }
     });
-    // Remove duplicate links
     return [...new Map(links.map((link) => [link.path, link])).values()];
   };
 
@@ -183,13 +176,13 @@ function Navbar({ onLogout }) {
               <Menu.Button className="flex items-center max-w-xs rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
                 <span className="sr-only">Open user menu</span>
                 <div className="flex items-center">
-                  {profileSrc ? (
+                  {facePhotoSrc ? (
                     <img
                       className="h-8 w-8 rounded-full object-cover"
-                      src={profileSrc}
+                      src={facePhotoSrc}
                       alt={user ? user.name || user.eng_name : 'User'}
                       onError={() => {
-                        setProfileSrc('/IMG/default-profile.png'); // Fallback to default icon
+                        setFacePhotoSrc('/IMG/default-profile.png');
                       }}
                     />
                   ) : (

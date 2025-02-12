@@ -332,7 +332,6 @@ import QC2InspectionPage from "./pages/QC2Inspection";
 import Return from "./pages/QC Inspection/Return";
 import { AuthProvider } from './components/authentication/AuthContext.jsx';
 
-
 // Create a context for Bluetooth functionality
 export const BluetoothContext = createContext(null);
 

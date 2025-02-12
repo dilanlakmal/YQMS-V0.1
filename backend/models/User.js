@@ -16,6 +16,7 @@ const userSchema = new mongoose.Schema({
   dept_name: { type: String },
   sect_name: { type: String },
   profile: { type: String },
+  face_photo: { type: String },
   device_token: { type: Map, of: String }, // Use Map for device_token
   remember_token: { type: String },
   face_id: { type: String },

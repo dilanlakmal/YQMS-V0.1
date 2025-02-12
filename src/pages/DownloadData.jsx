@@ -654,6 +654,12 @@ function DownloadData() {
                         <td colSpan="10" className="text-center py-4">
                           Loading...
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {item.factory}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {item.count}
+                        </td>
                       </tr>
                     ) : (tabDataResults[activeTab] && tabDataResults[activeTab].length === 0) ? (
                       <tr>

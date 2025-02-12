@@ -1049,22 +1049,23 @@ app.get('/api/user-profile', async (req, res) => {
     const token = req.headers.authorization.split(' ')[1];
     const decoded = jwt.verify(token, 'your_jwt_secret');
     const user = await UserMain.findById(decoded.userId);
-
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
+    // console.log('User Data:', user);
     res.status(200).json({
       emp_id: user.emp_id,
       name: user.name,
       dept_name: user.dept_name,
       sect_name: user.sect_name,
+      face_photo: user.face_photo,
       profile: user.profile ? `/public/storage/profiles/${decoded.userId}/${path.basename(user.profile)}` : null,
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch user profile', error: error.message });
   }
 });
+
 
 app.put('/api/user-profile',authenticateUser, upload, async (req, res) => {
   try {
