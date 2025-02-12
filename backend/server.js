@@ -35,9 +35,9 @@ app.use(
 
 //-----------------------------DATABASE CONNECTIONS------------------------------------------------//
 
-// const ymProdConnection = mongoose.createConnection("mongodb://localhost:27017/ym_prod");
-// const mainUserConnection = mongoose.createConnection("mongodb://127.0.0.1:27017/eco_development");
-const mainUserConnection = mongoose.createConnection("mongodb://yasomi:Yasomi%40YM2025@192.167.1.10:29000/ym_eco_board?authSource=admin");
+
+// const mainUserConnection = mongoose.createConnection("mongodb://yasomi:Yasomi%40YM2025@192.167.1.10:29000/ym_eco_board?authSource=admin");
+const mainUserConnection = mongoose.createConnection("mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin");
 const ymProdConnection = mongoose.createConnection("mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin");
 
 // // Log connection status
@@ -382,11 +382,19 @@ app.post("/api/check-bundle-id", async (req, res) => {
   }
 });
 
+// const checkDbConnection = (req, res, next) => {
+//   if (ymProdConnection.readyState !== 1) { // 1 means connected
+//     return res.status(500).json({ error: 'Mongoose connection is not ready' });
+//   }
+//   next();
+// };
+
 // Update the MONo search endpoint to handle complex pattern matching
 app.get("/api/search-mono", async (req, res) => {
   try {
     const digits = req.query.digits;
-    const collection = mongoose.connection.db.collection("dt_orders");
+
+    const collection = ymProdConnection.db.collection("dt_orders");
 
     // More robust regex pattern to match last 3 digits before any non-digit characters
     const regexPattern = new RegExp(
@@ -443,6 +451,8 @@ app.get("/api/search-mono", async (req, res) => {
       ])
       .toArray();
 
+      // console.log("Search results:", results);
+
     res.json(results.map((r) => r._id));
   } catch (error) {
     console.error("Error searching MONo:", error);
@@ -453,7 +463,7 @@ app.get("/api/search-mono", async (req, res) => {
 // Update /api/order-details endpoint
 app.get("/api/order-details/:mono", async (req, res) => {
   try {
-    const collection = mongoose.connection.db.collection("dt_orders");
+    const collection = ymProdConnection.db.collection("dt_orders");
     const order = await collection.findOne({
       Order_No: req.params.mono,
     });
@@ -523,10 +533,11 @@ app.get("/api/order-details/:mono", async (req, res) => {
 // Update /api/order-sizes endpoint
 app.get("/api/order-sizes/:mono/:color", async (req, res) => {
   try {
-    const collection = mongoose.connection.db.collection("dt_orders");
+    const collection = ymProdConnection.db.collection("dt_orders");
+    
     const order = await collection.findOne({ Order_No: req.params.mono });
 
-    if (!order) return res.status(404).json({ error: "Order not found" });
+    if (!order) return res.status(404).json({ error: "Order not found" });s
 
     const colorObj = order.OrderColors.find(
       (c) => c.Color.toLowerCase() === req.params.color.toLowerCase().trim()
@@ -928,7 +939,7 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid username or password" });
     }
 
-    console.log('user details:', user);
+    // console.log('user details:', user);
 
     const isPasswordValid = await bcrypt.compare(
       password.trim(),
@@ -944,7 +955,7 @@ app.post("/api/login", async (req, res) => {
       user.password = newHashedPassword;
       await user.save();
     }
-    console.log('user:', isPasswordValid);
+    // console.log('user:', isPasswordValid);
 
     const accessToken = jwt.sign(
       { userId: user._id, email: user.email, name: user.name },

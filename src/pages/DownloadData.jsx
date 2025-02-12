@@ -33,6 +33,8 @@ function DownloadData() {
       buyer: '',
     },
   ]);
+  
+  const [tabDataResults, setTabDataResults] = useState([[]]); // Store data per tab
 
   const addTab = (tabName) => {
     setTabs((prevTabs) => [...prevTabs, tabName]);
@@ -52,6 +54,11 @@ function DownloadData() {
         buyer: '',
       },
     ]);
+      // Initialize data for the new tab
+      setTabDataResults((prevTabDataResults) => [
+        ...prevTabDataResults,
+        [], // Initialize with an empty array for the new tab
+      ]);
   };
 
   const closeTab = (index) => {
@@ -84,7 +91,9 @@ function DownloadData() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(0);
+  
   const [dropdownStates, setDropdownStates] = useState({
+    date:false,
     moNo: false,
     styleNo: false,
     lineNo: false,
@@ -119,6 +128,18 @@ function DownloadData() {
     bundleId: [],
   });
 
+   const [sortOrder, setSortOrder] = useState({
+    field: null,
+    order: 'asc', // 'asc' or 'desc'
+  });
+
+  const handleSort = (field) => {
+    setSortOrder((prevSortOrder) => ({
+      field,
+      order: prevSortOrder.field === field && prevSortOrder.order === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
   useEffect(() => {
     fetchUniqueValues();
   }, []);
@@ -150,32 +171,29 @@ function DownloadData() {
   };
 
   const toggleDropdown = (field) => {
-    setDropdownStates({
-      moNo: false,
-      styleNo: false,
-      lineNo: false,
-      color: false,
-      size: false,
-      buyer: false,
-      [field]: !dropdownStates[field],
+    setDropdownStates((prevState) => ({
+      ...prevState,
+      [field]: !prevState[field],
+    }));
+  };
+  
+
+  const toggleHeaderDropdown = (field) => {
+    setHeaderDropdownStates((prevState) => {
+      const newState = {
+        ...prevState,
+        [field]: !prevState[field],
+      };
+      Object.keys(newState).forEach((key) => {
+        if (key !== field) {
+          newState[key] = false;
+        }
+      });
+      console.log("Updated Header Dropdown States:", newState);
+      return newState;
     });
   };
 
-  const toggleHeaderDropdown = (field) => {
-    setHeaderDropdownStates({
-      date: false,
-      type: false,
-      taskNo: false,
-      moNo: false,
-      styleNo: false,
-      lineNo: false,
-      color: false,
-      size: false,
-      buyer: false,
-      bundleId: false,
-      [field]: !headerDropdownStates[field],
-    });
-  };
 
   function formatDate(dateString) {
     if (!dateString) {
@@ -217,11 +235,17 @@ function DownloadData() {
       const response = await fetch(`${API_BASE_URL}/api/download-data?${params}`);
       if (!response.ok) throw new Error('Failed to fetch data');
       const result = await response.json();
-      console.log('Received Data:', result.data);
       const validatedData = result.data.map(item => ({
         ...item,
         date: item.date ? formatDate(item.date) : 'Invalid Date'
       }));
+
+      setTabDataResults((prevTabDataResults) => {
+        const newTabDataResults = [...prevTabDataResults];
+        newTabDataResults[activeTab] = validatedData;
+        return newTabDataResults;
+      });
+
       setData(validatedData);
       setTotalRecords(result.total);
       setTotalPages(result.totalPages);
@@ -266,13 +290,13 @@ function DownloadData() {
   };
 
   const applyFilters = (data, filters) => {
-    return data.filter(item => {
+    let filteredData = data.filter((item) => {
       return (
         (!filters.date[0] || item.date === filters.date[0]) &&
-        (!filters.type[0] || item.type === filters.type[0]) &&
+        (!filters.type[0] || filters.type.includes(item.type)) &&
         (!filters.taskNo.length || filters.taskNo.includes(item.taskNo)) &&
-        (!filters.moNo.length || filters.moNo.includes(item.moNo)) &&
-        (!filters.styleNo.length || filters.styleNo.includes(item.styleNo)) &&
+        (!filters.moNo.length || filters.moNo.includes(item.selectedMono)) &&
+        (!filters.styleNo.length || filters.styleNo.includes(item.custStyle)) &&
         (!filters.lineNo.length || filters.lineNo.includes(item.lineNo)) &&
         (!filters.color.length || filters.color.includes(item.color)) &&
         (!filters.size.length || filters.size.includes(item.size)) &&
@@ -280,7 +304,19 @@ function DownloadData() {
         (!filters.bundleId.length || filters.bundleId.includes(item.bundleId))
       );
     });
+
+    if (sortOrder.field) {
+      filteredData = filteredData.sort((a, z) => {
+        if (a[sortOrder.field] < z[sortOrder.field]) return sortOrder.order === 'asc' ? -1 : 1;
+        if (a[sortOrder.field] > z[sortOrder.field]) return sortOrder.order === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filteredData;
   };
+
+  
 
   const renderPagination = () => {
     const pages = [];
@@ -342,39 +378,62 @@ function DownloadData() {
     return pages;
   };
 
-  const renderFilterDropdown = (field, options) => (
-    <div className="relative">
-      <button
-        onClick={() => toggleHeaderDropdown(field)}
-        className="flex items-center space-x-1 focus:outline-none"
-      >
-        <Filter className="h-4 w-4" />
-      </button>
-      {headerDropdownStates[field] && (
-        <div className="absolute z-20 w-48 mt-2 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
-          {options.map((option, idx) => (
-            <div key={idx} className="px-4 py-2 hover:bg-gray-100 cursor-pointer">
-              <label className="flex items-center space-x-2">
+  const renderFilterDropdown = (field, options) => {
+      const [searchTerm, setSearchTerm] = useState('');
+  
+      const filteredOptions = options.filter((option) =>
+        option.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+  
+      return (
+        <div className="relative">
+          <button
+            onClick={() => toggleHeaderDropdown(field)}
+            className="flex items-center space-x-1 focus:outline-none"
+          >
+            <Filter className="h-4 w-4" />
+          </button>
+          {headerDropdownStates[field] && (
+            <div className="absolute z-20 w-48 mt-2 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+              <div className="p-2">
                 <input
-                  type="checkbox"
-                  checked={filters[field].includes(option)}
-                  onChange={(e) => {
-                    const newFilters = e.target.checked
-                      ? [...filters[field], option]
-                      : filters[field].filter((item) => item !== option);
-                    handleFilterChange(field, newFilters);
-                    handleSearch(); // Trigger search when an option is selected
-                  }}
+                  type="text"
+                  placeholder="Search..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full p-1 border rounded"
                 />
-                <span>{option}</span>
-              </label>
+              </div>
+              <div className="p-2">
+                <button onClick={() => handleSort(field)} className="w-full text-left">
+                  Sort {sortOrder.field === field && sortOrder.order === 'asc' ? '↓' : '↑'}
+                </button>
+              </div>
+              {filteredOptions.map((option, idx) => (
+                <div key={idx} className="px-4 py-2 hover:bg-gray-100 cursor-pointer">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={filters[field].includes(option)}
+                      onChange={(e) => {
+                        const newFilters = e.target.checked
+                          ? [...filters[field], option]
+                          : filters[field].filter((item) => item !== option);
+                        handleFilterChange(field, newFilters);
+                        handleSearch(); // Trigger search when an option is selected
+                      }}
+                    />
+                    <span>{option}</span>
+                  </label>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      )}
-    </div>
-  );
-
+      );
+    };
+  
+  
   return (
     <div className="flex ">
       <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} addTab={addTab} />
@@ -472,14 +531,14 @@ function DownloadData() {
                     value={value}
                     onChange={(e) => {
                       setter(e.target.value);
-                      toggleDropdown(label.toLowerCase().replace(' ', ''));
+                      toggleDropdown(label.toLowerCase().replace(' ', ' '));
                     }}
-                    onFocus={() => toggleDropdown(label.toLowerCase().replace(' ', ''))}
+                    onFocus={() => toggleDropdown(label.toLowerCase().replace(' ', ' '))}
                     className="w-full px-3 py-2 border rounded-md"
                     placeholder={`${label}...`}
                   />
-                  <Search className="                    absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-                  {dropdownStates[label.toLowerCase().replace(' ', '')] && (
+                  <Search className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+                  {dropdownStates[label.toLowerCase().replace(' ', ' ')] && (
                     <div className="absolute z-20 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
                       {options
                         .filter((opt) => opt.toLowerCase().includes(value.toLowerCase()))
@@ -489,7 +548,7 @@ function DownloadData() {
                             className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                             onClick={() => {
                               setter(opt);
-                              toggleDropdown(label.toLowerCase().replace(' ', ''));
+                              toggleDropdown(label.toLowerCase().replace(' ', ' '));
                               handleSearch(); // Trigger search when an option is selected
                             }}
                           >
@@ -566,7 +625,7 @@ function DownloadData() {
                   <thead className="bg-gray-50">
                     <tr>
                       {[
-                        { label: 'Date', field: 'date', options: [] },
+                        { label: 'Date', field: 'date', options: data.map(item => item.date) },
                         { label: 'Type', field: 'type', options: DATA_TYPES },
                         { label: 'Task No', field: 'taskNo', options: ['52', '53'] },
                         { label: 'MO No', field: 'moNo', options: moNoOptions },
@@ -583,27 +642,27 @@ function DownloadData() {
                         >
                           <div className="flex items-center space-x-2">
                             <span>{label}</span>
-                            {renderFilterDropdown(field, options)}
+                            {renderFilterDropdown(field, [...new Set(options)])}
                           </div>
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white divide-y divide-gray-200" style={{minHeight:'200px'}}>
                     {loading ? (
                       <tr>
                         <td colSpan="10" className="text-center py-4">
                           Loading...
                         </td>
                       </tr>
-                    ) : data.length === 0 ? (
+                    ) : (tabDataResults[activeTab] && tabDataResults[activeTab].length === 0) ? (
                       <tr>
                         <td colSpan="10" className="text-center py-4">
                           No data found
                         </td>
                       </tr>
                     ) : (
-                      applyFilters(data, filters).map((item, index) => (
+                      applyFilters(tabDataResults[activeTab] || [], filters).map((item, index) => (
                         <tr key={index}>
                           <td className="px-6 py-4 whitespace-nowrap">{item.date}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{item.type}</td>

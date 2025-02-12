@@ -58,7 +58,7 @@ function Login({ onLogin }) {
 
           onLogin(accessToken);
           navigate('/home');
-          console.log('User Login:',response);
+          // console.log('User Login:',response);
         }
       } catch (error) {
         setError("Invalid username or password");
