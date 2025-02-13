@@ -1,3 +1,7 @@
+/* ------------------------------
+   Import Required Libraries/Models
+------------------------------ */
+
 import bcrypt from "bcrypt";
 import bodyParser from "body-parser";
 import cors from "cors";
@@ -8,8 +12,17 @@ import mongoose from "mongoose";
 import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
+import createIroningModel from "./models/Ironing.js";
 import createRoleModel from "./models/Role.js";
+//import createRoleManagmentModel from "./models/RoleManagment.js";
+import createRoleManagmentModel from "./models/RoleManagment.js";
 import createUserModel from "./models/User.js";
+import createQCDataModel from "./models/qc1_data.js";
+import createQc2OrderDataModel from "./models/qc2_orderdata.js";
+
+/* ------------------------------
+   Connection String
+------------------------------ */
 
 const app = express();
 const PORT = 5001;
@@ -30,269 +43,48 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+//"mongodb://localhost:27017/ym_prod"
 
 const mongoURI =
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"; //"mongodb://localhost:27017/ym_prod";
+  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin";
 mongoose
-  .connect(mongoURI) //{ ,useNewUrlParser: true, useUnifiedTopology: true }
-  .then(() => console.log("MongoDB connected to ym_prod database"))
+  .connect(mongoURI) //, { useNewUrlParser: true, useUnifiedTopology: true }
+  .then(() => console.log("Successfully connected......"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-const mainUserConnection = mongoose.createConnection(
+const ymProdConnection = mongoose.createConnection(
   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
+  //"mongodb://localhost:27017/ym_prod"
 );
 
-mainUserConnection.on("connected", () =>
-  console.log("Connected to users collection")
+ymProdConnection.on("connected", () =>
+  console.log("Connected to ym_prod database in 192.167.1.10:29000...")
 );
-mainUserConnection.on("error", (err) =>
-  console.error("unexpected error:", err)
-);
+ymProdConnection.on("error", (err) => console.error("unexpected error:", err));
 
 // Define model on connections
-const UserMain = createUserModel(mainUserConnection);
-const Role = createRoleModel(mainUserConnection);
-
-// Add this function in server.js (before routes)
-const generateRandomId = async () => {
-  let randomId;
-  let isUnique = false;
-
-  while (!isUnique) {
-    randomId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
-    const existing = await QC2OrderData.findOne({ bundle_random_id: randomId });
-    if (!existing) isUnique = true;
-  }
-
-  return randomId;
-};
-
-const qcDataSchema = new mongoose.Schema(
-  {
-    headerData: {
-      type: Object,
-      required: true,
-      transform: function (doc, ret) {
-        for (let key in ret) {
-          if (ret[key] instanceof Date) {
-            ret[key] = ret[key].toISOString();
-          }
-        }
-        return ret;
-      },
-    },
-    type: { type: String, required: true },
-    garmentNo: {
-      type: Number,
-      required: function () {
-        return !this.type.includes("return");
-      },
-    },
-    status: { type: String, required: true },
-    timestamp: { type: Number, required: true },
-    formattedTimestamp: { type: String, required: true },
-    actualtime: { type: Number, required: true },
-    formattedActualTime: { type: String, required: true },
-    defectDetails: { type: Array, default: [] },
-    checkedQty: { type: Number, required: true },
-    goodOutput: { type: Number, required: true },
-    defectQty: { type: Number, required: true },
-    defectPieces: { type: Number, required: true },
-    defectArray: { type: Array, default: [] },
-    cumulativeChecked: { type: Number, required: true },
-    cumulativeDefects: { type: Number, required: true },
-    cumulativeGoodOutput: { type: Number, required: true },
-    cumulativeDefectPieces: { type: Number, required: true },
-    returnDefectList: { type: Array, default: [] },
-    returnDefectArray: { type: Array, default: [] },
-    returnDefectQty: { type: Number, required: true },
-    cumulativeReturnDefectQty: { type: Number, required: true },
-    selectedMono: String,
-    buyer: String,
-    orderQty: Number,
-    factoryname: String,
-    custStyle: String,
-    country: String,
-    color: String,
-    size: String,
-  },
-  {
-    collection: "qc1_data",
-  }
-);
-
-const QCData = mongoose.model("qc1_data", qcDataSchema);
-
-// Schema for qc2_orderdata collection
-const qc2OrderDataSchema = new mongoose.Schema(
-  {
-    bundle_random_id: { type: String, required: true, unique: true },
-    bundle_id: { type: String, required: true },
-    task_no: { type: Number, default: 52 },
-    date: { type: String, required: true },
-    department: { type: String, required: true },
-    selectedMono: { type: String, required: true },
-    custStyle: { type: String, required: true },
-    buyer: { type: String, required: true },
-    country: { type: String, required: true },
-    orderQty: { type: Number, required: true },
-    factory: { type: String, required: true },
-    lineNo: { type: String, required: true },
-    color: { type: String, required: true },
-    size: { type: String, required: true },
-    colorCode: { type: String, required: true },
-    chnColor: { type: String, required: true },
-    colorKey: { type: Number, required: true },
-    sizeOrderQty: { type: Number, required: true },
-    planCutQty: { type: Number, required: true },
-    count: { type: Number, required: true },
-    bundleQty: { type: Number, required: true },
-    totalBundleQty: { type: Number, required: true },
-    sub_con: { type: String, default: "No" }, // New field
-    sub_con_factory: { type: String, default: "N/A" }, // New field
-    updated_date_seperator: { type: String, required: true },
-    updated_time_seperator: { type: String, required: true },
-  },
-  { collection: "qc2_orderdata" }
-);
-
-const QC2OrderData = mongoose.model("qc2_orderdata", qc2OrderDataSchema);
-
-// Ironing Schema
-const ironingSchema = new mongoose.Schema(
-  {
-    ironing_record_id: Number,
-    task_no: { type: Number, default: 53 },
-    ironing_bundle_id: { type: String, required: true, unique: true },
-    ironing_updated_date: String,
-    ironing_update_time: String,
-    bundle_id: String,
-    selectedMono: String,
-    custStyle: String,
-    buyer: String,
-    country: String,
-    factory: String,
-    lineNo: String,
-    color: String,
-    size: String,
-    count: String,
-    totalBundleQty: Number,
-  },
-  { collection: "ironing" }
-);
-
-const Ironing = mongoose.model("Ironing", ironingSchema);
+const UserMain = createUserModel(ymProdConnection);
+const Role = createRoleModel(ymProdConnection);
+const QCData = createQCDataModel(ymProdConnection);
+const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
+const Ironing = createIroningModel(ymProdConnection);
+const RoleManagment = createRoleManagmentModel(ymProdConnection);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// Save bundle data to MongoDB
-app.post("/api/save-bundle-data", async (req, res) => {
-  try {
-    const { bundleData } = req.body;
-    const savedRecords = [];
+/* ------------------------------
+   End Points - dt_orders
+------------------------------ */
 
-    // Save each bundle record
-    for (const bundle of bundleData) {
-      const randomId = await generateRandomId();
-
-      const now = new Date();
-
-      // Format timestamps
-      const updated_date_seperator = now.toLocaleDateString("en-US", {
-        month: "2-digit",
-        day: "2-digit",
-        year: "numeric",
-      });
-
-      const updated_time_seperator = now.toLocaleTimeString("en-US", {
-        hour12: false,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-
-      const newBundle = new QC2OrderData({
-        ...bundle,
-        bundle_random_id: randomId,
-        factory: bundle.factory || "N/A", // Handle null factory
-        custStyle: bundle.custStyle || "N/A", // Handle null custStyle
-        country: bundle.country || "N/A", // Handle null country
-        department: bundle.department,
-        sub_con: bundle.sub_con || "No",
-        sub_con_factory:
-          bundle.sub_con === "Yes" ? bundle.sub_con_factory || "" : "N/A",
-        updated_date_seperator,
-        updated_time_seperator,
-      });
-      await newBundle.save();
-      savedRecords.push(newBundle);
-    }
-    // const savedRecords = await QC2OrderData.insertMany(bundleData);
-
-    res.status(201).json({
-      message: "Bundle data saved successfully",
-      data: savedRecords,
-    });
-  } catch (error) {
-    console.error("Error saving bundle data:", error);
-    res.status(500).json({
-      message: "Failed to save bundle data",
-      error: error.message,
-    });
-  }
-});
-
-// New Endpoint to Get Bundle by Random ID
-app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
-  try {
-    const bundle = await QC2OrderData.findOne({
-      bundle_random_id: req.params.randomId,
-    });
-
-    if (!bundle) {
-      return res.status(404).json({ error: "Bundle not found" });
-    }
-
-    res.json(bundle);
-  } catch (error) {
-    console.error("Error fetching bundle:", error);
-    res.status(500).json({ error: "Failed to fetch bundle" });
-  }
-});
-
-// Check if bundle_id already exists and get the largest number
-app.post("/api/check-bundle-id", async (req, res) => {
-  try {
-    const { date, lineNo, selectedMono, color, size } = req.body;
-
-    // Find all bundle IDs matching the criteria
-    const existingBundles = await QC2OrderData.find({
-      bundle_id: {
-        $regex: `^${date}:${lineNo}:${selectedMono}:${color}:${size}`,
-      },
-    });
-
-    // Extract the largest number from the bundle IDs
-    let largestNumber = 0;
-    existingBundles.forEach((bundle) => {
-      const parts = bundle.bundle_id.split(":");
-      const number = parseInt(parts[parts.length - 1]);
-      if (number > largestNumber) {
-        largestNumber = number;
-      }
-    });
-
-    res.status(200).json({ largestNumber });
-  } catch (error) {
-    console.error("Error checking bundle ID:", error);
-    res.status(500).json({
-      message: "Failed to check bundle ID",
-      error: error.message,
-    });
-  }
-});
+// const checkDbConnection = (req, res, next) => {
+//   if (ymProdConnection.readyState !== 1) {
+//     // 1 means connected
+//     return res.status(500).json({ error: "Mongoose connection is not ready" });
+//   }
+//   next();
+// };
 
 // Update the MONo search endpoint to handle complex pattern matching
 app.get("/api/search-mono", async (req, res) => {
@@ -508,6 +300,7 @@ app.get("/api/total-garments-count/:mono/:color/:size", async (req, res) => {
   }
 });
 
+// This endpoint is unused
 async function fetchOrderDetails(mono) {
   const collection = mongoose.connection.db.collection("dt_orders");
   const order = await collection.findOne({ Order_No: mono });
@@ -545,6 +338,156 @@ async function fetchOrderDetails(mono) {
   };
 }
 
+/* ------------------------------
+   End Points - qc2_orderdata
+------------------------------ */
+
+// Generate a random ID for the bundle
+const generateRandomId = async () => {
+  let randomId;
+  let isUnique = false;
+
+  while (!isUnique) {
+    randomId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+    const existing = await QC2OrderData.findOne({ bundle_random_id: randomId });
+    if (!existing) isUnique = true;
+  }
+
+  return randomId;
+};
+
+// Save bundle data to MongoDB
+app.post("/api/save-bundle-data", async (req, res) => {
+  try {
+    const { bundleData } = req.body;
+    const savedRecords = [];
+
+    // Save each bundle record
+    for (const bundle of bundleData) {
+      const randomId = await generateRandomId();
+
+      const now = new Date();
+
+      // Format timestamps
+      const updated_date_seperator = now.toLocaleDateString("en-US", {
+        month: "2-digit",
+        day: "2-digit",
+        year: "numeric",
+      });
+
+      const updated_time_seperator = now.toLocaleTimeString("en-US", {
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+      const newBundle = new QC2OrderData({
+        ...bundle,
+        bundle_random_id: randomId,
+        factory: bundle.factory || "N/A", // Handle null factory
+        custStyle: bundle.custStyle || "N/A", // Handle null custStyle
+        country: bundle.country || "N/A", // Handle null country
+        department: bundle.department,
+        sub_con: bundle.sub_con || "No",
+        sub_con_factory:
+          bundle.sub_con === "Yes" ? bundle.sub_con_factory || "" : "N/A",
+        updated_date_seperator,
+        updated_time_seperator,
+        // Ensure user fields are included
+        emp_id: bundle.emp_id,
+        eng_name: bundle.eng_name,
+        kh_name: bundle.kh_name || "",
+        job_title: bundle.job_title || "",
+        dept_name: bundle.dept_name,
+        sect_name: bundle.sect_name || "",
+      });
+      await newBundle.save();
+      savedRecords.push(newBundle);
+    }
+    // const savedRecords = await QC2OrderData.insertMany(bundleData);
+
+    res.status(201).json({
+      message: "Bundle data saved successfully",
+      data: savedRecords,
+    });
+  } catch (error) {
+    console.error("Error saving bundle data:", error);
+    res.status(500).json({
+      message: "Failed to save bundle data",
+      error: error.message,
+    });
+  }
+});
+
+//For Data tab display records in a table
+app.get("/api/user-batches", async (req, res) => {
+  try {
+    const { emp_id } = req.query;
+    if (!emp_id) {
+      return res.status(400).json({ message: "emp_id is required" });
+    }
+    const batches = await QC2OrderData.find({ emp_id });
+    res.json(batches);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch user batches" });
+  }
+});
+
+/* ------------------------------
+   End Points - Ironing
+------------------------------ */
+
+// New Endpoint to Get Bundle by Random ID
+app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
+  try {
+    const bundle = await QC2OrderData.findOne({
+      bundle_random_id: req.params.randomId,
+    });
+
+    if (!bundle) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+
+    res.json(bundle);
+  } catch (error) {
+    console.error("Error fetching bundle:", error);
+    res.status(500).json({ error: "Failed to fetch bundle" });
+  }
+});
+
+// Check if bundle_id already exists and get the largest number
+app.post("/api/check-bundle-id", async (req, res) => {
+  try {
+    const { date, lineNo, selectedMono, color, size } = req.body;
+
+    // Find all bundle IDs matching the criteria
+    const existingBundles = await QC2OrderData.find({
+      bundle_id: {
+        $regex: `^${date}:${lineNo}:${selectedMono}:${color}:${size}`,
+      },
+    });
+
+    // Extract the largest number from the bundle IDs
+    let largestNumber = 0;
+    existingBundles.forEach((bundle) => {
+      const parts = bundle.bundle_id.split(":");
+      const number = parseInt(parts[parts.length - 1]);
+      if (number > largestNumber) {
+        largestNumber = number;
+      }
+    });
+
+    res.status(200).json({ largestNumber });
+  } catch (error) {
+    console.error("Error checking bundle ID:", error);
+    res.status(500).json({
+      message: "Failed to check bundle ID",
+      error: error.message,
+    });
+  }
+});
+
 // Check if ironing record exists
 app.get("/api/check-ironing-exists/:bundleId", async (req, res) => {
   try {
@@ -571,6 +514,10 @@ app.post("/api/save-ironing", async (req, res) => {
     }
   }
 });
+
+/* ------------------------------
+   End Points - Live Dashboard - QC1
+------------------------------ */
 
 app.get("/api/dashboard-stats", async (req, res) => {
   try {
@@ -862,6 +809,10 @@ app.get("/api/dashboard-stats", async (req, res) => {
   }
 });
 
+/* ------------------------------
+   End Points - QC1
+------------------------------ */
+
 app.post("/api/save-qc-data", async (req, res) => {
   try {
     // Sanitize defectDetails
@@ -901,6 +852,10 @@ app.post("/api/save-qc-data", async (req, res) => {
     });
   }
 });
+
+/* ------------------------------
+   End Points - Download Data
+------------------------------ */
 
 // Helper function to format date to MM/DD/YYYY
 const formatDate = (date) => {
@@ -1055,7 +1010,7 @@ app.get("/api/download-data", async (req, res) => {
 });
 
 /* ------------------------------
-   NEW SCHEMAS & ENDPOINTS
+   QC2 - Inspection Pass Bundle, Reworks
 ------------------------------ */
 
 // Schema for qc2_inspection_pass_bundle with header fields as separate fields
@@ -1202,7 +1157,7 @@ app.post("/api/reworks", async (req, res) => {
 });
 
 /* ------------------------------
-   User Auth ENDPOINTS - START
+   User Auth ENDPOINTS
 ------------------------------ */
 
 const authenticateUser = (req, res, next) => {
@@ -1228,47 +1183,47 @@ const generateRandomString = (length) => {
   return result;
 };
 
-// Set storage engine
+// ------------------------
+// Multer Storage Setup
+// ------------------------
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const userId = req.userId;
     if (!userId) {
       return cb(new Error("User ID is not defined"));
     }
-    const dir = `../public/storage/profiles/${userId}`;
+    const dir = path.join(
+      __dirname,
+      "../public/storage/profiles/",
+      userId.toString()
+    );
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    const randomString = generateRandomString(32);
+    const randomString = Math.random().toString(36).substring(2, 34);
     cb(null, `${randomString}${path.extname(file.originalname)}`);
   },
 });
 
-// Initialize upload
 const upload = multer({
   storage: storage,
   limits: { fileSize: 5000000 }, // Limit file size to 5MB
   fileFilter: (req, file, cb) => {
-    checkFileType(file, cb);
+    const filetypes = /jpeg|jpg|png|gif/;
+    const extname = filetypes.test(
+      path.extname(file.originalname).toLowerCase()
+    );
+    const mimetype = filetypes.test(file.mimetype);
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb("Error: Images Only!");
+    }
   },
 }).single("profile");
 
-// Check file type
-function checkFileType(file, cb) {
-  // Allowed ext
-  const filetypes = /jpeg|jpg|png|gif/;
-  // Check ext
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  // Check mime
-  const mimetype = filetypes.test(file.mimetype);
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    cb("Error: Images Only!");
-  }
-}
-
+// User Managment
 // User routes
 app.get("/users", async (req, res) => {
   try {
@@ -1321,6 +1276,7 @@ app.post("/users", async (req, res) => {
   }
 });
 
+//Update
 app.put("/users/:id", async (req, res) => {
   try {
     const user = await UserMain.findByIdAndUpdate(req.params.id, req.body, {
@@ -1333,6 +1289,7 @@ app.put("/users/:id", async (req, res) => {
   }
 });
 
+//Delete
 app.delete("/users/:id", async (req, res) => {
   try {
     await UserMain.findByIdAndDelete(req.params.id);
@@ -1343,6 +1300,7 @@ app.delete("/users/:id", async (req, res) => {
   }
 });
 
+// Getting Roles
 app.get("/roles", async (req, res) => {
   try {
     const roles = await Role.find();
@@ -1353,6 +1311,7 @@ app.get("/roles", async (req, res) => {
   }
 });
 
+// Change role
 app.put("/users/:id", async (req, res) => {
   try {
     const { name, email, roles, sub_roles, keywords, password } = req.body;
@@ -1381,6 +1340,7 @@ app.put("/users/:id", async (req, res) => {
   }
 });
 
+// When Login get user data
 app.post("/api/get-user-data", async (req, res) => {
   try {
     const { token } = req.body;
@@ -1397,6 +1357,9 @@ app.post("/api/get-user-data", async (req, res) => {
     res.status(200).json({
       emp_id: user.emp_id,
       name: user.name,
+      eng_name: user.eng_name,
+      kh_name: user.kh_name,
+      job_title: user.job_title,
       dept_name: user.dept_name,
       sect_name: user.sect_name,
       profile: user.profile,
@@ -1411,6 +1374,7 @@ app.post("/api/get-user-data", async (req, res) => {
   }
 });
 
+// Avoid Logout when Refresh
 app.post("/api/refresh-token", async (req, res) => {
   try {
     const { refreshToken } = req.body;
@@ -1442,7 +1406,7 @@ app.post("/api/refresh-token", async (req, res) => {
 app.post("/api/login", async (req, res) => {
   try {
     const { username, password, rememberMe } = req.body;
-    if (!mainUserConnection.readyState) {
+    if (!ymProdConnection.readyState) {
       return res.status(500).json({ message: "Database not connected" });
     }
 
@@ -1491,6 +1455,11 @@ app.post("/api/login", async (req, res) => {
       refreshToken,
       user: {
         emp_id: user.emp_id,
+        eng_name: user.eng_name,
+        kh_name: user.kh_name,
+        job_title: user.job_title,
+        dept_name: user.dept_name,
+        sect_name: user.sect_name,
         name: user.name,
         email: user.email,
         roles: user.roles,
@@ -1554,7 +1523,9 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// Fetch User Profile Endpoint
+// ------------------------
+// GET /api/user-profile
+// ------------------------
 app.get("/api/user-profile", async (req, res) => {
   try {
     const token = req.headers.authorization.split(" ")[1];
@@ -1565,16 +1536,24 @@ app.get("/api/user-profile", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Use custom image if exists; otherwise use face_photo (or default fallback)
+    let profileImage = "";
+    if (user.profile && user.profile.trim() !== "") {
+      profileImage = `http://localhost:5001/public/storage/profiles/${
+        decoded.userId
+      }/${path.basename(user.profile)}`;
+    } else if (user.face_photo && user.face_photo.trim() !== "") {
+      profileImage = user.face_photo;
+    } else {
+      profileImage = "/IMG/default-profile.png";
+    }
+
     res.status(200).json({
       emp_id: user.emp_id,
       name: user.name,
       dept_name: user.dept_name,
       sect_name: user.sect_name,
-      profile: user.profile
-        ? `/public/storage/profiles/${decoded.userId}/${path.basename(
-            user.profile
-          )}`
-        : null,
+      profile: profileImage,
     });
   } catch (error) {
     res
@@ -1583,6 +1562,9 @@ app.get("/api/user-profile", async (req, res) => {
   }
 });
 
+// ------------------------
+// PUT /api/user-profile
+// ------------------------
 app.put("/api/user-profile", authenticateUser, upload, async (req, res) => {
   try {
     const token = req.headers.authorization.split(" ")[1];
@@ -1594,20 +1576,16 @@ app.put("/api/user-profile", authenticateUser, upload, async (req, res) => {
       name: req.body.name,
       dept_name: req.body.dept_name,
       sect_name: req.body.sect_name,
-      profile: req.file
-        ? `profiles/${userId}/${req.file.filename}`
-        : req.body.profile,
-      // profile: req.file ? `../storage/app/public/profiles/${userId}/${req.file.filename}` : req.body.profile, // Save file path
     };
 
-    // console.log('Updated Profile:', updatedProfile);
+    // If a new image was uploaded, update the profile field.
+    if (req.file) {
+      updatedProfile.profile = `profiles/${userId}/${req.file.filename}`;
+    }
 
     const user = await UserMain.findByIdAndUpdate(userId, updatedProfile, {
       new: true,
     });
-
-    // console.log('Updated User:', user);
-
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -1622,8 +1600,736 @@ app.put("/api/user-profile", authenticateUser, upload, async (req, res) => {
 });
 
 /* ------------------------------
-   ENDPOINTS - END
+   Super Admin ENDPOINTS
 ------------------------------ */
+
+// // Search users by Emp ID
+// app.get("/api/search-users", async (req, res) => {
+//   try {
+//     const { q } = req.query;
+//     const users = await UserMain.find(
+//       { emp_id: { $regex: q, $options: "i" } },
+//       "emp_id name eng_name kh_name job_title dept_name sect_name"
+//     );
+//     res.json(users);
+//   } catch (error) {
+//     console.error("Error searching users:", error);
+//     res.status(500).json({ message: "Failed to search users" });
+//   }
+// });
+
+// // Add this endpoint to your server.js
+// app.get("/api/user-details", async (req, res) => {
+//   try {
+//     const { empId } = req.query;
+//     if (!empId) {
+//       return res.status(400).json({ message: "Employee ID is required" });
+//     }
+
+//     const user = await UserMain.findOne({ emp_id: empId });
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     res.status(200).json({
+//       name: user.name,
+//       eng_name: user.eng_name,
+//       kh_name: user.kh_name,
+//       job_title: user.job_title,
+//       dept_name: user.dept_name,
+//       sect_name: user.sect_name,
+//       working_status: user.working_status,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching user details:", error);
+//     res.status(500).json({ message: "Failed to fetch user details" });
+//   }
+// });
+
+// // Save Super Admin to role_management
+// app.post("/api/role-management", async (req, res) => {
+//   try {
+//     const { role, jobTitles, users } = req.body;
+//     const existingRole = await RoleManagment.findOne({ role });
+
+//     if (existingRole) {
+//       // Update existing role
+//       existingRole.users.push(...users);
+//       await existingRole.save();
+//     } else {
+//       // Create new role
+//       const newRole = new RoleManagment({ role, jobTitles, users });
+//       await newRole.save();
+//     }
+//     res.json({ message: "Super Admin registered successfully" });
+//   } catch (error) {
+//     console.error("Error saving role data:", error);
+//     res.status(500).json({ message: "Failed to save role data" });
+//   }
+// });
+
+/* ------------------------------
+   Role Managment ENDPOINTS
+------------------------------ */
+
+// // Get all roles
+// app.get("/api/role-managment", async (req, res) => {
+//   try {
+//     const data = await RoleManagment.find({});
+//     res.json(data);
+//   } catch (error) {
+//     console.error("Error fetching role data:", error);
+//     res.status(500).json({ message: "Failed to fetch role data" });
+//   }
+// });
+
+// // Save a new role
+// app.post("/api/role-managment", async (req, res) => {
+//   try {
+//     const { role, jobTitles, users } = req.body;
+//     const newRole = new RoleManagment({ role, jobTitles, users });
+//     await newRole.save();
+//     res.json(newRole);
+//   } catch (error) {
+//     console.error("Error saving role data:", error);
+//     res.status(500).json({ message: "Failed to save role data" });
+//   }
+// });
+
+// // Get job titles
+// app.get("/api/job-titles", async (req, res) => {
+//   try {
+//     const jobTitles = await UserMain.distinct("job_title");
+//     res.json(jobTitles);
+//   } catch (error) {
+//     console.error("Error fetching job titles:", error);
+//     res.status(500).json({ message: "Failed to fetch job titles" });
+//   }
+// });
+
+// // Get users by job titles
+// app.post("/api/users-by-job-titles", async (req, res) => {
+//   try {
+//     const { jobTitles } = req.body;
+//     const users = await UserMain.find({
+//       job_title: { $in: jobTitles },
+//     });
+//     res.json(users);
+//   } catch (error) {
+//     console.error("Error fetching users:", error);
+//     res.status(500).json({ message: "Failed to fetch users" });
+//   }
+// });
+
+// /* ------------------------------
+//    Super Admin ENDPOINTS
+// ------------------------------ */
+
+// // Search users by Emp ID
+// app.get("/api/search-users", async (req, res) => {
+//   try {
+//     const { q } = req.query;
+//     const users = await UserMain.find(
+//       { emp_id: { $regex: q, $options: "i" } },
+//       "emp_id name eng_name kh_name job_title dept_name sect_name"
+//     );
+//     res.json(users);
+//   } catch (error) {
+//     console.error("Error searching users:", error);
+//     res.status(500).json({ message: "Failed to search users" });
+//   }
+// });
+
+// // Get user details by emp_id
+// app.get("/api/user-details", async (req, res) => {
+//   try {
+//     const { empId } = req.query;
+//     if (!empId) {
+//       return res.status(400).json({ message: "Employee ID is required" });
+//     }
+
+//     const user = await UserMain.findOne({ emp_id: empId });
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     res.status(200).json({
+//       name: user.name,
+//       eng_name: user.eng_name,
+//       kh_name: user.kh_name,
+//       job_title: user.job_title,
+//       dept_name: user.dept_name,
+//       sect_name: user.sect_name,
+//       working_status: user.working_status,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching user details:", error);
+//     res.status(500).json({ message: "Failed to fetch user details" });
+//   }
+// });
+
+// // Save Super Admin to role_management
+// app.post("/api/role-management/super-admin", async (req, res) => {
+//   try {
+//     const { user } = req.body;
+//     const existingRole = await RoleManagment.findOne({ role: "Super Admin" });
+
+//     if (existingRole) {
+//       // Check if user already exists in the array
+//       const userExists = existingRole.users.some(
+//         (u) => u.emp_id === user.emp_id
+//       );
+//       if (!userExists) {
+//         existingRole.users.push({
+//           emp_id: user.emp_id,
+//           name: user.name,
+//           eng_name: user.eng_name,
+//           kh_name: user.kh_name,
+//           job_title: "Developer",
+//           dept_name: user.dept_name,
+//           sect_name: user.sect_name,
+//         });
+//         await existingRole.save();
+//       }
+//     } else {
+//       // Create new Super Admin role
+//       const newRole = new RoleManagment({
+//         role: "Super Admin",
+//         jobTitles: ["Developer"],
+//         users: [
+//           {
+//             emp_id: user.emp_id,
+//             name: user.name,
+//             eng_name: user.eng_name,
+//             kh_name: user.kh_name,
+//             job_title: "Developer",
+//             dept_name: user.dept_name,
+//             sect_name: user.sect_name,
+//           },
+//         ],
+//       });
+//       await newRole.save();
+//     }
+
+//     // Update user roles in User collection
+//     await UserMain.findOneAndUpdate(
+//       { emp_id: user.emp_id },
+//       { $addToSet: { roles: "super_admin" } }
+//     );
+
+//     res.json({ message: "Super Admin registered successfully" });
+//   } catch (error) {
+//     console.error("Error saving super admin:", error);
+//     res.status(500).json({ message: "Failed to save super admin" });
+//   }
+// });
+
+// /* ------------------------------
+//    Role Management ENDPOINTS
+// ------------------------------ */
+
+// // Get all roles
+// app.get("/api/role-management", async (req, res) => {
+//   try {
+//     const data = await RoleManagment.find({});
+//     res.json(data);
+//   } catch (error) {
+//     console.error("Error fetching role data:", error);
+//     res.status(500).json({ message: "Failed to fetch role data" });
+//   }
+// });
+
+// // Save or update a role
+// app.post("/api/role-management", async (req, res) => {
+//   try {
+//     const { role, jobTitles } = req.body;
+
+//     // Find users with matching job titles
+//     const users = await UserMain.find({ job_title: { $in: jobTitles } });
+
+//     const mappedUsers = users.map((user) => ({
+//       emp_id: user.emp_id,
+//       name: user.name,
+//       eng_name: user.eng_name,
+//       kh_name: user.kh_name,
+//       job_title: user.job_title,
+//       dept_name: user.dept_name,
+//       sect_name: user.sect_name,
+//     }));
+
+//     const existingRole = await RoleManagment.findOne({ role });
+
+//     if (existingRole) {
+//       existingRole.jobTitles = jobTitles;
+//       existingRole.users = mappedUsers;
+//       await existingRole.save();
+//     } else {
+//       const newRole = new RoleManagment({
+//         role,
+//         jobTitles,
+//         users: mappedUsers,
+//       });
+//       await newRole.save();
+//     }
+
+//     // Update user roles
+//     for (const user of users) {
+//       await UserMain.findOneAndUpdate(
+//         { emp_id: user.emp_id },
+//         { $addToSet: { roles: role.toLowerCase().replace(" ", "_") } }
+//       );
+//     }
+
+//     res.json({ message: "Role updated successfully" });
+//   } catch (error) {
+//     console.error("Error saving role data:", error);
+//     res.status(500).json({ message: "Failed to save role data" });
+//   }
+// });
+
+// // Get all job titles
+// app.get("/api/job-titles", async (req, res) => {
+//   try {
+//     const jobTitles = await UserMain.distinct("job_title");
+//     res.json(jobTitles.filter((title) => title)); // Filter out null/empty values
+//   } catch (error) {
+//     console.error("Error fetching job titles:", error);
+//     res.status(500).json({ message: "Failed to fetch job titles" });
+//   }
+// });
+
+// // Get users by job titles
+// app.post("/api/users-by-job-titles", async (req, res) => {
+//   try {
+//     const { jobTitles } = req.body;
+//     const users = await UserMain.find({
+//       job_title: { $in: jobTitles },
+//     }).select("emp_id name eng_name kh_name job_title dept_name sect_name");
+//     res.json(users);
+//   } catch (error) {
+//     console.error("Error fetching users:", error);
+//     res.status(500).json({ message: "Failed to fetch users" });
+//   }
+// });
+
+// // Search users by Emp ID from users collection
+// app.get("/api/search-users", async (req, res) => {
+//   try {
+//     const { q } = req.query;
+//     const users = await UserMain.find(
+//       { emp_id: { $regex: q, $options: "i" } },
+//       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+//     );
+//     res.json(users);
+//   } catch (error) {
+//     console.error("Error searching users:", error);
+//     res.status(500).json({ message: "Failed to search users" });
+//   }
+// });
+
+// // Get user details by emp_id from users collection
+// app.get("/api/user-details", async (req, res) => {
+//   try {
+//     const { empId } = req.query;
+//     if (!empId) {
+//       return res.status(400).json({ message: "Employee ID is required" });
+//     }
+
+//     const user = await UserMain.findOne(
+//       { emp_id: empId },
+//       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+//     );
+
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     res.status(200).json(user);
+//   } catch (error) {
+//     console.error("Error fetching user details:", error);
+//     res.status(500).json({ message: "Failed to fetch user details" });
+//   }
+// });
+
+// // Get all job titles from users collection
+// app.get("/api/job-titles", async (req, res) => {
+//   try {
+//     const jobTitles = await UserMain.distinct("job_title");
+//     res.json(jobTitles.filter((title) => title)); // Filter out null/empty values
+//   } catch (error) {
+//     console.error("Error fetching job titles:", error);
+//     res.status(500).json({ message: "Failed to fetch job titles" });
+//   }
+// });
+
+// // Get users by job title from users collection
+// app.get("/api/users-by-job-title", async (req, res) => {
+//   try {
+//     const { jobTitle } = req.query;
+//     const users = await UserMain.find(
+//       { job_title: jobTitle },
+//       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+//     );
+//     res.json(users);
+//   } catch (error) {
+//     console.error("Error fetching users by job title:", error);
+//     res.status(500).json({ message: "Failed to fetch users" });
+//   }
+// });
+
+// // Save Super Admin to role_management collection
+// app.post("/api/role-management/super-admin", async (req, res) => {
+//   try {
+//     const { user } = req.body;
+
+//     // Find or create Super Admin role
+//     let superAdminRole = await RoleManagment.findOne({ role: "Super Admin" });
+
+//     if (!superAdminRole) {
+//       superAdminRole = new RoleManagment({
+//         role: "Super Admin",
+//         jobTitles: ["Developer"],
+//         users: [],
+//       });
+//     }
+
+//     // Check if user already exists
+//     const userExists = superAdminRole.users.some(
+//       (u) => u.emp_id === user.emp_id
+//     );
+
+//     if (userExists) {
+//       return res.status(400).json({ message: "User is already a Super Admin" });
+//     }
+
+//     // Get complete user details from users collection
+//     const userDetails = await UserMain.findOne(
+//       { emp_id: user.emp_id },
+//       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+//     );
+
+//     if (!userDetails) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     // Add user to Super Admin role
+//     superAdminRole.users.push({
+//       emp_id: userDetails.emp_id,
+//       name: userDetails.name,
+//       eng_name: userDetails.eng_name,
+//       kh_name: userDetails.kh_name,
+//       job_title: "Developer",
+//       dept_name: userDetails.dept_name,
+//       sect_name: userDetails.sect_name,
+//       working_status: userDetails.working_status,
+//       face_photo: userDetails.face_photo,
+//     });
+
+//     await superAdminRole.save();
+//     res.json({ message: "Super Admin registered successfully" });
+//   } catch (error) {
+//     console.error("Error registering super admin:", error);
+//     res.status(500).json({ message: "Failed to register super admin" });
+//   }
+// });
+
+// // Save or update role in role_management collection
+// app.post("/api/role-management", async (req, res) => {
+//   try {
+//     const { role, jobTitles } = req.body;
+
+//     // Get users with matching job titles from users collection
+//     const users = await UserMain.find(
+//       { job_title: { $in: jobTitles } },
+//       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+//     );
+
+//     // Find or create role
+//     let roleDoc = await RoleManagment.findOne({ role });
+
+//     if (roleDoc) {
+//       roleDoc.jobTitles = jobTitles;
+//       roleDoc.users = users.map((user) => ({
+//         emp_id: user.emp_id,
+//         name: user.name,
+//         eng_name: user.eng_name,
+//         kh_name: user.kh_name,
+//         job_title: user.job_title,
+//         dept_name: user.dept_name,
+//         sect_name: user.sect_name,
+//         working_status: user.working_status,
+//         face_photo: user.face_photo,
+//       }));
+//     } else {
+//       roleDoc = new RoleManagment({
+//         role,
+//         jobTitles,
+//         users: users.map((user) => ({
+//           emp_id: user.emp_id,
+//           name: user.name,
+//           eng_name: user.eng_name,
+//           kh_name: user.kh_name,
+//           job_title: user.job_title,
+//           dept_name: user.dept_name,
+//           sect_name: user.sect_name,
+//           working_status: user.working_status,
+//           face_photo: user.face_photo,
+//         })),
+//       });
+//     }
+
+//     await roleDoc.save();
+//     res.json({ message: "Role updated successfully" });
+//   } catch (error) {
+//     console.error("Error saving role:", error);
+//     res.status(500).json({ message: "Failed to save role" });
+//   }
+// });
+
+// // Get user roles from role_management collection
+// app.get("/api/user-roles/:empId", async (req, res) => {
+//   try {
+//     const { empId } = req.params;
+//     const roles = [];
+
+//     const userRoles = await RoleManagment.find({
+//       "users.emp_id": empId,
+//     });
+
+//     userRoles.forEach((role) => {
+//       roles.push(role.role);
+//     });
+
+//     res.json({ roles });
+//   } catch (error) {
+//     console.error("Error fetching user roles:", error);
+//     res.status(500).json({ message: "Failed to fetch user roles" });
+//   }
+// });
+
+// /* ------------------------------
+//    Super Admin ENDPOINTS
+// ------------------------------ */
+
+app.post("/api/role-management/super-admin", async (req, res) => {
+  try {
+    const { user } = req.body;
+
+    let superAdminRole = await RoleManagment.findOne({ role: "Super Admin" });
+
+    if (!superAdminRole) {
+      superAdminRole = new RoleManagment({
+        role: "Super Admin",
+        jobTitles: ["Developer"],
+        users: [],
+      });
+    }
+
+    const userExists = superAdminRole.users.some(
+      (u) => u.emp_id === user.emp_id
+    );
+
+    if (userExists) {
+      return res.status(400).json({ message: "User is already a Super Admin" });
+    }
+
+    const userDetails = await UserMain.findOne(
+      { emp_id: user.emp_id },
+      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+    );
+
+    if (!userDetails) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    superAdminRole.users.push({
+      emp_id: userDetails.emp_id,
+      name: userDetails.name,
+      eng_name: userDetails.eng_name,
+      kh_name: userDetails.kh_name,
+      job_title: "Developer",
+      dept_name: userDetails.dept_name,
+      sect_name: userDetails.sect_name,
+      working_status: userDetails.working_status,
+      face_photo: userDetails.face_photo,
+    });
+
+    await superAdminRole.save();
+    res.json({ message: "Super Admin registered successfully" });
+  } catch (error) {
+    console.error("Error registering super admin:", error);
+    res.status(500).json({ message: "Failed to register super admin" });
+  }
+});
+
+// /* ------------------------------
+//    Role Management ENDPOINTS
+// ------------------------------ */
+
+app.get("/api/search-users", async (req, res) => {
+  try {
+    const { q } = req.query;
+    const users = await UserMain.find(
+      {
+        emp_id: { $regex: q, $options: "i" },
+        working_status: "Working",
+      },
+      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+    );
+    res.json(users);
+  } catch (error) {
+    console.error("Error searching users:", error);
+    res.status(500).json({ message: "Failed to search users" });
+  }
+});
+
+app.get("/api/user-details", async (req, res) => {
+  try {
+    const { empId } = req.query;
+    if (!empId) {
+      return res.status(400).json({ message: "Employee ID is required" });
+    }
+
+    const user = await UserMain.findOne(
+      { emp_id: empId, working_status: "Working" },
+      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Error fetching user details:", error);
+    res.status(500).json({ message: "Failed to fetch user details" });
+  }
+});
+
+app.get("/api/job-titles", async (req, res) => {
+  try {
+    const jobTitles = await UserMain.distinct("job_title", {
+      working_status: "Working",
+    });
+    res.json(jobTitles.filter((title) => title));
+  } catch (error) {
+    console.error("Error fetching job titles:", error);
+    res.status(500).json({ message: "Failed to fetch job titles" });
+  }
+});
+
+app.get("/api/users-by-job-title", async (req, res) => {
+  try {
+    const { jobTitle } = req.query;
+    const users = await UserMain.find(
+      {
+        job_title: jobTitle,
+        working_status: "Working",
+      },
+      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+    );
+    res.json(users);
+  } catch (error) {
+    console.error("Error fetching users by job title:", error);
+    res.status(500).json({ message: "Failed to fetch users" });
+  }
+});
+
+app.post("/api/role-management", async (req, res) => {
+  try {
+    const { role, jobTitles } = req.body;
+
+    const users = await UserMain.find(
+      {
+        job_title: { $in: jobTitles },
+        working_status: "Working",
+      },
+      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+    );
+
+    let roleDoc = await RoleManagment.findOne({ role });
+
+    if (roleDoc) {
+      roleDoc.jobTitles = jobTitles;
+      roleDoc.users = users.map((user) => ({
+        emp_id: user.emp_id,
+        name: user.name,
+        eng_name: user.eng_name,
+        kh_name: user.kh_name,
+        job_title: user.job_title,
+        dept_name: user.dept_name,
+        sect_name: user.sect_name,
+        working_status: user.working_status,
+        face_photo: user.face_photo,
+      }));
+    } else {
+      roleDoc = new RoleManagment({
+        role,
+        jobTitles,
+        users: users.map((user) => ({
+          emp_id: user.emp_id,
+          name: user.name,
+          eng_name: user.eng_name,
+          kh_name: user.kh_name,
+          job_title: user.job_title,
+          dept_name: user.dept_name,
+          sect_name: user.sect_name,
+          working_status: user.working_status,
+          face_photo: user.face_photo,
+        })),
+      });
+    }
+
+    await roleDoc.save();
+    res.json({ message: `Role ${roleDoc ? "updated" : "added"} successfully` });
+  } catch (error) {
+    console.error("Error saving role:", error);
+    res.status(500).json({ message: "Failed to save role" });
+  }
+});
+
+app.get("/api/user-roles/:empId", async (req, res) => {
+  try {
+    const { empId } = req.params;
+    const roles = [];
+
+    const userRoles = await RoleManagment.find({
+      "users.emp_id": empId,
+    });
+
+    userRoles.forEach((role) => {
+      roles.push(role.role);
+    });
+
+    res.json({ roles });
+  } catch (error) {
+    console.error("Error fetching user roles:", error);
+    res.status(500).json({ message: "Failed to fetch user roles" });
+  }
+});
+
+app.get("/api/role-management", async (req, res) => {
+  try {
+    const roles = await RoleManagment.find({}).sort({
+      role: 1, // Sort by role name
+    });
+    res.json(roles);
+  } catch (error) {
+    console.error("Error fetching roles:", error);
+    res.status(500).json({ message: "Failed to fetch roles" });
+  }
+});
+
+// Get all roles from role_management collection
+app.get("/api/role-management", async (req, res) => {
+  try {
+    const roles = await RoleManagment.find({});
+    res.json(roles);
+  } catch (error) {
+    console.error("Error fetching roles:", error);
+    res.status(500).json({ message: "Failed to fetch roles" });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);

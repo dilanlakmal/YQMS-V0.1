@@ -3,6 +3,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { FaEye, FaPrint, FaQrcode } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../components/authentication/AuthContext"; // Import the AuthContext
 import BluetoothComponent from "../components/forms/Bluetooth";
 import MonoSearch from "../components/forms/MonoSearch";
 import NumLetterPad from "../components/forms/NumLetterPad";
@@ -11,6 +12,8 @@ import QRCodePreview from "../components/forms/QRCodePreview";
 import SubConSelection from "../components/forms/SubConSelection";
 
 function BundleRegistration() {
+  const { user, loading } = useAuth(); // Get the logged-in user data
+  const [userBatches, setUserBatches] = useState([]);
   const navigate = useNavigate();
   const [qrData, setQrData] = useState([]);
   const [showQRPreview, setShowQRPreview] = useState(false);
@@ -229,6 +232,23 @@ function BundleRegistration() {
     setEstimatedTotal(newEstimatedTotal);
   }, [formData.totalGarmentsCount, formData.count, formData.bundleQty]);
 
+  useEffect(() => {
+    const fetchUserBatches = async () => {
+      try {
+        if (!user) return;
+        const response = await fetch(
+          `http://localhost:5001/api/user-batches?emp_id=${user.emp_id}`
+        );
+        const data = await response.json();
+        setUserBatches(data);
+      } catch (error) {
+        console.error("Error fetching user batches:", error);
+      }
+    };
+
+    fetchUserBatches();
+  }, [user]);
+
   // Handle number pad input
   const handleNumberPadInput = (value) => {
     if (numberPadTarget === "bundleQty") {
@@ -260,6 +280,11 @@ function BundleRegistration() {
 
   // Generate QR code and save bundle data
   const handleGenerateQR = async () => {
+    if (!user || loading) {
+      alert("User data is not available. Please try again.");
+      return;
+    }
+
     if (!validateLineNo()) {
       alert("Invalid Line No. It must be between 1 and 30 for YM factory.");
       return;
@@ -318,6 +343,13 @@ function BundleRegistration() {
           totalBundleQty: 1, // This is always 1 for each record, becuase when user Generate QR, it's for one bundle
           sub_con: isSubCon ? "Yes" : "No",
           sub_con_factory: isSubCon ? subConName : "",
+          // Add user data
+          emp_id: user.emp_id,
+          eng_name: user.eng_name,
+          kh_name: user.kh_name,
+          job_title: user.job_title,
+          dept_name: user.dept_name,
+          sect_name: user.sect_name,
         };
 
         bundleData.push(bundleRecord);
@@ -811,8 +843,24 @@ function BundleRegistration() {
                       Record ID
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Date
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Time
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Department
                     </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      EmpID
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      EngName
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      KhName
+                    </th>
+
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       MONo
                     </th>
@@ -864,62 +912,77 @@ function BundleRegistration() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {dataRecords.map((record, index) => (
+                  {userBatches.map((batch, index) => (
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {index + 1}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.department}
+                        {batch.updated_date_seperator}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.selectedMono}
+                        {batch.updated_time_seperator}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.custStyle}
+                        {batch.department}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.buyer}
+                        {batch.emp_id}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.country}
+                        {batch.eng_name}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.orderQty}
+                        {batch.kh_name}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.factory}
+                        {batch.selectedMono}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.lineNo}
+                        {batch.custStyle}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.color}
+                        {batch.buyer}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.chnColor}
+                        {batch.country}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.size}
+                        {batch.orderQty}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.sizeOrderQty}
+                        {batch.factory}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.planCutQty}
+                        {batch.lineNo}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.count}
+                        {batch.color}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.bundleQty}
+                        {batch.chnColor}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.sub_con}
+                        {batch.size}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.sub_con === "Yes"
-                          ? record.sub_con_factory
+                        {batch.sizeOrderQty}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {batch.planCutQty}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {batch.count}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {batch.bundleQty}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {batch.sub_con}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {batch.sub_con === "Yes"
+                          ? batch.sub_con_factory
                           : "N/A"}
                       </td>
                     </tr>
@@ -962,3 +1025,5 @@ function BundleRegistration() {
 }
 
 export default BundleRegistration;
+
+//{dataRecords.map((record, index) => (
