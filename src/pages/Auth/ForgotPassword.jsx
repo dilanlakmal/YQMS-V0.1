@@ -4,9 +4,12 @@ import { Link } from "react-router-dom";
 import AuthLayout from "../../components/layout/AuthLayout";
 import Button from "../../components/layout/Button";
 import FormInput from "../../components/layout/FormInput";
+import { text } from "body-parser";
 
 const ForgotPassword = () => {
-  const [email, setEmail] = useState("");
+  const [empId, setEmpId] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [conPassword, setConPassword] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const handleSubmit = (e) => {
@@ -17,7 +20,7 @@ const ForgotPassword = () => {
   return (
     <AuthLayout
       title="Forgot Password?"
-      subtitle="Enter your email address and we'll send you instructions to reset your password."
+      subtitle="You can create new password hear. Please follow the instruction."
     >
       <a href="/" className="flex items-center text-gray-600 mb-8">
         <ArrowLeft className="h-5 w-5 mr-2" />
@@ -27,17 +30,38 @@ const ForgotPassword = () => {
       {!isSubmitted ? (
         <form onSubmit={handleSubmit} className="space-y-6">
           <FormInput
-            label="Email Address"
-            id="email"
-            name="email"
-            type="email"
+            label="Employee Id"
+            id="emp_id"
+            name="emp_id"
+            type="text"
             required
-            placeholder="Enter your email address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your Employee Id"
+            value={empId}
+            onChange={(e) => setEmpId(e.target.value)}
           />
+          <FormInput
+            label="New Password"
+            id="password"
+            name="password"
+            type="password"
+            required
+            placeholder="Enter your new password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+          <FormInput
+          label="Re-enter your password "
+          id="confirm_password"
+          name="confirm_password"
+          type="password"
+          required
+          placeholder="Re-enter your new password"
+          value={conPassword}
+          onChange={(e) => setConPassword(e.target.value)}
+        />
 
-          <Button type="submit">Send Reset Instructions</Button>
+
+          <Button type="submit">Reset</Button>
         </form>
       ) : (
         <div className="text-center">
@@ -59,10 +83,10 @@ const ForgotPassword = () => {
             </div>
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Check Your Email
+            Reseat Successful
           </h2>
           <p className="text-gray-600 mb-6">
-            We've sent password reset instructions to {email}
+           Successfully Reset Your password. Now you can login using new password.
           </p>
           <Link
             to="/"
