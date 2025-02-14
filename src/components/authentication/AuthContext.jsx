@@ -5,7 +5,11 @@ import bcrypt from 'bcryptjs';
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const storedUser =
+      localStorage.getItem("user") || sessionStorage.getItem("user");
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,11 +25,18 @@ export const AuthProvider = ({ children }) => {
 
         const userData = {
           ...response.data,
+          emp_id: response.data.emp_id,
+          eng_name: response.data.eng_name,
+          kh_name: response.data.kh_name,
+          job_title: response.data.job_title,
+          dept_name: response.data.dept_name,
+          sect_name: response.data.sect_name,
           roles: response.data.roles || [],
           sub_roles: response.data.sub_roles || [],
         };
 
         setUser(userData);
+        localStorage.setItem("user", JSON.stringify(userData));
       } catch (error) {
         console.error('Error fetching user data:', error);
       } finally {
@@ -33,7 +44,11 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    fetchUser();
+    if (!user) {
+      fetchUser();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   const hashPassword = async (password) => {
