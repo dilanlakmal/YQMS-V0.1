@@ -656,7 +656,7 @@ import {
   Routes,
 } from "react-router-dom";
 import "./App.css";
-import Navbar from "./components/Navbar"; // Updated path
+import Navbar from "./components/layout/Navbar";// Updated path
 import RoleManagement from "./components/RoleManagement"; // Fixed spelling
 import Analytics from "./pages/Analytics";
 import BundleRegistration from "./pages/BundleRegistration";

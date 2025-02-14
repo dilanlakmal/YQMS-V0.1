@@ -789,7 +789,7 @@ app.post("/api/refresh-token", async (req, res) => {
 app.post("/api/login", async (req, res) => {
   try {
     const { username, password, rememberMe } = req.body;
-    if (!mainUserConnection.readyState) {
+    if (!ymProdConnection.readyState) {
       return res.status(500).json({ message: "Database not connected" });
     }
 
@@ -940,6 +940,76 @@ app.post("/api/reset-password", async (req, res) => {
     });
   }
 });
+/* ----------------------------
+   User Auth ENDPOINTS
+------------------------------ */
+
+const authenticateUser = (req, res, next) => {
+  try {
+    const token = req.headers.authorization.split(' ')[1];
+    const decodedToken = jwt.verify(token, 'your_jwt_secret');
+    req.userId = decodedToken.userId; // Set the userId in the request object
+    next();
+  } catch (error) {
+    res.status(401).json({ message: 'Authentication failed', error: error.message });
+  }
+};
+
+const generateRandomString = (length) => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return result;
+};
+
+
+// Multer Storage Setup
+// ------------------------
+// Set storage engine
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const userId = req.userId; 
+    if (!userId) {
+      return cb(new Error('User ID is not defined'));
+    }
+    const dir = `../public/storage/profiles/${userId}`;
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const randomString = generateRandomString(32);
+    cb(null, `${randomString}${path.extname(file.originalname)}`);
+  },
+});
+
+// Initialize upload
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5000000 }, // Limit file size to 5MB
+  fileFilter: (req, file, cb) => {
+    checkFileType(file, cb);
+  },
+}).single('profile');
+
+// Check file type
+function checkFileType(file, cb) {
+  // Allowed ext
+  const filetypes = /jpeg|jpg|png|gif/;
+  // Check ext
+  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+  // Check mime
+  const mimetype = filetypes.test(file.mimetype);
+  if (mimetype && extname) {
+    return cb(null, true);
+  } else {
+    cb('Error: Images Only!');
+  }
+}
+
+
+// ------------------------
 
 
 // Fetch User Profile Endpoint
@@ -1277,73 +1347,7 @@ app.post("/api/reworks", async (req, res) => {
   }
 });
 
-/* ------------------------------
-   User Auth ENDPOINTS
------------------------------- */
 
-const authenticateUser = (req, res, next) => {
-  try {
-    const token = req.headers.authorization.split(' ')[1];
-    const decodedToken = jwt.verify(token, 'your_jwt_secret');
-    req.userId = decodedToken.userId; // Set the userId in the request object
-    next();
-  } catch (error) {
-    res.status(401).json({ message: 'Authentication failed', error: error.message });
-  }
-};
-
-const generateRandomString = (length) => {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
-  }
-  return result;
-};
-
-// ------------------------
-// Multer Storage Setup
-// ------------------------
-// Set storage engine
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const userId = req.userId; 
-    if (!userId) {
-      return cb(new Error('User ID is not defined'));
-    }
-    const dir = `../public/storage/profiles/${userId}`;
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const randomString = generateRandomString(32);
-    cb(null, `${randomString}${path.extname(file.originalname)}`);
-  },
-});
-
-// Initialize upload
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 5000000 }, // Limit file size to 5MB
-  fileFilter: (req, file, cb) => {
-    checkFileType(file, cb);
-  },
-}).single('profile');
-
-// Check file type
-function checkFileType(file, cb) {
-  // Allowed ext
-  const filetypes = /jpeg|jpg|png|gif/;
-  // Check ext
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  // Check mime
-  const mimetype = filetypes.test(file.mimetype);
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    cb('Error: Images Only!');
-  }
-}
 
 // User Managment
 // User routes
@@ -1676,6 +1680,7 @@ app.get("/api/user-profile", async (req, res) => {
 });
 
 // ------------------------
+
 // PUT /api/user-profile
 // ------------------------
 app.put("/api/user-profile", authenticateUser, upload, async (req, res) => {
