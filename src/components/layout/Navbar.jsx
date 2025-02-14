@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Menu } from '@headlessui/react';
 import { User, LogOut } from 'lucide-react';
 import axios from 'axios';
+import LanguageSwitcher from './LangSwitch';
 
 function Navbar({ onLogout }) {
   const [user, setUser] = useState(null);
@@ -164,6 +165,9 @@ function Navbar({ onLogout }) {
               </Link>
             ))}
           </div>
+          <div className="flex items-center space-x-3 mr-3">
+            <LanguageSwitcher />
+            </div>
           <div className="flex items-center">
             {user && (
               <div className="flex items-center space-x-3 mr-3">

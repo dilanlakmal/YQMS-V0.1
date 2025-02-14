@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { useAuth } from '../../components/authentication/AuthContext.jsx';
+import bcrypt from 'bcryptjs';
 
 const MySwal = withReactContent(Swal);
 

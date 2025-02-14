@@ -1,0 +1,20 @@
+{
+    "welcome": "Welcome to Quality Data Management System",
+    "click_cards": "Click on the cards below to start inspection Reports or Live monitoring",
+    "unauthorized_access": "Unauthorized Access",
+    "loading": "Loading...",
+    "order_data": "Order Data",
+    "quality_inspection": "Quality Inspection",
+    "qa_audit": "QA Audit",
+    "data_analytics": "Data Analytics",
+    "bundle_registration": "Registration",
+    "washing": "Washing",
+    "dyeing": "Dyeing",
+    "ironing": "Ironing",
+    "qc1_inspection": "QC1 Inspection",
+    "qc2_inspection": "QC2 Inspection",
+    "qa_audit_report": "QA Audit Report",
+    "download_data": "Download Data",
+    "live_dashboard": "Live Dashboard"
+  }
+  

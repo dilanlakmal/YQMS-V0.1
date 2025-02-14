@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '../components/authentication/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 function Home() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [errorMessage, setErrorMessage] = useState('');
@@ -25,7 +27,7 @@ function Home() {
     if (hasRole(requiredRoles)) {
       navigate(path);
     } else {
-      setErrorMessage('Unauthorized Access');
+      setErrorMessage(t('Unauthorized Access'));
       setTimeout(() => {
         setErrorMessage('');
       }, 1000);
@@ -33,7 +35,7 @@ function Home() {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div>t(Loading...)</div>;
   }
 
   const cards = [
@@ -44,7 +46,7 @@ function Home() {
           path: "/bundle-registration",
           roles: ["admin_user"],
           image: "/IMG/bundle.avif",
-          title: "Bundle Registration",
+          title: t("bundle_registration"),
           description: "Click here to register orders for QC2 Inspection."
         },
         {

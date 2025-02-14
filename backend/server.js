@@ -28,7 +28,7 @@ app.use(bodyParser.json());
 app.use(
   cors({
     origin: "*", //["http://localhost:3001", "https://localhost:3001"], // Allow both HTTP and HTTPS, // Update with your frontend URL
-    methods: ["GET", "POST", "PUT"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
@@ -161,8 +161,11 @@ app.post('/users', async (req, res) => {
     }
 
     // Hash the password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // const salt = await bcrypt.genSalt(12);
+    // const hashedPassword = await bcrypt.hash(password, salt);
+
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Create a new user
     const newUser = new UserMain({
@@ -1037,6 +1040,43 @@ app.post("/api/register", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Failed to register user",
+      error: error.message,
+    });
+  }
+});
+
+app.post("/api/reset-password", async (req, res) => {
+  try {
+    const { emp_id, newPassword } = req.body;
+
+    if (!emp_id || !newPassword) {
+      return res.status(400).json({
+        message: "Employee ID and new password are required",
+      });
+    }
+
+    const user = await UserMain.findOne({ emp_id });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "Employee ID not found",
+      });
+    }
+
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    user.password = hashedPassword;
+    user.updated_at = new Date();
+
+    await user.save();
+
+    res.status(200).json({
+      message: "Password reset successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to reset password",
       error: error.message,
     });
   }

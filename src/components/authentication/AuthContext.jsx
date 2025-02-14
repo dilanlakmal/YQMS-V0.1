@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import bcrypt from 'bcryptjs'; 
 
 const AuthContext = createContext();
 
@@ -35,6 +36,12 @@ export const AuthProvider = ({ children }) => {
     fetchUser();
   }, []);
 
+  const hashPassword = async (password) => {
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    return hashedPassword;
+  };
+
   // useEffect(() => {
   //   const fetchUserData = async () => {
   //     try {
@@ -54,7 +61,7 @@ export const AuthProvider = ({ children }) => {
   // }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, loading, hashPassword }}>
       {children}
     </AuthContext.Provider>
   );

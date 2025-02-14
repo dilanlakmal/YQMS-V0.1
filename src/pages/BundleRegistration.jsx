@@ -9,8 +9,10 @@ import NumLetterPad from "../components/forms/NumLetterPad";
 import NumberPad from "../components/forms/NumberPad";
 import QRCodePreview from "../components/forms/QRCodePreview";
 import SubConSelection from "../components/forms/SubConSelection";
+import { useTranslation } from 'react-i18next';
 
 function BundleRegistration() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [qrData, setQrData] = useState([]);
   const [showQRPreview, setShowQRPreview] = useState(false);
@@ -403,7 +405,7 @@ function BundleRegistration() {
     <div className="min-h-screen bg-gray-50 pt-20 px-8">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">
-          Bundle Registration
+        {t('bundle_registration')}
         </h1>
 
         {/* Tabs */}

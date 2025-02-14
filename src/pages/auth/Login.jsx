@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { ClipboardList } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { ClipboardList } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState("");
@@ -12,7 +12,9 @@ function Login({ onLogin }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+    const token =
+      localStorage.getItem("accessToken") ||
+      sessionStorage.getItem("accessToken");
     if (token) {
       authenticateUser(token);
     }
@@ -20,20 +22,23 @@ function Login({ onLogin }) {
 
   const authenticateUser = async (token) => {
     try {
-      const response = await axios.get("http://localhost:5001/api/user-profile", {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      const response = await axios.get(
+        "http://localhost:5001/api/user-profile",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
-      });
+      );
 
       if (response.status === 200) {
         onLogin(token);
-        navigate('/home');
+        navigate("/home");
       }
     } catch (error) {
-      localStorage.removeItem('accessToken');
-      sessionStorage.removeItem('accessToken');
-      navigate('/login');
+      localStorage.removeItem("accessToken");
+      sessionStorage.removeItem("accessToken");
+      navigate("/login");
     }
   };
 
@@ -41,24 +46,27 @@ function Login({ onLogin }) {
     e.preventDefault();
     if (username && password) {
       try {
-        const response = await axios.post("http://localhost:5001/api/login", { username, password, rememberMe });
+        const response = await axios.post("http://localhost:5001/api/login", {
+          username,
+          password,
+          rememberMe,
+        });
 
         if (response.status === 200) {
           const { accessToken, refreshToken, user } = response.data;
 
           if (rememberMe) {
-            localStorage.setItem('accessToken', accessToken);
-            localStorage.setItem('refreshToken', refreshToken);
-            localStorage.setItem('user', JSON.stringify(user));
+            localStorage.setItem("accessToken", accessToken);
+            localStorage.setItem("refreshToken", refreshToken);
+            localStorage.setItem("user", JSON.stringify(user));
           } else {
-            sessionStorage.setItem('accessToken', accessToken);
-            sessionStorage.setItem('refreshToken', refreshToken);
-            sessionStorage.setItem('user', JSON.stringify(user));
+            sessionStorage.setItem("accessToken", accessToken);
+            sessionStorage.setItem("refreshToken", refreshToken);
+            sessionStorage.setItem("user", JSON.stringify(user));
           }
 
           onLogin(accessToken);
-          navigate('/home');
-          // console.log('User Login:',response);
+          navigate("/home");
         }
       } catch (error) {
         setError("Invalid username or password");
@@ -67,29 +75,34 @@ function Login({ onLogin }) {
   };
 
   const refreshToken = async () => {
-    const refreshToken = localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
+    const refreshToken =
+      localStorage.getItem("refreshToken") ||
+      sessionStorage.getItem("refreshToken");
     if (!refreshToken) {
-      navigate('/login');
+      navigate("/login");
       return;
     }
 
     try {
-      const response = await axios.post("http://localhost:5001/api/refresh-token", { refreshToken });
+      const response = await axios.post(
+        "http://localhost:5001/api/refresh-token",
+        { refreshToken }
+      );
 
       if (response.status === 200) {
         const { accessToken } = response.data;
-        if (localStorage.getItem('refreshToken')) {
-          localStorage.setItem('accessToken', accessToken);
+        if (localStorage.getItem("refreshToken")) {
+          localStorage.setItem("accessToken", accessToken);
         } else {
-          sessionStorage.setItem('accessToken', accessToken);
+          sessionStorage.setItem("accessToken", accessToken);
         }
 
         authenticateUser(accessToken);
       } else {
-        navigate('/login');
+        navigate("/login");
       }
     } catch (error) {
-      navigate('/login');
+      navigate("/login");
     }
   };
 
@@ -97,7 +110,6 @@ function Login({ onLogin }) {
     const interval = setInterval(refreshToken, 30 * 60 * 1000); // Refresh token every 30 minutes
     return () => clearInterval(interval);
   }, []);
-
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-gray-50">
@@ -116,17 +128,14 @@ function Login({ onLogin }) {
             />
           </div>
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Welcome Back!</h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              Welcome Back!
+            </h1>
             <p className="text-lg text-gray-600">
               Please enter login details below
             </p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-              <div className="text-red-500 text-center mb-4">
-                {error}
-              </div>
-            )}
             <div>
               <label
                 htmlFor="username"
@@ -172,12 +181,18 @@ function Login({ onLogin }) {
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
               />
-              <label htmlFor="rememberMe" className="ml-2 block text-s text-gray-900">
+              <label
+                htmlFor="rememberMe"
+                className="ml-2 block text-s text-gray-900"
+              >
                 Remember me
               </label>
             </div>
             <div className="text-right">
-              <Link to="/forgot-password" className="text-s text-blue-600 hover:text-blue-600">
+              <Link
+                to="/forgot-password"
+                className="text-s text-blue-600 hover:text-blue-600"
+              >
                 Forgot password?
               </Link>
             </div>
@@ -191,7 +206,10 @@ function Login({ onLogin }) {
             </center>
             <p className="text-center text-s text-gray-600">
               Don't have an account?{" "}
-              <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500">
+              <Link
+                to="/register"
+                className="font-medium text-blue-600 hover:text-blue-500"
+              >
                 Register
               </Link>
             </p>
@@ -202,7 +220,7 @@ function Login({ onLogin }) {
       <div className="flex-1 hidden lg:flex items-center justify-center p-12 bg-black">
         <div className="max-w-2xl text-center">
           <img
-            src= "/IMG/Quality.webp"
+            src="https://cdn.sanity.io/images/ztw74qc4/production/91213435f1cf5293b2105aea50d48c3df854ce68-1200x664.jpg?w=1536&fit=max&auto=format"
             alt="Quality Management"
             className="w-full rounded-lg shadow-lg mb-8"
           />

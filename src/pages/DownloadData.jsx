@@ -80,6 +80,9 @@ function DownloadData() {
   };
 
   const [moNoOptions, setMoNoOptions] = useState([]);
+  const [empIdOptions, setEmpIdOptions] = useState([]);
+  const [engNameOptions, setEngNameOptions] = useState([]);
+  const [jobTitleOptions, setJobTietlOptions] = useState([]);
   const [styleNoOptions, setStyleNoOptions] = useState([]);
   const [lineNoOptions, setLineNoOptions] = useState([]);
   const [colorOptions, setColorOptions] = useState([]);
@@ -654,12 +657,12 @@ function DownloadData() {
                         <td colSpan="10" className="text-center py-4">
                           Loading...
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        {/* <td className="px-6 py-4 whitespace-nowrap">
                           {item.factory}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {item.count}
-                        </td>
+                        </td> */}
                       </tr>
                     ) : (tabDataResults[activeTab] && tabDataResults[activeTab].length === 0) ? (
                       <tr>
