@@ -13,6 +13,7 @@ const roleManagmentSchema = new mongoose.Schema({
       dept_name: { type: String },
       sect_name: { type: String },
       working_status: { type: String },
+      phone_number: { type: String },
       face_photo: { type: String }, // Added profile field since it's used in the UI
     },
   ],

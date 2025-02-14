@@ -1,5 +1,5 @@
 import PropTypes from "prop-types";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
 import { useAuth } from "../../components/authentication/AuthContext.jsx";
@@ -9,96 +9,76 @@ const MySwal = withReactContent(Swal);
 const CreateUserModal = ({
   isOpen,
   onClose,
-  roles,
   onSubmit,
-  existingUserIds = [], // Use default parameter
+  existingUserIds = [],
+  existingUserNames = [], // <<< NEW: Prop for existing user names
 }) => {
   const { hashPassword } = useAuth();
   const [formData, setFormData] = useState({
-    emp_id: "",
     name: "",
-    email: "",
-    roles: [],
-    sub_roles: [],
-    keywords: "",
+    emp_id: "",
+    job_title: "",
+    eng_name: "",
+    kh_name: "",
+    phone_number: "",
+    dept_name: "",
+    sect_name: "",
+    working_status: "Working", // Auto-filled field
     password: "",
+    email: "",
   });
 
-  useEffect(() => {
-    // You can add any side effects related to existingUserIds here if needed
-  }, [existingUserIds]);
+  // Control extra (optional) fields visibility
+  const [showExtraFields, setShowExtraFields] = useState(false);
+
+  const toggleExtraFields = () => {
+    setShowExtraFields((prev) => !prev);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       [name]: value,
-    });
-  };
-
-  const handleRoleChange = (roleValue) => {
-    setFormData((prevFormData) => ({
-      ...prevFormData,
-      roles: prevFormData.roles.includes(roleValue)
-        ? prevFormData.roles.filter((role) => role !== roleValue)
-        : [...prevFormData.roles, roleValue],
     }));
-  };
-
-  const handleSubRoleChange = (subRoleValue, mainRoleValue) => {
-    setFormData((prevFormData) => ({
-      ...prevFormData,
-      sub_roles: prevFormData.sub_roles.includes(subRoleValue)
-        ? prevFormData.sub_roles.filter((subRole) => subRole !== subRoleValue)
-        : [...prevFormData.sub_roles, subRoleValue],
-    }));
-
-    // Automatically check/uncheck the main role based on sub-roles
-    const mainRoleSubRoles = roles.find(
-      (role) => role.value === mainRoleValue
-    ).sub_roles;
-    const allSubRolesSelected = mainRoleSubRoles.every((subRole) =>
-      formData.sub_roles.includes(subRole.value)
-    );
-
-    if (allSubRolesSelected) {
-      setFormData((prevFormData) => ({
-        ...prevFormData,
-        roles: prevFormData.roles.includes(mainRoleValue)
-          ? prevFormData.roles
-          : [...prevFormData.roles, mainRoleValue],
-      }));
-    } else {
-      setFormData((prevFormData) => ({
-        ...prevFormData,
-        roles: prevFormData.roles.filter((role) => role !== mainRoleValue),
-      }));
-    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Ensure required fields are provided.
+    if (!formData.name || !formData.password) return;
 
-    if (
-      Array.isArray(existingUserIds) &&
-      existingUserIds.includes(formData.emp_id)
-    ) {
+    // >>> NEW: Check if the name already exists in the users collection
+    if (existingUserNames.includes(formData.name.trim().toLowerCase())) {
+      MySwal.fire({
+        icon: "error",
+        title: "Error",
+        text: "User already exist! Please Use different Name",
+      });
+      return;
+    }
+    // <<<
+
+    // If emp_id is provided and already exists, alert the user.
+    if (formData.emp_id && existingUserIds.includes(formData.emp_id)) {
       MySwal.fire({
         icon: "error",
         title: "Error",
         text: "Employee ID already exists. Please use a different ID.",
       }).then(() => {
-        // Clear the form data
         setFormData({
-          emp_id: "",
           name: "",
-          email: "",
-          roles: [],
-          sub_roles: [],
-          keywords: "",
+          emp_id: "",
+          job_title: "",
+          eng_name: "",
+          kh_name: "",
+          phone_number: "",
+          dept_name: "",
+          sect_name: "",
+          working_status: "Working",
           password: "",
+          email: "",
         });
-        // Close the modal
         onClose();
       });
       return;
@@ -119,17 +99,19 @@ const CreateUserModal = ({
         title: "Success",
         text: "User created successfully!",
       }).then(() => {
-        // Clear the form data
         setFormData({
-          emp_id: "",
           name: "",
-          email: "",
-          roles: [],
-          sub_roles: [],
-          keywords: "",
+          emp_id: "",
+          job_title: "",
+          eng_name: "",
+          kh_name: "",
+          phone_number: "",
+          dept_name: "",
+          sect_name: "",
+          working_status: "Working",
           password: "",
+          email: "",
         });
-        // Close the modal
         onClose();
       });
     } catch (err) {
@@ -139,23 +121,28 @@ const CreateUserModal = ({
         title: "Error",
         text: err.message || "Failed to create user. Please try again later.",
       }).then(() => {
-        // Clear the form data
         setFormData({
-          emp_id: "",
           name: "",
-          email: "",
-          roles: [],
-          sub_roles: [],
-          keywords: "",
+          emp_id: "",
+          job_title: "",
+          eng_name: "",
+          kh_name: "",
+          phone_number: "",
+          dept_name: "",
+          sect_name: "",
+          working_status: "Working",
           password: "",
+          email: "",
         });
-        // Close the modal
         onClose();
       });
     }
   };
 
   if (!isOpen) return null;
+
+  // Disable the submit button until both Name and Password are provided.
+  const isSubmitDisabled = !formData.name || !formData.password;
 
   return (
     <div
@@ -168,7 +155,7 @@ const CreateUserModal = ({
       >
         <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t dark:border-gray-600">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Add User
+            Create an External User / Device
           </h3>
           <button
             type="button"
@@ -199,191 +186,223 @@ const CreateUserModal = ({
           onSubmit={handleSubmit}
           autoComplete="off"
         >
-          <div className="grid gap-4 mb-4 grid-cols-2">
-            <div className="col-span-2">
-              <label
-                htmlFor="emp_id"
-                className="mb-2 text-left block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Employee ID
-              </label>
-              <input
-                type="text"
-                name="emp_id"
-                id="emp_id"
-                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
-                placeholder="Enter employee ID"
-                required
-                value={formData.emp_id}
-                onChange={handleChange}
-              />
+          {/* Required Field: Name */}
+          <div className="mb-4">
+            <label
+              htmlFor="name"
+              className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
+            >
+              Name *
+            </label>
+            <input
+              type="text"
+              name="name"
+              id="name"
+              placeholder="Enter name"
+              required
+              value={formData.name}
+              onChange={handleChange}
+              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+            />
+          </div>
+
+          {/* Read-only Working Status */}
+          <div className="mb-4">
+            <label
+              htmlFor="working_status"
+              className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
+            >
+              Working Status
+            </label>
+            <input
+              type="text"
+              name="working_status"
+              id="working_status"
+              value={formData.working_status}
+              readOnly
+              className="bg-gray-100 border border-gray-300 text-gray-700 text-sm rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-500 dark:text-gray-300"
+            />
+          </div>
+
+          {/* Toggle Optional Fields */}
+          <div className="flex justify-end mb-4">
+            <button
+              type="button"
+              onClick={toggleExtraFields}
+              className="text-blue-600 hover:text-blue-800 focus:outline-none"
+            >
+              {showExtraFields
+                ? "− Hide Optional Fields"
+                : "+ Add Optional Fields"}
+            </button>
+          </div>
+
+          {showExtraFields && (
+            <div className="grid gap-4 mb-4 grid-cols-2">
+              <div className="col-span-2">
+                <label
+                  htmlFor="emp_id"
+                  className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
+                >
+                  Employee ID
+                </label>
+                <input
+                  type="text"
+                  name="emp_id"
+                  id="emp_id"
+                  placeholder="Enter Employee ID"
+                  value={formData.emp_id}
+                  onChange={handleChange}
+                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="job_title"
+                  className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
+                >
+                  Job Title
+                </label>
+                <input
+                  type="text"
+                  name="job_title"
+                  id="job_title"
+                  placeholder="Enter Job Title"
+                  value={formData.job_title}
+                  onChange={handleChange}
+                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="eng_name"
+                  className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
+                >
+                  English Name
+                </label>
+                <input
+                  type="text"
+                  name="eng_name"
+                  id="eng_name"
+                  placeholder="Enter English Name"
+                  value={formData.eng_name}
+                  onChange={handleChange}
+                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="kh_name"
+                  className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
+                >
+                  Khmer Name
+                </label>
+                <input
+                  type="text"
+                  name="kh_name"
+                  id="kh_name"
+                  placeholder="Enter Khmer Name"
+                  value={formData.kh_name}
+                  onChange={handleChange}
+                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="phone_number"
+                  className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
+                >
+                  Phone Number
+                </label>
+                <input
+                  type="text"
+                  name="phone_number"
+                  id="phone_number"
+                  placeholder="Enter Phone Number"
+                  value={formData.phone_number}
+                  onChange={handleChange}
+                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="dept_name"
+                  className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
+                >
+                  Department Name
+                </label>
+                <input
+                  type="text"
+                  name="dept_name"
+                  id="dept_name"
+                  placeholder="Enter Department Name"
+                  value={formData.dept_name}
+                  onChange={handleChange}
+                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="sect_name"
+                  className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
+                >
+                  Section Name
+                </label>
+                <input
+                  type="text"
+                  name="sect_name"
+                  id="sect_name"
+                  placeholder="Enter Section Name"
+                  value={formData.sect_name}
+                  onChange={handleChange}
+                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                />
+              </div>
+              <div className="col-span-2">
+                <label
+                  htmlFor="email"
+                  className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
+                >
+                  Email (optional)
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  id="email"
+                  placeholder="Enter Email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                />
+              </div>
             </div>
-            <div className="col-span-2">
-              <label
-                htmlFor="name"
-                className="mb-2 text-left block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Name
-              </label>
-              <input
-                type="text"
-                name="name"
-                id="name"
-                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
-                placeholder="Enter username"
-                required
-                value={formData.name}
-                onChange={handleChange}
-              />
-            </div>
-            <div className="col-span-2">
-              <label
-                htmlFor="email"
-                className="mb-2 text-left block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Email (optional)
-              </label>
-              <input
-                type="email"
-                name="email"
-                id="email"
-                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
-                placeholder="Enter email"
-                value={formData.email}
-                onChange={handleChange}
-              />
-            </div>
-            <div className="col-span-2">
-              <label
-                htmlFor="role"
-                className="mb-2 text-left block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Role
-              </label>
-              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-0 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500">
-                {roles.map((role) => (
-                  <li key={role.value} className="mb-2">
-                    <div className="flex items-center text-left p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-600">
-                      <input
-                        id={role.value}
-                        type="checkbox"
-                        value={role.value}
-                        name="roles[]"
-                        checked={formData.roles.includes(role.value)}
-                        onChange={() => handleRoleChange(role.value)}
-                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-700 dark:focus:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"
-                      />
-                      <label
-                        htmlFor={role.value}
-                        className="w-full ms-2 text-sm font-medium text-gray-900 rounded dark:text-gray-300"
-                      >
-                        {role.name}
-                      </label>
-                    </div>
-                    {role.sub_roles && role.sub_roles.length > 0 && (
-                      <ul className="ms-4">
-                        {role.sub_roles.map((subRole) => (
-                          <li key={subRole.value}>
-                            <div className="flex items-center text-left p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-600">
-                              <input
-                                id={subRole.value}
-                                type="checkbox"
-                                value={subRole.value}
-                                name="sub_roles[]"
-                                checked={formData.sub_roles.includes(
-                                  subRole.value
-                                )}
-                                onChange={() =>
-                                  handleSubRoleChange(subRole.value, role.value)
-                                }
-                                className="w-4 h-4 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-700 dark:focus:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"
-                              />
-                              <label
-                                htmlFor={subRole.value}
-                                className="w-full ms-2 text-sm font-medium text-gray-900 rounded dark:text-gray-300"
-                              >
-                                {subRole.name.replace("_", " ")}
-                              </label>
-                            </div>
-                            {subRole.types && subRole.types.length > 0 && (
-                              <ul className="ms-4">
-                                {subRole.types.map((type) => (
-                                  <li key={type.value}>
-                                    <div className="flex items-center text-left p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-600">
-                                      <input
-                                        id={type.value}
-                                        type="checkbox"
-                                        value={type.value}
-                                        name="types[]"
-                                        checked={formData.sub_roles.includes(
-                                          type.value
-                                        )}
-                                        onChange={() =>
-                                          handleSubRoleChange(
-                                            type.value,
-                                            role.value
-                                          )
-                                        }
-                                        className="w-4 h-4 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-700 dark:focus:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"
-                                      />
-                                      <label
-                                        htmlFor={type.value}
-                                        className="w-full ms-2 text-sm font-medium text-gray-900 rounded dark:text-gray-300"
-                                      >
-                                        {type.name.replace("_", " ")}
-                                      </label>
-                                    </div>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="col-span-2">
-              <label
-                htmlFor="keywords"
-                className="mb-2 text-left block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Role Keyword
-              </label>
-              <input
-                type="text"
-                name="keywords"
-                id="keywords"
-                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
-                placeholder="Enter keywords"
-                value={formData.keywords}
-                onChange={handleChange}
-              />
-            </div>
-            <div className="col-span-2">
-              <label
-                htmlFor="password"
-                className="mb-2 text-left block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Default Password
-              </label>
-              <input
-                type="password"
-                name="password"
-                id="password"
-                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
-                placeholder="Enter default password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-              />
-            </div>
+          )}
+          <div className="mb-4">
+            <label
+              htmlFor="password"
+              className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
+            >
+              Default Password *
+            </label>
+            <input
+              type="password"
+              name="password"
+              id="password"
+              placeholder="Enter default password"
+              required
+              value={formData.password}
+              onChange={handleChange}
+              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+            />
           </div>
           <button
             type="submit"
-            className="mt-0 sm:mt-2 text-white inline-flex items-center bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+            disabled={isSubmitDisabled}
+            className={`mt-0 sm:mt-2 text-white inline-flex items-center ${
+              isSubmitDisabled
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300"
+            } font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800`}
           >
             <svg
               className="me-1 -ms-1 w-5 h-5"
@@ -408,26 +427,9 @@ const CreateUserModal = ({
 CreateUserModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
-  roles: PropTypes.arrayOf(
-    PropTypes.shape({
-      value: PropTypes.string.isRequired,
-      name: PropTypes.string.isRequired,
-      sub_roles: PropTypes.arrayOf(
-        PropTypes.shape({
-          value: PropTypes.string.isRequired,
-          name: PropTypes.string.isRequired,
-          types: PropTypes.arrayOf(
-            PropTypes.shape({
-              value: PropTypes.string.isRequired,
-              name: PropTypes.string.isRequired,
-            })
-          ),
-        })
-      ),
-    })
-  ).isRequired,
   onSubmit: PropTypes.func.isRequired,
   existingUserIds: PropTypes.arrayOf(PropTypes.string),
+  existingUserNames: PropTypes.arrayOf(PropTypes.string), // <<< NEW prop type
 };
 
 export default CreateUserModal;

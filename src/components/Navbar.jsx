@@ -399,12 +399,20 @@ export default function Navbar() {
               )}
 
               {showRoleManagement && (
-                <Link
-                  to="/role-management"
-                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
-                >
-                  Role Management
-                </Link>
+                <>
+                  <Link
+                    to="/role-management"
+                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
+                  >
+                    Role Management
+                  </Link>
+                  <Link
+                    to="/userList"
+                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
+                  >
+                    User Management
+                  </Link>
+                </>
               )}
             </div>
           </div>

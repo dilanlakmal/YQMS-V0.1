@@ -1223,7 +1223,10 @@ const upload = multer({
   },
 }).single("profile");
 
-// User Managment
+/* ------------------------------
+   User Management old ENDPOINTS
+------------------------------ */
+
 // User routes
 app.get("/users", async (req, res) => {
   try {
@@ -1235,34 +1238,62 @@ app.get("/users", async (req, res) => {
   }
 });
 
+// POST /users - Create an External User / Device
 app.post("/users", async (req, res) => {
   try {
-    const { emp_id, name, email, roles, sub_roles, keywords, password } =
-      req.body;
+    const {
+      emp_id,
+      name,
+      email,
+      job_title,
+      eng_name,
+      kh_name,
+      phone_number,
+      dept_name,
+      sect_name,
+      working_status, // Optional, but will default to "Working"
+      password,
+    } = req.body;
 
-    // Log the incoming request body
     console.log("Request body:", req.body);
 
-    // Check if the emp_id already exists
-    const existingUser = await UserMain.findOne({ emp_id });
-    if (existingUser) {
+    // >>> NEW: Check if a user with the same name already exists (case-insensitive)
+    const existingUserByName = await UserMain.findOne({
+      name: { $regex: new RegExp(`^${name}$`, "i") },
+    });
+    if (existingUserByName) {
       return res.status(400).json({
-        message: "Employee ID already exists. Please use a different ID.",
+        message: "User already exist! Please Use different Name",
       });
+    }
+    // <<<
+
+    // If emp_id is provided, check if it already exists
+    if (emp_id) {
+      const existingUser = await UserMain.findOne({ emp_id });
+      if (existingUser) {
+        return res.status(400).json({
+          message: "Employee ID already exists. Please use a different ID.",
+        });
+      }
     }
 
     // Hash the password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create a new user
+    // Create a new user with the provided fields.
     const newUser = new UserMain({
       emp_id,
       name,
       email,
-      roles,
-      sub_roles,
-      keywords,
+      job_title,
+      eng_name,
+      kh_name,
+      phone_number,
+      dept_name,
+      sect_name,
+      working_status: working_status || "Working",
       password: hashedPassword,
     });
 
@@ -1276,18 +1307,59 @@ app.post("/users", async (req, res) => {
   }
 });
 
-//Update
-app.put("/users/:id", async (req, res) => {
-  try {
-    const user = await UserMain.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
-    res.json(user);
-  } catch (error) {
-    console.error("Error updating user:", error);
-    res.status(500).json({ message: "Failed to update user" });
-  }
-});
+// app.post("/users", async (req, res) => {
+//   try {
+//     const { emp_id, name, email, roles, sub_roles, keywords, password } =
+//       req.body;
+
+//     // Log the incoming request body
+//     console.log("Request body:", req.body);
+
+//     // Check if the emp_id already exists
+//     const existingUser = await UserMain.findOne({ emp_id });
+//     if (existingUser) {
+//       return res.status(400).json({
+//         message: "Employee ID already exists. Please use a different ID.",
+//       });
+//     }
+
+//     // Hash the password
+//     const salt = await bcrypt.genSalt(10);
+//     const hashedPassword = await bcrypt.hash(password, salt);
+
+//     // Create a new user
+//     const newUser = new UserMain({
+//       emp_id,
+//       name,
+//       email,
+//       roles,
+//       sub_roles,
+//       keywords,
+//       password: hashedPassword,
+//     });
+
+//     // Save the user to the database
+//     await newUser.save();
+
+//     res.status(201).json(newUser);
+//   } catch (error) {
+//     console.error("Error creating user:", error);
+//     res.status(500).json({ message: "Failed to create user" });
+//   }
+// });
+
+// //Update
+// app.put("/users/:id", async (req, res) => {
+//   try {
+//     const user = await UserMain.findByIdAndUpdate(req.params.id, req.body, {
+//       new: true,
+//     });
+//     res.json(user);
+//   } catch (error) {
+//     console.error("Error updating user:", error);
+//     res.status(500).json({ message: "Failed to update user" });
+//   }
+// });
 
 //Delete
 app.delete("/users/:id", async (req, res) => {
@@ -1300,46 +1372,51 @@ app.delete("/users/:id", async (req, res) => {
   }
 });
 
-// Getting Roles
-app.get("/roles", async (req, res) => {
-  try {
-    const roles = await Role.find();
-    res.json(roles);
-  } catch (error) {
-    console.error("Error fetching roles:", error);
-    res.status(500).json({ error: "Failed to fetch roles" });
-  }
-});
+//-----------------------------------------------------------//
+// // Getting Roles
+// app.get("/roles", async (req, res) => {
+//   try {
+//     const roles = await Role.find();
+//     res.json(roles);
+//   } catch (error) {
+//     console.error("Error fetching roles:", error);
+//     res.status(500).json({ error: "Failed to fetch roles" });
+//   }
+// });
 
-// Change role
-app.put("/users/:id", async (req, res) => {
-  try {
-    const { name, email, roles, sub_roles, keywords, password } = req.body;
-    const updatedUser = { name, email, keywords };
+// // Change role
+// app.put("/users/:id", async (req, res) => {
+//   try {
+//     const { name, email, roles, sub_roles, keywords, password } = req.body;
+//     const updatedUser = { name, email, keywords };
 
-    if (roles) {
-      updatedUser.roles = [...new Set(roles)]; // Remove duplicates
-    }
+//     if (roles) {
+//       updatedUser.roles = [...new Set(roles)]; // Remove duplicates
+//     }
 
-    if (sub_roles) {
-      updatedUser.sub_roles = [...new Set(sub_roles)]; // Remove duplicates
-    }
+//     if (sub_roles) {
+//       updatedUser.sub_roles = [...new Set(sub_roles)]; // Remove duplicates
+//     }
 
-    if (password) {
-      const saltRounds = 12;
-      updatedUser.password = await bcrypt.hash(password, saltRounds); // Ensure you hash the password before saving
-    }
+//     if (password) {
+//       const saltRounds = 12;
+//       updatedUser.password = await bcrypt.hash(password, saltRounds); // Ensure you hash the password before saving
+//     }
 
-    const user = await UserMain.findByIdAndUpdate(req.params.id, updatedUser, {
-      new: true,
-    });
-    res.json(user);
-  } catch (error) {
-    console.error("Error updating user:", error);
-    res.status(500).json({ message: "Failed to update user" });
-  }
-});
+//     const user = await UserMain.findByIdAndUpdate(req.params.id, updatedUser, {
+//       new: true,
+//     });
+//     res.json(user);
+//   } catch (error) {
+//     console.error("Error updating user:", error);
+//     res.status(500).json({ message: "Failed to update user" });
+//   }
+// });
+//-----------------------------------------------------------//
 
+/* ------------------------------
+   Login Authentication ENDPOINTS
+------------------------------ */
 // When Login get user data
 app.post("/api/get-user-data", async (req, res) => {
   try {
@@ -1472,6 +1549,9 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
+/* ------------------------------
+   Registration - Login Page ENDPOINTS
+------------------------------ */
 // Registration Endpoint
 app.post("/api/register", async (req, res) => {
   try {
@@ -1526,17 +1606,17 @@ app.post("/api/register", async (req, res) => {
 // ------------------------
 // GET /api/user-profile
 // ------------------------
-app.get("/api/user-profile", async (req, res) => {
+app.get("/api/user-profile", authenticateUser, async (req, res) => {
   try {
     const token = req.headers.authorization.split(" ")[1];
     const decoded = jwt.verify(token, "your_jwt_secret");
     const user = await UserMain.findById(decoded.userId);
-
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Use custom image if exists; otherwise use face_photo (or default fallback)
+    // Determine profile image:
+    // Use the custom uploaded image if available; otherwise use face_photo; else fallback.
     let profileImage = "";
     if (user.profile && user.profile.trim() !== "") {
       profileImage = `http://localhost:5001/public/storage/profiles/${
@@ -1553,29 +1633,80 @@ app.get("/api/user-profile", async (req, res) => {
       name: user.name,
       dept_name: user.dept_name,
       sect_name: user.sect_name,
-      profile: profileImage,
+      working_status: user.working_status,
+      phone_number: user.phone_number,
+      eng_name: user.eng_name,
+      kh_name: user.kh_name,
+      job_title: user.job_title,
+      email: user.email,
+      profile: profileImage, // URL for display
+      face_photo: user.face_photo,
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Failed to fetch user profile", error: error.message });
+    res.status(500).json({
+      message: "Failed to fetch user profile",
+      error: error.message,
+    });
   }
 });
+
+// app.get("/api/user-profile", async (req, res) => {
+//   try {
+//     const token = req.headers.authorization.split(" ")[1];
+//     const decoded = jwt.verify(token, "your_jwt_secret");
+//     const user = await UserMain.findById(decoded.userId);
+
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     // Use custom image if exists; otherwise use face_photo (or default fallback)
+//     let profileImage = "";
+//     if (user.profile && user.profile.trim() !== "") {
+//       profileImage = `http://localhost:5001/public/storage/profiles/${
+//         decoded.userId
+//       }/${path.basename(user.profile)}`;
+//     } else if (user.face_photo && user.face_photo.trim() !== "") {
+//       profileImage = user.face_photo;
+//     } else {
+//       profileImage = "/IMG/default-profile.png";
+//     }
+
+//     res.status(200).json({
+//       emp_id: user.emp_id,
+//       name: user.name,
+//       dept_name: user.dept_name,
+//       sect_name: user.sect_name,
+//       profile: profileImage,
+//     });
+//   } catch (error) {
+//     res
+//       .status(500)
+//       .json({ message: "Failed to fetch user profile", error: error.message });
+//   }
+// });
 
 // ------------------------
 // PUT /api/user-profile
 // ------------------------
+
 app.put("/api/user-profile", authenticateUser, upload, async (req, res) => {
   try {
     const token = req.headers.authorization.split(" ")[1];
     const decoded = jwt.verify(token, "your_jwt_secret");
     const userId = decoded.userId;
 
+    // Update additional fields along with existing ones.
     const updatedProfile = {
       emp_id: req.body.emp_id,
       name: req.body.name,
       dept_name: req.body.dept_name,
       sect_name: req.body.sect_name,
+      phone_number: req.body.phone_number,
+      eng_name: req.body.eng_name,
+      kh_name: req.body.kh_name,
+      job_title: req.body.job_title,
+      email: req.body.email,
     };
 
     // If a new image was uploaded, update the profile field.
@@ -1583,6 +1714,7 @@ app.put("/api/user-profile", authenticateUser, upload, async (req, res) => {
       updatedProfile.profile = `profiles/${userId}/${req.file.filename}`;
     }
 
+    // Update the user document in the main collection.
     const user = await UserMain.findByIdAndUpdate(userId, updatedProfile, {
       new: true,
     });
@@ -1590,527 +1722,30 @@ app.put("/api/user-profile", authenticateUser, upload, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // --- Update the phone_number in role_managment collection ---
+    // For every document in role_managment that has a user with the same emp_id,
+    // update that user's phone_number field.
+    await RoleManagment.updateMany(
+      { "users.emp_id": user.emp_id },
+      { $set: { "users.$[elem].phone_number": user.phone_number } },
+      { arrayFilters: [{ "elem.emp_id": user.emp_id }] }
+    );
+
     res.status(200).json({ message: "Profile updated successfully", user });
   } catch (error) {
     console.error("Error updating user profile:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to update user profile", error: error.message });
+    res.status(500).json({
+      message: "Failed to update user profile",
+      error: error.message,
+    });
   }
 });
 
-/* ------------------------------
-   Super Admin ENDPOINTS
------------------------------- */
-
-// // Search users by Emp ID
-// app.get("/api/search-users", async (req, res) => {
-//   try {
-//     const { q } = req.query;
-//     const users = await UserMain.find(
-//       { emp_id: { $regex: q, $options: "i" } },
-//       "emp_id name eng_name kh_name job_title dept_name sect_name"
-//     );
-//     res.json(users);
-//   } catch (error) {
-//     console.error("Error searching users:", error);
-//     res.status(500).json({ message: "Failed to search users" });
-//   }
-// });
-
-// // Add this endpoint to your server.js
-// app.get("/api/user-details", async (req, res) => {
-//   try {
-//     const { empId } = req.query;
-//     if (!empId) {
-//       return res.status(400).json({ message: "Employee ID is required" });
-//     }
-
-//     const user = await UserMain.findOne({ emp_id: empId });
-//     if (!user) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-
-//     res.status(200).json({
-//       name: user.name,
-//       eng_name: user.eng_name,
-//       kh_name: user.kh_name,
-//       job_title: user.job_title,
-//       dept_name: user.dept_name,
-//       sect_name: user.sect_name,
-//       working_status: user.working_status,
-//     });
-//   } catch (error) {
-//     console.error("Error fetching user details:", error);
-//     res.status(500).json({ message: "Failed to fetch user details" });
-//   }
-// });
-
-// // Save Super Admin to role_management
-// app.post("/api/role-management", async (req, res) => {
-//   try {
-//     const { role, jobTitles, users } = req.body;
-//     const existingRole = await RoleManagment.findOne({ role });
-
-//     if (existingRole) {
-//       // Update existing role
-//       existingRole.users.push(...users);
-//       await existingRole.save();
-//     } else {
-//       // Create new role
-//       const newRole = new RoleManagment({ role, jobTitles, users });
-//       await newRole.save();
-//     }
-//     res.json({ message: "Super Admin registered successfully" });
-//   } catch (error) {
-//     console.error("Error saving role data:", error);
-//     res.status(500).json({ message: "Failed to save role data" });
-//   }
-// });
-
-/* ------------------------------
-   Role Managment ENDPOINTS
------------------------------- */
-
-// // Get all roles
-// app.get("/api/role-managment", async (req, res) => {
-//   try {
-//     const data = await RoleManagment.find({});
-//     res.json(data);
-//   } catch (error) {
-//     console.error("Error fetching role data:", error);
-//     res.status(500).json({ message: "Failed to fetch role data" });
-//   }
-// });
-
-// // Save a new role
-// app.post("/api/role-managment", async (req, res) => {
-//   try {
-//     const { role, jobTitles, users } = req.body;
-//     const newRole = new RoleManagment({ role, jobTitles, users });
-//     await newRole.save();
-//     res.json(newRole);
-//   } catch (error) {
-//     console.error("Error saving role data:", error);
-//     res.status(500).json({ message: "Failed to save role data" });
-//   }
-// });
-
-// // Get job titles
-// app.get("/api/job-titles", async (req, res) => {
-//   try {
-//     const jobTitles = await UserMain.distinct("job_title");
-//     res.json(jobTitles);
-//   } catch (error) {
-//     console.error("Error fetching job titles:", error);
-//     res.status(500).json({ message: "Failed to fetch job titles" });
-//   }
-// });
-
-// // Get users by job titles
-// app.post("/api/users-by-job-titles", async (req, res) => {
-//   try {
-//     const { jobTitles } = req.body;
-//     const users = await UserMain.find({
-//       job_title: { $in: jobTitles },
-//     });
-//     res.json(users);
-//   } catch (error) {
-//     console.error("Error fetching users:", error);
-//     res.status(500).json({ message: "Failed to fetch users" });
-//   }
-// });
-
 // /* ------------------------------
 //    Super Admin ENDPOINTS
 // ------------------------------ */
 
-// // Search users by Emp ID
-// app.get("/api/search-users", async (req, res) => {
-//   try {
-//     const { q } = req.query;
-//     const users = await UserMain.find(
-//       { emp_id: { $regex: q, $options: "i" } },
-//       "emp_id name eng_name kh_name job_title dept_name sect_name"
-//     );
-//     res.json(users);
-//   } catch (error) {
-//     console.error("Error searching users:", error);
-//     res.status(500).json({ message: "Failed to search users" });
-//   }
-// });
-
-// // Get user details by emp_id
-// app.get("/api/user-details", async (req, res) => {
-//   try {
-//     const { empId } = req.query;
-//     if (!empId) {
-//       return res.status(400).json({ message: "Employee ID is required" });
-//     }
-
-//     const user = await UserMain.findOne({ emp_id: empId });
-//     if (!user) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-
-//     res.status(200).json({
-//       name: user.name,
-//       eng_name: user.eng_name,
-//       kh_name: user.kh_name,
-//       job_title: user.job_title,
-//       dept_name: user.dept_name,
-//       sect_name: user.sect_name,
-//       working_status: user.working_status,
-//     });
-//   } catch (error) {
-//     console.error("Error fetching user details:", error);
-//     res.status(500).json({ message: "Failed to fetch user details" });
-//   }
-// });
-
-// // Save Super Admin to role_management
-// app.post("/api/role-management/super-admin", async (req, res) => {
-//   try {
-//     const { user } = req.body;
-//     const existingRole = await RoleManagment.findOne({ role: "Super Admin" });
-
-//     if (existingRole) {
-//       // Check if user already exists in the array
-//       const userExists = existingRole.users.some(
-//         (u) => u.emp_id === user.emp_id
-//       );
-//       if (!userExists) {
-//         existingRole.users.push({
-//           emp_id: user.emp_id,
-//           name: user.name,
-//           eng_name: user.eng_name,
-//           kh_name: user.kh_name,
-//           job_title: "Developer",
-//           dept_name: user.dept_name,
-//           sect_name: user.sect_name,
-//         });
-//         await existingRole.save();
-//       }
-//     } else {
-//       // Create new Super Admin role
-//       const newRole = new RoleManagment({
-//         role: "Super Admin",
-//         jobTitles: ["Developer"],
-//         users: [
-//           {
-//             emp_id: user.emp_id,
-//             name: user.name,
-//             eng_name: user.eng_name,
-//             kh_name: user.kh_name,
-//             job_title: "Developer",
-//             dept_name: user.dept_name,
-//             sect_name: user.sect_name,
-//           },
-//         ],
-//       });
-//       await newRole.save();
-//     }
-
-//     // Update user roles in User collection
-//     await UserMain.findOneAndUpdate(
-//       { emp_id: user.emp_id },
-//       { $addToSet: { roles: "super_admin" } }
-//     );
-
-//     res.json({ message: "Super Admin registered successfully" });
-//   } catch (error) {
-//     console.error("Error saving super admin:", error);
-//     res.status(500).json({ message: "Failed to save super admin" });
-//   }
-// });
-
-// /* ------------------------------
-//    Role Management ENDPOINTS
-// ------------------------------ */
-
-// // Get all roles
-// app.get("/api/role-management", async (req, res) => {
-//   try {
-//     const data = await RoleManagment.find({});
-//     res.json(data);
-//   } catch (error) {
-//     console.error("Error fetching role data:", error);
-//     res.status(500).json({ message: "Failed to fetch role data" });
-//   }
-// });
-
-// // Save or update a role
-// app.post("/api/role-management", async (req, res) => {
-//   try {
-//     const { role, jobTitles } = req.body;
-
-//     // Find users with matching job titles
-//     const users = await UserMain.find({ job_title: { $in: jobTitles } });
-
-//     const mappedUsers = users.map((user) => ({
-//       emp_id: user.emp_id,
-//       name: user.name,
-//       eng_name: user.eng_name,
-//       kh_name: user.kh_name,
-//       job_title: user.job_title,
-//       dept_name: user.dept_name,
-//       sect_name: user.sect_name,
-//     }));
-
-//     const existingRole = await RoleManagment.findOne({ role });
-
-//     if (existingRole) {
-//       existingRole.jobTitles = jobTitles;
-//       existingRole.users = mappedUsers;
-//       await existingRole.save();
-//     } else {
-//       const newRole = new RoleManagment({
-//         role,
-//         jobTitles,
-//         users: mappedUsers,
-//       });
-//       await newRole.save();
-//     }
-
-//     // Update user roles
-//     for (const user of users) {
-//       await UserMain.findOneAndUpdate(
-//         { emp_id: user.emp_id },
-//         { $addToSet: { roles: role.toLowerCase().replace(" ", "_") } }
-//       );
-//     }
-
-//     res.json({ message: "Role updated successfully" });
-//   } catch (error) {
-//     console.error("Error saving role data:", error);
-//     res.status(500).json({ message: "Failed to save role data" });
-//   }
-// });
-
-// // Get all job titles
-// app.get("/api/job-titles", async (req, res) => {
-//   try {
-//     const jobTitles = await UserMain.distinct("job_title");
-//     res.json(jobTitles.filter((title) => title)); // Filter out null/empty values
-//   } catch (error) {
-//     console.error("Error fetching job titles:", error);
-//     res.status(500).json({ message: "Failed to fetch job titles" });
-//   }
-// });
-
-// // Get users by job titles
-// app.post("/api/users-by-job-titles", async (req, res) => {
-//   try {
-//     const { jobTitles } = req.body;
-//     const users = await UserMain.find({
-//       job_title: { $in: jobTitles },
-//     }).select("emp_id name eng_name kh_name job_title dept_name sect_name");
-//     res.json(users);
-//   } catch (error) {
-//     console.error("Error fetching users:", error);
-//     res.status(500).json({ message: "Failed to fetch users" });
-//   }
-// });
-
-// // Search users by Emp ID from users collection
-// app.get("/api/search-users", async (req, res) => {
-//   try {
-//     const { q } = req.query;
-//     const users = await UserMain.find(
-//       { emp_id: { $regex: q, $options: "i" } },
-//       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
-//     );
-//     res.json(users);
-//   } catch (error) {
-//     console.error("Error searching users:", error);
-//     res.status(500).json({ message: "Failed to search users" });
-//   }
-// });
-
-// // Get user details by emp_id from users collection
-// app.get("/api/user-details", async (req, res) => {
-//   try {
-//     const { empId } = req.query;
-//     if (!empId) {
-//       return res.status(400).json({ message: "Employee ID is required" });
-//     }
-
-//     const user = await UserMain.findOne(
-//       { emp_id: empId },
-//       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
-//     );
-
-//     if (!user) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-
-//     res.status(200).json(user);
-//   } catch (error) {
-//     console.error("Error fetching user details:", error);
-//     res.status(500).json({ message: "Failed to fetch user details" });
-//   }
-// });
-
-// // Get all job titles from users collection
-// app.get("/api/job-titles", async (req, res) => {
-//   try {
-//     const jobTitles = await UserMain.distinct("job_title");
-//     res.json(jobTitles.filter((title) => title)); // Filter out null/empty values
-//   } catch (error) {
-//     console.error("Error fetching job titles:", error);
-//     res.status(500).json({ message: "Failed to fetch job titles" });
-//   }
-// });
-
-// // Get users by job title from users collection
-// app.get("/api/users-by-job-title", async (req, res) => {
-//   try {
-//     const { jobTitle } = req.query;
-//     const users = await UserMain.find(
-//       { job_title: jobTitle },
-//       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
-//     );
-//     res.json(users);
-//   } catch (error) {
-//     console.error("Error fetching users by job title:", error);
-//     res.status(500).json({ message: "Failed to fetch users" });
-//   }
-// });
-
-// // Save Super Admin to role_management collection
-// app.post("/api/role-management/super-admin", async (req, res) => {
-//   try {
-//     const { user } = req.body;
-
-//     // Find or create Super Admin role
-//     let superAdminRole = await RoleManagment.findOne({ role: "Super Admin" });
-
-//     if (!superAdminRole) {
-//       superAdminRole = new RoleManagment({
-//         role: "Super Admin",
-//         jobTitles: ["Developer"],
-//         users: [],
-//       });
-//     }
-
-//     // Check if user already exists
-//     const userExists = superAdminRole.users.some(
-//       (u) => u.emp_id === user.emp_id
-//     );
-
-//     if (userExists) {
-//       return res.status(400).json({ message: "User is already a Super Admin" });
-//     }
-
-//     // Get complete user details from users collection
-//     const userDetails = await UserMain.findOne(
-//       { emp_id: user.emp_id },
-//       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
-//     );
-
-//     if (!userDetails) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-
-//     // Add user to Super Admin role
-//     superAdminRole.users.push({
-//       emp_id: userDetails.emp_id,
-//       name: userDetails.name,
-//       eng_name: userDetails.eng_name,
-//       kh_name: userDetails.kh_name,
-//       job_title: "Developer",
-//       dept_name: userDetails.dept_name,
-//       sect_name: userDetails.sect_name,
-//       working_status: userDetails.working_status,
-//       face_photo: userDetails.face_photo,
-//     });
-
-//     await superAdminRole.save();
-//     res.json({ message: "Super Admin registered successfully" });
-//   } catch (error) {
-//     console.error("Error registering super admin:", error);
-//     res.status(500).json({ message: "Failed to register super admin" });
-//   }
-// });
-
-// // Save or update role in role_management collection
-// app.post("/api/role-management", async (req, res) => {
-//   try {
-//     const { role, jobTitles } = req.body;
-
-//     // Get users with matching job titles from users collection
-//     const users = await UserMain.find(
-//       { job_title: { $in: jobTitles } },
-//       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
-//     );
-
-//     // Find or create role
-//     let roleDoc = await RoleManagment.findOne({ role });
-
-//     if (roleDoc) {
-//       roleDoc.jobTitles = jobTitles;
-//       roleDoc.users = users.map((user) => ({
-//         emp_id: user.emp_id,
-//         name: user.name,
-//         eng_name: user.eng_name,
-//         kh_name: user.kh_name,
-//         job_title: user.job_title,
-//         dept_name: user.dept_name,
-//         sect_name: user.sect_name,
-//         working_status: user.working_status,
-//         face_photo: user.face_photo,
-//       }));
-//     } else {
-//       roleDoc = new RoleManagment({
-//         role,
-//         jobTitles,
-//         users: users.map((user) => ({
-//           emp_id: user.emp_id,
-//           name: user.name,
-//           eng_name: user.eng_name,
-//           kh_name: user.kh_name,
-//           job_title: user.job_title,
-//           dept_name: user.dept_name,
-//           sect_name: user.sect_name,
-//           working_status: user.working_status,
-//           face_photo: user.face_photo,
-//         })),
-//       });
-//     }
-
-//     await roleDoc.save();
-//     res.json({ message: "Role updated successfully" });
-//   } catch (error) {
-//     console.error("Error saving role:", error);
-//     res.status(500).json({ message: "Failed to save role" });
-//   }
-// });
-
-// // Get user roles from role_management collection
-// app.get("/api/user-roles/:empId", async (req, res) => {
-//   try {
-//     const { empId } = req.params;
-//     const roles = [];
-
-//     const userRoles = await RoleManagment.find({
-//       "users.emp_id": empId,
-//     });
-
-//     userRoles.forEach((role) => {
-//       roles.push(role.role);
-//     });
-
-//     res.json({ roles });
-//   } catch (error) {
-//     console.error("Error fetching user roles:", error);
-//     res.status(500).json({ message: "Failed to fetch user roles" });
-//   }
-// });
-
-// /* ------------------------------
-//    Super Admin ENDPOINTS
-// ------------------------------ */
-
+// Adding Super Admin End point
 app.post("/api/role-management/super-admin", async (req, res) => {
   try {
     const { user } = req.body;
@@ -2135,7 +1770,7 @@ app.post("/api/role-management/super-admin", async (req, res) => {
 
     const userDetails = await UserMain.findOne(
       { emp_id: user.emp_id },
-      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo phone_number working_status"
     );
 
     if (!userDetails) {
@@ -2151,6 +1786,7 @@ app.post("/api/role-management/super-admin", async (req, res) => {
       dept_name: userDetails.dept_name,
       sect_name: userDetails.sect_name,
       working_status: userDetails.working_status,
+      phone_number: userDetails.phone_number,
       face_photo: userDetails.face_photo,
     });
 
@@ -2159,6 +1795,66 @@ app.post("/api/role-management/super-admin", async (req, res) => {
   } catch (error) {
     console.error("Error registering super admin:", error);
     res.status(500).json({ message: "Failed to register super admin" });
+  }
+});
+
+// Delete Super Admin endpoint
+app.delete("/api/role-management/super-admin/:empId", async (req, res) => {
+  try {
+    const { empId } = req.params;
+
+    // Find the Super Admin role
+    const superAdminRole = await RoleManagment.findOne({ role: "Super Admin" });
+
+    if (!superAdminRole) {
+      return res.status(404).json({ message: "Super Admin role not found" });
+    }
+
+    // Check if the employee ID is in the protected list
+    const protectedEmpIds = ["YM6702", "YM7903"];
+    if (protectedEmpIds.includes(empId)) {
+      return res.status(403).json({
+        message: "Cannot delete protected Super Admin users",
+      });
+    }
+
+    // Find the user index in the users array
+    const userIndex = superAdminRole.users.findIndex(
+      (user) => user.emp_id === empId
+    );
+
+    if (userIndex === -1) {
+      return res.status(404).json({
+        message: "User not found in Super Admin role",
+      });
+    }
+
+    // Remove the user from the array using MongoDB update
+    const result = await RoleManagment.updateOne(
+      { role: "Super Admin" },
+      {
+        $pull: {
+          users: { emp_id: empId },
+        },
+      }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(500).json({
+        message: "Failed to remove Super Admin",
+      });
+    }
+
+    // Fetch the updated document
+    const updatedRole = await RoleManagment.findOne({ role: "Super Admin" });
+
+    res.json({
+      message: "Super Admin removed successfully",
+      updatedRole: updatedRole,
+    });
+  } catch (error) {
+    console.error("Error removing super admin:", error);
+    res.status(500).json({ message: "Failed to remove super admin" });
   }
 });
 
@@ -2174,7 +1870,7 @@ app.get("/api/search-users", async (req, res) => {
         emp_id: { $regex: q, $options: "i" },
         working_status: "Working",
       },
-      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo phone_number working_status"
     );
     res.json(users);
   } catch (error) {
@@ -2192,7 +1888,7 @@ app.get("/api/user-details", async (req, res) => {
 
     const user = await UserMain.findOne(
       { emp_id: empId, working_status: "Working" },
-      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo phone_number working_status"
     );
 
     if (!user) {
@@ -2226,7 +1922,7 @@ app.get("/api/users-by-job-title", async (req, res) => {
         job_title: jobTitle,
         working_status: "Working",
       },
-      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo phone_number working_status"
     );
     res.json(users);
   } catch (error) {
@@ -2244,7 +1940,7 @@ app.post("/api/role-management", async (req, res) => {
         job_title: { $in: jobTitles },
         working_status: "Working",
       },
-      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo working_status"
+      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo phone_number working_status"
     );
 
     let roleDoc = await RoleManagment.findOne({ role });
@@ -2260,6 +1956,7 @@ app.post("/api/role-management", async (req, res) => {
         dept_name: user.dept_name,
         sect_name: user.sect_name,
         working_status: user.working_status,
+        phone_number: user.phone_number,
         face_photo: user.face_photo,
       }));
     } else {
@@ -2275,6 +1972,7 @@ app.post("/api/role-management", async (req, res) => {
           dept_name: user.dept_name,
           sect_name: user.sect_name,
           working_status: user.working_status,
+          phone_number: user.phone_number,
           face_photo: user.face_photo,
         })),
       });
@@ -2328,6 +2026,99 @@ app.get("/api/role-management", async (req, res) => {
   } catch (error) {
     console.error("Error fetching roles:", error);
     res.status(500).json({ message: "Failed to fetch roles" });
+  }
+});
+
+// /* ------------------------------
+//    User Management ENDPOINTS
+// ------------------------------ */
+
+// Get user roles
+app.get("/api/user-roles/:empId", async (req, res) => {
+  try {
+    const { empId } = req.params;
+    const roles = [];
+
+    // Find all roles where this user exists
+    const userRoles = await RoleManagment.find({
+      "users.emp_id": empId,
+    });
+
+    userRoles.forEach((role) => {
+      if (!["Super Admin", "Admin"].includes(role.role)) {
+        roles.push(role.role);
+      }
+    });
+
+    res.json({ roles });
+  } catch (error) {
+    console.error("Error fetching user roles:", error);
+    res.status(500).json({ message: "Failed to fetch user roles" });
+  }
+});
+
+// Update user roles
+app.post("/api/update-user-roles", async (req, res) => {
+  try {
+    const { emp_id, currentRoles, newRoles, userData } = req.body;
+
+    // Find roles to remove (in currentRoles but not in newRoles)
+    const rolesToRemove = currentRoles.filter(
+      (role) => !newRoles.includes(role)
+    );
+
+    // Find roles to add (in newRoles but not in currentRoles)
+    const rolesToAdd = newRoles.filter((role) => !currentRoles.includes(role));
+
+    // Remove user from roles
+    for (const role of rolesToRemove) {
+      const roleDoc = await RoleManagment.findOne({ role });
+      if (roleDoc) {
+        // Remove user from users array
+        roleDoc.users = roleDoc.users.filter((u) => u.emp_id !== emp_id);
+
+        // Check if there are any other users with the same job title
+        const otherUsersWithSameTitle = roleDoc.users.some(
+          (u) => u.job_title === userData.job_title
+        );
+        if (!otherUsersWithSameTitle) {
+          roleDoc.jobTitles = roleDoc.jobTitles.filter(
+            (t) => t !== userData.job_title
+          );
+        }
+
+        await roleDoc.save();
+      }
+    }
+
+    // Add user to new roles
+    for (const role of rolesToAdd) {
+      const roleDoc = await RoleManagment.findOne({ role });
+      if (roleDoc) {
+        // Add job title if not exists
+        if (!roleDoc.jobTitles.includes(userData.job_title)) {
+          roleDoc.jobTitles.push(userData.job_title);
+        }
+
+        // Add user if not exists
+        if (!roleDoc.users.some((u) => u.emp_id === emp_id)) {
+          roleDoc.users.push(userData);
+        }
+
+        await roleDoc.save();
+      }
+    }
+
+    res.json({
+      success: true,
+      message: "User roles updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating user roles:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update user roles",
+    });
   }
 });
 
