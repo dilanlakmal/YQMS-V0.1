@@ -71,6 +71,18 @@ function Home() {
 
   const cards = [
     {
+      title: "Cutting/SSC",
+      items: [
+        {
+          path: "/cutting",
+          roles: ["Admin", "Bundle Registration"],
+          image: "/IMG/bundle.avif",
+          title: t("cutting"),
+          description: "Click here to register orders for Cutting."
+        },
+      ]
+    },
+    {
       title: "Order Data",
       items: [
         {
@@ -176,7 +188,7 @@ function Home() {
             {errorMessage}
           </div>
         )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8">
           {cards.map((section, index) => (
             <div key={index} className="space-y-8">
               <h2 className="text-2xl font-bold text-blue-900 mb-4 text-center">

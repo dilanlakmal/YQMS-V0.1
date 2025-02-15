@@ -660,6 +660,7 @@ import Navbar from "./components/layout/Navbar";// Updated path
 import RoleManagement from "./components/RoleManagement"; // Fixed spelling
 import Analytics from "./pages/Analytics";
 import BundleRegistration from "./pages/BundleRegistration";
+import Cutting from "./pages/Cutting";
 import Dashboard from "./pages/Dashboard";
 import Details from "./pages/QC Inspection/Details";
 import DownloadData from "./pages/DownloadData";
@@ -964,6 +965,10 @@ function App() {
                 <Route
                   path="/bundle-registration"
                   element={<BundleRegistration />}
+                />
+                <Route
+                  path="/cutting"
+                  element={<Cutting />}
                 />
                 <Route path="/ironing" element={<IroningPage />} />
                 <Route path="/qc2-inspection" element={<QC2InspectionPage />} />
