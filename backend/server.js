@@ -43,7 +43,7 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-//"mongodb://localhost:27017/ym_prod"
+// "mongodb://localhost:27017/ym_prod"
 
 const mongoURI =
   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin";
@@ -1287,7 +1287,7 @@ app.post("/users", async (req, res) => {
       emp_id,
       name,
       email,
-      job_title,
+      job_title: job_title || "External",
       eng_name,
       kh_name,
       phone_number,
@@ -1986,17 +1986,42 @@ app.post("/api/role-management", async (req, res) => {
   }
 });
 
+// Update the /api/user-roles/:empId endpoint (remove duplicates and modify)
 app.get("/api/user-roles/:empId", async (req, res) => {
   try {
     const { empId } = req.params;
     const roles = [];
 
-    const userRoles = await RoleManagment.find({
+    // Check Super Admin role first
+    const superAdminRole = await RoleManagment.findOne({
+      role: "Super Admin",
       "users.emp_id": empId,
     });
 
-    userRoles.forEach((role) => {
-      roles.push(role.role);
+    if (superAdminRole) {
+      roles.push("Super Admin");
+      return res.json({ roles }); // Return early if Super Admin
+    }
+
+    // Check Admin role
+    const adminRole = await RoleManagment.findOne({
+      role: "Admin",
+      "users.emp_id": empId,
+    });
+
+    if (adminRole) {
+      roles.push("Admin");
+      return res.json({ roles }); // Return early if Admin
+    }
+
+    // Get other roles
+    const otherRoles = await RoleManagment.find({
+      role: { $nin: ["Super Admin", "Admin"] },
+      "users.emp_id": empId,
+    });
+
+    otherRoles.forEach((roleDoc) => {
+      roles.push(roleDoc.role);
     });
 
     res.json({ roles });
@@ -2005,6 +2030,26 @@ app.get("/api/user-roles/:empId", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch user roles" });
   }
 });
+
+// app.get("/api/user-roles/:empId", async (req, res) => {
+//   try {
+//     const { empId } = req.params;
+//     const roles = [];
+
+//     const userRoles = await RoleManagment.find({
+//       "users.emp_id": empId,
+//     });
+
+//     userRoles.forEach((role) => {
+//       roles.push(role.role);
+//     });
+
+//     res.json({ roles });
+//   } catch (error) {
+//     console.error("Error fetching user roles:", error);
+//     res.status(500).json({ message: "Failed to fetch user roles" });
+//   }
+// });
 
 app.get("/api/role-management", async (req, res) => {
   try {

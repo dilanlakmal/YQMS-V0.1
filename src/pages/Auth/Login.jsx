@@ -2,6 +2,7 @@
 // import { ClipboardList } from "lucide-react";
 // import React, { useEffect, useState } from "react";
 // import { Link, useNavigate } from "react-router-dom";
+// import { useAuth } from "../../components/authentication/AuthContext";
 
 // function Login({ onLogin }) {
 //   const [username, setUsername] = useState("");
@@ -10,6 +11,7 @@
 //   const [error, setError] = useState("");
 //   const [loading, setLoading] = useState(false);
 //   const navigate = useNavigate();
+//   const { updateUser } = useAuth(); // Get updateUser from AuthContext
 
 //   useEffect(() => {
 //     const token =
@@ -25,9 +27,7 @@
 //       const response = await axios.get(
 //         "http://localhost:5001/api/user-profile",
 //         {
-//           headers: {
-//             Authorization: `Bearer ${token}`,
-//           },
+//           headers: { Authorization: `Bearer ${token}` },
 //         }
 //       );
 
@@ -66,6 +66,7 @@
 //           }
 
 //           onLogin(accessToken);
+//           updateUser(user); // Update global user state
 //           navigate("/home");
 //         }
 //       } catch (error) {
@@ -88,7 +89,6 @@
 //         "http://localhost:5001/api/refresh-token",
 //         { refreshToken }
 //       );
-
 //       if (response.status === 200) {
 //         const { accessToken } = response.data;
 //         if (localStorage.getItem("refreshToken")) {
@@ -96,7 +96,6 @@
 //         } else {
 //           sessionStorage.setItem("accessToken", accessToken);
 //         }
-
 //         authenticateUser(accessToken);
 //       } else {
 //         navigate("/login");
@@ -107,7 +106,7 @@
 //   };
 
 //   useEffect(() => {
-//     const interval = setInterval(refreshToken, 30 * 60 * 1000); // Refresh token every 30 minutes
+//     const interval = setInterval(refreshToken, 30 * 60 * 1000); // Refresh every 30 minutes
 //     return () => clearInterval(interval);
 //   }, []);
 
@@ -139,7 +138,7 @@
 //             <div>
 //               <label
 //                 htmlFor="username"
-//                 className="block text-s  font-medium text-gray-700 mb-1"
+//                 className="block text-s font-medium text-gray-700 mb-1"
 //               >
 //                 User Name
 //               </label>
@@ -199,7 +198,7 @@
 //             <center>
 //               <button
 //                 type="submit"
-//                 className="w-40 h-15  flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+//                 className="w-40 h-15 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
 //               >
 //                 Log in
 //               </button>
@@ -235,11 +234,12 @@
 
 // export default Login;
 
-// Login.jsx
 import axios from "axios";
 import { ClipboardList } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../components/authentication/AuthContext";
+import { useFormData } from "../../components/context/FormDataContext";
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState("");
@@ -248,6 +248,8 @@ function Login({ onLogin }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { updateUser } = useAuth();
+  const { updateFormData } = useFormData();
 
   useEffect(() => {
     const token =
@@ -268,6 +270,21 @@ function Login({ onLogin }) {
       );
 
       if (response.status === 200) {
+        // Load saved form data for the user
+        const userId = response.data.emp_id;
+        const savedData = localStorage.getItem(`formData_${userId}`);
+        if (savedData) {
+          try {
+            const parsedData = JSON.parse(savedData);
+            // Update form data context with saved data
+            Object.keys(parsedData).forEach((formName) => {
+              updateFormData(formName, parsedData[formName]);
+            });
+          } catch (error) {
+            console.error("Error loading saved form data:", error);
+          }
+        }
+
         onLogin(token);
         navigate("/home");
       }
@@ -301,7 +318,22 @@ function Login({ onLogin }) {
             sessionStorage.setItem("user", JSON.stringify(user));
           }
 
+          // Load saved form data for the user
+          const savedData = localStorage.getItem(`formData_${user.emp_id}`);
+          if (savedData) {
+            try {
+              const parsedData = JSON.parse(savedData);
+              // Update form data context with saved data
+              Object.keys(parsedData).forEach((formName) => {
+                updateFormData(formName, parsedData[formName]);
+              });
+            } catch (error) {
+              console.error("Error loading saved form data:", error);
+            }
+          }
+
           onLogin(accessToken);
+          updateUser(user);
           navigate("/home");
         }
       } catch (error) {
@@ -341,7 +373,7 @@ function Login({ onLogin }) {
   };
 
   useEffect(() => {
-    const interval = setInterval(refreshToken, 30 * 60 * 1000); // Refresh every 30 minutes
+    const interval = setInterval(refreshToken, 30 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 

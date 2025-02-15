@@ -380,13 +380,36 @@ function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [userRoles, setUserRoles] = useState([]);
   const [roleManagement, setRoleManagement] = useState(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
-    if (!loading && user) {
-      fetchUserRoles();
-      fetchRoleManagement();
+    if (!loading) {
+      if (!user) {
+        navigate("/login");
+        return;
+      }
+      fetchData();
     }
   }, [user, loading]);
+
+  const fetchData = async () => {
+    try {
+      setPageLoading(true);
+      await Promise.all([fetchUserRoles(), fetchRoleManagement()]);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setErrorMessage("Error loading data");
+    } finally {
+      setPageLoading(false);
+    }
+  };
+
+  // useEffect(() => {
+  //   if (!loading && user) {
+  //     fetchUserRoles();
+  //     fetchRoleManagement();
+  //   }
+  // }, [user, loading]);
 
   const fetchUserRoles = async () => {
     try {
@@ -433,7 +456,7 @@ function Home() {
     }
   };
 
-  if (loading) {
+  if (loading || pageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-xl text-gray-600">Loading...</div>

@@ -245,7 +245,14 @@ function Profile() {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
-        setProfile(response.data);
+
+        // Ensure face_photo is properly set from the response
+        setProfile({
+          ...response.data,
+          face_photo: response.data.face_photo || "/IMG/default-profile.png",
+        });
+
+        //setProfile(response.data);
       } catch (error) {
         console.error("Error fetching profile:", error);
       }
@@ -316,12 +323,23 @@ function Profile() {
   // Determine which image URL to show.
   // If profile.profile is a File, generate a temporary URL.
   // Otherwise, use the URL from the server. If none exists, fallback.
+
   const getProfileImageSrc = () => {
-    if (!profile.profile)
-      return profile.face_photo || "/IMG/default-profile.png";
-    if (typeof profile.profile === "string") return profile.profile;
-    return URL.createObjectURL(profile.profile);
+    if (profile.profile instanceof File) {
+      return URL.createObjectURL(profile.profile);
+    }
+    if (profile.profile) {
+      return profile.profile;
+    }
+    return profile.face_photo || "/IMG/default-profile.png";
   };
+
+  //   const getProfileImageSrc = () => {
+  //     if (!profile.profile)
+  //       return profile.face_photo || "/IMG/default-profile.png";
+  //     if (typeof profile.profile === "string") return profile.profile;
+  //     return URL.createObjectURL(profile.profile);
+  //   };
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-50 to-gray-100 py-10 px-5">

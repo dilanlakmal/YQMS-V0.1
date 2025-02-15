@@ -4,6 +4,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { FaEye, FaPrint, FaQrcode } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/authentication/AuthContext"; // Import the AuthContext
+import { useFormData } from "../components/context/FormDataContext";
 import BluetoothComponent from "../components/forms/Bluetooth";
 import MonoSearch from "../components/forms/MonoSearch";
 import NumLetterPad from "../components/forms/NumLetterPad";
@@ -13,6 +14,12 @@ import SubConSelection from "../components/forms/SubConSelection";
 
 function BundleRegistration() {
   const { user, loading } = useAuth(); // Get the logged-in user data
+  const {
+    formData: persistedFormData,
+    updateFormData,
+    clearFormData,
+  } = useFormData();
+
   const [userBatches, setUserBatches] = useState([]);
   const navigate = useNavigate();
   const [qrData, setQrData] = useState([]);
@@ -22,30 +29,45 @@ function BundleRegistration() {
   const [isGenerateDisabled, setIsGenerateDisabled] = useState(false);
   const [activeTab, setActiveTab] = useState("registration");
   const [dataRecords, setDataRecords] = useState([]);
-  const [isSubCon, setIsSubCon] = useState(false);
-  const [subConName, setSubConName] = useState("");
+  // const [isSubCon, setIsSubCon] = useState(false);
+  // const [subConName, setSubConName] = useState("");
+
   const [isPrinting, setIsPrinting] = useState(false);
   const [totalBundleQty, setTotalBundleQty] = useState(0);
 
-  const [formData, setFormData] = useState({
-    date: new Date(),
-    department: "",
-    selectedMono: "",
-    buyer: "",
-    orderQty: "",
-    factoryInfo: "",
-    custStyle: "",
-    country: "",
-    color: "",
-    size: "",
-    bundleQty: "",
-    lineNo: "",
-    count: "10",
-    colorCode: "",
-    chnColor: "",
-    colorKey: "",
-    sizeOrderQty: "",
-    planCutQty: "",
+  // Initialize form data with today's date by default
+  const [formData, setFormData] = useState(() => {
+    const savedData = persistedFormData.bundleRegistration;
+    const today = new Date();
+
+    // If there's saved data and user is logged in, use it
+    // Otherwise use default values with today's date
+    return savedData && user
+      ? {
+          ...savedData,
+          // Only keep saved date if it exists and was changed today
+          date: savedData.date ? new Date(savedData.date) : today,
+        }
+      : {
+          date: today,
+          department: "",
+          selectedMono: "",
+          buyer: "",
+          orderQty: "",
+          factoryInfo: "",
+          custStyle: "",
+          country: "",
+          color: "",
+          size: "",
+          bundleQty: "",
+          lineNo: "",
+          count: "10",
+          colorCode: "",
+          chnColor: "",
+          colorKey: "",
+          sizeOrderQty: "",
+          planCutQty: "",
+        };
   });
 
   // Reference to Bluetooth component
@@ -58,8 +80,32 @@ function BundleRegistration() {
   const [hasColors, setHasColors] = useState(false);
   const [hasSizes, setHasSizes] = useState(false);
 
+  // Sub-con state management
+  const [isSubCon, setIsSubCon] = useState(() => {
+    return (
+      persistedFormData.bundleRegistration?.department === "Sub-con" || false
+    );
+  });
+
+  const [subConName, setSubConName] = useState(() => {
+    return persistedFormData.bundleRegistration?.subConName || "";
+  });
+
   const subConNames = ["Sunicon", "Elite", "SYD"];
   const [estimatedTotal, setEstimatedTotal] = useState(null);
+
+  // Update context whenever form data changes
+  useEffect(() => {
+    updateFormData("bundleRegistration", {
+      ...formData,
+      isSubCon,
+      subConName,
+    });
+  }, [formData, isSubCon, subConName, updateFormData]);
+
+  // useEffect(() => {
+  //   updateFormData("bundleRegistration", formData);
+  // }, [formData, updateFormData]);
 
   // Add useEffect to handle department change
   useEffect(() => {
@@ -385,6 +431,15 @@ function BundleRegistration() {
           );
           const totalData = await totalResponse.json();
           setTotalBundleQty(totalData.total);
+
+          // Directly fetch and update user batches IMMEDIATELY after saving
+          if (user) {
+            const batchesResponse = await fetch(
+              `http://localhost:5001/api/user-batches?emp_id=${user.emp_id}`
+            );
+            const batchesData = await batchesResponse.json();
+            setUserBatches(batchesData);
+          }
         } catch (error) {
           console.error("Error updating total bundle quantity:", error);
         }
@@ -421,6 +476,15 @@ function BundleRegistration() {
         bundleQty: "",
       }));
       setIsGenerateDisabled(false); // Enable Generate QR after successful print
+
+      // Directly fetch and update user batches IMMEDIATELY after printing
+      if (user) {
+        const batchesResponse = await fetch(
+          `http://localhost:5001/api/user-batches?emp_id=${user.emp_id}`
+        );
+        const batchesData = await batchesResponse.json();
+        setUserBatches(batchesData);
+      }
 
       alert("QR codes printed successfully!");
     } catch (error) {
@@ -509,13 +573,16 @@ function BundleRegistration() {
                 </label>
                 <MonoSearch
                   value={formData.selectedMono}
+                  // onSelect={(mono) =>
+                  //   setFormData((prev) => ({
+                  //     ...prev,
+                  //     selectedMono: mono,
+                  //     color: "",
+                  //     size: "",
+                  //   }))
+                  // }
                   onSelect={(mono) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      selectedMono: mono,
-                      color: "",
-                      size: "",
-                    }))
+                    setFormData({ ...formData, selectedMono: mono })
                   }
                   placeholder="Search Last 3 Digits of MONo..."
                   showSearchIcon={true}
@@ -589,8 +656,8 @@ function BundleRegistration() {
                       const selectedColor = colors.find(
                         (c) => c.original === e.target.value
                       );
-                      setFormData((prev) => ({
-                        ...prev,
+                      const newFormData = {
+                        ...formData,
                         color: e.target.value,
                         colorCode: selectedColor?.code || "",
                         chnColor: selectedColor?.chn || "",
@@ -598,8 +665,22 @@ function BundleRegistration() {
                         size: "",
                         sizeOrderQty: "",
                         planCutQty: "",
-                      }));
+                      };
+                      setFormData(newFormData);
+                      // Update the persisted form data
+                      updateFormData("bundleRegistration", newFormData);
                     }}
+                    //   setFormData((prev) => ({
+                    //     ...prev,
+                    //     color: e.target.value,
+                    //     colorCode: selectedColor?.code || "",
+                    //     chnColor: selectedColor?.chn || "",
+                    //     colorKey: selectedColor?.key || "",
+                    //     size: "",
+                    //     sizeOrderQty: "",
+                    //     planCutQty: "",
+                    //   }));
+                    // }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
                     <option value="">Select Color</option>
@@ -626,13 +707,23 @@ function BundleRegistration() {
                         const selectedSize = sizes.find(
                           (s) => s.size === e.target.value
                         );
-                        setFormData((prev) => ({
-                          ...prev,
+                        const newFormData = {
+                          ...formData,
                           size: e.target.value,
                           sizeOrderQty: selectedSize?.orderQty || 0,
                           planCutQty: selectedSize?.planCutQty || 0,
-                        }));
+                        };
+                        setFormData(newFormData);
+                        // Update the persisted form data
+                        updateFormData("bundleRegistration", newFormData);
                       }}
+                      //   setFormData((prev) => ({
+                      //     ...prev,
+                      //     size: e.target.value,
+                      //     sizeOrderQty: selectedSize?.orderQty || 0,
+                      //     planCutQty: selectedSize?.planCutQty || 0,
+                      //   }));
+                      // }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     >
                       <option value="">Select Size</option>
