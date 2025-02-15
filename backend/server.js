@@ -20,6 +20,7 @@ import createUserModel from "./models/User.js";
 import createQCDataModel from "./models/qc1_data.js";
 import createQc2OrderDataModel from "./models/qc2_orderdata.js";
 // Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "./config.js";
 
 /* ------------------------------
    Connection String
@@ -1619,7 +1620,7 @@ app.get("/api/user-profile", authenticateUser, async (req, res) => {
     // Use the custom uploaded image if available; otherwise use face_photo; else fallback.
     let profileImage = "";
     if (user.profile && user.profile.trim() !== "") {
-      profileImage = `http://localhost:5001/public/storage/profiles/${
+      profileImage = `${API_BASE_URL}/public/storage/profiles/${
         decoded.userId
       }/${path.basename(user.profile)}`;
     } else if (user.face_photo && user.face_photo.trim() !== "") {
