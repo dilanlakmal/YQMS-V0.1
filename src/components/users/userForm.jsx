@@ -1,5 +1,7 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../../config";
 
 const UserForm = ({ fetchUsers, editingUser, setEditingUser }) => {
   const [emp_id, setEmpId] = useState("");
@@ -23,7 +25,7 @@ const UserForm = ({ fetchUsers, editingUser, setEditingUser }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (editingUser) {
-      await axios.put(`http://localhost:5000/users/${editingUser._id}`, {
+      await axios.put(`${API_BASE_URL}/users/${editingUser._id}`, {
         emp_id,
         name,
         eng_name,
@@ -33,7 +35,7 @@ const UserForm = ({ fetchUsers, editingUser, setEditingUser }) => {
       });
       setEditingUser(null);
     } else {
-      await axios.post("http://localhost:5000/users", {
+      await axios.post(`${API_BASE_URL}/users`, {
         emp_id,
         name,
         eng_name,

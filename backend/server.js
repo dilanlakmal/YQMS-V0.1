@@ -43,18 +43,17 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-// "mongodb://localhost:27017/ym_prod"
+//   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
 
-const mongoURI =
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin";
+const mongoURI = "mongodb://localhost:27017/ym_prod";
 mongoose
   .connect(mongoURI) //, { useNewUrlParser: true, useUnifiedTopology: true }
   .then(() => console.log("Successfully connected......"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
 const ymProdConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
-  //"mongodb://localhost:27017/ym_prod"
+  //"mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
+  "mongodb://localhost:27017/ym_prod"
 );
 
 ymProdConnection.on("connected", () =>
@@ -2167,6 +2166,6 @@ app.post("/api/update-user-roles", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });

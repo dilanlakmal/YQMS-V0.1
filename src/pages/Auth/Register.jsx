@@ -5,6 +5,8 @@ import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "../../components/layout/AuthLayout";
 import Button from "../../components/layout/Button";
 import FormInput from "../../components/layout/FormInput";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../../config";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -54,7 +56,7 @@ const Register = () => {
       try {
         console.log("Form data being sent:", formData);
         const response = await axios.post(
-          "http://localhost:5001/api/register",
+          `${API_BASE_URL}/api/register`,
           formData
         );
         if (response.status === 201) {

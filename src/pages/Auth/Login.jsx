@@ -240,6 +240,8 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../components/authentication/AuthContext";
 import { useFormData } from "../../components/context/FormDataContext";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../../config";
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState("");
@@ -262,12 +264,9 @@ function Login({ onLogin }) {
 
   const authenticateUser = async (token) => {
     try {
-      const response = await axios.get(
-        "http://localhost:5001/api/user-profile",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await axios.get(`${API_BASE_URL}/api/user-profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (response.status === 200) {
         // Load saved form data for the user
@@ -299,7 +298,7 @@ function Login({ onLogin }) {
     e.preventDefault();
     if (username && password) {
       try {
-        const response = await axios.post("http://localhost:5001/api/login", {
+        const response = await axios.post(`${API_BASE_URL}/api/login`, {
           username,
           password,
           rememberMe,
@@ -352,10 +351,9 @@ function Login({ onLogin }) {
     }
 
     try {
-      const response = await axios.post(
-        "http://localhost:5001/api/refresh-token",
-        { refreshToken }
-      );
+      const response = await axios.post(`${API_BASE_URL}/api/refresh-token`, {
+        refreshToken,
+      });
       if (response.status === 200) {
         const { accessToken } = response.data;
         if (localStorage.getItem("refreshToken")) {

@@ -11,6 +11,8 @@ import NumLetterPad from "../components/forms/NumLetterPad";
 import NumberPad from "../components/forms/NumberPad";
 import QRCodePreview from "../components/forms/QRCodePreview";
 import SubConSelection from "../components/forms/SubConSelection";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../config";
 
 function BundleRegistration() {
   const { user, loading } = useAuth(); // Get the logged-in user data
@@ -124,7 +126,7 @@ function BundleRegistration() {
 
       try {
         const response = await fetch(
-          `http://localhost:5001/api/order-details/${formData.selectedMono}`
+          `${API_BASE_URL}/api/order-details/${formData.selectedMono}`
         );
         const data = await response.json();
 
@@ -145,7 +147,7 @@ function BundleRegistration() {
         }));
 
         const totalResponse = await fetch(
-          `http://localhost:5001/api/total-bundle-qty/${formData.selectedMono}`
+          `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
         );
         if (!totalResponse.ok)
           throw new Error("Failed to fetch total bundle quantity");
@@ -179,7 +181,7 @@ function BundleRegistration() {
 
       try {
         const response = await fetch(
-          `http://localhost:5001/api/order-sizes/${formData.selectedMono}/${formData.color}`
+          `${API_BASE_URL}/api/order-sizes/${formData.selectedMono}/${formData.color}`
         );
         const data = await response.json();
 
@@ -189,7 +191,7 @@ function BundleRegistration() {
 
           // Fetch total garments count for the selected MONo, Color, and Size
           const totalCountResponse = await fetch(
-            `http://localhost:5001/api/total-garments-count/${formData.selectedMono}/${formData.color}/${data[0].size}`
+            `${API_BASE_URL}/api/total-garments-count/${formData.selectedMono}/${formData.color}/${data[0].size}`
           );
           const totalCountData = await totalCountResponse.json();
           const totalGarmentsCount = totalCountData.totalCount;
@@ -219,7 +221,7 @@ function BundleRegistration() {
       if (formData.selectedMono && formData.color && formData.size) {
         try {
           const response = await fetch(
-            `http://localhost:5001/api/total-garments-count/${formData.selectedMono}/${formData.color}/${formData.size}`
+            `${API_BASE_URL}/api/total-garments-count/${formData.selectedMono}/${formData.color}/${formData.size}`
           );
           const data = await response.json();
           setFormData((prev) => ({
@@ -242,7 +244,7 @@ function BundleRegistration() {
 
       try {
         const response = await fetch(
-          `http://localhost:5001/api/total-bundle-qty/${formData.selectedMono}`
+          `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
         );
         const data = await response.json();
         setTotalBundleQty(data.total);
@@ -283,7 +285,7 @@ function BundleRegistration() {
       try {
         if (!user) return;
         const response = await fetch(
-          `http://localhost:5001/api/user-batches?emp_id=${user.emp_id}`
+          `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
         );
         const data = await response.json();
         setUserBatches(data);
@@ -341,20 +343,17 @@ function BundleRegistration() {
     if (formData.totalGarmentsCount > formData.planCutQty) return;
 
     try {
-      const response = await fetch(
-        "http://localhost:5001/api/check-bundle-id",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            date: date.toISOString().split("T")[0],
-            lineNo,
-            selectedMono,
-            color,
-            size,
-          }),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/check-bundle-id`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: date.toISOString().split("T")[0],
+          lineNo,
+          selectedMono,
+          color,
+          size,
+        }),
+      });
 
       const { largestNumber } = await response.json();
 
@@ -402,14 +401,11 @@ function BundleRegistration() {
       }
 
       // Save bundle data to MongoDB
-      const saveResponse = await fetch(
-        "http://localhost:5001/api/save-bundle-data",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bundleData }),
-        }
-      );
+      const saveResponse = await fetch(`${API_BASE_URL}/api/save-bundle-data`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bundleData }),
+      });
 
       if (saveResponse.ok) {
         const savedData = await saveResponse.json();
@@ -427,7 +423,7 @@ function BundleRegistration() {
         // Fetch and update totalBundleQty IMMEDIATELY after saving
         try {
           const totalResponse = await fetch(
-            `http://localhost:5001/api/total-bundle-qty/${formData.selectedMono}`
+            `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
           );
           const totalData = await totalResponse.json();
           setTotalBundleQty(totalData.total);
@@ -435,7 +431,7 @@ function BundleRegistration() {
           // Directly fetch and update user batches IMMEDIATELY after saving
           if (user) {
             const batchesResponse = await fetch(
-              `http://localhost:5001/api/user-batches?emp_id=${user.emp_id}`
+              `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
             );
             const batchesData = await batchesResponse.json();
             setUserBatches(batchesData);
@@ -480,7 +476,7 @@ function BundleRegistration() {
       // Directly fetch and update user batches IMMEDIATELY after printing
       if (user) {
         const batchesResponse = await fetch(
-          `http://localhost:5001/api/user-batches?emp_id=${user.emp_id}`
+          `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
         );
         const batchesData = await batchesResponse.json();
         setUserBatches(batchesData);

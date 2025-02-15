@@ -20,7 +20,7 @@
 //     const checkExistingRole = async () => {
 //       try {
 //         const response = await axios.get(
-//           "http://localhost:5001/api/role-management"
+//           "${API_BASE_URL}/api/role-management"
 //         );
 //         const superAdminRole = response.data.find(
 //           (role) => role.role === "Super Admin"
@@ -42,7 +42,7 @@
 
 //     try {
 //       const response = await axios.get(
-//         `http://localhost:5001/api/search-users?q=${query}`
+//         `${API_BASE_URL}/api/search-users?q=${query}`
 //       );
 //       setSearchResults(response.data);
 //     } catch (error) {
@@ -54,7 +54,7 @@
 //   const handleUserSelect = async (user) => {
 //     try {
 //       const response = await axios.get(
-//         `http://localhost:5001/api/user-details?empId=${user.emp_id}`
+//         `${API_BASE_URL}/api/user-details?empId=${user.emp_id}`
 //       );
 //       setSelectedUser({ ...user, ...response.data });
 //       setSearchResults([]);
@@ -71,7 +71,7 @@
 //     try {
 //       // First, check if the role exists
 //       const roleResponse = await axios.get(
-//         "http://localhost:5001/api/role-management"
+//         "${API_BASE_URL}/api/role-management"
 //       );
 //       const superAdminRole = roleResponse.data.find(
 //         (role) => role.role === "Super Admin"
@@ -90,7 +90,7 @@
 
 //       // Register the Super Admin
 //       const response = await axios.post(
-//         "http://localhost:5001/api/role-management/super-admin",
+//         "${API_BASE_URL}/api/role-management/super-admin",
 //         {
 //           user: selectedUser,
 //         }
@@ -103,7 +103,7 @@
 
 //       // Refresh the existing role data
 //       const updatedRoleResponse = await axios.get(
-//         "http://localhost:5001/api/role-management"
+//         "${API_BASE_URL}/api/role-management"
 //       );
 //       const updatedSuperAdminRole = updatedRoleResponse.data.find(
 //         (role) => role.role === "Super Admin"
@@ -265,7 +265,7 @@
 //     const checkExistingRole = async () => {
 //       try {
 //         const response = await axios.get(
-//           "http://localhost:5001/api/role-management"
+//           "${API_BASE_URL}/api/role-management"
 //         );
 //         const superAdminRole = response.data.find(
 //           (role) => role.role === "Super Admin"
@@ -287,7 +287,7 @@
 
 //     try {
 //       const response = await axios.get(
-//         `http://localhost:5001/api/search-users?q=${query}`
+//         `${API_BASE_URL}/api/search-users?q=${query}`
 //       );
 //       setSearchResults(response.data);
 //     } catch (error) {
@@ -299,7 +299,7 @@
 //   const handleUserSelect = async (user) => {
 //     try {
 //       const response = await axios.get(
-//         `http://localhost:5001/api/user-details?empId=${user.emp_id}`
+//         `${API_BASE_URL}/api/user-details?empId=${user.emp_id}`
 //       );
 //       setSelectedUser({ ...user, ...response.data });
 //       setSearchResults([]);
@@ -316,7 +316,7 @@
 //     try {
 //       // First, check if the role exists
 //       const roleResponse = await axios.get(
-//         "http://localhost:5001/api/role-management"
+//         "${API_BASE_URL}/api/role-management"
 //       );
 //       const superAdminRole = roleResponse.data.find(
 //         (role) => role.role === "Super Admin"
@@ -335,7 +335,7 @@
 
 //       // Register the Super Admin
 //       const response = await axios.post(
-//         "http://localhost:5001/api/role-management/super-admin",
+//         "${API_BASE_URL}/api/role-management/super-admin",
 //         {
 //           user: selectedUser,
 //         }
@@ -348,7 +348,7 @@
 
 //       // Refresh the existing role data
 //       const updatedRoleResponse = await axios.get(
-//         "http://localhost:5001/api/role-management"
+//         "${API_BASE_URL}/api/role-management"
 //       );
 //       const updatedSuperAdminRole = updatedRoleResponse.data.find(
 //         (role) => role.role === "Super Admin"
@@ -369,14 +369,14 @@
 //   const handleDelete = async (empId) => {
 //     try {
 //       await axios.delete(
-//         `http://localhost:5001/api/role-management/super-admin/${empId}`
+//         `${API_BASE_URL}/api/role-management/super-admin/${empId}`
 //       );
 
 //       setSuccessMessage("Super Admin removed successfully!");
 
 //       // Refresh the existing role data
 //       const updatedRoleResponse = await axios.get(
-//         "http://localhost:5001/api/role-management"
+//         "${API_BASE_URL}/api/role-management"
 //       );
 //       const updatedSuperAdminRole = updatedRoleResponse.data.find(
 //         (role) => role.role === "Super Admin"
@@ -525,6 +525,8 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../config";
 
 const allowedInitialEmpIds = ["YM6702", "YM7903"];
 
@@ -543,9 +545,7 @@ export default function Settings() {
     // Check if Super Admin role already exists
     const checkExistingRole = async () => {
       try {
-        const response = await axios.get(
-          "http://localhost:5001/api/role-management"
-        );
+        const response = await axios.get(`${API_BASE_URL}/api/role-management`);
         const superAdminRole = response.data.find(
           (role) => role.role === "Super Admin"
         );
@@ -566,7 +566,7 @@ export default function Settings() {
 
     try {
       const response = await axios.get(
-        `http://localhost:5001/api/search-users?q=${query}`
+        `${API_BASE_URL}/api/search-users?q=${query}`
       );
       setSearchResults(response.data);
     } catch (error) {
@@ -578,7 +578,7 @@ export default function Settings() {
   const handleUserSelect = async (user) => {
     try {
       const response = await axios.get(
-        `http://localhost:5001/api/user-details?empId=${user.emp_id}`
+        `${API_BASE_URL}/api/user-details?empId=${user.emp_id}`
       );
       setSelectedUser({ ...user, ...response.data });
       setSearchResults([]);
@@ -595,7 +595,7 @@ export default function Settings() {
     try {
       // First, check if the role exists
       const roleResponse = await axios.get(
-        "http://localhost:5001/api/role-management"
+        `${API_BASE_URL}/api/role-management`
       );
       const superAdminRole = roleResponse.data.find(
         (role) => role.role === "Super Admin"
@@ -614,7 +614,7 @@ export default function Settings() {
 
       // Register the Super Admin
       const response = await axios.post(
-        "http://localhost:5001/api/role-management/super-admin",
+        `${API_BASE_URL}/api/role-management/super-admin`,
         {
           user: selectedUser,
         }
@@ -627,7 +627,7 @@ export default function Settings() {
 
       // Refresh the existing role data
       const updatedRoleResponse = await axios.get(
-        "http://localhost:5001/api/role-management"
+        `${API_BASE_URL}/api/role-management`
       );
       const updatedSuperAdminRole = updatedRoleResponse.data.find(
         (role) => role.role === "Super Admin"
@@ -648,14 +648,14 @@ export default function Settings() {
   const handleDelete = async (empId) => {
     try {
       const response = await axios.delete(
-        `http://localhost:5001/api/role-management/super-admin/${empId}`
+        `${API_BASE_URL}/api/role-management/super-admin/${empId}`
       );
 
       setSuccessMessage("Super Admin removed successfully!");
 
       // Update the existing role data immediately after successful deletion
       const updatedRoleResponse = await axios.get(
-        "http://localhost:5001/api/role-management"
+        `${API_BASE_URL}/api/role-management`
       );
       const updatedSuperAdminRole = updatedRoleResponse.data.find(
         (role) => role.role === "Super Admin"

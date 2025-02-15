@@ -3,6 +3,8 @@ import React, { useEffect, useState } from "react";
 import CreateUserModal from "./createUser";
 import DeleteUserModal from "./deleteUser";
 import EditUserModal from "./editUser";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../../config";
 
 const UserList = () => {
   const [users, setUsers] = useState([]);
@@ -28,7 +30,7 @@ const UserList = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get("http://localhost:5001/users");
+      const response = await axios.get(`${API_BASE_URL}/users`);
       setUsers(response.data);
       setFilteredUsers(response.data);
       setError(null); // Clear any previous errors
@@ -40,7 +42,7 @@ const UserList = () => {
 
   const fetchRoles = async () => {
     try {
-      const response = await axios.get("http://localhost:5001/roles"); // Adjust the URL as needed
+      const response = await axios.get(`${API_BASE_URL}/roles`); // Adjust the URL as needed
       setRoles(response.data);
     } catch (error) {
       if (error.response && error.response.status === 404) {
@@ -77,7 +79,7 @@ const UserList = () => {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`http://localhost:5001/users/${id}`);
+      await axios.delete(`${API_BASE_URL}/users/${id}`);
       fetchUsers();
       handleCloseDeleteModal();
     } catch (error) {
@@ -116,10 +118,7 @@ const UserList = () => {
 
   const handleUpdateUser = async (updatedUser) => {
     try {
-      await axios.put(
-        `http://localhost:5001/users/${updatedUser._id}`,
-        updatedUser
-      );
+      await axios.put(`${API_BASE_URL}/users/${updatedUser._id}`, updatedUser);
       fetchUsers();
       handleCloseModal();
     } catch (error) {
@@ -130,7 +129,7 @@ const UserList = () => {
 
   const handleCreateUser = async (newUser) => {
     try {
-      const response = await axios.post("http://localhost:5001/users", newUser);
+      const response = await axios.post(`${API_BASE_URL}/users`, newUser);
       setUsers([...users, response.data]);
       handleCloseCreateModal();
       return response;

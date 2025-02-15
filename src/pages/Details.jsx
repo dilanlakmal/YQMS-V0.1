@@ -1,15 +1,13 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import {
-  FACTORIES,
-  STYLE_CODES,
-  getCustomerByStyleCode,
-} from "../constants/data";
+import { useNavigate } from "react-router-dom";
 import MonoSearch from "../components/forms/MonoSearch";
 import StyleCodeSelect from "../components/forms/StyleCodeSelect";
 import StyleDigitInput from "../components/forms/StyleDigitInput";
+import { FACTORIES, getCustomerByStyleCode } from "../constants/data";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../config";
 
 function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
   const navigate = useNavigate();
@@ -49,7 +47,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
 
       try {
         const response = await fetch(
-          `http://localhost:5001/api/order-details/${formData.selectedMono}`
+          `${API_BASE_URL}/api/order-details/${formData.selectedMono}`
         );
         const data = await response.json();
 
@@ -77,7 +75,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
 
       try {
         const response = await fetch(
-          `http://localhost:5001/api/order-sizes/${formData.selectedMono}/${formData.color}`
+          `${API_BASE_URL}/api/order-sizes/${formData.selectedMono}/${formData.color}`
         );
         const data = await response.json();
         setSizes(data);

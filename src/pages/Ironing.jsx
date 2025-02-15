@@ -1,16 +1,18 @@
 // IroningPage.jsx
-import React, { useState, useEffect } from "react";
 import {
-  QrCode,
   AlertCircle,
-  Package,
-  Loader2,
-  Table,
-  X,
   Check,
   Clock,
+  Loader2,
+  Package,
+  QrCode,
+  Table,
+  X,
 } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import Scanner from "../components/forms/Scanner";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../config";
 
 const IroningPage = () => {
   const [error, setError] = useState(null);
@@ -37,13 +39,13 @@ const IroningPage = () => {
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:5001/api/bundle-by-random-id/${randomId}`
+        `${API_BASE_URL}/api/bundle-by-random-id/${randomId}`
       );
       if (!response.ok) throw new Error("Bundle not found");
 
       const data = await response.json();
       const existsResponse = await fetch(
-        `http://localhost:5001/api/check-ironing-exists/${data.bundle_id}-53`
+        `${API_BASE_URL}/api/check-ironing-exists/${data.bundle_id}-53`
       );
       const existsData = await existsResponse.json();
 
@@ -84,7 +86,7 @@ const IroningPage = () => {
         ...scannedData,
       };
 
-      const response = await fetch("http://localhost:5001/api/save-ironing", {
+      const response = await fetch(`${API_BASE_URL}/api/save-ironing`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newRecord),

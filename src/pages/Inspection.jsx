@@ -1,17 +1,19 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import Header from "../components/inspection/Header";
-import ViewToggle from "../components/inspection/ViewToggle";
-import DefectsList from "../components/inspection/DefectsList";
-import Summary from "../components/inspection/Summary";
-import PlayPauseButton from "../components/inspection/PlayPauseButton";
-import PreviewModal from "../components/inspection/PreviewModal";
-import { defectsList } from "../constants/defects";
+import { faEye } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEye, faDownload } from "@fortawesome/free-solid-svg-icons";
-import HandleDownloadPDF from "../components/handlefunc/HandleDownloadPDF";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import FormatTime from "../components/formatting/FormatTime";
 import { formatTimeString } from "../components/formatting/FormatedTime";
+import HandleDownloadPDF from "../components/handlefunc/HandleDownloadPDF";
+import DefectsList from "../components/inspection/DefectsList";
+import Header from "../components/inspection/Header";
+import PlayPauseButton from "../components/inspection/PlayPauseButton";
+import PreviewModal from "../components/inspection/PreviewModal";
+import Summary from "../components/inspection/Summary";
+import ViewToggle from "../components/inspection/ViewToggle";
+import { defectsList } from "../constants/defects";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../config";
 
 function Inspection({
   savedState,
@@ -83,7 +85,7 @@ function Inspection({
   const saveQCDataToBackend = async (qcData) => {
     try {
       console.log("Sending QC Data to Backend:", qcData); // Debugging line
-      const response = await fetch("http://localhost:5001/api/save-qc-data", {
+      const response = await fetch(`${API_BASE_URL}/api/save-qc-data`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -20,7 +20,7 @@
 //   const fetchUserRoles = async () => {
 //     try {
 //       const response = await axios.get(
-//         `http://localhost:5001/api/user-roles/${user.emp_id}`
+//         `${API_BASE_URL}/api/user-roles/${user.emp_id}`
 //       );
 //       setUserRoles(response.data.roles);
 //     } catch (error) {
@@ -31,7 +31,7 @@
 //   const fetchRoleManagement = async () => {
 //     try {
 //       const response = await axios.get(
-//         "http://localhost:5001/api/role-management"
+//         "${API_BASE_URL}/api/role-management"
 //       );
 //       setRoleManagement(response.data);
 //     } catch (error) {
@@ -373,6 +373,8 @@ import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/authentication/AuthContext";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../config";
 
 function Home() {
   const navigate = useNavigate();
@@ -414,7 +416,7 @@ function Home() {
   const fetchUserRoles = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:5001/api/user-roles/${user.emp_id}`
+        `${API_BASE_URL}/api/user-roles/${user.emp_id}`
       );
       setUserRoles(response.data.roles);
     } catch (error) {
@@ -424,9 +426,7 @@ function Home() {
 
   const fetchRoleManagement = async () => {
     try {
-      const response = await axios.get(
-        "http://localhost:5001/api/role-management"
-      );
+      const response = await axios.get("${API_BASE_URL}/api/role-management");
       setRoleManagement(response.data);
     } catch (error) {
       console.error("Error fetching role management:", error);
@@ -465,6 +465,55 @@ function Home() {
   }
 
   const cards = [
+    {
+      title: "Cutting/SCC",
+      items: [
+        {
+          path: "/cutting",
+          roles: ["Admin", "QC1"],
+          icon: (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="w-6 h-6 text-blue-600 group-hover:text-white"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 12l-9-9-9 9m18-5v14a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2zM9 10h6m-6 4h6m-3-8v4"
+              />
+            </svg>
+          ),
+          title: "Cutting",
+          description: "Begin a new Cutting Inspection Reports here.",
+        },
+        {
+          path: "/scc",
+          roles: ["Admin", "QC2"],
+          icon: (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="w-6 h-6 text-blue-600 group-hover:text-white"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          ),
+          title: "SCC",
+          description: "Begin a new SCC Inspection Report here.",
+        },
+      ],
+    },
     {
       title: "Order Data",
       items: [
@@ -722,7 +771,7 @@ function Home() {
             {errorMessage}
           </div>
         )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {cards.map((section, sectionIndex) => (
             <div key={sectionIndex} className="space-y-8">
               <h2 className="text-2xl font-bold text-blue-900 mb-4 text-center">

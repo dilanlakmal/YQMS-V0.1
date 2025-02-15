@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../../config";
 
 function MonoSearch({
   value,
@@ -19,7 +21,7 @@ function MonoSearch({
         setIsLoading(true);
         try {
           const response = await fetch(
-            `http://localhost:5001/api/search-mono?digits=${searchTerm}`
+            `${API_BASE_URL}/api/search-mono?digits=${searchTerm}`
           );
           const data = await response.json();
           setSuggestions(data);

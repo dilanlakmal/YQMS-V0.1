@@ -1,6 +1,8 @@
 import axios from "axios";
 import PropTypes from "prop-types";
 import React, { useEffect, useState } from "react";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../../config";
 
 const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
   const [userRoles, setUserRoles] = useState([]);
@@ -18,6 +20,8 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
   };
 
   const availableRoles = [
+    "Cutting",
+    "SCC",
     "Bundle Registration",
     "Washing",
     "Dyeing",
@@ -43,7 +47,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
   const fetchUserRoles = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:5001/api/user-roles/${user.emp_id}`
+        `${API_BASE_URL}/api/user-roles/${user.emp_id}`
       );
       setUserRoles(response.data.roles);
       setSelectedRoles(response.data.roles);
@@ -86,7 +90,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
 
       // Then update roles
       const response = await axios.post(
-        "http://localhost:5001/api/update-user-roles",
+        `${API_BASE_URL}/api/update-user-roles`,
         {
           emp_id: user.emp_id,
           currentRoles: userRoles,

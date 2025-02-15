@@ -3,6 +3,8 @@ import { ChevronDown, LogOut, User } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./authentication/AuthContext";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../config";
 
 export default function Navbar(onLogout) {
   const navigate = useNavigate();
@@ -22,7 +24,7 @@ export default function Navbar(onLogout) {
   const fetchUserRoles = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:5001/api/user-roles/${user.emp_id}`
+        `${API_BASE_URL}/api/user-roles/${user.emp_id}`
       );
       setUserRoles(response.data.roles);
     } catch (error) {
@@ -32,9 +34,7 @@ export default function Navbar(onLogout) {
 
   const fetchRoleManagement = async () => {
     try {
-      const response = await axios.get(
-        "http://localhost:5001/api/role-management"
-      );
+      const response = await axios.get(`${API_BASE_URL}/api/role-management`);
       setRoleManagement(response.data);
     } catch (error) {
       console.error("Error fetching role management:", error);

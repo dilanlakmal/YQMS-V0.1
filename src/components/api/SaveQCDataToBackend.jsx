@@ -1,6 +1,9 @@
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../../config";
+
 const SaveQCDataToBackend = async (qcData) => {
   try {
-    const response = await fetch("http://localhost:5001/api/save-qc-data", {
+    const response = await fetch(`${API_BASE_URL}/api/save-qc-data`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

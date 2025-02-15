@@ -211,6 +211,8 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../../config";
 
 function Profile() {
   const [profile, setProfile] = useState({
@@ -239,12 +241,9 @@ function Profile() {
           sessionStorage.getItem("accessToken");
         if (!token) throw new Error("No token found");
 
-        const response = await axios.get(
-          "http://localhost:5001/api/user-profile",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const response = await axios.get(`${API_BASE_URL}/api/user-profile`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         // Ensure face_photo is properly set from the response
         setProfile({
@@ -303,7 +302,7 @@ function Profile() {
         formData.append("profile", profile.profile);
       }
 
-      await axios.put("http://localhost:5001/api/user-profile", formData, {
+      await axios.put(`${API_BASE_URL}/api/user-profile`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data",

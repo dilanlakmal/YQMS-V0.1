@@ -1,5 +1,7 @@
 import axios from "axios";
 import React, { createContext, useContext, useEffect, useState } from "react";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../../config";
 
 const AuthContext = createContext();
 
@@ -44,7 +46,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         const response = await axios.post(
-          "http://localhost:5001/api/get-user-data",
+          `${API_BASE_URL}//api/get-user-data`,
           { token }
         );
         const userData = {
