@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema({
-  emp_id: { type: String, required: true },
+  emp_id: { type: String },
   emp_code: { type: String },
   eng_name: { type: String },
   kh_name: { type: String },
@@ -21,6 +21,7 @@ const userSchema = new mongoose.Schema({
   remember_token: { type: String },
   face_id: { type: String },
   face_photo: { type: String }, // Added face_photo field
+  phone_number: { type: String },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
 });

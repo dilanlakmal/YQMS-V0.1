@@ -159,7 +159,8 @@ export default function RoleManagement() {
     "QC1",
     "QC2",
     "QA",
-    "Data Analytics",
+    "Download Data",
+    "Live Dashboard",
   ];
 
   return (

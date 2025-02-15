@@ -65,7 +65,8 @@ function Home() {
   };
 
   if (loading) {
-    return <div>t(Loading...)</div>;
+    // return <div>t(Loading...)</div>;
+    return <div>Loading...</div>;
   }
 
   const cards = [

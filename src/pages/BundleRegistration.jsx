@@ -11,6 +11,7 @@ import NumberPad from "../components/forms/NumberPad";
 import QRCodePreview from "../components/forms/QRCodePreview";
 import SubConSelection from "../components/forms/SubConSelection";
 import { useTranslation } from 'react-i18next';
+import EditModal from "../components/forms/EditBundleData"; 
 
 function BundleRegistration() {
   const { t } = useTranslation();
@@ -49,6 +50,9 @@ function BundleRegistration() {
     sizeOrderQty: "",
     planCutQty: "",
   });
+
+  const [editModalOpen, setEditModalOpen] = useState(false); // State to control the edit modal
+  const [editRecordId, setEditRecordId] = useState(null); // State to store the ID of the record being edited
 
   // Reference to Bluetooth component
   const bluetoothComponentRef = useRef();
@@ -432,6 +436,65 @@ function BundleRegistration() {
       setIsPrinting(false);
     }
   };
+
+// Handle edit button click
+const handleEdit = (recordId) => {
+  const record = userBatches.find((batch) => batch.id === recordId);
+  if (record) {
+    setFormData({
+      date: new Date(record.date),
+      department: record.department,
+      selectedMono: record.selectedMono,
+      buyer: record.buyer,
+      orderQty: record.orderQty,
+      factoryInfo: record.factory,
+      custStyle: record.custStyle,
+      country: record.country,
+      color: record.color,
+      size: record.size,
+      bundleQty: record.bundleQty,
+      lineNo: record.lineNo,
+      count: record.count,
+      colorCode: record.colorCode,
+      chnColor: record.chnColor,
+      colorKey: record.colorKey,
+      sizeOrderQty: record.sizeOrderQty,
+      planCutQty: record.planCutQty,
+    });
+    setEditRecordId(recordId);
+    setEditModalOpen(true);
+  }
+};
+
+// Handle save button click in the modal
+const handleSave = async () => {
+  try {
+    const response = await fetch(
+      `http://localhost:5001/api/update-bundle-data/${editRecordId}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      }
+    );
+    if (response.ok) {
+      const updatedRecord = await response.json();
+      setUserBatches((prevBatches) =>
+        prevBatches.map((batch) =>
+          batch.id === editRecordId ? updatedRecord : batch
+        )
+      );
+      setEditModalOpen(false);
+      alert("Record updated successfully!");
+    } else {
+      alert("Failed to update record.");
+    }
+  } catch (error) {
+    console.error("Error updating record:", error);
+    alert("Failed to update record.");
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20 px-8">
@@ -848,6 +911,9 @@ function BundleRegistration() {
                       Date
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Modify
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Time
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
@@ -921,6 +987,14 @@ function BundleRegistration() {
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {batch.updated_date_seperator}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                      <button
+                          onClick={() => handleEdit(batch.id)}
+                          className="ml-2 text-gray-900 font-m hover:text-blue-800 border px-4 py-2 bg-green-500"
+                        >
+                          Edit
+                        </button>
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {batch.updated_time_seperator}
@@ -1020,6 +1094,15 @@ function BundleRegistration() {
           onClose={() => setShowQRPreview(false)}
           qrData={qrData}
           onPrint={handlePrintQR}
+        />
+
+        {/* Edit Modal */}
+        <EditModal
+          isOpen={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          formData={formData}
+          setFormData={setFormData}
+          handleSave={handleSave}
         />
       </div>
     </div>
