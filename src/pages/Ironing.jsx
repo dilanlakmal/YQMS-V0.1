@@ -111,6 +111,12 @@ const IroningPage = () => {
         }),
         ...scannedData,
         passQtyIron,
+        emp_id_ironing: user.emp_id,
+        eng_name_ironing: user.eng_name,
+        kh_name_ironing: user.kh_name,
+        job_title_ironing: user.job_title,
+        dept_name_ironing: user.dept_name,
+        sect_name_ironing: user.sect_name,
       };
 
       console.log("New Record to be saved:", newRecord); // Log the new record
@@ -130,6 +136,12 @@ const IroningPage = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             passQtyIron,
+            emp_id_ironing: user.emp_id,
+            eng_name_ironing: user.eng_name,
+            kh_name_ironing: user.kh_name,
+            job_title_ironing: user.job_title,
+            dept_name_ironing: user.dept_name,
+            sect_name_ironing: user.sect_name,
             ironing_updated_date: newRecord.ironing_updated_date,
             ironing_update_time: newRecord.ironing_update_time,
           }),

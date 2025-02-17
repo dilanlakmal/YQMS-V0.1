@@ -629,7 +629,17 @@ app.post("/api/save-ironing", async (req, res) => {
 app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
   try {
     const { bundleId } = req.params;
-    const { passQtyIron, ironing_updated_date, ironing_update_time } = req.body;
+    const {
+      passQtyIron,
+      ironing_updated_date,
+      ironing_update_time,
+      emp_id_ironing,
+      eng_name_ironing,
+      kh_name_ironing,
+      job_title_ironing,
+      dept_name_ironing,
+      sect_name_ironing,
+    } = req.body;
 
     const updatedRecord = await QC2OrderData.findOneAndUpdate(
       { bundle_id: bundleId },
@@ -637,6 +647,12 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
         passQtyIron,
         ironing_updated_date,
         ironing_update_time,
+        emp_id_ironing,
+        eng_name_ironing,
+        kh_name_ironing,
+        job_title_ironing,
+        dept_name_ironing,
+        sect_name_ironing,
       },
       { new: true }
     );
