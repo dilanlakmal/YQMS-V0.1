@@ -36,6 +36,9 @@ const qc2OrderDataSchema = new mongoose.Schema(
     job_title: { type: String },
     dept_name: { type: String, required: true },
     sect_name: { type: String },
+    passQtyIron: { type: Number },
+    ironing_updated_date: { type: String },
+    ironing_update_time: { type: String },
   },
   { collection: "qc2_orderdata" }
 );

@@ -9,6 +9,7 @@ const ironingSchema = new mongoose.Schema(
     ironing_updated_date: String,
     ironing_update_time: String,
     bundle_id: String,
+    department: String,
     selectedMono: String,
     custStyle: String,
     buyer: String,
@@ -19,6 +20,12 @@ const ironingSchema = new mongoose.Schema(
     size: String,
     count: String,
     totalBundleQty: Number,
+    passQtyIron: Number,
+    sub_con: String,
+    sub_con_factory: String,
+    emp_id: String,
+    updated_date_seperator: String,
+    updated_time_seperator: String,
   },
   { collection: "ironing" }
 );

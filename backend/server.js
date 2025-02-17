@@ -608,6 +608,42 @@ app.post("/api/save-ironing", async (req, res) => {
   }
 });
 
+// Update qc2_orderdata with ironing details
+app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
+  try {
+    const { bundleId } = req.params;
+    const { passQtyIron, ironing_updated_date, ironing_update_time } = req.body;
+
+    const updatedRecord = await QC2OrderData.findOneAndUpdate(
+      { bundle_id: bundleId },
+      {
+        passQtyIron,
+        ironing_updated_date,
+        ironing_update_time,
+      },
+      { new: true }
+    );
+
+    if (!updatedRecord) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+
+    res.json({ message: "Record updated successfully", data: updatedRecord });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update record" });
+  }
+});
+
+// For Data tab display records in a table
+app.get("/api/ironing-records", async (req, res) => {
+  try {
+    const records = await Ironing.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch ironing records" });
+  }
+});
+
 /* ------------------------------
    End Points - Live Dashboard - QC1
 ------------------------------ */
