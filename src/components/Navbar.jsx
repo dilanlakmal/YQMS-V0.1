@@ -3,13 +3,16 @@ import {
   Activity,
   BarChart2,
   ChevronDown,
+  ChevronRight,
   ClipboardList,
   FileText,
   LayoutDashboard,
   LogOut,
+  Menu,
   Package,
   Settings,
   User,
+  X,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -21,6 +24,8 @@ export default function Navbar({ onLogout }) {
   const { user, clearUser } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [expandedSection, setExpandedSection] = useState(null);
   const [roleManagement, setRoleManagement] = useState(null);
   const [userRoles, setUserRoles] = useState([]);
 
@@ -55,14 +60,18 @@ export default function Navbar({ onLogout }) {
   const isAdmin = userRoles.includes("Admin");
   const isAllowedSuperAdmin = ["YM6702", "YM7903"].includes(user?.emp_id);
 
-  const hasAccess = (path) => {
+  // New hasAccess function that checks requiredRoles array
+  const hasAccess = (requiredRoles) => {
     if (!user || !roleManagement) return false;
+    // Super Admins and Admins have full access
     if (isSuperAdmin || isAdmin) return true;
-
-    return roleManagement.some(
-      (role) =>
-        role.users.some((u) => u.emp_id === user.emp_id) &&
-        role.role.toLowerCase().replace(" ", "_") === path.replace("/", "")
+    // Check if at least one of the required roles is present in the roleManagement data for this user
+    return requiredRoles.some((reqRole) =>
+      roleManagement.some(
+        (roleObj) =>
+          roleObj.role === reqRole &&
+          roleObj.users.some((u) => u.emp_id === user.emp_id)
+      )
     );
   };
 
@@ -78,45 +87,96 @@ export default function Navbar({ onLogout }) {
     navigate("/", { replace: true });
   };
 
+  // Navigation items now include requiredRoles for each link.
   const navItems = [
     {
       title: "Cutting",
       icon: <ClipboardList className="h-4 w-4 mr-2" />,
       items: [
-        { path: "/cutting", title: "Cutting" },
-        { path: "/scc", title: "SCC" },
+        {
+          path: "/cutting",
+          title: "Cutting",
+          requiredRoles: ["Super Admin", "Admin", "Cutting"],
+        },
+        {
+          path: "/scc",
+          title: "SCC",
+          requiredRoles: ["Super Admin", "Admin", "SCC"],
+        },
       ],
     },
     {
       title: "Orders",
       icon: <Package className="h-4 w-4 mr-2" />,
       items: [
-        { path: "/bundle-registration", title: "Bundle Registration" },
-        { path: "/washing", title: "Washing" },
-        { path: "/dyeing", title: "Dyeing" },
-        { path: "/ironing", title: "Ironing" },
-        { path: "/packing", title: "Packing" },
+        {
+          path: "/bundle-registration",
+          title: "Bundle Registration",
+          requiredRoles: ["Super Admin", "Admin", "Bundle Registration"],
+        },
+        {
+          path: "/washing",
+          title: "Washing",
+          requiredRoles: ["Super Admin", "Admin", "Washing"],
+        },
+        {
+          path: "/opa",
+          title: "OPA",
+          requiredRoles: ["Super Admin", "Admin", "OPA"],
+        },
+        {
+          path: "/ironing",
+          title: "Ironing",
+          requiredRoles: ["Super Admin", "Admin", "Ironing"],
+        },
+        {
+          path: "/packing",
+          title: "Packing",
+          requiredRoles: ["Super Admin", "Admin", "Packing"],
+        },
       ],
     },
     {
       title: "QC",
       icon: <Activity className="h-4 w-4 mr-2" />,
       items: [
-        { path: "/details", title: "QC1 Inspection" },
-        { path: "/qc2-inspection", title: "QC2 Inspection" },
+        {
+          path: "/details",
+          title: "QC1 Inspection",
+          requiredRoles: ["Super Admin", "Admin", "QC1"],
+        },
+        {
+          path: "/qc2-inspection",
+          title: "QC2 Inspection",
+          requiredRoles: ["Super Admin", "Admin", "QC2"],
+        },
       ],
     },
     {
       title: "QA",
       icon: <BarChart2 className="h-4 w-4 mr-2" />,
-      items: [{ path: "/audit", title: "QA Audit" }],
+      items: [
+        {
+          path: "/audit",
+          title: "QA Audit",
+          requiredRoles: ["Super Admin", "Admin", "QA"],
+        },
+      ],
     },
     {
       title: "Reports",
       icon: <FileText className="h-4 w-4 mr-2" />,
       items: [
-        { path: "/download-data", title: "Download Data" },
-        { path: "/dashboard", title: "Live Dashboard" },
+        {
+          path: "/download-data",
+          title: "Download Data",
+          requiredRoles: ["Super Admin", "Admin", "Download Data"],
+        },
+        {
+          path: "/dashboard",
+          title: "Live Dashboard",
+          requiredRoles: ["Super Admin", "Admin", "Live Dashboard"],
+        },
       ],
     },
   ];
@@ -132,6 +192,23 @@ export default function Navbar({ onLogout }) {
   const closeAllDropdowns = () => {
     setIsMenuOpen(null);
     setIsProfileOpen(false);
+    setExpandedSection(null);
+  };
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const handleSectionClick = (sectionTitle) => {
+    setExpandedSection((prevState) =>
+      prevState === sectionTitle ? null : sectionTitle
+    );
+  };
+
+  const handleSubLinkClick = (path) => {
+    navigate(path);
+    setIsMobileMenuOpen(false);
+    setExpandedSection(null);
   };
 
   useEffect(() => {
@@ -180,19 +257,26 @@ export default function Navbar({ onLogout }) {
                   } transition-all duration-200`}
                 >
                   <div className="py-1">
-                    {section.items.map(
-                      (item) =>
-                        hasAccess(item.path) && (
-                          <Link
-                            key={item.path}
-                            to={item.path}
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            onClick={closeAllDropdowns}
-                          >
-                            {item.title}
-                          </Link>
-                        )
-                    )}
+                    {section.items.map((item) => {
+                      const accessible = hasAccess(item.requiredRoles);
+                      return accessible ? (
+                        <Link
+                          key={item.path}
+                          to={item.path}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={closeAllDropdowns}
+                        >
+                          {item.title}
+                        </Link>
+                      ) : (
+                        <span
+                          key={item.path}
+                          className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed"
+                        >
+                          {item.title}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -274,68 +358,97 @@ export default function Navbar({ onLogout }) {
                 )}
               </div>
             )}
+
+            <div className="sm:hidden">
+              <button
+                onClick={toggleMobileMenu}
+                className="text-gray-900 hover:text-gray-600 focus:outline-none"
+              >
+                {isMobileMenuOpen ? (
+                  <X className="h-6 w-6" />
+                ) : (
+                  <Menu className="h-6 w-6" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Mobile menu */}
-      <div className={`sm:hidden ${isMenuOpen ? "block" : "hidden"}`}>
-        <div className="pt-2 pb-3 space-y-1">
-          {navItems.map((section) => (
-            <div key={section.title}>
-              <div className="px-4 py-2 text-base font-medium text-gray-700 flex items-center">
-                {section.icon}
-                {section.title}
+      {isMobileMenuOpen && (
+        <div className="sm:hidden">
+          <div className="px-2 pt-2 pb-3 space-y-1">
+            {navItems.map((section) => (
+              <div key={section.title}>
+                <div
+                  className="flex items-center justify-between px-4 py-2 text-base font-medium text-gray-700"
+                  onClick={() => handleSectionClick(section.title)}
+                >
+                  {section.icon}
+                  {section.title}
+                  <ChevronRight
+                    className={`h-4 w-4 transition-transform ${
+                      expandedSection === section.title ? "rotate-90" : ""
+                    }`}
+                  />
+                </div>
+                {expandedSection === section.title && (
+                  <div className="pl-4">
+                    {section.items.map((item) => {
+                      const accessible = hasAccess(item.requiredRoles);
+                      return (
+                        <div
+                          key={item.path}
+                          className={`block pl-4 pr-4 py-2 text-base font-medium ${
+                            accessible
+                              ? "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                              : "text-gray-400 cursor-not-allowed"
+                          }`}
+                          onClick={() =>
+                            accessible && handleSubLinkClick(item.path)
+                          }
+                        >
+                          {item.title}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              {section.items.map(
-                (item) =>
-                  hasAccess(item.path) && (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      className="block pl-8 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
-                      onClick={closeAllDropdowns}
-                    >
-                      {item.title}
-                    </Link>
-                  )
-              )}
-            </div>
-          ))}
+            ))}
 
-          {isAllowedSuperAdmin && (
-            <Link
-              to="/settings"
-              className="block pl-4 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
-              onClick={closeAllDropdowns}
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </Link>
-          )}
+            {isAllowedSuperAdmin && (
+              <div
+                className="block pl-4 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                onClick={() => handleSubLinkClick("/settings")}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </div>
+            )}
 
-          {showRoleManagement && (
-            <>
-              <Link
-                to="/role-management"
-                className="block pl-4 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
-                onClick={closeAllDropdowns}
-              >
-                <LayoutDashboard className="h-4 w-4 mr-2" />
-                Role Management
-              </Link>
-              <Link
-                to="/user-list"
-                className="block pl-4 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
-                onClick={closeAllDropdowns}
-              >
-                <User className="h-4 w-4 mr-2" />
-                User Management
-              </Link>
-            </>
-          )}
+            {showRoleManagement && (
+              <>
+                <div
+                  className="block pl-4 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                  onClick={() => handleSubLinkClick("/role-management")}
+                >
+                  <LayoutDashboard className="h-4 w-4 mr-2" />
+                  Role Management
+                </div>
+                <div
+                  className="block pl-4 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                  onClick={() => handleSubLinkClick("/user-list")}
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  User Management
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </nav>
   );
 }
