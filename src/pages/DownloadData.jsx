@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import ExcelDownloadButton from '../components/forms/ExcelDownloadButton';
@@ -79,7 +79,7 @@ function DownloadData() {
     // Update header filters when main filters change
     setFilters((prevFilters) => ({
       ...prevFilters,
-      [field]: value ? [value] : [],
+      [field]: [value],
     }));
     // Update active filters state
     setActiveFilters((prevActiveFilters) => ({
@@ -100,7 +100,6 @@ function DownloadData() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(0);
-
   const [dropdownStates, setDropdownStates] = useState({
     date: false,
     moNo: false,
@@ -248,7 +247,6 @@ function DownloadData() {
         page: currentPage,
         limit: recordsPerPage,
       });
-
       const response = await fetch(`${API_BASE_URL}/api/download-data?${params}`);
       if (!response.ok) throw new Error('Failed to fetch data');
       const result = await response.json();
@@ -302,10 +300,12 @@ function DownloadData() {
   }, [filters]);
 
   const handleFilterChange = (field, value) => {
-    setFilters((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+      setFilters((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+      // Update main filters when header filters change
+      handleTabDataChange(field, value[0] || '');
     // Update active filters state
     setActiveFilters((prevActiveFilters) => ({
       ...prevActiveFilters,
@@ -402,13 +402,30 @@ function DownloadData() {
 
   const renderFilterDropdown = (field, options) => {
     const [searchTerm, setSearchTerm] = useState('');
-
     const filteredOptions = options.filter((option) =>
       option.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const dropdownRef = useRef(null);
+
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setHeaderDropdownStates((prevState) => ({
+          ...prevState,
+          [field]: false,
+        }));
+      }
+    };
+
+    useEffect(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }, []);
+
     return (
-      <div className="relative">
+      <div ref={dropdownRef} className="relative">
         <button
           onClick={() => toggleHeaderDropdown(field)}
           className="flex items-center space-x-1 focus:outline-none"
