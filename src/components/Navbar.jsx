@@ -1,5 +1,16 @@
 import axios from "axios";
-import { ChevronDown, LogOut, User } from "lucide-react";
+import {
+  Activity,
+  BarChart2,
+  ChevronDown,
+  ClipboardList,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  Package,
+  Settings,
+  User,
+} from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../config";
@@ -69,7 +80,16 @@ export default function Navbar({ onLogout }) {
 
   const navItems = [
     {
-      title: "Order Data",
+      title: "Cutting",
+      icon: <ClipboardList className="h-4 w-4 mr-2" />,
+      items: [
+        { path: "/cutting", title: "Cutting" },
+        { path: "/scc", title: "SCC" },
+      ],
+    },
+    {
+      title: "Orders",
+      icon: <Package className="h-4 w-4 mr-2" />,
       items: [
         { path: "/bundle-registration", title: "Bundle Registration" },
         { path: "/washing", title: "Washing" },
@@ -79,18 +99,21 @@ export default function Navbar({ onLogout }) {
       ],
     },
     {
-      title: "Quality Inspection",
+      title: "QC",
+      icon: <Activity className="h-4 w-4 mr-2" />,
       items: [
         { path: "/details", title: "QC1 Inspection" },
         { path: "/qc2-inspection", title: "QC2 Inspection" },
       ],
     },
     {
-      title: "QA Audit",
+      title: "QA",
+      icon: <BarChart2 className="h-4 w-4 mr-2" />,
       items: [{ path: "/audit", title: "QA Audit" }],
     },
     {
-      title: "Data Analytics",
+      title: "Reports",
+      icon: <FileText className="h-4 w-4 mr-2" />,
       items: [
         { path: "/download-data", title: "Download Data" },
         { path: "/dashboard", title: "Live Dashboard" },
@@ -105,6 +128,28 @@ export default function Navbar({ onLogout }) {
       prevState === sectionTitle ? null : sectionTitle
     );
   };
+
+  const closeAllDropdowns = () => {
+    setIsMenuOpen(null);
+    setIsProfileOpen(false);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isMenuOpen || isProfileOpen) {
+        const isDropdownClicked = event.target.closest(".relative.group");
+        const isProfileClicked = event.target.closest(".relative");
+        if (!isDropdownClicked && !isProfileClicked) {
+          closeAllDropdowns();
+        }
+      }
+    };
+
+    document.addEventListener("click", handleClickOutside);
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, [isMenuOpen, isProfileOpen]);
 
   return (
     <nav className="bg-white shadow-lg fixed top-0 left-0 right-0 z-50">
@@ -123,6 +168,7 @@ export default function Navbar({ onLogout }) {
                   className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
                   onClick={() => toggleDropdown(section.title)}
                 >
+                  {section.icon}
                   {section.title}
                   <ChevronDown className="ml-1 h-4 w-4" />
                 </button>
@@ -141,6 +187,7 @@ export default function Navbar({ onLogout }) {
                             key={item.path}
                             to={item.path}
                             className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={closeAllDropdowns}
                           >
                             {item.title}
                           </Link>
@@ -156,6 +203,7 @@ export default function Navbar({ onLogout }) {
                 to="/settings"
                 className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
               >
+                <Settings className="h-4 w-4 mr-2" />
                 Settings
               </Link>
             )}
@@ -166,13 +214,15 @@ export default function Navbar({ onLogout }) {
                   to="/role-management"
                   className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
                 >
-                  Role Management
+                  <LayoutDashboard className="h-4 w-4 mr-2" />
+                  Roles
                 </Link>
                 <Link
                   to="/user-list"
                   className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
                 >
-                  User Management
+                  <User className="h-4 w-4 mr-2" />
+                  Users
                 </Link>
               </>
             )}
@@ -204,7 +254,7 @@ export default function Navbar({ onLogout }) {
                       <Link
                         to="/profile"
                         className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        onClick={() => setIsProfileOpen(false)}
+                        onClick={closeAllDropdowns}
                       >
                         <User className="h-4 w-4 mr-2" />
                         Profile
@@ -212,7 +262,7 @@ export default function Navbar({ onLogout }) {
                       <button
                         onClick={() => {
                           handleSignOut();
-                          setIsProfileOpen(false);
+                          closeAllDropdowns();
                         }}
                         className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
@@ -233,7 +283,8 @@ export default function Navbar({ onLogout }) {
         <div className="pt-2 pb-3 space-y-1">
           {navItems.map((section) => (
             <div key={section.title}>
-              <div className="px-4 py-2 text-base font-medium text-gray-700">
+              <div className="px-4 py-2 text-base font-medium text-gray-700 flex items-center">
+                {section.icon}
                 {section.title}
               </div>
               {section.items.map(
@@ -243,6 +294,7 @@ export default function Navbar({ onLogout }) {
                       key={item.path}
                       to={item.path}
                       className="block pl-8 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                      onClick={closeAllDropdowns}
                     >
                       {item.title}
                     </Link>
@@ -255,18 +307,32 @@ export default function Navbar({ onLogout }) {
             <Link
               to="/settings"
               className="block pl-4 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+              onClick={closeAllDropdowns}
             >
+              <Settings className="h-4 w-4 mr-2" />
               Settings
             </Link>
           )}
 
           {showRoleManagement && (
-            <Link
-              to="/role-management"
-              className="block pl-4 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
-            >
-              Role Management
-            </Link>
+            <>
+              <Link
+                to="/role-management"
+                className="block pl-4 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                onClick={closeAllDropdowns}
+              >
+                <LayoutDashboard className="h-4 w-4 mr-2" />
+                Role Management
+              </Link>
+              <Link
+                to="/user-list"
+                className="block pl-4 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                onClick={closeAllDropdowns}
+              >
+                <User className="h-4 w-4 mr-2" />
+                User Management
+              </Link>
+            </>
           )}
         </div>
       </div>

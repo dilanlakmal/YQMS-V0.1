@@ -1,33 +1,31 @@
 import axios from "axios";
 import React, { createContext, useContext, useEffect, useState } from "react";
-// Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "../../../config";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const storedUser =
-      localStorage.getItem("user") || sessionStorage.getItem("user");
-    return storedUser ? JSON.parse(storedUser) : null;
+    try {
+      const storedUser =
+        localStorage.getItem("user") || sessionStorage.getItem("user");
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+      return null;
+    }
   });
   const [loading, setLoading] = useState(true);
 
-  // >>> ADDED: Simple hashPassword function (identity function)
   const hashPassword = async (password) => {
-    // In a production app, hashing should be done on the server side.
-    // Here we simply return the password as-is.
     return password;
   };
-  // <<<
 
-  // Method to update user after login
   const updateUser = (userData) => {
     setUser(userData);
     localStorage.setItem("user", JSON.stringify(userData));
   };
 
-  // Method to clear user data on sign out
   const clearUser = () => {
     setUser(null);
     localStorage.removeItem("user");
@@ -45,10 +43,9 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
-        const response = await axios.post(
-          `${API_BASE_URL}//api/get-user-data`,
-          { token }
-        );
+        const response = await axios.post(`${API_BASE_URL}/api/get-user-data`, {
+          token,
+        });
         const userData = {
           ...response.data,
           emp_id: response.data.emp_id,

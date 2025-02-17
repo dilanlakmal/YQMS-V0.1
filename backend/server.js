@@ -45,17 +45,18 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-//   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
+//    "mongodb://localhost:27017/ym_prod"
 
-const mongoURI = "mongodb://localhost:27017/ym_prod";
+const mongoURI =
+  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin";
 mongoose
   .connect(mongoURI) //, { useNewUrlParser: true, useUnifiedTopology: true }
   .then(() => console.log("Successfully connected......"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
 const ymProdConnection = mongoose.createConnection(
-  //"mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
-  "mongodb://localhost:27017/ym_prod"
+  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
+  //"mongodb://localhost:27017/ym_prod"
 );
 
 ymProdConnection.on("connected", () =>
