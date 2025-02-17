@@ -12,11 +12,13 @@ import {
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { API_BASE_URL } from "../../config";
+import { useAuth } from "../components/authentication/AuthContext";
 import Scanner from "../components/forms/Scanner";
 
 const IroningPage = () => {
+  const { user, loading } = useAuth();
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
   const [activeTab, setActiveTab] = useState("scan");
   const [ironingRecords, setIroningRecords] = useState([]);
   const [scannedData, setScannedData] = useState(null);
@@ -24,6 +26,27 @@ const IroningPage = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [autoAdd, setAutoAdd] = useState(true);
   const [passQtyIron, setPassQtyIron] = useState(0);
+  const [ironingRecordId, setIroningRecordId] = useState(1);
+
+  useEffect(() => {
+    const fetchInitialRecordId = async () => {
+      if (user && user.emp_id) {
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/api/last-ironing-record-id/${user.emp_id}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            setIroningRecordId(data.lastRecordId + 1);
+          }
+        } catch (err) {
+          console.error("Error fetching initial record ID:", err);
+        }
+      }
+    };
+
+    fetchInitialRecordId();
+  }, [user]);
 
   useEffect(() => {
     let timer;
@@ -39,7 +62,7 @@ const IroningPage = () => {
 
   const fetchBundleData = async (randomId) => {
     try {
-      setLoading(true);
+      setLoadingData(true);
       const response = await fetch(
         `${API_BASE_URL}/api/bundle-by-random-id/${randomId}`
       );
@@ -64,7 +87,7 @@ const IroningPage = () => {
       setError(err.message);
       setScannedData(null);
     } finally {
-      setLoading(false);
+      setLoadingData(false);
     }
   };
 
@@ -72,8 +95,8 @@ const IroningPage = () => {
     try {
       const now = new Date();
       const newRecord = {
-        ironing_record_id: ironingRecords.length + 1,
-        task_no: 53,
+        ironing_record_id: ironingRecordId,
+        task_no_ironing: 53,
         ironing_bundle_id: `${scannedData.bundle_id}-53`,
         ironing_updated_date: now.toLocaleDateString("en-US", {
           month: "2-digit",
@@ -89,6 +112,8 @@ const IroningPage = () => {
         ...scannedData,
         passQtyIron,
       };
+
+      console.log("New Record to be saved:", newRecord); // Log the new record
 
       const response = await fetch(`${API_BASE_URL}/api/save-ironing`, {
         method: "POST",
@@ -117,6 +142,7 @@ const IroningPage = () => {
       setScannedData(null);
       setIsAdding(false);
       setCountdown(5);
+      setIroningRecordId((prev) => prev + 1); // Increment the record ID
     } catch (err) {
       setError(err.message);
     }
@@ -218,7 +244,7 @@ const IroningPage = () => {
               continuous={true}
             />
 
-            {loading && (
+            {loadingData && (
               <div className="flex items-center justify-center gap-2 text-blue-600 mt-4">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <p>Loading bundle data...</p>
@@ -421,7 +447,7 @@ const IroningPage = () => {
                         {record.ironing_record_id}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.task_no}
+                        {record.task_no_ironing}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {record.department}

@@ -593,6 +593,23 @@ app.get("/api/check-ironing-exists/:bundleId", async (req, res) => {
   }
 });
 
+// New endpoint to get the last ironing record ID for a specific emp_id
+app.get("/api/last-ironing-record-id/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const lastRecord = await Ironing.findOne(
+      { emp_id },
+      {},
+      { sort: { ironing_record_id: -1 } }
+    );
+    const lastRecordId = lastRecord ? lastRecord.ironing_record_id : 0;
+    res.json({ lastRecordId });
+  } catch (error) {
+    console.error("Error fetching last ironing record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last ironing record ID" });
+  }
+});
+
 // Save ironing record
 app.post("/api/save-ironing", async (req, res) => {
   try {
