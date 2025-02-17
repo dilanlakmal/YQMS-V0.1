@@ -24,7 +24,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
     "SCC",
     "Bundle Registration",
     "Washing",
-    "Dyeing",
+    "OPA",
     "Ironing",
     "Packing",
     "QC1",

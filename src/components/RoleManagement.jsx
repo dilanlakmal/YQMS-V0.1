@@ -155,7 +155,7 @@ export default function RoleManagement() {
     "SCC",
     "Bundle Registration",
     "Washing",
-    "Dyeing",
+    "OPA",
     "Ironing",
     "Packing",
     "QC1",

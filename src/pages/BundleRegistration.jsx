@@ -47,7 +47,7 @@ function BundleRegistration() {
   const [estimatedTotal, setEstimatedTotal] = useState(null);
 
   const bluetoothComponentRef = useRef();
-  const subConNames = ["Sunicon", "Elite", "SYD"];
+  const subConNames = ["Sunicon", "Win Sheng", "Yeewo", "Jinmyung"];
 
   const [formData, setFormData] = useState(() => {
     const savedData = persistedFormData.bundleRegistration;
@@ -91,14 +91,21 @@ function BundleRegistration() {
   useEffect(() => {
     if (formData.department === "Sub-con") {
       setIsSubCon(true);
-    } else {
-      setIsSubCon(false);
-      setSubConName("");
-    }
-    if (formData.department === "Washing") {
+      setFormData((prev) => ({
+        ...prev,
+        lineNo: "SUB",
+      }));
+    } else if (formData.department === "Washing") {
       setFormData((prev) => ({
         ...prev,
         lineNo: "WA",
+      }));
+    } else {
+      setIsSubCon(false);
+      setSubConName("");
+      setFormData((prev) => ({
+        ...prev,
+        lineNo: "",
       }));
     }
   }, [formData.department]);
@@ -288,11 +295,14 @@ function BundleRegistration() {
   };
 
   const validateLineNo = () => {
-    if (formData.factoryInfo === "YM") {
+    if (
+      formData.factoryInfo === "YM" &&
+      formData.department === "QC1 Endline"
+    ) {
       const lineNo = parseInt(formData.lineNo);
       return lineNo >= 1 && lineNo <= 30;
     }
-    return true;
+    return formData.lineNo === "WA" || formData.lineNo === "SUB";
   };
 
   const handleGenerateQR = async () => {
@@ -612,12 +622,17 @@ function BundleRegistration() {
                     setNumberPadTarget("lineNo");
                     setShowNumberPad(true);
                   }}
-                  readOnly
+                  readOnly={formData.department !== "QC1 Endline"}
                   className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
                 />
                 {formData.department === "Washing" && (
                   <div className="absolute inset-y-0 right-0 flex items-center pointer-events-none">
                     <span className="text-gray-500">WA</span>
+                  </div>
+                )}
+                {formData.department === "Sub-con" && (
+                  <div className="absolute inset-y-0 right-0 flex items-center pointer-events-none">
+                    <span className="text-gray-500">SUB</span>
                   </div>
                 )}
               </div>

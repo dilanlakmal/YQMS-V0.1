@@ -2,14 +2,13 @@ import axios from "axios";
 import { ChevronDown, LogOut, User } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "./authentication/AuthContext";
-// Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "../../config";
+import { useAuth } from "./authentication/AuthContext";
 
-export default function Navbar(onLogout) {
+export default function Navbar({ onLogout }) {
   const navigate = useNavigate();
   const { user, clearUser } = useAuth();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [roleManagement, setRoleManagement] = useState(null);
   const [userRoles, setUserRoles] = useState([]);
@@ -101,69 +100,82 @@ export default function Navbar(onLogout) {
 
   const showRoleManagement = isSuperAdmin || isAdmin;
 
+  const toggleDropdown = (sectionTitle) => {
+    setIsMenuOpen((prevState) =>
+      prevState === sectionTitle ? null : sectionTitle
+    );
+  };
+
   return (
     <nav className="bg-white shadow-lg fixed top-0 left-0 right-0 z-50">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="flex justify-between h-16">
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
-              <Link to="/home" className="text-xl font-bold text-blue-600">
-                YQMS
-              </Link>
-            </div>
+        <div className="flex justify-between h-16 items-center">
+          <div className="flex items-center">
+            <Link to="/home" className="text-xl font-bold text-blue-600">
+              YQMS
+            </Link>
+          </div>
 
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-              {navItems.map((section) => (
-                <div key={section.title} className="relative group">
-                  <button className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900">
-                    {section.title}
-                    <ChevronDown className="ml-1 h-4 w-4" />
-                  </button>
-                  <div className="absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                    <div className="py-1">
-                      {section.items.map(
-                        (item) =>
-                          hasAccess(item.path) && (
-                            <Link
-                              key={item.path}
-                              to={item.path}
-                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            >
-                              {item.title}
-                            </Link>
-                          )
-                      )}
-                    </div>
+          <div className="hidden sm:flex sm:space-x-8">
+            {navItems.map((section) => (
+              <div key={section.title} className="relative group">
+                <button
+                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
+                  onClick={() => toggleDropdown(section.title)}
+                >
+                  {section.title}
+                  <ChevronDown className="ml-1 h-4 w-4" />
+                </button>
+                <div
+                  className={`absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 ${
+                    isMenuOpen === section.title
+                      ? "opacity-100 visible"
+                      : "opacity-0 invisible"
+                  } transition-all duration-200`}
+                >
+                  <div className="py-1">
+                    {section.items.map(
+                      (item) =>
+                        hasAccess(item.path) && (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            {item.title}
+                          </Link>
+                        )
+                    )}
                   </div>
                 </div>
-              ))}
+              </div>
+            ))}
 
-              {isAllowedSuperAdmin && (
+            {isAllowedSuperAdmin && (
+              <Link
+                to="/settings"
+                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
+              >
+                Settings
+              </Link>
+            )}
+
+            {showRoleManagement && (
+              <>
                 <Link
-                  to="/settings"
+                  to="/role-management"
                   className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
                 >
-                  Settings
+                  Role Management
                 </Link>
-              )}
-
-              {showRoleManagement && (
-                <>
-                  <Link
-                    to="/role-management"
-                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
-                  >
-                    Role Management
-                  </Link>
-                  <Link
-                    to="/userList"
-                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
-                  >
-                    User Management
-                  </Link>
-                </>
-              )}
-            </div>
+                <Link
+                  to="/user-list"
+                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
+                >
+                  User Management
+                </Link>
+              </>
+            )}
           </div>
 
           <div className="flex items-center">
