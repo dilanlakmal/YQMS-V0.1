@@ -1,21 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { FaEye, FaPrint, FaQrcode } from "react-icons/fa";
+import { FaEye, FaMinus, FaPlus, FaPrint, FaQrcode } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../components/authentication/AuthContext"; // Import the AuthContext
+import { API_BASE_URL } from "../../config";
+import { useAuth } from "../components/authentication/AuthContext";
 import { useFormData } from "../components/context/FormDataContext";
 import BluetoothComponent from "../components/forms/Bluetooth";
 import MonoSearch from "../components/forms/MonoSearch";
 import NumLetterPad from "../components/forms/NumLetterPad";
 import NumberPad from "../components/forms/NumberPad";
 import QRCodePreview from "../components/forms/QRCodePreview";
+import ReprintTab from "../components/forms/ReprintTab";
 import SubConSelection from "../components/forms/SubConSelection";
-// Import the API_BASE_URL from our config file
-import { API_BASE_URL } from "../../config";
 
 function BundleRegistration() {
-  const { user, loading } = useAuth(); // Get the logged-in user data
+  const { user, loading } = useAuth();
   const {
     formData: persistedFormData,
     updateFormData,
@@ -31,23 +31,31 @@ function BundleRegistration() {
   const [isGenerateDisabled, setIsGenerateDisabled] = useState(false);
   const [activeTab, setActiveTab] = useState("registration");
   const [dataRecords, setDataRecords] = useState([]);
-  // const [isSubCon, setIsSubCon] = useState(false);
-  // const [subConName, setSubConName] = useState("");
-
   const [isPrinting, setIsPrinting] = useState(false);
   const [totalBundleQty, setTotalBundleQty] = useState(0);
+  const [colors, setColors] = useState([]);
+  const [sizes, setSizes] = useState([]);
+  const [hasColors, setHasColors] = useState(false);
+  const [hasSizes, setHasSizes] = useState(false);
+  const [isSubCon, setIsSubCon] = useState(
+    () =>
+      persistedFormData.bundleRegistration?.department === "Sub-con" || false
+  );
+  const [subConName, setSubConName] = useState(
+    () => persistedFormData.bundleRegistration?.subConName || ""
+  );
+  const [estimatedTotal, setEstimatedTotal] = useState(null);
 
-  // Initialize form data with today's date by default
+  const bluetoothComponentRef = useRef();
+  const subConNames = ["Sunicon", "Elite", "SYD"];
+
   const [formData, setFormData] = useState(() => {
     const savedData = persistedFormData.bundleRegistration;
     const today = new Date();
 
-    // If there's saved data and user is logged in, use it
-    // Otherwise use default values with today's date
     return savedData && user
       ? {
           ...savedData,
-          // Only keep saved date if it exists and was changed today
           date: savedData.date ? new Date(savedData.date) : today,
         }
       : {
@@ -61,9 +69,9 @@ function BundleRegistration() {
           country: "",
           color: "",
           size: "",
-          bundleQty: "",
+          bundleQty: 1, // Default value for Bundle Qty
           lineNo: "",
-          count: "10",
+          count: 10, // Default value for Count
           colorCode: "",
           chnColor: "",
           colorKey: "",
@@ -72,44 +80,14 @@ function BundleRegistration() {
         };
   });
 
-  // Reference to Bluetooth component
-  const bluetoothComponentRef = useRef();
-
-  // Hardcoded Sub Con names
-
-  const [colors, setColors] = useState([]);
-  const [sizes, setSizes] = useState([]);
-  const [hasColors, setHasColors] = useState(false);
-  const [hasSizes, setHasSizes] = useState(false);
-
-  // Sub-con state management
-  const [isSubCon, setIsSubCon] = useState(() => {
-    return (
-      persistedFormData.bundleRegistration?.department === "Sub-con" || false
-    );
-  });
-
-  const [subConName, setSubConName] = useState(() => {
-    return persistedFormData.bundleRegistration?.subConName || "";
-  });
-
-  const subConNames = ["Sunicon", "Elite", "SYD"];
-  const [estimatedTotal, setEstimatedTotal] = useState(null);
-
-  // Update context whenever form data changes
   useEffect(() => {
     updateFormData("bundleRegistration", {
       ...formData,
       isSubCon,
       subConName,
     });
-  }, [formData, isSubCon, subConName, updateFormData]);
+  }, [formData, isSubCon, subConName]);
 
-  // useEffect(() => {
-  //   updateFormData("bundleRegistration", formData);
-  // }, [formData, updateFormData]);
-
-  // Add useEffect to handle department change
   useEffect(() => {
     if (formData.department === "Sub-con") {
       setIsSubCon(true);
@@ -117,13 +95,17 @@ function BundleRegistration() {
       setIsSubCon(false);
       setSubConName("");
     }
+    if (formData.department === "Washing") {
+      setFormData((prev) => ({
+        ...prev,
+        lineNo: "WA",
+      }));
+    }
   }, [formData.department]);
 
-  // Fetch order details when MONo is selected
   useEffect(() => {
     const fetchOrderDetails = async () => {
       if (!formData.selectedMono) return;
-
       try {
         const response = await fetch(
           `${API_BASE_URL}/api/order-details/${formData.selectedMono}`
@@ -174,11 +156,9 @@ function BundleRegistration() {
     fetchOrderDetails();
   }, [formData.selectedMono]);
 
-  // Fetch sizes when color is selected
   useEffect(() => {
     const fetchSizes = async () => {
       if (!formData.selectedMono || !formData.color) return;
-
       try {
         const response = await fetch(
           `${API_BASE_URL}/api/order-sizes/${formData.selectedMono}/${formData.color}`
@@ -189,7 +169,6 @@ function BundleRegistration() {
           setSizes(data);
           setHasSizes(true);
 
-          // Fetch total garments count for the selected MONo, Color, and Size
           const totalCountResponse = await fetch(
             `${API_BASE_URL}/api/total-garments-count/${formData.selectedMono}/${formData.color}/${data[0].size}`
           );
@@ -198,7 +177,7 @@ function BundleRegistration() {
 
           setFormData((prev) => ({
             ...prev,
-            totalGarmentsCount, // Add this line
+            totalGarmentsCount,
           }));
         } else {
           setSizes([]);
@@ -213,8 +192,6 @@ function BundleRegistration() {
 
     fetchSizes();
   }, [formData.selectedMono, formData.color]);
-
-  // Fetch total garments count for the selected MONo, Color, and Size
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -232,12 +209,11 @@ function BundleRegistration() {
           console.error("Error fetching updated total:", error);
         }
       }
-    }, 500); // Update every 0.5 seconds
+    }, 500);
 
     return () => clearInterval(interval);
   }, [formData.selectedMono, formData.color, formData.size]);
 
-  // Add this useEffect for real-time total bundle quantity updates
   useEffect(() => {
     const fetchTotalBundleQty = async () => {
       if (!formData.selectedMono) return;
@@ -253,17 +229,12 @@ function BundleRegistration() {
       }
     };
 
-    // Fetch immediately when component mounts or selectedMono changes
     fetchTotalBundleQty();
 
-    // Set up interval to fetch every 0.5 seconds
     const interval = setInterval(fetchTotalBundleQty, 500);
 
-    // Cleanup interval on component unmount or selectedMono change
     return () => clearInterval(interval);
   }, [formData.selectedMono]);
-
-  // Calculate estimated total
 
   useEffect(() => {
     if (
@@ -297,7 +268,6 @@ function BundleRegistration() {
     fetchUserBatches();
   }, [user]);
 
-  // Handle number pad input
   const handleNumberPadInput = (value) => {
     if (numberPadTarget === "bundleQty") {
       setFormData((prev) => ({
@@ -317,7 +287,6 @@ function BundleRegistration() {
     }
   };
 
-  // Validate Line No for YM factory
   const validateLineNo = () => {
     if (formData.factoryInfo === "YM") {
       const lineNo = parseInt(formData.lineNo);
@@ -326,7 +295,6 @@ function BundleRegistration() {
     return true;
   };
 
-  // Generate QR code and save bundle data
   const handleGenerateQR = async () => {
     if (!user || loading) {
       alert("User data is not available. Please try again.");
@@ -385,10 +353,9 @@ function BundleRegistration() {
           planCutQty: formData.planCutQty,
           count: formData.count,
           bundleQty: formData.bundleQty,
-          totalBundleQty: 1, // This is always 1 for each record, becuase when user Generate QR, it's for one bundle
+          totalBundleQty: 1,
           sub_con: isSubCon ? "Yes" : "No",
           sub_con_factory: isSubCon ? subConName : "",
-          // Add user data
           emp_id: user.emp_id,
           eng_name: user.eng_name,
           kh_name: user.kh_name,
@@ -400,7 +367,6 @@ function BundleRegistration() {
         bundleData.push(bundleRecord);
       }
 
-      // Save bundle data to MongoDB
       const saveResponse = await fetch(`${API_BASE_URL}/api/save-bundle-data`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -410,17 +376,14 @@ function BundleRegistration() {
       if (saveResponse.ok) {
         const savedData = await saveResponse.json();
         setQrData(savedData.data);
-        setIsGenerateDisabled(true); // Disable Generate QR button
-        // Reset bundleQty in form data
+        setIsGenerateDisabled(true);
         setFormData((prev) => ({
           ...prev,
           bundleQty: "",
         }));
 
-        // After successful save, update the client's data records
         setDataRecords((prevRecords) => [...prevRecords, ...savedData.data]);
 
-        // Fetch and update totalBundleQty IMMEDIATELY after saving
         try {
           const totalResponse = await fetch(
             `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
@@ -428,7 +391,6 @@ function BundleRegistration() {
           const totalData = await totalResponse.json();
           setTotalBundleQty(totalData.total);
 
-          // Directly fetch and update user batches IMMEDIATELY after saving
           if (user) {
             const batchesResponse = await fetch(
               `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
@@ -451,29 +413,28 @@ function BundleRegistration() {
   const handlePrintQR = async () => {
     if (!bluetoothComponentRef.current) {
       alert("Bluetooth component not initialized");
-      setIsGenerateDisabled(false); // Enable Generate QR immediately if Bluetooth isn't ready
+      setIsGenerateDisabled(false);
       return;
     }
 
     try {
       setIsPrinting(true);
 
-      // Print each QR code sequentially
       for (const data of qrData) {
         await bluetoothComponentRef.current.printData({
           ...data,
-          bundle_id: data.bundle_random_id, // Use the correct field for QR content
+          bundle_id: data.bundle_random_id,
         });
       }
 
-      // Clear form after successful print
       setFormData((prev) => ({
         ...prev,
-        bundleQty: "",
+        bundleQty: 1, // Reset to default value
+        size: "",
+        count: 10, // Reset to default value
       }));
-      setIsGenerateDisabled(false); // Enable Generate QR after successful print
+      setIsGenerateDisabled(false);
 
-      // Directly fetch and update user batches IMMEDIATELY after printing
       if (user) {
         const batchesResponse = await fetch(
           `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
@@ -485,9 +446,25 @@ function BundleRegistration() {
       alert("QR codes printed successfully!");
     } catch (error) {
       alert(`Print failed: ${error.message}`);
-      setIsGenerateDisabled(false); // Re-enable Generate QR on print failure
+      setIsGenerateDisabled(false);
     } finally {
       setIsPrinting(false);
+    }
+  };
+
+  const incrementValue = (field) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: parseInt(prev[field]) + 1,
+    }));
+  };
+
+  const decrementValue = (field) => {
+    if (formData[field] > 1) {
+      setFormData((prev) => ({
+        ...prev,
+        [field]: parseInt(prev[field]) - 1,
+      }));
     }
   };
 
@@ -498,7 +475,6 @@ function BundleRegistration() {
           Bundle Registration
         </h1>
 
-        {/* Tabs */}
         <div className="flex space-x-4 mb-6">
           <button
             onClick={() => setActiveTab("registration")}
@@ -520,11 +496,20 @@ function BundleRegistration() {
           >
             Data
           </button>
+          <button
+            onClick={() => setActiveTab("reprint")}
+            className={`px-4 py-2 rounded-md ${
+              activeTab === "reprint"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            Reprint
+          </button>
         </div>
 
         {activeTab === "registration" ? (
           <div className="bg-white p-6 rounded-lg shadow-md">
-            {/* Date Picker and MONo Search */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -559,7 +544,6 @@ function BundleRegistration() {
                   <option value="">Select Department</option>
                   <option value="QC1 Endline">QC1 Endline</option>
                   <option value="Washing">Washing</option>
-                  <option value="Dyeing">Dyeing</option>
                   <option value="Sub-con">Sub-con</option>
                 </select>
               </div>
@@ -569,14 +553,6 @@ function BundleRegistration() {
                 </label>
                 <MonoSearch
                   value={formData.selectedMono}
-                  // onSelect={(mono) =>
-                  //   setFormData((prev) => ({
-                  //     ...prev,
-                  //     selectedMono: mono,
-                  //     color: "",
-                  //     size: "",
-                  //   }))
-                  // }
                   onSelect={(mono) =>
                     setFormData({ ...formData, selectedMono: mono })
                   }
@@ -586,7 +562,7 @@ function BundleRegistration() {
                 />
               </div>
             </div>
-            {/* Selected MONo and Order Details */}
+
             {formData.selectedMono && (
               <div className="mb-6 p-4 bg-gray-50 rounded-md">
                 <h2 className="text-lg font-bold text-gray-800 mb-4">
@@ -623,23 +599,30 @@ function BundleRegistration() {
                 </div>
               </div>
             )}
-            {/* Line No */}
+
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Line No
               </label>
-              <input
-                type="text"
-                value={formData.lineNo}
-                onClick={() => {
-                  setNumberPadTarget("lineNo");
-                  setShowNumberPad(true);
-                }}
-                readOnly
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.lineNo}
+                  onClick={() => {
+                    setNumberPadTarget("lineNo");
+                    setShowNumberPad(true);
+                  }}
+                  readOnly
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
+                />
+                {formData.department === "Washing" && (
+                  <div className="absolute inset-y-0 right-0 flex items-center pointer-events-none">
+                    <span className="text-gray-500">WA</span>
+                  </div>
+                )}
+              </div>
             </div>
-            {/* Color and Size in one line */}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -663,20 +646,8 @@ function BundleRegistration() {
                         planCutQty: "",
                       };
                       setFormData(newFormData);
-                      // Update the persisted form data
                       updateFormData("bundleRegistration", newFormData);
                     }}
-                    //   setFormData((prev) => ({
-                    //     ...prev,
-                    //     color: e.target.value,
-                    //     colorCode: selectedColor?.code || "",
-                    //     chnColor: selectedColor?.chn || "",
-                    //     colorKey: selectedColor?.key || "",
-                    //     size: "",
-                    //     sizeOrderQty: "",
-                    //     planCutQty: "",
-                    //   }));
-                    // }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
                     <option value="">Select Color</option>
@@ -696,7 +667,6 @@ function BundleRegistration() {
                 </label>
                 {hasColors ? (
                   hasSizes ? (
-                    // Update the size dropdown and selection handler
                     <select
                       value={formData.size}
                       onChange={(e) => {
@@ -710,16 +680,8 @@ function BundleRegistration() {
                           planCutQty: selectedSize?.planCutQty || 0,
                         };
                         setFormData(newFormData);
-                        // Update the persisted form data
                         updateFormData("bundleRegistration", newFormData);
                       }}
-                      //   setFormData((prev) => ({
-                      //     ...prev,
-                      //     size: e.target.value,
-                      //     sizeOrderQty: selectedSize?.orderQty || 0,
-                      //     planCutQty: selectedSize?.planCutQty || 0,
-                      //   }));
-                      // }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     >
                       <option value="">Select Size</option>
@@ -737,7 +699,7 @@ function BundleRegistration() {
                 )}
               </div>
             </div>
-            {/* Size Order Qty and Plan Cut Qty */}
+
             <div className="mt-4 grid grid-cols-2 gap-4">
               {formData.sizeOrderQty > 0 && (
                 <div className="p-2 bg-blue-50 rounded-md">
@@ -752,7 +714,7 @@ function BundleRegistration() {
                 </div>
               )}
             </div>
-            {/* Display Total Garments Count */}
+
             {formData.totalGarmentsCount !== undefined && (
               <div
                 className={`mt-2 text-sm ${
@@ -765,37 +727,68 @@ function BundleRegistration() {
               </div>
             )}
 
-            {/* Count and Bundle Qty in one line */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Count
                 </label>
-                <input
-                  type="text"
-                  value={formData.count}
-                  onClick={() => {
-                    setNumberPadTarget("count");
-                    setShowNumberPad(true);
-                  }}
-                  readOnly
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
-                />
+                <div className="flex items-center border border-gray-300 rounded-md">
+                  <button
+                    type="button"
+                    onClick={() => decrementValue("count")}
+                    className="px-3 py-2 bg-gray-200 rounded-l-md"
+                  >
+                    <FaMinus />
+                  </button>
+                  <input
+                    type="text"
+                    value={formData.count}
+                    onClick={() => {
+                      setNumberPadTarget("count");
+                      setShowNumberPad(true);
+                    }}
+                    readOnly
+                    className="w-full px-3 py-2 bg-gray-50 text-center"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => incrementValue("count")}
+                    className="px-3 py-2 bg-gray-200 rounded-r-md"
+                  >
+                    <FaPlus />
+                  </button>
+                </div>
               </div>
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Bundle Qty
                 </label>
-                <input
-                  type="text"
-                  value={formData.bundleQty}
-                  onClick={() => {
-                    setNumberPadTarget("bundleQty");
-                    setShowNumberPad(true);
-                  }}
-                  readOnly
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
-                />
+                <div className="flex items-center border border-gray-300 rounded-md">
+                  <button
+                    type="button"
+                    onClick={() => decrementValue("bundleQty")}
+                    className="px-3 py-2 bg-gray-200 rounded-l-md"
+                  >
+                    <FaMinus />
+                  </button>
+                  <input
+                    type="text"
+                    value={formData.bundleQty}
+                    onClick={() => {
+                      setNumberPadTarget("bundleQty");
+                      setShowNumberPad(true);
+                    }}
+                    readOnly
+                    className="w-full px-3 py-2 bg-gray-50 text-center"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => incrementValue("bundleQty")}
+                    className="px-3 py-2 bg-gray-200 rounded-r-md"
+                  >
+                    <FaPlus />
+                  </button>
+                </div>
                 {formData.selectedMono && (
                   <p className="mt-2 text-sm text-gray-700">
                     Total Registered Bundle Qty: {totalBundleQty}
@@ -803,7 +796,7 @@ function BundleRegistration() {
                 )}
               </div>
             </div>
-            {/* Sub Con Selection - Modified to show only when department is not Sub-con */}
+
             {formData.department !== "Sub-con" && (
               <SubConSelection
                 isSubCon={isSubCon}
@@ -812,7 +805,7 @@ function BundleRegistration() {
                 setSubConName={setSubConName}
               />
             )}
-            {/* When department is Sub-con, show forced Sub-con selection */}
+
             {formData.department === "Sub-con" && (
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -847,7 +840,6 @@ function BundleRegistration() {
               </div>
             )}
 
-            {/* QR Code Controls */}
             <div className="flex justify-between mt-6">
               <div className="flex space-x-4">
                 <button
@@ -876,10 +868,6 @@ function BundleRegistration() {
                           ? "bg-red-500"
                           : "bg-green-500") + " text-white"
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
-
-                    // formData.count
-                    //   ? "bg-green-500 text-white hover:bg-green-600"
-                    //   : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
                 >
                   <FaQrcode className="mr-2" /> Generate QR
@@ -902,24 +890,17 @@ function BundleRegistration() {
                         isPrinting
                           ? "bg-gray-400 cursor-not-allowed"
                           : "bg-green-500 hover:bg-green-600"
-                      } text-white`}
+                      }`}
                     >
                       <FaPrint className="mr-2" />
                       {isPrinting ? "Printing..." : "Print QR"}
                     </button>
-                    {/* <button
-                      type="button"
-                      onClick={handlePrintQR}
-                      className="px-4 py-2 rounded-md bg-green-500 text-white hover:bg-green-600 flex items-center"
-                    >
-                      <FaPrint className="mr-2" /> Print QR
-                    </button> */}
                   </>
                 )}
               </div>
             </div>
           </div>
-        ) : (
+        ) : activeTab === "data" ? (
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-lg font-bold text-gray-800 mb-4">Data</h2>
             <div className="overflow-x-auto">
@@ -928,6 +909,9 @@ function BundleRegistration() {
                   <tr>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Record ID
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Package NO
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Date
@@ -947,7 +931,6 @@ function BundleRegistration() {
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       KhName
                     </th>
-
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       MONo
                     </th>
@@ -1003,6 +986,9 @@ function BundleRegistration() {
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {index + 1}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {batch.package_no}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {batch.updated_date_seperator}
@@ -1078,9 +1064,10 @@ function BundleRegistration() {
               </table>
             </div>
           </div>
+        ) : (
+          <ReprintTab />
         )}
 
-        {/* Number Pad Modal */}
         {showNumberPad && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center pt-20">
             {numberPadTarget === "bundleQty" ||
@@ -1099,7 +1086,6 @@ function BundleRegistration() {
           </div>
         )}
 
-        {/* QR Code Preview Modal */}
         <QRCodePreview
           isOpen={showQRPreview}
           onClose={() => setShowQRPreview(false)}
@@ -1112,5 +1098,3 @@ function BundleRegistration() {
 }
 
 export default BundleRegistration;
-
-//{dataRecords.map((record, index) => (

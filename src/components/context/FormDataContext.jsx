@@ -45,11 +45,11 @@ export const FormDataProvider = ({ children }) => {
     if (savedData) {
       const parsedData = JSON.parse(savedData);
       // Ensure date is converted back to Date object
-      if (parsedData.bundleRegistration?.date) {
-        parsedData.bundleRegistration.date = new Date(
-          parsedData.bundleRegistration.date
-        );
-      }
+      //   if (parsedData.bundleRegistration?.date) {
+      //     parsedData.bundleRegistration.date = new Date(
+      //       parsedData.bundleRegistration.date
+      //     );
+      //   }
       return parsedData;
     }
 
@@ -107,25 +107,6 @@ export const FormDataProvider = ({ children }) => {
       localStorage.setItem(`formData_${userId}`, JSON.stringify(savedData));
     }
   };
-
-  // Function to clear all data for a specific user
-  //   const clearUserData = () => {
-  //     if (userId !== "anonymous") {
-  //       localStorage.removeItem(`formData_${userId}`);
-  //       setFormData({
-  //         bundleRegistration: {
-  //           date: new Date(),
-  //         },
-  //         washing: {},
-  //         dyeing: {},
-  //         ironing: {},
-  //         packing: {},
-  //         qc1Inspection: {},
-  //         qc2Inspection: {},
-  //         qaAudit: {},
-  //       });
-  //     }
-  //   };
 
   return (
     <FormDataContext.Provider
