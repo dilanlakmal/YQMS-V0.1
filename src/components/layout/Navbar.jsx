@@ -321,7 +321,7 @@ const showRoleManagement = isSuperAdmin || isAdmin;
     // </nav>
 
     <nav className="bg-white shadow-lg fixed top-0 left-0 right-0 z-50">
-  <div className="max-w-7xl mx-auto px-4">
+  <div className="max-w-8xl mx-auto px-4">
     <div className="flex justify-between h-16">
       <div className="flex">
         <div className="flex-shrink-0 flex items-center">
@@ -380,7 +380,9 @@ const showRoleManagement = isSuperAdmin || isAdmin;
           )}
         </div>
       </div>
-      
+      <div className="flex items-center space-x-3 mr-3">
+             <LanguageSwitcher />
+        </div>
       <div className="flex items-center border pr-2 pl-2">
         {user && (
           <div className="relative">
