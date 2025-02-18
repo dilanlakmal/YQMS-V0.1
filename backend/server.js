@@ -21,6 +21,10 @@ import axios from 'axios';
 import createRoleManagmentModel from "./models/RoleManagment.js";
 import createQC2InspectionPassBundle from "./models/qc2_inspection_pass_bundle.js";
 import createQC2ReworksModel from "./models/qc2_reworks.js";
+import createWashingModel from "./models/Washing.js";
+import createOPAModel from "./models/OPA.js";
+
+
 
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "./config.js";
@@ -70,6 +74,8 @@ const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
 const RoleManagment = createRoleManagmentModel(ymProdConnection);
 const QC2InspectionPassBundle = createQC2InspectionPassBundle(ymProdConnection);
 const QC2Reworks = createQC2ReworksModel(ymProdConnection);
+const Washing = createWashingModel(ymProdConnection);
+const OPA = createOPAModel(ymProdConnection);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -650,6 +656,7 @@ app.post("/api/check-bundle-id", async (req, res) => {
   }
 });
 
+
 // Check if ironing record exists
 app.get("/api/check-ironing-exists/:bundleId", async (req, res) => {
   try {
@@ -727,6 +734,333 @@ app.get("/api/ironing-records", async (req, res) => {
     res.json(records);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch ironing records" });
+  }
+});
+
+// Check if ironing record exists
+app.get("/api/check-ironing-exists/:bundleId", async (req, res) => {
+  try {
+    const record = await Ironing.findOne({
+      ironing_bundle_id: req.params.bundleId,
+    });
+    res.json({ exists: !!record });
+  } catch (error) {
+    res.status(500).json({ error: "Error checking record" });
+  }
+});
+
+// New endpoint to get the last ironing record ID for a specific emp_id
+app.get("/api/last-ironing-record-id/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const lastRecord = await Ironing.findOne(
+      { emp_id },
+      {},
+      { sort: { ironing_record_id: -1 } }
+    );
+    const lastRecordId = lastRecord ? lastRecord.ironing_record_id : 0;
+    res.json({ lastRecordId });
+  } catch (error) {
+    console.error("Error fetching last ironing record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last ironing record ID" });
+  }
+});
+
+// Save ironing record
+app.post("/api/save-ironing", async (req, res) => {
+  try {
+    const newRecord = new Ironing(req.body);
+    await newRecord.save();
+    res.status(201).json({ message: "Record saved successfully" });
+  } catch (error) {
+    if (error.code === 11000) {
+      res.status(400).json({ error: "Duplicate record found" });
+    } else {
+      res.status(500).json({ error: "Failed to save record" });
+    }
+  }
+});
+
+// Update qc2_orderdata with ironing details
+app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
+  try {
+    const { bundleId } = req.params;
+    const { passQtyIron, ironing_updated_date, ironing_update_time } = req.body;
+
+    const updatedRecord = await QC2OrderData.findOneAndUpdate(
+      { bundle_id: bundleId },
+      {
+        passQtyIron,
+        ironing_updated_date,
+        ironing_update_time,
+      },
+      { new: true }
+    );
+
+    if (!updatedRecord) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+
+    res.json({ message: "Record updated successfully", data: updatedRecord });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update record" });
+  }
+});
+
+// For Data tab display records in a table
+app.get("/api/ironing-records", async (req, res) => {
+  try {
+    const records = await Ironing.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch ironing records" });
+  }
+});
+
+/* ------------------------------
+   End Points - Washing
+------------------------------ */
+
+// Check if washing record exists
+app.get("/api/check-washing-exists/:bundleId", async (req, res) => {
+  try {
+    const record = await Washing.findOne({
+      washing_bundle_id: req.params.bundleId,
+    });
+    res.json({ exists: !!record });
+  } catch (error) {
+    res.status(500).json({ error: "Error checking record" });
+  }
+});
+
+// New endpoint to get the last washing record ID for a specific emp_id
+app.get("/api/last-washing-record-id/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const lastRecord = await Washing.findOne(
+      { emp_id },
+      {},
+      { sort: { washing_record_id: -1 } }
+    );
+    const lastRecordId = lastRecord ? lastRecord.washing_record_id : 0;
+    res.json({ lastRecordId });
+  } catch (error) {
+    console.error("Error fetching last washing record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last washing record ID" });
+  }
+});
+
+// Save washing record
+app.post("/api/save-washing", async (req, res) => {
+  try {
+    const newRecord = new Washing(req.body);
+    await newRecord.save();
+    res.status(201).json({ message: "Record saved successfully" });
+  } catch (error) {
+    if (error.code === 11000) {
+      res.status(400).json({ error: "Duplicate record found" });
+    } else {
+      res.status(500).json({ error: "Failed to save record" });
+    }
+  }
+});
+
+// Update qc2_orderdata with washing details
+app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
+  try {
+    const { bundleId } = req.params;
+    const { passQtyWash, washing_updated_date, washing_update_time } = req.body;
+    const updatedRecord = await QC2OrderData.findOneAndUpdate(
+      { bundle_id: bundleId },
+      {
+        passQtyWash,
+        washing_updated_date,
+        washing_update_time,
+      },
+      { new: true }
+    );
+    if (!updatedRecord) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+    res.json({ message: "Record updated successfully", data: updatedRecord });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update record" });
+  }
+});
+
+// For Data tab display records in a table
+app.get("/api/washing-records", async (req, res) => {
+  try {
+    const records = await Washing.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch washing records" });
+  }
+});
+
+
+
+/* ------------------------------
+   End Points - OPA
+------------------------------ */
+
+// Check if OPA record exists
+app.get("/api/check-opa-exists/:bundleId", async (req, res) => {
+  try {
+    const record = await OPA.findOne({
+      opa_bundle_id: req.params.bundleId,
+    });
+    res.json({ exists: !!record });
+  } catch (error) {
+    res.status(500).json({ error: "Error checking record" });
+  }
+});
+
+// New endpoint to get the last OPA record ID for a specific emp_id
+app.get("/api/last-opa-record-id/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const lastRecord = await OPA.findOne(
+      { emp_id },
+      {},
+      { sort: { opa_record_id: -1 } }
+    );
+    const lastRecordId = lastRecord ? lastRecord.opa_record_id : 0;
+    res.json({ lastRecordId });
+  } catch (error) {
+    console.error("Error fetching last OPA record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last OPA record ID" });
+  }
+});
+
+// Save OPA record
+app.post("/api/save-opa", async (req, res) => {
+  try {
+    const newRecord = new OPA(req.body);
+    await newRecord.save();
+    res.status(201).json({ message: "Record saved successfully" });
+  } catch (error) {
+    if (error.code === 11000) {
+      res.status(400).json({ error: "Duplicate record found" });
+    } else {
+      res.status(500).json({ error: "Failed to save record" });
+    }
+  }
+});
+
+// Update qc2_orderdata with OPA details
+app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
+  try {
+    const { bundleId } = req.params;
+    const { passQtyOPA, opa_updated_date, opa_update_time } = req.body;
+
+    const updatedRecord = await QC2OrderData.findOneAndUpdate(
+      { bundle_id: bundleId },
+      {
+        passQtyOPA,
+        opa_updated_date,
+        opa_update_time,
+      },
+      { new: true }
+    );
+
+    if (!updatedRecord) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+
+    res.json({ message: "Record updated successfully", data: updatedRecord });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update record" });
+  }
+});
+
+// For Data tab display records in a table
+app.get("/api/opa-records", async (req, res) => {
+  try {
+    const records = await OPA.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch OPA records" });
+  }
+});
+
+// Check if OPA record exists
+app.get("/api/check-opa-exists/:bundleId", async (req, res) => {
+  try {
+    const record = await OPA.findOne({
+      opa_bundle_id: req.params.bundleId,
+    });
+    res.json({ exists: !!record });
+  } catch (error) {
+    res.status(500).json({ error: "Error checking record" });
+  }
+});
+
+// New endpoint to get the last OPA record ID for a specific emp_id
+app.get("/api/last-opa-record-id/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const lastRecord = await OPA.findOne(
+      { emp_id },
+      {},
+      { sort: { opa_record_id: -1 } }
+    );
+    const lastRecordId = lastRecord ? lastRecord.opa_record_id : 0;
+    res.json({ lastRecordId });
+  } catch (error) {
+    console.error("Error fetching last OPA record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last OPA record ID" });
+  }
+});
+
+// Save OPA record
+app.post("/api/save-opa", async (req, res) => {
+  try {
+    const newRecord = new OPA(req.body);
+    await newRecord.save();
+    res.status(201).json({ message: "Record saved successfully" });
+  } catch (error) {
+    if (error.code === 11000) {
+      res.status(400).json({ error: "Duplicate record found" });
+    } else {
+      res.status(500).json({ error: "Failed to save record" });
+    }
+  }
+});
+
+// Update qc2_orderdata with OPA details
+app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
+  try {
+    const { bundleId } = req.params;
+    const { passQtyOPA, opa_updated_date, opa_update_time } = req.body;
+
+    const updatedRecord = await QC2OrderData.findOneAndUpdate(
+      { bundle_id: bundleId },
+      {
+        passQtyOPA,
+        opa_updated_date,
+        opa_update_time,
+      },
+      { new: true }
+    );
+
+    if (!updatedRecord) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+
+    res.json({ message: "Record updated successfully", data: updatedRecord });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update record" });
+  }
+});
+
+// For Data tab display records in a table
+app.get("/api/opa-records", async (req, res) => {
+  try {
+    const records = await OPA.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch OPA records" });
   }
 });
 

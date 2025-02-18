@@ -18,6 +18,8 @@ import DownloadData from "./pages/DownloadData";
 import Home from "./pages/Home";
 import Inspection from "./pages/QC Inspection/Inspection";
 import IroningPage from "./pages/Ironing";
+import WashingPage from "./pages/Washing";
+import OPAPage from "./pages/OPA";
 import Login from "./pages/Auth/Login"
 import ForgotPassword from "./pages/Auth/ForgotPassword";
 import Register from "./pages/Auth/Register"; 
@@ -325,6 +327,8 @@ function App() {
                   element={<Cutting />}
                 />
                 <Route path="/ironing" element={<IroningPage />} />
+                <Route path="/washing" element={<WashingPage />} />
+                <Route path="/opa" element={<OPAPage />} />
                 <Route path="/qc2-inspection" element={<QC2InspectionPage />} />
                 <Route path="/download-data" element={<DownloadData />} />
               </>
