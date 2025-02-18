@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import bcrypt from 'bcryptjs';
 import axios from "axios";
+import { API_BASE_URL } from "../../../config";
 
 const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
   const [userRoles, setUserRoles] = useState([]);
@@ -19,9 +20,11 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
   };
 
   const availableRoles = [
+    "Cutting",
+    "SCC",
     "Bundle Registration",
     "Washing",
-    "Dyeing",
+    "OPA",
     "Ironing",
     "Packing",
     "QC1",
@@ -44,10 +47,15 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
   const fetchUserRoles = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:5001/api/user-roles/${user.emp_id}`
+        `${API_BASE_URL}/api/user-roles/${user.emp_id}`
       );
       setUserRoles(response.data.roles);
       setSelectedRoles(response.data.roles);
+
+      // If user is Super Admin/Admin, disable role editing
+      if (roles.includes("Super Admin") || roles.includes("Admin")) {
+        setDisableRoles(true);
+      }
     } catch (error) {
       console.error("Error fetching user roles:", error);
     }
@@ -82,7 +90,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
 
       // Then update roles
       const response = await axios.post(
-        "http://localhost:5001/api/update-user-roles",
+        `${API_BASE_URL}/api/update-user-roles`,
         {
           emp_id: user.emp_id,
           currentRoles: userRoles,
@@ -312,26 +320,36 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
                 <label className="block text-sm font-medium text-white mb-2">
                   Roles
                 </label>
-                <div className="grid grid-cols-2 gap-4">
-                  {availableRoles.map((role) => (
-                    <div key={role} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id={`role-${role}`}
-                        checked={selectedRoles.includes(role)}
-                        onChange={() => handleRoleChange(role)}
-                        disabled={disableRoles}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <label
-                        htmlFor={`role-${role}`}
-                        className="ml-2 text-sm font-medium text-white"
-                      >
-                        {role}
-                      </label>
-                    </div>
-                  ))}
-                </div>
+                {selectedRoles.includes("Super Admin") ? (
+                  <div className="p-3 bg-green-100 text-green-700 rounded-lg">
+                    This user is a Super Admin. All Access Granted!!
+                  </div>
+                ) : selectedRoles.includes("Admin") ? (
+                  <div className="p-3 bg-blue-100 text-blue-700 rounded-lg">
+                    This user is an Admin. All Access Granted!!
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {availableRoles.map((role) => (
+                      <div key={role} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id={`role-${role}`}
+                          checked={selectedRoles.includes(role)}
+                          onChange={() => handleRoleChange(role)}
+                          disabled={disableRoles}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <label
+                          htmlFor={`role-${role}`}
+                          className="ml-2 text-sm font-medium text-white"
+                        >
+                          {role}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

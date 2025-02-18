@@ -20,7 +20,10 @@ import axios from 'axios';
 //import createRoleManagmentModel from "./models/RoleManagment.js";
 import createRoleManagmentModel from "./models/RoleManagment.js";
 import createQC2InspectionPassBundle from "./models/qc2_inspection_pass_bundle.js";
+import createQC2ReworksModel from "./models/qc2_reworks.js";
 
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "./config.js";
 
 /* ------------------------------
    Connection String
@@ -43,7 +46,7 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-//"mongodb://localhost:27017/ym_prod"
+//    "mongodb://localhost:27017/ym_prod"
 
 //-----------------------------DATABASE CONNECTIONS------------------------------------------------//
 
@@ -66,6 +69,11 @@ const Ironing = createIroningModel(ymProdConnection);
 const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
 const RoleManagment = createRoleManagmentModel(ymProdConnection);
 const QC2InspectionPassBundle = createQC2InspectionPassBundle(ymProdConnection);
+const QC2Reworks = createQC2ReworksModel(ymProdConnection);
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
 
 //-----------------------------END DATABASE CONNECTIONS------------------------------------------------//
 
@@ -417,9 +425,7 @@ const generateRandomId = async () => {
   return randomId;
 };
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
-});
+
 
 // Save bundle data to MongoDB
 app.post("/api/save-bundle-data", async (req, res) => {
@@ -429,6 +435,13 @@ app.post("/api/save-bundle-data", async (req, res) => {
 
     // Save each bundle record
     for (const bundle of bundleData) {
+      // Get current package number for this MONo-Color-Size combination
+      const packageCount = await QC2OrderData.countDocuments({
+        selectedMono: bundle.selectedMono,
+        color: bundle.color,
+        size: bundle.size,
+      });
+
       const randomId = await generateRandomId();
 
       const now = new Date();
@@ -449,6 +462,7 @@ app.post("/api/save-bundle-data", async (req, res) => {
 
       const newBundle = new QC2OrderData({
         ...bundle,
+        package_no: packageCount + 1,
         bundle_random_id: randomId,
         factory: bundle.factory || "N/A", // Handle null factory
         custStyle: bundle.custStyle || "N/A", // Handle null custStyle
@@ -496,6 +510,89 @@ app.get("/api/user-batches", async (req, res) => {
     res.json(batches);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch user batches" });
+  }
+});
+
+/* ------------------------------
+   End Points - Reprint - qc2 orders
+------------------------------ */
+
+// Reprint endpoints
+app.get("/api/reprint-search-mono", async (req, res) => {
+  try {
+    const digits = req.query.digits;
+    const results = await QC2OrderData.aggregate([
+      {
+        $match: {
+          selectedMono: { $regex: `${digits}$` },
+        },
+      },
+      {
+        $group: {
+          _id: "$selectedMono",
+          count: { $sum: 1 },
+        },
+      },
+      { $limit: 100 },
+    ]);
+
+    res.json(results.map((r) => r._id));
+  } catch (error) {
+    res.status(500).json({ error: "Failed to search MONo" });
+  }
+});
+
+app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
+  try {
+    const mono = req.params.mono;
+    const result = await QC2OrderData.aggregate([
+      { $match: { selectedMono: mono } },
+      {
+        $group: {
+          _id: {
+            color: "$color",
+            size: "$size",
+          },
+          colorCode: { $first: "$colorCode" },
+          chnColor: { $first: "$chnColor" },
+          package_no: { $first: "$package_no" }, // Add this line
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.color",
+          sizes: { $push: "$_id.size" },
+          colorCode: { $first: "$colorCode" },
+          chnColor: { $first: "$chnColor" },
+        },
+      },
+    ]);
+
+    const colors = result.map((c) => ({
+      color: c._id,
+      sizes: c.sizes,
+      colorCode: c.colorCode,
+      chnColor: c.chnColor,
+    }));
+
+    res.json(colors);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch colors/sizes" });
+  }
+});
+
+app.get("/api/reprint-records", async (req, res) => {
+  try {
+    const { mono, color, size } = req.query;
+    const records = await QC2OrderData.find({
+      selectedMono: mono,
+      color: color,
+      size: size,
+    }).sort({ package_no: 1 });
+
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch records" });
   }
 });
 
@@ -565,6 +662,23 @@ app.get("/api/check-ironing-exists/:bundleId", async (req, res) => {
   }
 });
 
+// New endpoint to get the last ironing record ID for a specific emp_id
+app.get("/api/last-ironing-record-id/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const lastRecord = await Ironing.findOne(
+      { emp_id },
+      {},
+      { sort: { ironing_record_id: -1 } }
+    );
+    const lastRecordId = lastRecord ? lastRecord.ironing_record_id : 0;
+    res.json({ lastRecordId });
+  } catch (error) {
+    console.error("Error fetching last ironing record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last ironing record ID" });
+  }
+});
+
 // Save ironing record
 app.post("/api/save-ironing", async (req, res) => {
   try {
@@ -577,6 +691,42 @@ app.post("/api/save-ironing", async (req, res) => {
     } else {
       res.status(500).json({ error: "Failed to save record" });
     }
+  }
+});
+
+// Update qc2_orderdata with ironing details
+app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
+  try {
+    const { bundleId } = req.params;
+    const { passQtyIron, ironing_updated_date, ironing_update_time } = req.body;
+
+    const updatedRecord = await QC2OrderData.findOneAndUpdate(
+      { bundle_id: bundleId },
+      {
+        passQtyIron,
+        ironing_updated_date,
+        ironing_update_time,
+      },
+      { new: true }
+    );
+
+    if (!updatedRecord) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+
+    res.json({ message: "Record updated successfully", data: updatedRecord });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update record" });
+  }
+});
+
+// For Data tab display records in a table
+app.get("/api/ironing-records", async (req, res) => {
+  try {
+    const records = await Ironing.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch ironing records" });
   }
 });
 
@@ -1290,28 +1440,6 @@ app.get("/api/download-data", async (req, res) => {
 // Schema for qc2_inspection_pass_bundle with header fields as separate fields
 
 
-// Schema for qc2_reworks with separate header fields
-const qc2ReworksSchema = new mongoose.Schema(
-  {
-    bundleNo: { type: String, required: true },
-    moNo: { type: String, required: true },
-    custStyle: { type: String, required: true },
-    color: { type: String, required: true },
-    size: { type: String, required: true },
-    lineNo: { type: String, required: true },
-    department: { type: String, required: true },
-    reworkGarments: [
-      {
-        defectName: { type: String, required: true },
-        count: { type: Number, required: true },
-        time: { type: String, required: true }, // "HH:MM:SS"
-      },
-    ],
-  },
-  { collection: "qc2_reworks" }
-);
-
-const QC2Reworks = mongoose.model("qc2_reworks", qc2ReworksSchema);
 
 // Endpoint to save inspection pass bundle data
 app.post("/api/inspection-pass-bundle", async (req, res) => {
@@ -1471,7 +1599,7 @@ app.post("/users", async (req, res) => {
       emp_id,
       name,
       email,
-      job_title,
+      job_title: job_title || "External",
       eng_name,
       kh_name,
       phone_number,
@@ -1618,11 +1746,14 @@ app.post('/api/get-user-data', async (req, res) => {
     res.status(200).json({
       emp_id: user.emp_id,
       name: user.name,
+      eng_name: user.eng_name,
+      kh_name: user.kh_name,
+      job_title: user.job_title,
       dept_name: user.dept_name,
       sect_name: user.sect_name,
       profile: user.profile,
-      roles: user.roles, 
-      sub_roles: user.sub_roles, 
+      roles: user.roles,
+      sub_roles: user.sub_roles,
     });
   } catch (error) {
     console.error('Error fetching user data:', error);
@@ -1921,6 +2052,7 @@ app.put("/api/user-profile", authenticateUser, upload, async (req, res) => {
   }
 });
 
+
 // /* ------------------------------
 //    Super Admin ENDPOINTS
 // ------------------------------ */
@@ -2166,17 +2298,42 @@ app.post("/api/role-management", async (req, res) => {
   }
 });
 
+// Update the /api/user-roles/:empId endpoint (remove duplicates and modify)
 app.get("/api/user-roles/:empId", async (req, res) => {
   try {
     const { empId } = req.params;
     const roles = [];
 
-    const userRoles = await RoleManagment.find({
+    // Check Super Admin role first
+    const superAdminRole = await RoleManagment.findOne({
+      role: "Super Admin",
       "users.emp_id": empId,
     });
 
-    userRoles.forEach((role) => {
-      roles.push(role.role);
+    if (superAdminRole) {
+      roles.push("Super Admin");
+      return res.json({ roles }); // Return early if Super Admin
+    }
+
+    // Check Admin role
+    const adminRole = await RoleManagment.findOne({
+      role: "Admin",
+      "users.emp_id": empId,
+    });
+
+    if (adminRole) {
+      roles.push("Admin");
+      return res.json({ roles }); // Return early if Admin
+    }
+
+    // Get other roles
+    const otherRoles = await RoleManagment.find({
+      role: { $nin: ["Super Admin", "Admin"] },
+      "users.emp_id": empId,
+    });
+
+    otherRoles.forEach((roleDoc) => {
+      roles.push(roleDoc.role);
     });
 
     res.json({ roles });
@@ -2185,6 +2342,26 @@ app.get("/api/user-roles/:empId", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch user roles" });
   }
 });
+
+// app.get("/api/user-roles/:empId", async (req, res) => {
+//   try {
+//     const { empId } = req.params;
+//     const roles = [];
+
+//     const userRoles = await RoleManagment.find({
+//       "users.emp_id": empId,
+//     });
+
+//     userRoles.forEach((role) => {
+//       roles.push(role.role);
+//     });
+
+//     res.json({ roles });
+//   } catch (error) {
+//     console.error("Error fetching user roles:", error);
+//     res.status(500).json({ message: "Failed to fetch user roles" });
+//   }
+// });
 
 app.get("/api/role-management", async (req, res) => {
   try {
@@ -2302,10 +2479,6 @@ app.post("/api/update-user-roles", async (req, res) => {
   }
 });
 
-// app.listen(PORT, () => {
-//   console.log(`Server is running on http://localhost:${PORT}`);
-// });
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running at http://0.0.0.0:${PORT}/`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
 });

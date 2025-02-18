@@ -1,29 +1,31 @@
 import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import {
-  BarChart,
-  Activity,
-  AlertCircle,
-  CheckCircle,
-  RefreshCcw,
-  Box,
-  TrendingUp,
-  Factory,
-  Hash,
-  Briefcase,
-  Calendar,
-} from "lucide-react";
-import {
-  Chart as ChartJS,
   CategoryScale,
+  Chart as ChartJS,
+  Legend,
+  LineElement,
   LinearScale,
   PointElement,
-  LineElement,
   Title,
   Tooltip,
-  Legend,
 } from "chart.js";
+import {
+  Activity,
+  AlertCircle,
+  BarChart,
+  Box,
+  Briefcase,
+  Calendar,
+  CheckCircle,
+  Factory,
+  Hash,
+  RefreshCcw,
+  TrendingUp,
+} from "lucide-react";
 import { Line } from "react-chartjs-2";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../config";
 
 ChartJS.register(
   CategoryScale,
@@ -185,7 +187,7 @@ function Dashboard() {
         setLoading(true);
       }
 
-      const healthCheck = await fetch("http://localhost:5001/api/health");
+      const healthCheck = await fetch(`${API_BASE_URL}/api/health`);
       if (!healthCheck.ok) {
         throw new Error("Server health check failed");
       }
@@ -196,7 +198,7 @@ function Dashboard() {
       }).toString();
 
       const response = await fetch(
-        `http://localhost:5001/api/dashboard-stats?${queryParams}`
+        `${API_BASE_URL}/api/dashboard-stats?${queryParams}`
       );
 
       if (!response.ok) {

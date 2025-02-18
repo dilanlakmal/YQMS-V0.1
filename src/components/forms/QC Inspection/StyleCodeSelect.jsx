@@ -1,4 +1,4 @@
-import { STYLE_CODES } from '../../../constants/QC Inspection/styleCode&factory';
+import { STYLE_CODES } from '../../../constants/QC Inspection/data';
 
 function StyleCodeSelect({ value, onChange, onCustomerChange }) {
   const handleChange = (e) => {

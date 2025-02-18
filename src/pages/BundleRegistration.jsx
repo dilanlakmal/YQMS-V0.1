@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { FaEye, FaPrint, FaQrcode } from "react-icons/fa";
+import { FaEye, FaMinus, FaPlus, FaPrint, FaQrcode } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../components/authentication/AuthContext"; // Import the AuthContext
+import { API_BASE_URL } from "../../config";
+import { useAuth } from "../components/authentication/AuthContext";
+import { useFormData } from "../components/context/FormDataContext";
 import BluetoothComponent from "../components/forms/Bluetooth";
 import MonoSearch from "../components/forms/MonoSearch";
 import NumLetterPad from "../components/forms/NumLetterPad";
 import NumberPad from "../components/forms/NumberPad";
 import QRCodePreview from "../components/forms/QRCodePreview";
+import ReprintTab from "../components/forms/ReprintTab";
 import SubConSelection from "../components/forms/SubConSelection";
 import { useTranslation } from 'react-i18next';
 import EditModal from "../components/forms/EditBundleData"; 
@@ -16,6 +19,12 @@ import EditModal from "../components/forms/EditBundleData";
 function BundleRegistration() {
   const { t } = useTranslation();
   const { user, loading } = useAuth(); // Get the logged-in user data
+  const {
+    formData: persistedFormData,
+    updateFormData,
+    clearFormData,
+  } = useFormData();
+
   const [userBatches, setUserBatches] = useState([]);
   const navigate = useNavigate();
   const [qrData, setQrData] = useState([]);
@@ -25,66 +34,116 @@ function BundleRegistration() {
   const [isGenerateDisabled, setIsGenerateDisabled] = useState(false);
   const [activeTab, setActiveTab] = useState("registration");
   const [dataRecords, setDataRecords] = useState([]);
-  const [isSubCon, setIsSubCon] = useState(false);
-  const [subConName, setSubConName] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
   const [totalBundleQty, setTotalBundleQty] = useState(0);
-
-  const [formData, setFormData] = useState({
-    date: new Date(),
-    department: "",
-    selectedMono: "",
-    buyer: "",
-    orderQty: "",
-    factoryInfo: "",
-    custStyle: "",
-    country: "",
-    color: "",
-    size: "",
-    bundleQty: "",
-    lineNo: "",
-    count: "10",
-    colorCode: "",
-    chnColor: "",
-    colorKey: "",
-    sizeOrderQty: "",
-    planCutQty: "",
-  });
-
-  const [editModalOpen, setEditModalOpen] = useState(false); // State to control the edit modal
-  const [editRecordId, setEditRecordId] = useState(null); // State to store the ID of the record being edited
-
-  // Reference to Bluetooth component
-  const bluetoothComponentRef = useRef();
-
-  // Hardcoded Sub Con names
-
   const [colors, setColors] = useState([]);
   const [sizes, setSizes] = useState([]);
   const [hasColors, setHasColors] = useState(false);
   const [hasSizes, setHasSizes] = useState(false);
-
-  const subConNames = ["Sunicon", "Elite", "SYD"];
+  const [isSubCon, setIsSubCon] = useState(
+    () =>
+      persistedFormData.bundleRegistration?.department === "Sub-con" || false
+  );
+  const [subConName, setSubConName] = useState(
+    () => persistedFormData.bundleRegistration?.subConName || ""
+  );
   const [estimatedTotal, setEstimatedTotal] = useState(null);
+  
+  const bluetoothComponentRef = useRef();
+  const subConNames = ["Sunicon", "Win Sheng", "Yeewo", "Jinmyung"];
 
-  // Add useEffect to handle department change
+  // const [formData, setFormData] = useState({
+  //   date: new Date(),
+  //   department: "",
+  //   selectedMono: "",
+  //   buyer: "",
+  //   orderQty: "",
+  //   factoryInfo: "",
+  //   custStyle: "",
+  //   country: "",
+  //   color: "",
+  //   size: "",
+  //   bundleQty: "",
+  //   lineNo: "",
+  //   count: "10",
+  //   colorCode: "",
+  //   chnColor: "",
+  //   colorKey: "",
+  //   sizeOrderQty: "",
+  //   planCutQty: "",
+  // });
+
+  const [editModalOpen, setEditModalOpen] = useState(false); // State to control the edit modal
+  const [editRecordId, setEditRecordId] = useState(null); // State to store the ID of the record being edited
+
+  // Hardcoded Sub Con names
+  const [formData, setFormData] = useState(() => {
+    const savedData = persistedFormData.bundleRegistration;
+    const today = new Date();
+
+    return savedData && user
+      ? {
+          ...savedData,
+          date: savedData.date ? new Date(savedData.date) : today,
+        }
+      : {
+          date: today,
+          department: "",
+          selectedMono: "",
+          buyer: "",
+          orderQty: "",
+          factoryInfo: "",
+          custStyle: "",
+          country: "",
+          color: "",
+          size: "",
+          bundleQty: 1, // Default value for Bundle Qty
+          lineNo: "",
+          count: 10, // Default value for Count
+          colorCode: "",
+          chnColor: "",
+          colorKey: "",
+          sizeOrderQty: "",
+          planCutQty: "",
+        };
+  });
+
+  useEffect(() => {
+    updateFormData("bundleRegistration", {
+      ...formData,
+      isSubCon,
+      subConName,
+    });
+  }, [formData, isSubCon, subConName]);
+
   useEffect(() => {
     if (formData.department === "Sub-con") {
       setIsSubCon(true);
+      setFormData((prev) => ({
+        ...prev,
+        lineNo: "SUB",
+      }));
+    } else if (formData.department === "Washing") {
+      setFormData((prev) => ({
+        ...prev,
+        lineNo: "WA",
+      }));
     } else {
       setIsSubCon(false);
       setSubConName("");
+      setFormData((prev) => ({
+        ...prev,
+        lineNo: "",
+      }));
     }
   }, [formData.department]);
 
-  // Fetch order details when MONo is selected
   useEffect(() => {
     const fetchOrderDetails = async () => {
       if (!formData.selectedMono) return;
-
       try {
         const response = await fetch(
-          `http://localhost:5001/api/order-details/${formData.selectedMono}`
+          `${API_BASE_URL}/api/order-details/${formData.selectedMono}`
         );
         const data = await response.json();
 
@@ -105,7 +164,7 @@ function BundleRegistration() {
         }));
 
         const totalResponse = await fetch(
-          `http://localhost:5001/api/total-bundle-qty/${formData.selectedMono}`
+          `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
         );
         if (!totalResponse.ok)
           throw new Error("Failed to fetch total bundle quantity");
@@ -132,14 +191,12 @@ function BundleRegistration() {
     fetchOrderDetails();
   }, [formData.selectedMono]);
 
-  // Fetch sizes when color is selected
   useEffect(() => {
     const fetchSizes = async () => {
       if (!formData.selectedMono || !formData.color) return;
-
       try {
         const response = await fetch(
-          `http://localhost:5001/api/order-sizes/${formData.selectedMono}/${formData.color}`
+          `${API_BASE_URL}/api/order-sizes/${formData.selectedMono}/${formData.color}`
         );
         const data = await response.json();
 
@@ -147,16 +204,15 @@ function BundleRegistration() {
           setSizes(data);
           setHasSizes(true);
 
-          // Fetch total garments count for the selected MONo, Color, and Size
           const totalCountResponse = await fetch(
-            `http://localhost:5001/api/total-garments-count/${formData.selectedMono}/${formData.color}/${data[0].size}`
+            `${API_BASE_URL}/api/total-garments-count/${formData.selectedMono}/${formData.color}/${data[0].size}`
           );
           const totalCountData = await totalCountResponse.json();
           const totalGarmentsCount = totalCountData.totalCount;
 
           setFormData((prev) => ({
             ...prev,
-            totalGarmentsCount, // Add this line
+            totalGarmentsCount,
           }));
         } else {
           setSizes([]);
@@ -172,14 +228,12 @@ function BundleRegistration() {
     fetchSizes();
   }, [formData.selectedMono, formData.color]);
 
-  // Fetch total garments count for the selected MONo, Color, and Size
-
   useEffect(() => {
     const interval = setInterval(async () => {
       if (formData.selectedMono && formData.color && formData.size) {
         try {
           const response = await fetch(
-            `http://localhost:5001/api/total-garments-count/${formData.selectedMono}/${formData.color}/${formData.size}`
+            `${API_BASE_URL}/api/total-garments-count/${formData.selectedMono}/${formData.color}/${formData.size}`
           );
           const data = await response.json();
           setFormData((prev) => ({
@@ -190,19 +244,18 @@ function BundleRegistration() {
           console.error("Error fetching updated total:", error);
         }
       }
-    }, 500); // Update every 0.5 seconds
+    }, 500);
 
     return () => clearInterval(interval);
   }, [formData.selectedMono, formData.color, formData.size]);
 
-  // Add this useEffect for real-time total bundle quantity updates
   useEffect(() => {
     const fetchTotalBundleQty = async () => {
       if (!formData.selectedMono) return;
 
       try {
         const response = await fetch(
-          `http://localhost:5001/api/total-bundle-qty/${formData.selectedMono}`
+          `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
         );
         const data = await response.json();
         setTotalBundleQty(data.total);
@@ -211,17 +264,12 @@ function BundleRegistration() {
       }
     };
 
-    // Fetch immediately when component mounts or selectedMono changes
     fetchTotalBundleQty();
 
-    // Set up interval to fetch every 0.5 seconds
     const interval = setInterval(fetchTotalBundleQty, 500);
 
-    // Cleanup interval on component unmount or selectedMono change
     return () => clearInterval(interval);
   }, [formData.selectedMono]);
-
-  // Calculate estimated total
 
   useEffect(() => {
     if (
@@ -243,7 +291,7 @@ function BundleRegistration() {
       try {
         if (!user) return;
         const response = await fetch(
-          `http://localhost:5001/api/user-batches?emp_id=${user.emp_id}`
+          `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
         );
         const data = await response.json();
         setUserBatches(data);
@@ -255,7 +303,6 @@ function BundleRegistration() {
     fetchUserBatches();
   }, [user]);
 
-  // Handle number pad input
   const handleNumberPadInput = (value) => {
     if (numberPadTarget === "bundleQty") {
       setFormData((prev) => ({
@@ -275,16 +322,17 @@ function BundleRegistration() {
     }
   };
 
-  // Validate Line No for YM factory
   const validateLineNo = () => {
-    if (formData.factoryInfo === "YM") {
+    if (
+      formData.factoryInfo === "YM" &&
+      formData.department === "QC1 Endline"
+    ) {
       const lineNo = parseInt(formData.lineNo);
       return lineNo >= 1 && lineNo <= 30;
     }
-    return true;
+    return formData.lineNo === "WA" || formData.lineNo === "SUB";
   };
 
-  // Generate QR code and save bundle data
   const handleGenerateQR = async () => {
     if (!user || loading) {
       alert("User data is not available. Please try again.");
@@ -301,20 +349,17 @@ function BundleRegistration() {
     if (formData.totalGarmentsCount > formData.planCutQty) return;
 
     try {
-      const response = await fetch(
-        "http://localhost:5001/api/check-bundle-id",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            date: date.toISOString().split("T")[0],
-            lineNo,
-            selectedMono,
-            color,
-            size,
-          }),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/check-bundle-id`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: date.toISOString().split("T")[0],
+          lineNo,
+          selectedMono,
+          color,
+          size,
+        }),
+      });
 
       const { largestNumber } = await response.json();
 
@@ -346,10 +391,9 @@ function BundleRegistration() {
           planCutQty: formData.planCutQty,
           count: formData.count,
           bundleQty: formData.bundleQty,
-          totalBundleQty: 1, // This is always 1 for each record, becuase when user Generate QR, it's for one bundle
+          totalBundleQty: 1,
           sub_con: isSubCon ? "Yes" : "No",
           sub_con_factory: isSubCon ? subConName : "",
-          // Add user data
           emp_id: user.emp_id,
           eng_name: user.eng_name,
           kh_name: user.kh_name,
@@ -361,36 +405,37 @@ function BundleRegistration() {
         bundleData.push(bundleRecord);
       }
 
-      // Save bundle data to MongoDB
-      const saveResponse = await fetch(
-        "http://localhost:5001/api/save-bundle-data",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bundleData }),
-        }
-      );
+      const saveResponse = await fetch(`${API_BASE_URL}/api/save-bundle-data`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bundleData }),
+      });
 
       if (saveResponse.ok) {
         const savedData = await saveResponse.json();
         setQrData(savedData.data);
-        setIsGenerateDisabled(true); // Disable Generate QR button
-        // Reset bundleQty in form data
+        setIsGenerateDisabled(true);
         setFormData((prev) => ({
           ...prev,
           bundleQty: "",
         }));
 
-        // After successful save, update the client's data records
         setDataRecords((prevRecords) => [...prevRecords, ...savedData.data]);
 
-        // Fetch and update totalBundleQty IMMEDIATELY after saving
         try {
           const totalResponse = await fetch(
-            `http://localhost:5001/api/total-bundle-qty/${formData.selectedMono}`
+            `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
           );
           const totalData = await totalResponse.json();
           setTotalBundleQty(totalData.total);
+
+          if (user) {
+            const batchesResponse = await fetch(
+              `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
+            );
+            const batchesData = await batchesResponse.json();
+            setUserBatches(batchesData);
+          }
         } catch (error) {
           console.error("Error updating total bundle quantity:", error);
         }
@@ -406,95 +451,60 @@ function BundleRegistration() {
   const handlePrintQR = async () => {
     if (!bluetoothComponentRef.current) {
       alert("Bluetooth component not initialized");
-      setIsGenerateDisabled(false); // Enable Generate QR immediately if Bluetooth isn't ready
+      setIsGenerateDisabled(false);
       return;
     }
 
     try {
       setIsPrinting(true);
 
-      // Print each QR code sequentially
       for (const data of qrData) {
         await bluetoothComponentRef.current.printData({
           ...data,
-          bundle_id: data.bundle_random_id, // Use the correct field for QR content
+          bundle_id: data.bundle_random_id,
         });
       }
 
-      // Clear form after successful print
       setFormData((prev) => ({
         ...prev,
-        bundleQty: "",
+        bundleQty: 1, // Reset to default value
+        size: "",
+        count: 10, // Reset to default value
       }));
-      setIsGenerateDisabled(false); // Enable Generate QR after successful print
+      setIsGenerateDisabled(false);
+
+      if (user) {
+        const batchesResponse = await fetch(
+          `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
+        );
+        const batchesData = await batchesResponse.json();
+        setUserBatches(batchesData);
+      }
 
       alert("QR codes printed successfully!");
     } catch (error) {
       alert(`Print failed: ${error.message}`);
-      setIsGenerateDisabled(false); // Re-enable Generate QR on print failure
+      setIsGenerateDisabled(false);
     } finally {
       setIsPrinting(false);
     }
   };
 
-// Handle edit button click
-const handleEdit = (recordId) => {
-  const record = userBatches.find((batch) => batch.id === recordId);
-  if (record) {
-    setFormData({
-      date: new Date(record.date),
-      department: record.department,
-      selectedMono: record.selectedMono,
-      buyer: record.buyer,
-      orderQty: record.orderQty,
-      factoryInfo: record.factory,
-      custStyle: record.custStyle,
-      country: record.country,
-      color: record.color,
-      size: record.size,
-      bundleQty: record.bundleQty,
-      lineNo: record.lineNo,
-      count: record.count,
-      colorCode: record.colorCode,
-      chnColor: record.chnColor,
-      colorKey: record.colorKey,
-      sizeOrderQty: record.sizeOrderQty,
-      planCutQty: record.planCutQty,
-    });
-    setEditRecordId(recordId);
-    setEditModalOpen(true);
-  }
-};
+  const incrementValue = (field) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: parseInt(prev[field]) + 1,
+    }));
+  };
 
-// Handle save button click in the modal
-const handleSave = async () => {
-  try {
-    const response = await fetch(
-      `http://localhost:5001/api/update-bundle-data/${editRecordId}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      }
-    );
-    if (response.ok) {
-      const updatedRecord = await response.json();
-      setUserBatches((prevBatches) =>
-        prevBatches.map((batch) =>
-          batch.id === editRecordId ? updatedRecord : batch
-        )
-      );
-      setEditModalOpen(false);
-      alert("Record updated successfully!");
-    } else {
-      alert("Failed to update record.");
+  const decrementValue = (field) => {
+    if (formData[field] > 1) {
+      setFormData((prev) => ({
+        ...prev,
+        [field]: parseInt(prev[field]) - 1,
+      }));
     }
-  } catch (error) {
-    console.error("Error updating record:", error);
-    alert("Failed to update record.");
-  }
-};
-
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20 px-8">
@@ -503,7 +513,6 @@ const handleSave = async () => {
         {t('bundle_registration')}
         </h1>
 
-        {/* Tabs */}
         <div className="flex space-x-4 mb-6">
           <button
             onClick={() => setActiveTab("registration")}
@@ -525,11 +534,20 @@ const handleSave = async () => {
           >
             Data
           </button>
+          <button
+            onClick={() => setActiveTab("reprint")}
+            className={`px-4 py-2 rounded-md ${
+              activeTab === "reprint"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            Reprint
+          </button>
         </div>
 
         {activeTab === "registration" ? (
           <div className="bg-white p-6 rounded-lg shadow-md">
-            {/* Date Picker and MONo Search */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -564,7 +582,6 @@ const handleSave = async () => {
                   <option value="">Select Department</option>
                   <option value="QC1 Endline">QC1 Endline</option>
                   <option value="Washing">Washing</option>
-                  <option value="Dyeing">Dyeing</option>
                   <option value="Sub-con">Sub-con</option>
                 </select>
               </div>
@@ -575,12 +592,7 @@ const handleSave = async () => {
                 <MonoSearch
                   value={formData.selectedMono}
                   onSelect={(mono) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      selectedMono: mono,
-                      color: "",
-                      size: "",
-                    }))
+                    setFormData({ ...formData, selectedMono: mono })
                   }
                   placeholder="Search Last 3 Digits of MONo..."
                   showSearchIcon={true}
@@ -588,7 +600,7 @@ const handleSave = async () => {
                 />
               </div>
             </div>
-            {/* Selected MONo and Order Details */}
+
             {formData.selectedMono && (
               <div className="mb-6 p-4 bg-gray-50 rounded-md">
                 <h2 className="text-lg font-bold text-gray-800 mb-4">
@@ -625,23 +637,35 @@ const handleSave = async () => {
                 </div>
               </div>
             )}
-            {/* Line No */}
+
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Line No
               </label>
-              <input
-                type="text"
-                value={formData.lineNo}
-                onClick={() => {
-                  setNumberPadTarget("lineNo");
-                  setShowNumberPad(true);
-                }}
-                readOnly
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.lineNo}
+                  onClick={() => {
+                    setNumberPadTarget("lineNo");
+                    setShowNumberPad(true);
+                  }}
+                  readOnly={formData.department !== "QC1 Endline"}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
+                />
+                {formData.department === "Washing" && (
+                  <div className="absolute inset-y-0 right-0 flex items-center pointer-events-none">
+                    <span className="text-gray-500">WA</span>
+                  </div>
+                )}
+                {formData.department === "Sub-con" && (
+                  <div className="absolute inset-y-0 right-0 flex items-center pointer-events-none">
+                    <span className="text-gray-500">SUB</span>
+                  </div>
+                )}
+              </div>
             </div>
-            {/* Color and Size in one line */}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -654,8 +678,8 @@ const handleSave = async () => {
                       const selectedColor = colors.find(
                         (c) => c.original === e.target.value
                       );
-                      setFormData((prev) => ({
-                        ...prev,
+                      const newFormData = {
+                        ...formData,
                         color: e.target.value,
                         colorCode: selectedColor?.code || "",
                         chnColor: selectedColor?.chn || "",
@@ -663,7 +687,9 @@ const handleSave = async () => {
                         size: "",
                         sizeOrderQty: "",
                         planCutQty: "",
-                      }));
+                      };
+                      setFormData(newFormData);
+                      updateFormData("bundleRegistration", newFormData);
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
@@ -684,19 +710,20 @@ const handleSave = async () => {
                 </label>
                 {hasColors ? (
                   hasSizes ? (
-                    // Update the size dropdown and selection handler
                     <select
                       value={formData.size}
                       onChange={(e) => {
                         const selectedSize = sizes.find(
                           (s) => s.size === e.target.value
                         );
-                        setFormData((prev) => ({
-                          ...prev,
+                        const newFormData = {
+                          ...formData,
                           size: e.target.value,
                           sizeOrderQty: selectedSize?.orderQty || 0,
                           planCutQty: selectedSize?.planCutQty || 0,
-                        }));
+                        };
+                        setFormData(newFormData);
+                        updateFormData("bundleRegistration", newFormData);
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     >
@@ -715,7 +742,7 @@ const handleSave = async () => {
                 )}
               </div>
             </div>
-            {/* Size Order Qty and Plan Cut Qty */}
+
             <div className="mt-4 grid grid-cols-2 gap-4">
               {formData.sizeOrderQty > 0 && (
                 <div className="p-2 bg-blue-50 rounded-md">
@@ -730,7 +757,7 @@ const handleSave = async () => {
                 </div>
               )}
             </div>
-            {/* Display Total Garments Count */}
+
             {formData.totalGarmentsCount !== undefined && (
               <div
                 className={`mt-2 text-sm ${
@@ -743,37 +770,68 @@ const handleSave = async () => {
               </div>
             )}
 
-            {/* Count and Bundle Qty in one line */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Count
                 </label>
-                <input
-                  type="text"
-                  value={formData.count}
-                  onClick={() => {
-                    setNumberPadTarget("count");
-                    setShowNumberPad(true);
-                  }}
-                  readOnly
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
-                />
+                <div className="flex items-center border border-gray-300 rounded-md">
+                  <button
+                    type="button"
+                    onClick={() => decrementValue("count")}
+                    className="px-3 py-2 bg-gray-200 rounded-l-md"
+                  >
+                    <FaMinus />
+                  </button>
+                  <input
+                    type="text"
+                    value={formData.count}
+                    onClick={() => {
+                      setNumberPadTarget("count");
+                      setShowNumberPad(true);
+                    }}
+                    readOnly
+                    className="w-full px-3 py-2 bg-gray-50 text-center"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => incrementValue("count")}
+                    className="px-3 py-2 bg-gray-200 rounded-r-md"
+                  >
+                    <FaPlus />
+                  </button>
+                </div>
               </div>
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Bundle Qty
                 </label>
-                <input
-                  type="text"
-                  value={formData.bundleQty}
-                  onClick={() => {
-                    setNumberPadTarget("bundleQty");
-                    setShowNumberPad(true);
-                  }}
-                  readOnly
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md cursor-pointer"
-                />
+                <div className="flex items-center border border-gray-300 rounded-md">
+                  <button
+                    type="button"
+                    onClick={() => decrementValue("bundleQty")}
+                    className="px-3 py-2 bg-gray-200 rounded-l-md"
+                  >
+                    <FaMinus />
+                  </button>
+                  <input
+                    type="text"
+                    value={formData.bundleQty}
+                    onClick={() => {
+                      setNumberPadTarget("bundleQty");
+                      setShowNumberPad(true);
+                    }}
+                    readOnly
+                    className="w-full px-3 py-2 bg-gray-50 text-center"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => incrementValue("bundleQty")}
+                    className="px-3 py-2 bg-gray-200 rounded-r-md"
+                  >
+                    <FaPlus />
+                  </button>
+                </div>
                 {formData.selectedMono && (
                   <p className="mt-2 text-sm text-gray-700">
                     Total Registered Bundle Qty: {totalBundleQty}
@@ -781,7 +839,7 @@ const handleSave = async () => {
                 )}
               </div>
             </div>
-            {/* Sub Con Selection - Modified to show only when department is not Sub-con */}
+
             {formData.department !== "Sub-con" && (
               <SubConSelection
                 isSubCon={isSubCon}
@@ -790,7 +848,7 @@ const handleSave = async () => {
                 setSubConName={setSubConName}
               />
             )}
-            {/* When department is Sub-con, show forced Sub-con selection */}
+
             {formData.department === "Sub-con" && (
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -825,7 +883,6 @@ const handleSave = async () => {
               </div>
             )}
 
-            {/* QR Code Controls */}
             <div className="flex justify-between mt-6">
               <div className="flex space-x-4">
                 <button
@@ -854,10 +911,6 @@ const handleSave = async () => {
                           ? "bg-red-500"
                           : "bg-green-500") + " text-white"
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
-
-                    // formData.count
-                    //   ? "bg-green-500 text-white hover:bg-green-600"
-                    //   : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
                 >
                   <FaQrcode className="mr-2" /> Generate QR
@@ -880,24 +933,17 @@ const handleSave = async () => {
                         isPrinting
                           ? "bg-gray-400 cursor-not-allowed"
                           : "bg-green-500 hover:bg-green-600"
-                      } text-white`}
+                      }`}
                     >
                       <FaPrint className="mr-2" />
                       {isPrinting ? "Printing..." : "Print QR"}
                     </button>
-                    {/* <button
-                      type="button"
-                      onClick={handlePrintQR}
-                      className="px-4 py-2 rounded-md bg-green-500 text-white hover:bg-green-600 flex items-center"
-                    >
-                      <FaPrint className="mr-2" /> Print QR
-                    </button> */}
                   </>
                 )}
               </div>
             </div>
           </div>
-        ) : (
+        ) : activeTab === "data" ? (
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-lg font-bold text-gray-800 mb-4">Data</h2>
             <div className="overflow-x-auto">
@@ -906,6 +952,9 @@ const handleSave = async () => {
                   <tr>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Record ID
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Package NO
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Date
@@ -928,7 +977,6 @@ const handleSave = async () => {
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       KhName
                     </th>
-
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       MONo
                     </th>
@@ -984,6 +1032,9 @@ const handleSave = async () => {
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {index + 1}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {batch.package_no}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {batch.updated_date_seperator}
@@ -1067,9 +1118,10 @@ const handleSave = async () => {
               </table>
             </div>
           </div>
+        ) : (
+          <ReprintTab />
         )}
 
-        {/* Number Pad Modal */}
         {showNumberPad && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center pt-20">
             {numberPadTarget === "bundleQty" ||
@@ -1088,7 +1140,6 @@ const handleSave = async () => {
           </div>
         )}
 
-        {/* QR Code Preview Modal */}
         <QRCodePreview
           isOpen={showQRPreview}
           onClose={() => setShowQRPreview(false)}
@@ -1110,5 +1161,3 @@ const handleSave = async () => {
 }
 
 export default BundleRegistration;
-
-//{dataRecords.map((record, index) => (

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '../components/authentication/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { API_BASE_URL } from "../../config";
 
 function Home() {
   const { t } = useTranslation();
@@ -11,19 +12,34 @@ function Home() {
   const [errorMessage, setErrorMessage] = useState('');
   const [userRoles, setUserRoles] = useState([]);
   const [roleManagement, setRoleManagement] = useState(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
-    if (!loading && user) {
-      fetchUserRoles();
-      fetchRoleManagement();
+    if (!loading) {
+      if (!user) {
+        navigate("/login");
+        return;
+      }
+      fetchData();
     }
   }, [user, loading]);
 
+  const fetchData = async () => {
+    try {
+      setPageLoading(true);
+      await Promise.all([fetchUserRoles(), fetchRoleManagement()]);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setErrorMessage("Error loading data");
+    } finally {
+      setPageLoading(false);
+    }
+  };
+
   const fetchUserRoles = async () => {
     try {
-      const response = await axios.get(
-        `http://localhost:5001/api/user-roles/${user.emp_id}`
-      );
+      const response = await axios.get(`${API_BASE_URL}/api/user-roles/${user.emp_id}`);
+      // console.log("User roles fetched:", response.data.roles); // Debugging log
       setUserRoles(response.data.roles);
     } catch (error) {
       console.error("Error fetching user roles:", error);
@@ -32,9 +48,8 @@ function Home() {
 
   const fetchRoleManagement = async () => {
     try {
-      const response = await axios.get(
-        "http://localhost:5001/api/role-management"
-      );
+      const response = await axios.get(`${API_BASE_URL}/api/role-management`);
+      // console.log("Role management fetched:", response.data); // Debugging log
       setRoleManagement(response.data);
     } catch (error) {
       console.error("Error fetching role management:", error);
@@ -64,8 +79,7 @@ function Home() {
     }
   };
 
-  if (loading) {
-    // return <div>t(Loading...)</div>;
+  if (loading || pageLoading) {
     return <div>Loading...</div>;
   }
 
@@ -75,10 +89,17 @@ function Home() {
       items: [
         {
           path: "/cutting",
-          roles: ["Admin", "Bundle Registration"],
+          roles: ["Admin", "QC1"],
           image: "/IMG/bundle.avif",
           title: t("cutting"),
-          description: "Click here to register orders for Cutting."
+          description: "Begin a new Cutting Inspection Reports here."
+        },
+        {
+          path: "/scc",
+          roles: ["Admin", "QC2"],
+          image: "/IMG/bundle.avif",
+          title: t("SCC"),
+          description: "Begin a new SCC Inspection Report here."
         },
       ]
     },
@@ -100,11 +121,11 @@ function Home() {
           description: "Click here to register orders for Washing."
         },
         {
-          path: "/dyeing",
-          roles: ["Admin", "Dyeing"],
+          path: "/opa",
+          roles: ["Admin", "OPA"],
           image: "/IMG/dyeing.png",
-          title: "Dyeing",
-          description: "Click here to register orders for Dyeing."
+          title: "OPA",
+          description: "Click here to scan orders in OPA."
         },
         {
           path: "/ironing",

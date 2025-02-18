@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../components/inspection/Header";
 import ViewToggle from "../../components/inspection/ViewToggle";
@@ -7,6 +7,8 @@ import Summary from "../../components/inspection/Summary";
 import { defectsList } from "../../constants/QC Inspection/defects";
 import FormatTime from "../../components/formatting/FormatTime";
 import { formatTimeString } from "../../components/formatting/FormatedTime";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../../config";
 
 function Return({
   savedState,
@@ -128,7 +130,7 @@ function Return({
 
   const saveQCDataToBackend = async (qcData) => {
     try {
-      const response = await fetch("http://localhost:5001/api/save-qc-data", {
+      const response = await fetch(`${API_BASE_URL}/api/save-qc-data`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

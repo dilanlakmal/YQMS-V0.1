@@ -2,6 +2,9 @@ import axios from "axios";
 import { ClipboardList } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../../../config";
+import { useAuth } from "../../components/authentication/AuthContext";
+import { useFormData } from "../../components/context/FormDataContext";
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState("");
@@ -10,6 +13,8 @@ function Login({ onLogin }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { updateUser } = useAuth();
+  const { updateFormData } = useFormData();
 
   useEffect(() => {
     const token =
@@ -22,17 +27,25 @@ function Login({ onLogin }) {
 
   const authenticateUser = async (token) => {
     try {
-      const response = await axios.get(
-        "http://localhost:5001/api/user-profile",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await axios.get(`${API_BASE_URL}/api/user-profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (response.status === 200) {
-        onLogin(token);
+        const { accessToken, refreshToken, user } = response.data;
+
+        if (rememberMe) {
+          localStorage.setItem("accessToken", accessToken);
+          localStorage.setItem("refreshToken", refreshToken);
+          localStorage.setItem("user", JSON.stringify(user));
+        } else {
+          sessionStorage.setItem("accessToken", accessToken);
+          sessionStorage.setItem("refreshToken", refreshToken);
+          sessionStorage.setItem("user", JSON.stringify(user));
+        }
+
+        onLogin(accessToken);
+        updateUser(user);
         navigate("/home");
       }
     } catch (error) {
@@ -46,7 +59,7 @@ function Login({ onLogin }) {
     e.preventDefault();
     if (username && password) {
       try {
-        const response = await axios.post("http://localhost:5001/api/login", {
+        const response = await axios.post(`${API_BASE_URL}/api/login`, {
           username,
           password,
           rememberMe,
@@ -66,6 +79,7 @@ function Login({ onLogin }) {
           }
 
           onLogin(accessToken);
+          updateUser(user);
           navigate("/home");
         }
       } catch (error) {
@@ -84,11 +98,9 @@ function Login({ onLogin }) {
     }
 
     try {
-      const response = await axios.post(
-        "http://localhost:5001/api/refresh-token",
-        { refreshToken }
-      );
-
+      const response = await axios.post(`${API_BASE_URL}/api/refresh-token`, {
+        refreshToken,
+      });
       if (response.status === 200) {
         const { accessToken } = response.data;
         if (localStorage.getItem("refreshToken")) {
@@ -107,13 +119,12 @@ function Login({ onLogin }) {
   };
 
   useEffect(() => {
-    const interval = setInterval(refreshToken, 30 * 60 * 1000); // Refresh token every 30 minutes
+    const interval = setInterval(refreshToken, 30 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-gray-50">
-      {/* Left Section */}
       <div className="flex-1 flex flex-col justify-center items-center px-4 sm:px-6 lg:px-20 xl:px-24">
         <div className="w-full max-w-md">
           <div className="flex items-center justify-center mb-8">
@@ -172,7 +183,8 @@ function Login({ onLogin }) {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
               <input
                 id="rememberMe"
                 name="rememberMe"
@@ -187,8 +199,8 @@ function Login({ onLogin }) {
               >
                 Remember me
               </label>
-            </div>
-            <div className="text-right">
+              </div>
+              <div className="text-right">
               <Link
                 to="/forgot-password"
                 className="text-s text-blue-600 hover:text-blue-600"
@@ -196,14 +208,16 @@ function Login({ onLogin }) {
                 Forgot password?
               </Link>
             </div>
+            </div>
+           
             <center>
-              <button
+            <button
                 type="submit"
-                className="w-40 h-15  flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="w-40 h-15 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Log in
               </button>
-            </center>
+              </center>
             <p className="text-center text-s text-gray-600">
               Don't have an account?{" "}
               <Link
@@ -216,7 +230,6 @@ function Login({ onLogin }) {
           </form>
         </div>
       </div>
-      {/* Right Section */}
       <div className="flex-1 hidden lg:flex items-center justify-center p-12 bg-black">
         <div className="max-w-2xl text-center">
           <img

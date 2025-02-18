@@ -1,29 +1,56 @@
-// IroningPage.jsx
-import React, { useState, useEffect } from "react";
 import {
-  QrCode,
   AlertCircle,
-  Package,
-  Loader2,
-  Table,
-  X,
   Check,
   Clock,
+  Loader2,
+  Minus,
+  Package,
+  Plus,
+  QrCode,
+  Table,
+  X,
 } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { API_BASE_URL } from "../../config";
+import { useAuth } from "../components/authentication/AuthContext";
 import Scanner from "../components/forms/Scanner";
 
 const IroningPage = () => {
+  const { user, loading } = useAuth();
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
   const [activeTab, setActiveTab] = useState("scan");
   const [ironingRecords, setIroningRecords] = useState([]);
   const [scannedData, setScannedData] = useState(null);
   const [countdown, setCountdown] = useState(5);
   const [isAdding, setIsAdding] = useState(false);
+  const [autoAdd, setAutoAdd] = useState(true);
+  const [passQtyIron, setPassQtyIron] = useState(0);
+  const [ironingRecordId, setIroningRecordId] = useState(1);
+
+  useEffect(() => {
+    const fetchInitialRecordId = async () => {
+      if (user && user.emp_id) {
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/api/last-ironing-record-id/${user.emp_id}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            setIroningRecordId(data.lastRecordId + 1);
+          }
+        } catch (err) {
+          console.error("Error fetching initial record ID:", err);
+        }
+      }
+    };
+
+    fetchInitialRecordId();
+  }, [user]);
 
   useEffect(() => {
     let timer;
-    if (isAdding && countdown > 0) {
+    if (autoAdd && isAdding && countdown > 0) {
       timer = setInterval(() => {
         setCountdown((prev) => prev - 1);
       }, 1000);
@@ -31,19 +58,19 @@ const IroningPage = () => {
       handleAddRecord();
     }
     return () => clearInterval(timer);
-  }, [isAdding, countdown]);
+  }, [autoAdd, isAdding, countdown]);
 
   const fetchBundleData = async (randomId) => {
     try {
-      setLoading(true);
+      setLoadingData(true);
       const response = await fetch(
-        `http://localhost:5001/api/bundle-by-random-id/${randomId}`
+        `${API_BASE_URL}/api/bundle-by-random-id/${randomId}`
       );
       if (!response.ok) throw new Error("Bundle not found");
 
       const data = await response.json();
       const existsResponse = await fetch(
-        `http://localhost:5001/api/check-ironing-exists/${data.bundle_id}-53`
+        `${API_BASE_URL}/api/check-ironing-exists/${data.bundle_id}-53`
       );
       const existsData = await existsResponse.json();
 
@@ -52,6 +79,7 @@ const IroningPage = () => {
       }
 
       setScannedData(data);
+      setPassQtyIron(data.count);
       setIsAdding(true);
       setCountdown(5);
       setError(null);
@@ -59,7 +87,7 @@ const IroningPage = () => {
       setError(err.message);
       setScannedData(null);
     } finally {
-      setLoading(false);
+      setLoadingData(false);
     }
   };
 
@@ -67,8 +95,8 @@ const IroningPage = () => {
     try {
       const now = new Date();
       const newRecord = {
-        ironing_record_id: ironingRecords.length + 1,
-        task_no: 53,
+        ironing_record_id: ironingRecordId,
+        task_no_ironing: 53,
         ironing_bundle_id: `${scannedData.bundle_id}-53`,
         ironing_updated_date: now.toLocaleDateString("en-US", {
           month: "2-digit",
@@ -82,9 +110,12 @@ const IroningPage = () => {
           second: "2-digit",
         }),
         ...scannedData,
+        passQtyIron,
       };
 
-      const response = await fetch("http://localhost:5001/api/save-ironing", {
+      console.log("New Record to be saved:", newRecord); // Log the new record
+
+      const response = await fetch(`${API_BASE_URL}/api/save-ironing`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newRecord),
@@ -92,18 +123,29 @@ const IroningPage = () => {
 
       if (!response.ok) throw new Error("Failed to save ironing record");
 
+      const updateResponse = await fetch(
+        `${API_BASE_URL}/api/update-qc2-orderdata/${scannedData.bundle_id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            passQtyIron,
+            ironing_updated_date: newRecord.ironing_updated_date,
+            ironing_update_time: newRecord.ironing_update_time,
+          }),
+        }
+      );
+
+      if (!updateResponse.ok) throw new Error("Failed to update qc2_orderdata");
+
       setIroningRecords((prev) => [...prev, newRecord]);
       setScannedData(null);
       setIsAdding(false);
       setCountdown(5);
+      setIroningRecordId((prev) => prev + 1); // Increment the record ID
     } catch (err) {
       setError(err.message);
     }
-  };
-
-  const handleCancelAdd = () => {
-    setIsAdding(false);
-    setCountdown(5);
   };
 
   const handleReset = () => {
@@ -115,6 +157,27 @@ const IroningPage = () => {
   const handleScanSuccess = (decodedText) => {
     if (!isAdding) fetchBundleData(decodedText);
   };
+
+  const handlePassQtyChange = (value) => {
+    if (value >= 0 && value <= scannedData.count) {
+      setPassQtyIron(value);
+    }
+  };
+
+  const fetchIroningRecords = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ironing-records`);
+      if (!response.ok) throw new Error("Failed to fetch ironing records");
+      const data = await response.json();
+      setIroningRecords(data);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchIroningRecords();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -156,6 +219,16 @@ const IroningPage = () => {
           </button>
         </div>
 
+        <div className="flex items-center mb-4">
+          <label className="text-gray-700 mr-2">Auto Add:</label>
+          <input
+            type="checkbox"
+            checked={autoAdd}
+            onChange={(e) => setAutoAdd(e.target.checked)}
+            className="form-checkbox"
+          />
+        </div>
+
         {error && (
           <div className="mb-6 p-4 bg-red-100 border border-red-200 rounded-lg flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-red-500" />
@@ -171,7 +244,7 @@ const IroningPage = () => {
               continuous={true}
             />
 
-            {loading && (
+            {loadingData && (
               <div className="flex items-center justify-center gap-2 text-blue-600 mt-4">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <p>Loading bundle data...</p>
@@ -214,6 +287,69 @@ const IroningPage = () => {
                         <p className="text-sm text-gray-600">Size</p>
                         <p className="font-medium">{scannedData.size}</p>
                       </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Factory</p>
+                        <p className="font-medium">{scannedData.factory}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Line No</p>
+                        <p className="font-medium">{scannedData.lineNo}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Count</p>
+                        <p className="font-medium">{scannedData.count}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Separator ID</p>
+                        <p className="font-medium">{scannedData.emp_id}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Registered Date</p>
+                        <p className="font-medium">
+                          {scannedData.updated_date_seperator}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Registered Time</p>
+                        <p className="font-medium">
+                          {scannedData.updated_time_seperator}
+                        </p>
+                      </div>
+                      {scannedData.sub_con === "Yes" && (
+                        <div>
+                          <p className="text-sm text-gray-600">
+                            Sub Con Factory Name
+                          </p>
+                          <p className="font-medium">
+                            {scannedData.sub_con_factory}
+                          </p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm text-gray-600">Pass Qty (Iron)</p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handlePassQtyChange(passQtyIron - 1)}
+                            className="px-2 py-1 rounded-md bg-gray-200 text-gray-700"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                          <input
+                            type="number"
+                            value={passQtyIron}
+                            onChange={(e) =>
+                              handlePassQtyChange(Number(e.target.value))
+                            }
+                            className="w-16 text-center border border-gray-300 rounded-md"
+                          />
+                          <button
+                            onClick={() => handlePassQtyChange(passQtyIron + 1)}
+                            className="px-2 py-1 rounded-md bg-gray-200 text-gray-700"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="mt-6 flex items-center gap-4">
@@ -225,7 +361,7 @@ const IroningPage = () => {
                             : "bg-green-500 text-white"
                         }`}
                       >
-                        {isAdding ? (
+                        {autoAdd && isAdding ? (
                           <>
                             <Clock className="w-5 h-5" />
                             Adding ({countdown}s)
@@ -233,20 +369,10 @@ const IroningPage = () => {
                         ) : (
                           <>
                             <Check className="w-5 h-5" />
-                            Add Now
+                            {autoAdd ? "Add Now" : "Add"}
                           </>
                         )}
                       </button>
-
-                      {isAdding && (
-                        <button
-                          onClick={handleCancelAdd}
-                          className="px-4 py-2 rounded-md bg-red-500 text-white flex items-center gap-2"
-                        >
-                          <X className="w-5 h-5" />
-                          Cancel
-                        </button>
-                      )}
 
                       <button
                         onClick={handleReset}
@@ -265,7 +391,6 @@ const IroningPage = () => {
           <div className="bg-white p-6 rounded-lg shadow-lg">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 border border-gray-200">
-                {/* Table headers and rows same as before, add new fields */}
                 <thead className="bg-sky-100">
                   <tr>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
@@ -277,9 +402,6 @@ const IroningPage = () => {
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Department
                     </th>
-                    {/* <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Bundle ID
-                    </th> */}
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Updated Date
                     </th>
@@ -313,9 +435,9 @@ const IroningPage = () => {
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Count
                     </th>
-                    {/* <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Bundle ID
-                    </th> */}
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      Pass Qty (Iron)
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -325,14 +447,11 @@ const IroningPage = () => {
                         {record.ironing_record_id}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.task_no}
+                        {record.task_no_ironing}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {record.department}
                       </td>
-                      {/* <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.ironing_bundle_id}
-                      </td> */}
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {record.ironing_updated_date}
                       </td>
@@ -366,9 +485,9 @@ const IroningPage = () => {
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {record.count}
                       </td>
-                      {/* <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.bundle_id}
-                      </td> */}
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        {record.passQtyIron}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

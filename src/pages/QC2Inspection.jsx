@@ -14,6 +14,8 @@ import React, { useEffect, useState } from "react";
 import Scanner from "../components/forms/Scanner";
 import DefectBox from "../components/inspection/DefectBox";
 import { defectsList } from "../constants/QC Inspection/defects";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../config";
 
 const QC2InspectionPage = () => {
   // Bundle, defect, and scanning states
@@ -68,7 +70,7 @@ const QC2InspectionPage = () => {
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:5001/api/bundle-by-random-id/${randomId}`
+        `${API_BASE_URL}/api/bundle-by-random-id/${randomId}`
       );
       if (!response.ok) throw new Error("Bundle not found");
       const data = await response.json();
@@ -120,7 +122,7 @@ const QC2InspectionPage = () => {
 
     try {
       const response = await fetch(
-        "http://localhost:5001/api/inspection-pass-bundle",
+        `${API_BASE_URL}/api/inspection-pass-bundle`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -185,7 +187,7 @@ const QC2InspectionPage = () => {
       };
 
       try {
-        const response = await fetch("http://localhost:5001/api/reworks", {
+        const response = await fetch(`${API_BASE_URL}/api/reworks`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),

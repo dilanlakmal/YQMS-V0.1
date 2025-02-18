@@ -1,16 +1,35 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
-import bcrypt from 'bcryptjs'; 
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_BASE_URL } from "../../../config";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const storedUser =
-      localStorage.getItem("user") || sessionStorage.getItem("user");
-    return storedUser ? JSON.parse(storedUser) : null;
+    try {
+      const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+      return null;
+    }
   });
+
   const [loading, setLoading] = useState(true);
+
+  const updateUser = (userData, token) => {
+    setUser(userData);
+    localStorage.setItem("user", JSON.stringify(userData));
+    localStorage.setItem("accessToken", token);
+  };
+
+  const clearUser = () => {
+    setUser(null);
+    localStorage.removeItem("user");
+    localStorage.removeItem("accessToken");
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("accessToken");
+  };
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -21,8 +40,7 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
-        const response = await axios.post('http://localhost:5001/api/get-user-data', { token });
-
+        const response = await axios.post(`${API_BASE_URL}/api/get-user-data`, { token });
         const userData = {
           ...response.data,
           emp_id: response.data.emp_id,
@@ -51,32 +69,8 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const hashPassword = async (password) => {
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-    return hashedPassword;
-  };
-
-  // useEffect(() => {
-  //   const fetchUserData = async () => {
-  //     try {
-  //       const token = localStorage.getItem('accessToken'); 
-  //       if (token) {
-  //         const response = await axios.post('/api/get-user-data', { token });
-  //         setUser(response.data);
-  //       }
-  //     } catch (error) {
-  //       console.error('Failed to fetch user data:', error);
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   fetchUserData();
-  // }, []);
-
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, hashPassword }}>
+    <AuthContext.Provider value={{ user, setUser, loading, updateUser, clearUser }}>
       {children}
     </AuthContext.Provider>
   );

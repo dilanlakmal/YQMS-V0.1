@@ -2,6 +2,8 @@ import axios from "axios";
 import { X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
+// Import the API_BASE_URL from our config file
+import { API_BASE_URL } from "../../config";
 
 export default function RoleManagement() {
   const { user } = useAuth();
@@ -28,7 +30,7 @@ export default function RoleManagement() {
   const fetchUserRoles = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:5001/api/user-roles/${user.emp_id}`
+        `${API_BASE_URL}/api/user-roles/${user.emp_id}`
       );
       setUserRoles(response.data.roles);
     } catch (error) {
@@ -40,9 +42,7 @@ export default function RoleManagement() {
 
   const fetchRoles = async () => {
     try {
-      const response = await axios.get(
-        "http://localhost:5001/api/role-management"
-      );
+      const response = await axios.get(`${API_BASE_URL}/api/role-management`);
       setRoles(response.data);
     } catch (error) {
       setError("Failed to fetch roles");
@@ -51,7 +51,7 @@ export default function RoleManagement() {
 
   const fetchJobTitles = async () => {
     try {
-      const response = await axios.get("http://localhost:5001/api/job-titles");
+      const response = await axios.get(`${API_BASE_URL}/api/job-titles`);
       setJobTitles(response.data);
     } catch (error) {
       setError("Failed to fetch job titles");
@@ -68,7 +68,7 @@ export default function RoleManagement() {
       for (const title of existingRole.jobTitles) {
         try {
           const response = await axios.get(
-            `http://localhost:5001/api/users-by-job-title?jobTitle=${title}`
+            `${API_BASE_URL}/api/users-by-job-title?jobTitle=${title}`
           );
           users.push(
             ...response.data.filter((user) => user.working_status === "Working")
@@ -92,7 +92,7 @@ export default function RoleManagement() {
       setSelectedJobTitles(newJobTitles);
       try {
         const response = await axios.get(
-          `http://localhost:5001/api/users-by-job-title?jobTitle=${title}`
+          `${API_BASE_URL}/api/users-by-job-title?jobTitle=${title}`
         );
         const workingUsers = response.data.filter(
           (user) => user.working_status === "Working"
@@ -129,7 +129,7 @@ export default function RoleManagement() {
     }
 
     try {
-      await axios.post("http://localhost:5001/api/role-management", {
+      await axios.post(`${API_BASE_URL}/api/role-management`, {
         role: selectedRole,
         jobTitles: selectedJobTitles,
       });
@@ -151,9 +151,11 @@ export default function RoleManagement() {
 
   const availableRoles = [
     ...(isSuperAdmin ? ["Admin"] : []),
+    "Cutting",
+    "SCC",
     "Bundle Registration",
     "Washing",
-    "Dyeing",
+    "OPA",
     "Ironing",
     "Packing",
     "QC1",
