@@ -22,9 +22,12 @@ const ironingSchema = new mongoose.Schema(
     passQtyIron: Number,
     sub_con: String,
     sub_con_factory: String,
-    emp_id: String,
-    updated_date_seperator: String,
-    updated_time_seperator: String,
+    emp_id_ironing: String,
+    eng_name_ironing: String,
+    kh_name_ironing: String,
+    job_title_ironing: String,
+    dept_name_ironing: String,
+    sect_name_ironing: String,
   },
   { collection: "ironing" }
 );

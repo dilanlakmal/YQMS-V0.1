@@ -16,6 +16,7 @@ import createQCDataModel from "./models/qc1_data.js";
 import createRoleModel from "./models/Role.js";
 import createIroningModel from "./models/Ironing.js";
 import createQc2OrderDataModel from "./models/qc2_orderdata.js";
+import createQC2DefectPrintModel from "./models/QC2DefectPrint.js";
 import axios from 'axios';
 //import createRoleManagmentModel from "./models/RoleManagment.js";
 import createRoleManagmentModel from "./models/RoleManagment.js";
@@ -78,6 +79,7 @@ const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const Washing = createWashingModel(ymProdConnection);
 const OPA = createOPAModel(ymProdConnection);
 const Packing = createPackingModel(ymProdConnection);
+const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -787,7 +789,17 @@ app.post("/api/save-ironing", async (req, res) => {
 app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
   try {
     const { bundleId } = req.params;
-    const { passQtyIron, ironing_updated_date, ironing_update_time } = req.body;
+    const {
+      passQtyIron,
+      ironing_updated_date,
+      ironing_update_time,
+      emp_id_ironing,
+      eng_name_ironing,
+      kh_name_ironing,
+      job_title_ironing,
+      dept_name_ironing,
+      sect_name_ironing,
+    } = req.body;
 
     const updatedRecord = await QC2OrderData.findOneAndUpdate(
       { bundle_id: bundleId },
@@ -795,6 +807,12 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
         passQtyIron,
         ironing_updated_date,
         ironing_update_time,
+        emp_id_ironing,
+        eng_name_ironing,
+        kh_name_ironing,
+        job_title_ironing,
+        dept_name_ironing,
+        sect_name_ironing,
       },
       { new: true }
     );
@@ -1593,6 +1611,73 @@ app.post("/api/reworks", async (req, res) => {
   }
 });
 
+/* ------------------------------
+   QC2 - Defect Print
+------------------------------ */
+
+// Create new defect print record
+app.post("/api/qc2-defect-print", async (req, res) => {
+  try {
+    const {
+      factory,
+      package_no,
+      moNo,
+      custStyle,
+      color,
+      size,
+      repair,
+      count,
+      count_print,
+      defects,
+      defect_id,
+    } = req.body;
+
+    const now = new Date();
+    const print_time = now.toLocaleTimeString("en-US", { hour12: false });
+
+    const defectPrint = new QC2DefectPrint({
+      factory,
+      package_no,
+      moNo,
+      custStyle,
+      color,
+      size,
+      repair,
+      count,
+      count_print,
+      defects,
+      print_time,
+      defect_id,
+    });
+
+    const savedDefectPrint = await defectPrint.save();
+    res.json(savedDefectPrint);
+  } catch (error) {
+    console.error("Error creating defect print record:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get defect print records by defect_id
+app.get("/api/qc2-defect-print/:defect_id", async (req, res) => {
+  try {
+    const { defect_id } = req.params;
+    const defectPrint = await QC2DefectPrint.findOne({ defect_id });
+
+    if (!defectPrint) {
+      return res.status(404).json({ error: "Defect print record not found" });
+    }
+
+    res.json(defectPrint);
+  } catch (error) {
+    console.error("Error fetching defect print record:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ------------------------------
+   User Auth ENDPOINTS
+------------------------------ */
 
 
 /* ------------------------------
