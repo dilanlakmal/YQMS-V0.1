@@ -8,7 +8,7 @@ import {
 
 import "./App.css";
 import Navbar from "./components/layout/Navbar";// Updated path
-import RoleManagement from "./components/RoleManagement"; // Fixed spelling
+import RoleManagement from "./components/users/RoleManagement"; // Fixed spelling
 import Analytics from "./pages/Analytics";
 import BundleRegistration from "./pages/BundleRegistration";
 import Cutting from "./pages/Cutting";

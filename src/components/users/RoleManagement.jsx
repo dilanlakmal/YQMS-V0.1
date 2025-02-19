@@ -1,9 +1,9 @@
 import axios from "axios";
 import { X } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { useAuth } from "../components/authentication/AuthContext";
+import { useAuth } from "../authentication/AuthContext";
 // Import the API_BASE_URL from our config file
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../../config";
 
 export default function RoleManagement() {
   const { user } = useAuth();
