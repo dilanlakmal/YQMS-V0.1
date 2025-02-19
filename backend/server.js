@@ -15,6 +15,7 @@ import { fileURLToPath } from "url";
 import createIroningModel from "./models/Ironing.js";
 import createRoleModel from "./models/Role.js";
 //import createRoleManagmentModel from "./models/RoleManagment.js";
+import createQC2DefectPrintModel from "./models/QC2DefectPrint.js";
 import createRoleManagmentModel from "./models/RoleManagment.js";
 import createUserModel from "./models/User.js";
 import createQCDataModel from "./models/qc1_data.js";
@@ -71,6 +72,7 @@ const QCData = createQCDataModel(ymProdConnection);
 const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
 const Ironing = createIroningModel(ymProdConnection);
 const RoleManagment = createRoleManagmentModel(ymProdConnection);
+const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -1315,6 +1317,70 @@ app.post("/api/reworks", async (req, res) => {
       message: "Failed to save reworks data",
       error: error.message,
     });
+  }
+});
+
+/* ------------------------------
+   QC2 - Defect Print
+------------------------------ */
+
+// Create new defect print record
+app.post("/api/qc2-defect-print", async (req, res) => {
+  try {
+    const {
+      factory,
+      package_no,
+      moNo,
+      custStyle,
+      color,
+      size,
+      repair,
+      count,
+      count_print,
+      defects,
+      defect_id,
+    } = req.body;
+
+    const now = new Date();
+    const print_time = now.toLocaleTimeString("en-US", { hour12: false });
+
+    const defectPrint = new QC2DefectPrint({
+      factory,
+      package_no,
+      moNo,
+      custStyle,
+      color,
+      size,
+      repair,
+      count,
+      count_print,
+      defects,
+      print_time,
+      defect_id,
+    });
+
+    const savedDefectPrint = await defectPrint.save();
+    res.json(savedDefectPrint);
+  } catch (error) {
+    console.error("Error creating defect print record:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get defect print records by defect_id
+app.get("/api/qc2-defect-print/:defect_id", async (req, res) => {
+  try {
+    const { defect_id } = req.params;
+    const defectPrint = await QC2DefectPrint.findOne({ defect_id });
+
+    if (!defectPrint) {
+      return res.status(404).json({ error: "Defect print record not found" });
+    }
+
+    res.json(defectPrint);
+  } catch (error) {
+    console.error("Error fetching defect print record:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 

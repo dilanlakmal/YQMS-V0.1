@@ -1106,6 +1106,7 @@ function BundleRegistration() {
           onClose={() => setShowQRPreview(false)}
           qrData={qrData}
           onPrint={handlePrintQR}
+          mode="production" // Add this line
         />
       </div>
     </div>

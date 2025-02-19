@@ -1,24 +1,28 @@
+// New code 2
+
 import {
   AlertCircle,
   ArrowLeft,
   ArrowUpDown,
   CheckCircle,
+  Eye,
   Filter,
   Globe,
   Menu,
+  Printer,
   QrCode,
   Tag,
   XCircle,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { API_BASE_URL } from "../../config";
+import BluetoothComponent from "../components/forms/Bluetooth";
+import QRCodePreview from "../components/forms/QRCodePreview";
 import Scanner from "../components/forms/Scanner";
 import DefectBox from "../components/inspection/DefectBox";
-import { defectsList } from "../constants/defects";
-// Import the API_BASE_URL from our config file
-import { API_BASE_URL } from "../../config";
+import { allDefects, defectsList } from "../constants/defects";
 
 const QC2InspectionPage = () => {
-  // Bundle, defect, and scanning states
   const [error, setError] = useState(null);
   const [bundleData, setBundleData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -29,22 +33,20 @@ const QC2InspectionPage = () => {
   const [scanning, setScanning] = useState(false);
   const [totalPass, setTotalPass] = useState(0);
   const [totalRejects, setTotalRejects] = useState(0);
-
-  // Tab and view state
-  const [activeTab, setActiveTab] = useState("first"); // "first", "return", "data", "dashboard"
+  const [activeTab, setActiveTab] = useState("first");
   const [inDefectWindow, setInDefectWindow] = useState(false);
-
-  // Sort option (for DefectBox) and dropdown toggle
   const [sortOption, setSortOption] = useState("alphaAsc");
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
-
-  // Left Navigation Panel states and filters
   const [navOpen, setNavOpen] = useState(false);
   const [language, setLanguage] = useState("english");
-  const [defectTypeFilter, setDefectTypeFilter] = useState("all"); // "all", "common", "type1", "type2"
-  const [categoryFilter, setCategoryFilter] = useState(""); // e.g. "fabric", etc.
+  const [defectTypeFilter, setDefectTypeFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [qrCodesData, setQrCodesData] = useState([]);
+  const [showQRPreview, setShowQRPreview] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
-  // Whenever bundleData is set, initialize header values and switch into defect window mode.
+  const bluetoothRef = useRef();
+
   useEffect(() => {
     if (bundleData) {
       setTotalPass(bundleData.count || 0);
@@ -58,14 +60,145 @@ const QC2InspectionPage = () => {
     }
   }, [bundleData]);
 
-  //If the user selects any defect (i.e. tempDefects nonzero), then reset rejectedOnce.
   useEffect(() => {
     if (Object.values(tempDefects).some((count) => count > 0) && rejectedOnce) {
       setRejectedOnce(false);
     }
   }, [tempDefects, rejectedOnce]);
 
-  // API call to fetch bundle data (e.g. after scanning a QR code)
+  const generateDefectId = () => {
+    return Math.random().toString(36).substring(2, 12).toUpperCase();
+  };
+
+  const groupDefectsByRepair = () => {
+    const groups = {};
+
+    Object.entries(confirmedDefects).forEach(([index, count]) => {
+      const defect = allDefects[parseInt(index)];
+      if (!defect || count === 0) return;
+
+      const repair = defect.repair;
+      if (!groups[repair]) {
+        groups[repair] = {
+          defects: [],
+          totalCount: 0,
+          defectChunks: [],
+        };
+      }
+
+      groups[repair].defects.push({
+        defectName: defect.english,
+        count,
+      });
+      groups[repair].totalCount += count;
+    });
+
+    // Calculate count_print for each chunk
+    Object.values(groups).forEach((group) => {
+      const chunkSize = 3;
+      let tempDefects = [];
+      let countPrint = 0;
+
+      group.defects.forEach((defect) => {
+        tempDefects.push(defect);
+        countPrint += defect.count;
+
+        if (tempDefects.length === chunkSize) {
+          group.defectChunks.push({
+            defects: tempDefects,
+            count_print: countPrint,
+          });
+          tempDefects = [];
+          countPrint = 0;
+        }
+      });
+
+      if (tempDefects.length > 0) {
+        group.defectChunks.push({
+          defects: tempDefects,
+          count_print: countPrint,
+        });
+      }
+    });
+
+    return groups;
+  };
+
+  const handleGenerateQRCodes = async () => {
+    const defectGroups = groupDefectsByRepair();
+    const qrCodes = [];
+
+    for (const [repair, group] of Object.entries(defectGroups)) {
+      for (const chunk of group.defectChunks) {
+        const defectId = generateDefectId();
+        const now = new Date();
+        const print_time = now.toLocaleTimeString("en-US", { hour12: false });
+        const qrData = {
+          factory: bundleData.factory || "YM",
+          package_no: getBundleNumber(bundleData.bundle_id),
+          moNo: bundleData.selectedMono,
+          custStyle: bundleData.custStyle,
+          color: bundleData.color,
+          size: bundleData.size,
+          repair,
+          count: group.totalCount, // Keep the original total count
+          count_print: chunk.count_print, // Use count_print here
+          defects: chunk.defects.map((d) => ({
+            defectName: d.defectName,
+            count: d.count,
+          })),
+          print_time,
+          defect_id: defectId,
+        };
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/qc2-defect-print`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(qrData),
+          });
+
+          if (!response.ok) throw new Error("Failed to save defect print data");
+
+          const savedData = await response.json();
+          console.log("Defect print data saved:", savedData);
+          qrCodes.push(qrData);
+        } catch (error) {
+          console.error("Error saving defect print:", error);
+          setError(`Failed to generate QR codes: ${error.message}`);
+          alert(`Failed to save defect data: ${error.message}`);
+          return;
+        }
+      }
+    }
+
+    setQrCodesData(qrCodes);
+    setPrinting(true);
+  };
+
+  const handlePrintQRCode = async () => {
+    if (!bluetoothRef.current?.isConnected) {
+      alert("Please connect to a printer first");
+      return;
+    }
+
+    try {
+      setPrinting(true);
+
+      // Iterate through all QR codes and print them
+      for (const qrCode of qrCodesData) {
+        await bluetoothRef.current.printDefectData(qrCode);
+      }
+
+      alert("All QR codes printed successfully!");
+    } catch (error) {
+      console.error("Print error:", error);
+      alert(`Failed to print QR codes: ${error.message}`);
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   const fetchBundleData = async (randomId) => {
     try {
       setLoading(true);
@@ -88,21 +221,18 @@ const QC2InspectionPage = () => {
 
   const handlePassBundle = async () => {
     const hasDefects = Object.values(tempDefects).some((count) => count > 0);
-    if (hasDefects && !rejectedOnce) return; // Button is disabled if there are temporary defects not yet rejected
+    if (hasDefects && !rejectedOnce) return;
 
-    // Build defectArray from confirmedDefects using defect indices to get English names
     const englishDefectItems = defectsList["english"];
     const defectArray = Object.keys(confirmedDefects).map((key) => ({
       defectName: englishDefectItems[key]?.name || "",
       totalCount: confirmedDefects[key],
     }));
 
-    // Get current time and date
     const now = new Date();
     const inspection_time = now.toLocaleTimeString("en-US", { hour12: false });
     const inspection_date = now.toLocaleDateString("en-US");
 
-    // Build payload with separate header fields extracted from bundleData
     const payload = {
       bundleNo: getBundleNumber(bundleData.bundle_id),
       moNo: bundleData.selectedMono,
@@ -114,7 +244,7 @@ const QC2InspectionPage = () => {
       checkedQty: bundleData.count,
       totalPass: totalPass,
       totalRejects: totalRejects,
-      defectQty: defectQty,
+      defectQty,
       defectArray,
       inspection_time,
       inspection_date,
@@ -137,7 +267,6 @@ const QC2InspectionPage = () => {
       console.error(err);
     }
 
-    // Reset states and return to scanner view
     setTotalPass(0);
     setTotalRejects(0);
     setConfirmedDefects({});
@@ -153,7 +282,6 @@ const QC2InspectionPage = () => {
     const hasDefects = Object.values(tempDefects).some((count) => count > 0);
     if (totalPass > 0 && hasDefects) {
       const newConfirmed = { ...confirmedDefects };
-      // Capture current temporary defects before clearing
       const currentTempDefects = { ...tempDefects };
       Object.keys(currentTempDefects).forEach((key) => {
         newConfirmed[key] = (newConfirmed[key] || 0) + currentTempDefects[key];
@@ -164,7 +292,6 @@ const QC2InspectionPage = () => {
       setTotalRejects((prev) => prev + 1);
       setRejectedOnce(true);
 
-      // Build ReworkGarments array using defect indices to get English names
       const englishDefectItems = defectsList["english"];
       const now = new Date();
       const currentTime = now.toLocaleTimeString("en-US", { hour12: false });
@@ -174,7 +301,6 @@ const QC2InspectionPage = () => {
         time: currentTime,
       }));
 
-      // Build payload with separate header fields
       const payload = {
         bundleNo: getBundleNumber(bundleData.bundle_id),
         moNo: bundleData.selectedMono,
@@ -201,26 +327,20 @@ const QC2InspectionPage = () => {
     }
   };
 
-  // "Start Scanner" button handler (only one button in First Inspection tab)
   const handleStartScanner = () => {
     setScanning(true);
     setInDefectWindow(false);
   };
 
-  // Helper to extract bundle number from bundleData.bundle_id
   const getBundleNumber = (bundleId) => {
     const parts = bundleId?.split(":") || [];
     return parts[parts.length - 1] || "";
   };
 
-  // Calculate total defect quantity.
   const defectQty = Object.values(confirmedDefects).reduce((a, b) => a + b, 0);
   const hasDefects = Object.values(tempDefects).some((count) => count > 0);
 
-  // Determine active filter for DefectBox.
   const activeFilter = categoryFilter || defectTypeFilter;
-
-  // Options for Category filter (8 buttons)
   const categoryOptions = [
     "fabric",
     "workmanship",
@@ -234,7 +354,6 @@ const QC2InspectionPage = () => {
 
   return (
     <div className="flex h-screen">
-      {/* LEFT NAVIGATION PANEL */}
       <div
         className={`${
           navOpen ? "w-64" : "w-16"
@@ -250,7 +369,6 @@ const QC2InspectionPage = () => {
         </div>
         {navOpen && (
           <div className="space-y-6">
-            {/* Language Filter */}
             <div>
               <div className="flex items-center mb-1">
                 <Globe className="w-5 h-5 mr-1" />
@@ -267,7 +385,7 @@ const QC2InspectionPage = () => {
                 <option value="all">All Languages</option>
               </select>
             </div>
-            {/* Defect Type Filter (4 buttons) */}
+
             <div>
               <div className="flex items-center mb-1">
                 <Filter className="w-5 h-5 mr-1" />
@@ -292,7 +410,7 @@ const QC2InspectionPage = () => {
                 ))}
               </div>
             </div>
-            {/* Category Filter (8 buttons, single select) */}
+
             <div>
               <div className="flex items-center mb-1">
                 <Tag className="w-5 h-5 mr-1" />
@@ -315,7 +433,7 @@ const QC2InspectionPage = () => {
                 ))}
               </div>
             </div>
-            {/* Sort Filter */}
+
             <div>
               <div className="flex items-center mb-1">
                 <ArrowUpDown className="w-5 h-5 mr-1" />
@@ -367,13 +485,19 @@ const QC2InspectionPage = () => {
                 )}
               </div>
             </div>
+
+            <div>
+              <div className="flex items-center mb-1">
+                <Printer className="w-5 h-5 mr-1" />
+                <span className="font-medium">Printer</span>
+              </div>
+              <BluetoothComponent ref={bluetoothRef} />
+            </div>
           </div>
         )}
       </div>
 
-      {/* RIGHT MAIN CONTENT */}
       <div className={`${navOpen ? "w-3/4" : "w-11/12"} flex flex-col`}>
-        {/* TAB BAR – visible only when NOT in defect window mode */}
         {!inDefectWindow && (
           <div className="bg-gray-200 p-2">
             <div className="flex space-x-4">
@@ -400,7 +524,6 @@ const QC2InspectionPage = () => {
           </div>
         )}
 
-        {/* MAIN CONTENT AREA */}
         <div className="flex-grow overflow-hidden bg-gray-50">
           {activeTab !== "first" ? (
             <div className="h-full flex items-center justify-center">
@@ -409,14 +532,13 @@ const QC2InspectionPage = () => {
           ) : (
             <>
               {!inDefectWindow ? (
-                // Start Scanner View (only one button)
                 <div className="flex flex-col items-center justify-center h-full p-4">
                   {!scanning && (
                     <button
                       onClick={handleStartScanner}
                       className="px-6 py-3 rounded bg-blue-600 hover:bg-blue-700 text-white mb-4"
                     >
-                      Start Inspetion
+                      Start Inspection
                     </button>
                   )}
                   {scanning && (
@@ -429,18 +551,15 @@ const QC2InspectionPage = () => {
                   )}
                 </div>
               ) : (
-                // Defect Window View: Fixed header area and scrollable defect box.
                 <>
-                  {/* FIXED HEADER AREA */}
                   <div className="p-2 bg-blue-100 border-b">
                     <div className="flex items-center">
-                      {/* Return Bundle Button (left) */}
                       <div className="w-1/6 h-32 flex justify-center">
                         <button
                           onClick={handleReturnBundle}
-                          disabled={!hasDefects}
+                          disabled={!hasDefects || printing}
                           className={`px-4 py-2 rounded ${
-                            !hasDefects
+                            !hasDefects || printing
                               ? "bg-gray-300 cursor-not-allowed"
                               : "bg-red-600 hover:bg-red-700 text-white"
                           }`}
@@ -449,9 +568,7 @@ const QC2InspectionPage = () => {
                         </button>
                       </div>
 
-                      {/* HEADER DATA & 4 CARD VISUALS (center) */}
                       <div className="w-4/6 mx-4">
-                        {/* Horizontal scrolling header data */}
                         <div className="overflow-x-auto whitespace-nowrap h-12 border-b mb-2">
                           <div className="flex space-x-4 items-center">
                             <div>
@@ -499,7 +616,6 @@ const QC2InspectionPage = () => {
                           </div>
                         </div>
 
-                        {/* 4 Card Visuals */}
                         <div className="flex justify-between">
                           <div className="flex-1 mx-1 bg-gray-100 rounded p-2 flex items-center">
                             <QrCode className="w-5 h-5 mr-2" />
@@ -560,13 +676,12 @@ const QC2InspectionPage = () => {
                         </div>
                       </div>
 
-                      {/* Pass Bundle Button (right) */}
-                      <div className="w-1/6 h-32 flex justify-center">
+                      <div className="w-1/6 h-32 flex flex-col justify-center items-center space-y-2">
                         <button
                           onClick={handlePassBundle}
-                          disabled={hasDefects && !rejectedOnce}
+                          disabled={(hasDefects && !rejectedOnce) || printing}
                           className={`px-4 py-2 rounded ${
-                            hasDefects && !rejectedOnce
+                            (hasDefects && !rejectedOnce) || printing
                               ? "bg-gray-300 cursor-not-allowed"
                               : totalRejects > 0
                               ? "bg-yellow-500 hover:bg-yellow-600"
@@ -575,11 +690,54 @@ const QC2InspectionPage = () => {
                         >
                           Pass Bundle
                         </button>
+
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={handleGenerateQRCodes}
+                            disabled={!defectQty}
+                            className={`p-2 rounded ${
+                              !defectQty
+                                ? "bg-gray-300 cursor-not-allowed"
+                                : "bg-blue-600 hover:bg-blue-700 text-white"
+                            }`}
+                            title="Generate QR"
+                          >
+                            <QrCode className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => setShowQRPreview(true)}
+                            disabled={!qrCodesData.length}
+                            className={`p-2 rounded ${
+                              !qrCodesData.length
+                                ? "bg-gray-300 cursor-not-allowed"
+                                : "bg-blue-600 hover:bg-blue-700 text-white"
+                            }`}
+                            title="Preview QR"
+                          >
+                            <Eye className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={handlePrintQRCode}
+                            //onClick={() => handlePrintQRCode(qrCodesData[0])}
+                            disabled={
+                              !qrCodesData.length ||
+                              !bluetoothRef.current?.isConnected
+                            }
+                            className={`p-2 rounded ${
+                              !qrCodesData.length ||
+                              !bluetoothRef.current?.isConnected
+                                ? "bg-gray-300 cursor-not-allowed"
+                                : "bg-blue-600 hover:bg-blue-700 text-white"
+                            }`}
+                            title="Print QR"
+                          >
+                            <Printer className="w-5 h-5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* SCROLLABLE DEFECT BOX – only this area scrolls vertically */}
                   <div className="h-[calc(100vh-200px)] overflow-y-auto p-4">
                     <DefectBox
                       language={language}
@@ -596,6 +754,14 @@ const QC2InspectionPage = () => {
           )}
         </div>
       </div>
+
+      <QRCodePreview
+        isOpen={showQRPreview}
+        onClose={() => setShowQRPreview(false)}
+        qrData={qrCodesData}
+        onPrint={handlePrintQRCode}
+        mode="inspection" // Add this line
+      />
     </div>
   );
 };

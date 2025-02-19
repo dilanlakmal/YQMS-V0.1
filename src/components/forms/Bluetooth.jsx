@@ -1,7 +1,6 @@
 import { AlertCircle, Bluetooth, Printer } from "lucide-react";
 import React, { forwardRef, useImperativeHandle, useState } from "react";
 
-// Printer-specific configurations
 const PRINTER_CONFIG = {
   gainscha: {
     serviceUUID: "000018f0-0000-1000-8000-00805f9b34fb",
@@ -27,6 +26,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
     isConnected: state.isConnected,
     selectedDevice: state.selectedDevice,
     printData: async (data) => await handlePrint(data),
+    printDefectData: async (data) => await handleDefectPrint(data),
   }));
 
   const detectPrinterType = (deviceName) => {
@@ -105,9 +105,8 @@ const BluetoothComponent = forwardRef((props, ref) => {
     if (!characteristic) throw new Error("Printer not ready");
 
     try {
-      // Generate TSPL commands with optimized layout and smaller QR code
       const tsplCommands = [
-        "SIZE 40 mm, 75 mm", // Increased label height to 70 mm
+        "SIZE 40 mm, 75 mm",
         "GAP 0 mm, 0 mm",
         "DIRECTION 0",
         "CLS",
@@ -115,7 +114,6 @@ const BluetoothComponent = forwardRef((props, ref) => {
         "DENSITY 8",
         "SET TEAR ON",
         `SET COUNTER @1 ${counter}`,
-        // Adjusted text positions to fit within 75 mm height
         `TEXT 20,30,"2",0,1,1,"Factory: ${printData.factory}"`,
         `TEXT 20,50,"2",0,1,1,"Cust.Style: ${printData.custStyle}"`,
         `TEXT 20,70,"2",0,1,1,"MO: ${printData.selectedMono}"`,
@@ -124,42 +122,70 @@ const BluetoothComponent = forwardRef((props, ref) => {
         `TEXT 20,130,"2",0,1,1,"Color: ${printData.color}"`,
         `TEXT 20,150,"2",0,1,1,"Size: ${printData.size}"`,
         `TEXT 20,170,"2",0,1,1,"Count: ${printData.count}"`,
-        // Corrected QR code parameters and position
-        `QRCODE 30,210,L,6,M,0,"${printData.bundle_random_id}"`, // Y=300, size=M, EC=3 (H)
+        `QRCODE 30,210,L,6,M,0,"${printData.bundle_random_id}"`,
         "PRINT 1",
         "",
       ].join("\n");
-      // const tsplCommands = [
-      //   "SIZE 40 mm, 25 mm",
-      //   "GAP 0 mm, 0 mm",
-      //   "DIRECTION 0",
-      //   "CLS",
-      //   "SPEED 4",
-      //   "DENSITY 8",
-      //   "SET TEAR ON",
-      //   `SET COUNTER @1 ${counter}`,
-      //   // Adjusted text positions and added factory name
-      //   `TEXT 10,10,"2",0,1,1,"Factory: ${printData.factory}"`,
-      //   `TEXT 10,30,"2",0,1,1,"MO: ${printData.selectedMono}"`,
-      //   `TEXT 10,50,"2",0,1,1,"Buyer: ${printData.buyer}"`,
-      //   `TEXT 10,70,"2",0,1,1,"Line: ${printData.lineNo}"`,
-      //   `TEXT 10,90,"2",0,1,1,"Color: ${printData.color}"`,
-      //   `TEXT 10,110,"2",0,1,1,"Size: ${printData.size}"`,
-      //   `TEXT 10,130,"2",0,1,1,"Count: ${printData.count}"`,
-      //   // Reduced QR code size (L to M) and adjusted position
-      //   `QRCODE 5,170,L,4,M,0,"${printData.bundle_random_id}"`,
-      //   "PRINT 1",
-      //   "",
-      // ].join("\n");
 
-      // Convert to bytes with GBK encoding
       const encoder = new TextEncoder("gbk");
       const data = encoder.encode(tsplCommands);
 
-      // Send commands
       await sendChunkedData(data);
+      updateState({ counter: counter + 1 });
 
-      // Increment counter for next print
+      return true;
+    } catch (error) {
+      console.error("Print Error:", error);
+      handleDisconnect("Print failed: " + error.message);
+      throw error;
+    }
+  };
+
+  const handleDefectPrint = async (printData) => {
+    const { characteristic, counter } = state;
+    if (!characteristic) throw new Error("Printer not ready");
+
+    try {
+      // Create defects list string
+      const defectsList = printData.defects
+        .map((d) => `${d.defectName}:  (${d.count})`)
+        //.join(", ");
+        .join("\n"); // Use "\n" for new lines
+
+      const tsplCommands = [
+        "SIZE 40 mm, 75 mm", // Increased height to accommodate multiple defect lines
+        "GAP 0 mm, 0 mm",
+        "DIRECTION 0",
+        "CLS",
+        "SPEED 4",
+        "DENSITY 8",
+        "SET TEAR ON",
+        `SET COUNTER @1 ${counter}`,
+        `TEXT 20,10,"2",0,1,1,"Factory: ${printData.factory}"`,
+        `TEXT 20,30,"2",0,1,1,"MO: ${printData.moNo}"`,
+        `TEXT 20,50,"2",0,1,1,"Style: ${printData.custStyle}"`,
+        `TEXT 20,70,"2",0,1,1,"Color: ${printData.color}"`,
+        `TEXT 20,90,"2",0,1,1,"Size: ${printData.size}"`,
+        `TEXT 20,110,"2",0,1,1,"Count: ${printData.count_print}"`,
+        `TEXT 20,130,"2",0,1,1,"Repair: ${printData.repair}"`,
+        `TEXT 20,150,"2",0,1,1,"Defects:"`, // Label for defects
+        ...printData.defects.map(
+          (d, index) =>
+            `TEXT 20,${180 + index * 20},"2",0,1,1,"${d.defectName} (${
+              d.count
+            })"`
+        ), // Print each defect on a new line
+        `QRCODE 30,${180 + printData.defects.length * 20},L,6,M,0,"${
+          printData.defect_id
+        }"`, // Adjust QR code position dynamically
+        "PRINT 1",
+        "",
+      ].join("\n");
+
+      const encoder = new TextEncoder("gbk");
+      const data = encoder.encode(tsplCommands);
+
+      await sendChunkedData(data);
       updateState({ counter: counter + 1 });
 
       return true;

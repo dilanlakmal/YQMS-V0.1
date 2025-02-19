@@ -254,6 +254,7 @@ export default function ReprintTab() {
         onClose={() => setShowQRPreview(false)}
         qrData={selectedRecords}
         onPrint={handlePrint}
+        mode="production" // Add this line
       />
     </div>
   );
