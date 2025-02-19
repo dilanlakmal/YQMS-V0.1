@@ -155,7 +155,7 @@ export default function Navbar({ onLogout }) {
   const navItems = [
     {
       title: "Cutting",
-      icon: <ClipboardList className="h-4 w-4 mr-2" />,
+      icon: <ClipboardList className="h-5 w-5 mr-2" />,
       items: [
         {
           path: "/cutting",
@@ -171,7 +171,7 @@ export default function Navbar({ onLogout }) {
     },
     {
       title: "Orders",
-      icon: <Package className="h-4 w-4 mr-2" />,
+      icon: <Package className="h-5 w-5 mr-2" />,
       items: [
         {
           path: "/bundle-registration",
@@ -202,7 +202,7 @@ export default function Navbar({ onLogout }) {
     },
     {
       title: "QC",
-      icon: <Activity className="h-4 w-4 mr-2" />,
+      icon: <Activity className="h-5 w-5 mr-2" />,
       items: [
         {
           path: "/details",
@@ -218,7 +218,7 @@ export default function Navbar({ onLogout }) {
     },
     {
       title: "QA",
-      icon: <BarChart2 className="h-4 w-4 mr-2" />,
+      icon: <BarChart2 className="h-5 w-5 mr-2" />,
       items: [
         {
           path: "/audit",
@@ -229,7 +229,7 @@ export default function Navbar({ onLogout }) {
     },
     {
       title: "Reports",
-      icon: <FileText className="h-4 w-4 mr-2" />,
+      icon: <FileText className="h-5 w-5 mr-2" />,
       items: [
         {
           path: "/download-data",
@@ -297,7 +297,7 @@ export default function Navbar({ onLogout }) {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between h-16 items-center">
           <div className="flex items-center">
-            <Link to="/home" className="text-xl font-bold text-blue-600">
+            <Link to="/home" className="text-2xl font-bold text-blue-600">
               YQMS
             </Link>
           </div>
@@ -306,7 +306,7 @@ export default function Navbar({ onLogout }) {
             {navItems.map((section) => (
               <div key={section.title} className="relative group">
                 <button
-                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
+                  className="inline-flex items-center px-1 pt-1 text-m font-medium text-gray-900"
                   onClick={() => toggleDropdown(section.title)}
                 >
                   {section.icon}
@@ -349,9 +349,9 @@ export default function Navbar({ onLogout }) {
             {isAllowedSuperAdmin && (
               <Link
                 to="/settings"
-                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
+                className="inline-flex items-center px-1 pt-1 text-m font-medium text-gray-900"
               >
-                <Settings className="h-4 w-4 mr-2" />
+                <Settings className="h-5 w-5 mr-2" />
                 Settings
               </Link>
             )}
@@ -360,16 +360,16 @@ export default function Navbar({ onLogout }) {
               <>
                 <Link
                   to="/role-management"
-                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
+                  className="inline-flex items-center px-1 pt-1 text-m font-medium text-gray-900"
                 >
-                  <LayoutDashboard className="h-4 w-4 mr-2" />
+                  <LayoutDashboard className="h-5 w-5 mr-2" />
                   Roles
                 </Link>
                 <Link
                   to="/user-list"
-                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
+                  className="inline-flex items-center px-1 pt-1 text-m font-medium text-gray-900"
                 >
-                  <User className="h-4 w-4 mr-2" />
+                  <User className="h-5 w-5 mr-2" />
                   Users
                 </Link>
               </>
@@ -383,14 +383,14 @@ export default function Navbar({ onLogout }) {
                   className="flex items-center space-x-4 cursor-pointer"
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                 >
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-m font-medium text-gray-900">
                     {user.name}
                   </span>
                   <div className="relative">
                     <img
                       src={user.face_photo || "/default-avatar.png"}
                       alt={user.name}
-                      className="h-8 w-8 rounded-full"
+                      className="h-10 w-10 rounded-full"
                     />
                     <ChevronDown className="h-4 w-4 absolute -bottom-1 -right-1 text-gray-500" />
                   </div>
