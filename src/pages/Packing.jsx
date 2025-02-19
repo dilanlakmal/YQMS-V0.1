@@ -8,29 +8,29 @@ import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
 import QrCodeScanner from "../components/forms/QRCodeScanner";
 
-const WashingPage = () => {
+const PackingPage = () => {
   const { user, loading } = useAuth();
   const [error, setError] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
   const [activeTab, setActiveTab] = useState("scan");
-  const [washingRecords, setWashingRecords] = useState([]);
+  const [packingRecords, setPackingRecords] = useState([]);
   const [scannedData, setScannedData] = useState(null);
   const [countdown, setCountdown] = useState(5);
   const [isAdding, setIsAdding] = useState(false);
   const [autoAdd, setAutoAdd] = useState(true);
-  const [passQtyWash, setPassQtyWash] = useState(0);
-  const [washingRecordId, setWashingRecordId] = useState(1);
+  const [passQtyPack, setPassQtyPack] = useState(0);
+  const [packingRecordId, setPackingRecordId] = useState(1);
 
   useEffect(() => {
     const fetchInitialRecordId = async () => {
       if (user && user.emp_id) {
         try {
           const response = await fetch(
-            `${API_BASE_URL}/api/last-washing-record-id/${user.emp_id}`
+            `${API_BASE_URL}/api/last-packing-record-id/${user.emp_id}`
           );
           if (response.ok) {
             const data = await response.json();
-            setWashingRecordId(data.lastRecordId + 1);
+            setPackingRecordId(data.lastRecordId + 1);
           }
         } catch (err) {
           console.error("Error fetching initial record ID:", err);
@@ -61,14 +61,14 @@ const WashingPage = () => {
       if (!response.ok) throw new Error("Bundle not found");
       const data = await response.json();
       const existsResponse = await fetch(
-        `${API_BASE_URL}/api/check-washing-exists/${data.bundle_id}-53`
+        `${API_BASE_URL}/api/check-packing-exists/${data.bundle_id}-53`
       );
       const existsData = await existsResponse.json();
       if (existsData.exists) {
         throw new Error("This data already exists");
       }
       setScannedData(data);
-      setPassQtyWash(data.count);
+      setPassQtyPack(data.count);
       setIsAdding(true);
       setCountdown(5);
       setError(null);
@@ -84,48 +84,48 @@ const WashingPage = () => {
     try {
       const now = new Date();
       const newRecord = {
-        washing_record_id: washingRecordId,
-        task_no_washing: 53,
-        washing_bundle_id: `${scannedData.bundle_id}-53`,
-        washing_updated_date: now.toLocaleDateString("en-US", {
+        packing_record_id: packingRecordId,
+        task_no_packing: 53,
+        packing_bundle_id: `${scannedData.bundle_id}-53`,
+        packing_updated_date: now.toLocaleDateString("en-US", {
           month: "2-digit",
           day: "2-digit",
           year: "numeric",
         }),
-        washing_update_time: now.toLocaleTimeString("en-US", {
+        packing_update_time: now.toLocaleTimeString("en-US", {
           hour12: false,
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
         }),
         ...scannedData,
-        passQtyWash,
+        passQtyPack,
       };
       console.log("New Record to be saved:", newRecord); // Log the new record
-      const response = await fetch(`${API_BASE_URL}/api/save-washing`, {
+      const response = await fetch(`${API_BASE_URL}/api/save-packing`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newRecord),
       });
-      if (!response.ok) throw new Error("Failed to save washing record");
+      if (!response.ok) throw new Error("Failed to save Packing record");
       const updateResponse = await fetch(
         `${API_BASE_URL}/api/update-qc2-orderdata/${scannedData.bundle_id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            passQtyWash,
-            washing_updated_date: newRecord.washing_updated_date,
-            washing_update_time: newRecord.washing_update_time,
+            passQtyPack,
+            packing_updated_date: newRecord.packing_updated_date,
+            packing_update_time: newRecord.packing_update_time,
           }),
         }
       );
       if (!updateResponse.ok) throw new Error("Failed to update qc2_orderdata");
-      setWashingRecords((prev) => [...prev, newRecord]);
+      setPackingRecords((prev) => [...prev, newRecord]);
       setScannedData(null);
       setIsAdding(false);
       setCountdown(5);
-      setWashingRecordId((prev) => prev + 1); // Increment the record ID
+      setPackingRecordId((prev) => prev + 1); // Increment the record ID
     } catch (err) {
       setError(err.message);
     }
@@ -143,23 +143,23 @@ const WashingPage = () => {
 
   const handlePassQtyChange = (value) => {
     if (value >= 0 && value <= scannedData.count) {
-      setPassQtyWash(value);
+      setPassQtyPack(value);
     }
   };
 
-  const fetchWashingRecords = async () => {
+  const fetchPackingRecords = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/washing-records`);
-      if (!response.ok) throw new Error("Failed to fetch washing records");
+      const response = await fetch(`${API_BASE_URL}/api/packing-records`);
+      if (!response.ok) throw new Error("Failed to fetch Packing records");
       const data = await response.json();
-      setWashingRecords(data);
+      setPackingRecords(data);
     } catch (err) {
       setError(err.message);
     }
   };
 
   useEffect(() => {
-    fetchWashingRecords();
+    fetchPackingRecords();
   }, []);
 
   return (
@@ -169,11 +169,11 @@ const WashingPage = () => {
           <div className="flex items-center justify-center gap-2 mb-4">
             <QrCode className="w-8 h-8 text-blue-600" />
             <h1 className="text-3xl font-bold text-gray-800">
-              Washing Process Scanner
+              Packing Process Scanner
             </h1>
           </div>
           <p className="text-gray-600">
-            Scan the QR code on the bundle to record washing details
+            Scan the QR code on the bundle to record Packing details
           </p>
         </div>
         <div className="flex space-x-4 mb-6">
@@ -226,7 +226,7 @@ const WashingPage = () => {
             handleReset={handleReset}
             scannedData={scannedData}
             loadingData={loadingData}
-            passQtyWash={passQtyWash}
+            passQtyPack={passQtyPack}
             handlePassQtyChange={handlePassQtyChange}
             error={error}
           />
@@ -237,7 +237,7 @@ const WashingPage = () => {
                 <thead className="bg-sky-100">
                   <tr>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Washing ID
+                      Packing ID
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       Task No
@@ -279,27 +279,27 @@ const WashingPage = () => {
                       Count
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Pass Qty (Wash)
+                      Pass Qty (Packing)
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {washingRecords.map((record, index) => (
+                  {packingRecords.map((record, index) => (
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.washing_record_id}
+                        {record.packing_record_id}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.task_no_washing}
+                        {record.task_no_packing}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {record.department}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.washing_updated_date}
+                        {record.packing_updated_date}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.washing_update_time}
+                        {record.packing_update_time}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {record.selectedMono}
@@ -329,7 +329,7 @@ const WashingPage = () => {
                         {record.count}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {record.passQtyWash}
+                        {record.passQtyPack}
                       </td>
                     </tr>
                   ))}
@@ -343,4 +343,4 @@ const WashingPage = () => {
   );
 };
 
-export default WashingPage;
+export default PackingPage;

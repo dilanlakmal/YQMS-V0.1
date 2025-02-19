@@ -90,7 +90,7 @@ function Home() {
         {
           path: "/cutting",
           roles: ["Admin", "QC1"],
-          image: "/IMG/bundle.avif",
+          image: "/IMG/cutting.webp",
           title: t("cutting"),
           description: "Begin a new Cutting Inspection Reports here."
         },
@@ -137,7 +137,7 @@ function Home() {
         {
           path: "/packing",
           roles: ["Admin", "Packing"],
-          image: "/IMG/ironing.png",
+          image: "/IMG/packing.webp",
           title: "Packing",
           description: "Click here to register orders for Packing."
         }

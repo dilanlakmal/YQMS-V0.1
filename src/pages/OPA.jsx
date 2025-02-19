@@ -1,19 +1,12 @@
 import {
   AlertCircle,
-  Check,
-  Clock,
-  Loader2,
-  Minus,
-  Package,
-  Plus,
   QrCode,
   Table,
-  X,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
-import Scanner from "../components/forms/Scanner";
+import QrCodeScanner from "../components/forms/QRCodeScanner";
 
 const OPAPage = () => {
   const { user, loading } = useAuth();
@@ -44,7 +37,6 @@ const OPAPage = () => {
         }
       }
     };
-
     fetchInitialRecordId();
   }, [user]);
 
@@ -67,17 +59,14 @@ const OPAPage = () => {
         `${API_BASE_URL}/api/bundle-by-random-id/${randomId}`
       );
       if (!response.ok) throw new Error("Bundle not found");
-
       const data = await response.json();
       const existsResponse = await fetch(
         `${API_BASE_URL}/api/check-opa-exists/${data.bundle_id}-53`
       );
       const existsData = await existsResponse.json();
-
       if (existsData.exists) {
         throw new Error("This data already exists");
       }
-
       setScannedData(data);
       setPassQtyOPA(data.count);
       setIsAdding(true);
@@ -112,17 +101,13 @@ const OPAPage = () => {
         ...scannedData,
         passQtyOPA,
       };
-
       console.log("New Record to be saved:", newRecord); // Log the new record
-
       const response = await fetch(`${API_BASE_URL}/api/save-opa`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newRecord),
       });
-
       if (!response.ok) throw new Error("Failed to save OPA record");
-
       const updateResponse = await fetch(
         `${API_BASE_URL}/api/update-qc2-orderdata/${scannedData.bundle_id}`,
         {
@@ -135,9 +120,7 @@ const OPAPage = () => {
           }),
         }
       );
-
       if (!updateResponse.ok) throw new Error("Failed to update qc2_orderdata");
-
       setOPARecords((prev) => [...prev, newRecord]);
       setScannedData(null);
       setIsAdding(false);
@@ -181,7 +164,7 @@ const OPAPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-4xl mx-auto p-6">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-4">
             <QrCode className="w-8 h-8 text-blue-600" />
@@ -193,7 +176,6 @@ const OPAPage = () => {
             Scan the QR code on the bundle to record OPA details
           </p>
         </div>
-
         <div className="flex space-x-4 mb-6">
           <button
             onClick={() => setActiveTab("scan")}
@@ -218,7 +200,6 @@ const OPAPage = () => {
             Data
           </button>
         </div>
-
         <div className="flex items-center mb-4">
           <label className="text-gray-700 mr-2">Auto Add:</label>
           <input
@@ -228,165 +209,27 @@ const OPAPage = () => {
             className="form-checkbox"
           />
         </div>
-
         {error && (
           <div className="mb-6 p-4 bg-red-100 border border-red-200 rounded-lg flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-red-500" />
             <p className="text-red-700">{error}</p>
           </div>
         )}
-
         {activeTab === "scan" ? (
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <Scanner
-              onScanSuccess={handleScanSuccess}
-              onScanError={(err) => setError(err)}
-              continuous={true}
-            />
-
-            {loadingData && (
-              <div className="flex items-center justify-center gap-2 text-blue-600 mt-4">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <p>Loading bundle data...</p>
-              </div>
-            )}
-
-            {scannedData && (
-              <div className="mt-6 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-start gap-4">
-                  <Package className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
-                  <div className="flex-grow">
-                    <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                      Order Details
-                    </h2>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-600">Bundle ID</p>
-                        <p className="font-medium">{scannedData.bundle_id}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">MO Number</p>
-                        <p className="font-medium">
-                          {scannedData.selectedMono}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Style</p>
-                        <p className="font-medium">{scannedData.custStyle}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Buyer</p>
-                        <p className="font-medium">{scannedData.buyer}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Color</p>
-                        <p className="font-medium">{scannedData.color}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Size</p>
-                        <p className="font-medium">{scannedData.size}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Factory</p>
-                        <p className="font-medium">{scannedData.factory}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Line No</p>
-                        <p className="font-medium">{scannedData.lineNo}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Count</p>
-                        <p className="font-medium">{scannedData.count}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Separator ID</p>
-                        <p className="font-medium">{scannedData.emp_id}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Registered Date</p>
-                        <p className="font-medium">
-                          {scannedData.updated_date_seperator}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Registered Time</p>
-                        <p className="font-medium">
-                          {scannedData.updated_time_seperator}
-                        </p>
-                      </div>
-                      {scannedData.sub_con === "Yes" && (
-                        <div>
-                          <p className="text-sm text-gray-600">
-                            Sub Con Factory Name
-                          </p>
-                          <p className="font-medium">
-                            {scannedData.sub_con_factory}
-                          </p>
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-sm text-gray-600">Pass Qty (Iron)</p>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handlePassQtyChange(passQtyOPA - 1)}
-                            className="px-2 py-1 rounded-md bg-gray-200 text-gray-700"
-                          >
-                            <Minus className="w-4 h-4" />
-                          </button>
-                          <input
-                            type="number"
-                            value={passQtyOPA}
-                            onChange={(e) =>
-                              handlePassQtyChange(Number(e.target.value))
-                            }
-                            className="w-16 text-center border border-gray-300 rounded-md"
-                          />
-                          <button
-                            onClick={() => handlePassQtyChange(passQtyOPA + 1)}
-                            className="px-2 py-1 rounded-md bg-gray-200 text-gray-700"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-6 flex items-center gap-4">
-                      <button
-                        onClick={handleAddRecord}
-                        className={`px-4 py-2 rounded-md flex items-center gap-2 ${
-                          isAdding
-                            ? "bg-blue-500 text-white"
-                            : "bg-green-500 text-white"
-                        }`}
-                      >
-                        {autoAdd && isAdding ? (
-                          <>
-                            <Clock className="w-5 h-5" />
-                            Adding ({countdown}s)
-                          </>
-                        ) : (
-                          <>
-                            <Check className="w-5 h-5" />
-                            {autoAdd ? "Add Now" : "Add"}
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        onClick={handleReset}
-                        className="px-4 py-2 rounded-md bg-gray-500 text-white flex items-center gap-2"
-                      >
-                        <X className="w-5 h-5" />
-                        Reset
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <QrCodeScanner
+            onScanSuccess={handleScanSuccess}
+            onScanError={(err) => setError(err)}
+            autoAdd={autoAdd}
+            isAdding={isAdding}
+            countdown={countdown}
+            handleAddRecord={handleAddRecord}
+            handleReset={handleReset}
+            scannedData={scannedData}
+            loadingData={loadingData}
+            passQtyOPA={passQtyOPA}
+            handlePassQtyChange={handlePassQtyChange}
+            error={error}
+          />
         ) : (
           <div className="bg-white p-6 rounded-lg shadow-lg">
             <div className="overflow-x-auto">
@@ -436,7 +279,7 @@ const OPAPage = () => {
                       Count
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Pass Qty (Iron)
+                      Pass Qty (OPA)
                     </th>
                   </tr>
                 </thead>

@@ -36,8 +36,17 @@ const qc2OrderDataSchema = new mongoose.Schema(
     dept_name: { type: String, required: true },
     sect_name: { type: String },
     passQtyIron: { type: Number },
+    passQtyWash: { type: Number },
+    passQtyPack: { type: Number },
+    passQtyOPA: { type: Number },
     ironing_updated_date: { type: String },
     ironing_update_time: { type: String },
+    washing_updated_date: { type: String },
+    washing_update_time: { type: String },
+    packing_updated_date: { type: String },
+    packing_update_time: { type: String },
+    opa_updated_date: { type: String },
+    opa_update_time: { type: String },
   },
   { collection: "qc2_orderdata" }
 );

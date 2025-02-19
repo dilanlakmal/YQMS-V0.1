@@ -20,6 +20,7 @@ import Inspection from "./pages/QC Inspection/Inspection";
 import IroningPage from "./pages/Ironing";
 import WashingPage from "./pages/Washing";
 import OPAPage from "./pages/OPA";
+import PackingPage from "./pages/Packing";
 import Login from "./pages/Auth/Login"
 import ForgotPassword from "./pages/Auth/ForgotPassword";
 import Register from "./pages/Auth/Register"; 
@@ -329,6 +330,7 @@ function App() {
                 <Route path="/ironing" element={<IroningPage />} />
                 <Route path="/washing" element={<WashingPage />} />
                 <Route path="/opa" element={<OPAPage />} />
+                <Route path="/packing" element={<PackingPage />} />
                 <Route path="/qc2-inspection" element={<QC2InspectionPage />} />
                 <Route path="/download-data" element={<DownloadData />} />
               </>

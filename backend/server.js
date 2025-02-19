@@ -23,6 +23,7 @@ import createQC2InspectionPassBundle from "./models/qc2_inspection_pass_bundle.j
 import createQC2ReworksModel from "./models/qc2_reworks.js";
 import createWashingModel from "./models/Washing.js";
 import createOPAModel from "./models/OPA.js";
+import createPackingModel from "./models/Packing.js";
 
 
 
@@ -76,6 +77,7 @@ const QC2InspectionPassBundle = createQC2InspectionPassBundle(ymProdConnection);
 const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const Washing = createWashingModel(ymProdConnection);
 const OPA = createOPAModel(ymProdConnection);
+const Packing = createPackingModel(ymProdConnection);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -984,11 +986,16 @@ app.get("/api/opa-records", async (req, res) => {
   }
 });
 
-// Check if OPA record exists
-app.get("/api/check-opa-exists/:bundleId", async (req, res) => {
+
+/* ------------------------------
+   End Points - Packing
+------------------------------ */
+
+// Check if Packing record exists
+app.get("/api/check-packing-exists/:bundleId", async (req, res) => {
   try {
-    const record = await OPA.findOne({
-      opa_bundle_id: req.params.bundleId,
+    const record = await Packing.findOne({
+      packing_bundle_id: req.params.bundleId,
     });
     res.json({ exists: !!record });
   } catch (error) {
@@ -996,27 +1003,27 @@ app.get("/api/check-opa-exists/:bundleId", async (req, res) => {
   }
 });
 
-// New endpoint to get the last OPA record ID for a specific emp_id
-app.get("/api/last-opa-record-id/:emp_id", async (req, res) => {
+// New endpoint to get the last Packing record ID for a specific emp_id
+app.get("/api/last-packing-record-id/:emp_id", async (req, res) => {
   try {
     const { emp_id } = req.params;
-    const lastRecord = await OPA.findOne(
+    const lastRecord = await Packing.findOne(
       { emp_id },
       {},
-      { sort: { opa_record_id: -1 } }
+      { sort: { packing_record_id: -1 } }
     );
-    const lastRecordId = lastRecord ? lastRecord.opa_record_id : 0;
+    const lastRecordId = lastRecord ? lastRecord.packing_record_id : 0;
     res.json({ lastRecordId });
   } catch (error) {
-    console.error("Error fetching last OPA record ID:", error);
-    res.status(500).json({ error: "Failed to fetch last OPA record ID" });
+    console.error("Error fetching last Packing record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last Packing record ID" });
   }
 });
 
-// Save OPA record
-app.post("/api/save-opa", async (req, res) => {
+// Save Packing record
+app.post("/api/save-packing", async (req, res) => {
   try {
-    const newRecord = new OPA(req.body);
+    const newRecord = new Packing(req.body);
     await newRecord.save();
     res.status(201).json({ message: "Record saved successfully" });
   } catch (error) {
@@ -1028,26 +1035,23 @@ app.post("/api/save-opa", async (req, res) => {
   }
 });
 
-// Update qc2_orderdata with OPA details
+// Update qc2_orderdata with Packing details
 app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
   try {
     const { bundleId } = req.params;
-    const { passQtyOPA, opa_updated_date, opa_update_time } = req.body;
-
+    const { passQtyPacking, packing_updated_date, packing_update_time } = req.body;
     const updatedRecord = await QC2OrderData.findOneAndUpdate(
       { bundle_id: bundleId },
       {
-        passQtyOPA,
-        opa_updated_date,
-        opa_update_time,
+        passQtyPacking,
+        packing_updated_date,
+        packing_update_time,
       },
       { new: true }
     );
-
     if (!updatedRecord) {
       return res.status(404).json({ error: "Bundle not found" });
     }
-
     res.json({ message: "Record updated successfully", data: updatedRecord });
   } catch (error) {
     res.status(500).json({ error: "Failed to update record" });
@@ -1055,12 +1059,12 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
 });
 
 // For Data tab display records in a table
-app.get("/api/opa-records", async (req, res) => {
+app.get("/api/packing-records", async (req, res) => {
   try {
-    const records = await OPA.find();
+    const records = await Packing.find();
     res.json(records);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch OPA records" });
+    res.status(500).json({ message: "Failed to fetch Packing records" });
   }
 });
 
