@@ -144,13 +144,13 @@ function Profile() {
             <div className="flex-grow">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-bold text-gray-700">
                     Employee ID
                   </label>
                   <p className="mt-1 text-sm text-gray-900">{profile.emp_id}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-bold  text-gray-700">
                     Working Status
                   </label>
                   <p className="mt-1 text-sm text-gray-900">
@@ -158,7 +158,7 @@ function Profile() {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-bold  text-gray-700">
                     Department
                   </label>
                   <p className="mt-1 text-sm text-gray-900">
@@ -166,7 +166,7 @@ function Profile() {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-bold  text-gray-700">
                     Section
                   </label>
                   <p className="mt-1 text-sm text-gray-900">

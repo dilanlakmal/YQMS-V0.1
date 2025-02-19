@@ -4,7 +4,20 @@ import React, { useState } from "react";
 import Scanner from "./Scanner";
 import { Loader2, Package, Minus, Plus, Check, Clock, X, AlertCircle } from "lucide-react";
 
-const QrCodeScanner = ({ onScanSuccess, onScanError, autoAdd, isAdding, countdown, handleAddRecord, handleReset, scannedData, loadingData, passQtyIron, handlePassQtyChange, error }) => {
+const QrCodeScanner = ({ 
+  onScanSuccess, 
+  onScanError, 
+  autoAdd, 
+  isAdding, 
+  countdown, 
+  handleAddRecord, 
+  handleReset, 
+  scannedData, 
+  loadingData, 
+  passQtyIron, 
+  handlePassQtyChange, 
+  error,
+  isIroningPage }) => {
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg">
       <Scanner
@@ -88,29 +101,31 @@ const QrCodeScanner = ({ onScanSuccess, onScanError, autoAdd, isAdding, countdow
                   </div>
                 )}
                 <div>
-                  <p className="text-sm text-gray-600">Pass Qty (Iron)</p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handlePassQtyChange(passQtyIron - 1)}
-                      className="px-2 py-1 rounded-md bg-gray-200 text-gray-700"
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-                    <input
-                      type="number"
-                      value={passQtyIron}
-                      onChange={(e) =>
-                        handlePassQtyChange(Number(e.target.value))
-                      }
-                      className="w-16 text-center border border-gray-300 rounded-md"
-                    />
-                    <button
-                      onClick={() => handlePassQtyChange(passQtyIron + 1)}
-                      className="px-2 py-1 rounded-md bg-gray-200 text-gray-700"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
+                <p className="text-sm text-gray-600">Pass Qty (Iron)</p>
+                  {isIroningPage ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handlePassQtyChange(passQtyIron - 1)}
+                        className="px-2 py-1 rounded-md bg-gray-200 text-gray-700"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <input
+                        type="number"
+                        value={passQtyIron}
+                        onChange={(e) => handlePassQtyChange(Number(e.target.value))}
+                        className="w-16 text-center border border-gray-300 rounded-md"
+                      />
+                      <button
+                        onClick={() => handlePassQtyChange(passQtyIron + 1)}
+                        className="px-2 py-1 rounded-md bg-gray-200 text-gray-700"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="font-medium">{passQtyIron}</p>
+                  )}
                 </div>
               </div>
               <div className="mt-6 flex items-center gap-4">

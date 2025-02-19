@@ -229,6 +229,7 @@ const IroningPage = () => {
             passQtyIron={passQtyIron}
             handlePassQtyChange={handlePassQtyChange}
             error={error}
+            isIroningPage={true}
           />
         ) : (
           <div className="bg-white p-6 rounded-lg shadow-lg">

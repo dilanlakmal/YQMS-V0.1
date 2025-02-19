@@ -1877,7 +1877,7 @@ app.post('/api/get-user-data', async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    console.log("Display user data:", user);
+    // console.log("Display user data:", user);
 
     res.status(200).json({
       emp_id: user.emp_id,

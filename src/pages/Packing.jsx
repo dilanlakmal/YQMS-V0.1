@@ -229,6 +229,7 @@ const PackingPage = () => {
             passQtyPack={passQtyPack}
             handlePassQtyChange={handlePassQtyChange}
             error={error}
+            isIroningPage={false}
           />
         ) : (
           <div className="bg-white p-6 rounded-lg shadow-lg">
