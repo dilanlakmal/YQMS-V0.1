@@ -1299,318 +1299,43 @@ app.post("/api/save-qc-data", async (req, res) => {
   }
 });
 
-//-----------------------------USER FUNCTION------------------------------------------------//
-
-app.post("/api/refresh-token", async (req, res) => {
-  try {
-    const { refreshToken } = req.body;
-    if (!refreshToken) {
-      return res.status(401).json({ message: "Refresh token is required" });
-    }
-
-    jwt.verify(refreshToken, "your_refresh_token_secret", (err, decoded) => {
-      if (err) {
-        return res.status(401).json({ message: "Invalid refresh token" });
-      }
-
-      const accessToken = jwt.sign(
-        { userId: decoded.userId },
-        "your_jwt_secret",
-        { expiresIn: "1h" }
-      );
-
-      res.status(200).json({ accessToken });
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to refresh token", error: error.message });
-  }
-});
 
 
 
-// Login Endpoint
-app.post("/api/login", async (req, res) => {
-  try {
-    const { username, password, rememberMe } = req.body;
-    if (!ymProdConnection.readyState) {
-      return res.status(500).json({ message: "Database not connected" });
-    }
-
-    const user = await UserMain.findOne({
-      $or: [{ email: username }, { name: username }, { emp_id: username }],
-    });
-
-    if (!user) {
-      return res.status(401).json({ message: "Invalid username or password" });
-    }
-
-    // console.log('user details:', user);
-
-    const isPasswordValid = await bcrypt.compare(
-      password.trim(),
-      user.password.replace("$2y$", "$2b$")
-    );
-
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: "Invalid username or password" });
-    }
-
-    if (user.password.startsWith("$2y$")) {
-      const newHashedPassword = await bcrypt.hash(password.trim(), 10);
-      user.password = newHashedPassword;
-      await user.save();
-    }
-    // console.log('user:', isPasswordValid);
-
-    const accessToken = jwt.sign(
-      { userId: user._id, email: user.email, name: user.name },
-      "your_jwt_secret",
-      { expiresIn: "1h" }
-    );
-
-    const refreshToken = jwt.sign(
-      { userId: user._id },
-      "your_refresh_token_secret",
-      { expiresIn: "30d" }
-    );
-
-    // console.log('Access Token:', accessToken); 
-    // console.log('Refresh Token:', refreshToken); 
-
-    res.status(200).json({
-      message: "Login successful",
-      accessToken,
-      refreshToken,
-      user: {
-        emp_id: user.emp_id,
-        name: user.name,
-        email: user.email,
-        roles: user.roles,
-        sub_roles: user.sub_roles,
-      },
-    });
-  } catch (error) {
-    // console.error("Login error:", error);
-    res.status(500).json({ message: "Failed to log in", error: error.message });
-  }
-});
 
 
-// Registration Endpoint
-app.post("/api/register", async (req, res) => {
-  try {
-    const { emp_id, eng_name, kh_name, password, confirmPassword } = req.body;
-
-    if (!emp_id || !eng_name || !password || !confirmPassword) {
-      return res.status(400).json({
-        message: "Employee ID, name, and password are required",
-      });
-    }
-
-    if (password !== confirmPassword) {
-      return res.status(400).json({
-        message: "Passwords do not match",
-      });
-    }
-
-    const existingUser = await UserMain.findOne({ emp_id });
-
-    if (existingUser) {
-      return res.status(400).json({
-        message: "Employee ID already registered",
-      });
-    }
-
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-    const newUser = new UserMain({
-      emp_id,
-      eng_name,
-      name: eng_name,
-      kh_name: kh_name || "",
-      password: hashedPassword,
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
-
-    await newUser.save();
-
-    res.status(201).json({
-      message: "User registered successfully",
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Failed to register user",
-      error: error.message,
-    });
-  }
-});
-
-app.post("/api/reset-password", async (req, res) => {
-  try {
-    const { emp_id, newPassword } = req.body;
-
-    if (!emp_id || !newPassword) {
-      return res.status(400).json({
-        message: "Employee ID and new password are required",
-      });
-    }
-
-    const user = await UserMain.findOne({ emp_id });
-
-    if (!user) {
-      return res.status(404).json({
-        message: "Employee ID not found",
-      });
-    }
-
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
-
-    user.password = hashedPassword;
-    user.updated_at = new Date();
-
-    await user.save();
-
-    res.status(200).json({
-      message: "Password reset successfully",
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Failed to reset password",
-      error: error.message,
-    });
-  }
-});
-/* ----------------------------
-   User Auth ENDPOINTS
------------------------------- */
-
-const authenticateUser = (req, res, next) => {
-  try {
-    const token = req.headers.authorization.split(' ')[1];
-    const decodedToken = jwt.verify(token, 'your_jwt_secret');
-    req.userId = decodedToken.userId; // Set the userId in the request object
-    next();
-  } catch (error) {
-    res.status(401).json({ message: 'Authentication failed', error: error.message });
-  }
-};
-
-const generateRandomString = (length) => {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
-  }
-  return result;
-};
-
-
-// Multer Storage Setup
-// ------------------------
-// Set storage engine
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const userId = req.userId; 
-    if (!userId) {
-      return cb(new Error('User ID is not defined'));
-    }
-    const dir = `../public/storage/profiles/${userId}`;
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const randomString = generateRandomString(32);
-    cb(null, `${randomString}${path.extname(file.originalname)}`);
-  },
-});
-
-// Initialize upload
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 5000000 }, // Limit file size to 5MB
-  fileFilter: (req, file, cb) => {
-    checkFileType(file, cb);
-  },
-}).single('profile');
-
-// Check file type
-function checkFileType(file, cb) {
-  // Allowed ext
-  const filetypes = /jpeg|jpg|png|gif/;
-  // Check ext
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  // Check mime
-  const mimetype = filetypes.test(file.mimetype);
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    cb('Error: Images Only!');
-  }
-}
-
-
-// ------------------------
-
-
-// Fetch User Profile Endpoint
-app.get('/api/user-profile', async (req, res) => {
-  try {
-    const token = req.headers.authorization.split(' ')[1];
-    const decoded = jwt.verify(token, 'your_jwt_secret');
-    const user = await UserMain.findById(decoded.userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    // console.log('User Data:', user);
-    res.status(200).json({
-      emp_id: user.emp_id,
-      name: user.name,
-      dept_name: user.dept_name,
-      sect_name: user.sect_name,
-      face_photo: user.face_photo,
-      profile: user.profile ? `/public/storage/profiles/${decoded.userId}/${path.basename(user.profile)}` : null,
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch user profile', error: error.message });
-  }
-});
-
-
-app.put('/api/user-profile',authenticateUser, upload, async (req, res) => {
-  try {
-    const token = req.headers.authorization.split(' ')[1];
-    const decoded = jwt.verify(token, 'your_jwt_secret');
-    const userId = decoded.userId;
+// app.put('/api/user-profile',authenticateUser, upload, async (req, res) => {
+//   try {
+//     const token = req.headers.authorization.split(' ')[1];
+//     const decoded = jwt.verify(token, 'your_jwt_secret');
+//     const userId = decoded.userId;
     
 
-    const updatedProfile = {
-      emp_id: req.body.emp_id,
-      name: req.body.name,
-      dept_name: req.body.dept_name,
-      sect_name: req.body.sect_name,
-      profile: req.file ? `profiles/${userId}/${req.file.filename}` : req.body.profile,
-      // profile: req.file ? `../storage/app/public/profiles/${userId}/${req.file.filename}` : req.body.profile, // Save file path
-    };
+//     const updatedProfile = {
+//       emp_id: req.body.emp_id,
+//       name: req.body.name,
+//       dept_name: req.body.dept_name,
+//       sect_name: req.body.sect_name,
+//       profile: req.file ? `profiles/${userId}/${req.file.filename}` : req.body.profile,
+//       // profile: req.file ? `../storage/app/public/profiles/${userId}/${req.file.filename}` : req.body.profile, // Save file path
+//     };
 
-    // console.log('Updated Profile:', updatedProfile);
+//     // console.log('Updated Profile:', updatedProfile);
 
-    const user = await UserMain.findByIdAndUpdate(userId, updatedProfile, { new: true });
+//     const user = await UserMain.findByIdAndUpdate(userId, updatedProfile, { new: true });
 
-    // console.log('Updated User:', user);
+//     // console.log('Updated User:', user);
 
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+//     if (!user) {
+//       return res.status(404).json({ message: 'User not found' });
+//     }
 
-    res.status(200).json({ message: 'Profile updated successfully', user });
-  } catch (error) {
-    console.error('Error updating user profile:', error);
-    res.status(500).json({ message: 'Failed to update user profile', error: error.message });
-  }
-});
+//     res.status(200).json({ message: 'Profile updated successfully', user });
+//   } catch (error) {
+//     console.error('Error updating user profile:', error);
+//     res.status(500).json({ message: 'Failed to update user profile', error: error.message });
+//   }
+// });
 
 //-----------------------------END USER FUNCTION------------------------------------------------//
 
@@ -2064,6 +1789,78 @@ app.delete('/users/:id', async (req, res) => {
 // });
 //-----------------------------------------------------------//
 
+/* ----------------------------
+   User Auth ENDPOINTS
+------------------------------ */
+
+const authenticateUser = (req, res, next) => {
+  try {
+    const token = req.headers.authorization.split(' ')[1];
+    const decodedToken = jwt.verify(token, 'your_jwt_secret');
+    req.userId = decodedToken.userId; // Set the userId in the request object
+    next();
+  } catch (error) {
+    res.status(401).json({ message: 'Authentication failed', error: error.message });
+  }
+};
+
+const generateRandomString = (length) => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return result;
+};
+
+
+// Multer Storage Setup
+// ------------------------
+// Set storage engine
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const userId = req.userId; 
+    if (!userId) {
+      return cb(new Error('User ID is not defined'));
+    }
+    const dir = `../public/storage/profiles/${userId}`;
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const randomString = generateRandomString(32);
+    cb(null, `${randomString}${path.extname(file.originalname)}`);
+  },
+});
+
+// Initialize upload
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5000000 }, // Limit file size to 5MB
+  fileFilter: (req, file, cb) => {
+    checkFileType(file, cb);
+  },
+}).single('profile');
+
+// Check file type
+function checkFileType(file, cb) {
+  // Allowed ext
+  const filetypes = /jpeg|jpg|png|gif/;
+  // Check ext
+  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+  // Check mime
+  const mimetype = filetypes.test(file.mimetype);
+  if (mimetype && extname) {
+    return cb(null, true);
+  } else {
+    cb('Error: Images Only!');
+  }
+}
+
+
+// ------------------------
+
+
 /* ------------------------------
    Login Authentication ENDPOINTS
 ------------------------------ */
@@ -2080,6 +1877,7 @@ app.post('/api/get-user-data', async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+    console.log("Display user data:", user);
 
     res.status(200).json({
       emp_id: user.emp_id,
@@ -2090,6 +1888,7 @@ app.post('/api/get-user-data', async (req, res) => {
       dept_name: user.dept_name,
       sect_name: user.sect_name,
       profile: user.profile,
+      face_photo: user.face_photo,
       roles: user.roles,
       sub_roles: user.sub_roles,
     });
@@ -2102,6 +1901,7 @@ app.post('/api/get-user-data', async (req, res) => {
 // Avoid Logout when Refresh
 app.post("/api/refresh-token", async (req, res) => {
   try {
+    // 
     const { refreshToken } = req.body;
     if (!refreshToken) {
       return res.status(401).json({ message: "Refresh token is required" });
@@ -2121,11 +1921,10 @@ app.post("/api/refresh-token", async (req, res) => {
       res.status(200).json({ accessToken });
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Failed to refresh token", error: error.message });
+    res.status(500).json({ message: "Failed to refresh token", error: error.message });
   }
 });
+
 
 // Login Endpoint
 app.post("/api/login", async (req, res) => {
@@ -2142,7 +1941,8 @@ app.post("/api/login", async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: "Invalid username or password" });
     }
-    console.log("User Details", user);
+
+    // console.log('user details:', user);
 
     const isPasswordValid = await bcrypt.compare(
       password.trim(),
@@ -2158,6 +1958,7 @@ app.post("/api/login", async (req, res) => {
       user.password = newHashedPassword;
       await user.save();
     }
+    // console.log('user:', isPasswordValid);
 
     const accessToken = jwt.sign(
       { userId: user._id, email: user.email, name: user.name },
@@ -2171,8 +1972,9 @@ app.post("/api/login", async (req, res) => {
       { expiresIn: "30d" }
     );
 
-    console.log("Access Token:", accessToken);
-    console.log("Refresh Token:", refreshToken);
+  
+    // console.log('Access Token:', accessToken); 
+    // console.log('Refresh Token:', refreshToken); 
 
     res.status(200).json({
       message: "Login successful",
@@ -2180,11 +1982,6 @@ app.post("/api/login", async (req, res) => {
       refreshToken,
       user: {
         emp_id: user.emp_id,
-        eng_name: user.eng_name,
-        kh_name: user.kh_name,
-        job_title: user.job_title,
-        dept_name: user.dept_name,
-        sect_name: user.sect_name,
         name: user.name,
         email: user.email,
         roles: user.roles,
@@ -2251,6 +2048,43 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
+app.post("/api/reset-password", async (req, res) => {
+  try {
+    const { emp_id, newPassword } = req.body;
+
+    if (!emp_id || !newPassword) {
+      return res.status(400).json({
+        message: "Employee ID and new password are required",
+      });
+    }
+
+    const user = await UserMain.findOne({ emp_id });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "Employee ID not found",
+      });
+    }
+
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    user.password = hashedPassword;
+    user.updated_at = new Date();
+
+    await user.save();
+
+    res.status(200).json({
+      message: "Password reset successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to reset password",
+      error: error.message,
+    });
+  }
+});
+
 // ------------------------
 // GET /api/user-profile
 // ------------------------
@@ -2298,46 +2132,35 @@ app.get("/api/user-profile", authenticateUser, async (req, res) => {
   }
 });
 
-// app.get("/api/user-profile", async (req, res) => {
-//   try {
-//     const token = req.headers.authorization.split(" ")[1];
-//     const decoded = jwt.verify(token, "your_jwt_secret");
-//     const user = await UserMain.findById(decoded.userId);
-
-//     if (!user) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-
-//     // Use custom image if exists; otherwise use face_photo (or default fallback)
-//     let profileImage = "";
-//     if (user.profile && user.profile.trim() !== "") {
-//       profileImage = `http://localhost:5001/public/storage/profiles/${
-//         decoded.userId
-//       }/${path.basename(user.profile)}`;
-//     } else if (user.face_photo && user.face_photo.trim() !== "") {
-//       profileImage = user.face_photo;
-//     } else {
-//       profileImage = "/IMG/default-profile.png";
-//     }
-
-//     res.status(200).json({
-//       emp_id: user.emp_id,
-//       name: user.name,
-//       dept_name: user.dept_name,
-//       sect_name: user.sect_name,
-//       profile: profileImage,
-//     });
-//   } catch (error) {
-//     res
-//       .status(500)
-//       .json({ message: "Failed to fetch user profile", error: error.message });
-//   }
-// });
 
 // ------------------------
 
 // PUT /api/user-profile
 // ------------------------
+
+// Fetch User Profile Endpoint
+app.get('/api/user-profile', async (req, res) => {
+  try {
+    const token = req.headers.authorization.split(' ')[1];
+    const decoded = jwt.verify(token, 'your_jwt_secret');
+    const user = await UserMain.findById(decoded.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    // console.log('User Data:', user);
+    res.status(200).json({
+      emp_id: user.emp_id,
+      name: user.name,
+      dept_name: user.dept_name,
+      sect_name: user.sect_name,
+      face_photo: user.face_photo,
+      profile: user.profile ? `/public/storage/profiles/${decoded.userId}/${path.basename(user.profile)}` : null,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch user profile', error: error.message });
+  }
+});
+
 
 app.put("/api/user-profile", authenticateUser, upload, async (req, res) => {
   try {

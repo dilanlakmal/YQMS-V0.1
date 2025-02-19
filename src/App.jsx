@@ -21,7 +21,7 @@ import IroningPage from "./pages/Ironing";
 import WashingPage from "./pages/Washing";
 import OPAPage from "./pages/OPA";
 import PackingPage from "./pages/Packing";
-import Login from "./pages/Auth/Login"
+import Login from "./pages/Auth/Login";
 import ForgotPassword from "./pages/Auth/ForgotPassword";
 import Register from "./pages/Auth/Register"; 
 import Logs from "./pages/QC Inspection/Logs";
@@ -200,6 +200,7 @@ function App() {
       }));
     }
   };
+  
 
   return (
     <AuthProvider>
@@ -342,7 +343,7 @@ function App() {
       </div>
       
         
-        
+
     </Router>
     </FormDataProvider>
     </AuthProvider>

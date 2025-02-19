@@ -13,7 +13,7 @@ function Login({ onLogin }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { updateUser } = useAuth();
+  const { setUser } = useAuth();
   const { updateFormData } = useFormData();
 
   useEffect(() => {
@@ -32,20 +32,7 @@ function Login({ onLogin }) {
       });
 
       if (response.status === 200) {
-        const { accessToken, refreshToken, user } = response.data;
-
-        if (rememberMe) {
-          localStorage.setItem("accessToken", accessToken);
-          localStorage.setItem("refreshToken", refreshToken);
-          localStorage.setItem("user", JSON.stringify(user));
-        } else {
-          sessionStorage.setItem("accessToken", accessToken);
-          sessionStorage.setItem("refreshToken", refreshToken);
-          sessionStorage.setItem("user", JSON.stringify(user));
-        }
-
-        onLogin(accessToken);
-        updateUser(user);
+        onLogin(token);
         navigate("/home");
       }
     } catch (error) {
@@ -79,8 +66,8 @@ function Login({ onLogin }) {
           }
 
           onLogin(accessToken);
-          updateUser(user);
           navigate("/home");
+          setUser(user);
         }
       } catch (error) {
         setError("Invalid username or password");
@@ -147,6 +134,11 @@ function Login({ onLogin }) {
             </p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+              <div className="text-red-500 text-center mb-4">
+                {error}
+              </div>
+            )}
             <div>
               <label
                 htmlFor="username"
