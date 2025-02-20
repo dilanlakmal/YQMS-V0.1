@@ -14,10 +14,13 @@ const QrCodeScanner = ({
   handleReset, 
   scannedData, 
   loadingData, 
-  passQtyIron, 
+  passQtyIron,
+  passQtyOPA,
+  passQtyWash,
+  passQtyPack, 
   handlePassQtyChange, 
   error,
-  isIroningPage }) => {
+  isIroningPage, isWashingPage, isPackingPage, isOPAPage }) => {
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg">
       <Scanner
@@ -101,7 +104,12 @@ const QrCodeScanner = ({
                   </div>
                 )}
                 <div>
-                <p className="text-sm text-gray-600">Pass Qty (Iron)</p>
+                  {isIroningPage && <p className="text-sm text-gray-600">Pass Qty (Iron)</p>}
+                  {isWashingPage && <p className="text-sm text-gray-600">Pass Qty (wash)</p>}
+                  {isPackingPage && <p className="text-sm text-gray-600">Pass Qty (pack)</p>}
+                  {isOPAPage && <p className="text-sm text-gray-600">Pass Qty (OPA)</p>}
+
+
                   {isIroningPage ? (
                     <div className="flex items-center gap-2">
                       <button
@@ -124,7 +132,17 @@ const QrCodeScanner = ({
                       </button>
                     </div>
                   ) : (
-                    <p className="font-medium">{passQtyIron}</p>
+                    // <p className="font-medium">{passQtyIron}</p>
+                    <input
+                      type="number"
+                      value={isWashingPage ? passQtyWash :
+                        isPackingPage ? passQtyPack :
+                        isOPAPage ? passQtyOPA :
+                        passQtyIron // Default to passQtyIron if none of the conditions match
+                      }
+                      readOnly
+                      className="w-16 text-center border border-gray-300 rounded-md bg-gray-100"
+                    />
                   )}
                 </div>
               </div>
