@@ -6,8 +6,10 @@ import MonoSearch from "./MonoSearch";
 import QRCodePreview from "./QRCodePreview";
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "../../../config";
+import { useTranslation } from 'react-i18next';
 
 export default function ReprintTab() {
+  const { t } = useTranslation();
   const { formData, updateFormData } = useFormData(); // Access context
   const [selectedMono, setSelectedMono] = useState("");
   const [color, setColor] = useState("");
@@ -91,7 +93,7 @@ export default function ReprintTab() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Search MONo
+            {t("bundle.search_mono")}
           </label>
           <MonoSearch
             value={selectedMono}
@@ -107,32 +109,32 @@ export default function ReprintTab() {
       {orderDetails && (
         <div className="mb-6 p-4 bg-gray-50 rounded-md">
           <h2 className="text-lg font-bold text-gray-800 mb-4">
-            Order Details
+          {t("bundle.order_details")}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-gray-700">
-                <span className="font-bold">Selected MONo:</span> {selectedMono}
+                <span className="font-bold">{t("bundle.selected_mono")}:</span> {selectedMono}
               </p>
               <p className="text-sm text-gray-700">
-                <span className="font-bold">Customer Style:</span>{" "}
+                <span className="font-bold">{t("bundle.customer_style")}:</span>{" "}
                 {orderDetails.custStyle || "N/A"}
               </p>
               <p className="text-sm text-gray-700">
-                <span className="font-bold">Buyer:</span> {orderDetails.engName}
+                <span className="font-bold">{t("bundle.buyer")}:</span> {orderDetails.engName}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-700">
-                <span className="font-bold">Country:</span>{" "}
+                <span className="font-bold">{t("bundle.country")}:</span>{" "}
                 {orderDetails.country || "N/A"}
               </p>
               <p className="text-sm text-gray-700">
-                <span className="font-bold">Order Qty:</span>{" "}
+                <span className="font-bold">{t("bundle.order_qty")}:</span>{" "}
                 {orderDetails.totalQty || "N/A"}
               </p>
               <p className="text-sm text-gray-700">
-                <span className="font-bold">Factory:</span>{" "}
+                <span className="font-bold">{t("bundle.factory")}:</span>{" "}
                 {orderDetails.factoryname || "N/A"}
               </p>
             </div>
@@ -143,7 +145,7 @@ export default function ReprintTab() {
       {selectedMono && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div>
-            <label>Color</label>
+            <label>{t("bundle.color")}</label>
             <select
               value={color}
               onChange={(e) => {
@@ -152,7 +154,7 @@ export default function ReprintTab() {
               }}
               className="w-full p-2 border rounded"
             >
-              <option value="">Select Color</option>
+              <option value="">{t("bundle.select_color")}</option>
               {colors.map((c) => (
                 <option key={c.color} value={c.color}>
                   {c.color}
@@ -161,14 +163,14 @@ export default function ReprintTab() {
             </select>
           </div>
           <div>
-            <label>Size</label>
+            <label>{t("bundle.size")}</label>
             <select
               value={size}
               onChange={(e) => setSize(e.target.value)}
               className="w-full p-2 border rounded"
               disabled={!color}
             >
-              <option value="">Select Size</option>
+              <option value="">{t("bundle.select-size")}</option>
               {colors
                 .find((c) => c.color === color)
                 ?.sizes.map((s) => (
@@ -186,16 +188,16 @@ export default function ReprintTab() {
           <table className="min-w-full border-collapse border border-gray-200">
             <thead>
               <tr className="bg-sky-100">
-                <th className="p-2 border border-gray-300">Package No</th>
-                <th className="p-2 border border-gray-300">MONo</th>
-                <th className="p-2 border border-gray-300">Color</th>
-                <th className="p-2 border border-gray-300">Size</th>
-                <th className="p-2 border border-gray-300">Style No</th>
-                <th className="p-2 border border-gray-300">Line No</th>
-                <th className="p-2 border border-gray-300">Date</th>
-                <th className="p-2 border border-gray-300">Time</th>
-                <th className="p-2 border border-gray-300">Emp ID</th>
-                <th className="p-2 border border-gray-300">Actions</th>
+                <th className="p-2 border border-gray-300">{t("bundle.package_no")}</th>
+                <th className="p-2 border border-gray-300">{t("bundle.mono")}</th>
+                <th className="p-2 border border-gray-300">{t("bundle.color")}</th>
+                <th className="p-2 border border-gray-300">{t("bundle.size")}</th>
+                <th className="p-2 border border-gray-300">{t("bundle.style_no")}</th>
+                <th className="p-2 border border-gray-300">{t("bundle.line_no")}</th>
+                <th className="p-2 border border-gray-300">{t("bundle.date")}</th>
+                <th className="p-2 border border-gray-300">{t("bundle.time")}</th>
+                <th className="p-2 border border-gray-300">{t("bundle.emp_id")}</th>
+                <th className="p-2 border border-gray-300">{t("bundle.action")}</th>
               </tr>
             </thead>
             <tbody>

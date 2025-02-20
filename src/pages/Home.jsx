@@ -110,7 +110,7 @@ function Home() {
           path: "/bundle-registration",
           roles: ["Admin", "Bundle Registration"],
           image: "/IMG/bundle.avif",
-          title: t("bundle_registration"),
+          title: t("home.bundle_registration"),
           description: "Click here to register orders for QC2 Inspection."
         },
         {

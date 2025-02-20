@@ -1,4 +1,6 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
+
 
 const SubConSelection = ({
   isSubCon,
@@ -6,12 +8,13 @@ const SubConSelection = ({
   subConName,
   setSubConName,
 }) => {
+  const { t } = useTranslation(); 
   const subConNames = ["Sunicon", "Elite", "SYD"];
 
   return (
     <div className="mb-6">
       <label className="block text-sm font-medium text-gray-700 mb-2">
-        Sub - con
+        {t("bundle.sub_con")}
       </label>
       <div className="space-y-4">
         <div className="flex items-center space-x-4">
