@@ -1,12 +1,14 @@
-import DatePicker from 'react-datepicker';
+import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
-function DateSelector({ selectedDate, onChange }) {
+function DateSelector({ selectedDate, onChange, hideLabel }) {
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        Date
-      </label>
+      {!hideLabel && (
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Date
+        </label>
+      )}
       <DatePicker
         selected={selectedDate}
         onChange={onChange}

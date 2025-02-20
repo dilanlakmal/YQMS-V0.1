@@ -323,6 +323,7 @@ const LiveDashboard = () => {
                   </label>
                   <DateSelector
                     selectedDate={startDate}
+                    hideLabel={true}
                     onChange={(date) => setStartDate(date)}
                   />
                 </div>
@@ -332,6 +333,7 @@ const LiveDashboard = () => {
                   </label>
                   <DateSelector
                     selectedDate={endDate}
+                    hideLabel={true}
                     onChange={(date) => setEndDate(date)}
                   />
                 </div>
@@ -394,7 +396,7 @@ const LiveDashboard = () => {
                 </div>
               </div>
               {/* Second row: 2 filters */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mt-4">
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-gray-700 mb-1">
                     Department
@@ -458,7 +460,7 @@ const LiveDashboard = () => {
           {Object.keys(appliedFilters).length > 0 && (
             <div className="mb-4">
               <h3 className="text-sm font-medium text-gray-700 mb-2">
-                Applied Filters:
+                Summary: Applied Filters:
               </h3>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(appliedFilters).map(([key, value]) => (
@@ -552,6 +554,13 @@ const LiveDashboard = () => {
               </div>
               <TrendingDown className="text-orange-500 text-3xl" />
             </div>
+          </div>
+
+          {/* Chart/Table Toggle Section with Title */}
+          <div className="mb-4">
+            <h2 className="text-sm font-medium text-gray-900 mb-2">
+              QC2 Defect rate by Defect Name
+            </h2>
           </div>
 
           {/* Toggle between Chart and Table for Defect Rates */}
