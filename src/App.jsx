@@ -17,6 +17,7 @@ import DownloadData from "./pages/DownloadData";
 import Home from "./pages/Home";
 import Inspection from "./pages/Inspection";
 import IroningPage from "./pages/Ironing";
+import LiveDashboard from "./pages/LiveDashboard";
 import Logs from "./pages/Logs";
 import QC2InspectionPage from "./pages/QC2Inspection";
 import Return from "./pages/Return";
@@ -312,6 +313,7 @@ function App() {
                       }
                     />
                     <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/live-dashboard" element={<LiveDashboard />} />
                     <Route
                       path="/bundle-registration"
                       element={<BundleRegistration />}

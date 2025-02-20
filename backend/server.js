@@ -1174,13 +1174,14 @@ app.get("/api/download-data", async (req, res) => {
 });
 
 /* ------------------------------
-   QC2 - Inspection Pass Bundle, Reworks
+   QC2 - Inspection Pass Bundle
 ------------------------------ */
 
 // Schema for qc2_inspection_pass_bundle with header fields as separate fields
 const qc2InspectionPassBundleSchema = new mongoose.Schema(
   {
-    bundleNo: { type: String, required: true }, // extracted from bundleData.bundle_id
+    //bundleNo: { type: String, required: true }, // extracted from bundleData.bundle_id
+    package_no: { type: Number, required: true }, // extracted from bundleData.package_no
     moNo: { type: String, required: true }, // from bundleData.selectedMono
     custStyle: { type: String, required: true }, // from bundleData.custStyle
     color: { type: String, required: true }, // from bundleData.color
@@ -1199,6 +1200,14 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
     ],
     inspection_time: { type: String, required: true }, // "HH:MM:SS"
     inspection_date: { type: String, required: true }, // "MM/DD/YYYY"
+    emp_id_inspection: { type: String, required: true },
+    eng_name_inspection: { type: String, required: true },
+    kh_name_inspection: { type: String, required: true },
+    job_title_inspection: { type: String, required: true },
+    dept_name_inspection: { type: String, required: true },
+    sect_name_inspection: { type: String, required: true },
+    bundle_id: { type: String, required: true }, // Add this line
+    bundle_random_id: { type: String, required: true }, // Add this line
   },
   { collection: "qc2_inspection_pass_bundle" }
 );
@@ -1208,34 +1217,12 @@ const QC2InspectionPassBundle = mongoose.model(
   qc2InspectionPassBundleSchema
 );
 
-// Schema for qc2_reworks with separate header fields
-const qc2ReworksSchema = new mongoose.Schema(
-  {
-    bundleNo: { type: String, required: true },
-    moNo: { type: String, required: true },
-    custStyle: { type: String, required: true },
-    color: { type: String, required: true },
-    size: { type: String, required: true },
-    lineNo: { type: String, required: true },
-    department: { type: String, required: true },
-    reworkGarments: [
-      {
-        defectName: { type: String, required: true },
-        count: { type: Number, required: true },
-        time: { type: String, required: true }, // "HH:MM:SS"
-      },
-    ],
-  },
-  { collection: "qc2_reworks" }
-);
-
-const QC2Reworks = mongoose.model("qc2_reworks", qc2ReworksSchema);
-
 // Endpoint to save inspection pass bundle data
 app.post("/api/inspection-pass-bundle", async (req, res) => {
   try {
     const {
-      bundleNo,
+      package_no,
+      //bundleNo,
       moNo,
       custStyle,
       color,
@@ -1249,10 +1236,19 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       defectArray,
       inspection_time,
       inspection_date,
+      emp_id_inspection,
+      eng_name_inspection,
+      kh_name_inspection,
+      job_title_inspection,
+      dept_name_inspection,
+      sect_name_inspection,
+      bundle_id,
+      bundle_random_id,
     } = req.body;
 
     const newRecord = new QC2InspectionPassBundle({
-      bundleNo,
+      package_no,
+      //bundleNo,
       moNo,
       custStyle,
       color,
@@ -1266,6 +1262,14 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       defectArray,
       inspection_time,
       inspection_date,
+      emp_id_inspection,
+      eng_name_inspection,
+      kh_name_inspection,
+      job_title_inspection,
+      dept_name_inspection,
+      sect_name_inspection,
+      bundle_id,
+      bundle_random_id,
     });
 
     await newRecord.save();
@@ -1282,11 +1286,368 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
   }
 });
 
+app.get("/api/qc2-inspection-pass-bundle", async (req, res) => {
+  try {
+    const dataCards = await QC2InspectionPassBundle.find().sort({
+      createdAt: -1,
+    });
+    res.json(dataCards);
+  } catch (error) {
+    console.error("Error fetching data cards:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
+  try {
+    const {
+      moNo,
+      package_no,
+      emp_id_inspection,
+      startDate,
+      endDate,
+      color,
+      size,
+      department,
+    } = req.query;
+    let match = {};
+    if (moNo) {
+      match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    }
+    if (package_no) {
+      const packageNoNumber = Number(package_no);
+      if (isNaN(packageNoNumber)) {
+        return res.status(400).json({ error: "Package No must be a number" });
+      }
+      match.package_no = packageNoNumber;
+    }
+    if (emp_id_inspection) {
+      match.emp_id_inspection = {
+        $regex: new RegExp(emp_id_inspection.trim(), "i"),
+      };
+    }
+    if (color) {
+      match.color = color;
+    }
+    if (size) {
+      match.size = size;
+    }
+    if (department) {
+      match.department = department;
+    }
+    // For date filtering, convert inspection_date using $dateFromString
+    let exprConditions = [];
+    if (startDate) {
+      const [sm, sd, sy] = startDate.split("/");
+      const startObj = new Date(sy, sm - 1, sd);
+      exprConditions.push({
+        $gte: [
+          {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+            },
+          },
+          startObj,
+        ],
+      });
+    }
+    if (endDate) {
+      const [em, ed, ey] = endDate.split("/");
+      const endObj = new Date(ey, em - 1, ed);
+      exprConditions.push({
+        $lte: [
+          {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+            },
+          },
+          endObj,
+        ],
+      });
+    }
+    if (exprConditions.length > 0) {
+      match.$expr = { $and: exprConditions };
+    }
+
+    const pipeline = [{ $match: match }, { $sort: { createdAt: -1 } }];
+    const dataCards = await QC2InspectionPassBundle.aggregate(pipeline);
+    res.json(dataCards);
+  } catch (error) {
+    console.error("Error searching data cards:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Endpoint to get summary data
+app.get("/api/qc2-inspection-summary", async (req, res) => {
+  try {
+    const {
+      moNo,
+      emp_id_inspection,
+      startDate,
+      endDate,
+      color,
+      size,
+      department,
+    } = req.query;
+    let match = {};
+    if (moNo) {
+      match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    }
+    if (emp_id_inspection) {
+      match.emp_id_inspection = {
+        $regex: new RegExp(emp_id_inspection.trim(), "i"),
+      };
+    }
+    if (color) {
+      match.color = color;
+    }
+    if (size) {
+      match.size = size;
+    }
+    if (department) {
+      match.department = department;
+    }
+    let exprConditions = [];
+    if (startDate) {
+      const [sm, sd, sy] = startDate.split("/");
+      const startObj = new Date(sy, sm - 1, sd);
+      exprConditions.push({
+        $gte: [
+          {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+            },
+          },
+          startObj,
+        ],
+      });
+    }
+    if (endDate) {
+      const [em, ed, ey] = endDate.split("/");
+      const endObj = new Date(ey, em - 1, ed);
+      exprConditions.push({
+        $lte: [
+          {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+            },
+          },
+          endObj,
+        ],
+      });
+    }
+    if (exprConditions.length > 0) {
+      match.$expr = { $and: exprConditions };
+    }
+
+    const data = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: null,
+          checkedQty: { $sum: "$checkedQty" },
+          totalPass: { $sum: "$totalPass" },
+          totalRejects: { $sum: "$totalRejects" },
+          defectsQty: { $sum: "$defectQty" },
+          totalBundles: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          checkedQty: 1,
+          totalPass: 1,
+          totalRejects: 1,
+          defectsQty: 1,
+          totalBundles: 1,
+          defectRate: {
+            $cond: [
+              { $eq: ["$checkedQty", 0] },
+              0,
+              { $divide: ["$defectsQty", "$checkedQty"] },
+            ],
+          },
+          defectRatio: {
+            $cond: [
+              { $eq: ["$checkedQty", 0] },
+              0,
+              { $divide: ["$totalRejects", "$checkedQty"] },
+            ],
+          },
+        },
+      },
+    ]);
+
+    if (data.length > 0) {
+      res.json(data[0]);
+    } else {
+      res.json({
+        checkedQty: 0,
+        totalPass: 0,
+        totalRejects: 0,
+        defectsQty: 0,
+        totalBundles: 0,
+        defectRate: 0,
+        defectRatio: 0,
+      });
+    }
+  } catch (error) {
+    console.error("Error fetching summary data:", error);
+    res.status(500).json({ error: "Failed to fetch summary data" });
+  }
+});
+
+// Endpoint to get defect rates by defect names
+app.get("/api/qc2-defect-rates", async (req, res) => {
+  try {
+    const {
+      moNo,
+      emp_id_inspection,
+      startDate,
+      endDate,
+      color,
+      size,
+      department,
+    } = req.query;
+    let match = {};
+    if (moNo) {
+      match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    }
+    if (emp_id_inspection) {
+      match.emp_id_inspection = {
+        $regex: new RegExp(emp_id_inspection.trim(), "i"),
+      };
+    }
+    if (color) {
+      match.color = color;
+    }
+    if (size) {
+      match.size = size;
+    }
+    if (department) {
+      match.department = department;
+    }
+    let exprConditions = [];
+    if (startDate) {
+      const [sm, sd, sy] = startDate.split("/");
+      const startObj = new Date(sy, sm - 1, sd);
+      exprConditions.push({
+        $gte: [
+          {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+            },
+          },
+          startObj,
+        ],
+      });
+    }
+    if (endDate) {
+      const [em, ed, ey] = endDate.split("/");
+      const endObj = new Date(ey, em - 1, ed);
+      exprConditions.push({
+        $lte: [
+          {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+            },
+          },
+          endObj,
+        ],
+      });
+    }
+    if (exprConditions.length > 0) {
+      match.$expr = { $and: exprConditions };
+    }
+
+    const data = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      { $unwind: "$defectArray" },
+      {
+        $group: {
+          _id: "$defectArray.defectName",
+          totalCount: { $sum: "$defectArray.totalCount" },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          defectName: "$_id",
+          totalCount: 1,
+        },
+      },
+    ]);
+
+    const totalCheckedQtyAgg = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: null,
+          totalCheckedQty: { $sum: "$checkedQty" },
+        },
+      },
+    ]);
+    const totalChecked =
+      totalCheckedQtyAgg.length > 0 ? totalCheckedQtyAgg[0].totalCheckedQty : 1;
+    const defectRates = data.map((item) => ({
+      ...item,
+      defectRate: item.totalCount / totalChecked,
+    }));
+    res.json(defectRates);
+  } catch (error) {
+    console.error("Error fetching defect rates:", error);
+    res.status(500).json({ error: "Failed to fetch defect rates" });
+  }
+});
+
+/* ------------------------------
+   QC2 - Reworks
+------------------------------ */
+// Schema for qc2_reworks with separate header fields
+const qc2ReworksSchema = new mongoose.Schema(
+  {
+    package_no: { type: Number, required: true }, // extracted from bundleData.package_no
+    //bundleNo: { type: String, required: true },
+    moNo: { type: String, required: true },
+    custStyle: { type: String, required: true },
+    color: { type: String, required: true },
+    size: { type: String, required: true },
+    lineNo: { type: String, required: true },
+    department: { type: String, required: true },
+    reworkGarments: [
+      {
+        defectName: { type: String, required: true },
+        count: { type: Number, required: true },
+        time: { type: String, required: true }, // "HH:MM:SS"
+      },
+    ],
+    emp_id_inspection: { type: String, required: true },
+    eng_name_inspection: { type: String, required: true },
+    kh_name_inspection: { type: String, required: true },
+    job_title_inspection: { type: String, required: true },
+    dept_name_inspection: { type: String, required: true },
+    sect_name_inspection: { type: String, required: true },
+    bundle_id: { type: String, required: true }, // Add this line
+    bundle_random_id: { type: String, required: true }, // Add this line
+  },
+  { collection: "qc2_reworks" }
+);
+
+const QC2Reworks = mongoose.model("qc2_reworks", qc2ReworksSchema);
+
 // Endpoint to save reworks (reject garment) data
 app.post("/api/reworks", async (req, res) => {
   try {
     const {
-      bundleNo,
+      package_no,
+      //bundleNo,
       moNo,
       custStyle,
       color,
@@ -1294,10 +1655,19 @@ app.post("/api/reworks", async (req, res) => {
       lineNo,
       department,
       reworkGarments,
+      emp_id_inspection,
+      eng_name_inspection,
+      kh_name_inspection,
+      job_title_inspection,
+      dept_name_inspection,
+      sect_name_inspection,
+      bundle_id,
+      bundle_random_id,
     } = req.body;
 
     const newRecord = new QC2Reworks({
-      bundleNo,
+      package_no,
+      //bundleNo,
       moNo,
       custStyle,
       color,
@@ -1305,6 +1675,14 @@ app.post("/api/reworks", async (req, res) => {
       lineNo,
       department,
       reworkGarments,
+      emp_id_inspection,
+      eng_name_inspection,
+      kh_name_inspection,
+      job_title_inspection,
+      dept_name_inspection,
+      sect_name_inspection,
+      bundle_id,
+      bundle_random_id,
     });
     await newRecord.save();
     res.status(201).json({
@@ -1339,6 +1717,14 @@ app.post("/api/qc2-defect-print", async (req, res) => {
       count_print,
       defects,
       defect_id,
+      emp_id_inspection,
+      eng_name_inspection,
+      kh_name_inspection,
+      job_title_inspection,
+      dept_name_inspection,
+      sect_name_inspection,
+      bundle_id,
+      bundle_random_id,
     } = req.body;
 
     const now = new Date();
@@ -1357,12 +1743,79 @@ app.post("/api/qc2-defect-print", async (req, res) => {
       defects,
       print_time,
       defect_id,
+      emp_id_inspection,
+      eng_name_inspection,
+      kh_name_inspection,
+      job_title_inspection,
+      dept_name_inspection,
+      sect_name_inspection,
+      bundle_id,
+      bundle_random_id,
     });
 
     const savedDefectPrint = await defectPrint.save();
     res.json(savedDefectPrint);
   } catch (error) {
     console.error("Error creating defect print record:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Search defect print records
+app.get("/api/qc2-defect-print/search", async (req, res) => {
+  try {
+    const { moNo, package_no, repair } = req.query;
+    const query = {};
+
+    // Build the query object based on provided parameters
+    if (moNo) {
+      query.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    }
+
+    if (package_no) {
+      const packageNoNumber = Number(package_no);
+      if (isNaN(packageNoNumber)) {
+        return res.status(400).json({ error: "Package No must be a number" });
+      }
+      query.package_no = packageNoNumber;
+    }
+
+    if (repair) {
+      query.repair = { $regex: new RegExp(repair.trim(), "i") };
+    }
+
+    // Execute the search query
+    const defectPrints = await QC2DefectPrint.find(query).sort({
+      createdAt: -1,
+    });
+
+    // Return empty array if no results found
+    if (!defectPrints || defectPrints.length === 0) {
+      return res.json([]);
+    }
+
+    res.json(defectPrints);
+  } catch (error) {
+    console.error("Error searching defect print records:", error);
+    res.status(500).json({
+      error: "Failed to search defect cards",
+      details: error.message,
+    });
+  }
+});
+
+// Fetch all defect print records
+app.get("/api/qc2-defect-print", async (req, res) => {
+  try {
+    const defectPrints = await QC2DefectPrint.find().sort({ createdAt: -1 });
+
+    if (!defectPrints || defectPrints.length === 0) {
+      return res.json([]);
+    }
+
+    res.json(defectPrints);
+  } catch (error) {
+    console.error("Error fetching defect print records:", error);
     res.status(500).json({ error: error.message });
   }
 });

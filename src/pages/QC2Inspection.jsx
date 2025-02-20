@@ -8,6 +8,7 @@ import {
   Eye,
   Filter,
   Globe,
+  Loader2,
   Menu,
   Printer,
   QrCode,
@@ -16,16 +17,21 @@ import {
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "../../config";
+import { useAuth } from "../components/authentication/AuthContext";
 import BluetoothComponent from "../components/forms/Bluetooth";
 import QRCodePreview from "../components/forms/QRCodePreview";
 import Scanner from "../components/forms/Scanner";
 import DefectBox from "../components/inspection/DefectBox";
+import DefectPrint from "../components/inspection/DefectPrint";
+import QC2Data from "../components/inspection/QC2Data";
 import { allDefects, defectsList } from "../constants/defects";
 
 const QC2InspectionPage = () => {
+  const { user, loading } = useAuth();
   const [error, setError] = useState(null);
   const [bundleData, setBundleData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
+  //const [loading, setLoading] = useState(false);
   const [tempDefects, setTempDefects] = useState({});
   const [confirmedDefects, setConfirmedDefects] = useState({});
   const [bundlePassed, setBundlePassed] = useState(false);
@@ -44,12 +50,13 @@ const QC2InspectionPage = () => {
   const [qrCodesData, setQrCodesData] = useState([]);
   const [showQRPreview, setShowQRPreview] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [generateQRDisabled, setGenerateQRDisabled] = useState(false); // New state for button disable status
 
   const bluetoothRef = useRef();
 
   useEffect(() => {
     if (bundleData) {
-      setTotalPass(bundleData.count || 0);
+      setTotalPass(bundleData.passQtyIron || 0);
       setTotalRejects(0);
       setConfirmedDefects({});
       setTempDefects({});
@@ -125,6 +132,8 @@ const QC2InspectionPage = () => {
   };
 
   const handleGenerateQRCodes = async () => {
+    if (generateQRDisabled) return; // Prevent multiple clicks
+    setGenerateQRDisabled(true); // Disable the button
     const defectGroups = groupDefectsByRepair();
     const qrCodes = [];
 
@@ -135,7 +144,7 @@ const QC2InspectionPage = () => {
         const print_time = now.toLocaleTimeString("en-US", { hour12: false });
         const qrData = {
           factory: bundleData.factory || "YM",
-          package_no: getBundleNumber(bundleData.bundle_id),
+          package_no: bundleData.package_no, //getBundleNumber(bundleData.bundle_id),
           moNo: bundleData.selectedMono,
           custStyle: bundleData.custStyle,
           color: bundleData.color,
@@ -149,6 +158,14 @@ const QC2InspectionPage = () => {
           })),
           print_time,
           defect_id: defectId,
+          emp_id_inspection: user.emp_id,
+          eng_name_inspection: user.eng_name,
+          kh_name_inspection: user.kh_name,
+          job_title_inspection: user.job_title,
+          dept_name_inspection: user.dept_name,
+          sect_name_inspection: user.sect_name,
+          bundle_id: bundleData.bundle_id, // Add this line
+          bundle_random_id: bundleData.bundle_random_id, // Add this line
         };
 
         try {
@@ -167,6 +184,7 @@ const QC2InspectionPage = () => {
           console.error("Error saving defect print:", error);
           setError(`Failed to generate QR codes: ${error.message}`);
           alert(`Failed to save defect data: ${error.message}`);
+          setGenerateQRDisabled(false); // Re-enable the button in case of error
           return;
         }
       }
@@ -201,21 +219,32 @@ const QC2InspectionPage = () => {
 
   const fetchBundleData = async (randomId) => {
     try {
-      setLoading(true);
+      setLoadingData(true);
       const response = await fetch(
         `${API_BASE_URL}/api/bundle-by-random-id/${randomId}`
       );
       if (!response.ok) throw new Error("Bundle not found");
+
       const data = await response.json();
-      setBundleData(data);
-      setInDefectWindow(true);
-      setScanning(false);
-      setError(null);
+
+      if (data.passQtyIron === undefined) {
+        setError(
+          "This bundle has not been ironed yet. Please wait until it is ironed."
+        );
+        setBundleData(null);
+        setInDefectWindow(false);
+        setScanning(false);
+      } else {
+        setBundleData(data);
+        setInDefectWindow(true);
+        setScanning(false);
+        setError(null);
+      }
     } catch (err) {
       setError(err.message || "Failed to fetch bundle data");
       setBundleData(null);
     } finally {
-      setLoading(false);
+      setLoadingData(false);
     }
   };
 
@@ -234,20 +263,28 @@ const QC2InspectionPage = () => {
     const inspection_date = now.toLocaleDateString("en-US");
 
     const payload = {
-      bundleNo: getBundleNumber(bundleData.bundle_id),
+      package_no: bundleData.package_no, //getBundleNumber(bundleData.bundle_id),
       moNo: bundleData.selectedMono,
       custStyle: bundleData.custStyle,
       color: bundleData.color,
       size: bundleData.size,
       lineNo: bundleData.lineNo,
       department: bundleData.department,
-      checkedQty: bundleData.count,
+      checkedQty: bundleData.passQtyIron,
       totalPass: totalPass,
       totalRejects: totalRejects,
       defectQty,
       defectArray,
       inspection_time,
       inspection_date,
+      emp_id_inspection: user.emp_id,
+      eng_name_inspection: user.eng_name,
+      kh_name_inspection: user.kh_name,
+      job_title_inspection: user.job_title,
+      dept_name_inspection: user.dept_name,
+      sect_name_inspection: user.sect_name,
+      bundle_id: bundleData.bundle_id, // Add this line
+      bundle_random_id: bundleData.bundle_random_id, // Add this line
     };
 
     try {
@@ -302,7 +339,7 @@ const QC2InspectionPage = () => {
       }));
 
       const payload = {
-        bundleNo: getBundleNumber(bundleData.bundle_id),
+        package_no: bundleData.package_no, //getBundleNumber(bundleData.bundle_id),
         moNo: bundleData.selectedMono,
         custStyle: bundleData.custStyle,
         color: bundleData.color,
@@ -310,6 +347,14 @@ const QC2InspectionPage = () => {
         lineNo: bundleData.lineNo,
         department: bundleData.department,
         reworkGarments,
+        emp_id_inspection: user.emp_id,
+        eng_name_inspection: user.eng_name,
+        kh_name_inspection: user.kh_name,
+        job_title_inspection: user.job_title,
+        dept_name_inspection: user.dept_name,
+        sect_name_inspection: user.sect_name,
+        bundle_id: bundleData.bundle_id, // Add this line
+        bundle_random_id: bundleData.bundle_random_id, // Add this line
       };
 
       try {
@@ -332,10 +377,12 @@ const QC2InspectionPage = () => {
     setInDefectWindow(false);
   };
 
-  const getBundleNumber = (bundleId) => {
-    const parts = bundleId?.split(":") || [];
-    return parts[parts.length - 1] || "";
-  };
+  // const getBundleNumber = (bundleId) => {
+  //   const parts = bundleId?.split(":") || [];
+  //   return parts[parts.length - 1] || "";
+  // };
+
+  //{getBundleNumber(bundleData.package_no)}
 
   const defectQty = Object.values(confirmedDefects).reduce((a, b) => a + b, 0);
   const hasDefects = Object.values(tempDefects).some((count) => count > 0);
@@ -501,28 +548,38 @@ const QC2InspectionPage = () => {
         {!inDefectWindow && (
           <div className="bg-gray-200 p-2">
             <div className="flex space-x-4">
-              {["first", "return", "data", "dashboard"].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 rounded ${
-                    activeTab === tab
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-black"
-                  }`}
-                >
-                  {tab === "first"
-                    ? "First Inspection"
-                    : tab === "return"
-                    ? "Return Inspection"
-                    : tab === "data"
-                    ? "Data"
-                    : "Dashboard"}
-                </button>
-              ))}
+              {["first", "return", "data", "dashboard", "defect-cards"].map(
+                (tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-4 py-2 rounded ${
+                      activeTab === tab
+                        ? "bg-blue-600 text-white"
+                        : "bg-white text-black"
+                    }`}
+                  >
+                    {tab === "first"
+                      ? "First Inspection"
+                      : tab === "return"
+                      ? "Return Inspection"
+                      : tab === "data"
+                      ? "Data"
+                      : tab === "dashboard"
+                      ? "Dashboard"
+                      : "Defect Cards"}
+                  </button>
+                )
+              )}
             </div>
           </div>
         )}
+
+        {activeTab === "defect-cards" && (
+          <DefectPrint bluetoothRef={bluetoothRef} />
+        )}
+
+        {activeTab === "data" && <QC2Data />}
 
         <div className="flex-grow overflow-hidden bg-gray-50">
           {activeTab !== "first" ? (
@@ -547,6 +604,12 @@ const QC2InspectionPage = () => {
                         onScanSuccess={fetchBundleData}
                         onScanError={(err) => setError(err)}
                       />
+                      {loadingData && (
+                        <div className="flex items-center justify-center gap-2 text-blue-600 mt-4">
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <p>Loading bundle data...</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -572,9 +635,9 @@ const QC2InspectionPage = () => {
                         <div className="overflow-x-auto whitespace-nowrap h-12 border-b mb-2">
                           <div className="flex space-x-4 items-center">
                             <div>
-                              <span className="text-xs">Bundle No: </span>
+                              <span className="text-xs">Department: </span>
                               <span className="text-xs font-bold">
-                                {getBundleNumber(bundleData.bundle_id)}
+                                {bundleData.department}
                               </span>
                             </div>
                             <div>
@@ -608,9 +671,9 @@ const QC2InspectionPage = () => {
                               </span>
                             </div>
                             <div>
-                              <span className="text-xs">Department: </span>
+                              <span className="text-xs">Package No: </span>
                               <span className="text-xs font-bold">
-                                {bundleData.department}
+                                {bundleData.package_no}
                               </span>
                             </div>
                           </div>
@@ -622,12 +685,12 @@ const QC2InspectionPage = () => {
                             <div className="hidden md:block">
                               <div className="text-xs">Checked Qty</div>
                               <div className="text-xl font-bold">
-                                {bundleData.count}
+                                {bundleData.passQtyIron}
                               </div>
                             </div>
                             <div className="block md:hidden">
                               <div className="text-xl font-bold">
-                                {bundleData.count}
+                                {bundleData.passQtyIron}
                               </div>
                             </div>
                           </div>
@@ -694,9 +757,9 @@ const QC2InspectionPage = () => {
                         <div className="flex space-x-2">
                           <button
                             onClick={handleGenerateQRCodes}
-                            disabled={!defectQty}
+                            disabled={!defectQty || generateQRDisabled}
                             className={`p-2 rounded ${
-                              !defectQty
+                              !defectQty || generateQRDisabled
                                 ? "bg-gray-300 cursor-not-allowed"
                                 : "bg-blue-600 hover:bg-blue-700 text-white"
                             }`}
