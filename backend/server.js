@@ -2321,6 +2321,17 @@ app.delete("/users/:id", async (req, res) => {
 /* ------------------------------
    Login Authentication ENDPOINTS
 ------------------------------ */
+
+// Helper function to get profile image URL
+const getProfileImageUrl = (user) => {
+  if (user.profile && user.profile.trim() !== "") {
+    return `${API_BASE_URL}/public/storage/profiles/${user._id}/${path.basename(
+      user.profile
+    )}`;
+  }
+  return user.face_photo || "/IMG/default-profile.png";
+};
+
 // When Login get user data
 app.post("/api/get-user-data", async (req, res) => {
   try {
@@ -2343,7 +2354,9 @@ app.post("/api/get-user-data", async (req, res) => {
       job_title: user.job_title,
       dept_name: user.dept_name,
       sect_name: user.sect_name,
-      profile: user.profile,
+      profile: getProfileImageUrl(user), // Use helper function
+      face_photo: user.face_photo, // Include face_photo
+      //profile: user.profile,
       roles: user.roles,
       sub_roles: user.sub_roles,
     });
@@ -2445,6 +2458,8 @@ app.post("/api/login", async (req, res) => {
         email: user.email,
         roles: user.roles,
         sub_roles: user.sub_roles,
+        profile: getProfileImageUrl(user), // Use helper function
+        face_photo: user.face_photo, // Include face_photo
       },
     });
   } catch (error) {
@@ -2543,7 +2558,7 @@ app.get("/api/user-profile", authenticateUser, async (req, res) => {
       kh_name: user.kh_name,
       job_title: user.job_title,
       email: user.email,
-      profile: profileImage, // URL for display
+      profile: getProfileImageUrl(user), // Use helper function --- profileImage,
       face_photo: user.face_photo,
     });
   } catch (error) {
