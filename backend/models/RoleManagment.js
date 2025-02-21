@@ -17,7 +17,10 @@ const roleManagmentSchema = new mongoose.Schema({
       face_photo: { type: String }, // Added profile field since it's used in the UI
     },
   ],
+  
 });
+
+
 
 // Export the model with explicit collection name
 export default (connection) =>

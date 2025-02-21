@@ -76,6 +76,10 @@ function BundleRegistration() {
   const [editModalOpen, setEditModalOpen] = useState(false); // State to control the edit modal
   const [editRecordId, setEditRecordId] = useState(null); // State to store the ID of the record being edited
 
+  const [styleCodeFilter, setStyleCodeFilter] = useState("");
+  const [packageNoFilter, setPackageNoFilter] = useState("");
+  const [monoFilter, setMonoFilter] = useState("");
+
   // Hardcoded Sub Con names
   const [formData, setFormData] = useState(() => {
     const savedData = persistedFormData.bundleRegistration;
@@ -505,6 +509,79 @@ function BundleRegistration() {
       }));
     }
   };
+
+  // Handle edit button click
+const handleEdit = (recordId) => {
+  const record = userBatches.find((batch) => batch.id === recordId);
+  if (record) {
+    setFormData({
+      date: new Date(record.date),
+      department: record.department,
+      selectedMono: record.selectedMono,
+      buyer: record.buyer,
+      orderQty: record.orderQty,
+      factoryInfo: record.factory,
+      custStyle: record.custStyle,
+      country: record.country,
+      color: record.color,
+      size: record.size,
+      bundleQty: record.bundleQty,
+      lineNo: record.lineNo,
+      count: record.count,
+      colorCode: record.colorCode,
+      chnColor: record.chnColor,
+      colorKey: record.colorKey,
+      sizeOrderQty: record.sizeOrderQty,
+      planCutQty: record.planCutQty,
+    });
+    setEditRecordId(recordId);
+    setEditModalOpen(true);
+  }
+};
+
+// Handle save button click in the modal
+const handleSave = async () => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/update-bundle-data/${editRecordId}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      }
+    );
+    if (response.ok) {
+      const updatedRecord = await response.json();
+      setUserBatches((prevBatches) =>
+        prevBatches.map((batch) =>
+          batch.id === editRecordId ? updatedRecord : batch
+        )
+      );
+      setEditModalOpen(false);
+      alert("Record updated successfully!");
+    } else {
+      alert("Failed to update record.");
+    }
+  } catch (error) {
+    console.error("Error updating record:", error);
+    alert("Failed to update record.");
+  }
+};
+
+const filteredBatches = userBatches.filter((batch) => {
+  const matchesStyleCode = styleCodeFilter
+    ? batch.custStyle?.toLowerCase().includes(styleCodeFilter.toLowerCase())
+    : true;
+    const matchesPackageNo = packageNoFilter
+    ? batch.package_no?.toString().toLowerCase().includes(packageNoFilter.toLowerCase())
+    : true;
+  const matchesMono = monoFilter
+    ? batch.selectedMono?.toLowerCase().endsWith(monoFilter.toLowerCase())
+    : true;
+  return matchesStyleCode && matchesPackageNo && matchesMono;
+});
+
+
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20 px-8">
@@ -949,6 +1026,30 @@ function BundleRegistration() {
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-lg font-bold text-gray-800 mb-4">{t("bundle.data")}</h2>
             <div className="overflow-x-auto">
+            <div className="flex space-x-4 mb-6">
+                <input
+                  type="text"
+                  placeholder="Filter by Style Code"
+                  value={styleCodeFilter}
+                  onChange={(e) => setStyleCodeFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md"
+                />
+                <input
+                  type="text"
+                  placeholder="Filter by Package No"
+                  value={packageNoFilter}
+                  onChange={(e) => setPackageNoFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md"
+                />
+                <input
+                  type="text"
+                  placeholder="Filter by MONo"
+                  value={monoFilter}
+                  onChange={(e) => setMonoFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md"
+                />
+              </div>
+              
               <table className="min-w-full divide-y divide-gray-200 border border-gray-200">
                 <thead className="bg-sky-100">
                   <tr>
@@ -1030,7 +1131,7 @@ function BundleRegistration() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {userBatches.map((batch, index) => (
+                  {filteredBatches.map((batch, index) => (
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {index + 1}
@@ -1151,13 +1252,13 @@ function BundleRegistration() {
         />
 
         {/* Edit Modal */}
-        {/* <EditModal
+        <EditModal
           isOpen={editModalOpen}
           onClose={() => setEditModalOpen(false)}
           formData={formData}
           setFormData={setFormData}
           handleSave={handleSave}
-        /> */}
+        />
         
       </div>
     </div>

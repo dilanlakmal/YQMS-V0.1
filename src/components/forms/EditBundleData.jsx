@@ -2,18 +2,14 @@ import React, { useEffect, useState } from 'react';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import PropTypes from 'prop-types';
-// import NumberPad from "../components/forms/NumberPad";
-// import NumLetterPad from "../components/forms/NumLetterPad";
+import { API_BASE_URL } from "../../../config";
 
 const EditModal = ({ isOpen, onClose, formData, setFormData, handleSave }) => {
   const [availableSizes, setAvailableSizes] = useState([]);
   const [availableColors, setAvailableColors] = useState([]);
-  // const [showNumberPad, setShowNumberPad] = useState(false);
-  // const [numberPadTarget, setNumberPadTarget] = useState("");
 
   useEffect(() => {
     if (formData.selectedMono) {
-      // Fetch available sizes and colors based on the selected order (selectedMono)
       fetchAvailableSizesAndColors(formData.selectedMono);
     }
   }, [formData.selectedMono]);
@@ -27,12 +23,12 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, handleSave }) => {
 
   const fetchSizes = async (selectedMono) => {
     try {
-      const response = await fetch(`http://localhost:5001/api/sizes?styleNo=${selectedMono}`);
+      const response = await fetch(`${API_BASE_URL}/api/sizes?styleNo=${selectedMono}`);
       if (!response.ok) {
         throw new Error('Failed to fetch sizes');
       }
       const data = await response.json();
-      return data.sizes; // Assuming the API returns an object with a 'sizes' array
+      return data.sizes;
     } catch (error) {
       console.error(error);
       return [];
@@ -41,37 +37,17 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, handleSave }) => {
 
   const fetchColors = async (selectedMono) => {
     try {
-      const response = await fetch(`http://localhost:5001/api/colors?styleNo=${selectedMono}`);
+      const response = await fetch(`${API_BASE_URL}/api/colors?styleNo=${selectedMono}`);
       if (!response.ok) {
         throw new Error('Failed to fetch colors');
       }
       const data = await response.json();
-      return data.colors; // Assuming the API returns an object with a 'colors' array
+      return data.colors;
     } catch (error) {
       console.error(error);
       return [];
     }
   };
-
-  // Handle number pad input
-  // const handleNumberPadInput = (value) => {
-  //   if (numberPadTarget === "bundleQty") {
-  //     setFormData((prev) => ({
-  //       ...prev,
-  //       bundleQty: value,
-  //     }));
-  //   } else if (numberPadTarget === "lineNo") {
-  //     setFormData((prev) => ({
-  //       ...prev,
-  //       lineNo: value,
-  //     }));
-  //   } else if (numberPadTarget === "count") {
-  //     setFormData((prev) => ({
-  //       ...prev,
-  //       count: value,
-  //     }));
-  //   }
-  // };
 
   if (!isOpen) return null;
 
@@ -80,18 +56,15 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, handleSave }) => {
       <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-5xl">
         <h2 className="text-2xl font-bold mb-4">Edit Record</h2>
         <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-6">
-          {/* Selected MONo and Order Details */}
           <div className="mb-6 p-4 bg-blue-50 rounded-md">
             <h2 className="text-lg font-bold text-gray-800 mb-4">Order Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-700">
-                  <span className="font-bold">Selected MONo:</span>{" "}
-                  {formData.selectedMono}
+                  <span className="font-bold">Selected MONo:</span> {formData.selectedMono}
                 </p>
                 <p className="text-sm text-gray-700">
-                  <span className="font-bold">Customer Style:</span>{" "}
-                  {formData.custStyle}
+                  <span className="font-bold">Customer Style:</span> {formData.custStyle}
                 </p>
                 <p className="text-sm text-gray-700">
                   <span className="font-bold">Buyer:</span> {formData.buyer}
@@ -99,16 +72,13 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, handleSave }) => {
               </div>
               <div>
                 <p className="text-sm text-gray-700">
-                  <span className="font-bold">Country:</span>{" "}
-                  {formData.country}
+                  <span className="font-bold">Country:</span> {formData.country}
                 </p>
                 <p className="text-sm text-gray-700">
-                  <span className="font-bold">Order Qty:</span>{" "}
-                  {formData.orderQty}
+                  <span className="font-bold">Order Qty:</span> {formData.orderQty}
                 </p>
                 <p className="text-sm text-gray-700">
-                  <span className="font-bold">Factory:</span>{" "}
-                  {formData.factoryInfo}
+                  <span className="font-bold">Factory:</span> {formData.factoryInfo}
                 </p>
               </div>
             </div>
@@ -181,11 +151,7 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, handleSave }) => {
             <input
               type="text"
               value={formData.count}
-              // onClick={() => {
-              //   setNumberPadTarget("count");
-              //   setShowNumberPad(true);
-              // }}
-              onChange={(e) => setFormData((prev) => ({ ...prev, count: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, count: e.target.value.toString() }))}
               className="w-full px-3 py-1 border border-gray-300 rounded-md"
             />
           </div>
@@ -215,24 +181,6 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, handleSave }) => {
           </button>
         </div>
       </div>
-      {/* Number Pad Modal */}
-      {/* {showNumberPad && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center pt-20">
-          {numberPadTarget === "bundleQty" ||
-          numberPadTarget === "count" ||
-          formData.factoryInfo === "YM" ? (
-            <NumberPad
-              onClose={() => setShowNumberPad(false)}
-              onInput={handleNumberPadInput}
-            />
-          ) : (
-            <NumLetterPad
-              onClose={() => setShowNumberPad(false)}
-              onInput={handleNumberPadInput}
-            />
-          )}
-        </div>
-      )} */}
     </div>
   );
 };

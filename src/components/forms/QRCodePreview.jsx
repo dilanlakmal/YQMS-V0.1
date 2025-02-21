@@ -13,7 +13,7 @@ export default function QRCodePreview({
   const data = Array.isArray(qrData) ? qrData : [];
 
   // Debugging: Log the data structure
-  console.log("QRCodePreview Data:", data);
+  // console.log("QRCodePreview Data:", data);
 
   const handlePrint = async () => {
     try {
