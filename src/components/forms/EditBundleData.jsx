@@ -4,7 +4,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import PropTypes from 'prop-types';
 import { API_BASE_URL } from "../../../config";
 
-const EditModal = ({ isOpen, onClose, formData, setFormData, handleSave }) => {
+const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, setEditModalOpen }) => {
   const [availableSizes, setAvailableSizes] = useState([]);
   const [availableColors, setAvailableColors] = useState([]);
 
@@ -46,6 +46,35 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, handleSave }) => {
     } catch (error) {
       console.error(error);
       return [];
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/update-bundle-data/${formData.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        }
+      );
+
+      if (response.ok) {
+        const updatedRecord = await response.json();
+        setUserBatches((prevBatches) =>
+          prevBatches.map((batch) =>
+            batch.id === formData.id ? updatedRecord : batch
+          )
+        );
+        setEditModalOpen(false);
+        alert("Record updated successfully!");
+      } else {
+        alert("Failed to update record.");
+      }
+    } catch (error) {
+      console.error("Error updating record:", error);
+      alert("Failed to update record.");
     }
   };
 
@@ -189,6 +218,7 @@ EditModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
   formData: PropTypes.shape({
+    id: PropTypes.string.isRequired,
     date: PropTypes.instanceOf(Date).isRequired,
     department: PropTypes.string.isRequired,
     lineNo: PropTypes.string.isRequired,
@@ -204,7 +234,8 @@ EditModal.propTypes = {
     country: PropTypes.string.isRequired,
   }).isRequired,
   setFormData: PropTypes.func.isRequired,
-  handleSave: PropTypes.func.isRequired,
+  setUserBatches: PropTypes.func.isRequired, // Add this prop
+  setEditModalOpen: PropTypes.func.isRequired, // Add this prop
 };
 
 export default EditModal;

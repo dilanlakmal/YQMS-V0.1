@@ -14,17 +14,12 @@ import QRCodePreview from "../components/forms/QRCodePreview";
 import ReprintTab from "../components/forms/ReprintTab";
 import SubConSelection from "../components/forms/SubConSelection";
 import { useTranslation } from 'react-i18next';
-import EditModal from "../components/forms/EditBundleData"; 
+import EditModal from "../components/forms/EditBundleData";
 
 function BundleRegistration() {
   const { t } = useTranslation();
   const { user, loading } = useAuth(); // Get the logged-in user data
-  const {
-    formData: persistedFormData,
-    updateFormData,
-    clearFormData,
-  } = useFormData();
-
+  const { formData: persistedFormData, updateFormData, clearFormData } = useFormData();
   const [userBatches, setUserBatches] = useState([]);
   const navigate = useNavigate();
   const [qrData, setQrData] = useState([]);
@@ -41,50 +36,27 @@ function BundleRegistration() {
   const [hasColors, setHasColors] = useState(false);
   const [hasSizes, setHasSizes] = useState(false);
   const [isSubCon, setIsSubCon] = useState(
-    () =>
-      persistedFormData.bundleRegistration?.department === "Sub-con" || false
+    () => persistedFormData.bundleRegistration?.department === "Sub-con" || false
   );
   const [subConName, setSubConName] = useState(
     () => persistedFormData.bundleRegistration?.subConName || ""
   );
   const [estimatedTotal, setEstimatedTotal] = useState(null);
-  
+
   const bluetoothComponentRef = useRef();
   const subConNames = ["Sunicon", "Win Sheng", "Yeewo", "Jinmyung"];
 
-  // const [formData, setFormData] = useState({
-  //   date: new Date(),
-  //   department: "",
-  //   selectedMono: "",
-  //   buyer: "",
-  //   orderQty: "",
-  //   factoryInfo: "",
-  //   custStyle: "",
-  //   country: "",
-  //   color: "",
-  //   size: "",
-  //   bundleQty: "",
-  //   lineNo: "",
-  //   count: "10",
-  //   colorCode: "",
-  //   chnColor: "",
-  //   colorKey: "",
-  //   sizeOrderQty: "",
-  //   planCutQty: "",
-  // });
-
   const [editModalOpen, setEditModalOpen] = useState(false); // State to control the edit modal
   const [editRecordId, setEditRecordId] = useState(null); // State to store the ID of the record being edited
-
   const [styleCodeFilter, setStyleCodeFilter] = useState("");
   const [packageNoFilter, setPackageNoFilter] = useState("");
   const [monoFilter, setMonoFilter] = useState("");
+  const [colorFilter, setColorFilter] = useState("");
+  const [sizeFilter, setSizeFilter] = useState("");
 
-  // Hardcoded Sub Con names
   const [formData, setFormData] = useState(() => {
     const savedData = persistedFormData.bundleRegistration;
     const today = new Date();
-
     return savedData && user
       ? {
           ...savedData,
@@ -150,7 +122,6 @@ function BundleRegistration() {
           `${API_BASE_URL}/api/order-details/${formData.selectedMono}`
         );
         const data = await response.json();
-
         setFormData((prev) => ({
           ...prev,
           buyer: data.engName,
@@ -166,7 +137,6 @@ function BundleRegistration() {
           sizeOrderQty: "",
           planCutQty: "",
         }));
-
         const totalResponse = await fetch(
           `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
         );
@@ -174,7 +144,6 @@ function BundleRegistration() {
           throw new Error("Failed to fetch total bundle quantity");
         const totalData = await totalResponse.json();
         setTotalBundleQty(totalData.total);
-
         if (data.colors && data.colors.length > 0) {
           setColors(data.colors);
           setHasColors(true);
@@ -191,7 +160,6 @@ function BundleRegistration() {
         setHasSizes(false);
       }
     };
-
     fetchOrderDetails();
   }, [formData.selectedMono]);
 
@@ -203,17 +171,14 @@ function BundleRegistration() {
           `${API_BASE_URL}/api/order-sizes/${formData.selectedMono}/${formData.color}`
         );
         const data = await response.json();
-
         if (data && data.length > 0) {
           setSizes(data);
           setHasSizes(true);
-
           const totalCountResponse = await fetch(
             `${API_BASE_URL}/api/total-garments-count/${formData.selectedMono}/${formData.color}/${data[0].size}`
           );
           const totalCountData = await totalCountResponse.json();
           const totalGarmentsCount = totalCountData.totalCount;
-
           setFormData((prev) => ({
             ...prev,
             totalGarmentsCount,
@@ -228,7 +193,6 @@ function BundleRegistration() {
         setHasSizes(false);
       }
     };
-
     fetchSizes();
   }, [formData.selectedMono, formData.color]);
 
@@ -249,14 +213,12 @@ function BundleRegistration() {
         }
       }
     }, 500);
-
     return () => clearInterval(interval);
   }, [formData.selectedMono, formData.color, formData.size]);
 
   useEffect(() => {
     const fetchTotalBundleQty = async () => {
       if (!formData.selectedMono) return;
-
       try {
         const response = await fetch(
           `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
@@ -267,11 +229,8 @@ function BundleRegistration() {
         console.error("Error fetching total bundle quantity:", error);
       }
     };
-
     fetchTotalBundleQty();
-
     const interval = setInterval(fetchTotalBundleQty, 500);
-
     return () => clearInterval(interval);
   }, [formData.selectedMono]);
 
@@ -303,7 +262,6 @@ function BundleRegistration() {
         console.error("Error fetching user batches:", error);
       }
     };
-
     fetchUserBatches();
   }, [user]);
 
@@ -342,16 +300,12 @@ function BundleRegistration() {
       alert("User data is not available. Please try again.");
       return;
     }
-
     if (!validateLineNo()) {
       alert("Invalid Line No. It must be between 1 and 30 for YM factory.");
       return;
     }
-
     const { date, selectedMono, color, size, lineNo } = formData;
-
     if (formData.totalGarmentsCount > formData.planCutQty) return;
-
     try {
       const response = await fetch(`${API_BASE_URL}/api/check-bundle-id`, {
         method: "POST",
@@ -364,17 +318,11 @@ function BundleRegistration() {
           size,
         }),
       });
-
       const { largestNumber } = await response.json();
-
       const bundleQty = parseInt(formData.bundleQty);
       const bundleData = [];
-
       for (let i = 1; i <= bundleQty; i++) {
-        const bundleId = `${
-          date.toISOString().split("T")[0]
-        }:${lineNo}:${selectedMono}:${color}:${size}:${largestNumber + i}`;
-
+        const bundleId = `${date.toISOString().split("T")[0]}:${lineNo}:${selectedMono}:${color}:${size}:${largestNumber + i}`;
         const bundleRecord = {
           bundle_id: bundleId,
           date: date.toLocaleDateString("en-US"),
@@ -405,16 +353,13 @@ function BundleRegistration() {
           dept_name: user.dept_name,
           sect_name: user.sect_name,
         };
-
         bundleData.push(bundleRecord);
       }
-
       const saveResponse = await fetch(`${API_BASE_URL}/api/save-bundle-data`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bundleData }),
       });
-
       if (saveResponse.ok) {
         const savedData = await saveResponse.json();
         setQrData(savedData.data);
@@ -423,16 +368,13 @@ function BundleRegistration() {
           ...prev,
           bundleQty: "",
         }));
-
         setDataRecords((prevRecords) => [...prevRecords, ...savedData.data]);
-
         try {
           const totalResponse = await fetch(
             `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
           );
           const totalData = await totalResponse.json();
           setTotalBundleQty(totalData.total);
-
           if (user) {
             const batchesResponse = await fetch(
               `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
@@ -458,17 +400,14 @@ function BundleRegistration() {
       setIsGenerateDisabled(false);
       return;
     }
-
     try {
       setIsPrinting(true);
-
       for (const data of qrData) {
         await bluetoothComponentRef.current.printData({
           ...data,
           bundle_id: data.bundle_random_id,
         });
       }
-
       setFormData((prev) => ({
         ...prev,
         bundleQty: 1, // Reset to default value
@@ -476,7 +415,6 @@ function BundleRegistration() {
         count: 10, // Reset to default value
       }));
       setIsGenerateDisabled(false);
-
       if (user) {
         const batchesResponse = await fetch(
           `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
@@ -484,7 +422,6 @@ function BundleRegistration() {
         const batchesData = await batchesResponse.json();
         setUserBatches(batchesData);
       }
-
       alert("QR codes printed successfully!");
     } catch (error) {
       alert(`Print failed: ${error.message}`);
@@ -511,85 +448,59 @@ function BundleRegistration() {
   };
 
   // Handle edit button click
-const handleEdit = (recordId) => {
-  const record = userBatches.find((batch) => batch.id === recordId);
-  if (record) {
-    setFormData({
-      date: new Date(record.date),
-      department: record.department,
-      selectedMono: record.selectedMono,
-      buyer: record.buyer,
-      orderQty: record.orderQty,
-      factoryInfo: record.factory,
-      custStyle: record.custStyle,
-      country: record.country,
-      color: record.color,
-      size: record.size,
-      bundleQty: record.bundleQty,
-      lineNo: record.lineNo,
-      count: record.count,
-      colorCode: record.colorCode,
-      chnColor: record.chnColor,
-      colorKey: record.colorKey,
-      sizeOrderQty: record.sizeOrderQty,
-      planCutQty: record.planCutQty,
-    });
-    setEditRecordId(recordId);
-    setEditModalOpen(true);
-  }
-};
-
-// Handle save button click in the modal
-const handleSave = async () => {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/api/update-bundle-data/${editRecordId}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      }
-    );
-    if (response.ok) {
-      const updatedRecord = await response.json();
-      setUserBatches((prevBatches) =>
-        prevBatches.map((batch) =>
-          batch.id === editRecordId ? updatedRecord : batch
-        )
-      );
-      setEditModalOpen(false);
-      alert("Record updated successfully!");
-    } else {
-      alert("Failed to update record.");
+  const handleEdit = (recordId) => {
+    const record = userBatches.find((batch) => batch.id === recordId);
+    if (record) {
+      setFormData({
+        id: record._id,
+        date: new Date(record.date),
+        department: record.department,
+        selectedMono: record.selectedMono,
+        buyer: record.buyer,
+        orderQty: record.orderQty,
+        factoryInfo: record.factory,
+        custStyle: record.custStyle,
+        country: record.country,
+        color: record.color,
+        size: record.size,
+        bundleQty: record.bundleQty,
+        lineNo: record.lineNo,
+        count: record.count,
+        colorCode: record.colorCode,
+        chnColor: record.chnColor,
+        colorKey: record.colorKey,
+        sizeOrderQty: record.sizeOrderQty,
+        planCutQty: record.planCutQty,
+      });
+      setEditRecordId(recordId);
+      setEditModalOpen(true);
     }
-  } catch (error) {
-    console.error("Error updating record:", error);
-    alert("Failed to update record.");
-  }
-};
+  };
 
-const filteredBatches = userBatches.filter((batch) => {
-  const matchesStyleCode = styleCodeFilter
-    ? batch.custStyle?.toLowerCase().includes(styleCodeFilter.toLowerCase())
-    : true;
+  const filteredBatches = userBatches.filter((batch) => {
+    const matchesStyleCode = styleCodeFilter
+      ? batch.custStyle?.toLowerCase().includes(styleCodeFilter.toLowerCase())
+      : true;
+    const matchesColor = colorFilter
+      ? batch.color?.toLowerCase().includes(colorFilter.toLowerCase())
+      : true;
+    const matchesSize = sizeFilter
+      ? batch.size?.toLowerCase().includes(sizeFilter.toLowerCase())
+      : true;
     const matchesPackageNo = packageNoFilter
-    ? batch.package_no?.toString().toLowerCase().includes(packageNoFilter.toLowerCase())
-    : true;
-  const matchesMono = monoFilter
-    ? batch.selectedMono?.toLowerCase().endsWith(monoFilter.toLowerCase())
-    : true;
-  return matchesStyleCode && matchesPackageNo && matchesMono;
-});
-
-
-
+      ? batch.package_no?.toString().toLowerCase().includes(packageNoFilter.toLowerCase())
+      : true;
+    const matchesMono = monoFilter
+      ? batch.selectedMono?.toLowerCase().endsWith(monoFilter.toLowerCase())
+      : true;
+    return matchesStyleCode && matchesPackageNo && matchesMono && matchesColor && matchesSize;
+  });
   return (
     <div className="min-h-screen bg-gray-50 pt-20 px-8">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-8xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">
-        {t('bundle.bundle_registration')}
+          {t('bundle.bundle_registration')}
         </h1>
-
         <div className="flex space-x-4 mb-6">
           <button
             onClick={() => setActiveTab("registration")}
@@ -600,7 +511,6 @@ const filteredBatches = userBatches.filter((batch) => {
             }`}
           >
             {t('bundle.registration')}
-           
           </button>
           <button
             onClick={() => setActiveTab("data")}
@@ -610,7 +520,7 @@ const filteredBatches = userBatches.filter((batch) => {
                 : "bg-gray-200 text-gray-700"
             }`}
           >
-           {t('bundle.data')}
+            {t('bundle.data')}
           </button>
           <button
             onClick={() => setActiveTab("reprint")}
@@ -621,7 +531,6 @@ const filteredBatches = userBatches.filter((batch) => {
             }`}
           >
             {t('bundle.reprint')}
-            
           </button>
         </div>
 
@@ -630,7 +539,7 @@ const filteredBatches = userBatches.filter((batch) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t("bundle.date")}
+                  {t("bundle.date")}
                 </label>
                 <DatePicker
                   selected={formData.date}
@@ -646,7 +555,7 @@ const filteredBatches = userBatches.filter((batch) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t("bundle.department")}
+                  {t("bundle.department")}
                 </label>
                 <select
                   value={formData.department}
@@ -666,7 +575,7 @@ const filteredBatches = userBatches.filter((batch) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t("bundle.search_mono")}
+                  {t("bundle.search_mono")}
                 </label>
                 <MonoSearch
                   value={formData.selectedMono}
@@ -683,7 +592,7 @@ const filteredBatches = userBatches.filter((batch) => {
             {formData.selectedMono && (
               <div className="mb-6 p-4 bg-gray-50 rounded-md">
                 <h2 className="text-lg font-bold text-gray-800 mb-4">
-                {t("bundle.order_details")}
+                  {t("bundle.order_details")}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -719,7 +628,7 @@ const filteredBatches = userBatches.filter((batch) => {
 
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t("bundle.line_no")}
+                {t("bundle.line_no")}
               </label>
               <div className="relative">
                 <input
@@ -748,7 +657,7 @@ const filteredBatches = userBatches.filter((batch) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t("bundle.color")}
+                  {t("bundle.color")}
                 </label>
                 {hasColors ? (
                   <select
@@ -785,7 +694,7 @@ const filteredBatches = userBatches.filter((batch) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t("bundle.size")}
+                  {t("bundle.size")}
                 </label>
                 {hasColors ? (
                   hasSizes ? (
@@ -852,7 +761,7 @@ const filteredBatches = userBatches.filter((batch) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t("bundle.count")}
+                  {t("bundle.count")}
                 </label>
                 <div className="flex items-center border border-gray-300 rounded-md">
                   <button
@@ -883,7 +792,7 @@ const filteredBatches = userBatches.filter((batch) => {
               </div>
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t("bundle.bundle_qty")}
+                  {t("bundle.bundle_qty")}
                 </label>
                 <div className="flex items-center border border-gray-300 rounded-md">
                   <button
@@ -931,7 +840,7 @@ const filteredBatches = userBatches.filter((batch) => {
             {formData.department === "Sub-con" && (
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t("bundle.sub_con_factory")}
+                  {t("bundle.sub_con_factory")}
                 </label>
                 <select
                   value={subConName}
@@ -994,7 +903,6 @@ const filteredBatches = userBatches.filter((batch) => {
                 >
                   <FaQrcode className="mr-2" /> {t("bundle.generate_qr")}
                 </button>
-
                 {qrData.length > 0 && (
                   <>
                     <button
@@ -1026,7 +934,21 @@ const filteredBatches = userBatches.filter((batch) => {
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-lg font-bold text-gray-800 mb-4">{t("bundle.data")}</h2>
             <div className="overflow-x-auto">
-            <div className="flex space-x-4 mb-6">
+              <div className="flex space-x-4 mb-6">
+              <input
+                  type="text"
+                  placeholder="Filter by Color"
+                  value={colorFilter}
+                  onChange={(e) => setColorFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md"
+                />
+                <input
+                  type="text"
+                  placeholder="Filter by Size"
+                  value={sizeFilter}
+                  onChange={(e) => setSizeFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md"
+                />
                 <input
                   type="text"
                   placeholder="Filter by Style Code"
@@ -1049,69 +971,69 @@ const filteredBatches = userBatches.filter((batch) => {
                   className="px-4 py-2 border border-gray-300 rounded-md"
                 />
               </div>
-              
+
               <table className="min-w-full divide-y divide-gray-200 border border-gray-200">
                 <thead className="bg-sky-100">
                   <tr>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.record_id")}
+                      {t("bundle.record_id")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.package_no")}
+                      {t("bundle.package_no")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.date")}
+                      {t("bundle.date")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.modify")}
+                      {t("bundle.modify")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.time")}
+                      {t("bundle.time")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.department")}
+                      {t("bundle.department")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.emp_id")}
+                      {t("bundle.emp_id")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.eng_name")}
+                      {t("bundle.eng_name")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.kh_name")}
+                      {t("bundle.kh_name")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.mono")}
+                      {t("bundle.mono")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.customer_style")}
+                      {t("bundle.customer_style")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.buyer")}
+                      {t("bundle.buyer")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.country")}
+                      {t("bundle.country")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.total_order_qty")}
+                      {t("bundle.total_order_qty")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.factory")}
+                      {t("bundle.factory")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.line_no")}
+                      {t("bundle.line_no")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.color")}
+                      {t("bundle.color")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.color_chi")}
+                      {t("bundle.color_chi")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.size")}
+                      {t("bundle.size")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.order_cut_qty")}
+                      {t("bundle.order_cut_qty")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       {t("bundle.plan_cut_qty")}
@@ -1120,10 +1042,10 @@ const filteredBatches = userBatches.filter((batch) => {
                       {t("bundle.count")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.total_bundle_qty")}
+                      {t("bundle.total_bundle_qty")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("bundle.sub_con")}
+                      {t("bundle.sub_con")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                       {t("bundle.sub_con_factory")}
@@ -1143,7 +1065,7 @@ const filteredBatches = userBatches.filter((batch) => {
                         {batch.updated_date_seperator}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                      <button
+                        <button
                           onClick={() => handleEdit(batch.id)}
                           className="ml-2 text-gray-900 font-m hover:text-blue-800 border px-4 py-2 bg-green-500"
                         >
@@ -1211,9 +1133,7 @@ const filteredBatches = userBatches.filter((batch) => {
                         {batch.sub_con}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                        {batch.sub_con === "Yes"
-                          ? batch.sub_con_factory
-                          : "N/A"}
+                        {batch.sub_con === "Yes" ? batch.sub_con_factory : "N/A"}
                       </td>
                     </tr>
                   ))}
@@ -1257,12 +1177,15 @@ const filteredBatches = userBatches.filter((batch) => {
           onClose={() => setEditModalOpen(false)}
           formData={formData}
           setFormData={setFormData}
-          handleSave={handleSave}
+          setUserBatches={setUserBatches}
+          setEditModalOpen={setEditModalOpen}
         />
-        
       </div>
     </div>
   );
 }
 
 export default BundleRegistration;
+
+
+ 

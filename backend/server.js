@@ -1912,40 +1912,29 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
 });
 
 /* ------------------------------
+   Bundle Registration Data Edit
+------------------------------ */
+
+app.put('/api/update-bundle-data/:id', async (req, res) => {
+  const { id } = req.params;
+  const updateData = req.body;
+
+  try {
+    const updatedOrder = await QC2OrderData.findByIdAndUpdate(id, updateData, { new: true });
+    if (!updatedOrder) {
+      return res.status(404).send({ message: 'Order not found' });
+    }
+    res.send(updatedOrder);
+  } catch (error) {
+    console.error('Error updating order:', error);
+    res.status(500).send({ message: 'Internal Server Error' });
+  }
+});
+
+
+/* ------------------------------
    QC2 - Reworks
 ------------------------------ */
-// Schema for qc2_reworks with separate header fields
-const qc2ReworksSchema = new mongoose.Schema(
-  {
-    package_no: { type: Number, required: true }, // extracted from bundleData.package_no
-    //bundleNo: { type: String, required: true },
-    moNo: { type: String, required: true },
-    custStyle: { type: String, required: true },
-    color: { type: String, required: true },
-    size: { type: String, required: true },
-    lineNo: { type: String, required: true },
-    department: { type: String, required: true },
-    reworkGarments: [
-      {
-        defectName: { type: String, required: true },
-        count: { type: Number, required: true },
-        time: { type: String, required: true }, // "HH:MM:SS"
-      },
-    ],
-    emp_id_inspection: { type: String, required: true },
-    eng_name_inspection: { type: String, required: true },
-    kh_name_inspection: { type: String, required: true },
-    job_title_inspection: { type: String, required: true },
-    dept_name_inspection: { type: String, required: true },
-    sect_name_inspection: { type: String, required: true },
-    bundle_id: { type: String, required: true }, // Add this line
-    bundle_random_id: { type: String, required: true }, // Add this line
-  },
-  { collection: "qc2_reworks" }
-);
-
-const QC2Reworks = mongoose.model("qc2_reworks", qc2ReworksSchema);
-
 // Endpoint to save reworks (reject garment) data
 app.post("/api/reworks", async (req, res) => {
   try {
