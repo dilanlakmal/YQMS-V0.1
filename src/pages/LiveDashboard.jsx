@@ -20,8 +20,9 @@ import {
   TrendingDown,
   XCircle,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Bar } from "react-chartjs-2";
+import { io } from "socket.io-client"; // Import Socket.io client
 import { API_BASE_URL } from "../../config";
 import DateSelector from "../components/forms/DateSelector"; // make sure this version does NOT render its own label
 
@@ -73,6 +74,8 @@ const LiveDashboard = () => {
   });
   const [defectRates, setDefectRates] = useState([]);
   const [viewMode, setViewMode] = useState("chart");
+
+  const filtersRef = useRef({});
 
   // --- Helper: Format Date to "MM/DD/YYYY" (ensure two-digit month/day) ---
   const formatDate = (date) => {
@@ -198,6 +201,55 @@ const LiveDashboard = () => {
     fetchFilterOptions();
     fetchSummaryData();
     fetchDefectRates();
+
+    const intervalId = setInterval(() => {
+      const currentFilters = filtersRef.current;
+      fetchSummaryData(currentFilters);
+      fetchDefectRates(currentFilters);
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Update ref when filter states change
+  useEffect(() => {
+    filtersRef.current = {
+      moNo,
+      color,
+      size,
+      department,
+      empId,
+      startDate: startDate ? formatDate(startDate) : null,
+      endDate: endDate ? formatDate(endDate) : null,
+    };
+  }, [moNo, color, size, department, empId, startDate, endDate]);
+
+  // Socket.io connection
+  useEffect(() => {
+    const socket = io(`${{ API_BASE_URL }}`, {
+      path: "/socket.io",
+      transports: ["websocket"],
+    });
+
+    socket.on("qc2_data_updated", () => {
+      console.log("Data updated event received");
+      const currentFilters = filtersRef.current;
+
+      const filters = {
+        moNo: currentFilters.moNo,
+        color: currentFilters.color,
+        size: currentFilters.size,
+        department: currentFilters.department,
+        emp_id_inspection: currentFilters.empId,
+        startDate: currentFilters.startDate,
+        endDate: currentFilters.endDate,
+      };
+
+      fetchSummaryData(filters);
+      fetchDefectRates(filters);
+    });
+
+    return () => socket.disconnect();
   }, []);
 
   // --- Calculate dynamic max defect rate for Y axis ---

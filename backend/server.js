@@ -7,17 +7,23 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import express from "express";
 import fs from "fs";
+import https from "https"; // Import https for HTTPS server
+//import http from "http"; // Import http for Socket.io
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import multer from "multer";
 import path from "path";
+import { Server } from "socket.io"; // Import Socket.io
 import { fileURLToPath } from "url";
 import createIroningModel from "./models/Ironing.js";
 import createRoleModel from "./models/Role.js";
 //import createRoleManagmentModel from "./models/RoleManagment.js";
+import createOPAModel from "./models/OPA.js";
+import createPackingModel from "./models/Packing.js";
 import createQC2DefectPrintModel from "./models/QC2DefectPrint.js";
 import createRoleManagmentModel from "./models/RoleManagment.js";
 import createUserModel from "./models/User.js";
+import createWashingModel from "./models/Washing.js";
 import createQCDataModel from "./models/qc1_data.js";
 import createQc2OrderDataModel from "./models/qc2_orderdata.js";
 // Import the API_BASE_URL from our config file
@@ -29,6 +35,57 @@ import { API_BASE_URL } from "./config.js";
 
 const app = express();
 const PORT = 5001;
+
+/* ------------------------------
+   for HTTPS
+------------------------------ */
+
+// Load SSL certificates
+const privateKey = fs.readFileSync(
+  "/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.167.7.252+1-key.pem",
+  "utf8"
+);
+const certificate = fs.readFileSync(
+  "/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.167.7.252+1.pem",
+  "utf8"
+);
+
+const credentials = {
+  key: privateKey,
+  cert: certificate,
+};
+
+// Create HTTPS server
+const server = https.createServer(credentials, app);
+
+// Initialize Socket.io
+const io = new Server(server, {
+  cors: {
+    origin: "https://192.167.7.252:3001", // Update with your frontend URL  //"https://localhost:3001"
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  },
+  //path: "/socket.io",
+  //transports: ["websocket"],
+});
+
+/* ------------------------------
+   for HTTP
+------------------------------ */
+
+//const server = http.createServer(app); // Create HTTP server for Socket.io
+
+// const io = new Server(server, {
+//   cors: {
+//     origin: "*", // Allow all origins (update with your frontend URL in production)
+//     methods: ["GET", "POST"],
+//     allowedHeaders: ["Content-Type", "Authorization"],
+//     credentials: true,
+//   },
+//   path: "/socket.io",
+//   transports: ["websocket"],
+// }); // Initialize Socket.io
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,6 +128,9 @@ const Role = createRoleModel(ymProdConnection);
 const QCData = createQCDataModel(ymProdConnection);
 const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
 const Ironing = createIroningModel(ymProdConnection);
+const Washing = createWashingModel(ymProdConnection);
+const OPA = createOPAModel(ymProdConnection);
+const Packing = createPackingModel(ymProdConnection);
 const RoleManagment = createRoleManagmentModel(ymProdConnection);
 const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
 
@@ -371,8 +431,8 @@ app.post("/api/save-bundle-data", async (req, res) => {
       // Get current package number for this MONo-Color-Size combination
       const packageCount = await QC2OrderData.countDocuments({
         selectedMono: bundle.selectedMono,
-        color: bundle.color,
-        size: bundle.size,
+        //color: bundle.color,
+        //size: bundle.size,
       });
 
       const randomId = await generateRandomId();
@@ -676,6 +736,253 @@ app.get("/api/ironing-records", async (req, res) => {
     res.json(records);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch ironing records" });
+  }
+});
+
+/* ------------------------------
+   End Points - Washing
+------------------------------ */
+
+// Check if washing record exists
+app.get("/api/check-washing-exists/:bundleId", async (req, res) => {
+  try {
+    const record = await Washing.findOne({
+      washing_bundle_id: req.params.bundleId,
+    });
+    res.json({ exists: !!record });
+  } catch (error) {
+    res.status(500).json({ error: "Error checking record" });
+  }
+});
+
+// New endpoint to get the last washing record ID for a specific emp_id
+app.get("/api/last-washing-record-id/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const lastRecord = await Washing.findOne(
+      { emp_id },
+      {},
+      { sort: { washing_record_id: -1 } }
+    );
+    const lastRecordId = lastRecord ? lastRecord.washing_record_id : 0;
+    res.json({ lastRecordId });
+  } catch (error) {
+    console.error("Error fetching last washing record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last washing record ID" });
+  }
+});
+
+// Save washing record
+app.post("/api/save-washing", async (req, res) => {
+  try {
+    const newRecord = new Washing(req.body);
+    await newRecord.save();
+    res.status(201).json({ message: "Record saved successfully" });
+  } catch (error) {
+    if (error.code === 11000) {
+      res.status(400).json({ error: "Duplicate record found" });
+    } else {
+      res.status(500).json({ error: "Failed to save record" });
+    }
+  }
+});
+
+// Update qc2_orderdata with washing details
+app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
+  try {
+    const { bundleId } = req.params;
+    const { passQtyWash, washing_updated_date, washing_update_time } = req.body;
+    const updatedRecord = await QC2OrderData.findOneAndUpdate(
+      { bundle_id: bundleId },
+      {
+        passQtyWash,
+        washing_updated_date,
+        washing_update_time,
+      },
+      { new: true }
+    );
+    if (!updatedRecord) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+    res.json({ message: "Record updated successfully", data: updatedRecord });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update record" });
+  }
+});
+
+// For Data tab display records in a table
+app.get("/api/washing-records", async (req, res) => {
+  try {
+    const records = await Washing.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch washing records" });
+  }
+});
+
+/* ------------------------------
+   End Points - OPA
+------------------------------ */
+
+// Check if OPA record exists
+app.get("/api/check-opa-exists/:bundleId", async (req, res) => {
+  try {
+    const record = await OPA.findOne({
+      opa_bundle_id: req.params.bundleId,
+    });
+    res.json({ exists: !!record });
+  } catch (error) {
+    res.status(500).json({ error: "Error checking record" });
+  }
+});
+
+// New endpoint to get the last OPA record ID for a specific emp_id
+app.get("/api/last-opa-record-id/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const lastRecord = await OPA.findOne(
+      { emp_id },
+      {},
+      { sort: { opa_record_id: -1 } }
+    );
+    const lastRecordId = lastRecord ? lastRecord.opa_record_id : 0;
+    res.json({ lastRecordId });
+  } catch (error) {
+    console.error("Error fetching last OPA record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last OPA record ID" });
+  }
+});
+
+// Save OPA record
+app.post("/api/save-opa", async (req, res) => {
+  try {
+    const newRecord = new OPA(req.body);
+    await newRecord.save();
+    res.status(201).json({ message: "Record saved successfully" });
+  } catch (error) {
+    if (error.code === 11000) {
+      res.status(400).json({ error: "Duplicate record found" });
+    } else {
+      res.status(500).json({ error: "Failed to save record" });
+    }
+  }
+});
+
+// Update qc2_orderdata with OPA details
+app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
+  try {
+    const { bundleId } = req.params;
+    const { passQtyOPA, opa_updated_date, opa_update_time } = req.body;
+
+    const updatedRecord = await QC2OrderData.findOneAndUpdate(
+      { bundle_id: bundleId },
+      {
+        passQtyOPA,
+        opa_updated_date,
+        opa_update_time,
+      },
+      { new: true }
+    );
+
+    if (!updatedRecord) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+
+    res.json({ message: "Record updated successfully", data: updatedRecord });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update record" });
+  }
+});
+
+// For Data tab display records in a table
+app.get("/api/opa-records", async (req, res) => {
+  try {
+    const records = await OPA.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch OPA records" });
+  }
+});
+
+/* ------------------------------
+   End Points - Packing
+------------------------------ */
+
+// Check if Packing record exists
+app.get("/api/check-packing-exists/:bundleId", async (req, res) => {
+  try {
+    const record = await Packing.findOne({
+      packing_bundle_id: req.params.bundleId,
+    });
+    res.json({ exists: !!record });
+  } catch (error) {
+    res.status(500).json({ error: "Error checking record" });
+  }
+});
+
+// New endpoint to get the last Packing record ID for a specific emp_id
+app.get("/api/last-packing-record-id/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const lastRecord = await Packing.findOne(
+      { emp_id },
+      {},
+      { sort: { packing_record_id: -1 } }
+    );
+    const lastRecordId = lastRecord ? lastRecord.packing_record_id : 0;
+    res.json({ lastRecordId });
+  } catch (error) {
+    console.error("Error fetching last Packing record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last Packing record ID" });
+  }
+});
+
+// Save Packing record
+app.post("/api/save-packing", async (req, res) => {
+  try {
+    const newRecord = new Packing(req.body);
+    await newRecord.save();
+    res.status(201).json({ message: "Record saved successfully" });
+  } catch (error) {
+    if (error.code === 11000) {
+      res.status(400).json({ error: "Duplicate record found" });
+    } else {
+      res.status(500).json({ error: "Failed to save record" });
+    }
+  }
+});
+
+// Update qc2_orderdata with Packing details
+app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
+  try {
+    const { bundleId } = req.params;
+    const { passQtyPacking, packing_updated_date, packing_update_time } =
+      req.body;
+    const updatedRecord = await QC2OrderData.findOneAndUpdate(
+      { bundle_id: bundleId },
+      {
+        passQtyPacking,
+        packing_updated_date,
+        packing_update_time,
+      },
+      { new: true }
+    );
+    if (!updatedRecord) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+    res.json({ message: "Record updated successfully", data: updatedRecord });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update record" });
+  }
+});
+
+// For Data tab display records in a table
+app.get("/api/packing-records", async (req, res) => {
+  try {
+    const records = await Packing.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch Packing records" });
   }
 });
 
@@ -1217,6 +1524,15 @@ const QC2InspectionPassBundle = mongoose.model(
   qc2InspectionPassBundleSchema
 );
 
+// Socket.io connection handler
+io.on("connection", (socket) => {
+  console.log("A client connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("A client disconnected:", socket.id);
+  });
+});
+
 // Endpoint to save inspection pass bundle data
 app.post("/api/inspection-pass-bundle", async (req, res) => {
   try {
@@ -1273,6 +1589,10 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
     });
 
     await newRecord.save();
+
+    // Emit event to all clients
+    io.emit("qc2_data_updated");
+
     res.status(201).json({
       message: "Inspection pass bundle saved successfully",
       data: newRecord,
@@ -1947,7 +2267,6 @@ app.post("/users", async (req, res) => {
         message: "User already exist! Please Use different Name",
       });
     }
-    // <<<
 
     // If emp_id is provided, check if it already exists
     if (emp_id) {
@@ -1988,60 +2307,6 @@ app.post("/users", async (req, res) => {
   }
 });
 
-// app.post("/users", async (req, res) => {
-//   try {
-//     const { emp_id, name, email, roles, sub_roles, keywords, password } =
-//       req.body;
-
-//     // Log the incoming request body
-//     console.log("Request body:", req.body);
-
-//     // Check if the emp_id already exists
-//     const existingUser = await UserMain.findOne({ emp_id });
-//     if (existingUser) {
-//       return res.status(400).json({
-//         message: "Employee ID already exists. Please use a different ID.",
-//       });
-//     }
-
-//     // Hash the password
-//     const salt = await bcrypt.genSalt(10);
-//     const hashedPassword = await bcrypt.hash(password, salt);
-
-//     // Create a new user
-//     const newUser = new UserMain({
-//       emp_id,
-//       name,
-//       email,
-//       roles,
-//       sub_roles,
-//       keywords,
-//       password: hashedPassword,
-//     });
-
-//     // Save the user to the database
-//     await newUser.save();
-
-//     res.status(201).json(newUser);
-//   } catch (error) {
-//     console.error("Error creating user:", error);
-//     res.status(500).json({ message: "Failed to create user" });
-//   }
-// });
-
-// //Update
-// app.put("/users/:id", async (req, res) => {
-//   try {
-//     const user = await UserMain.findByIdAndUpdate(req.params.id, req.body, {
-//       new: true,
-//     });
-//     res.json(user);
-//   } catch (error) {
-//     console.error("Error updating user:", error);
-//     res.status(500).json({ message: "Failed to update user" });
-//   }
-// });
-
 //Delete
 app.delete("/users/:id", async (req, res) => {
   try {
@@ -2052,48 +2317,6 @@ app.delete("/users/:id", async (req, res) => {
     res.status(500).json({ message: "Failed to delete user" });
   }
 });
-
-//-----------------------------------------------------------//
-// // Getting Roles
-// app.get("/roles", async (req, res) => {
-//   try {
-//     const roles = await Role.find();
-//     res.json(roles);
-//   } catch (error) {
-//     console.error("Error fetching roles:", error);
-//     res.status(500).json({ error: "Failed to fetch roles" });
-//   }
-// });
-
-// // Change role
-// app.put("/users/:id", async (req, res) => {
-//   try {
-//     const { name, email, roles, sub_roles, keywords, password } = req.body;
-//     const updatedUser = { name, email, keywords };
-
-//     if (roles) {
-//       updatedUser.roles = [...new Set(roles)]; // Remove duplicates
-//     }
-
-//     if (sub_roles) {
-//       updatedUser.sub_roles = [...new Set(sub_roles)]; // Remove duplicates
-//     }
-
-//     if (password) {
-//       const saltRounds = 12;
-//       updatedUser.password = await bcrypt.hash(password, saltRounds); // Ensure you hash the password before saving
-//     }
-
-//     const user = await UserMain.findByIdAndUpdate(req.params.id, updatedUser, {
-//       new: true,
-//     });
-//     res.json(user);
-//   } catch (error) {
-//     console.error("Error updating user:", error);
-//     res.status(500).json({ message: "Failed to update user" });
-//   }
-// });
-//-----------------------------------------------------------//
 
 /* ------------------------------
    Login Authentication ENDPOINTS
@@ -2330,42 +2553,6 @@ app.get("/api/user-profile", authenticateUser, async (req, res) => {
     });
   }
 });
-
-// app.get("/api/user-profile", async (req, res) => {
-//   try {
-//     const token = req.headers.authorization.split(" ")[1];
-//     const decoded = jwt.verify(token, "your_jwt_secret");
-//     const user = await UserMain.findById(decoded.userId);
-
-//     if (!user) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-
-//     // Use custom image if exists; otherwise use face_photo (or default fallback)
-//     let profileImage = "";
-//     if (user.profile && user.profile.trim() !== "") {
-//       profileImage = `${API_BASE_URL}/public/storage/profiles/${
-//         decoded.userId
-//       }/${path.basename(user.profile)}`;
-//     } else if (user.face_photo && user.face_photo.trim() !== "") {
-//       profileImage = user.face_photo;
-//     } else {
-//       profileImage = "/IMG/default-profile.png";
-//     }
-
-//     res.status(200).json({
-//       emp_id: user.emp_id,
-//       name: user.name,
-//       dept_name: user.dept_name,
-//       sect_name: user.sect_name,
-//       profile: profileImage,
-//     });
-//   } catch (error) {
-//     res
-//       .status(500)
-//       .json({ message: "Failed to fetch user profile", error: error.message });
-//   }
-// });
 
 // ------------------------
 // PUT /api/user-profile
@@ -2712,26 +2899,6 @@ app.get("/api/user-roles/:empId", async (req, res) => {
   }
 });
 
-// app.get("/api/user-roles/:empId", async (req, res) => {
-//   try {
-//     const { empId } = req.params;
-//     const roles = [];
-
-//     const userRoles = await RoleManagment.find({
-//       "users.emp_id": empId,
-//     });
-
-//     userRoles.forEach((role) => {
-//       roles.push(role.role);
-//     });
-
-//     res.json({ roles });
-//   } catch (error) {
-//     console.error("Error fetching user roles:", error);
-//     res.status(500).json({ message: "Failed to fetch user roles" });
-//   }
-// });
-
 app.get("/api/role-management", async (req, res) => {
   try {
     const roles = await RoleManagment.find({}).sort({
@@ -2848,6 +3015,10 @@ app.post("/api/update-user-roles", async (req, res) => {
   }
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+// app.listen(PORT, "0.0.0.0", () => {
+//   console.log(`Server is running on http://localhost:${PORT}`);
+// });
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`HTTPS Server is running on https://localhost:${PORT}`);
 });
