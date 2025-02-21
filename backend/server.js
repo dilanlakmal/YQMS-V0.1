@@ -251,11 +251,9 @@ app.get("/api/order-details/:mono", async (req, res) => {
 app.get("/api/order-sizes/:mono/:color", async (req, res) => {
   try {
     const collection = ymProdConnection.db.collection("dt_orders");
-    
     const order = await collection.findOne({ Order_No: req.params.mono });
 
-    if (!order) return res.status(404).json({ error: "Order not found" });s
-
+    if (!order) return res.status(404).json({ error: "Order not found" });
     const colorObj = order.OrderColors.find(
       (c) => c.Color.toLowerCase() === req.params.color.toLowerCase().trim()
     );
@@ -448,8 +446,8 @@ app.post("/api/save-bundle-data", async (req, res) => {
       // Get current package number for this MONo-Color-Size combination
       const packageCount = await QC2OrderData.countDocuments({
         selectedMono: bundle.selectedMono,
-        color: bundle.color,
-        size: bundle.size,
+        // color: bundle.color,
+        // size: bundle.size,
       });
 
       const randomId = await generateRandomId();
@@ -1485,21 +1483,20 @@ app.get("/api/download-data", async (req, res) => {
     console.log("Found records:", data.length); // For debugging
 
     // Transform data for consistent response
-    const transformedData = data.map((item) => {
-      const date = item[dateField]; // Log the date field
-      return {
-        date: date,
-        type: isIroning ? "Ironing" : "QC2 Order Data",
-        taskNo: isIroning ? "53" : "52",
-        selectedMono: item.selectedMono,
-        custStyle: item.custStyle,
-        lineNo: item.lineNo,
-        color: item.color,
-        size: item.size,
-        buyer: item.buyer,
-        bundle_id: isIroning ? item.ironing_bundle_id : item.bundle_id,
-      };
-    });
+    const transformedData = data.map((item) => ({
+      date: item[dateField],
+      type: isIroning ? "Ironing" : "QC2 Order Data",
+      taskNo: isIroning ? "53" : "52",
+      selectedMono: item.selectedMono,
+      custStyle: item.custStyle,
+      lineNo: item.lineNo,
+      color: item.color,
+      size: item.size,
+      buyer: item.buyer,
+      bundle_id: isIroning ? item.ironing_bundle_id : item.bundle_id,
+      factory: item.factory,
+      count: item.count,
+    }));
 
     res.json({
       data: transformedData,
