@@ -21,6 +21,7 @@ import IroningPage from "./pages/Ironing";
 import WashingPage from "./pages/Washing";
 import OPAPage from "./pages/OPA";
 import PackingPage from "./pages/Packing";
+import LiveDashboard from "./pages/LiveDashboard";
 import Login from "./pages/Auth/Login";
 import ForgotPassword from "./pages/Auth/ForgotPassword";
 import Register from "./pages/Auth/Register"; 
@@ -320,6 +321,7 @@ function App() {
                   }
                 />
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/live-dashboard" element={<LiveDashboard />} />
                 <Route
                   path="/bundle-registration"
                   element={<BundleRegistration />}

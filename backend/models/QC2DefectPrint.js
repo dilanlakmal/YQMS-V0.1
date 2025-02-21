@@ -7,7 +7,7 @@ const qc2DefectPrintSchema = new mongoose.Schema(
       required: true,
     },
     package_no: {
-      type: String,
+      type: Number,
       required: true,
     },
     moNo: {
@@ -63,6 +63,32 @@ const qc2DefectPrintSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+    emp_id_inspection: {
+      type: String,
+      required: true,
+    },
+    eng_name_inspection: {
+      type: String,
+      required: true,
+    },
+    kh_name_inspection: {
+      type: String,
+      required: true,
+    },
+    job_title_inspection: {
+      type: String,
+      required: true,
+    },
+    dept_name_inspection: {
+      type: String,
+      required: true,
+    },
+    sect_name_inspection: {
+      type: String,
+      required: true,
+    },
+    bundle_id: { type: String, required: true }, // Add this line
+    bundle_random_id: { type: String, required: true }, // Add this line
   },
   {
     timestamps: true,

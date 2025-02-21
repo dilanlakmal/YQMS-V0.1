@@ -185,7 +185,7 @@ function Home() {
           description: "Click here to Download Data."
         },
         {
-          path: "/dashboard",
+          path: "/live-dashboard",
           roles: ["Admin", "Data Analytics"],
           image: "/IMG/dash.png",
           title: "Live Dashboard",
