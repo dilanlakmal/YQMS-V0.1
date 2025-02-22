@@ -91,7 +91,7 @@ function Home() {
           path: "/cutting",
           roles: ["Admin", "QC1"],
           image: "/IMG/cutting.webp",
-          title: t("cutting"),
+          title: t("home.cutting"),
           description: "Begin a new Cutting Inspection Reports here."
         },
         {

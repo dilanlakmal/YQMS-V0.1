@@ -69,7 +69,8 @@
     "order_cut_qty":"订单切割数量",
     "total_bundle_qty":"总捆绑数量",
     "edit":"编辑",
-    "action":"行动"  
+    "action":"行动",
+    "print_qr":"打印二维码"
   }
   }
   

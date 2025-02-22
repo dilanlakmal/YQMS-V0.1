@@ -300,12 +300,16 @@ function BundleRegistration() {
       alert("User data is not available. Please try again.");
       return;
     }
+
     if (!validateLineNo()) {
       alert("Invalid Line No. It must be between 1 and 30 for YM factory.");
       return;
     }
+
     const { date, selectedMono, color, size, lineNo } = formData;
+
     if (formData.totalGarmentsCount > formData.planCutQty) return;
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/check-bundle-id`, {
         method: "POST",
@@ -318,11 +322,17 @@ function BundleRegistration() {
           size,
         }),
       });
+
       const { largestNumber } = await response.json();
+
       const bundleQty = parseInt(formData.bundleQty);
       const bundleData = [];
+
       for (let i = 1; i <= bundleQty; i++) {
-        const bundleId = `${date.toISOString().split("T")[0]}:${lineNo}:${selectedMono}:${color}:${size}:${largestNumber + i}`;
+        const bundleId = `${
+          date.toISOString().split("T")[0]
+        }:${lineNo}:${selectedMono}:${color}:${size}:${largestNumber + i}`;
+
         const bundleRecord = {
           bundle_id: bundleId,
           date: date.toLocaleDateString("en-US"),
@@ -353,13 +363,16 @@ function BundleRegistration() {
           dept_name: user.dept_name,
           sect_name: user.sect_name,
         };
+
         bundleData.push(bundleRecord);
       }
+
       const saveResponse = await fetch(`${API_BASE_URL}/api/save-bundle-data`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bundleData }),
       });
+
       if (saveResponse.ok) {
         const savedData = await saveResponse.json();
         setQrData(savedData.data);
@@ -368,13 +381,16 @@ function BundleRegistration() {
           ...prev,
           bundleQty: "",
         }));
+
         setDataRecords((prevRecords) => [...prevRecords, ...savedData.data]);
+
         try {
           const totalResponse = await fetch(
             `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
           );
           const totalData = await totalResponse.json();
           setTotalBundleQty(totalData.total);
+
           if (user) {
             const batchesResponse = await fetch(
               `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
@@ -393,6 +409,7 @@ function BundleRegistration() {
       alert("Failed to save bundle data.");
     }
   };
+ 
 
   const handlePrintQR = async () => {
     if (!bluetoothComponentRef.current) {
@@ -910,7 +927,7 @@ function BundleRegistration() {
                       onClick={() => setShowQRPreview(true)}
                       className="px-4 py-2 rounded-md bg-indigo-500 text-white hover:bg-indigo-600 flex items-center"
                     >
-                      <FaEye className="mr-2" /> {t("bundle.preview-qr")}
+                      <FaEye className="mr-2" /> {t("bundle.preview_qr")}
                     </button>
                     <button
                       type="button"
@@ -923,7 +940,7 @@ function BundleRegistration() {
                       }`}
                     >
                       <FaPrint className="mr-2" />
-                      {isPrinting ? "Printing..." : "Print QR"}
+                      {isPrinting ? t("bundle.printing") : t("bundle.print_qr")}
                     </button>
                   </>
                 )}

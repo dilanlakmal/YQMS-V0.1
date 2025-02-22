@@ -69,7 +69,8 @@
     "order_cut_qty":"Order Cut Qty",
     "total_bundle_qty":"Total Bundle Qty",
     "edit":"Edit",
-    "action":"Action"
+    "action":"Action",
+    "print_qr":"Print QR"
   }
   }
   

@@ -439,7 +439,20 @@ const generateRandomId = async () => {
 app.post("/api/save-bundle-data", async (req, res) => {
   try {
     const { bundleData } = req.body;
+
+    // Log the incoming bundleData for debugging
+    console.log("Received bundleData:", bundleData);
+
     const savedRecords = [];
+
+    // Validate the incoming data
+    for (const bundle of bundleData) {
+      if (!bundle.emp_id || !bundle.eng_name || !bundle.dept_name) {
+        return res.status(400).json({
+          message: "Validation failed: 'emp_id', 'eng_name', and 'dept_name' are required in each bundle.",
+        });
+      }
+    }
 
     // Save each bundle record
     for (const bundle of bundleData) {
@@ -451,7 +464,6 @@ app.post("/api/save-bundle-data", async (req, res) => {
       });
 
       const randomId = await generateRandomId();
-
       const now = new Date();
 
       // Format timestamps
@@ -489,10 +501,10 @@ app.post("/api/save-bundle-data", async (req, res) => {
         dept_name: bundle.dept_name,
         sect_name: bundle.sect_name || "",
       });
+
       await newBundle.save();
       savedRecords.push(newBundle);
     }
-    // const savedRecords = await QC2OrderData.insertMany(bundleData);
 
     res.status(201).json({
       message: "Bundle data saved successfully",
@@ -506,6 +518,7 @@ app.post("/api/save-bundle-data", async (req, res) => {
     });
   }
 });
+
 
 //For Data tab display records in a table
 app.get("/api/user-batches", async (req, res) => {
@@ -2638,7 +2651,7 @@ app.get("/api/user-profile", authenticateUser, async (req, res) => {
     // Use the custom uploaded image if available; otherwise use face_photo; else fallback.
     let profileImage = "";
     if (user.profile && user.profile.trim() !== "") {
-      profileImage = `http://localhost:5001/public/storage/profiles/${
+      profileImage = `${API_BASE_URL}/public/storage/profiles/${
         decoded.userId
       }/${path.basename(user.profile)}`;
     } else if (user.face_photo && user.face_photo.trim() !== "") {

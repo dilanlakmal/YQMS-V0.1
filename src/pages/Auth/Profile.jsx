@@ -18,6 +18,7 @@ function Profile() {
     profile: "", // This will be a URL string or a File object
     face_photo: "",
   });
+
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
@@ -34,9 +35,10 @@ function Profile() {
         });
 
         const userData = response.data;
+
         setProfile({
-          ...response.data,
-          image: userData.face_photo || "/IMG/default-profile.png",
+          ...userData,
+          image: userData.face_photo || userData.profile || "/IMG/default-profile.png",
         });
       } catch (error) {
         console.error("Error fetching profile:", error);
@@ -49,7 +51,7 @@ function Profile() {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setProfile((prev) => ({ ...prev, image: file }));
+      setProfile((prev) => ({ ...prev, profile: file }));
     }
   };
 
@@ -77,9 +79,11 @@ function Profile() {
       formData.append("kh_name", profile.kh_name);
       formData.append("job_title", profile.job_title);
       formData.append("email", profile.email);
-      if (profile.image && profile.image instanceof File) {
-        formData.append("profile", profile.image);
+
+      if (profile.profile && profile.profile instanceof File) {
+        formData.append("profile", profile.profile);
       }
+
       await axios.put(`${API_BASE_URL}/api/user-profile`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -98,22 +102,16 @@ function Profile() {
   };
 
   const getProfileImageSrc = () => {
-    if (!profile.profile)
-      return profile.face_photo || "/IMG/default-profile.png";
-    if (typeof profile.profile === "string") return profile.profile;
-    return URL.createObjectURL(profile.profile);
+    if (profile.profile instanceof File) {
+      return URL.createObjectURL(profile.profile);
+    }
+
+    if (profile.profile) {
+      return profile.profile;
+    }
+
+    return profile.face_photo || "/IMG/default-profile.png";
   };
-
-
-  // const getProfileImageSrc = () => {
-  //   if (profile.profile instanceof File) {
-  //     return URL.createObjectURL(profile.profile);
-  //   }
-  //   if (profile.profile) {
-  //     return profile.profile;
-  //   }
-  //   return profile.face_photo || "/IMG/default-profile.png";
-  // };
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-50 to-gray-100 py-10 px-5">
@@ -129,7 +127,7 @@ function Profile() {
             <div className="relative">
               <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-200">
                 <img
-                   src={getProfileImageSrc()}
+                  src={getProfileImageSrc()}
                   alt="Profile"
                   className="w-full h-full object-cover"
                 />
@@ -150,7 +148,7 @@ function Profile() {
                   <p className="mt-1 text-sm text-gray-900">{profile.emp_id}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold  text-gray-700">
+                  <label className="block text-sm font-bold text-gray-700">
                     Working Status
                   </label>
                   <p className="mt-1 text-sm text-gray-900">
@@ -158,7 +156,7 @@ function Profile() {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold  text-gray-700">
+                  <label className="block text-sm font-bold text-gray-700">
                     Department
                   </label>
                   <p className="mt-1 text-sm text-gray-900">
@@ -166,7 +164,7 @@ function Profile() {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold  text-gray-700">
+                  <label className="block text-sm font-bold text-gray-700">
                     Section
                   </label>
                   <p className="mt-1 text-sm text-gray-900">
@@ -176,7 +174,6 @@ function Profile() {
               </div>
             </div>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-100">
@@ -253,7 +250,6 @@ function Profile() {
               />
             </div>
           </div>
-
           <div className="flex justify-end mt-6">
             <button
               type="submit"

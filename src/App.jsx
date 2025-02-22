@@ -7,39 +7,46 @@ import {
 } from "react-router-dom";
 
 import "./App.css";
-import Navbar from "./components/layout/Navbar";// Updated path
-import RoleManagement from "./components/users/RoleManagement"; // Fixed spelling
+import Navbar from "./components/layout/Navbar";
+import RoleManagement from "./components/users/RoleManagement";
 import Analytics from "./pages/Analytics";
 import BundleRegistration from "./pages/BundleRegistration";
-import Cutting from "./pages/Cutting";
 import Dashboard from "./pages/Dashboard";
 import Details from "./pages/QC Inspection/Details";
 import DownloadData from "./pages/DownloadData";
 import Home from "./pages/Home";
 import Inspection from "./pages/QC Inspection/Inspection";
 import IroningPage from "./pages/Ironing";
-import WashingPage from "./pages/Washing";
+import LiveDashboard from "./pages/LiveDashboard";
+import Logs from "./pages/QC Inspection/Logs";
 import OPAPage from "./pages/OPA";
 import PackingPage from "./pages/Packing";
-import LiveDashboard from "./pages/LiveDashboard";
-import Login from "./pages/Auth/Login";
-import ForgotPassword from "./pages/Auth/ForgotPassword";
-import Register from "./pages/Auth/Register"; 
-import Logs from "./pages/QC Inspection/Logs";
-import Profile from "./pages/Auth/Profile";
-import UserList from "./components/users/userList";
 import QC2InspectionPage from "./pages/QC2Inspection";
 import Return from "./pages/QC Inspection/Return";
-import { AuthProvider } from './components/authentication/AuthContext';
-import { FormDataProvider } from "./components/context/FormDataContext";
 import Setting from "./pages/Setting";
+import WashingPage from "./pages/Washing";
+
+// Authentication components
+import UserList from "./components/users/userList";
+import ForgotPassword from "./pages/Auth/ForgotPassword";
+import Login from "./pages/Auth/Login";
+import Profile from "./pages/Auth/Profile";
+import Register from "./pages/Auth/Register";
 import '../src/lang/i18n';
 
-// Create a context for Bluetooth functionality
+// Context
+import { AuthProvider } from "./components/authentication/AuthContext.jsx";
+import { FormDataProvider } from "./components/context/FormDataContext";
+
 export const BluetoothContext = createContext(null);
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+function AppContent() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return !!(
+      localStorage.getItem("accessToken") ||
+      sessionStorage.getItem("accessToken")
+    );
+  });
   const [detailsSubmitted, setDetailsSubmitted] = useState(false);
   const [sharedState, setSharedState] = useState({
     cumulativeChecked: 0,
@@ -74,7 +81,6 @@ function App() {
     return () => clearInterval(interval);
   }, [isPlaying]);
 
-
   const handleUpdateSharedState = (newState) => {
     setSharedState((prev) => ({
       ...prev,
@@ -87,6 +93,12 @@ function App() {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("user");
+    sessionStorage.removeItem("accessToken");
+    sessionStorage.removeItem("refreshToken");
+    sessionStorage.removeItem("user");
     setIsAuthenticated(false);
     resetAllStates();
   };
@@ -201,154 +213,143 @@ function App() {
       }));
     }
   };
-  
 
   return (
-    <AuthProvider>
-    <FormDataProvider>
-    <Router>
-      <div className="min-h-screen bg-gray-50">
-        {isAuthenticated && <Navbar onLogout={handleLogout} />}
-        <div className={isAuthenticated ? "pt-16" : ""}>
-          <Routes>
+    <div className="min-h-screen bg-gray-50">
+      {isAuthenticated && <Navbar onLogout={handleLogout} />}
+      <div className={isAuthenticated ? "pt-16" : ""}>
+        <Routes>
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route
-              path="/register"
-              element={<Register />} // Add Register route
-            />
-            <Route
-              path="/forgot-password"
-              element={<ForgotPassword />} // Add ForgotPassword route
-            />
-            <Route
-              path="/"
-              element={
-                isAuthenticated ? (
-                  <Navigate to="/home" replace />
-                ) : (
-                  <Login onLogin={handleLogin} />
-                )
-              }
-            />
-           
-            {isAuthenticated ? (
-              <>
-                <Route path="/home" element={<Home />} />
-                <Route
-                  path="/details"
-                  element={
-                    <Details
-                      onDetailsSubmit={handleDetailsSubmit}
-                      isSubmitted={detailsSubmitted}
-                      savedDetails={logsState.details}
+            path="/"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/home" replace />
+              ) : (
+                <Login onLogin={handleLogin} />
+              )
+            }
+          />
+          {isAuthenticated ? (
+            <>
+              <Route path="/home" element={<Home />} />
+              <Route
+                path="/details"
+                element={
+                  <Details
+                    onDetailsSubmit={handleDetailsSubmit}
+                    isSubmitted={detailsSubmitted}
+                    savedDetails={logsState.details}
+                  />
+                }
+              />
+              <Route
+                path="/inspection"
+                element={
+                  detailsSubmitted ? (
+                    <Inspection
+                      savedState={inspectionState}
+                      onStateChange={handleInspectionStateChange}
+                      onLogEntry={handleLogEntry}
+                      onStartTime={(time) =>
+                        setLogsState((prev) => ({
+                          ...prev,
+                          startTime: time,
+                          lastActionTime: time,
+                        }))
+                      }
+                      onSubmit={handleSubmit}
+                      timer={timer}
+                      isPlaying={isPlaying}
+                      onPlayPause={handlePlayPause}
+                      sharedState={sharedState}
+                      onUpdateSharedState={handleUpdateSharedState}
                     />
-                  }
-                />
-                <Route
-                  path="/inspection"
-                  element={
-                    detailsSubmitted ? (
-                      <Inspection
-                        savedState={inspectionState}
-                        onStateChange={handleInspectionStateChange}
-                        onLogEntry={handleLogEntry}
-                        onStartTime={(time) =>
-                          setLogsState((prev) => ({
-                            ...prev,
-                            startTime: time,
-                            lastActionTime: time,
-                          }))
-                        }
-                        onSubmit={handleSubmit}
-                        timer={timer}
-                        isPlaying={isPlaying}
-                        onPlayPause={handlePlayPause}
-                        sharedState={sharedState}
-                        onUpdateSharedState={handleUpdateSharedState}
-                      />
-                    ) : (
-                      <Navigate to="/details" replace />
-                    )
-                  }
-                />
-                <Route
-                  path="/return"
-                  element={
-                    detailsSubmitted ? (
-                      <Return
-                        savedState={returnState}
-                        onStateChange={handleReturnStateChange}
-                        onLogEntry={handleLogEntry}
-                        timer={timer}
-                        isPlaying={isPlaying}
-                        sharedState={sharedState}
-                        onUpdateSharedState={handleUpdateSharedState}
-                      />
-                    ) : (
-                      <Navigate to="/details" replace />
-                    )
-                  }
-                />
-                <Route
-                  path="/logs"
-                  element={
-                    detailsSubmitted ? (
-                      <Logs logsState={logsState} />
-                    ) : (
-                      <Navigate to="/details" replace />
-                    )
-                  }
-                />
-                <Route path="/userList" element={<UserList />} />
-                <Route path="/role-management" element={<RoleManagement />} />
-                <Route path="/settings" element={<Setting />} />
-                <Route path="/profile" element={<Profile />} />
-                {/* <Route path="/login" element={<Login onLogin={handleLogin} />} />
-                <Route path="/home" element={<Home />} /> */}
-                <Route
-                  path="/analytics"
-                  element={
-                    detailsSubmitted ? (
-                      <Analytics
-                        savedState={inspectionState}
-                        defects={inspectionState?.defects || {}}
-                        checkedQuantity={inspectionState?.checkedQuantity || 0}
-                        logsState={logsState}
-                        timer={timer}
-                      />
-                    ) : (
-                      <Navigate to="/details" replace />
-                    )
-                  }
-                />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/live-dashboard" element={<LiveDashboard />} />
-                <Route
-                  path="/bundle-registration"
-                  element={<BundleRegistration />}
-                />
-                <Route
-                  path="/cutting"
-                  element={<Cutting />}
-                />
-                <Route path="/ironing" element={<IroningPage />} />
-                <Route path="/washing" element={<WashingPage />} />
-                <Route path="/opa" element={<OPAPage />} />
-                <Route path="/packing" element={<PackingPage />} />
-                <Route path="/qc2-inspection" element={<QC2InspectionPage />} />
-                <Route path="/download-data" element={<DownloadData />} />
-              </>
-            ) : (
-              <Route path="*" element={<Navigate to="/" replace />} />
-            )}
-          </Routes>
-        </div>
+                  ) : (
+                    <Navigate to="/details" replace />
+                  )
+                }
+              />
+              <Route
+                path="/return"
+                element={
+                  detailsSubmitted ? (
+                    <Return
+                      savedState={returnState}
+                      onStateChange={handleReturnStateChange}
+                      onLogEntry={handleLogEntry}
+                      timer={timer}
+                      isPlaying={isPlaying}
+                      sharedState={sharedState}
+                      onUpdateSharedState={handleUpdateSharedState}
+                    />
+                  ) : (
+                    <Navigate to="/details" replace />
+                  )
+                }
+              />
+              <Route
+                path="/logs"
+                element={
+                  detailsSubmitted ? (
+                    <Logs logsState={logsState} />
+                  ) : (
+                    <Navigate to="/details" replace />
+                  )
+                }
+              />
+              <Route path="/user-list" element={<UserList />} />
+              <Route path="/role-management" element={<RoleManagement />} />
+              <Route path="/settings" element={<Setting />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route
+                path="/analytics"
+                element={
+                  detailsSubmitted ? (
+                    <Analytics
+                      savedState={inspectionState}
+                      defects={inspectionState?.defects || {}}
+                      checkedQuantity={inspectionState?.checkedQuantity || 0}
+                      logsState={logsState}
+                      timer={timer}
+                    />
+                  ) : (
+                    <Navigate to="/details" replace />
+                  )
+                }
+              />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/live-dashboard" element={<LiveDashboard />} />
+              <Route
+                path="/bundle-registration"
+                element={<BundleRegistration />}
+              />
+              <Route path="/ironing" element={<IroningPage />} />
+              <Route path="/washing" element={<WashingPage />} />
+              <Route path="/opa" element={<OPAPage />} />
+              <Route path="/packing" element={<PackingPage />} />
+              <Route path="/qc2-inspection" element={<QC2InspectionPage />} />
+              <Route path="/download-data" element={<DownloadData />} />
+            </>
+          ) : (
+            <Route path="*" element={<Navigate to="/" replace />} />
+          )}
+        </Routes>
       </div>
-      
-        
+    </div>
+  );
+}
 
+function App() {
+  return (
+    <Router>
+      <AuthProvider>
+        <FormDataProvider>
+          <AppContent />
+        </FormDataProvider>
+      </AuthProvider>
     </Router>
-    </FormDataProvider>
-    </AuthProvider>
   );
 }
 
