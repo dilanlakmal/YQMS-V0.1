@@ -36,14 +36,49 @@ function Login({ onLogin }) {
         navigate("/home");
       }
     } catch (error) {
-      localStorage.removeItem("accessToken");
-      sessionStorage.removeItem("accessToken");
-      navigate("/login");
+      console.error("Authentication error:", error);
+      // Only clear storage if it's an authentication error
+      if (error.response && error.response.status === 401) {
+        localStorage.removeItem("accessToken");
+        sessionStorage.removeItem("accessToken");
+      }
     }
   };
 
+  //   const authenticateUser = async (token) => {
+  //     try {
+  //       const response = await axios.get(`${API_BASE_URL}/api/user-profile`, {
+  //         headers: { Authorization: `Bearer ${token}` },
+  //       });
+
+  //       if (response.status === 200) {
+  //         const { accessToken, refreshToken, user } = response.data;
+
+  //         if (rememberMe) {
+  //           localStorage.setItem("accessToken", accessToken);
+  //           localStorage.setItem("refreshToken", refreshToken);
+  //           localStorage.setItem("user", JSON.stringify(user));
+  //         } else {
+  //           sessionStorage.setItem("accessToken", accessToken);
+  //           sessionStorage.setItem("refreshToken", refreshToken);
+  //           sessionStorage.setItem("user", JSON.stringify(user));
+  //         }
+
+  //         onLogin(accessToken);
+  //         updateUser(user);
+  //         navigate("/home");
+  //       }
+  //     } catch (error) {
+  //       localStorage.removeItem("accessToken");
+  //       sessionStorage.removeItem("accessToken");
+  //       navigate("/login");
+  //     }
+  //   };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setError("");
     if (username && password) {
       try {
         const response = await axios.post(`${API_BASE_URL}/api/login`, {
@@ -71,6 +106,8 @@ function Login({ onLogin }) {
         }
       } catch (error) {
         setError("Invalid username or password");
+      } finally {
+        setLoading(false);
       }
     }
   };

@@ -4,6 +4,7 @@
     "click_cards": "Click on the cards below to start inspection Reports or Live monitoring",
     "unauthorized_access": "Unauthorized Access",
     "loading": "Loading...",
+    "cutting/scc":"Cutting/SCC",
     "order_data": "Order Data",
     "quality_inspection": "Quality Inspection",
     "qa_audit": "QA Audit",
@@ -11,6 +12,9 @@
     "bundle_registration": "Bundle Registration",
     "cutting": "Cutting",
     "washing": "Washing",
+    "opa":"OPA",
+    "scc":"SCC",
+    "packing":"Packing",
     "dyeing": "Dyeing",
     "ironing": "Ironing",
     "qc1_inspection": "QC1 Inspection",
@@ -19,7 +23,73 @@
     "download_data": "Download Data",
     "live_dashboard": "Live Dashboard"
   },
-  
+  "nav":{
+    "orders":"Orders",
+    "qc":"QC",
+    "qa":"QA",
+    "report":"Report",
+    "setting":"Setting",
+    "roles":"Roles",
+    "users":"Users"
+  },
+
+  "iro":{
+    "header":"Ironing Process Scanner",
+    "card":"Scan the QR code on the bundle to record ironing details",
+    "qr_scan":"QR Scan",
+    "auto_add":"Auto Add",
+    "ironing_id":"Ironing ID",
+    "task_no":"Task No",
+    "updated_date":"Updated Date",
+    "updated_time":"Updated Time",
+    "pass_qty":"Pass Qty (Iron)"
+  },
+
+  "wash":{
+    "header":"Washing Process Scanner",
+    "card":"Scan the QR code on the bundle to record washing details",
+    "washing_id":"WashingID",
+    "pass_qty":"Pass Qty (Wash)"
+  },
+
+  "opa":{
+    "header":"OPA Process Scanner",
+    "card":"Scan the QR code on the bundle to record OPA details",
+    "opa_id":"OPA ID",
+    "pass_qty":"Pass Qty (OPA)"
+  },
+
+  "pack":{
+    "header":"Packing Process Scanner",
+    "card":"Scan the QR code on the bundle to record packing details",
+    "packing_id":"Packing ID",
+    "pass_qty":"Pass Qty (Pack)"
+  },
+
+  "ana":{
+    "total_defects":"Total Defects",
+    "checked_qty":"Checked Qty",
+    "good_output":"Good Output",
+    "defect_pieces":"Defect Pieces",
+    "return_defect":"Return Defect #",
+    "defect_rate":"Defect Rate",
+    "defect_ratio":"Defect Ratio",
+    "defect_rate_by":"Defect Rate by Defect Name",
+    "all_categories":"All Categories",
+    "defect_rate_over":"Defect Rate Over Time",
+    "all_defects":"All Defects",
+    "time":"Time",
+    "min":"Minutes",
+    "hr":"Hour",
+    "defect_rate_by_ca":"Defect Rate By Category",
+    "category":"Category"
+  },
+
+  "cut":{
+    "ok":"OK"
+  },
+
+
   "bundle": {
     "bundle_registration":"Bundle Registration",
     "registration":"Registration",

@@ -26,6 +26,7 @@ import {
 import { Line } from "react-chartjs-2";
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "../../config";
+import { useTranslation } from 'react-i18next';
 
 ChartJS.register(
   CategoryScale,
@@ -39,6 +40,7 @@ ChartJS.register(
 
 // LineChart Component
 const LineChart = ({ timeSeriesData, maxDefectRate }) => {
+  const { t } = useTranslation();
   const [interval, setInterval] = useState('1min');
   const [filteredData, setFilteredData] = useState(timeSeriesData);
 
@@ -74,7 +76,7 @@ const LineChart = ({ timeSeriesData, maxDefectRate }) => {
   return (
     <div className="bg-white overflow-hidden">
       <div className="flex justify-between items-center mb-4">
-      <h3 className="text-lg font-semibold text-gray-800">Defect Rate Over Time</h3>
+      <h3 className="text-lg font-semibold text-gray-800">{t("ana.defect_rate_over")}</h3>
         <select
           value={interval}
           onChange={(e) => setInterval(e.target.value)}

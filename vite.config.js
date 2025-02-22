@@ -29,3 +29,14 @@ export default defineConfig({
 //     },
 //   },
 // });
+//     open: true,
+//     https: {
+//       key: fs.readFileSync(
+//         "/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.167.7.252+1-key.pem"
+//       ),
+//       cert: fs.readFileSync(
+//         "/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.167.7.252+1.pem"
+//       ),
+//     },
+//   },
+// });

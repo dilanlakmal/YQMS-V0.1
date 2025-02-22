@@ -1,14 +1,12 @@
-import {
-  AlertCircle,
-  QrCode,
-  Table,
-} from "lucide-react";
+import { AlertCircle, QrCode, Table } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
 import QrCodeScanner from "../components/forms/QRCodeScanner";
+import { useTranslation } from 'react-i18next';
 
 const OPAPage = () => {
+  const { t } = useTranslation();
   const { user, loading } = useAuth();
   const [error, setError] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
@@ -169,11 +167,11 @@ const OPAPage = () => {
           <div className="flex items-center justify-center gap-2 mb-4">
             <QrCode className="w-8 h-8 text-blue-600" />
             <h1 className="text-3xl font-bold text-gray-800">
-              OPA Process Scanner
+             {t("opa.header")}
             </h1>
           </div>
           <p className="text-gray-600">
-            Scan the QR code on the bundle to record OPA details
+          {t("opa.card")}
           </p>
         </div>
         <div className="flex space-x-4 mb-6">
@@ -186,7 +184,7 @@ const OPAPage = () => {
             }`}
           >
             <QrCode className="w-5 h-5" />
-            QR Scan
+            {t("iro.qr_scan")}
           </button>
           <button
             onClick={() => setActiveTab("data")}
@@ -197,11 +195,11 @@ const OPAPage = () => {
             }`}
           >
             <Table className="w-5 h-5" />
-            Data
+            {t("bundle.date")}
           </button>
         </div>
         <div className="flex items-center mb-4">
-          <label className="text-gray-700 mr-2">Auto Add:</label>
+          <label className="text-gray-700 mr-2">{t("iro.auto_add")}:</label>
           <input
             type="checkbox"
             checked={autoAdd}
@@ -238,49 +236,49 @@ const OPAPage = () => {
                 <thead className="bg-sky-100">
                   <tr>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      OPA ID
+                    {t("opa.opa_id")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Task No
+                    {t("iro.task_no")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Department
+                    {t("bundle.department")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Updated Date
+                    {t("iro.updated_date")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Updated Time
+                    {t("iro.updated_time")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      MONo
+                    {t("bundle.mono")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Cust. Style
+                    {t("bundle.customer_style")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Buyer
+                    {t("bundle.buyer")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Country
+                    {t("bundle.country")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Factory
+                    {t("bundle.factory")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Line No
+                    {t("bundle.line_no")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Color
+                    {t("bundle.color")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Size
+                    {t("bundle.size")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Count
+                    {t("bundle.count")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Pass Qty (OPA)
+                    {t("opa.pass_qty")}
                     </th>
                   </tr>
                 </thead>

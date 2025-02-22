@@ -85,7 +85,7 @@ function Home() {
 
   const cards = [
     {
-      title: "Cutting/SSC",
+      title: t("home.cutting/scc"),
       items: [
         {
           path: "/cutting",
@@ -104,7 +104,7 @@ function Home() {
       ]
     },
     {
-      title: "Order Data",
+      title:  t("home.order_data"),
       items: [
         {
           path: "/bundle-registration",
@@ -117,78 +117,78 @@ function Home() {
           path: "/washing",
           roles: ["Admin", "Washing"],
           image: "/IMG/washing.jpg",
-          title: "Washing",
+          title: t("home.washing"),
           description: "Click here to register orders for Washing."
         },
         {
           path: "/opa",
           roles: ["Admin", "OPA"],
           image: "/IMG/dyeing.png",
-          title: "OPA",
+          title: t("home.opa"),
           description: "Click here to scan orders in OPA."
         },
         {
           path: "/ironing",
           roles: ["Admin", "Ironing"],
           image: "/IMG/ironing.png",
-          title: "Ironing",
+          title: t("home.ironing"),
           description: "Click here to register orders for Ironing."
         },
         {
           path: "/packing",
           roles: ["Admin", "Packing"],
           image: "/IMG/packing.webp",
-          title: "Packing",
+          title: t("home.packing"),
           description: "Click here to register orders for Packing."
         }
       ]
     },
     {
-      title: "Quality Inspection",
+      title:  t("home.quality_inspection"),
       items: [
         {
           path: "/details",
           roles: ["Admin", "QC1"],
           image: "/IMG/qcc.png",
-          title: "QC1 Inspection",
+          title:  t("home.qc1_inspection"),
           description: "Begin a new QC1 Endline Inspection here."
         },
         {
           path: "/qc2-inspection",
           roles: ["Admin", "QC2"],
           image: "/IMG/qc2.png",
-          title: "QC2 Inspection",
+          title:  t("home.qc2_inspection"),
           description: "Begin a new QC2 Inspection Report here."
         }
       ]
     },
     {
-      title: "QA Audit",
+      title:  t("home.qa_audit"),
       items: [
         {
           path: "/audit",
           roles: ["Admin", "QA"],
           image: "/IMG/qaa.png",
-          title: "QA Audit",
+          title:  t("home.qa_audit"),
           description: "Start a QA Audit Report here."
         }
       ]
     },
     {
-      title: "Data Analytics",
+      title:  t("home.data_analytics"),
       items: [
         {
           path: "/download-data",
           roles: ["Admin", "Data Analytics"],
           image: "/IMG/download.jpg",
-          title: "Download Data",
+          title:  t("home.download_data"),
           description: "Click here to Download Data."
         },
         {
           path: "/live-dashboard",
           roles: ["Admin", "Data Analytics"],
           image: "/IMG/dash.png",
-          title: "Live Dashboard",
+          title:  t("home.live_dashboard"),
           description: "Click here to see Live Dashboard."
         }
       ]
@@ -199,10 +199,10 @@ function Home() {
     <div className="min-h-screen bg-gradient-to-r from-blue-50 to-gray-100 py-20 px-20">
       <div className="max-w-7xl mx-auto">
         <h3 className="text-3xl font-extrabold text-blue-900 mb-8 text-center drop-shadow-md">
-          Welcome to Quality Data Management System
+          {t("home.welcome")}
         </h3>
         <p className="text-lg text-gray-700 text-left mb-12 text-center">
-          Click on the cards below to start inspection Reports or Live monitoring
+        {t("home.click_cards")}
         </p>
         {errorMessage && (
           <div className="bg-red-500 text-white text-center py-2 mb-4 rounded">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Header from "../components/inspection/Header";
+import { useTranslation } from 'react-i18next';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -56,6 +57,7 @@ ChartJS.register(
 );
 
 function Analytics({ savedState, defects, checkedQuantity, logsState }) {
+  const { t } = useTranslation();
   const { inspectionData } = savedState || {};
   const [selectedDefect, setSelectedDefect] = useState(null); // State for selected defect filter
   const [timeFilter, setTimeFilter] = useState("time"); // State for time filter (HR, Min, Time)
@@ -416,7 +418,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
               className="text-blue-500 text-2xl"
             />
             <div>
-              <h3 className="text-lg font-medium">Total Defects</h3>
+              <h3 className="text-lg font-medium">{t("ana.total_defects")}</h3>
               <p className="text-xl font-semibold">{totalDefects}</p>
             </div>
           </div>
@@ -425,7 +427,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
           <div className="bg-white p-4 rounded-lg shadow-md flex items-center space-x-4">
             <FontAwesomeIcon icon={faEye} className="text-green-500 text-2xl" />
             <div>
-              <h3 className="text-lg font-medium">Checked Qty</h3>
+              <h3 className="text-lg font-medium">{t("ana.checked_qty")}</h3>
               <p className="text-xl font-semibold">{checkedQuantity}</p>
             </div>
           </div>
@@ -437,7 +439,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
               className="text-purple-500 text-2xl"
             />
             <div>
-              <h3 className="text-lg font-medium">Good Output</h3>
+              <h3 className="text-lg font-medium">{t("ana.good_output")}</h3>
               <p className="text-xl font-semibold">{goodOutput}</p>
             </div>
           </div>
@@ -449,7 +451,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
               className="text-red-500 text-2xl"
             />
             <div>
-              <h3 className="text-lg font-medium">Defect Pieces</h3>
+              <h3 className="text-lg font-medium">{t("ana.defect_pieces")}</h3>
               <p className="text-xl font-semibold">{defectPieces}</p>
             </div>
           </div>
@@ -461,7 +463,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
               className="text-yellow-500 text-2xl"
             />
             <div>
-              <h3 className="text-lg font-medium">Return Defect #</h3>
+              <h3 className="text-lg font-medium">{t("ana.return_defect")}</h3>
               <p className="text-xl font-semibold">{returnDefectQty}</p>
             </div>
           </div>
@@ -473,7 +475,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
               className="text-indigo-500 text-2xl"
             />
             <div>
-              <h3 className="text-lg font-medium">Defect Rate</h3>
+              <h3 className="text-lg font-medium">{t("ana.defect_rate")}</h3>
               <p className="text-xl font-semibold">{defectRate}%</p>
             </div>
           </div>
@@ -485,7 +487,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
               className="text-pink-500 text-2xl"
             />
             <div>
-              <h3 className="text-lg font-medium">Defect Ratio</h3>
+              <h3 className="text-lg font-medium">{t("ana.defect_ratio")}</h3>
               <p className="text-xl font-semibold">{defectRatio}%</p>
             </div>
           </div>
@@ -497,7 +499,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
           <div className="bg-white p-6 rounded-lg shadow-md mb-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold mb-4">
-                Defect Rate by Defect Name
+              {t("ana.defect_rate_by")}
               </h2>
               {/* Category Filter Dropdown */}
               <select
@@ -505,7 +507,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
                 onChange={(e) => setSelectedCategory(e.target.value || null)}
                 className="p-2 border border-gray-300 rounded-md shadow-sm"
               >
-                <option value="">All Categories</option>
+                <option value="">{t("ana.all_category")}</option>
                 {categories.map(({ name }) => (
                   <option key={name} value={name}>
                     {name}
@@ -544,7 +546,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
 
           <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Defect Rate Over Time</h2>
+              <h2 className="text-xl font-semibold">{t("ana.defect_rate_over")}</h2>
               <div className="flex space-x-4">
                 {/* Defect Name Filter */}
                 <select
@@ -552,7 +554,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
                   onChange={(e) => setSelectedDefect(e.target.value || null)}
                   className="p-2 border border-gray-300 rounded-md shadow-sm"
                 >
-                  <option value="">All Defects</option>
+                  <option value="">{t("ana.all_defects")}</option>
                   {defectNames.map((name) => (
                     <option key={name} value={name}>
                       {name}
@@ -565,9 +567,9 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
                   onChange={(e) => setTimeFilter(e.target.value)}
                   className="p-2 border border-gray-300 rounded-md shadow-sm"
                 >
-                  <option value="time">Time (HH:MM:SS)</option>
-                  <option value="min">Minutes</option>
-                  <option value="hr">Hour</option>
+                  <option value="time">{t("ana.time")} (HH:MM:SS)</option>
+                  <option value="min">{t("ana.min")}</option>
+                  <option value="hr">{t("ana.hr")}</option>
                 </select>
               </div>
             </div>
@@ -595,16 +597,16 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
         {/* Category Defect Rates Table */}
         <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold mb-4">
-            Defect Rate by Category
+          {t("ana.defect-rate_by_ca")}
           </h2>
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Category
+                {t("ana.category")}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Defect Rate (%)
+                {t("ana.defect_rate")} (%)
                 </th>
               </tr>
             </thead>

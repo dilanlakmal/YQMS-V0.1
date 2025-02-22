@@ -1,5 +1,3 @@
-// src/components/QrCodeScanner.js
-
 import React, { useState } from "react";
 import Scanner from "./Scanner";
 import { Loader2, Package, Minus, Plus, Check, Clock, X, AlertCircle } from "lucide-react";

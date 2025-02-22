@@ -4,6 +4,7 @@
     "click_cards": "点击下面的卡片开始检查报告或实时监控",
     "unauthorized_access": "未经授权的访问",
     "loading": "加载中...",
+    "cutting/scc":"切割/SCC",
     "order_data": "订单数据",
     "quality_inspection": "质量检验",
     "qa_audit": "质量保证审计",
@@ -11,6 +12,9 @@
     "bundle_registration": "捆绑注册",
     "cutting": "切割",
     "washing": "洗涤",
+    "opa":"OPA",
+    "scc":"SCC",
+    "packing":"包装",
     "dyeing": "染色",
     "ironing": "熨烫",
     "qc1_inspection": "QC1检验",
@@ -18,6 +22,16 @@
     "qa_audit_report": "质量保证审计报告",
     "download_data": "下载数据",
     "live_dashboard": "实时仪表板"
+  },
+
+  "nav":{
+    "orders":"订单",
+    "qc":"QC",
+    "qa":"QA",
+    "report":"报告",
+    "setting":"设置",
+    "roles":"角色",
+    "users":"用户"
   },
   
   "bundle": {

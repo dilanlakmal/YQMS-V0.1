@@ -4,6 +4,7 @@
     "click_cards": "ចុចលើសន្លឹកបៀខាងក្រោម ដើម្បីចាប់ផ្តើមរបាយការណ៍ត្រួតពិនិត្យ ឬការត្រួតពិនិត្យផ្ទាល់",
     "unauthorized_access": "ការចូលប្រើដោយគ្មានការអនុញ្ញាត",
     "loading": "កំពុង​ផ្ទុក...",
+    "cutting/scc":"កាត់ / SCC",
     "order_data": "បញ្ជាទិញទិន្នន័យ",
     "quality_inspection": "ការត្រួតពិនិត្យគុណភាព",
     "qa_audit": "សវនកម្ម QA",
@@ -11,6 +12,9 @@
     "bundle_registration": "ការចុះឈ្មោះជាកញ្ចប់",
     "cutting": "កាត់",
     "washing": "លាង",
+    "opa":"OPA",
+    "scc":"SCC",
+    "packing":"ការវេចខ្ចប់",
     "dyeing": "លាបពណ៌",
     "ironing": "ដែក",
     "qc1_inspection": "ការត្រួតពិនិត្យ QC1",
@@ -18,6 +22,16 @@
     "qa_audit_report": "របាយការណ៍សវនកម្ម QA",
     "download_data": "ទាញយកទិន្នន័យ",
     "live_dashboard": "ផ្ទាំងគ្រប់គ្រងផ្ទាល់"
+  },
+
+  "nav":{
+    "orders":"ការបញ្ជាទិញ",
+    "qc":"QC",
+    "qa":"QA",
+    "report":"របាយការណ៍",
+    "setting":"ការកំណត់",
+    "roles":"តួនាទី",
+    "users":"អ្នកប្រើប្រាស់"
   },
   
   "bundle": {

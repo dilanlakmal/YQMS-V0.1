@@ -305,7 +305,7 @@ function BundleRegistration() {
                 : "bg-gray-200 text-gray-700"
             }`}
           >
-            Registration
+           {t("bundle.registration")}
           </button>
         </div>
 
@@ -315,7 +315,7 @@ function BundleRegistration() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date
+                {t("bundle.date")}
                 </label>
                 <DatePicker
                   selected={formData.date}
@@ -331,7 +331,7 @@ function BundleRegistration() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Department
+                {t("bundle.department")}
                 </label>
                 <select
                   value={formData.department}
@@ -343,16 +343,16 @@ function BundleRegistration() {
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
-                  <option value="">Select Department</option>
-                  <option value="QC1 Endline">QC1 Endline</option>
-                  <option value="Washing">Washing</option>
+                  <option value="">{t("bundle.select_department")}</option>
+                  <option value="QC1 Endline">{t("bundle.qc1_endline")}</option>
+                  <option value="Washing">{t("bundle.washing")}</option>
                   <option value="Dyeing">Dyeing</option>
-                  <option value="Sub-con">Sub-con</option>
+                  <option value="Sub-con">{t("bundle.sub_con")}</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Search MONo
+                {t("bundle.search_mono")}
                 </label>
                 <MonoSearch
                   value={formData.selectedMono}
@@ -374,33 +374,33 @@ function BundleRegistration() {
             {formData.selectedMono && (
               <div className="mb-6 p-4 bg-gray-50 rounded-md">
                 <h2 className="text-lg font-bold text-gray-800 mb-4">
-                  Order Details
+                {t("bundle.order_details")}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-700">
-                      <span className="font-bold">Selected MONo:</span>{" "}
+                      <span className="font-bold">{t("bundle.select-mono")}:</span>{" "}
                       {formData.selectedMono}
                     </p>
                     <p className="text-sm text-gray-700">
-                      <span className="font-bold">Customer Style:</span>{" "}
+                      <span className="font-bold">{t("bundle.customer_style")}:</span>{" "}
                       {formData.custStyle}
                     </p>
                     <p className="text-sm text-gray-700">
-                      <span className="font-bold">Buyer:</span> {formData.buyer}
+                      <span className="font-bold">{t("bundle.buyer")}:</span> {formData.buyer}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-700">
-                      <span className="font-bold">Country:</span>{" "}
+                      <span className="font-bold">{t("bundle.country")}:</span>{" "}
                       {formData.country}
                     </p>
                     <p className="text-sm text-gray-700">
-                      <span className="font-bold">Order Qty:</span>{" "}
+                      <span className="font-bold">{t("bundle.order_qty")}:</span>{" "}
                       {formData.orderQty}
                     </p>
                     <p className="text-sm text-gray-700">
-                      <span className="font-bold">Factory:</span>{" "}
+                      <span className="font-bold">{t("bundle.factory")}:</span>{" "}
                       {formData.factoryInfo}
                     </p>
                   </div>
@@ -411,7 +411,7 @@ function BundleRegistration() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Line No
+              {t("bundle.line_no")}
               </label>
               <input
                 type="text"
@@ -429,7 +429,7 @@ function BundleRegistration() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Color
+                {t("bundle.color")}
                 </label>
                 {hasColors ? (
                   <select
@@ -451,7 +451,7 @@ function BundleRegistration() {
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
-                    <option value="">Select Color</option>
+                    <option value="">{t("bundle.select-color")}</option>
                     {colors.map((color) => (
                       <option key={color.original} value={color.original}>
                         {color.original}
@@ -459,12 +459,12 @@ function BundleRegistration() {
                     ))}
                   </select>
                 ) : (
-                  <p className="text-sm text-gray-500">No Colors Available</p>
+                  <p className="text-sm text-gray-500">{t("bundle.no_colors_available")}</p>
                 )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Size
+                {t("bundle.size")}
                 </label>
                 {hasColors ? (
                   hasSizes ? (
@@ -484,7 +484,7 @@ function BundleRegistration() {
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     >
-                      <option value="">Select Size</option>
+                      <option value="">{t("bundle.select_size")}</option>
                       {sizes.map((sizeObj) => (
                         <option key={sizeObj.size} value={sizeObj.size}>
                           {sizeObj.size}
@@ -492,10 +492,10 @@ function BundleRegistration() {
                       ))}
                     </select>
                   ) : (
-                    <p className="text-sm text-gray-500">No Sizes Available</p>
+                    <p className="text-sm text-gray-500">{t("bundle.no_size_available")}</p>
                   )
                 ) : (
-                  <p className="text-sm text-gray-500">No Colors Available</p>
+                  <p className="text-sm text-gray-500">{t("bundle.no_colors_available")}</p>
                 )}
               </div>
             </div>
@@ -503,13 +503,13 @@ function BundleRegistration() {
             <div className="mt-4 grid grid-cols-2 gap-4">
               {formData.sizeOrderQty > 0 && (
                 <div className="p-2 bg-blue-50 rounded-md">
-                  <span className="text-sm font-medium">Size Order Qty: </span>
+                  <span className="text-sm font-medium">{t("bundle.size-order_qty")}: </span>
                   <span className="text-sm">{formData.sizeOrderQty}</span>
                 </div>
               )}
               {formData.planCutQty > 0 && (
                 <div className="p-2 bg-green-50 rounded-md">
-                  <span className="text-sm font-medium">Plan Cut Qty: </span>
+                  <span className="text-sm font-medium">{t("bundle.plan_cut_qty")}: </span>
                   <span className="text-sm">{formData.planCutQty}</span>
                 </div>
               )}
@@ -523,7 +523,7 @@ function BundleRegistration() {
                     : "text-green-500"
                 }`}
               >
-                Total Garments Count: {formData.totalGarmentsCount}
+                {t("bundle.total_garment_count")}: {formData.totalGarmentsCount}
               </div>
             )}
 
@@ -531,7 +531,7 @@ function BundleRegistration() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Count
+                {t("bundle.count")}
                 </label>
                 <input
                   type="text"
@@ -546,7 +546,7 @@ function BundleRegistration() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Bundle Qty
+                {t("bundle.bundle_qty")}
                 </label>
                 <input
                   type="text"
@@ -560,7 +560,7 @@ function BundleRegistration() {
                 />
                 {formData.selectedMono && (
                   <p className="mt-2 text-sm text-gray-700">
-                    Total Registered Bundle Qty: {totalBundleQty}
+                   {t("bundle.total_registered_bundle_qty")}: {totalBundleQty}
                   </p>
                 )}
               </div>
@@ -578,14 +578,14 @@ function BundleRegistration() {
             {formData.department === "Sub-con" && (
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Sub-con Factory
+                {t("bundle.sub_con_factory")}
                 </label>
                 <select
                   value={subConName}
                   onChange={(e) => setSubConName(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
-                  <option value="">Select Sub-con Factory</option>
+                  <option value="">{t("bundle.select-sub_con_factory")}</option>
                   {subConNames.map((name) => (
                     <option key={name} value={name}>
                       {name}
@@ -617,7 +617,7 @@ function BundleRegistration() {
                       onClick={handleOkClick}
                       className="px-4 py-2 rounded-md bg-indigo-500 text-white hover:bg-indigo-600 flex items-center"
                     >
-                       OK
+                       {t("bundle.ok")}
                     </button>
                      
               </div>
