@@ -381,13 +381,13 @@ function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-50 to-gray-100 py-20 px-20">
       <div className="max-w-8xl mx-auto">
-        <h3 className="text-3xl font-extrabold text-blue-900 mb-8 text-center drop-shadow-md">
+        {/* <h3 className="text-3xl font-extrabold text-blue-900 mb-8 text-center drop-shadow-md">
           Welcome to Quality Data Management System
-        </h3>
-        <p className="text-lg text-gray-700 text-center mb-12">
+        </h3> */}
+        {/* <p className="text-lg text-gray-700 text-center mb-12">
           Click on the cards below to start inspection Reports or Live
           monitoring
-        </p>
+        </p> */}
         {errorMessage && (
           <div className="bg-red-500 text-white text-center py-2 mb-4 rounded">
             {errorMessage}
