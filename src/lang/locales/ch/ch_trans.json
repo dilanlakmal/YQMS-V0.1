@@ -33,6 +33,62 @@
     "roles":"角色",
     "users":"用户"
   },
+
+  "iro":{
+    "header":"熨烫过程扫描仪",
+    "card":"扫描包裹上的二维码记录熨烫详情",
+    "qr_scan":"二维码扫描",
+    "auto_add":"自动添加",
+    "ironing_id":"熨烫ID",
+    "task_no":"任务号",
+    "updated_date":"更新日期",
+    "updated_time":"更新时间",
+    "pass_qty":"通行数量（铁)"
+  },
+
+  "wash":{
+    "header":"洗涤过程扫描仪",
+    "card":"扫描包裹上的二维码记录洗涤详情",
+    "washing_id":"洗涤 ID",
+    "pass_qty":"通过数量（清洗)"
+  },
+
+  "opa":{
+    "header":"OPA 进程扫描仪",
+    "card":"扫描包裹上的二维码记录 OPA 详情",
+    "opa_id":"OPA ID",
+    "pass_qty":"通行证数量（OPA)"
+  },
+
+  "pack":{
+    "header":"包装过程扫描仪",
+    "card":"扫描包裹上的二维码记录包装详情",
+    "packing_id":"包装编号",
+    "pass_qty":"通行证数量（包)"
+  },
+
+  "ana":{
+    "total_defects":"总缺陷",
+    "checked_qty":"已检查数量",
+    "good_output":"良好输出",
+    "defect_pieces":"缺陷件",
+    "return_defect":"退回缺陷编号",
+    "defect_rate":"缺陷率",
+    "defect_ratio":"缺陷率",
+    "defect_rate_by":"按缺陷名称划分的缺陷率",
+    "all_categories":"所有类别",
+    "defect_rate_over":"随时间推移的缺陷率",
+    "all_defects":"全部缺陷",
+    "time":"时间",
+    "min":"分钟",
+    "hr":"小时",
+    "defect_rate_by_ca":"按类别划分的缺陷率",
+    "category":"类别"
+  },
+
+  "cut":{
+    "ok":"好的"
+  },
   
   "bundle": {
     "bundle_registration":"捆绑注册",
@@ -85,6 +141,87 @@
     "edit":"编辑",
     "action":"行动",
     "print_qr":"打印二维码"
+  },
+
+  "defIm":{
+    "defect_images":"缺陷图像",
+    "defect_name":"缺陷名称",
+    "images":"图像"
+  },
+
+  "downDa":{
+    "start_date":"开始日期",
+    "end_date":"结束日期",
+    "type":"类型",
+    "record_per":"每页记录数",
+    "style_no":"款式号",
+    "bundle_id":"捆绑包 ID",
+    "no_data":"未找到数据",
+    "summary":"概括",
+    "total_record":"总记录",
+    "total_pages":"总页数",
+    "search":"搜索",
+    "searching":"正在搜索...",
+    "download_excel":"下载 Excel",
+    "download_pdf":"下载 PDF"
+  },
+
+  "dash":{
+    "coming_soon":"即将推出",
+    "filters":"过滤器",
+    "apply":"申请",
+    "reset":"重置",
+    "applied_filters":"已应用过滤器",
+    "total_pass":"全胜",
+    "total_rejects":"全部被拒绝",
+    "defects_qty":"缺陷数量",
+    "total_bundle":"总包",
+    "rank":"秩",
+    "level":"等级",
+    "hide":"隐藏",
+    "show":"展示",
+    "qc2":"QC2"
+  },
+
+  "set":{
+    "head":"您无权访问此页面。",
+    "super_admin":"超级管理员注册",
+    "role":"角色",
+    "job_title":"职称",
+    "search_emp_id":"搜索员工 ID",
+    "selected_user_details":"选定用户的详细信息",
+    "name":"姓名",
+    "english_name":"英文名",
+    "khmer_name":"高棉名字",
+    "section":"部分",
+    "phone_no":"部分",
+    "working_status":"工作状态",
+    "current_super_admins":"现任超级管理员",
+    "delete":"删除",
+    "register_super_admin":"注册超级管理员"
+  },
+
+  "insp":{
+    "submit":"提交",
+    "pass":"经过",
+    "reject":"拒绝"
+  },
+
+  "detail":{
+    "head":"质检详情",
+    "fill_below":"填写下方内容",
+    "style_info":"风格信息",
+    "customer":"顾客",
+    "order_info":"订单信息",
+    "select_factory":"选择工厂",
+    "continue":"继续检查",
+    "submit_details":"提交详细信息"
+  },
+
+  "return":{
+    "pass_return":"通行证返回",
+    "reject_return":"拒绝退货"
   }
+
   }
   

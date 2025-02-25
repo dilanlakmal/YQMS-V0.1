@@ -8,12 +8,14 @@ import { Search, Filter, Check } from 'lucide-react'; // Import Check icon
 import TabBar from '../components/layout/TabBar';
 import { API_BASE_URL } from "../../config";
 import FilterDropDown from "../components/forms/FilterDropDown";
+import { useTranslation } from 'react-i18next';
 
 const RECORDS_PER_PAGE_OPTIONS = [50, 100, 200, 500];
 const DATA_TYPES = ['QC2 Order Data', 'Ironing'];
 
 function DownloadData() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { t } = useTranslation();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const toggleSidebar = () => {
     setIsSidebarOpen((prev) => !prev);
   };
@@ -423,9 +425,9 @@ function DownloadData() {
     // Implement your summary logic here
     return (
       <div>
-        <h2 className="text-xl font-bold mb-4">Summary</h2>
-        <p>Total Records: {totalRecords}</p>
-        <p>Total Pages: {totalPages}</p>
+        <h2 className="text-xl font-bold mb-4">{t("downDa.summary")}</h2>
+        <p>{t("downDa.total_record")}: {totalRecords}</p>
+        <p>{t("downDa.total_pages")}: {totalPages}</p>
         {/* Add more summary details as needed */}
       </div>
     );
@@ -434,9 +436,12 @@ function DownloadData() {
   
 
    return (
-    <div className="flex">
+    // <div className={`${
+    //   isSidebarOpen ? "w-64" : "w-16"
+    // } flex bg-gray-800 text-white h-screen p-2 transition-all duration-300`}>
+     <div className="flex h-screen"> 
       <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} addTab={addTab} />
-      <div className={`flex-1 transition-all duration-300 overflow-y-auto ${isSidebarOpen ? 'ml-64' : 'ml-12'}`}>
+      <div className={`flex-1 bg-white-800  transition-all duration-300 overflow-y-auto ${isSidebarOpen ? 'ml-64' : 'ml-16'}`}>
         <TabBar tabs={tabs} activeTab={activeTab} onTabClick={setActiveTab} onCloseTab={closeTab} />
         <div className="bg-white rounded-lg shadow-lg p-10 mb-8">
           <h1 className="text-2xl font-bold mb-6"> {tabs[activeTab]}</h1>
@@ -446,7 +451,7 @@ function DownloadData() {
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Start Date</label>
+                  <label className="block text-sm font-medium text-gray-700">{t("downDa.start_date")}</label>
                   <DatePicker
                     selected={tabData[activeTab].startDate}
                     onChange={(date) => handleTabDataChange('startDate', date)}
@@ -455,7 +460,7 @@ function DownloadData() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">End Date</label>
+                  <label className="block text-sm font-medium text-gray-700">{t("downDa.end_date")}</label>
                   <DatePicker
                     selected={tabData[activeTab].endDate}
                     onChange={(date) => handleTabDataChange('endDate', date)}
@@ -464,7 +469,7 @@ function DownloadData() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Type</label>
+                  <label className="block text-sm font-medium text-gray-700">{t("downDa.type")}</label>
                   <select
                     value={tabData[activeTab].type}
                     onChange={(e) => handleTypeChange(e.target.value)}
@@ -478,7 +483,7 @@ function DownloadData() {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Task No</label>
+                  <label className="block text-sm font-medium text-gray-700">{t("iro.task_no")}</label>
                   <select
                     value={tabData[activeTab].taskNo}
                     onChange={(e) => handleTaskNoChange(e.target.value)}
@@ -490,37 +495,37 @@ function DownloadData() {
                 </div>
                 {[
                   {
-                    label: 'MO No',
+                    label: t("bundle.mono"),
                     value: tabData[activeTab].moNo,
                     setter: (value) => handleTabDataChange('moNo', value),
                     options: moNoOptions,
                   },
                   {
-                    label: 'Style No',
+                    label: t("downDa.style_no"),
                     value: tabData[activeTab].styleNo,
                     setter: (value) => handleTabDataChange('styleNo', value),
                     options: styleNoOptions,
                   },
                   {
-                    label: 'Line No',
+                    label: t("bundle.line_no"),
                     value: tabData[activeTab].lineNo,
                     setter: (value) => handleTabDataChange('lineNo', value),
                     options: lineNoOptions,
                   },
                   {
-                    label: 'Color',
+                    label: t("bundle.color"),
                     value: tabData[activeTab].color,
                     setter: (value) => handleTabDataChange('color', value),
                     options: colorOptions,
                   },
                   {
-                    label: 'Size',
+                    label: t("bundle.size"),
                     value: tabData[activeTab].size,
                     setter: (value) => handleTabDataChange('size', value),
                     options: sizeOptions,
                   },
                   {
-                    label: 'Buyer',
+                    label: t("bundle.buyer"),
                     value: tabData[activeTab].buyer,
                     setter: (value) => handleTabDataChange('buyer', value),
                     options: buyerOptions,
@@ -571,7 +576,7 @@ function DownloadData() {
                     className="bg-blue-500 text-white px-6 py-2 rounded-md hover"
                     disabled={loading}
                   >
-                    {loading ? 'Searching...' : 'Search'}
+                    {loading ? t("downDa.searching") : t("downDa.search")}
                   </button>
                   {tabDataResults[activeTab].length > 0 && (
                     <>
@@ -603,7 +608,7 @@ function DownloadData() {
                   )}
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">Records per page:</span>
+                  <span className="text-sm text-gray-600">{t("downDa.record_per")}:</span>
                   <select
                     value={recordsPerPage}
                     onChange={(e) => {
@@ -628,16 +633,16 @@ function DownloadData() {
                       <thead className="bg-gray-50">
                         <tr>
                           {[
-                            { label: 'Date', field: 'date', options: data.map(item => item.date) },
-                            { label: 'Type', field: 'type', options: DATA_TYPES },
-                            { label: 'Task No', field: 'taskNo', options: ['52', '53'] },
-                            { label: 'MO No', field: 'moNo', options: moNoOptions },
-                            { label: 'Style No', field: 'styleNo', options: styleNoOptions },
-                            { label: 'Line No', field: 'lineNo', options: lineNoOptions },
-                            { label: 'Color', field: 'color', options: colorOptions },
-                            { label: 'Size', field: 'size', options: sizeOptions },
-                            { label: 'Buyer', field: 'buyer', options: buyerOptions },
-                            { label: 'Bundle ID', field: 'bundleId', options: [] },
+                            { label: t("bundle.date"), field: 'date', options: data.map(item => item.date) },
+                            { label: t("downDa.type"), field: 'type', options: DATA_TYPES },
+                            { label: t("iro.task_no"), field: 'taskNo', options: ['52', '53'] },
+                            { label: t("bundle.mono"), field: 'moNo', options: moNoOptions },
+                            { label: t("downDa.style_no"), field: 'styleNo', options: styleNoOptions },
+                            { label: t("bundle.line_no"), field: 'lineNo', options: lineNoOptions },
+                            { label: t("bundle.color"), field: 'color', options: colorOptions },
+                            { label: t("bundle.size"), field: 'size', options: sizeOptions },
+                            { label: t("bundle.buyer"), field: 'buyer', options: buyerOptions },
+                            { label: t("downDa.bundle_id"), field: 'bundleId', options: [] },
                           ].map(({ label, field, options }) => (
                             <th
                               key={field}
@@ -665,13 +670,13 @@ function DownloadData() {
                         {loading ? (
                           <tr>
                             <td colSpan="10" className="text-center py-4">
-                              Loading...
+                              {t("home.loading")}
                             </td>
                           </tr>
                         ) : (tabDataResults[activeTab] && tabDataResults[activeTab].length === 0) ? (
                           <tr>
                             <td colSpan="10" className="text-center py-4">
-                              No data found
+                              {t("downDa.no_data")}
                             </td>
                           </tr>
                         ) : (

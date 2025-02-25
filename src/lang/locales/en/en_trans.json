@@ -23,6 +23,7 @@
     "download_data": "Download Data",
     "live_dashboard": "Live Dashboard"
   },
+
   "nav":{
     "orders":"Orders",
     "qc":"QC",
@@ -89,7 +90,6 @@
     "ok":"OK"
   },
 
-
   "bundle": {
     "bundle_registration":"Bundle Registration",
     "registration":"Registration",
@@ -130,7 +130,7 @@
     "package_no":"Package No",
     "modify":"Modify",
     "time":"Time",
-    "emp_id":"EmpId",
+    "emp_id":"Employee ID",
     "eng_name":"EngName",
     "kh_name":"KhName",
     "mono":"MONo",
@@ -141,6 +141,87 @@
     "edit":"Edit",
     "action":"Action",
     "print_qr":"Print QR"
+  },
+
+  "defIm":{
+    "defect_images":"Defect Images",
+    "defect_name":"Defect Name",
+    "images":"Images"
+  },
+
+  "downDa":{
+    "start_date":"Start Date",
+    "end_date":"End Date",
+    "type":"Type",
+    "record_per":"Record Per Page",
+    "style_no":"Style No",
+    "bundle_id":"Bundle ID",
+    "no_data":"No Data Found",
+    "summary":"Summary",
+    "total_record":"Total Records",
+    "total_pages":"Total Pages",
+    "search":"Search",
+    "searching":"Searching...",
+    "download_excel":"Download Excel",
+    "download_pdf":"Download PDF"
+  },
+
+  "dash":{
+    "coming_soon":"Coming Soon",
+    "filters":"Filters",
+    "apply":"Apply",
+    "reset":"Reset",
+    "applied_filters":"Applied Filters",
+    "total_pass":"Total pass",
+    "total_rejects":"Total Rejects",
+    "defects_qty":"Defect Qty",
+    "total_bundle":"Total Bundle",
+    "rank":"Rank",
+    "level":"Level",
+    "hide":"Hide",
+    "show":"Show",
+    "qc2":"QC2"
+  },
+
+  "set":{
+    "head":"You do not have permission to access this page.",
+    "super_admin":"Super Admin Registration",
+    "role":"Role",
+    "job_title":"Job Title",
+    "search_emp_id":"Search Employee ID",
+    "selected_user_details":"Selected User Details",
+    "name":"Name",
+    "english_name":"English Name",
+    "khmer_name":"Khmer Name",
+    "section":"Section",
+    "phone_no":"Phone Number",
+    "working_status":"Working Status",
+    "current_super_admins":"Current Super Admins",
+    "delete":"Delete",
+    "register_super_admin":"Register Super Admin"
+  },
+
+  "insp":{
+    "submit":"Submit",
+    "pass":"Pass",
+    "reject":"Reject"
+  },
+
+  "detail":{
+    "head":"Quality Inspection Details",
+    "fill_below":"Fill Below",
+    "style_info":"Style Info",
+    "customer":"Customer",
+    "order_info":"Order Info",
+    "select_factory":"Select Factory",
+    "continue":"Continue to Inspection",
+    "submit_details":"Submit Details"
+  },
+
+  "return":{
+    "pass_return":"Pass Return",
+    "reject_return":"Reject_return"
   }
+
   }
   

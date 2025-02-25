@@ -3,6 +3,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import PropTypes from 'prop-types';
 import { API_BASE_URL } from "../../../config";
+import Swal from 'sweetalert2';
 
 const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, setEditModalOpen }) => {
   const [availableSizes, setAvailableSizes] = useState([]);
@@ -19,32 +20,44 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
     const colors = await fetchColors(selectedMono);
     setAvailableSizes(sizes);
     setAvailableColors(colors);
+    // console.log('Available Sizes:', sizes); // Log the sizes data
+    // console.log('Available Colors:', colors); // Log the colors data
   };
 
   const fetchSizes = async (selectedMono) => {
     try {
+      // console.log(`Fetching sizes for styleNo: ${selectedMono}`); // Log the selectedMono
       const response = await fetch(`${API_BASE_URL}/api/sizes?styleNo=${selectedMono}`);
+      // console.log('Sizes API Response:', response); // Log the full response
       if (!response.ok) {
+        const errorText = await response.text();
+        // console.error('Failed to fetch sizes:', errorText);
         throw new Error('Failed to fetch sizes');
       }
       const data = await response.json();
+      // console.log('Sizes Data:', data); // Log the data
       return data.sizes;
     } catch (error) {
-      console.error(error);
+      console.error('Error fetching sizes:', error);
       return [];
     }
   };
 
   const fetchColors = async (selectedMono) => {
     try {
+      // console.log(`Fetching colors for styleNo: ${selectedMono}`); // Log the selectedMono
       const response = await fetch(`${API_BASE_URL}/api/colors?styleNo=${selectedMono}`);
+      // console.log('Colors API Response:', response); // Log the full response
       if (!response.ok) {
+        const errorText = await response.text();
+        // console.error('Failed to fetch colors:', errorText);
         throw new Error('Failed to fetch colors');
       }
       const data = await response.json();
+      // console.log('Colors Data:', data); // Log the data
       return data.colors;
     } catch (error) {
-      console.error(error);
+      console.error('Error fetching colors:', error);
       return [];
     }
   };
@@ -59,7 +72,6 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
           body: JSON.stringify(formData),
         }
       );
-
       if (response.ok) {
         const updatedRecord = await response.json();
         setUserBatches((prevBatches) =>
@@ -68,13 +80,25 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
           )
         );
         setEditModalOpen(false);
-        alert("Record updated successfully!");
+        Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: 'Record updated successfully!',
+        });
       } else {
-        alert("Failed to update record.");
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Failed to update record.',
+        });
       }
     } catch (error) {
       console.error("Error updating record:", error);
-      alert("Failed to update record.");
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to update record.',
+      });
     }
   };
 
@@ -117,7 +141,7 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
             <DatePicker
-              selected={formData.date}
+              selected={new Date(formData.date)}
               onChange={(date) => setFormData((prev) => ({ ...prev, date }))}
               className="w-full px-3 py-1 border border-gray-300 rounded-md"
               dateFormat="yyyy-MM-dd"
@@ -179,7 +203,7 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
             <label className="block text-sm font-medium text-gray-700 mb-1">Count</label>
             <input
               type="text"
-              value={formData.count}
+              value={formData.count.toString()} // Ensure count is a string
               onChange={(e) => setFormData((prev) => ({ ...prev, count: e.target.value.toString() }))}
               className="w-full px-3 py-1 border border-gray-300 rounded-md"
             />
@@ -224,7 +248,7 @@ EditModal.propTypes = {
     lineNo: PropTypes.string.isRequired,
     color: PropTypes.string.isRequired,
     size: PropTypes.string.isRequired,
-    count: PropTypes.string.isRequired,
+    count: PropTypes.string.isRequired, // Ensure count is a string
     bundleQty: PropTypes.string.isRequired,
     buyer: PropTypes.string.isRequired,
     orderQty: PropTypes.string.isRequired,
@@ -234,8 +258,8 @@ EditModal.propTypes = {
     country: PropTypes.string.isRequired,
   }).isRequired,
   setFormData: PropTypes.func.isRequired,
-  setUserBatches: PropTypes.func.isRequired, // Add this prop
-  setEditModalOpen: PropTypes.func.isRequired, // Add this prop
+  setUserBatches: PropTypes.func.isRequired,
+  setEditModalOpen: PropTypes.func.isRequired,
 };
 
 export default EditModal;

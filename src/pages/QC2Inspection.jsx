@@ -400,9 +400,9 @@ const QC2InspectionPage = () => {
 
   return (
     <div className="flex h-screen">
-      <div
+      <div  
         className={`${
-          navOpen ? "w-64" : "w-16"
+          navOpen ? "w-72" : "w-16"
         } bg-gray-800 text-white h-screen p-2 transition-all duration-300`}
       >
         <div className="flex items-center justify-center mb-4">

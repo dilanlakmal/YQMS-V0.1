@@ -466,8 +466,11 @@ function BundleRegistration() {
 
   // Handle edit button click
   const handleEdit = (recordId) => {
-    const record = userBatches.find((batch) => batch.id === recordId);
+    // console.log("Record ID:", recordId); // Log the recordId
+    // console.log("User Batches:", userBatches); // Log the userBatches
+    const record = userBatches.find((batch) => batch._id === recordId);
     if (record) {
+      // console.log("Editing record:", record);
       setFormData({
         id: record._id,
         date: new Date(record.date),
@@ -1083,7 +1086,7 @@ function BundleRegistration() {
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         <button
-                          onClick={() => handleEdit(batch.id)}
+                          onClick={() => handleEdit(batch._id)}
                           className="ml-2 text-gray-900 font-m hover:text-blue-800 border px-4 py-2 bg-green-500"
                         >
                           {t("bundle.edit")}

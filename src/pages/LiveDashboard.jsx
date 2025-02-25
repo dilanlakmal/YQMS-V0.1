@@ -25,6 +25,7 @@ import { Bar } from "react-chartjs-2";
 // import { io } from "socket.io-client"; // Import Socket.io client
 import { API_BASE_URL } from "../../config";
 import DateSelector from "../components/forms/QC Inspection/DateSelector"; // make sure this version does NOT render its own label
+import { useTranslation } from 'react-i18next';
 
 ChartJS.register(
   CategoryScale,
@@ -37,6 +38,7 @@ ChartJS.register(
 );
 
 const LiveDashboard = () => {
+  const { t } = useTranslation();
   // --- Tabs state ---
   const [activeTab, setActiveTab] = useState("QC2");
 
@@ -225,32 +227,32 @@ const LiveDashboard = () => {
   }, [moNo, color, size, department, empId, startDate, endDate]);
 
   // Socket.io connection
-  useEffect(() => {
-    const socket = io(`${{ API_BASE_URL }}`, {
-      path: "/socket.io",
-      transports: ["websocket"],
-    });
+  // useEffect(() => {
+  //   const socket = io(`${{ API_BASE_URL }}`, {
+  //     path: "/socket.io",
+  //     transports: ["websocket"],
+  //   });
 
-    socket.on("qc2_data_updated", () => {
-      console.log("Data updated event received");
-      const currentFilters = filtersRef.current;
+  //   socket.on("qc2_data_updated", () => {
+  //     console.log("Data updated event received");
+  //     const currentFilters = filtersRef.current;
 
-      const filters = {
-        moNo: currentFilters.moNo,
-        color: currentFilters.color,
-        size: currentFilters.size,
-        department: currentFilters.department,
-        emp_id_inspection: currentFilters.empId,
-        startDate: currentFilters.startDate,
-        endDate: currentFilters.endDate,
-      };
+  //     const filters = {
+  //       moNo: currentFilters.moNo,
+  //       color: currentFilters.color,
+  //       size: currentFilters.size,
+  //       department: currentFilters.department,
+  //       emp_id_inspection: currentFilters.empId,
+  //       startDate: currentFilters.startDate,
+  //       endDate: currentFilters.endDate,
+  //     };
 
-      fetchSummaryData(filters);
-      fetchDefectRates(filters);
-    });
+  //     fetchSummaryData(filters);
+  //     fetchDefectRates(filters);
+  //   });
 
-    return () => socket.disconnect();
-  }, []);
+  //   return () => socket.disconnect();
+  // }, []);
 
   // --- Calculate dynamic max defect rate for Y axis ---
   const maxDefectRateValue =
@@ -318,12 +320,12 @@ const LiveDashboard = () => {
       <div className="mb-4">
         <div className="flex space-x-4 border-b">
           {[
-            "Bundle Registration",
-            "Washing",
-            "Ironing",
-            "OPA",
-            "QC2",
-            "Packing",
+            t("home.bundle_registration"),
+            t("home.washing"),
+            t("home.ironing"),
+            t("home.opa"),
+            t("dash.qc2"),
+            t("home.packing"),
           ].map((tab) => (
             <button
               key={tab}
@@ -342,25 +344,25 @@ const LiveDashboard = () => {
 
       {activeTab !== "QC2" ? (
         <div className="text-center mt-8 text-gray-700">
-          <h2 className="text-xl font-medium">Coming soon</h2>
+          <h2 className="text-xl font-medium">{t("dash.coming_soon")}</h2>
         </div>
       ) : (
         <>
           <h1 className="text-2xl font-medium mb-4 text-center">
-            Live Dashboard
+            {t("home.live_dashboard")}
           </h1>
 
           {/* Filter Pane Header with Filter Icon and Toggle */}
           <div className="flex items-center justify-between bg-white p-2 rounded-lg shadow mb-2">
             <div className="flex items-center space-x-2">
               <Filter className="text-blue-500" size={20} />
-              <h2 className="text-lg font-medium text-gray-700">Filters</h2>
+              <h2 className="text-lg font-medium text-gray-700">{t("dash.filters")}</h2>
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
               className="text-blue-500 flex items-center"
             >
-              {showFilters ? "Hide" : "Show"}
+              {showFilters ? t("dash.hide") : t("dash.show")}
             </button>
           </div>
 
@@ -371,7 +373,7 @@ const LiveDashboard = () => {
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-gray-700 mb-1">
-                    Start Date
+                    {t("downDa.start_date")}
                   </label>
                   <DateSelector
                     selectedDate={startDate}
@@ -381,7 +383,7 @@ const LiveDashboard = () => {
                 </div>
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-gray-700 mb-1">
-                    End Date
+                    {t('downDa.end_date')}
                   </label>
                   <DateSelector
                     selectedDate={endDate}
@@ -391,7 +393,7 @@ const LiveDashboard = () => {
                 </div>
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-gray-700 mb-1">
-                    MO No
+                    {t("bundle.mono")}
                   </label>
                   <input
                     type="text"
@@ -414,14 +416,14 @@ const LiveDashboard = () => {
                 </div>
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-gray-700 mb-1">
-                    Color
+                    {t("bundle.color")}
                   </label>
                   <select
                     value={color}
                     onChange={(e) => setColor(e.target.value)}
                     className="px-3 py-2 border border-gray-300 rounded-md"
                   >
-                    <option value="">Select Color</option>
+                    <option value="">{t("bundle.select_color")}</option>
                     {colorOptions.map((opt) => (
                       <option key={opt} value={opt}>
                         {opt}
@@ -431,14 +433,14 @@ const LiveDashboard = () => {
                 </div>
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-gray-700 mb-1">
-                    Size
+                  {t("bundle.size")}
                   </label>
                   <select
                     value={size}
                     onChange={(e) => setSize(e.target.value)}
                     className="px-3 py-2 border border-gray-300 rounded-md"
                   >
-                    <option value="">Select Size</option>
+                    <option value="">{t("bundle.select_size")}</option>
                     {sizeOptions.map((opt) => (
                       <option key={opt} value={opt}>
                         {opt}
@@ -451,14 +453,14 @@ const LiveDashboard = () => {
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mt-4">
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-gray-700 mb-1">
-                    Department
+                  {t("bundle.department")}
                   </label>
                   <select
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
                     className="px-3 py-2 border border-gray-300 rounded-md"
                   >
-                    <option value="">Select Department</option>
+                    <option value="">{t("bundle.select_department")}</option>
                     {departmentOptions.map((opt) => (
                       <option key={opt} value={opt}>
                         {opt}
@@ -468,7 +470,7 @@ const LiveDashboard = () => {
                 </div>
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-gray-700 mb-1">
-                    Emp ID
+                  {t("bundle.emp_id")}
                   </label>
                   <input
                     type="text"
@@ -496,13 +498,13 @@ const LiveDashboard = () => {
                   onClick={handleApplyFilters}
                   className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
                 >
-                  Apply
+                  {t("dash.apply")}
                 </button>
                 <button
                   onClick={handleResetFilters}
                   className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
                 >
-                  Reset
+                  {t("dash.reset")}
                 </button>
               </div>
             </div>
@@ -512,7 +514,7 @@ const LiveDashboard = () => {
           {Object.keys(appliedFilters).length > 0 && (
             <div className="mb-4">
               <h3 className="text-sm font-medium text-gray-700 mb-2">
-                Summary: Applied Filters:
+              {t("downDa.summary")}: {t("dash.applied_filters")}:
               </h3>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(appliedFilters).map(([key, value]) => (
@@ -532,7 +534,7 @@ const LiveDashboard = () => {
             <div className="p-6 bg-white shadow-md rounded-lg flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-700">
-                  Checked Qty
+                {t("ana.checked_qty")}
                 </h2>
                 <p className="text-2xl font-bold text-gray-900">
                   {summaryData.checkedQty}
@@ -543,7 +545,7 @@ const LiveDashboard = () => {
             <div className="p-6 bg-white shadow-md rounded-lg flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-700">
-                  Total Pass
+                {t("dash.total_pass")}
                 </h2>
                 <p className="text-2xl font-bold text-gray-900">
                   {summaryData.totalPass}
@@ -554,7 +556,7 @@ const LiveDashboard = () => {
             <div className="p-6 bg-white shadow-md rounded-lg flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-700">
-                  Total Rejects
+                {t("dash.total_rejects")}
                 </h2>
                 <p className="text-2xl font-bold text-gray-900">
                   {summaryData.totalRejects}
@@ -565,7 +567,7 @@ const LiveDashboard = () => {
             <div className="p-6 bg-white shadow-md rounded-lg flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-700">
-                  Defects Qty
+                {t("dash.defects_qty")}
                 </h2>
                 <p className="text-2xl font-bold text-gray-900">
                   {summaryData.defectsQty}
@@ -576,7 +578,7 @@ const LiveDashboard = () => {
             <div className="p-6 bg-white shadow-md rounded-lg flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-700">
-                  Total Bundles
+                {t("dash.total_bundle")}
                 </h2>
                 <p className="text-2xl font-bold text-gray-900">
                   {summaryData.totalBundles}
@@ -587,7 +589,7 @@ const LiveDashboard = () => {
             <div className="p-6 bg-white shadow-md rounded-lg flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-700">
-                  Defect Rate
+                {t("ana.defect_rate")}
                 </h2>
                 <p className="text-2xl font-bold text-gray-900">
                   {(summaryData.defectRate * 100).toFixed(2)}%
@@ -598,7 +600,7 @@ const LiveDashboard = () => {
             <div className="p-6 bg-white shadow-md rounded-lg flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-700">
-                  Defect Ratio
+                {t("ana.defect_ratio")}
                 </h2>
                 <p className="text-2xl font-bold text-gray-900">
                   {(summaryData.defectRatio * 100).toFixed(2)}%
@@ -611,7 +613,7 @@ const LiveDashboard = () => {
           {/* Chart/Table Toggle Section with Title */}
           <div className="mb-4">
             <h2 className="text-sm font-medium text-gray-900 mb-2">
-              QC2 Defect rate by Defect Name
+              QC2 {t("ana.defect_rate_by")}
             </h2>
           </div>
 
@@ -649,21 +651,21 @@ const LiveDashboard = () => {
                   <thead className="bg-light-blue-500">
                     <tr>
                       <th className="py-2 px-4 border-b border-gray-200 font-bold text-left block md:table-cell">
-                        <span className="hidden md:inline">Defect Name</span>
+                        <span className="hidden md:inline">{t("defIm.defect_name")}</span>
                       </th>
                       <th className="py-2 px-4 border-b border-gray-200 font-bold text-left block md:table-cell">
-                        <span className="hidden md:inline">Rank</span>
+                        <span className="hidden md:inline">{t("dash.rank")}</span>
                       </th>
                       <th className="py-2 px-4 border-b border-gray-200 font-bold text-left block md:table-cell">
-                        <span className="hidden md:inline">Defect Qty</span>
+                        <span className="hidden md:inline">{t("dash.defect_qty")}</span>
                       </th>
                       <th className="py-2 px-4 border-b border-gray-200 font-bold text-left block md:table-cell">
                         <span className="hidden md:inline">
-                          Defect Rate (%)
+                        {t("ana.defect_rate")} (%)
                         </span>
                       </th>
                       <th className="py-2 px-4 border-b border-gray-200 font-bold text-left block md:table-cell">
-                        <span className="hidden md:inline">Level</span>
+                        <span className="hidden md:inline">{t("dash.level")}</span>
                       </th>
                     </tr>
                   </thead>

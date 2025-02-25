@@ -527,10 +527,12 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "../../config";
+import { useTranslation } from 'react-i18next';
 
 const allowedInitialEmpIds = ["YM6702", "YM7903"];
 
 export default function Settings() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
@@ -679,7 +681,7 @@ export default function Settings() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-red-600">
-          You do not have permission to access this page.
+          {t("set.head")}
         </p>
       </div>
     );
@@ -687,7 +689,7 @@ export default function Settings() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Super Admin Registration</h1>
+      <h1 className="text-2xl font-bold mb-6"> {t("set.super_admin")}</h1>
 
       {error && (
         <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
@@ -704,7 +706,7 @@ export default function Settings() {
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700">
-            Role
+          {t("set.role")}
           </label>
           <input
             type="text"
@@ -716,7 +718,7 @@ export default function Settings() {
 
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700">
-            Job Title
+          {t("set.job_title")}
           </label>
           <input
             type="text"
@@ -728,7 +730,7 @@ export default function Settings() {
 
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700">
-            Search Employee ID
+          {t("set.search_emp_id")}
           </label>
           <input
             type="text"
@@ -755,21 +757,21 @@ export default function Settings() {
 
         {selectedUser && (
           <div className="mb-4 p-4 border border-gray-200 rounded-md">
-            <h3 className="font-medium mb-2">Selected User Details</h3>
-            <p>Name: {selectedUser.name}</p>
-            <p>English Name: {selectedUser.eng_name}</p>
-            <p>Khmer Name: {selectedUser.kh_name}</p>
-            <p>Job Title: {selectedUser.job_title}</p>
-            <p>Department: {selectedUser.dept_name}</p>
-            <p>Section: {selectedUser.sect_name}</p>
-            <p>Phone Number: {selectedUser.phone_number}</p>
-            <p>Working Status: {selectedUser.working_status}</p>
+            <h3 className="font-medium mb-2">{t("set.selected_user_details")}</h3>
+            <p>{t("set.name")}: {selectedUser.name}</p>
+            <p>{t("set.english_name")}: {selectedUser.eng_name}</p>
+            <p>{t("set.khmer_name")}: {selectedUser.kh_name}</p>
+            <p>{t("set.job_title")}: {selectedUser.job_title}</p>
+            <p>{t("bundle.department")}: {selectedUser.dept_name}</p>
+            <p>{t("set.section")}: {selectedUser.sect_name}</p>
+            <p>{t("set.phone_no")}: {selectedUser.phone_number}</p>
+            <p>{t("set.working_status")}: {selectedUser.working_status}</p>
           </div>
         )}
 
         {existingRole && (
           <div className="mb-4 p-4 border border-gray-200 rounded-md">
-            <h3 className="font-medium mb-2">Current Super Admins</h3>
+            <h3 className="font-medium mb-2">{t("set.current_super_admins")}</h3>
             <div className="flex flex-wrap gap-4">
               {existingRole.users.map((user) => (
                 <div key={user.emp_id} className="text-center relative">
@@ -785,7 +787,7 @@ export default function Settings() {
                       onClick={() => handleDelete(user.emp_id)}
                       className="mt-2 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
                     >
-                      Delete
+                      {t("set.delete")}
                     </button>
                   )}
                 </div>
@@ -799,7 +801,7 @@ export default function Settings() {
           disabled={!selectedUser}
           className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
         >
-          Register Super Admin
+          {t("set.register_super_admin")}
         </button>
       </div>
     </div>

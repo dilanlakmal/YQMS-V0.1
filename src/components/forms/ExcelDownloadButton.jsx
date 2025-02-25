@@ -1,7 +1,9 @@
 import { saveAs } from "file-saver";
 import ExcelJS from "exceljs";
+import { useTranslation } from 'react-i18next';
 
 function ExcelDownloadButton({ data, filters = {} }) {
+  const { t } = useTranslation();
   const generateFileName = () => {
     const parts = [];
     if (filters.taskNo) parts.push(`Task ${filters.taskNo}`);
@@ -108,7 +110,7 @@ function ExcelDownloadButton({ data, filters = {} }) {
       onClick={handleDownload}
       className="bg-green-500 text-white px-6 py-2 rounded-md hover:bg-green-600 ml-4"
     >
-      Download Excel
+      {t("downDa.download_excel")}
     </button>
   );
 }

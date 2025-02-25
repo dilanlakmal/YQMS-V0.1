@@ -3,4 +3,4 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const API_BASE_URL =
-  process.env.API_BASE_URL || "https://192.167.7.252:5001";
+  process.env.API_BASE_URL || "https://192.167.7.252:5000";

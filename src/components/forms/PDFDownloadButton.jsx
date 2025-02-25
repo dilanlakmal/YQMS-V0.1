@@ -8,6 +8,7 @@ import {
 } from "@react-pdf/renderer";
 import { saveAs } from "file-saver";
 import React from "react";
+import { useTranslation } from 'react-i18next';
 
 const styles = StyleSheet.create({
   page: {
@@ -105,6 +106,7 @@ function PDFDocument({ data, filters }) {
 }
 
 function PDFDownloadButton({ data, filters }) {
+  const { t } = useTranslation();
   const generateFileName = () => {
     const parts = [];
     if (filters.taskNo) parts.push(`Task ${filters.taskNo}`);
@@ -130,7 +132,7 @@ function PDFDownloadButton({ data, filters }) {
       onClick={handleDownload}
       className="bg-red-500 text-white px-6 py-2 rounded-md hover:bg-red-600 ml-4"
     >
-      Download PDF
+      {t("downDa.download_pdf")}
     </button>
   );
 }

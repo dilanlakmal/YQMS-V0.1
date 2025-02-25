@@ -8,8 +8,10 @@ import StyleDigitInput from "../../components/forms/QC Inspection/StyleDigitInpu
 import { FACTORIES, getCustomerByStyleCode } from "../../constants/QC Inspection/data";
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "../../../config";
+import { useTranslation } from "react-i18next";
 
 function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [leftActive, setLeftActive] = useState(false);
   const [rightActive, setRightActive] = useState(false);
@@ -182,7 +184,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
     <div className="min-h-screen bg-gray-50 pt-20 px-4">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">
-          Quality Inspection Details
+          {t("detail.head")}
         </h1>
 
         <form
@@ -201,7 +203,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
                     : "bg-gray-300 text-gray-600 hover:bg-gray-400"
                 }`}
               >
-                Fill Below (Style Info)
+                {t("detail.fill_below")} ({t("detail.style_info")})
               </button>
 
               <div className={`space-y-4 ${!leftActive ? "opacity-50" : ""}`}>
@@ -222,7 +224,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Customer
+                  {t("detail.customer")}
                   </label>
                   <input
                     type="text"
@@ -234,7 +236,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    MO No
+                  {t("bundle.mono")}
                   </label>
                   <input
                     type="text"
@@ -257,7 +259,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
                     : "bg-gray-300 text-gray-600 hover:bg-gray-400"
                 }`}
               >
-                Fill Below (Order Info)
+                {t("detail.fill_below")} ({t("detail.order_info")})
               </button>
 
               <div className={`space-y-4 ${!rightActive ? "opacity-50" : ""}`}>
@@ -282,7 +284,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
                 {formData.selectedMono && (
                   <div className="mb-4 p-2 bg-gray-50 rounded-md">
                     <p className="text-sm font-medium">
-                      Selected MONo:{" "}
+                    {t("bundle.selected_mono")}:{" "}
                       <span className="ml-2 font-bold text-blue-600">
                         {formData.selectedMono}
                       </span>
@@ -292,7 +294,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Buyer
+                  {t("bundle.buyer")}
                   </label>
                   <input
                     type="text"
@@ -304,7 +306,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Order Qty
+                  {t("bundle.order_qty")}
                   </label>
                   <input
                     type="text"
@@ -316,7 +318,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Factory
+                  {t("bundle.factory")}
                   </label>
                   <input
                     type="text"
@@ -328,7 +330,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Customer Style
+                  {t("bundle.customer_style")}
                   </label>
                   <input
                     type="text"
@@ -340,7 +342,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Country
+                  {t("bundle.county")}
                   </label>
                   <input
                     type="text"
@@ -352,7 +354,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Color
+                  {t("bundle.color")}
                   </label>
                   <select
                     value={formData.color}
@@ -365,7 +367,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                     disabled={!rightActive || isSubmitted}
                   >
-                    <option value="">Select Color</option>
+                    <option value="">{t("bundle.select_color")}</option>
                     {colors.map((color) => (
                       <option key={color} value={color}>
                         {color}
@@ -376,7 +378,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Size
+                  {t("bundle.size")}
                   </label>
                   <select
                     value={formData.size}
@@ -386,7 +388,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                     disabled={!rightActive || isSubmitted}
                   >
-                    <option value="">Select Size</option>
+                    <option value="">{t("bundle.select_size")}</option>
                     {sizes.map((size) => (
                       <option key={size} value={size}>
                         {size}
@@ -402,7 +404,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date
+              {t("bundle.date")}
               </label>
               <DatePicker
                 selected={formData.date}
@@ -419,7 +421,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Factory
+              {t("bundle.factory")}
               </label>
               <select
                 value={formData.factory}
@@ -433,7 +435,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
                 disabled={isSubmitted}
                 required
               >
-                <option value="">Select Factory</option>
+                <option value="">{t("detail.select_factory")}</option>
                 {FACTORIES.map((factory) => (
                   <option key={factory} value={factory}>
                     {factory}
@@ -444,7 +446,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Line No
+              {t("bundle.line_no")}
               </label>
               <input
                 type="text"
@@ -465,7 +467,7 @@ function Details({ onDetailsSubmit, isSubmitted, savedDetails }) {
               type="submit"
               className="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              {isSubmitted ? "Continue to Inspection" : "Submit Details"}
+              {isSubmitted ? t("detail.continue") : t("detail.submit_details")}
             </button>
           </div>
         </form>

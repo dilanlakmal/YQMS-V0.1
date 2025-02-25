@@ -346,7 +346,7 @@ function BundleRegistration() {
                   <option value="">{t("bundle.select_department")}</option>
                   <option value="QC1 Endline">{t("bundle.qc1_endline")}</option>
                   <option value="Washing">{t("bundle.washing")}</option>
-                  <option value="Dyeing">Dyeing</option>
+                  <option value="Dyeing">{t("home.opa")}</option>
                   <option value="Sub-con">{t("bundle.sub_con")}</option>
                 </select>
               </div>

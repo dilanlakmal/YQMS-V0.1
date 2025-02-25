@@ -14,6 +14,7 @@ import ViewToggle from "../../components/inspection/ViewToggle";
 import { defectsList } from "../../constants/QC Inspection/defects";
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "../../../config";
+import { useTranslation } from 'react-i18next';
 
 function Inspection({
  
@@ -29,6 +30,7 @@ function Inspection({
   onUpdateSharedState = () => {},
 }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [view, setView] = useState(savedState?.view || "list");
   const [language, setLanguage] = useState(savedState?.language || "english");
   const [defects, setDefects] = useState(savedState?.defects || {});
@@ -323,7 +325,7 @@ function Inspection({
                 onClick={handleSubmit}
                 className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-green-700"
               >
-                Submit
+                {t("insp.submit")}
               </button>
             </div>
           </div>
@@ -343,7 +345,7 @@ function Inspection({
                     : "bg-gray-300 text-gray-600"
                 }`}
               >
-                Pass
+                {t("insp.pass")}
               </button>
             </div>
             <div className="col-span-8">
@@ -381,7 +383,7 @@ function Inspection({
                     : "bg-gray-300 text-gray-600"
                 }`}
               >
-                Reject
+                {t("insp.reject")}
               </button>
             </div>
           </div>

@@ -9,6 +9,7 @@ import FormatTime from "../../components/formatting/FormatTime";
 import { formatTimeString } from "../../components/formatting/FormatedTime";
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "../../../config";
+import { useTranslation } from "react-i18next";
 
 function Return({
   savedState,
@@ -19,6 +20,7 @@ function Return({
   sharedState = {},
   onUpdateSharedState = () => {},
 }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [view, setView] = useState("list");
   const [language, setLanguage] = useState("english");
@@ -331,7 +333,7 @@ function Return({
                   : "bg-gray-300 text-gray-600"
               }`}
             >
-              Pass Return
+              {t("return.pass_return")}
             </button>
           </div>
           <div className="col-span-8">
@@ -373,7 +375,7 @@ function Return({
                   : "bg-gray-300 text-gray-600"
               }`}
             >
-              Reject Return
+              {t("return.reject_return")}
             </button>
           </div>
         </div>
