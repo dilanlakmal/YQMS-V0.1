@@ -25,7 +25,10 @@ import QC2Data from "../components/inspection/QC2Data";
 import { allDefects, defectsList } from "../constants/defects";
 
 const QC2InspectionPage = () => {
+  // Authentication and User Data
   const { user, loading } = useAuth();
+
+  // State Management
   const [error, setError] = useState(null);
   const [bundleData, setBundleData] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
@@ -57,6 +60,23 @@ const QC2InspectionPage = () => {
   const [passBundleCountdown, setPassBundleCountdown] = useState(null);
 
   const bluetoothRef = useRef();
+
+  const activeFilter = categoryFilter || defectTypeFilter;
+  const categoryOptions = [
+    "fabric",
+    "workmanship",
+    "cleanliness",
+    "embellishment",
+    "measurement",
+    "washing",
+    "finishing",
+    "miscellaneous",
+  ];
+
+  const defectQty = Object.values(confirmedDefects).reduce((a, b) => a + b, 0);
+  const hasDefects = Object.values(tempDefects).some((count) => count > 0);
+
+  // Effects
 
   // Reset state when new bundle data is loaded
   useEffect(() => {
@@ -105,6 +125,8 @@ const QC2InspectionPage = () => {
     return () => clearInterval(timer);
   }, [printing, qrCodesData, printMethod]);
 
+  // Helper Functions
+
   // Generate a random defect ID
   const generateDefectId = () => {
     return Math.random().toString(36).substring(2, 12).toUpperCase();
@@ -113,6 +135,17 @@ const QC2InspectionPage = () => {
   // Generate a random garment defect ID
   const generateGarmentDefectId = () => {
     return Math.floor(1000000000 + Math.random() * 9000000000).toString();
+  };
+
+  // Compute the aggregated defect array from all confirmed defects
+  const computeDefectArray = () => {
+    const englishDefectItems = defectsList["english"];
+    return Object.keys(confirmedDefects)
+      .filter((key) => confirmedDefects[key] > 0)
+      .map((key) => ({
+        defectName: englishDefectItems[key]?.name || "Unknown",
+        totalCount: confirmedDefects[key],
+      }));
   };
 
   // Group defects by repair type for "By Repair" method
@@ -176,7 +209,7 @@ const QC2InspectionPage = () => {
       }
 
       currentChunk.push(garment);
-      currentLineCount += linesNeeded; // Accumulate total lines
+      currentLineCount += linesNeeded;
     });
 
     // Push any remaining garments as a final chunk
@@ -187,256 +220,12 @@ const QC2InspectionPage = () => {
     return chunks;
   };
 
-  // Compute the aggregated defect array from all rejected garments
-  const computeDefectArray = () => {
-    const defectMap = {};
-    rejectedGarments.forEach((garment) => {
-      garment.defects.forEach((defect) => {
-        if (defect.count > 0) {
-          defectMap[defect.defectName] =
-            (defectMap[defect.defectName] || 0) + defect.count;
-        }
-      });
-    });
-    return Object.keys(defectMap).map((name) => ({
-      defectName: name,
-      totalCount: defectMap[name],
-    }));
-  };
+  // Event Handlers
 
-  // Handle QR code generation based on the selected print method
-  const handleGenerateQRCodes = async () => {
-    if (generateQRDisabled) return;
-    setGenerateQRDisabled(true);
-
-    const now = new Date();
-    const print_time = now.toLocaleTimeString("en-US", { hour12: false });
-    const inspection_date = now.toLocaleDateString("en-US");
-
-    const repairQrCodes = [];
-    const garmentQrCodes = [];
-    const bundleQrCodes = [];
-
-    // "By Repair"
-    if (printMethod === "repair") {
-      const defectGroups = groupDefectsByRepair();
-      for (const [repair, group] of Object.entries(defectGroups)) {
-        for (const chunk of group.defectChunks) {
-          const defectId = generateDefectId();
-          const qrData = {
-            factory: bundleData.factory || "YM",
-            package_no: bundleData.package_no,
-            moNo: bundleData.selectedMono,
-            custStyle: bundleData.custStyle,
-            color: bundleData.color,
-            size: bundleData.size,
-            repair,
-            count: group.totalCount,
-            count_print: chunk.count_print,
-            defects: chunk.defects,
-            print_time,
-            defect_id: defectId,
-            emp_id_inspection: user.emp_id,
-            eng_name_inspection: user.eng_name,
-            kh_name_inspection: user.kh_name,
-            job_title_inspection: user.job_title,
-            dept_name_inspection: user.dept_name,
-            sect_name_inspection: user.sect_name,
-            bundle_id: bundleData.bundle_id,
-            bundle_random_id: bundleData.bundle_random_id,
-          };
-          try {
-            const response = await fetch(
-              `${API_BASE_URL}/api/qc2-defect-print`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(qrData),
-              }
-            );
-            if (!response.ok)
-              throw new Error("Failed to save defect print data");
-            repairQrCodes.push(qrData);
-          } catch (error) {
-            setError(`Failed to generate QR codes (Repair): ${error.message}`);
-            setGenerateQRDisabled(false);
-            return;
-          }
-        }
-      }
-    }
-
-    // "By Garment"
-    if (printMethod === "garment") {
-      garmentQrCodes.push(
-        ...rejectedGarments.map((garment) => {
-          const defectId = generateDefectId();
-          const garmentDefectId = garment.garment_defect_id;
-          const defectsWithRepair = garment.defects.map((d) => ({
-            name: d.defectName,
-            count: d.count,
-            repair:
-              allDefects.find((def) => def.english === d.defectName)?.repair ||
-              "Unknown",
-          }));
-          return {
-            factory: bundleData.factory || "YM",
-            package_no: bundleData.package_no,
-            moNo: bundleData.selectedMono,
-            custStyle: bundleData.custStyle,
-            color: bundleData.color,
-            size: bundleData.size,
-            lineNo: bundleData.lineNo,
-            department: bundleData.department,
-            checkedQty: bundleData.passQtyIron,
-            totalPass,
-            totalRejects,
-            defectQty: garment.totalCount,
-            defectArray: [],
-            rejectGarments: [
-              {
-                totalCount: garment.totalCount,
-                defects: defectsWithRepair,
-                garment_defect_id: garmentDefectId,
-              },
-            ],
-            inspection_time: print_time,
-            inspection_date,
-            emp_id_inspection: user.emp_id,
-            eng_name_inspection: user.eng_name,
-            kh_name_inspection: user.kh_name,
-            job_title_inspection: user.job_title,
-            dept_name_inspection: user.dept_name,
-            sect_name_inspection: user.sect_name,
-            bundle_id: bundleData.bundle_id,
-            bundle_random_id: bundleData.bundle_random_id,
-            defect_id: defectId,
-            count: garment.totalCount,
-            defects: defectsWithRepair,
-          };
-        })
-      );
-    }
-
-    // "By Bundle"
-    if (printMethod === "bundle" && rejectedGarments.length > 0) {
-      const chunks = groupRejectedGarmentsForBundle();
-      chunks.forEach((chunk) => {
-        const defectPrintId = generateGarmentDefectId();
-        const totalRejectGarmentCount = chunk.length;
-        const totalPrintDefectCount = chunk.reduce(
-          (sum, garment) => sum + garment.totalCount,
-          0
-        );
-        const printData = chunk.map((garment, index) => {
-          const defects =
-            garment.defects.length > 6
-              ? [
-                  ...garment.defects.slice(0, 6).map((d) => ({
-                    name: d.defectName,
-                    count: d.count,
-                    repair:
-                      allDefects.find((def) => def.english === d.defectName)
-                        ?.repair || "Unknown",
-                  })),
-                  {
-                    name: "Others",
-                    count: garment.defects
-                      .slice(6)
-                      .reduce((sum, d) => sum + d.count, 0),
-                    repair: "Various",
-                  },
-                ]
-              : garment.defects.map((d) => ({
-                  name: d.defectName,
-                  count: d.count,
-                  repair:
-                    allDefects.find((def) => def.english === d.defectName)
-                      ?.repair || "Unknown",
-                }));
-          return { garmentNumber: index + 1, defects };
-        });
-        bundleQrCodes.push({
-          package_no: bundleData.package_no,
-          moNo: bundleData.selectedMono,
-          color: bundleData.color,
-          size: bundleData.size,
-          bundleQty: bundleData.passQtyIron,
-          totalRejectGarments: totalRejectGarmentCount,
-          totalDefectCount: totalPrintDefectCount,
-          defects: printData,
-          defect_print_id: defectPrintId,
-        });
-      });
-    }
-
-    setQrCodesData({
-      repair: repairQrCodes,
-      garment: garmentQrCodes,
-      bundle: bundleQrCodes,
-    });
-
-    // Update server record with defectArray and inspection_time
-    const defectArray = computeDefectArray();
-    const updatePayload = {
-      inspection_time: print_time,
-      defectArray,
-    };
-    if (printMethod === "bundle" && bundleQrCodes.length > 0) {
-      updatePayload.printArray = bundleQrCodes.map((qrCode) => ({
-        method: "bundle",
-        defect_print_id: qrCode.defect_print_id,
-        totalRejectGarmentCount: qrCode.totalRejectGarments,
-        totalPrintDefectCount: qrCode.totalDefectCount,
-        printData: qrCode.defects,
-      }));
-    }
-
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatePayload),
-        }
-      );
-      if (!response.ok) throw new Error("Failed to update inspection record");
-    } catch (err) {
-      setError(`Failed to update inspection record: ${err.message}`);
-      setGenerateQRDisabled(false);
-      return;
-    }
-
-    setGenerateQRDisabled(false);
-  };
-
-  // Handle printing of QR codes
-  const handlePrintQRCode = async () => {
-    if (!bluetoothRef.current?.isConnected) {
-      alert("Please connect to a printer first");
-      return;
-    }
-    try {
-      setPrinting(true);
-      const selectedQrCodes = qrCodesData[printMethod];
-      for (const qrCode of selectedQrCodes) {
-        if (printMethod === "repair") {
-          await bluetoothRef.current.printDefectData(qrCode);
-        } else if (printMethod === "garment") {
-          await bluetoothRef.current.printGarmentDefectData(qrCode);
-          if (!passBundleCountdown) setPassBundleCountdown(5);
-        } else if (printMethod === "bundle") {
-          await bluetoothRef.current.printBundleDefectData(qrCode);
-        }
-      }
-      alert("All QR codes printed successfully!");
-    } catch (error) {
-      console.error("Print error:", error);
-      alert(`Failed to print QR codes: ${error.message}`);
-    } finally {
-      setPrinting(false);
-    }
+  // Start the scanner interface
+  const handleStartScanner = () => {
+    setScanning(true);
+    setInDefectWindow(false);
   };
 
   // Fetch bundle data and create initial server record
@@ -505,27 +294,8 @@ const QC2InspectionPage = () => {
     }
   };
 
-  // Handle passing the bundle and reset state
-  const handlePassBundle = async () => {
-    const hasDefects = Object.values(tempDefects).some((count) => count > 0);
-    if (hasDefects && !rejectedOnce) return;
-
-    setTotalPass(0);
-    setTotalRejects(0);
-    setConfirmedDefects({});
-    setTempDefects({});
-    setBundlePassed(true);
-    setRejectedOnce(false);
-    setBundleData(null);
-    setInDefectWindow(false);
-    setScanning(true);
-    setRejectedGarments([]);
-    setQrCodesData({ repair: [], garment: [], bundle: [] });
-    setGenerateQRDisabled(false);
-    setPassBundleCountdown(null);
-  };
-
   // Handle rejecting a garment and updating server
+
   const handleReturnBundle = async () => {
     const hasDefects = Object.values(tempDefects).some((count) => count > 0);
     if (!hasDefects || totalPass <= 0) return;
@@ -543,17 +313,24 @@ const QC2InspectionPage = () => {
     setTotalRejects((prev) => prev + 1);
     setRejectedOnce(true);
 
-    const englishDefectItems = defectsList["english"];
     const now = new Date();
     const currentTime = now.toLocaleTimeString("en-US", { hour12: false });
 
-    const garmentDefectId = generateGarmentDefectId();
+    const garmentDefectId = generateGarmentDefectId(); // Your existing function
+
+    // Map defects with name, count, and repair
     const defects = Object.keys(currentTempDefects)
-      .filter((key) => currentTempDefects[key] > 0) // Only include defects with count > 0
-      .map((key) => ({
-        defectName: englishDefectItems[key]?.name || "",
-        count: currentTempDefects[key],
-      }));
+      .filter((key) => currentTempDefects[key] > 0)
+      .map((key) => {
+        const defectIndex = parseInt(key);
+        const defect = allDefects[defectIndex];
+        return {
+          name: defect?.english || "Unknown", // Use 'name' instead of 'defectName'
+          count: currentTempDefects[key],
+          repair: defect?.repair || "Unknown",
+        };
+      });
+
     const totalCount = defects.reduce((sum, d) => sum + d.count, 0);
     const newRejectGarment = {
       totalCount,
@@ -571,6 +348,7 @@ const QC2InspectionPage = () => {
       defectQty: defectQty + totalCount,
       rejectGarments: newRejectedGarments,
     };
+
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
@@ -580,14 +358,19 @@ const QC2InspectionPage = () => {
           body: JSON.stringify(updatePayload),
         }
       );
-      if (!response.ok) throw new Error("Failed to update inspection record");
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update inspection record: ${errorText}`);
+      }
+      console.log("Inspection record updated successfully");
     } catch (err) {
       setError(`Failed to update inspection record: ${err.message}`);
+      console.error(err);
     }
 
-    // Save to reworks
+    // Save to reworks (unchanged, assuming it’s correct)
     const reworkGarments = defects.map((defect) => ({
-      defectName: defect.defectName,
+      defectName: defect.name,
       count: defect.count,
       time: currentTime,
     }));
@@ -621,27 +404,254 @@ const QC2InspectionPage = () => {
     }
   };
 
-  // Start the scanner interface
-  const handleStartScanner = () => {
-    setScanning(true);
-    setInDefectWindow(false);
+  // Handle QR code generation for all methods
+  const handleGenerateQRCodes = async () => {
+    if (generateQRDisabled) return;
+    setGenerateQRDisabled(true);
+
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    const seconds = String(now.getSeconds()).padStart(2, "0");
+    const print_time = `${hours}:${minutes}:${seconds}`;
+    const inspection_date = now.toLocaleDateString("en-US");
+
+    const repairQrCodes = [];
+    const garmentQrCodes = [];
+    const bundleQrCodes = [];
+
+    // "By Repair" method
+    const defectGroups = groupDefectsByRepair();
+    for (const [repair, group] of Object.entries(defectGroups)) {
+      for (const chunk of group.defectChunks) {
+        const defectId = generateDefectId();
+        const qrData = {
+          factory: bundleData.factory || "YM",
+          package_no: bundleData.package_no,
+          moNo: bundleData.selectedMono,
+          custStyle: bundleData.custStyle,
+          color: bundleData.color,
+          size: bundleData.size,
+          repair,
+          count: group.totalCount,
+          count_print: chunk.count_print,
+          defects: chunk.defects,
+          inspection_time: print_time,
+          defect_id: defectId,
+          emp_id_inspection: user.emp_id,
+          eng_name_inspection: user.eng_name,
+          kh_name_inspection: user.kh_name,
+          job_title_inspection: user.job_title,
+          dept_name_inspection: user.dept_name,
+          sect_name_inspection: user.sect_name,
+          bundle_id: bundleData.bundle_id,
+          bundle_random_id: bundleData.bundle_random_id,
+        };
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/qc2-defect-print`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(qrData),
+          });
+          if (!response.ok) throw new Error("Failed to save defect print data");
+          repairQrCodes.push(qrData);
+        } catch (error) {
+          setError(`Failed to generate QR codes (Repair): ${error.message}`);
+          setGenerateQRDisabled(false);
+          return;
+        }
+      }
+    }
+
+    // "By Garment" method
+    garmentQrCodes.push(
+      ...rejectedGarments.map((garment) => {
+        const defectId = generateDefectId();
+        const garmentDefectId = garment.garment_defect_id;
+        const defectsWithRepair = garment.defects.map((d) => ({
+          name: d.name,
+          count: d.count,
+          repair:
+            allDefects.find((def) => def.english === d.name)?.repair ||
+            "Unknown",
+        }));
+        return {
+          factory: bundleData.factory || "YM",
+          package_no: bundleData.package_no,
+          moNo: bundleData.selectedMono,
+          custStyle: bundleData.custStyle,
+          color: bundleData.color,
+          size: bundleData.size,
+          lineNo: bundleData.lineNo,
+          department: bundleData.department,
+          checkedQty: bundleData.passQtyIron,
+          totalPass,
+          totalRejects,
+          defectQty: garment.totalCount,
+          rejectGarments: [
+            {
+              totalCount: garment.totalCount,
+              defects: defectsWithRepair,
+              garment_defect_id: garmentDefectId,
+            },
+          ],
+          inspection_time: print_time,
+          inspection_date,
+          emp_id_inspection: user.emp_id,
+          eng_name_inspection: user.eng_name,
+          kh_name_inspection: user.kh_name,
+          job_title_inspection: user.job_title,
+          dept_name_inspection: user.dept_name,
+          sect_name_inspection: user.sect_name,
+          bundle_id: bundleData.bundle_id,
+          bundle_random_id: bundleData.bundle_random_id,
+          defect_id: defectId,
+          count: garment.totalCount,
+          defects: defectsWithRepair,
+        };
+      })
+    );
+
+    // "By Bundle" method
+    if (rejectedGarments.length > 0) {
+      const chunks = groupRejectedGarmentsForBundle();
+      chunks.forEach((chunk) => {
+        const defectPrintId = generateGarmentDefectId();
+        const totalRejectGarmentCount = chunk.length;
+        const totalPrintDefectCount = chunk.reduce(
+          (sum, garment) => sum + garment.totalCount,
+          0
+        );
+        const printData = chunk.map((garment, index) => {
+          const defects =
+            garment.defects.length > 6
+              ? [
+                  ...garment.defects.slice(0, 6).map((d) => ({
+                    name: d.name, // Ensure 'name' is explicitly set
+                    count: d.count,
+                    repair: d.repair || "Unknown",
+                  })),
+                  {
+                    name: "Others",
+                    count: garment.defects
+                      .slice(6)
+                      .reduce((sum, d) => sum + d.count, 0),
+                    repair: "Various",
+                  },
+                ]
+              : garment.defects.map((d) => ({
+                  name: d.name, // Ensure 'name' is explicitly set
+                  count: d.count,
+                  repair: d.repair || "Unknown",
+                }));
+
+          return { garmentNumber: index + 1, defects };
+        });
+        bundleQrCodes.push({
+          package_no: bundleData.package_no,
+          moNo: bundleData.selectedMono,
+          color: bundleData.color,
+          size: bundleData.size,
+          bundleQty: bundleData.passQtyIron,
+          totalRejectGarments: totalRejectGarmentCount,
+          totalDefectCount: totalPrintDefectCount,
+          defects: printData,
+          defect_print_id: defectPrintId,
+        });
+      });
+    }
+
+    setQrCodesData({
+      repair: repairQrCodes,
+      garment: garmentQrCodes,
+      bundle: bundleQrCodes,
+    });
+
+    // Update server record with defectArray and inspection_time
+    const defectArray = computeDefectArray();
+    const updatePayload = {
+      inspection_time: print_time,
+      defectArray: defectArray,
+    };
+    if (bundleQrCodes.length > 0) {
+      updatePayload.printArray = bundleQrCodes.map((qrCode) => ({
+        method: "bundle",
+        defect_print_id: qrCode.defect_print_id,
+        totalRejectGarmentCount: qrCode.totalRejectGarments,
+        totalPrintDefectCount: qrCode.totalDefectCount,
+        printData: qrCode.defects,
+      }));
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatePayload),
+        }
+      );
+      if (!response.ok) throw new Error("Failed to update inspection record");
+    } catch (err) {
+      setError(`Failed to update inspection record: ${err.message}`);
+      setGenerateQRDisabled(false);
+      return;
+    }
+
+    // Do not re-enable Generate QR button here to keep it disabled
+    // setGenerateQRDisabled(false);
   };
 
-  const defectQty = Object.values(confirmedDefects).reduce((a, b) => a + b, 0);
-  const hasDefects = Object.values(tempDefects).some((count) => count > 0);
+  // Handle printing of QR codes
+  const handlePrintQRCode = async () => {
+    if (!bluetoothRef.current?.isConnected) {
+      alert("Please connect to a printer first");
+      return;
+    }
+    try {
+      setPrinting(true);
+      const selectedQrCodes = qrCodesData[printMethod];
+      for (const qrCode of selectedQrCodes) {
+        if (printMethod === "repair") {
+          await bluetoothRef.current.printDefectData(qrCode);
+        } else if (printMethod === "garment") {
+          await bluetoothRef.current.printGarmentDefectData(qrCode);
+          if (!passBundleCountdown) setPassBundleCountdown(5);
+        } else if (printMethod === "bundle") {
+          await bluetoothRef.current.printBundleDefectData(qrCode);
+        }
+      }
+      alert("All QR codes printed successfully!");
+    } catch (error) {
+      console.error("Print error:", error);
+      alert(`Failed to print QR codes: ${error.message}`);
+    } finally {
+      setPrinting(false);
+    }
+  };
 
-  const activeFilter = categoryFilter || defectTypeFilter;
-  const categoryOptions = [
-    "fabric",
-    "workmanship",
-    "cleanliness",
-    "embellishment",
-    "measurement",
-    "washing",
-    "finishing",
-    "miscellaneous",
-  ];
+  // Handle passing the bundle and reset state
+  const handlePassBundle = async () => {
+    const hasDefects = Object.values(tempDefects).some((count) => count > 0);
+    if (hasDefects && !rejectedOnce) return;
 
+    setTotalPass(0);
+    setTotalRejects(0);
+    setConfirmedDefects({});
+    setTempDefects({});
+    setBundlePassed(true);
+    setRejectedOnce(false);
+    setBundleData(null);
+    setInDefectWindow(false);
+    setScanning(true);
+    setRejectedGarments([]);
+    setQrCodesData({ repair: [], garment: [], bundle: [] });
+    setGenerateQRDisabled(false);
+    setPassBundleCountdown(null);
+  };
+
+  // Render UI
   return (
     <div className="flex h-screen">
       <div

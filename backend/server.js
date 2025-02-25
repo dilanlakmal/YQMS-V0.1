@@ -1645,6 +1645,7 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
   }
 });
 
+//Update QC2 inspection records for each of reject garments
 app.put(
   "/api/qc2-inspection-pass-bundle/:bundle_random_id",
   async (req, res) => {
@@ -1652,46 +1653,33 @@ app.put(
       const { bundle_random_id } = req.params;
       const { printArray, ...updateData } = req.body;
 
-      // Validate required fields
-      if (
-        updateData.totalPass === undefined ||
-        updateData.totalRejects === undefined ||
-        updateData.defectQty === undefined
-      ) {
-        return res
-          .status(400)
-          .json({
-            error:
-              "Missing required fields: totalPass, totalRejects, defectQty",
-          });
-      }
+      // Log the incoming request body for debugging
+      console.log("Request body:", req.body);
 
+      // Prepare update operations
       const updateOperations = { $set: updateData };
+
+      // Handle printArray separately with $push if provided
       if (printArray && Array.isArray(printArray)) {
-        // Validate printArray entries
-        for (const print of printArray) {
-          if (
-            !print.method ||
-            !print.defect_print_id ||
-            print.totalRejectGarmentCount === undefined ||
-            print.totalPrintDefectCount === undefined ||
-            !print.printData
-          ) {
-            return res.status(400).json({ error: "Invalid printArray entry" });
-          }
-        }
         updateOperations.$push = { printArray: { $each: printArray } };
       }
 
+      // Log the update operations for debugging
+      console.log("Update operations:", updateOperations);
+
+      // Perform the update
       const updatedRecord = await QC2InspectionPassBundle.findOneAndUpdate(
         { bundle_random_id },
         updateOperations,
-        { new: true }
+        { new: true, runValidators: true }
       );
 
       if (!updatedRecord) {
         return res.status(404).json({ error: "Record not found" });
       }
+
+      // Log the updated record for debugging
+      console.log("Updated record:", updatedRecord);
 
       io.emit("qc2_data_updated");
 
