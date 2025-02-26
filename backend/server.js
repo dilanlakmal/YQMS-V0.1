@@ -1498,6 +1498,7 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
     checkedQty: { type: Number, required: true }, // e.g. bundleData.count
     totalPass: { type: Number, required: true },
     totalRejects: { type: Number, required: true },
+    totalRepair: { type: Number, required: true, default: 0 }, // New field
     defectQty: { type: Number, required: true },
     defectArray: [
       {
@@ -1535,6 +1536,23 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
         defect_print_id: { type: String, required: true },
         totalRejectGarmentCount: { type: Number, required: true },
         totalPrintDefectCount: { type: Number, required: true },
+        repairGarmentsDefects: [
+          // New field
+          {
+            inspectionNo: { type: Number, required: true },
+            repairGarments: [
+              {
+                totalDefectCount: { type: Number, required: true },
+                repairDefectArray: [
+                  {
+                    name: { type: String, required: true },
+                    count: { type: Number, required: true },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
         printData: [
           {
             garmentNumber: { type: Number, required: true },
@@ -1547,9 +1565,11 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
             ],
           },
         ],
+        isCompleted: { type: Boolean, default: false }, // New field
         timestamp: { type: Date, default: Date.now },
       },
     ],
+    totalRepair: { type: Number, default: 0 },
   },
   { collection: "qc2_inspection_pass_bundle" }
 );
@@ -1583,6 +1603,7 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       checkedQty,
       totalPass,
       totalRejects,
+      totalRepair,
       defectQty,
       defectArray,
       rejectGarments,
@@ -1611,6 +1632,7 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       checkedQty,
       totalPass,
       totalRejects,
+      totalRepair: totalRepair || 0,
       defectQty,
       defectArray: defectArray || [],
       rejectGarments: rejectGarments || [],
@@ -1624,7 +1646,7 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       sect_name_inspection,
       bundle_id,
       bundle_random_id,
-      printArray,
+      printArray: printArray || [],
     });
 
     await newRecord.save();
@@ -1645,44 +1667,52 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
   }
 });
 
-//Update QC2 inspection records for each of reject garments
+//Update QC2 inspection records for each of reject garments - PUT endpoint to update inspection records
 app.put(
   "/api/qc2-inspection-pass-bundle/:bundle_random_id",
   async (req, res) => {
     try {
       const { bundle_random_id } = req.params;
-      const { printArray, ...updateData } = req.body;
+      const { updateOperations, arrayFilters } = req.body || {};
 
-      // Log the incoming request body for debugging
-      console.log("Request body:", req.body);
-
-      // Prepare update operations
-      const updateOperations = { $set: updateData };
-
-      // Handle printArray separately with $push if provided
-      if (printArray && Array.isArray(printArray)) {
-        updateOperations.$push = { printArray: { $each: printArray } };
+      let updateData = req.body;
+      if (updateOperations) {
+        updateData = updateOperations;
       }
 
-      // Log the update operations for debugging
-      console.log("Update operations:", updateOperations);
+      const updateOperationsFinal = {};
+      if (updateData.$set) {
+        updateOperationsFinal.$set = updateData.$set;
+      }
+      if (updateData.$push) {
+        updateOperationsFinal.$push = updateData.$push;
+      }
+      if (updateData.$inc) {
+        updateOperationsFinal.$inc = updateData.$inc;
+      }
+      if (!updateData.$set && !updateData.$push && !updateData.$inc) {
+        updateOperationsFinal.$set = updateData;
+      }
 
-      // Perform the update
+      const options = {
+        new: true,
+        runValidators: true,
+      };
+      if (arrayFilters) {
+        options.arrayFilters = arrayFilters;
+      }
+
       const updatedRecord = await QC2InspectionPassBundle.findOneAndUpdate(
         { bundle_random_id },
-        updateOperations,
-        { new: true, runValidators: true }
+        updateOperationsFinal,
+        options
       );
 
       if (!updatedRecord) {
         return res.status(404).json({ error: "Record not found" });
       }
 
-      // Log the updated record for debugging
-      console.log("Updated record:", updatedRecord);
-
       io.emit("qc2_data_updated");
-
       res.json({
         message: "Inspection pass bundle updated successfully",
         data: updatedRecord,
@@ -1697,6 +1727,101 @@ app.put(
   }
 );
 
+// app.put(
+//   "/api/qc2-inspection-pass-bundle/:bundle_random_id",
+//   async (req, res) => {
+//     try {
+//       const { bundle_random_id } = req.params;
+//       const { printArray, ...updateData } = req.body;
+
+//       // Log the incoming request body for debugging
+//       console.log("Request body:", req.body);
+
+//       // Prepare update operations
+//       const updateOperations = { $set: updateData };
+
+//       // Handle printArray separately with $push if provided
+//       if (printArray && Array.isArray(printArray)) {
+//         updateOperations.$push = { printArray: { $each: printArray } };
+//       }
+
+//       // Log the update operations for debugging
+//       console.log("Update operations:", updateOperations);
+
+//       // Perform the update
+//       const updatedRecord = await QC2InspectionPassBundle.findOneAndUpdate(
+//         { bundle_random_id },
+//         updateOperations,
+//         { new: true, runValidators: true }
+//       );
+
+//       if (!updatedRecord) {
+//         return res.status(404).json({ error: "Record not found" });
+//       }
+
+//       // Log the updated record for debugging
+//       console.log("Updated record:", updatedRecord);
+
+//       io.emit("qc2_data_updated");
+
+//       res.json({
+//         message: "Inspection pass bundle updated successfully",
+//         data: updatedRecord,
+//       });
+//     } catch (error) {
+//       console.error("Error updating inspection pass bundle:", error);
+//       res.status(500).json({
+//         message: "Failed to update inspection pass bundle",
+//         error: error.message,
+//       });
+//     }
+//   }
+// );
+
+// New endpoint to fetch by bundle_random_id
+app.get(
+  "/api/qc2-inspection-pass-bundle-by-random-id/:bundle_random_id",
+  async (req, res) => {
+    try {
+      const { bundle_random_id } = req.params;
+      const record = await QC2InspectionPassBundle.findOne({
+        bundle_random_id,
+      });
+      if (record) {
+        res.json(record);
+      } else {
+        res.status(404).json({ message: "Record not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+);
+
+// New GET endpoint to fetch record by defect_print_id
+app.get(
+  "/api/qc2-inspection-pass-bundle-by-defect-print-id/:defect_print_id",
+  async (req, res) => {
+    try {
+      const { defect_print_id } = req.params;
+      const record = await QC2InspectionPassBundle.findOne({
+        "printArray.defect_print_id": defect_print_id,
+        "printArray.isCompleted": false,
+      });
+      if (record) {
+        res.json(record);
+      } else {
+        res
+          .status(404)
+          .json({ message: "Record not found or already completed" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+);
+
+// GET endpoint to fetch all inspection records
 app.get("/api/qc2-inspection-pass-bundle", async (req, res) => {
   try {
     const dataCards = await QC2InspectionPassBundle.find().sort({

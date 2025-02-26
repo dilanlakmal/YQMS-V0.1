@@ -117,7 +117,8 @@ const BluetoothComponent = forwardRef((props, ref) => {
         `TEXT 20,130,"2",0,1,1,"Color: ${printData.color}"`,
         `TEXT 20,150,"2",0,1,1,"Size: ${printData.size}"`,
         `TEXT 20,170,"2",0,1,1,"Count: ${printData.count}"`,
-        `QRCODE 30,210,L,6,M,0,"${printData.bundle_random_id}"`,
+        `TEXT 20,190,"2",0,1,1,"Package No: ${printData.package_no}"`,
+        `QRCODE 30,230,L,6,M,0,"${printData.bundle_random_id}"`,
         "PRINT 1",
         "",
       ].join("\n");
