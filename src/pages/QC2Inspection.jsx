@@ -1262,7 +1262,10 @@ const QC2InspectionPage = () => {
       <QRCodePreview
         isOpen={showQRPreview}
         onClose={() => setShowQRPreview(false)}
-        qrData={qrCodesData[printMethod]}
+        qrData={(() => {
+          console.log("QRCodePreview qrData:", qrCodesData[printMethod]);
+          return qrCodesData[printMethod];
+        })()}
         onPrint={handlePrintQRCode}
         mode={
           printMethod === "repair"
@@ -1272,6 +1275,20 @@ const QC2InspectionPage = () => {
             : "bundle"
         }
       />
+
+      {/* <QRCodePreview
+        isOpen={showQRPreview}
+        onClose={() => setShowQRPreview(false)}
+        qrData={qrCodesData[printMethod]}
+        onPrint={handlePrintQRCode}
+        mode={
+          printMethod === "repair"
+            ? "inspection"
+            : printMethod === "garment"
+            ? "garment"
+            : "bundle"
+        }
+      /> */}
     </div>
   );
 };

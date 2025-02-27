@@ -15,7 +15,14 @@ export default function QRCodePreview({
   console.log("QRCodePreview Data:", data);
   data.forEach((item, index) => {
     console.log(`Item ${index}:`, item);
-    console.log(`Item ${index} defects:`, item.defects);
+    console.log(
+      `Item ${index} defects source:`,
+      mode === "inspection"
+        ? item.defects
+        : mode === "garment"
+        ? item.rejectGarments?.[0]?.defects
+        : item.defects || item.printData
+    );
   });
 
   const handlePrint = async () => {
@@ -37,6 +44,26 @@ export default function QRCodePreview({
       console.error("Print error:", error);
       alert("Failed to print. Please check printer connection.");
     }
+  };
+
+  const getDefects = (item) => {
+    if (mode === "inspection") {
+      return item.defects && Array.isArray(item.defects) ? item.defects : [];
+    } else if (mode === "garment") {
+      return item.rejectGarments?.[0]?.defects &&
+        Array.isArray(item.rejectGarments[0].defects)
+        ? item.rejectGarments[0].defects
+        : [];
+    } else if (mode === "bundle") {
+      // Handle both QC2Inspection.jsx (defects) and DefectPrint.jsx (printData)
+      if (item.defects && Array.isArray(item.defects)) {
+        return item.defects;
+      } else if (item.printData && Array.isArray(item.printData)) {
+        return item.printData;
+      }
+      return [];
+    }
+    return [];
   };
 
   return (
@@ -102,7 +129,7 @@ export default function QRCodePreview({
                             </p>
                             <p>
                               <strong>Count:</strong>{" "}
-                              {item.count_print || "N/A"}
+                              {item.count_print || item.count || "N/A"}
                             </p>
                           </>
                         ) : mode === "garment" ? (
@@ -116,7 +143,7 @@ export default function QRCodePreview({
                           <>
                             <p>
                               <strong>Bundle Qty:</strong>{" "}
-                              {item.bundleQty || "N/A"}
+                              {item.bundleQty || item.checkedQty || "N/A"}
                             </p>
                             <p>
                               <strong>Total Reject Garments:</strong>{" "}
@@ -124,7 +151,9 @@ export default function QRCodePreview({
                             </p>
                             <p>
                               <strong>Total Defect Count:</strong>{" "}
-                              {item.totalDefectCount || "N/A"}
+                              {item.totalDefectCount ||
+                                item.totalPrintDefectCount ||
+                                "N/A"}
                             </p>
                           </>
                         ) : (
@@ -150,73 +179,50 @@ export default function QRCodePreview({
                         mode === "bundle") && (
                         <div className="mt-2">
                           <p className="font-semibold">Defects:</p>
-                          {mode === "inspection" ? (
-                            <ul className="list-disc pl-4">
-                              {item.defects && Array.isArray(item.defects) ? (
-                                item.defects.map((defect, idx) => (
-                                  <li key={idx}>
-                                    {defect.defectName} ({defect.count})
-                                  </li>
-                                ))
-                              ) : (
-                                <li>No defects available</li>
-                              )}
-                            </ul>
-                          ) : mode === "garment" &&
-                            item.rejectGarments?.[0]?.defects ? (
-                            <div>
-                              {Object.entries(
-                                item.rejectGarments[0].defects.reduce(
-                                  (acc, defect) => {
-                                    const repair = defect.repair || "Unknown";
-                                    if (!acc[repair]) acc[repair] = [];
-                                    acc[repair].push(defect);
-                                    return acc;
-                                  },
-                                  {}
-                                )
-                              ).map(([repair, defects]) => (
-                                <div key={repair}>
-                                  <p className="font-bold">{repair}:</p>
-                                  <ul className="list-disc pl-4">
-                                    {defects.map((defect, idx) => (
+                          {(() => {
+                            const defects = getDefects(item);
+                            if (!defects || defects.length === 0) {
+                              return <p>No defects available</p>;
+                            }
+                            return (
+                              <ul className="list-disc pl-4">
+                                {mode === "inspection"
+                                  ? defects.map((defect, idx) => (
+                                      <li key={idx}>
+                                        {defect.defectName} ({defect.count})
+                                      </li>
+                                    ))
+                                  : mode === "garment"
+                                  ? defects.map((defect, idx) => (
                                       <li key={idx}>
                                         {defect.name} ({defect.count})
                                       </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              ))}
-                            </div>
-                          ) : mode === "bundle" ? (
-                            item.defects &&
-                            Array.isArray(item.defects) &&
-                            item.defects.length > 0 ? (
-                              <ul className="list-disc pl-4">
-                                {item.defects.flatMap((garment, garmentIdx) =>
-                                  garment.defects &&
-                                  Array.isArray(garment.defects) ? (
-                                    garment.defects.map((defect, defectIdx) => (
-                                      <li
-                                        key={`${garment.garmentNumber}-${defect.name}-${defectIdx}`}
-                                      >
-                                        ({garment.garmentNumber}) {defect.name}:{" "}
-                                        {defect.count}
-                                      </li>
                                     ))
-                                  ) : (
-                                    <li key={`no-defects-${garmentIdx}`}>
-                                      ({garment.garmentNumber}) No defects
-                                    </li>
-                                  )
-                                )}
+                                  : mode === "bundle"
+                                  ? defects.flatMap((garment, garmentIdx) =>
+                                      garment.defects &&
+                                      Array.isArray(garment.defects) ? (
+                                        garment.defects.map(
+                                          (defect, defectIdx) => (
+                                            <li
+                                              key={`${garment.garmentNumber}-${defect.name}-${defectIdx}`}
+                                            >
+                                              ({garment.garmentNumber}){" "}
+                                              {defect.name}: {defect.count}
+                                            </li>
+                                          )
+                                        )
+                                      ) : (
+                                        <li key={`no-defects-${garmentIdx}`}>
+                                          ({garment.garmentNumber || "N/A"}) No
+                                          defects
+                                        </li>
+                                      )
+                                    )
+                                  : null}
                               </ul>
-                            ) : (
-                              <p>No defects available</p>
-                            )
-                          ) : (
-                            <p>No defects available</p>
-                          )}
+                            );
+                          })()}
                         </div>
                       )}
                       <div className="flex justify-center mt-4">

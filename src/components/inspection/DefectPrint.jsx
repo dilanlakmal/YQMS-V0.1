@@ -9,6 +9,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
   const [searchMoNo, setSearchMoNo] = useState("");
   const [searchPackageNo, setSearchPackageNo] = useState("");
   const [searchRepairGroup, setSearchRepairGroup] = useState("");
+  const [searchStatus, setSearchStatus] = useState("both"); // "inProgress", "completed", "both"
   const [moNoOptions, setMoNoOptions] = useState([]);
   const [packageNoOptions, setPackageNoOptions] = useState([]);
   const [repairGroupOptions, setRepairGroupOptions] = useState([]);
@@ -44,15 +45,19 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
             bundle.printArray
               .filter((print) => print.method === "bundle")
               .map((print) => ({
+                package_no: bundle.package_no,
                 moNo: bundle.moNo,
                 custStyle: bundle.custStyle,
                 color: bundle.color,
                 size: bundle.size,
-                package_no: bundle.package_no,
-                totalRejectGarments: print.totalRejectGarmentCount,
-                totalDefectCount: print.totalPrintDefectCount,
-                defects: print.printData, // Array of garments with defects
+                checkedQty: bundle.checkedQty,
+                defectQty: bundle.defectQty,
+                totalRejectGarments: print.totalRejectGarmentCount || 0, // Default to 0 if undefined
+                totalPrintDefectCount: print.totalPrintDefectCount || 0, // Default to 0 if undefined
+                printData: print.printData || [], // Ensure array even if empty
                 defect_print_id: print.defect_print_id,
+                isCompleted: print.isCompleted || false,
+                rejectGarmentsLength: bundle.rejectGarments?.length || 0, // Default to 0 if undefined
               }))
           );
           setDefectCards(bundleQrCards);
@@ -116,7 +121,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
         searchPackageNo.trim() ||
         (mode === "repair" && searchRepairGroup.trim());
 
-      if (hasSearchParams) {
+      if (hasSearchParams || mode === "bundle") {
         const params = new URLSearchParams();
 
         if (searchMoNo.trim()) {
@@ -151,18 +156,31 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
           bundle.printArray
             .filter((print) => print.method === "bundle")
             .map((print) => ({
+              package_no: bundle.package_no,
               moNo: bundle.moNo,
               custStyle: bundle.custStyle,
               color: bundle.color,
               size: bundle.size,
-              package_no: bundle.package_no,
-              totalRejectGarments: print.totalRejectGarmentCount,
-              totalDefectCount: print.totalPrintDefectCount,
-              defects: print.printData,
+              checkedQty: bundle.checkedQty,
+              defectQty: bundle.defectQty,
+              totalRejectGarments: print.totalRejectGarmentCount || 0,
+              totalPrintDefectCount: print.totalPrintDefectCount || 0,
+              printData: print.printData || [],
               defect_print_id: print.defect_print_id,
+              isCompleted: print.isCompleted || false,
+              rejectGarmentsLength: bundle.rejectGarments?.length || 0,
             }))
+            .filter((card) =>
+              searchStatus === "both"
+                ? true
+                : searchStatus === "inProgress"
+                ? card.totalRejectGarments > 0
+                : card.totalRejectGarments === 0
+            )
         );
         setDefectCards(bundleQrCards);
+      } else if (mode === "garment") {
+        setDefectCards(data);
       } else {
         setDefectCards(data);
       }
@@ -180,6 +198,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
     setSearchMoNo("");
     setSearchPackageNo("");
     setSearchRepairGroup("");
+    setSearchStatus("both");
     fetchDefectCards();
   };
 
@@ -304,7 +323,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
               </select>
             </div>
           </>
-        ) : (
+        ) : mode === "garment" ? (
           <>
             <div className="relative w-full md:w-1/3">
               <label className="block mb-1 font-bold">MO No</label>
@@ -350,7 +369,88 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
               </datalist>
             </div>
           </>
-        )}
+        ) : mode === "bundle" ? (
+          <>
+            <div className="relative w-full md:w-1/4">
+              <label className="block mb-1 font-bold">MO No</label>
+              <input
+                type="text"
+                placeholder="Search MO No"
+                value={searchMoNo}
+                onChange={(e) => setSearchMoNo(e.target.value)}
+                className="border p-2 rounded w-full"
+                list="moNoOptions"
+              />
+              <datalist id="moNoOptions">
+                {moNoOptions
+                  .filter((option) =>
+                    option.toLowerCase().includes(searchMoNo.toLowerCase())
+                  )
+                  .map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+              </datalist>
+            </div>
+            <div className="relative w-full md:w-1/4">
+              <label className="block mb-1 font-bold">Package No</label>
+              <input
+                type="text"
+                placeholder="Search Package No"
+                value={searchPackageNo}
+                onChange={(e) => setSearchPackageNo(e.target.value)}
+                className="border p-2 rounded w-full"
+                list="packageNoOptions"
+              />
+              <datalist id="packageNoOptions">
+                {packageNoOptions
+                  .filter(
+                    (option) =>
+                      option !== undefined &&
+                      option !== null &&
+                      option.toString().includes(searchPackageNo)
+                  )
+                  .map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+              </datalist>
+            </div>
+            <div className="relative w-full md:w-1/4">
+              <label className="block mb-1 font-bold">Status</label>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setSearchStatus("inProgress")}
+                  className={`p-2 rounded border ${
+                    searchStatus === "inProgress"
+                      ? "bg-yellow-600 text-white"
+                      : "bg-gray-200"
+                  }`}
+                >
+                  In Progress
+                </button>
+                <button
+                  onClick={() => setSearchStatus("completed")}
+                  className={`p-2 rounded border ${
+                    searchStatus === "completed"
+                      ? "bg-green-600 text-white"
+                      : "bg-gray-200"
+                  }`}
+                >
+                  Completed
+                </button>
+                <button
+                  onClick={() => setSearchStatus("both")}
+                  className={`p-2 rounded border ${
+                    searchStatus === "both"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200"
+                  }`}
+                >
+                  Both
+                </button>
+              </div>
+            </div>
+          </>
+        ) : null}
         <div className="flex gap-2 w-full md:w-auto">
           <button
             onClick={handleSearch}
@@ -457,6 +557,9 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                 ) : mode === "bundle" ? (
                   <>
                     <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Package No
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
                       MO No
                     </th>
                     <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
@@ -469,16 +572,22 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                       Size
                     </th>
                     <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                      Package No
+                      Bundle Qty
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Total Defects
                     </th>
                     <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
                       Total Reject Garments
                     </th>
                     <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                      Total Defect Count
+                      Printed Reject Garments
                     </th>
                     <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                      Defect Details
+                      Print Details
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Status
                     </th>
                     <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
                       Action
@@ -577,15 +686,17 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                           {garment.totalCount || "N/A"}
                         </td>
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {garment.defects.map((defect) => (
-                            <div
-                              key={defect.name}
-                              className="flex justify-between text-sm"
-                            >
-                              <span>{defect.name}:</span>
-                              <span>{defect.count}</span>
-                            </div>
-                          ))}
+                          {garment.defects && Array.isArray(garment.defects)
+                            ? garment.defects.map((defect) => (
+                                <div
+                                  key={defect.name}
+                                  className="flex justify-between text-sm"
+                                >
+                                  <span>{defect.name}:</span>
+                                  <span>{defect.count}</span>
+                                </div>
+                              ))
+                            : "No defects"}
                         </td>
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           <button
@@ -620,11 +731,14 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                     ))
                   )
                 : mode === "bundle"
-                ? defectCards.map((card, index) => (
+                ? defectCards.map((card) => (
                     <tr
-                      key={card.defect_print_id || index}
+                      key={card.defect_print_id}
                       className="hover:bg-gray-100"
                     >
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.package_no || "N/A"}
+                      </td>
                       <td className="py-2 px-4 border-b border-gray-200 text-sm">
                         {card.moNo || "N/A"}
                       </td>
@@ -638,28 +752,56 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                         {card.size || "N/A"}
                       </td>
                       <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                        {card.package_no || "N/A"}
+                        {card.checkedQty || "N/A"}
                       </td>
                       <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                        {card.totalRejectGarments || "N/A"}
+                        {card.defectQty || "N/A"}
                       </td>
                       <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                        {card.totalDefectCount || "N/A"}
+                        {card.rejectGarmentsLength || "N/A"}
                       </td>
                       <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                        {card.defects && Array.isArray(card.defects)
-                          ? card.defects.flatMap((garment) =>
-                              garment.defects.map((defect) => (
+                        {card.totalRejectGarments === 0
+                          ? "0"
+                          : card.totalRejectGarments || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.printData && Array.isArray(card.printData)
+                          ? card.printData.flatMap((garment) =>
+                              garment.defects &&
+                              Array.isArray(garment.defects) ? (
+                                garment.defects.map((defect) => (
+                                  <div
+                                    key={`${garment.garmentNumber}-${defect.name}`}
+                                    className="text-sm"
+                                  >
+                                    ({garment.garmentNumber}) {defect.name}:{" "}
+                                    {defect.count}
+                                  </div>
+                                ))
+                              ) : (
                                 <div
-                                  key={`${garment.garmentNumber}-${defect.name}`}
+                                  key={garment.garmentNumber}
                                   className="text-sm"
                                 >
-                                  ({garment.garmentNumber}) {defect.name}:{" "}
-                                  {defect.count}
+                                  ({garment.garmentNumber}) No defects
                                 </div>
-                              ))
+                              )
                             )
-                          : "No defects"}
+                          : "No print data"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        <span
+                          className={`inline-block px-2 py-1 rounded-full text-white text-sm ${
+                            card.totalRejectGarments > 0
+                              ? "bg-yellow-500"
+                              : "bg-green-500"
+                          }`}
+                        >
+                          {card.totalRejectGarments > 0
+                            ? "In Progress"
+                            : "Completed"}
+                        </span>
                       </td>
                       <td className="py-2 px-4 border-b border-gray-200 text-sm">
                         <button
@@ -686,7 +828,6 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
         </div>
       )}
 
-      {/* QR Code Preview */}
       <QRCodePreview
         isOpen={showQRPreview}
         onClose={() => setShowQRPreview(false)}

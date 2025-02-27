@@ -1727,57 +1727,6 @@ app.put(
   }
 );
 
-// app.put(
-//   "/api/qc2-inspection-pass-bundle/:bundle_random_id",
-//   async (req, res) => {
-//     try {
-//       const { bundle_random_id } = req.params;
-//       const { printArray, ...updateData } = req.body;
-
-//       // Log the incoming request body for debugging
-//       console.log("Request body:", req.body);
-
-//       // Prepare update operations
-//       const updateOperations = { $set: updateData };
-
-//       // Handle printArray separately with $push if provided
-//       if (printArray && Array.isArray(printArray)) {
-//         updateOperations.$push = { printArray: { $each: printArray } };
-//       }
-
-//       // Log the update operations for debugging
-//       console.log("Update operations:", updateOperations);
-
-//       // Perform the update
-//       const updatedRecord = await QC2InspectionPassBundle.findOneAndUpdate(
-//         { bundle_random_id },
-//         updateOperations,
-//         { new: true, runValidators: true }
-//       );
-
-//       if (!updatedRecord) {
-//         return res.status(404).json({ error: "Record not found" });
-//       }
-
-//       // Log the updated record for debugging
-//       console.log("Updated record:", updatedRecord);
-
-//       io.emit("qc2_data_updated");
-
-//       res.json({
-//         message: "Inspection pass bundle updated successfully",
-//         data: updatedRecord,
-//       });
-//     } catch (error) {
-//       console.error("Error updating inspection pass bundle:", error);
-//       res.status(500).json({
-//         message: "Failed to update inspection pass bundle",
-//         error: error.message,
-//       });
-//     }
-//   }
-// );
-
 // New endpoint to fetch by bundle_random_id
 app.get(
   "/api/qc2-inspection-pass-bundle-by-random-id/:bundle_random_id",
