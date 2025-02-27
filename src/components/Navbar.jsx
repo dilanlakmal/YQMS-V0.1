@@ -15,11 +15,14 @@ import {
   X,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../config";
+import LanguageSwitcher from "../components/layout/LangSwitch";
 import { useAuth } from "./authentication/AuthContext";
 
 export default function Navbar({ onLogout }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, clearUser } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(null);
@@ -90,91 +93,92 @@ export default function Navbar({ onLogout }) {
   // Navigation items now include requiredRoles for each link.
   const navItems = [
     {
-      title: "Cutting",
+      title: t("home.cutting"), //"Cutting",
       icon: <ClipboardList className="h-4 w-4 mr-2" />,
       items: [
         {
           path: "/cutting",
-          title: "Cutting",
+          title: t("home.cutting"), //"Cutting",
           requiredRoles: ["Super Admin", "Admin", "Cutting"],
         },
         {
           path: "/scc",
-          title: "SCC",
+          title: t("home.scc"), //"SCC",
           requiredRoles: ["Super Admin", "Admin", "SCC"],
         },
       ],
     },
+
     {
-      title: "Orders",
+      title: t("nav.orders"),
       icon: <Package className="h-4 w-4 mr-2" />,
       items: [
         {
           path: "/bundle-registration",
-          title: "Bundle Registration",
+          title: t("home.bundle_registration"),
           requiredRoles: ["Super Admin", "Admin", "Bundle Registration"],
         },
         {
           path: "/washing",
-          title: "Washing",
+          title: t("home.washing"),
           requiredRoles: ["Super Admin", "Admin", "Washing"],
         },
         {
           path: "/opa",
-          title: "OPA",
+          title: t("home.opa"),
           requiredRoles: ["Super Admin", "Admin", "OPA"],
         },
         {
           path: "/ironing",
-          title: "Ironing",
+          title: t("home.ironing"),
           requiredRoles: ["Super Admin", "Admin", "Ironing"],
         },
         {
           path: "/packing",
-          title: "Packing",
+          title: t("home.packing"),
           requiredRoles: ["Super Admin", "Admin", "Packing"],
         },
       ],
     },
     {
-      title: "QC",
+      title: t("nav.qc"),
       icon: <Activity className="h-4 w-4 mr-2" />,
       items: [
         {
           path: "/details",
-          title: "QC1 Inspection",
+          title: t("home.qc1_inspection"),
           requiredRoles: ["Super Admin", "Admin", "QC1"],
         },
         {
           path: "/qc2-inspection",
-          title: "QC2 Inspection",
+          title: t("home.qc2_inspection"),
           requiredRoles: ["Super Admin", "Admin", "QC2"],
         },
       ],
     },
     {
-      title: "QA",
+      title: t("nav.qa"),
       icon: <BarChart2 className="h-4 w-4 mr-2" />,
       items: [
         {
           path: "/audit",
-          title: "QA Audit",
+          title: t("home.qa_audit"),
           requiredRoles: ["Super Admin", "Admin", "QA"],
         },
       ],
     },
     {
-      title: "Reports",
+      title: t("nav.report"),
       icon: <FileText className="h-4 w-4 mr-2" />,
       items: [
         {
           path: "/download-data",
-          title: "Download Data",
+          title: t("home.download_data"),
           requiredRoles: ["Super Admin", "Admin", "Download Data"],
         },
         {
           path: "/dashboard",
-          title: "Live Dashboard",
+          title: t("home.live_dashboard"),
           requiredRoles: ["Super Admin", "Admin", "Live Dashboard"],
         },
       ],
@@ -288,7 +292,7 @@ export default function Navbar({ onLogout }) {
                 className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
               >
                 <Settings className="h-4 w-4 mr-2" />
-                Settings
+                {t("nav.setting")}
               </Link>
             )}
 
@@ -299,17 +303,21 @@ export default function Navbar({ onLogout }) {
                   className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
                 >
                   <LayoutDashboard className="h-4 w-4 mr-2" />
-                  Roles
+                  {t("nav.roles")}
                 </Link>
                 <Link
                   to="/user-list"
                   className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900"
                 >
                   <User className="h-4 w-4 mr-2" />
-                  Users
+                  {t("nav.users")}
                 </Link>
               </>
             )}
+          </div>
+
+          <div className="inline-flex items-center space-x-3 mr-3">
+            <LanguageSwitcher />
           </div>
 
           <div className="flex items-center">
@@ -424,7 +432,7 @@ export default function Navbar({ onLogout }) {
                 onClick={() => handleSubLinkClick("/settings")}
               >
                 <Settings className="h-4 w-4 mr-2" />
-                Settings
+                {t("nav.setting")}
               </div>
             )}
 
@@ -435,14 +443,14 @@ export default function Navbar({ onLogout }) {
                   onClick={() => handleSubLinkClick("/role-management")}
                 >
                   <LayoutDashboard className="h-4 w-4 mr-2" />
-                  Role Management
+                  {t("nav.roles")}
                 </div>
                 <div
                   className="block pl-4 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
                   onClick={() => handleSubLinkClick("/user-list")}
                 >
                   <User className="h-4 w-4 mr-2" />
-                  User Management
+                  {t("nav.users")}
                 </div>
               </>
             )}

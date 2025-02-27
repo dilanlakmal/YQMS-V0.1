@@ -492,6 +492,28 @@ app.post("/api/save-bundle-data", async (req, res) => {
   }
 });
 
+/* ------------------------------
+   Bundle Registration Data Edit
+------------------------------ */
+
+app.put("/api/update-bundle-data/:id", async (req, res) => {
+  const { id } = req.params;
+  const updateData = req.body;
+
+  try {
+    const updatedOrder = await QC2OrderData.findByIdAndUpdate(id, updateData, {
+      new: true,
+    });
+    if (!updatedOrder) {
+      return res.status(404).send({ message: "Order not found" });
+    }
+    res.send(updatedOrder);
+  } catch (error) {
+    console.error("Error updating order:", error);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
 //For Data tab display records in a table
 app.get("/api/user-batches", async (req, res) => {
   try {
@@ -505,6 +527,20 @@ app.get("/api/user-batches", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch user batches" });
   }
 });
+
+// //For Data tab display records in a table
+// app.get("/api/user-batches", async (req, res) => {
+//   try {
+//     const { emp_id } = req.query;
+//     if (!emp_id) {
+//       return res.status(400).json({ message: "emp_id is required" });
+//     }
+//     const batches = await QC2OrderData.find({ emp_id });
+//     res.json(batches);
+//   } catch (error) {
+//     res.status(500).json({ message: "Failed to fetch user batches" });
+//   }
+// });
 
 /* ------------------------------
    End Points - Reprint - qc2 orders
@@ -2091,6 +2127,247 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch defect rates" });
   }
 });
+
+// Endpoint to get summaries per MO No
+app.get("/api/qc2-mo-summaries", async (req, res) => {
+  try {
+    const {
+      moNo,
+      emp_id_inspection,
+      startDate,
+      endDate,
+      color,
+      size,
+      department,
+    } = req.query;
+    let match = {};
+    if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    if (emp_id_inspection)
+      match.emp_id_inspection = {
+        $regex: new RegExp(emp_id_inspection.trim(), "i"),
+      };
+    if (color) match.color = color;
+    if (size) match.size = size;
+    if (department) match.department = department;
+    let exprConditions = [];
+    if (startDate) {
+      const [sm, sd, sy] = startDate.split("/");
+      const startObj = new Date(sy, sm - 1, sd);
+      exprConditions.push({
+        $gte: [
+          {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+            },
+          },
+          startObj,
+        ],
+      });
+    }
+    if (endDate) {
+      const [em, ed, ey] = endDate.split("/");
+      const endObj = new Date(ey, em - 1, ed);
+      exprConditions.push({
+        $lte: [
+          {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+            },
+          },
+          endObj,
+        ],
+      });
+    }
+    if (exprConditions.length > 0) match.$expr = { $and: exprConditions };
+
+    const data = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: "$moNo",
+          checkedQty: { $sum: "$checkedQty" },
+          totalPass: { $sum: "$totalPass" },
+          totalRejects: { $sum: "$totalRejects" },
+          defectsQty: { $sum: "$defectQty" },
+          totalBundles: { $sum: 1 },
+          defectArray: { $push: "$defectArray" }, // Include defectArray
+        },
+      },
+      {
+        $project: {
+          moNo: "$_id",
+          checkedQty: 1,
+          totalPass: 1,
+          totalRejects: 1,
+          defectsQty: 1,
+          totalBundles: 1,
+          defectArray: {
+            $reduce: {
+              input: "$defectArray",
+              initialValue: [],
+              in: { $concatArrays: ["$$value", "$$this"] },
+            },
+          }, // Flatten defectArray
+          defectRate: {
+            $cond: [
+              { $eq: ["$checkedQty", 0] },
+              0,
+              { $divide: ["$defectsQty", "$checkedQty"] },
+            ],
+          },
+          defectRatio: {
+            $cond: [
+              { $eq: ["$checkedQty", 0] },
+              0,
+              { $divide: ["$totalRejects", "$checkedQty"] },
+            ],
+          },
+          _id: 0,
+        },
+      },
+      { $sort: { moNo: 1 } }, // Consistent sorting by MO No
+    ]);
+
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching MO summaries:", error);
+    res.status(500).json({ error: "Failed to fetch MO summaries" });
+  }
+});
+
+// app.get("/api/qc2-mo-summaries", async (req, res) => {
+//   try {
+//     const {
+//       moNo,
+//       emp_id_inspection,
+//       startDate,
+//       endDate,
+//       color,
+//       size,
+//       department,
+//     } = req.query;
+//     let match = {};
+//     if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+//     if (emp_id_inspection)
+//       match.emp_id_inspection = {
+//         $regex: new RegExp(emp_id_inspection.trim(), "i"),
+//       };
+//     if (color) match.color = color;
+//     if (size) match.size = size;
+//     if (department) match.department = department;
+//     let exprConditions = [];
+//     if (startDate) {
+//       const [sm, sd, sy] = startDate.split("/");
+//       const startObj = new Date(sy, sm - 1, sd);
+//       exprConditions.push({
+//         $gte: [
+//           {
+//             $dateFromString: {
+//               dateString: "$inspection_date",
+//               format: "%m/%d/%Y",
+//             },
+//           },
+//           startObj,
+//         ],
+//       });
+//     }
+//     if (endDate) {
+//       const [em, ed, ey] = endDate.split("/");
+//       const endObj = new Date(ey, em - 1, ed);
+//       exprConditions.push({
+//         $lte: [
+//           {
+//             $dateFromString: {
+//               dateString: "$inspection_date",
+//               format: "%m/%d/%Y",
+//             },
+//           },
+//           endObj,
+//         ],
+//       });
+//     }
+//     if (exprConditions.length > 0) match.$expr = { $and: exprConditions };
+
+//     const data = await QC2InspectionPassBundle.aggregate([
+//       { $match: match },
+//       {
+//         $group: {
+//           _id: "$moNo",
+//           checkedQty: { $sum: "$checkedQty" },
+//           totalPass: { $sum: "$totalPass" },
+//           totalRejects: { $sum: "$totalRejects" },
+//           defectsQty: { $sum: "$defectQty" },
+//           totalBundles: { $sum: 1 },
+//         },
+//       },
+//       {
+//         $project: {
+//           moNo: "$_id",
+//           checkedQty: 1,
+//           totalPass: 1,
+//           totalRejects: 1,
+//           defectsQty: 1,
+//           totalBundles: 1,
+//           defectRate: {
+//             $cond: [
+//               { $eq: ["$checkedQty", 0] },
+//               0,
+//               { $divide: ["$defectsQty", "$checkedQty"] },
+//             ],
+//           },
+//           defectRatio: {
+//             $cond: [
+//               { $eq: ["$checkedQty", 0] },
+//               0,
+//               { $divide: ["$totalRejects", "$checkedQty"] },
+//             ],
+//           },
+//           _id: 0,
+//         },
+//       },
+//     ]);
+
+//     // Fetch defect rates per MO No
+//     const defectData = await QC2InspectionPassBundle.aggregate([
+//       { $match: match },
+//       { $unwind: "$defectArray" },
+//       {
+//         $group: {
+//           _id: { moNo: "$moNo", defectName: "$defectArray.defectName" },
+//           totalCount: { $sum: "$defectArray.totalCount" },
+//           totalCheckedQty: { $sum: "$checkedQty" },
+//         },
+//       },
+//       {
+//         $project: {
+//           moNo: "$_id.moNo",
+//           defectName: "$_id.defectName",
+//           totalCount: 1,
+//           defectRate: {
+//             $cond: [
+//               { $eq: ["$totalCheckedQty", 0] },
+//               0,
+//               { $divide: ["$totalCount", "$totalCheckedQty"] },
+//             ],
+//           },
+//           _id: 0,
+//         },
+//       },
+//     ]);
+
+//     res.json(
+//       data.map((summary) => ({
+//         ...summary,
+//         defectRates: defectData.filter((d) => d.moNo === summary.moNo),
+//       }))
+//     );
+//   } catch (error) {
+//     console.error("Error fetching MO summaries:", error);
+//     res.status(500).json({ error: "Failed to fetch MO summaries" });
+//   }
+// });
 
 /* ------------------------------
    QC2 - Reworks

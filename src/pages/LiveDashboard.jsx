@@ -25,6 +25,7 @@ import { Bar } from "react-chartjs-2";
 import { io } from "socket.io-client"; // Import Socket.io client
 import { API_BASE_URL } from "../../config";
 import DateSelector from "../components/forms/DateSelector"; // make sure this version does NOT render its own label
+import LiveStyleCard from "../components/inspection/LiveStyleCard";
 
 ChartJS.register(
   CategoryScale,
@@ -74,6 +75,10 @@ const LiveDashboard = () => {
   });
   const [defectRates, setDefectRates] = useState([]);
   const [viewMode, setViewMode] = useState("chart");
+
+  //New State for MO No Data
+
+  const [moSummaries, setMoSummaries] = useState([]); // New state for MO No summaries
 
   const filtersRef = useRef({});
 
@@ -159,6 +164,18 @@ const LiveDashboard = () => {
     }
   };
 
+  //Fetch MO No Summaries
+  const fetchMoSummaries = async (filters = {}) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/qc2-mo-summaries`, {
+        params: filters,
+      });
+      setMoSummaries(response.data);
+    } catch (error) {
+      console.error("Error fetching MO summaries:", error);
+    }
+  };
+
   // --- Apply and Reset Filters ---
   const handleApplyFilters = () => {
     const filters = {};
@@ -181,6 +198,7 @@ const LiveDashboard = () => {
     setAppliedFilters(applied);
     fetchSummaryData(filters);
     fetchDefectRates(filters);
+    fetchMoSummaries(filters); // Add this line
   };
 
   const handleResetFilters = () => {
@@ -194,6 +212,7 @@ const LiveDashboard = () => {
     setAppliedFilters({});
     fetchSummaryData();
     fetchDefectRates();
+    fetchMoSummaries(); // Add this line
   };
 
   useEffect(() => {
@@ -201,11 +220,13 @@ const LiveDashboard = () => {
     fetchFilterOptions();
     fetchSummaryData();
     fetchDefectRates();
+    fetchMoSummaries(); // Add this line
 
     const intervalId = setInterval(() => {
       const currentFilters = filtersRef.current;
       fetchSummaryData(currentFilters);
       fetchDefectRates(currentFilters);
+      fetchMoSummaries(currentFilters); // Add this line
     }, 5000);
 
     return () => clearInterval(intervalId);
@@ -247,6 +268,7 @@ const LiveDashboard = () => {
 
       fetchSummaryData(filters);
       fetchDefectRates(filters);
+      fetchMoSummaries(filters); // Add this line
     });
 
     return () => socket.disconnect();
@@ -607,6 +629,39 @@ const LiveDashboard = () => {
               <TrendingDown className="text-orange-500 text-3xl" />
             </div>
           </div>
+
+          {/* New MO No Cards Section */}
+          <div className="mt-6">
+            <h2 className="text-sm font-medium text-gray-900 mb-2">
+              MO No Summaries
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {moSummaries.map((summary) => (
+                <LiveStyleCard
+                  key={summary.moNo}
+                  moNo={summary.moNo}
+                  summaryData={summary}
+                />
+              ))}
+            </div>
+          </div>
+          {/* <div className="mt-6">
+            <h2 className="text-sm font-medium text-gray-900 mb-2">
+              MO No Summaries
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {moSummaries.map((summary) => (
+                <LiveStyleCard
+                  key={summary.moNo}
+                  moNo={summary.moNo}
+                  summaryData={summary}
+                  defectRates={defectRates.filter(
+                    (rate) => rate.moNo === summary.moNo
+                  )}
+                />
+              ))}
+            </div>
+          </div> */}
 
           {/* Chart/Table Toggle Section with Title */}
           <div className="mb-4">

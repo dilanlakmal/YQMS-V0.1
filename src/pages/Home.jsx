@@ -3,9 +3,11 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/authentication/AuthContext";
 // Import the API_BASE_URL from our config file
+import { useTranslation } from "react-i18next";
 import { API_BASE_URL } from "../../config";
 
 function Home() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [errorMessage, setErrorMessage] = useState("");
@@ -88,7 +90,7 @@ function Home() {
 
   const cards = [
     {
-      title: "Cutting/SCC",
+      title: t("home.cutting/scc"),
       items: [
         {
           path: "/cutting",
@@ -109,7 +111,7 @@ function Home() {
               />
             </svg>
           ),
-          title: "Cutting",
+          title: t("home.cutting"), //"Cutting",
           description: "Begin a new Cutting Inspection Reports here.",
         },
         {
@@ -131,13 +133,13 @@ function Home() {
               />
             </svg>
           ),
-          title: "SCC",
+          title: t("SCC"),
           description: "Begin a new SCC Inspection Report here.",
         },
       ],
     },
     {
-      title: "Order Data",
+      title: t("home.order_data"),
       items: [
         {
           path: "/bundle-registration",
@@ -158,7 +160,7 @@ function Home() {
               />
             </svg>
           ),
-          title: "Bundle Registration",
+          title: t("home.bundle_registration"),
           description: "Click here to register orders for QC2 Inspection.",
         },
         {
@@ -180,7 +182,7 @@ function Home() {
               />
             </svg>
           ),
-          title: "Washing",
+          title: t("home.washing"),
           description: "Click here to scan orders for Washing.",
         },
         {
@@ -202,7 +204,7 @@ function Home() {
               />
             </svg>
           ),
-          title: "OPA",
+          title: t("home.opa"),
           description: "Click here to scan orders in OPA.",
         },
         {
@@ -224,7 +226,7 @@ function Home() {
               />
             </svg>
           ),
-          title: "Ironing",
+          title: t("home.ironing"),
           description: "Click here to scan orders for Ironing.",
         },
         {
@@ -246,13 +248,13 @@ function Home() {
               />
             </svg>
           ),
-          title: "Packing",
+          title: t("home.packing"),
           description: "Click here to scan orders for Packing.",
         },
       ],
     },
     {
-      title: "Quality Inspection",
+      title: t("home.quality_inspection"),
       items: [
         {
           path: "/details",
@@ -273,7 +275,7 @@ function Home() {
               />
             </svg>
           ),
-          title: "QC1 Inspection",
+          title: t("home.qc1_inspection"),
           description: "Begin a new QC1 Endline Inspection here.",
         },
         {
@@ -295,13 +297,13 @@ function Home() {
               />
             </svg>
           ),
-          title: "QC2 Inspection",
+          title: t("home.qc2_inspection"),
           description: "Begin a new QC2 Inspection Report here.",
         },
       ],
     },
     {
-      title: "QA Audit",
+      title: t("home.qa_audit"),
       items: [
         {
           path: "/audit",
@@ -322,13 +324,13 @@ function Home() {
               />
             </svg>
           ),
-          title: "QA Audit",
+          title: t("home.qa_audit"),
           description: "Start a QA Audit Report here.",
         },
       ],
     },
     {
-      title: "Data Analytics",
+      title: t("home.data_analytics"),
       items: [
         {
           path: "/download-data",
@@ -349,7 +351,7 @@ function Home() {
               />
             </svg>
           ),
-          title: "Download Data",
+          title: t("home.download_data"),
           description: "Click here to Download Data.",
         },
         {
@@ -371,7 +373,7 @@ function Home() {
               />
             </svg>
           ),
-          title: "Live Dashboard",
+          title: t("home.live_dashboard"),
           description: "Click here to see Live Dashboard.",
         },
       ],

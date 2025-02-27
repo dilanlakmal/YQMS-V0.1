@@ -572,16 +572,16 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                       Size
                     </th>
                     <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                      Bundle Qty
+                      Checked Qty
                     </th>
                     <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                      Total Defects
+                      Defects Qty
                     </th>
                     <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
                       Total Reject Garments
                     </th>
                     <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                      Printed Reject Garments
+                      Current Reworking Units
                     </th>
                     <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
                       Print Details

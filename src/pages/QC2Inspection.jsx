@@ -20,6 +20,7 @@ import BluetoothComponent from "../components/forms/Bluetooth";
 import QRCodePreview from "../components/forms/QRCodePreview";
 import Scanner from "../components/forms/Scanner";
 import DefectBox from "../components/inspection/DefectBox";
+import DefectNames from "../components/inspection/DefectNames"; // Import the new component
 import DefectPrint from "../components/inspection/DefectPrint";
 import QC2Data from "../components/inspection/QC2Data";
 import { allDefects, defectsList } from "../constants/defects";
@@ -780,6 +781,33 @@ const QC2InspectionPage = () => {
 
       setIsReturnInspection(false);
       setSessionData(null);
+    } else {
+      // Set inspection_time when directly passing the bundle
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, "0");
+      const minutes = String(now.getMinutes()).padStart(2, "0");
+      const seconds = String(now.getSeconds()).padStart(2, "0");
+      const inspectionTime = `${hours}:${minutes}:${seconds}`;
+
+      const updatePayload = {
+        $set: {
+          inspection_time: inspectionTime,
+        },
+      };
+
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updatePayload),
+          }
+        );
+        if (!response.ok) throw new Error("Failed to update inspection record");
+      } catch (err) {
+        setError(`Failed to update inspection record: ${err.message}`);
+      }
     }
 
     setTotalPass(0);
@@ -986,9 +1014,9 @@ const QC2InspectionPage = () => {
                     }`}
                   >
                     {tab === "first"
-                      ? "First Inspection"
+                      ? "Inspection"
                       : tab === "return"
-                      ? "Return Inspection"
+                      ? "Defect Names"
                       : tab === "data"
                       ? "Data"
                       : tab === "dashboard"
@@ -1005,6 +1033,8 @@ const QC2InspectionPage = () => {
           <DefectPrint bluetoothRef={bluetoothRef} printMethod={printMethod} />
         )}
         {activeTab === "data" && <QC2Data />}
+
+        {activeTab === "return" && <DefectNames />}
 
         <div className="flex-grow overflow-hidden bg-gray-50">
           {activeTab !== "first" ? (

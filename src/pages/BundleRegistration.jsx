@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { useTranslation } from "react-i18next";
 import { FaEye, FaMinus, FaPlus, FaPrint, FaQrcode } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
 import { useFormData } from "../components/context/FormDataContext";
 import BluetoothComponent from "../components/forms/Bluetooth";
+import EditModal from "../components/forms/EditBundleData";
 import MonoSearch from "../components/forms/MonoSearch";
 import NumLetterPad from "../components/forms/NumLetterPad";
 import NumberPad from "../components/forms/NumberPad";
@@ -15,6 +17,7 @@ import ReprintTab from "../components/forms/ReprintTab";
 import SubConSelection from "../components/forms/SubConSelection";
 
 function BundleRegistration() {
+  const { t } = useTranslation();
   const { user, loading } = useAuth();
   const {
     formData: persistedFormData,
@@ -48,6 +51,14 @@ function BundleRegistration() {
 
   const bluetoothComponentRef = useRef();
   const subConNames = ["Sunicon", "Win Sheng", "Yeewo", "Jinmyung"];
+
+  const [editModalOpen, setEditModalOpen] = useState(false); // State to control the edit modal
+  const [editRecordId, setEditRecordId] = useState(null); // State to store the ID of the record being edited
+  const [styleCodeFilter, setStyleCodeFilter] = useState("");
+  const [packageNoFilter, setPackageNoFilter] = useState("");
+  const [monoFilter, setMonoFilter] = useState("");
+  const [colorFilter, setColorFilter] = useState("");
+  const [sizeFilter, setSizeFilter] = useState("");
 
   const [formData, setFormData] = useState(() => {
     const savedData = persistedFormData.bundleRegistration;
@@ -478,11 +489,72 @@ function BundleRegistration() {
     }
   };
 
+  // Handle edit button click
+  const handleEdit = (recordId) => {
+    // console.log("Record ID:", recordId); // Log the recordId
+    // console.log("User Batches:", userBatches); // Log the userBatches
+    const record = userBatches.find((batch) => batch._id === recordId);
+    if (record) {
+      // console.log("Editing record:", record);
+      setFormData({
+        id: record._id,
+        date: new Date(record.date),
+        department: record.department,
+        selectedMono: record.selectedMono,
+        buyer: record.buyer,
+        orderQty: record.orderQty,
+        factoryInfo: record.factory,
+        custStyle: record.custStyle,
+        country: record.country,
+        color: record.color,
+        size: record.size,
+        bundleQty: record.bundleQty,
+        lineNo: record.lineNo,
+        count: record.count,
+        colorCode: record.colorCode,
+        chnColor: record.chnColor,
+        colorKey: record.colorKey,
+        sizeOrderQty: record.sizeOrderQty,
+        planCutQty: record.planCutQty,
+      });
+      setEditRecordId(recordId);
+      setEditModalOpen(true);
+    }
+  };
+
+  const filteredBatches = userBatches.filter((batch) => {
+    const matchesStyleCode = styleCodeFilter
+      ? batch.custStyle?.toLowerCase().includes(styleCodeFilter.toLowerCase())
+      : true;
+    const matchesColor = colorFilter
+      ? batch.color?.toLowerCase().includes(colorFilter.toLowerCase())
+      : true;
+    const matchesSize = sizeFilter
+      ? batch.size?.toLowerCase().includes(sizeFilter.toLowerCase())
+      : true;
+    const matchesPackageNo = packageNoFilter
+      ? batch.package_no
+          ?.toString()
+          .toLowerCase()
+          .includes(packageNoFilter.toLowerCase())
+      : true;
+    const matchesMono = monoFilter
+      ? batch.selectedMono?.toLowerCase().endsWith(monoFilter.toLowerCase())
+      : true;
+    return (
+      matchesStyleCode &&
+      matchesPackageNo &&
+      matchesMono &&
+      matchesColor &&
+      matchesSize
+    );
+  });
+
   return (
     <div className="min-h-screen bg-gray-50 pt-20 px-8">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">
-          Bundle Registration
+          {t("bundle.bundle_registration")}
         </h1>
 
         <div className="flex space-x-4 mb-6">
@@ -494,7 +566,7 @@ function BundleRegistration() {
                 : "bg-gray-200 text-gray-700"
             }`}
           >
-            Registration
+            {t("bundle.registration")}
           </button>
           <button
             onClick={() => setActiveTab("data")}
@@ -504,7 +576,7 @@ function BundleRegistration() {
                 : "bg-gray-200 text-gray-700"
             }`}
           >
-            Data
+            {t("bundle.data")}
           </button>
           <button
             onClick={() => setActiveTab("reprint")}
@@ -514,7 +586,7 @@ function BundleRegistration() {
                 : "bg-gray-200 text-gray-700"
             }`}
           >
-            Reprint
+            {t("bundle.reprint")}
           </button>
         </div>
 
@@ -523,7 +595,7 @@ function BundleRegistration() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date
+                  {t("bundle.date")}
                 </label>
                 <DatePicker
                   selected={formData.date}
@@ -539,7 +611,7 @@ function BundleRegistration() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Department
+                  {t("bundle.department")}
                 </label>
                 <select
                   value={formData.department}
@@ -559,7 +631,7 @@ function BundleRegistration() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Search MONo
+                  {t("bundle.search_mono")}
                 </label>
                 <MonoSearch
                   value={formData.selectedMono}
@@ -576,7 +648,7 @@ function BundleRegistration() {
             {formData.selectedMono && (
               <div className="mb-6 p-4 bg-gray-50 rounded-md">
                 <h2 className="text-lg font-bold text-gray-800 mb-4">
-                  Order Details
+                  {t("bundle.order_details")}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -612,7 +684,7 @@ function BundleRegistration() {
 
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Line No
+                {t("bundle.line_no")}
               </label>
               <div className="relative">
                 <input
@@ -641,7 +713,7 @@ function BundleRegistration() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Color
+                  {t("bundle.color")}
                 </label>
                 {hasColors ? (
                   <select
@@ -678,7 +750,7 @@ function BundleRegistration() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Size
+                  {t("bundle.size")}
                 </label>
                 {hasColors ? (
                   hasSizes ? (
@@ -718,13 +790,17 @@ function BundleRegistration() {
             <div className="mt-4 grid grid-cols-2 gap-4">
               {formData.sizeOrderQty > 0 && (
                 <div className="p-2 bg-blue-50 rounded-md">
-                  <span className="text-sm font-medium">Size Order Qty: </span>
+                  <span className="text-sm font-medium">
+                    {t("bundle.size_order_qty")}:{" "}
+                  </span>
                   <span className="text-sm">{formData.sizeOrderQty}</span>
                 </div>
               )}
               {formData.planCutQty > 0 && (
                 <div className="p-2 bg-green-50 rounded-md">
-                  <span className="text-sm font-medium">Plan Cut Qty: </span>
+                  <span className="text-sm font-medium">
+                    {t("bundle.plan_cut_qty")}:{" "}
+                  </span>
                   <span className="text-sm">{formData.planCutQty}</span>
                 </div>
               )}
@@ -738,14 +814,14 @@ function BundleRegistration() {
                     : "text-green-500"
                 }`}
               >
-                Total Garments Count: {formData.totalGarmentsCount}
+                {t("bundle.total_garment_count")}: {formData.totalGarmentsCount}
               </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Count
+                  {t("bundle.count")}
                 </label>
                 <div className="flex items-center border border-gray-300 rounded-md">
                   <button
@@ -776,7 +852,7 @@ function BundleRegistration() {
               </div>
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Bundle Qty
+                  {t("bundle.bundle_qty")}
                 </label>
                 <div className="flex items-center border border-gray-300 rounded-md">
                   <button
@@ -806,7 +882,7 @@ function BundleRegistration() {
                 </div>
                 {formData.selectedMono && (
                   <p className="mt-2 text-sm text-gray-700">
-                    Total Registered Bundle Qty: {totalBundleQty}
+                    {t("bundle.total_registered_bundle_qty")}: {totalBundleQty}
                   </p>
                 )}
               </div>
@@ -824,14 +900,14 @@ function BundleRegistration() {
             {formData.department === "Sub-con" && (
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Sub-con Factory
+                  {t("bundle.sub_con_factory")}
                 </label>
                 <select
                   value={subConName}
                   onChange={(e) => setSubConName(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
-                  <option value="">Select Sub-con Factory</option>
+                  <option value="">{t("bundle.select_sub_con_factory")}</option>
                   {subConNames.map((name) => (
                     <option key={name} value={name}>
                       {name}
@@ -885,7 +961,7 @@ function BundleRegistration() {
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
                 >
-                  <FaQrcode className="mr-2" /> Generate QR
+                  <FaQrcode className="mr-2" /> {t("bundle.generate_qr")}
                 </button>
 
                 {qrData.length > 0 && (
@@ -895,7 +971,7 @@ function BundleRegistration() {
                       onClick={() => setShowQRPreview(true)}
                       className="px-4 py-2 rounded-md bg-indigo-500 text-white hover:bg-indigo-600 flex items-center"
                     >
-                      <FaEye className="mr-2" /> Preview QR
+                      <FaEye className="mr-2" /> {t("bundle.preview_qr")}
                     </button>
                     <button
                       type="button"
@@ -908,7 +984,7 @@ function BundleRegistration() {
                       }`}
                     >
                       <FaPrint className="mr-2" />
-                      {isPrinting ? "Printing..." : "Print QR"}
+                      {isPrinting ? "Printing..." : t("bundle.print_qr")}
                     </button>
                   </>
                 )}
@@ -919,85 +995,125 @@ function BundleRegistration() {
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-lg font-bold text-gray-800 mb-4">Data</h2>
             <div className="overflow-x-auto">
+              <div className="flex space-x-4 mb-6">
+                <input
+                  type="text"
+                  placeholder="Filter by Color"
+                  value={colorFilter}
+                  onChange={(e) => setColorFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md"
+                />
+                <input
+                  type="text"
+                  placeholder="Filter by Size"
+                  value={sizeFilter}
+                  onChange={(e) => setSizeFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md"
+                />
+                <input
+                  type="text"
+                  placeholder="Filter by Style Code"
+                  value={styleCodeFilter}
+                  onChange={(e) => setStyleCodeFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md"
+                />
+                <input
+                  type="text"
+                  placeholder="Filter by Package No"
+                  value={packageNoFilter}
+                  onChange={(e) => setPackageNoFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md"
+                />
+                <input
+                  type="text"
+                  placeholder="Filter by MONo"
+                  value={monoFilter}
+                  onChange={(e) => setMonoFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md"
+                />
+              </div>
               <table className="min-w-full divide-y divide-gray-200 border border-gray-200">
                 <thead className="bg-sky-100">
                   <tr>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Record ID
+                      {t("bundle.record_id")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Package NO
+                      {t("bundle.package_no")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Date
+                      {t("bundle.date")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Time
+                      {t("bundle.modify")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Department
+                      {t("bundle.time")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      EmpID
+                      {t("bundle.department")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      EngName
+                      {t("bundle.emp_id")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      KhName
+                      {t("bundle.eng_name")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      MONo
+                      {t("bundle.kh_name")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Customer Style
+                      {t("bundle.mono")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Buyer
+                      {t("bundle.customer_style")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Country
+                      {t("bundle.buyer")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Total Order Qty
+                      {t("bundle.country")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Factory
+                      {t("bundle.total_order_qty")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Line No
+                      {t("bundle.factory")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Color
+                      {t("bundle.line_no")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Color-Chi
+                      {t("bundle.color")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Size
+                      {t("bundle.color_chi")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Order Cut Qty
+                      {t("bundle.size")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Plan Cut Qty
+                      {t("bundle.order_cut_qty")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Count
+                      {t("bundle.plan_cut_qty")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Total Bundle Qty
+                      {t("bundle.count")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Sub Con
+                      {t("bundle.total_bundle_qty")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                      Sub Con Factory
+                      {t("bundle.sub_con")}
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                      {t("bundle.sub_con_factory")}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {userBatches.map((batch, index) => (
+                  {filteredBatches.map((batch, index) => (
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {index + 1}
@@ -1007,6 +1123,14 @@ function BundleRegistration() {
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {batch.updated_date_seperator}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
+                        <button
+                          onClick={() => handleEdit(batch._id)}
+                          className="ml-2 text-gray-900 font-m hover:text-blue-800 border px-4 py-2 bg-green-500"
+                        >
+                          {t("bundle.edit")}
+                        </button>
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                         {batch.updated_time_seperator}
@@ -1107,6 +1231,16 @@ function BundleRegistration() {
           qrData={qrData}
           onPrint={handlePrintQR}
           mode="production" // Add this line
+        />
+
+        {/* Edit Modal */}
+        <EditModal
+          isOpen={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          formData={formData}
+          setFormData={setFormData}
+          setUserBatches={setUserBatches}
+          setEditModalOpen={setEditModalOpen}
         />
       </div>
     </div>
