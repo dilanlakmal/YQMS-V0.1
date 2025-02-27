@@ -4,8 +4,10 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "../authentication/AuthContext";
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "../../../config";
+import { useTranslation } from "react-i18next";
 
 export default function RoleManagement() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("current");
   const [roles, setRoles] = useState([]);
@@ -167,7 +169,7 @@ export default function RoleManagement() {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Role Management</h1>
+      <h1 className="text-2xl font-bold mb-6">{t("roleMan.role_management")}</h1>
 
       <div className="mb-6">
         <div className="border-b border-gray-200">
@@ -180,7 +182,7 @@ export default function RoleManagement() {
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
-              Current Roles
+              {t("roleMan.current_roles")}
             </button>
             <button
               onClick={() => setActiveTab("add")}
@@ -190,7 +192,7 @@ export default function RoleManagement() {
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
-              Add/Update Role
+              {t("roleMan.add")}/{t("roleMan.update_role")}
             </button>
           </nav>
         </div>
@@ -212,13 +214,13 @@ export default function RoleManagement() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Role
+                  {t("set.role")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Job Titles
+                  {t("set.job_title")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Users
+                  {t("nav.users")}
                   </th>
                 </tr>
               </thead>
@@ -256,14 +258,14 @@ export default function RoleManagement() {
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Role
+              {t("set.role")}
               </label>
               <select
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 value={selectedRole}
                 onChange={(e) => handleRoleSelect(e.target.value)}
               >
-                <option value="">Select Role</option>
+                <option value="">{t("roleMan.select_role")}</option>
                 {availableRoles.map((role) => (
                   <option key={role} value={role}>
                     {role}
@@ -274,12 +276,12 @@ export default function RoleManagement() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Job Titles
+              {t("roleMan.job_titles")}
               </label>
               <div className="mt-1">
                 <input
                   type="text"
-                  placeholder="Search job titles"
+                  placeholder= {t("roleMan.search_job_titles")}
                   className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -320,7 +322,7 @@ export default function RoleManagement() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Users
+              {t("nav.users")}
               </label>
               <div className="mt-1 border rounded-md p-4 min-h-[200px] max-h-[400px] overflow-y-auto">
                 <div className="flex flex-wrap gap-4">

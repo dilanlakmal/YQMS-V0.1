@@ -4,8 +4,10 @@ import "react-datepicker/dist/react-datepicker.css";
 import PropTypes from 'prop-types';
 import { API_BASE_URL } from "../../../config";
 import Swal from 'sweetalert2';
+import { useTranslation } from 'react-i18next';
 
 const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, setEditModalOpen }) => {
+  const {t} = useTranslation();
   const [availableSizes, setAvailableSizes] = useState([]);
   const [availableColors, setAvailableColors] = useState([]);
 
@@ -107,31 +109,31 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
       <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-5xl">
-        <h2 className="text-2xl font-bold mb-4">Edit Record</h2>
+        <h2 className="text-2xl font-bold mb-4">{t("editBundle.edit_record")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-6">
           <div className="mb-6 p-4 bg-blue-50 rounded-md">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Order Details</h2>
+            <h2 className="text-lg font-bold text-gray-800 mb-4">{t("bundle.order_details")}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-700">
-                  <span className="font-bold">Selected MONo:</span> {formData.selectedMono}
+                  <span className="font-bold">{t("bundle.selected_mono")}:</span> {formData.selectedMono}
                 </p>
                 <p className="text-sm text-gray-700">
-                  <span className="font-bold">Customer Style:</span> {formData.custStyle}
+                  <span className="font-bold">{t("bundle.customer_style")}:</span> {formData.custStyle}
                 </p>
                 <p className="text-sm text-gray-700">
-                  <span className="font-bold">Buyer:</span> {formData.buyer}
+                  <span className="font-bold">{t("bundle.buyer")}:</span> {formData.buyer}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-700">
-                  <span className="font-bold">Country:</span> {formData.country}
+                  <span className="font-bold">{t("bundle.country")}:</span> {formData.country}
                 </p>
                 <p className="text-sm text-gray-700">
-                  <span className="font-bold">Order Qty:</span> {formData.orderQty}
+                  <span className="font-bold">{t("bundle.order_qty")}:</span> {formData.orderQty}
                 </p>
                 <p className="text-sm text-gray-700">
-                  <span className="font-bold">Factory:</span> {formData.factoryInfo}
+                  <span className="font-bold">{t("bundle.factory")}:</span> {formData.factoryInfo}
                 </p>
               </div>
             </div>
@@ -139,7 +141,7 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("bundle.date")}</label>
             <DatePicker
               selected={new Date(formData.date)}
               onChange={(date) => setFormData((prev) => ({ ...prev, date }))}
@@ -149,22 +151,22 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("bundle.department")}</label>
             <select
               value={formData.department}
               onChange={(e) => setFormData((prev) => ({ ...prev, department: e.target.value }))}
               className="w-full px-3 py-1 border border-gray-300 rounded-md"
               disabled
             >
-              <option value="">Select Department</option>
-              <option value="QC1 Endline">QC1 Endline</option>
-              <option value="Washing">Washing</option>
-              <option value="Dyeing">Dyeing</option>
-              <option value="Sub-con">Sub-con</option>
+              <option value="">{t("bundle.select_department")}</option>
+              <option value="QC1 Endline">{t("bundle.qc1_endline")}</option>
+              <option value="Washing">{t("home.washing")}</option>
+              <option value="OPA">{t("home.opa")}</option>
+              <option value="Sub-con">{t("bundle.sub_con")}</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Line No</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("bundle.line_no")}</label>
             <input
               type="text"
               value={formData.lineNo}
@@ -174,33 +176,33 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("bundle.color")}</label>
             <select
               value={formData.color}
               onChange={(e) => setFormData((prev) => ({ ...prev, color: e.target.value }))}
               className="w-full px-3 py-1 border border-gray-300 rounded-md"
             >
-              <option value="">Select Color</option>
+              <option value="">{t("bundle.select_color")}</option>
               {availableColors.map((color) => (
                 <option key={color} value={color}>{color}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Size</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("bundle.size")}</label>
             <select
               value={formData.size}
               onChange={(e) => setFormData((prev) => ({ ...prev, size: e.target.value }))}
               className="w-full px-3 py-1 border border-gray-300 rounded-md"
             >
-              <option value="">Select Size</option>
+              <option value="">{t("bundle.select_size")}</option>
               {availableSizes.map((size) => (
                 <option key={size} value={size}>{size}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Count</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("bundle.count")}</label>
             <input
               type="text"
               value={formData.count.toString()} // Ensure count is a string
@@ -209,7 +211,7 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Bundle Qty</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("bundle.bundle_qty")}</label>
             <input
               type="text"
               value={formData.bundleQty}
@@ -224,13 +226,13 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
             onClick={onClose}
             className="px-4 py-2 bg-red-500 text-white rounded-md"
           >
-            Cancel
+           {t("editU.cancel")}
           </button>
           <button
             onClick={handleSave}
             className="px-4 py-2 bg-blue-500 text-white rounded-md"
           >
-            Save
+            {t("editBundle.save")}
           </button>
         </div>
       </div>

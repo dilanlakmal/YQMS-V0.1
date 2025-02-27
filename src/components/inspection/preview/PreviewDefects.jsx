@@ -1,6 +1,8 @@
 import { defectsList } from "../../../constants/QC Inspection/defects";
+import { useTranslation } from "react-i18next";
 
 function PreviewDefects({ defects, language, checkedQuantity }) {
+  const {t} = useTranslation();
   const defectItems = defectsList[language];
   const defectEntries = Object.entries(defects)
     .filter(([_, count]) => count > 0)
@@ -16,19 +18,19 @@ function PreviewDefects({ defects, language, checkedQuantity }) {
 
   return (
     <div className="mb-4">
-      <h3 className="font-semibold mb-2">Defect Details</h3>
+      <h3 className="font-semibold mb-2">{t("preview.defect_details")}</h3>
       <div className="border rounded-lg overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Defect Type
+              {t("preview.defect_type")}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Quantity
+              {t("preview.quantity")}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Defect Rate
+              {t("ana.defect_rate")}
               </th>
             </tr>
           </thead>

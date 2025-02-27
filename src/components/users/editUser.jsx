@@ -3,8 +3,10 @@ import PropTypes from 'prop-types';
 import bcrypt from 'bcryptjs';
 import axios from "axios";
 import { API_BASE_URL } from "../../../config";
+import { useTranslation } from 'react-i18next';
 
 const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
+  const { t } = useTranslation();
   const [userRoles, setUserRoles] = useState([]);
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [message, setMessage] = useState({ type: "", text: "" });
@@ -140,7 +142,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
       <div className="relative p-4 w-full max-w-2xl max-h-full">
         <div className="relative bg-white rounded-lg shadow dark:bg-gray-700 overflow-y-auto max-h-[90vh]">
           <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t dark:border-gray-600">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Update User</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t("editU.update_user")}</h3>
             <button
               type="button"
               className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
@@ -161,7 +163,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
                   d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
                 />
               </svg>
-              <span className="sr-only">Close modal</span>
+              <span className="sr-only">{t("editU.close_modal")}</span>
             </button>
           </div>
 
@@ -197,7 +199,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-black">
-                        Employee ID
+                      {t("bundle.emp_id")}
                       </label>
                       <p className="mt-1 text-sm text-gray-900">
                         {user.emp_id}
@@ -205,7 +207,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-black">
-                        Department
+                      {t("bundle.department")}
                       </label>
                       <p className="mt-1 text-sm text-gray-900">
                         {user.dept_name}
@@ -213,7 +215,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-black">
-                        Section
+                      {t("set.section")}
                       </label>
                       <p className="mt-1 text-sm text-gray-900">
                         {user.sect_name}
@@ -221,7 +223,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-black">
-                        Working Status
+                      {t("set.working_status")}
                       </label>
                       <p className="mt-1 text-sm text-gray-900">
                         {user.working_status}
@@ -236,97 +238,97 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
             <div className="grid gap-4 mb-4 grid-cols-2">
               <div className="col-span-1">
                 <label className="block text-sm font-medium text-white">
-                  Name
+                {t("set.name")}
                 </label>
                 <input
                   type="text"
                   name="name"
                   defaultValue={user.name}
                   readOnly={!editableFields.name}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full px-3 px-3 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   required
                 />
               </div>
 
               <div className="col-span-1">
                 <label className="block text-sm font-medium text-white">
-                  Phone Number
+                {t("set.phone_no")}
                 </label>
                 <input
                   type="text"
                   name="name"
                   defaultValue={user.phone_number}
                   readOnly={!editableFields.phone_number}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full px-3 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   required
                 />
               </div>
 
               <div className="col-span-1">
                 <label className="block text-sm font-medium text-white">
-                  English Name
+                {t("set.english_name")}
                 </label>
                 <input
                   type="text"
                   name="eng_name"
                   defaultValue={user.eng_name}
                   readOnly={!editableFields.eng_name}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full px-3 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
 
               <div className="col-span-1">
                 <label className="block text-sm font-medium text-white">
-                  Khmer Name
+                {t("set.khmer_name")}
                 </label>
                 <input
                   type="text"
                   name="kh_name"
                   defaultValue={user.kh_name}
                   readOnly={!editableFields.kh_name}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full px-3 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
 
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-white">
-                  Job Title
+                {t("set.job_title")}
                 </label>
                 <input
                   type="text"
                   name="job_title"
                   defaultValue={user.job_title}
                   readOnly={!editableFields.job_title}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full px-3 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   required
                 />
               </div>
 
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-white">
-                  Email (optional)
+                {t("editU.email")} ({t("editU.optional")})
                 </label>
                 <input
                   type="email"
                   name="email"
                   defaultValue={user.email}
                   readOnly={!editableFields.email}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full px-3 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
 
               {/* Role Management Section */}
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-white mb-2">
-                  Roles
+                {t("nav.roles")}
                 </label>
                 {selectedRoles.includes("Super Admin") ? (
                   <div className="p-3 bg-green-100 text-green-700 rounded-lg">
-                    This user is a Super Admin. All Access Granted!!
+                    {t("editU.super_admin_user")}. {t("editU.access")}!!
                   </div>
                 ) : selectedRoles.includes("Admin") ? (
                   <div className="p-3 bg-blue-100 text-blue-700 rounded-lg">
-                    This user is an Admin. All Access Granted!!
+                    {t("editU.admin_user")}. {t("editU.access")}!!
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
@@ -359,13 +361,13 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
                 onClick={onClose}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                Cancel
+                {t("editU.cancel")}
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                Update
+                {t("editU.update")}
               </button>
             </div>
           </form>

@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition } from 'react';
 import axios from 'axios';
 import EditUserModal from './editUser';
 import CreateUserModal from './createUser';
 import DeleteUserModal from './deleteUser';
 import { API_BASE_URL } from "../../../config";
+import { useTranslation } from 'react-i18next';
 
 const UserList = () => {
+  const { t } = useTranslation();
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [search, setSearch] = useState('');
@@ -185,7 +187,7 @@ const UserList = () => {
           <div className="relative w-2/4">
             <input
               type="text"
-              placeholder="Search here..."
+              placeholder= {t("userL.search_here")}
               value={search}
               onChange={handleSearch}
               className="w-full p-2 pl-10 border border-gray-300 rounded-lg"
@@ -213,7 +215,7 @@ const UserList = () => {
           onClick={handleAddUser}
           className="ml-4 p-2 w-40 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
         >
-          + Add User
+          + {t("userL.add_user")}
         </button>
       </div>
       {error && <div className="text-red-500 mb-4">{error}</div>}
@@ -221,12 +223,12 @@ const UserList = () => {
         <table className="min-w-full bg-white border border-gray-200">
           <thead>
             <tr>
-              <th className="px-4 py-2 border bg-blue-50">Name</th>
-              <th className="px-4 py-2 border bg-blue-50">Full Name</th>
-              <th className="px-4 py-2 border bg-blue-50">Department</th>
-              <th className="px-4 py-2 border bg-blue-50">Job Title</th>
-              <th className="px-4 py-2 border bg-blue-50">Created At</th>
-              <th className="px-4 py-2 border bg-blue-50">Action</th>
+              <th className="px-4 py-2 border bg-blue-50">{t("set.name")}</th>
+              <th className="px-4 py-2 border bg-blue-50">{t("userL.full_name")}</th>
+              <th className="px-4 py-2 border bg-blue-50">{t("bundle.department")}</th>
+              <th className="px-4 py-2 border bg-blue-50">{t("set.job_title")}</th>
+              <th className="px-4 py-2 border bg-blue-50">{t("userL.created_at")}</th>
+              <th className="px-4 py-2 border bg-blue-50">{t("userL.action")}</th>
             </tr>
           </thead>
           <tbody>
@@ -242,13 +244,13 @@ const UserList = () => {
                     onClick={() => handleEdit(user)}
                     className="px-4 py-2 mr-5 bg-green-500 text-white rounded-lg hover:bg-green-600"
                   >
-                    Edit
+                    {t("bundle.edit")}
                   </button>
                   <button
                     onClick={() => handleDeleteUser(user)}
                     className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
                   >
-                    Delete
+                    {t("set.delete")}
                   </button>
                 </td>
               </tr>
@@ -268,7 +270,7 @@ const UserList = () => {
                 className={`px-3 py-1 rounded-lg ${currentPage === 1 ? 'bg-gray-200' : 'bg-blue-500 text-white'}`}
                 disabled={currentPage === 1}
               >
-                Previous
+               {t("userL.previous")}
               </button>
             </li>
             {getPageNumbers().map(pageNumber => (
@@ -302,7 +304,7 @@ const UserList = () => {
                 className={`px-3 py-1 rounded-lg ${currentPage === totalPages ? 'bg-gray-200' : 'bg-blue-500 text-white'}`}
                 disabled={currentPage === totalPages}
               >
-                Next
+                {t("userL.next")}
               </button>
             </li>
           </ul>

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Menu } from '@headlessui/react';
 import { FaChevronDown } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 
 const multipliers = [2, 3, 4, 5, 10, 15, 20, 25, 30, 40, 50, 100];
 
 function CheckedQuantity({ value, onChange, onLogEntry }) {
+  const {t} = useTranslation();
   const [multiplier, setMultiplier] = useState(1);
   const [inputValue, setInputValue] = useState('');
 
@@ -91,14 +93,14 @@ function CheckedQuantity({ value, onChange, onLogEntry }) {
           type="number"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          placeholder="Value"
+          placeholder= {t("checkQty.value")}
           className="w-20 h-8 px-2 rounded"
         />
         <button
           onClick={handleAddValue}
           className="px-3 h-8 bg-indigo-600 text-white rounded hover:bg-indigo-700"
         >
-          Add
+          {t("roleMan.add")}
         </button>
       </div>
     </div>

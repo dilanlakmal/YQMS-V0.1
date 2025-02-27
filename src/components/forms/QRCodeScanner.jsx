@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import Scanner from "./Scanner";
 import { Loader2, Package, Minus, Plus, Check, Clock, X, AlertCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const QrCodeScanner = ({ 
   onScanSuccess, 
@@ -19,6 +20,8 @@ const QrCodeScanner = ({
   handlePassQtyChange, 
   error,
   isIroningPage, isWashingPage, isPackingPage, isOPAPage }) => {
+    const {t} = useTranslation();
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg">
       <Scanner
@@ -30,7 +33,7 @@ const QrCodeScanner = ({
       {loadingData && (
         <div className="flex items-center justify-center gap-2 text-blue-600 mt-4">
           <Loader2 className="w-5 h-5 animate-spin" />
-          <p>Loading bundle data...</p>
+          <p>{t("qrCodeScan.loading_bundle")}</p>
         </div>
       )}
 
@@ -40,73 +43,73 @@ const QrCodeScanner = ({
             <Package className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
             <div className="flex-grow">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                Order Details
+              {t("bundle.order_details")}
               </h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-600">Bundle ID</p>
+                  <p className="text-sm text-gray-600">{t("downDa.bundle_id")}</p>
                   <p className="font-medium">{scannedData.bundle_id}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">MO Number</p>
+                  <p className="text-sm text-gray-600">{t("bundle.mono")}</p>
                   <p className="font-medium">{scannedData.selectedMono}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Style</p>
+                  <p className="text-sm text-gray-600">{t("prevHeader.style")}</p>
                   <p className="font-medium">{scannedData.custStyle}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Buyer</p>
+                  <p className="text-sm text-gray-600">{t("bundle.buyer")}</p>
                   <p className="font-medium">{scannedData.buyer}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Color</p>
+                  <p className="text-sm text-gray-600">{t("bundle.color")}</p>
                   <p className="font-medium">{scannedData.color}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Size</p>
+                  <p className="text-sm text-gray-600">{t("bundle.size")}</p>
                   <p className="font-medium">{scannedData.size}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Factory</p>
+                  <p className="text-sm text-gray-600">{t("bundle.factory")}</p>
                   <p className="font-medium">{scannedData.factory}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Line No</p>
+                  <p className="text-sm text-gray-600">{t("bundle.line_no")}</p>
                   <p className="font-medium">{scannedData.lineNo}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Count</p>
+                  <p className="text-sm text-gray-600">{t("bundle.count")}</p>
                   <p className="font-medium">{scannedData.count}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Separator ID</p>
+                  <p className="text-sm text-gray-600">{t("qrCodeScan.separator_id")}</p>
                   <p className="font-medium">{scannedData.emp_id}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Registered Date</p>
+                  <p className="text-sm text-gray-600">{t("qrCodeScan.registered_date")}</p>
                   <p className="font-medium">
                     {scannedData.updated_date_seperator}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Registered Time</p>
+                  <p className="text-sm text-gray-600">{t("qrCodeScan.registered_time")}</p>
                   <p className="font-medium">
                     {scannedData.updated_time_seperator}
                   </p>
                 </div>
                 {scannedData.sub_con === "Yes" && (
                   <div>
-                    <p className="text-sm text-gray-600">Sub Con Factory Name</p>
+                    <p className="text-sm text-gray-600">{t("qrCodeScan.sub_con_factory_name")}</p>
                     <p className="font-medium">{scannedData.sub_con_factory}</p>
                   </div>
                 )}
                 <div>
                   <div>
-                  {isIroningPage && <p className="text-sm text-gray-600">Pass Qty (Iron)</p>}
-                  {isWashingPage && <p className="text-sm text-gray-600">Pass Qty (wash)</p>}
-                  {isPackingPage && <p className="text-sm text-gray-600">Pass Qty (pack)</p>}
-                  {isOPAPage && <p className="text-sm text-gray-600">Pass Qty (OPA)</p>}
+                  {isIroningPage && <p className="text-sm text-gray-600">{t("iro.pass_qty")}</p>}
+                  {isWashingPage && <p className="text-sm text-gray-600">{t("wash.pass_qty")}</p>}
+                  {isPackingPage && <p className="text-sm text-gray-600">{t("pack.pass_qty")}</p>}
+                  {isOPAPage && <p className="text-sm text-gray-600">{t("opa.pass_qty")}</p>}
                   </div>
 
                   {isIroningPage ? (
@@ -149,7 +152,7 @@ const QrCodeScanner = ({
                   {autoAdd && isAdding ? (
                     <>
                       <Clock className="w-5 h-5" />
-                      Adding ({countdown}s)
+                      {t("qrCodeScan.adding")} ({countdown}s)
                     </>
                   ) : (
                     <>
@@ -163,7 +166,7 @@ const QrCodeScanner = ({
                   className="px-4 py-2 rounded-md bg-gray-500 text-white flex items-center gap-2"
                 >
                   <X className="w-5 h-5" />
-                  Reset
+                  {t("dash.reset")}
                 </button>
               </div>
             </div>

@@ -1,12 +1,14 @@
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { useTranslation } from "react-i18next";
 
 function DateSelector({ selectedDate, onChange, hideLabel }) {
+  const {t} = useTranslation();
   return (
     <div className="mb-4">
       {!hideLabel && (
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Date
+          {t("bundle.date")}
         </label>
       )}
       <DatePicker

@@ -2,6 +2,7 @@ import { Dialog } from "@headlessui/react";
 import PreviewHeader from "./preview/PreviewHeader";
 import PreviewDefects from "./preview/PreviewDefects";
 import PreviewSummary from "./preview/PreviewSummary";
+import { useTranslation } from "react-i18next";
 
 function PreviewModal({
   isOpen,
@@ -13,6 +14,8 @@ function PreviewModal({
   defectPieces,
   language,
 }) {
+  const {t} = useTranslation();
+  
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
@@ -21,7 +24,7 @@ function PreviewModal({
         <Dialog.Panel className="w-full max-w-4xl bg-white rounded-lg shadow-xl max-h-[90vh] flex flex-col">
           <div className="p-6 flex-shrink-0">
             <Dialog.Title className="text-2xl font-bold mb-4">
-              QC Inspection Report
+            {t("previewMode.qc_inspection_report")}
             </Dialog.Title>
             <PreviewHeader inspectionData={inspectionData} />
           </div>
@@ -46,7 +49,7 @@ function PreviewModal({
                 onClick={onClose}
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
               >
-                Close
+                {t("previewMode.close")}
               </button>
             </div>
           </div>

@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 function ControlButtons({ onPass, onReject, onCheckedQtyChange }) {
+  const {t} = useTranslation();
   const [isOnActive, setIsOnActive] = useState(false);
   const [isReturnActive, setIsReturnActive] = useState(false);
 
@@ -37,19 +39,19 @@ function ControlButtons({ onPass, onReject, onCheckedQtyChange }) {
           isOnActive ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700'
         }`}
       >
-        ON
+        {t("controlBut.on")}
       </button>
       <button
         onClick={handlePass}
         className="px-4 py-2 bg-blue-500 text-white rounded font-medium hover:bg-blue-600"
       >
-        Pass
+        {t("insp.pass")}
       </button>
       <button
         onClick={handleReject}
         className="px-4 py-2 bg-red-500 text-white rounded font-medium hover:bg-red-600"
       >
-        Reject
+       {t("insp.reject")}
       </button>
       <button
         onClick={handleReturnClick}
@@ -57,7 +59,7 @@ function ControlButtons({ onPass, onReject, onCheckedQtyChange }) {
           isReturnActive ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700'
         }`}
       >
-        Return
+        {t("controlBut.return")}
       </button>
     </div>
   );

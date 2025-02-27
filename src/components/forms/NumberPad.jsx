@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { FaTimes } from "react-icons/fa"; // Import the X icon
+import { useTranslation } from "react-i18next";
 
 function NumberPad({ onClose, onInput }) {
+  const {t} = useTranslation();
   const [inputValue, setInputValue] = useState("");
 
   const handleNumberClick = (number) => {
@@ -21,7 +23,7 @@ function NumberPad({ onClose, onInput }) {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center">
       <div className="bg-white w-full max-w-lg rounded-t-2xl p-4 shadow-lg animate-slide-up">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium">Enter Number</h3>
+          <h3 className="text-lg font-medium">{t("numPad.enter_number")}</h3>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 p-2"
@@ -64,7 +66,7 @@ function NumberPad({ onClose, onInput }) {
                 : "bg-gray-300 cursor-not-allowed"
             }`}
           >
-            Done
+            {t("numPad.done")}
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { Dialog, Transition } from "@headlessui/react";
 import { QRCodeSVG } from "qrcode.react";
 import { Fragment } from "react";
+import { useTranslation } from "react-i18next";
 
 export default function QRCodePreview({
   isOpen,
@@ -9,6 +10,7 @@ export default function QRCodePreview({
   onPrint,
   mode = "inspection", // Default to "inspection"
 }) {
+  const {t} = useTranslation();
   // Ensure qrData is always an array
   const data = Array.isArray(qrData) ? qrData : [];
 
@@ -78,55 +80,55 @@ export default function QRCodePreview({
                         {mode === "inspection" ? (
                           <>
                             <p>
-                              <strong>Factory:</strong> {item.factory}
+                              <strong>{t("bundle.factory")}:</strong> {item.factory}
                             </p>
                             <p>
-                              <strong>MO No:</strong> {item.moNo}
+                              <strong>{t("bundle.mono")}:</strong> {item.moNo}
                             </p>
                             <p>
-                              <strong>Cust. Style:</strong> {item.custStyle}
+                              <strong>{t("bundle.customer_style")}:</strong> {item.custStyle}
                             </p>
                             <p>
-                              <strong>Color:</strong> {item.color}
+                              <strong>{t("bundle.color")}:</strong> {item.color}
                             </p>
                             <p>
-                              <strong>Size:</strong> {item.size}
+                              <strong>{t("bundle.size")}:</strong> {item.size}
                             </p>
                             <p>
-                              <strong>Count:</strong> {item.count_print}
+                              <strong>{t("bundle.count")}:</strong> {item.count_print}
                             </p>
                             <p>
-                              <strong>Repair:</strong> {item.repair}
+                              <strong>{t("qrCodePrev.repair")}:</strong> {item.repair}
                             </p>
                           </>
                         ) : (
                           <>
                             <p>
-                              <strong>Factory:</strong> {item.factory}
+                              <strong>{t("bundle.factory")}:</strong> {item.factory}
                             </p>
                             <p>
-                              <strong>MONo:</strong> {item.selectedMono}
+                              <strong>{t("bundle.mono")}:</strong> {item.selectedMono}
                             </p>
                             <p>
-                              <strong>Cust. Style:</strong> {item.custStyle}
+                              <strong>{t("bundle.customer_style")}:</strong> {item.custStyle}
                             </p>
                             <p>
-                              <strong>Buyer:</strong> {item.buyer}
+                              <strong>{t("bundle.buyer")}:</strong> {item.buyer}
                             </p>
                             <p>
-                              <strong>Line No:</strong> {item.lineNo}
+                              <strong>{t("bundle.line_no")}:</strong> {item.lineNo}
                             </p>
                             <p>
-                              <strong>Color:</strong> {item.color}
+                              <strong>{t("bundle.color")}:</strong> {item.color}
                             </p>
                             <p>
-                              <strong>Size:</strong> {item.size}
+                              <strong>{t("bundle.size")}:</strong> {item.size}
                             </p>
                             <p>
-                              <strong>Count:</strong> {item.count}
+                              <strong>{t("bundle.count")}:</strong> {item.count}
                             </p>
                             <p>
-                              <strong>Package No:</strong> {item.package_no}
+                              <strong>{t("bundle.package_no")}:</strong> {item.package_no}
                             </p>
                           </>
                         )}
@@ -134,7 +136,7 @@ export default function QRCodePreview({
 
                       {mode === "inspection" && (
                         <div className="mt-2">
-                          <p className="font-semibold">Defects:</p>
+                          <p className="font-semibold">{t("qrCodePrev.defects")}:</p>
                           <ul className="list-disc pl-4">
                             {item.defects?.map((defect, idx) => (
                               <li key={idx}>
@@ -168,14 +170,14 @@ export default function QRCodePreview({
                     className="inline-flex justify-center rounded-md border border-transparent bg-green-100 px-4 py-2 text-sm font-medium text-green-900 hover:bg-green-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
                     onClick={handlePrint}
                   >
-                    Print
+                    {t("qrCodePrev.print")}
                   </button>
                   <button
                     type="button"
                     className="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                     onClick={onClose}
                   >
-                    Close
+                   {t("previewMode.close")}
                   </button>
                 </div>
               </Dialog.Panel>

@@ -1,7 +1,6 @@
 import React from "react";
 import { useTranslation } from 'react-i18next';
 
-
 const SubConSelection = ({
   isSubCon,
   setIsSubCon,
@@ -30,7 +29,7 @@ const SubConSelection = ({
               }}
               className="form-radio h-4 w-4 text-blue-600"
             />
-            <span className="ml-2">No</span>
+            <span className="ml-2">{t("subCon.no")}</span>
           </label>
           <label className="inline-flex items-center">
             <input
@@ -41,21 +40,21 @@ const SubConSelection = ({
               onChange={() => setIsSubCon(true)}
               className="form-radio h-4 w-4 text-blue-600"
             />
-            <span className="ml-2">Yes</span>
+            <span className="ml-2">{t("subCon.yes")}</span>
           </label>
         </div>
 
         {isSubCon && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sub con Factory name
+            {t("qrCodeScan.sub_con_factory_name")}
             </label>
             <select
               value={subConName}
               onChange={(e) => setSubConName(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
-              <option value="">Select Sub con Factory</option>
+              <option value="">{t("subCon.select_sub_con_factory")}</option>
               {subConNames.map((name) => (
                 <option key={name} value={name}>
                   {name}

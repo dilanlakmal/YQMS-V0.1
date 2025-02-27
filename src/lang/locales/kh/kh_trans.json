@@ -221,6 +221,161 @@
   "return":{
     "pass_return":"ត្រលប់មកវិញ",
     "reject_return":"បដិសេធ_ត្រឡប់"
+  },
+
+  "sideBar":{
+    "qc2_order":"ការបញ្ជាទិញ QC2",
+    "defect":"ពិការភាព",
+    "output":"ទិន្នផល"
+  },
+
+  "languages":{
+    "en":"ភាសាអង់គ្លេស",
+    "kh":"ខ្មែរ",
+    "ch":"ចិន"
+  },
+  "userL":{
+    "search_here":"ស្វែងរកនៅទីនេះ ...",
+    "add_user":"បន្ថែមអ្នកប្រើប្រាស់",
+    "full_name":"ឈ្មោះពេញ",
+    "created_at":"បង្កើតនៅ",
+    "action":"សកម្មភាព",
+    "previous":"មុន",
+    "next":"បន្ទាប់"
+  },
+
+  "roleMan":{
+    "role_management":"ការគ្រប់គ្រងតួនាទី",
+    "current_roles":"តួនាទីបច្ចុប្បន្ន",
+    "add":"បន្ថែម",
+    "update_role":"ធ្វើបច្ចុប្បន្នភាពតួនាទី",
+    "select_role":"ជ្រើសរើសតួនាទី",
+    "job_titles":"ចំណងជើងការងារ",
+    "search_job_titles":"ស្វែងរកចំណងជើងការងារ"
+  },
+
+  "editU":{
+    "update_user":"ធ្វើបច្ចុប្បន្នភាពអ្នកប្រើប្រាស់",
+    "close_modal":"ម៉ូឌុលបិទ",
+    "email":"ម៉ូឌុលបិទ",
+    "optional":"ស្រេចចិត្ត",
+    "super_admin_user":"អ្នកប្រើប្រាស់នេះគឺជាអ្នកគ្រប់គ្រងជាន់ខ្ពស់",
+    "admin_user":"អ្នកប្រើប្រាស់នេះគឺជាអ្នកគ្រប់គ្រង",
+    "access":"ការចូលប្រើទាំងអស់ត្រូវបានផ្តល់",
+    "cancel":"បោះបង់",
+    "update":"ធ្វើបច្ចុប្បន្នភាព"
+  },
+
+  "delU":{
+    "confirm":"តើអ្នកប្រាកដថាចង់លុបអ្នកប្រើប្រាស់គណនីនេះ",
+    "yes":"បាទ ខ្ញុំប្រាកដ",
+    "no":"ទេ បោះបង់"
+  },
+
+  "createU":{
+    "create_user":"បង្កើតអ្នកប្រើប្រាស់ខាងក្រៅ",
+    "device":"ឧបករណ៍",
+    "default_password":"ពាក្យសម្ងាត់លំនាំដើម"
+  },
+
+  "preview":{
+    "defect_details":"ព័ត៌មានលម្អិតអំពីពិការភាព",
+    "defect_type":"ប្រភេទពិការភាព",
+    "quantity":"បរិមាណ"
+  },
+
+  "prevHeader":{
+    "style":"រចនាប័ទ្ម"
+  },
+
+  "checkQty":{
+    "value":"តម្លៃ"
+  },
+
+  "controlBut":{
+    "on":"បើក",
+    "return":"ត្រឡប់"
+  },
+
+  "defectPrint":{
+    "search_package":"ស្វែងរកកញ្ចប់",
+    "repair_group":"ក្រុមជួសជុល",
+    "select_repair":"ជ្រើសរើសក្រុមជួសជុល",
+    "no_defect_card":"រកមិនឃើញកាតដែលមានបញ្ហា",
+    "defect_count":"ចំនួនពិការភាព"
+  },
+
+  "imageUpload":{
+    "upload_image":"បង្ហោះរូបភាព",
+    "capture":"ចាប់យក",
+    "upload":"ផ្ទុកឡើង",
+    "upload_message":"ទម្លាក់រូបភាពនៅទីនេះ ឬប្រើប៊ូតុងខាងលើ។"
+  },
+
+  "previewMode":{
+    "qc_inspection_report":"របាយការណ៍ត្រួតពិនិត្យ QC",
+    "close":"បិទ",
+    "no_data_card":"រកមិនឃើញកាតទិន្នន័យ",
+    "emp_name":"ឈ្មោះបុគ្គលិក",
+    "inspection_time":"ពេលវេលាត្រួតពិនិត្យ",
+    "inspection_date":"កាលបរិច្ឆេទត្រួតពិនិត្យ"
+  },
+
+  "summary":{
+    "defect_garment":"សម្លៀកបំពាក់ពិការ",
+    "return_defect":"ត្រឡប់បរិមាណខូច"
+  },
+
+  "editBundle":{
+    "edit_record":"កែសម្រួលកំណត់ត្រា",
+    "save":"រក្សាទុក"
+  },
+
+  "numPad":{
+    "enter_number":"បញ្ចូលលេខ",
+    "done":"រួចរាល់",
+    "enter_details":"បញ្ចូលព័ត៌មានលម្អិត"
+  },
+
+  "qrCodePrev":{
+    "repair":"ជួសជុល",
+    "defects":"ពិការភាព",
+    "print":"បោះពុម្ព"
+  },
+
+  "qrCodeScan":{
+    "loading_bundle":"កំពុងផ្ទុកទិន្នន័យបណ្តុំ...",
+    "separator_id":"លេខសម្គាល់អ្នកបំបែក",
+    "registered_date":"កាលបរិច្ឆេទចុះឈ្មោះ",
+    "registered_time":"ពេលវេលាចុះឈ្មោះ",
+    "sub_con_factory_name":"ឈ្មោះរោងចក្របន្តកិច្ចសន្យា",
+    "adding":"បន្ថែម"
+  },
+
+  "scan":{
+    "start":"ចាប់ផ្តើមម៉ាស៊ីនស្កេន",
+    "using":"ការប្រើប្រាស់",
+    "stop":"បញ្ឈប់ម៉ាស៊ីនស្កេន"
+  },
+
+  "subCon":{
+    "yes":"បាទ",
+    "no":"ទេ",
+    "select_sub_con_factory":"ជ្រើសរើសរោងចក្រក្រោមកិច្ចសន្យា"
+  },
+
+  "lineIn":{
+    "enter_line_no":"បញ្ចូលលេខបន្ទាត់"
+  },
+
+  "styleCode":{
+    "style_code":"កូដរចនាប័ទ្ម",
+    "select_style_code":"ជ្រើសរើសកូដរចនាប័ទ្ម"
+  },
+
+  "styleDig":{
+    "style_digit":"ខ្ទង់រចនាប័ទ្ម",
+    "enter_style_digit":"បញ្ចូលលេខរចនាប័ទ្ម"
   }
   
   }

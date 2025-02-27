@@ -4,6 +4,7 @@ import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { useAuth } from '../../components/authentication/AuthContext.jsx';
 import bcrypt from 'bcryptjs';
+import { useTranslation } from 'react-i18next';
 
 const MySwal = withReactContent(Swal);
 
@@ -14,6 +15,7 @@ const CreateUserModal = ({
   existingUserIds = [],
   existingUserNames = [], // <<< NEW: Prop for existing user names
 }) => {
+  const {t} = useTranslation();
   const { hashPassword } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
@@ -185,7 +187,7 @@ const CreateUserModal = ({
       >
         <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t dark:border-gray-600">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Create an External User / Device
+            {t("createU.create_user")} / {t("createU.device")}
           </h3>
           <button
             type="button"
@@ -207,7 +209,7 @@ const CreateUserModal = ({
                 d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
               />
             </svg>
-            <span className="sr-only">Close modal</span>
+            <span className="sr-only">{t("editU.close_modal")}</span>
           </button>
         </div>
         <form
@@ -222,7 +224,7 @@ const CreateUserModal = ({
               htmlFor="name"
               className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
             >
-              Name *
+             {t("set.name")} *
             </label>
             <input
               type="text"
@@ -242,7 +244,7 @@ const CreateUserModal = ({
               htmlFor="working_status"
               className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
             >
-              Working Status
+              {t("set.working_status")}
             </label>
             <input
               type="text"
@@ -274,7 +276,7 @@ const CreateUserModal = ({
                   htmlFor="emp_id"
                   className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
                 >
-                  Employee ID
+                  {t("bundle.emp_id")}
                 </label>
                 <input
                   type="text"
@@ -291,7 +293,7 @@ const CreateUserModal = ({
                   htmlFor="job_title"
                   className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
                 >
-                  Job Title
+                  {t("set.job_title")}
                 </label>
                 <input
                   type="text"
@@ -308,7 +310,7 @@ const CreateUserModal = ({
                   htmlFor="eng_name"
                   className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
                 >
-                  English Name
+                  {t("set.english_name")}
                 </label>
                 <input
                   type="text"
@@ -325,7 +327,7 @@ const CreateUserModal = ({
                   htmlFor="kh_name"
                   className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
                 >
-                  Khmer Name
+                  {t("set.khmer_name")}
                 </label>
                 <input
                   type="text"
@@ -342,7 +344,7 @@ const CreateUserModal = ({
                   htmlFor="phone_number"
                   className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
                 >
-                  Phone Number
+                  {t("set.phone.no")}
                 </label>
                 <input
                   type="text"
@@ -359,7 +361,7 @@ const CreateUserModal = ({
                   htmlFor="dept_name"
                   className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
                 >
-                  Department Name
+                  {t("bundle.department")}
                 </label>
                 <input
                   type="text"
@@ -376,7 +378,7 @@ const CreateUserModal = ({
                   htmlFor="sect_name"
                   className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
                 >
-                  Section Name
+                  {t("set.section")}
                 </label>
                 <input
                   type="text"
@@ -393,7 +395,7 @@ const CreateUserModal = ({
                   htmlFor="email"
                   className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
                 >
-                  Email (optional)
+                  {t("editU.email")} ({t("editU.optional")})
                 </label>
                 <input
                   type="email"
@@ -412,7 +414,7 @@ const CreateUserModal = ({
               htmlFor="password"
               className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 text-left"
             >
-              Default Password *
+             {t("createU.default_password")} *
             </label>
             <input
               type="password"
@@ -437,7 +439,7 @@ const CreateUserModal = ({
             <svg className="me-1 -ms-1 w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
               <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd"></path>
             </svg>
-            Add User
+            {t("userL.add_user")}
           </button>
         </form>
       </div>

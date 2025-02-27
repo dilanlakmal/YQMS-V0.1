@@ -2,8 +2,10 @@ import { Eye, Printer } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { API_BASE_URL } from "../../../config";
 import QRCodePreview from "../forms/QRCodePreview";
+import { useTranslation } from "react-i18next";
 
 const DefectPrint = ({ bluetoothRef }) => {
+  const {t} = useTranslation();
   const [defectCards, setDefectCards] = useState([]);
   const [searchMoNo, setSearchMoNo] = useState("");
   const [searchPackageNo, setSearchPackageNo] = useState("");
@@ -137,7 +139,7 @@ const DefectPrint = ({ bluetoothRef }) => {
     <div className="p-4">
       <div className="flex flex-col md:flex-row justify-between mb-4 gap-4">
         <div className="relative w-full md:w-1/3">
-          <label className="block mb-1 font-bold">MO No</label>
+          <label className="block mb-1 font-bold">{t("bundle.mono")}</label>
           <input
             type="text"
             placeholder="Search MO No"
@@ -157,10 +159,10 @@ const DefectPrint = ({ bluetoothRef }) => {
           </datalist>
         </div>
         <div className="relative w-full md:w-1/3">
-          <label className="block mb-1 font-bold">Package No</label>
+          <label className="block mb-1 font-bold">{t("bundle.package_no")}</label>
           <input
             type="text"
-            placeholder="Search Package No"
+            placeholder={t("defectPrint.search_package")}
             value={searchPackageNo}
             onChange={(e) => setSearchPackageNo(e.target.value)}
             className="border p-2 rounded w-full"
@@ -175,13 +177,13 @@ const DefectPrint = ({ bluetoothRef }) => {
           </datalist>
         </div>
         <div className="relative w-full md:w-1/3">
-          <label className="block mb-1 font-bold">Repair Group</label>
+          <label className="block mb-1 font-bold">{t("defectPrint.repair_group")}</label>
           <select
             value={searchRepairGroup}
             onChange={(e) => setSearchRepairGroup(e.target.value)}
             className="border p-2 rounded w-full"
           >
-            <option value="">Select Repair Group</option>
+            <option value="">{t("defectPrint.select_repair")}</option>
             {repairGroupOptions.map((option) => (
               <option key={option} value={option}>
                 {option}
@@ -197,7 +199,7 @@ const DefectPrint = ({ bluetoothRef }) => {
               loading ? "bg-blue-300" : "bg-blue-500 hover:bg-blue-600"
             } text-white px-4 py-2 rounded w-full md:w-auto transition-colors`}
           >
-            {loading ? "Searching..." : "Apply"}
+            {loading ? t("downDa.searching") : t("dash.apply")}
           </button>
           <button
             onClick={handleResetFilters}
@@ -206,7 +208,7 @@ const DefectPrint = ({ bluetoothRef }) => {
               loading ? "bg-gray-300" : "bg-gray-500 hover:bg-gray-600"
             } text-white px-4 py-2 rounded w-full md:w-auto transition-colors`}
           >
-            Reset Filters
+            {t("dash.reset")} {t("dash.filters")}
           </button>
         </div>
       </div>
@@ -217,7 +219,7 @@ const DefectPrint = ({ bluetoothRef }) => {
         </div>
       ) : defectCards.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          No defect cards found
+          {t("defectPrint.no_defect_card")}
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -225,34 +227,34 @@ const DefectPrint = ({ bluetoothRef }) => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  Factory
+                 {t("bundle.factory")}
                 </th>
                 <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  Package No
+                  {t("bundle.package_no")}
                 </th>
                 <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  MO No
+                  {t("bundle.mono")}
                 </th>
                 <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  Cust. Style
+                  {t("bundle.customer_style")}
                 </th>
                 <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  Color
+                  {t("bundle.color")}
                 </th>
                 <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  Size
+                  {t("bundle.size")}
                 </th>
                 <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  Repair Group
+                  {t("defectPrint.repair_group")}
                 </th>
                 <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  Defect Count
+                  {t("defectPrint.defect_count")}
                 </th>
                 <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  Defect Details
+                 {t("preview.defect_details")}
                 </th>
                 <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  Action
+                  {t("bundle.action")}
                 </th>
               </tr>
             </thead>

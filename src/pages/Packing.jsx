@@ -199,7 +199,7 @@ const PackingPage = () => {
           </button>
         </div>
         <div className="flex items-center mb-4">
-          <label className="text-gray-700 mr-2">{t("pack.auto_add")}:</label>
+          <label className="text-gray-700 mr-2">{t("iro.auto_add")}:</label>
           <input
             type="checkbox"
             checked={autoAdd}

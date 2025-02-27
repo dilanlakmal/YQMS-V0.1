@@ -221,6 +221,162 @@
   "return":{
     "pass_return":"Pass Return",
     "reject_return":"Reject_return"
+  },
+
+  "sideBar":{
+    "qc2_order":"QC2 Order",
+    "defect":"Defect",
+    "output":"Output"
+  },
+
+  "languages":{
+    "en":"English",
+    "kh":"Khmer",
+    "ch":"Chinese"
+  },
+
+  "userL":{
+    "search_here":"Search Here...",
+    "add_user":"Add User",
+    "full_name":"Full Name",
+    "created_at":"Created At",
+    "action":"Action",
+    "previous":"Previous",
+    "next":"Next"
+  },
+
+  "roleMan":{
+    "role_management":"Role Management",
+    "current_roles":"Current Roles",
+    "add":"Add",
+    "update_role":"Update Role",
+    "select_role":"Select Role",
+    "job_titles":"Job Titles",
+    "search_job_titles":"Search Job Titles"
+  },
+
+  "editU":{
+    "update_user":"Update User",
+    "close_modal":"Close Modal",
+    "email":"Email",
+    "optional":"Optional",
+    "super_admin_user":"This user is a Super Admin",
+    "admin_user":"This user is an Admin",
+    "access":"All Access Granted",
+    "cancel":"Cancel",
+    "update":"Update"
+  },
+
+  "delU":{
+    "confirm":"Are you sure you want to delete this account user",
+    "yes":"Yes, I'm sure",
+    "no":"No, cancel"
+  },
+
+  "createU":{
+    "create_user":"Create an External User",
+    "device":"Device",
+    "default_password":"Default Password"
+  },
+
+  "preview":{
+    "defect_details":"Defect Details",
+    "defect_type":"Defect Type",
+    "quantity":"Quantity"
+  },
+
+  "prevHeader":{
+    "style":"Style"
+  },
+
+  "checkQty":{
+    "value":"Value"
+  },
+
+  "controlBut":{
+    "on":"ON",
+    "return":"Return"
+  },
+
+  "defectPrint":{
+    "search_package":"Search Package No",
+    "repair_group":"Repair Group",
+    "select_repair":"Select Repair Group",
+    "no_defect_card":"No defect cards found",
+    "defect_count":"Defect Count"
+  },
+
+  "imageUpload":{
+    "upload_image":"Upload Images",
+    "capture":"Capture",
+    "upload":"Upload",
+    "upload_message":"Drop images here or use the buttons above."
+  },
+
+  "previewMode":{
+    "qc_inspection_report":"QC Inspection Report",
+    "close":"Close",
+    "no_data_card":"No data cards found",
+    "emp_name":"Employee Name",
+    "inspection_time":"Inspection Time",
+    "inspection_date":"Inspection Date"
+  },
+
+  "summary":{
+    "defect_garment":"Defect Garments",
+    "return_defect":"Return Def. Qty"
+  },
+
+  "editBundle":{
+    "edit_record":"Edit Record",
+    "save":"Save"
+  },
+
+  "numPad":{
+    "enter_number":"Enter Number",
+    "done":"Done",
+    "enter_details":"Enter Details"
+  },
+
+  "qrCodePrev":{
+    "repair":"Repair",
+    "defects":"Defects",
+    "print":"Print"
+  },
+
+  "qrCodeScan":{
+    "loading_bundle":"Loading bundle data...",
+    "separator_id":"Separator ID",
+    "registered_date":"Registered Date",
+    "registered_time":"Registered Time",
+    "sub_con_factory_name":"Sub-con Factory Name",
+    "adding":"Adding"
+  },
+
+  "scan":{
+    "start":"Start Scanner",
+    "using":"Using",
+    "stop":"Stop Scanner"
+  },
+
+  "subCon":{
+    "yes":"Yes",
+    "no":"No",
+    "select_sub_con_factory":"Select Sub-con Factory"
+  },
+
+  "lineIn":{
+    "enter_line_no":"Enter Line Number"
+  },
+
+  "styleCode":{
+    "style_code":"Style Code",
+    "select_style_code":"Select Style Code"
+  },
+
+  "styleDig":{
+    "style_digit":"Style Digit",
+    "enter_style_digit":"Enter Style Digit"
   }
 
   }

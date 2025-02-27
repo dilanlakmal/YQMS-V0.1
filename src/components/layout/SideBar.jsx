@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Menu, ChevronDown } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const Sidebar = ({ isOpen, toggleSidebar, addTab }) => {
+  const { t } = useTranslation();
   const [subMenuOpen, setSubMenuOpen] = useState({
     orderData: false,
     qc2Inspection: false,
@@ -32,6 +34,7 @@ const Sidebar = ({ isOpen, toggleSidebar, addTab }) => {
           ease-in-out
           w-64
           bg-gray-800
+          h-screen
           text-white
           z-30
         `}
@@ -46,34 +49,34 @@ const Sidebar = ({ isOpen, toggleSidebar, addTab }) => {
           <ul>
             <li className="px-4 py-2 hover:bg-gray-700">
               <button onClick={() => handleMenuClick('QC2 Order')} className="w-full text-left focus:outline-none">
-                QC2 Order
+               {t("sideBar.qc2_order")}
               </button>
             </li>
             <li className="px-4 py-2 hover:bg-gray-700">
               <button onClick={() => toggleSubMenu('orderData')} className="w-full text-left focus:outline-none flex justify-between items-center">
-                Order Data
+              {t("home.order_data")}
                 <ChevronDown className={`h-5 w-5 transition-transform ${subMenuOpen.orderData ? 'transform rotate-180' : ''}`} />
               </button>
               {subMenuOpen.orderData && (
                 <ul className="pl-4 mt-2">
                   <li className="px-4 py-2 hover:bg-gray-600">
                     <button onClick={() => handleMenuClick('Washing')} className="w-full text-left focus:outline-none">
-                      Washing
+                    {t("home.washing")}
                     </button>
                   </li>
                   <li className="px-4 py-2 hover:bg-gray-600">
-                    <button onClick={() => handleMenuClick('Dyeing')} className="w-full text-left focus:outline-none">
-                      Dyeing
+                    <button onClick={() => handleMenuClick('OPA')} className="w-full text-left focus:outline-none">
+                    {t("home.opa")}
                     </button>
                   </li>
                   <li className="px-4 py-2 hover:bg-gray-600">
                     <button onClick={() => handleMenuClick('Ironing')} className="w-full text-left focus:outline-none">
-                      Ironing
+                    {t("home.ironing")}
                     </button>
                   </li>
                   <li className="px-4 py-2 hover:bg-gray-600">
-                    <button onClick={() => handleMenuClick('Folding')} className="w-full text-left focus:outline-none">
-                      Folding
+                    <button onClick={() => handleMenuClick('Packing')} className="w-full text-left focus:outline-none">
+                    {t("home.packing")}
                     </button>
                   </li>
                 </ul>
@@ -81,19 +84,19 @@ const Sidebar = ({ isOpen, toggleSidebar, addTab }) => {
             </li>
             <li className="px-4 py-2 hover:bg-gray-700">
               <button onClick={() => toggleSubMenu('qc2Inspection')} className="w-full text-left focus:outline-none flex justify-between items-center">
-                QC2 Inspection
+              {t("home.qc2_inspection")}
                 <ChevronDown className={`h-5 w-5 transition-transform ${subMenuOpen.qc2Inspection ? 'transform rotate-180' : ''}`} />
               </button>
               {subMenuOpen.qc2Inspection && (
                 <ul className="pl-4 mt-2">
                   <li className="px-4 py-2 hover:bg-gray-600">
                     <button onClick={() => handleMenuClick('Output')} className="w-full text-left focus:outline-none">
-                      Output
+                    {t("sideBar.output")}
                     </button>
                   </li>
                   <li className="px-4 py-2 hover:bg-gray-600">
                     <button onClick={() => handleMenuClick('Defect')} className="w-full text-left focus:outline-none">
-                      Defect
+                    {t("sideBar.defect")}
                     </button>
                   </li>
                 </ul>

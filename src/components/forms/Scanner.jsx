@@ -1,8 +1,10 @@
 import { Html5Qrcode } from "html5-qrcode";
 import { Camera, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 const Scanner = ({ onScanSuccess, onScanError }) => {
+  const {t} = useTranslation();
   const [scanning, setScanning] = useState(false);
   const [html5QrCode, setHtml5QrCode] = useState(null);
   const [cameras, setCameras] = useState([]);
@@ -106,7 +108,7 @@ const Scanner = ({ onScanSuccess, onScanError }) => {
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
           >
             <Camera className="w-5 h-5" />
-            Start Scanner
+            {t("scan.start")}
           </button>
         ) : (
           <button
@@ -114,7 +116,7 @@ const Scanner = ({ onScanSuccess, onScanError }) => {
             className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2"
           >
             <X className="w-5 h-5" />
-            Stop Scanner
+            {t("scan.stop")}
           </button>
         )}
       </div>
@@ -122,7 +124,7 @@ const Scanner = ({ onScanSuccess, onScanError }) => {
       <div className="mt-6 text-center text-sm text-gray-500">
         <p className="flex items-center justify-center gap-2">
           <Camera className="w-4 h-4" />
-          Using{" "}
+          {t("scan.using")}{" "}
           {cameras.find((cam) => cam.id === selectedCameraId)?.label ||
             "Built-in Camera"}
         </p>
