@@ -1904,6 +1904,11 @@ app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
   }
 });
 
+// Helper function to escape special characters in regex
+const escapeRegExp = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // Escapes . * + ? ^ $ { } ( ) | [ ] \
+};
+
 // Endpoint to get summary data
 app.get("/api/qc2-inspection-summary", async (req, res) => {
   try {
@@ -1935,7 +1940,8 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     if (department) {
       match.department = department;
     }
-    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") }; // Add buyer match
+    if (buyer)
+      match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
     let exprConditions = [];
     if (startDate) {
       const [sm, sd, sy] = startDate.split("/");
@@ -2059,7 +2065,8 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
     if (department) {
       match.department = department;
     }
-    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") }; // Add buyer match
+    if (buyer)
+      match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
     let exprConditions = [];
     if (startDate) {
       const [sm, sd, sy] = startDate.split("/");
@@ -2157,7 +2164,8 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
     if (color) match.color = color;
     if (size) match.size = size;
     if (department) match.department = department;
-    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") }; // Add buyer match
+    if (buyer)
+      match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
     let exprConditions = [];
     if (startDate) {
       const [sm, sd, sy] = startDate.split("/");
@@ -2249,6 +2257,476 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch MO summaries" });
   }
 });
+
+app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
+  try {
+    const {
+      moNo,
+      emp_id_inspection,
+      startDate,
+      endDate,
+      color,
+      size,
+      department,
+      buyer,
+    } = req.query;
+    let match = {};
+    if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    if (emp_id_inspection)
+      match.emp_id_inspection = {
+        $regex: new RegExp(emp_id_inspection.trim(), "i"),
+      };
+    if (color) match.color = color;
+    if (size) match.size = size;
+    if (department) match.department = department;
+    if (buyer)
+      match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+    let exprConditions = [];
+    if (startDate) {
+      const [sm, sd, sy] = startDate.split("/");
+      const startObj = new Date(sy, sm - 1, sd);
+      exprConditions.push({
+        $gte: [
+          {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+            },
+          },
+          startObj,
+        ],
+      });
+    }
+    if (endDate) {
+      const [em, ed, ey] = endDate.split("/");
+      const endObj = new Date(ey, em - 1, ed);
+      exprConditions.push({
+        $lte: [
+          {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+            },
+          },
+          endObj,
+        ],
+      });
+    }
+    if (exprConditions.length > 0) match.$expr = { $and: exprConditions };
+
+    const data = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $project: {
+          moNo: 1,
+          checkedQty: 1,
+          defectQty: 1,
+          inspection_time: 1,
+          hour: {
+            $toInt: { $substr: ["$inspection_time", 0, 2] },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: { moNo: "$moNo", hour: "$hour" },
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$defectQty" },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.moNo",
+          hours: {
+            $push: {
+              hour: "$_id.hour",
+              checkedQty: "$totalCheckedQty",
+              defectQty: "$totalDefectQty",
+            },
+          },
+          totalCheckedQty: { $sum: "$totalCheckedQty" },
+          totalDefectQty: { $sum: "$totalDefectQty" },
+        },
+      },
+      {
+        $project: {
+          moNo: "$_id",
+          hourData: {
+            $arrayToObject: {
+              $map: {
+                input: "$hours",
+                as: "h",
+                in: {
+                  k: { $toString: { $add: ["$$h.hour", 1] } }, // Adjust hour to next hour
+                  v: {
+                    rate: {
+                      $cond: [
+                        { $eq: ["$$h.checkedQty", 0] },
+                        0,
+                        {
+                          $multiply: [
+                            { $divide: ["$$h.defectQty", "$$h.checkedQty"] },
+                            100,
+                          ],
+                        },
+                      ],
+                    },
+                    hasCheckedQty: { $gt: ["$$h.checkedQty", 0] },
+                  },
+                },
+              },
+            },
+          },
+          totalRate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                  100,
+                ],
+              },
+            ],
+          },
+          _id: 0,
+        },
+      },
+      { $sort: { moNo: 1 } }, // Consistent sorting by MO No
+    ]);
+
+    // Calculate totals per hour across all MO Nos
+    const totalData = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $project: {
+          checkedQty: 1,
+          defectQty: 1,
+          hour: {
+            $toInt: { $substr: ["$inspection_time", 0, 2] },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$hour",
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$defectQty" },
+        },
+      },
+      {
+        $project: {
+          hour: "$_id",
+          rate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                  100,
+                ],
+              },
+            ],
+          },
+          hasCheckedQty: { $gt: ["$totalCheckedQty", 0] },
+          _id: 0,
+        },
+      },
+    ]);
+
+    // Calculate grand total defect rate
+    const grandTotal = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: null,
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$defectQty" },
+        },
+      },
+      {
+        $project: {
+          rate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                  100,
+                ],
+              },
+            ],
+          },
+          _id: 0,
+        },
+      },
+    ]);
+
+    const result = {};
+    data.forEach((item) => {
+      result[item.moNo] = {};
+      Object.keys(item.hourData).forEach((hour) => {
+        const formattedHour = `${hour}:00`.padStart(5, "0");
+        result[item.moNo][formattedHour] = item.hourData[hour];
+      });
+      result[item.moNo].totalRate = item.totalRate;
+    });
+
+    result.total = {};
+    totalData.forEach((item) => {
+      const formattedHour = `${item.hour + 1}:00`.padStart(5, "0");
+      if (item.hour >= 6 && item.hour <= 20) {
+        // 6 AM to 8 PM
+        result.total[formattedHour] = {
+          rate: item.rate,
+          hasCheckedQty: item.hasCheckedQty,
+        };
+      }
+    });
+
+    result.grand = grandTotal.length > 0 ? grandTotal[0] : { rate: 0 };
+
+    // Fill missing hours with { rate: 0, hasCheckedQty: false }
+    const hours = [
+      "07:00",
+      "08:00",
+      "09:00",
+      "10:00",
+      "11:00",
+      "12:00",
+      "13:00",
+      "14:00",
+      "15:00",
+      "16:00",
+      "17:00",
+      "18:00",
+      "19:00",
+      "20:00",
+      "21:00",
+    ];
+    Object.keys(result).forEach((key) => {
+      if (key !== "grand") {
+        hours.forEach((hour) => {
+          if (!result[key][hour]) {
+            result[key][hour] = { rate: 0, hasCheckedQty: false };
+          }
+        });
+      }
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching defect rates by hour:", error);
+    res.status(500).json({ error: "Failed to fetch defect rates by hour" });
+  }
+});
+
+// // Endpoint to get defect rates by hour and MO No
+// app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
+//   try {
+//     const {
+//       moNo,
+//       emp_id_inspection,
+//       startDate,
+//       endDate,
+//       color,
+//       size,
+//       department,
+//       buyer,
+//     } = req.query;
+//     let match = {};
+//     if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+//     if (emp_id_inspection)
+//       match.emp_id_inspection = {
+//         $regex: new RegExp(emp_id_inspection.trim(), "i"),
+//       };
+//     if (color) match.color = color;
+//     if (size) match.size = size;
+//     if (department) match.department = department;
+//     if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") };
+//     let exprConditions = [];
+//     if (startDate) {
+//       const [sm, sd, sy] = startDate.split("/");
+//       const startObj = new Date(sy, sm - 1, sd);
+//       exprConditions.push({
+//         $gte: [
+//           {
+//             $dateFromString: {
+//               dateString: "$inspection_date",
+//               format: "%m/%d/%Y",
+//             },
+//           },
+//           startObj,
+//         ],
+//       });
+//     }
+//     if (endDate) {
+//       const [em, ed, ey] = endDate.split("/");
+//       const endObj = new Date(ey, em - 1, ed);
+//       exprConditions.push({
+//         $lte: [
+//           {
+//             $dateFromString: {
+//               dateString: "$inspection_date",
+//               format: "%m/%d/%Y",
+//             },
+//           },
+//           endObj,
+//         ],
+//       });
+//     }
+//     if (exprConditions.length > 0) match.$expr = { $and: exprConditions };
+
+//     const data = await QC2InspectionPassBundle.aggregate([
+//       { $match: match },
+//       {
+//         $project: {
+//           moNo: 1,
+//           checkedQty: 1,
+//           defectQty: 1,
+//           inspection_time: 1,
+//           hour: {
+//             $toInt: { $substr: ["$inspection_time", 0, 2] }, // Extract hour from HH:MM:SS
+//           },
+//         },
+//       },
+//       {
+//         $group: {
+//           _id: { moNo: "$moNo", hour: "$hour" },
+//           totalCheckedQty: { $sum: "$checkedQty" },
+//           totalDefectQty: { $sum: "$defectQty" },
+//         },
+//       },
+//       {
+//         $group: {
+//           _id: "$_id.moNo",
+//           hours: {
+//             $push: {
+//               hour: "$_id.hour",
+//               checkedQty: "$totalCheckedQty",
+//               defectQty: "$totalDefectQty",
+//             },
+//           },
+//         },
+//       },
+//       {
+//         $project: {
+//           moNo: "$_id",
+//           hourData: {
+//             $arrayToObject: {
+//               $map: {
+//                 input: "$hours",
+//                 as: "h",
+//                 in: {
+//                   k: { $toString: { $add: ["$$h.hour", 1] } }, // Adjust hour to next hour (e.g., 7 -> 08:00)
+//                   v: {
+//                     $cond: [
+//                       { $eq: ["$$h.checkedQty", 0] },
+//                       0,
+//                       {
+//                         $multiply: [
+//                           { $divide: ["$$h.defectQty", "$$h.checkedQty"] },
+//                           100,
+//                         ],
+//                       },
+//                     ],
+//                   },
+//                 },
+//               },
+//             },
+//           },
+//           _id: 0,
+//         },
+//       },
+//     ]);
+
+//     // Calculate totals per hour across all MO Nos
+//     const totalData = await QC2InspectionPassBundle.aggregate([
+//       { $match: match },
+//       {
+//         $project: {
+//           checkedQty: 1,
+//           defectQty: 1,
+//           hour: {
+//             $toInt: { $substr: ["$inspection_time", 0, 2] },
+//           },
+//         },
+//       },
+//       {
+//         $group: {
+//           _id: "$hour",
+//           totalCheckedQty: { $sum: "$checkedQty" },
+//           totalDefectQty: { $sum: "$defectQty" },
+//         },
+//       },
+//       {
+//         $project: {
+//           hour: "$_id",
+//           defectRate: {
+//             $cond: [
+//               { $eq: ["$totalCheckedQty", 0] },
+//               0,
+//               {
+//                 $multiply: [
+//                   { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+//                   100,
+//                 ],
+//               },
+//             ],
+//           },
+//           _id: 0,
+//         },
+//       },
+//     ]);
+
+//     const result = {};
+//     data.forEach((item) => {
+//       result[item.moNo] = {};
+//       Object.keys(item.hourData).forEach((hour) => {
+//         const formattedHour = `${hour}:00`.padStart(5, "0");
+//         result[item.moNo][formattedHour] = item.hourData[hour];
+//       });
+//     });
+
+//     result.total = {};
+//     totalData.forEach((item) => {
+//       const formattedHour = `${item.hour + 1}:00`.padStart(5, "0");
+//       if (item.hour >= 6 && item.hour <= 18) {
+//         // Filter 07:00 to 19:00
+//         result.total[formattedHour] = item.defectRate;
+//       }
+//     });
+
+//     // Fill missing hours with 0
+//     const hours = [
+//       "07:00",
+//       "08:00",
+//       "09:00",
+//       "10:00",
+//       "11:00",
+//       "12:00",
+//       "13:00",
+//       "14:00",
+//       "15:00",
+//       "16:00",
+//       "17:00",
+//       "18:00",
+//       "19:00",
+//     ];
+//     Object.keys(result).forEach((key) => {
+//       hours.forEach((hour) => {
+//         if (!result[key][hour]) result[key][hour] = 0;
+//       });
+//     });
+
+//     res.json(result);
+//   } catch (error) {
+//     console.error("Error fetching defect rates by hour:", error);
+//     res.status(500).json({ error: "Failed to fetch defect rates by hour" });
+//   }
+// });
 
 // app.get("/api/qc2-mo-summaries", async (req, res) => {
 //   try {

@@ -27,6 +27,7 @@ import { io } from "socket.io-client";
 import { API_BASE_URL } from "../../config";
 import DateSelector from "../components/forms/DateSelector";
 import LiveStyleCard from "../components/inspection/LiveStyleCard";
+import TrendAnalysisMO from "../components/inspection/TrendAnalysisMO"; // New component import
 
 ChartJS.register(
   CategoryScale,
@@ -74,6 +75,7 @@ const LiveDashboard = () => {
   });
   const [defectRates, setDefectRates] = useState([]);
   const [moSummaries, setMoSummaries] = useState([]);
+  const [hourlyDefectRates, setHourlyDefectRates] = useState({}); // New state for hourly defect rates
   const [viewMode, setViewMode] = useState("chart");
 
   const filtersRef = useRef({});
@@ -176,6 +178,19 @@ const LiveDashboard = () => {
     }
   };
 
+  // Fetch Hourly Defect Rates
+  const fetchHourlyDefectRates = async (filters = {}) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/qc2-defect-rates-by-hour`,
+        { params: filters }
+      );
+      setHourlyDefectRates(response.data);
+    } catch (error) {
+      console.error("Error fetching hourly defect rates:", error);
+    }
+  };
+
   // Apply Filters
   const handleApplyFilters = async () => {
     const filters = {};
@@ -207,6 +222,7 @@ const LiveDashboard = () => {
       fetchSummaryData(filters),
       fetchDefectRates(filters),
       fetchMoSummaries(filters),
+      fetchHourlyDefectRates(filters),
     ]);
   };
 
@@ -228,6 +244,7 @@ const LiveDashboard = () => {
       fetchSummaryData(),
       fetchDefectRates(),
       fetchMoSummaries(),
+      fetchHourlyDefectRates(),
     ]);
   };
 
@@ -239,6 +256,7 @@ const LiveDashboard = () => {
         fetchSummaryData(),
         fetchDefectRates(),
         fetchMoSummaries(),
+        fetchHourlyDefectRates(),
       ]);
     };
     fetchInitialData();
@@ -249,6 +267,7 @@ const LiveDashboard = () => {
         fetchSummaryData(currentFilters),
         fetchDefectRates(currentFilters),
         fetchMoSummaries(currentFilters),
+        fetchHourlyDefectRates(currentFilters),
       ]);
     }, 5000);
 
@@ -283,6 +302,7 @@ const LiveDashboard = () => {
         fetchSummaryData(currentFilters),
         fetchDefectRates(currentFilters),
         fetchMoSummaries(currentFilters),
+        fetchHourlyDefectRates(currentFilters),
       ]);
     });
 
@@ -806,6 +826,8 @@ const LiveDashboard = () => {
               </div>
             )}
           </div>
+          {/* New QC2 Defect Rate by Hour Chart */}
+          <TrendAnalysisMO data={hourlyDefectRates} />
         </>
       )}
     </div>
