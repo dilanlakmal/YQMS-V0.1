@@ -399,7 +399,7 @@ export default function Navbar({ onLogout }) {
                       alt={user.name}
                       className="h-8 w-8 rounded-full"
                     />
-                    <ChevronDown className="h-4 w-4 absolute -bottom-1 -right-1 text-gray-500" />
+                    {/* <ChevronDown className="h-4 w-4 absolute -bottom-1 -right-1 text-gray-500" /> */}
                   </div>
                 </div>
 
@@ -430,7 +430,7 @@ export default function Navbar({ onLogout }) {
               </div>
             )}
 
-            <div className="sm:hidden">
+            <div className="sm:hidden ml-4">
               <button
                 onClick={toggleMobileMenu}
                 className="text-gray-900 hover:text-gray-600 focus:outline-none"
@@ -449,11 +449,11 @@ export default function Navbar({ onLogout }) {
       {/* Mobile menu */}
       {isMobileMenuOpen && (
         <div className="sm:hidden">
-          <div className="px-2 pt-2 pb-3 space-y-1">
+          <div className="px-2 pt-2 pb-3 ">
             {navItems.map((section) => (
               <div key={section.title}>
                 <div
-                  className="flex items-center justify-between px-4 py-2 text-base font-medium text-gray-700"
+                  className="flex items-center justify-between px-4 py-1 text-base font-medium text-gray-700"
                   onClick={() => handleSectionClick(section.title)}
                 >
                   {section.icon}
@@ -488,6 +488,10 @@ export default function Navbar({ onLogout }) {
                 )}
               </div>
             ))}
+
+            <div className="flex items-center space-x-3 mr-3">
+              <LanguageSwitcher />
+            </div>
 
             {isAllowedSuperAdmin && (
               <div

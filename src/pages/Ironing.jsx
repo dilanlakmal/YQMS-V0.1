@@ -1,8 +1,4 @@
-import {
-  AlertCircle,
- QrCode,
-  Table,
-} from "lucide-react";
+import {AlertCircle, QrCode, Table,} from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -139,7 +135,7 @@ const IroningPage = () => {
       setScannedData(null);
       setIsAdding(false);
       setCountdown(5);
-      setIroningRecordId((prev) => prev + 1); // Increment the record ID
+      setIroningRecordId((prev) => prev + 1); // Increment the record IDl
     } catch (err) {
       setError(err.message);
     }
@@ -178,7 +174,7 @@ const IroningPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-8xl mx-auto p-6">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-4">
             <QrCode className="w-8 h-8 text-blue-600" />
@@ -252,7 +248,7 @@ const IroningPage = () => {
                 <thead className="bg-sky-100">
                   <tr>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("iro.ironing-id")}
+                    {t("iro.ironing_id")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                     {t("iro.task_no")}

@@ -239,16 +239,16 @@ const WashingPage = () => {
                     {t("wash.washing_id")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("iron.task_no")}
+                    {t("iro.task_no")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                     {t("bundle.department")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("wash.updated_date")}
+                    {t("iro.updated_date")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("wash.updated_time")}
+                    {t("iro.updated_time")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                     {t("bundle.mono")}

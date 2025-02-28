@@ -6,11 +6,11 @@ distinguished_name = dn
 req_extensions     = req_ext
 
 [ dn ]
-CN = 192.167.7.252
+CN = 192.167.12.7
 
 [ req_ext ]
 subjectAltName = @alt_names
 
 [ alt_names ]
-IP.1   = 192.167.7.252
+IP.1   = 192.167.12.7
 DNS.1  = localhost

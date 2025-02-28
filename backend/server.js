@@ -11,12 +11,16 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
 import fs from 'fs';
-// import { Server } from "socket.io"; // Import Socket.i
+import https from 'https';
+import { Server } from "socket.io"; // Import Socket.i
 import createUserModel from "./models/User.js";
 import createQCDataModel from "./models/qc1_data.js";
 import createRoleModel from "./models/Role.js";
 import createIroningModel from "./models/Ironing.js";
 import createQc2OrderDataModel from "./models/qc2_orderdata.js";
+import createOPAModel from "./models/OPA.js";
+import createPackingModel from "./models/Packing.js";
+import createWashingModel from "./models/Washing.js";
 import axios from 'axios';
 //import createRoleManagmentModel from "./models/RoleManagment.js";
 import createRoleManagmentModel from "./models/RoleManagment.js";
@@ -26,59 +30,40 @@ import createQC2InspectionPassBundle from "./models/qc2_inspection_pass_bundle.j
 /* ------------------------------
    Connection String
 ------------------------------ */
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 5000;
 
-// Load SSL certificates
-// const privateKey = fs.readFileSync(
-//   "/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.167.7.252+1-key.pem",
-//   "utf8"
-// );
-// const certificate = fs.readFileSync(
-//   "/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.167.7.252+1.pem",
-//   "utf8"
-// );
+// Serve static files from the React app
+// app.use(express.static(path.join(__dirname, '../build')));
 
-// const credentials = {
-//   key: privateKey,
-//   cert: certificate,
-// };
-
-// Create HTTPS server
-// const server = https.createServer(credentials, app);
-
-// Initialize Socket.io
-// const io = new Server(server, {
-  // cors: {
-    // origin: "https://192.167.7.252:3001", // Update with your frontend URL  //"https://localhost:3001"
-    // methods: ["GET", "POST"],
-    // allowedHeaders: ["Content-Type", "Authorization"],
-    // credentials: true,
-  // },
-  //path: "/socket.io",
-  //transports: ["websocket"],
+// Catch all handler to return the React app for any request
+// app.get('*', (req, res) => {
+    // res.sendFile(path.join(__dirname, 'index.html'));
 // });
 
-/* ------------------------------
-   for HTTP
------------------------------- */
+const options = {
+  key: fs.readFileSync(path.resolve(__dirname, '192.167.12.7-key.pem')),
+  cert: fs.readFileSync(path.resolve(__dirname, '192.167.12.7.pem'))
+};
 
-//const server = http.createServer(app); // Create HTTP server for Socket.io
+// Create HTTPS server
+const server = https.createServer(options, app);
 
-// const io = new Server(server, {
-//   cors: {
-//     origin: "*", // Allow all origins (update with your frontend URL in production)
-//     methods: ["GET", "POST"],
-//     allowedHeaders: ["Content-Type", "Authorization"],
-//     credentials: true,
-//   },
-//   path: "/socket.io",
-//   transports: ["websocket"],
-// }); // Initialize Socket.io
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Initialize Socket.io
+const io = new Server(server, {
+  cors: {
+    origin: "https://192.167.12.7:3001", // Update with your frontend URL  //"https://localhost:3001"
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  },
+  //path: "/socket.io",
+  //transports: ["websocket"],
+});
 
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
@@ -112,6 +97,9 @@ const UserMain = createUserModel(ymProdConnection);
 const QCData = createQCDataModel(ymProdConnection);
 const Role = createRoleModel(ymProdConnection);
 const Ironing = createIroningModel(ymProdConnection);
+const Washing = createWashingModel(ymProdConnection);
+const OPA = createOPAModel(ymProdConnection);
+const Packing = createPackingModel(ymProdConnection);
 const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
 const RoleManagment = createRoleManagmentModel(ymProdConnection);
 const QC2InspectionPassBundle = createQC2InspectionPassBundle(ymProdConnection);
@@ -635,6 +623,24 @@ app.get("/api/check-ironing-exists/:bundleId", async (req, res) => {
   }
 });
 
+// New endpoint to get the last ironing record ID for a specific emp_id
+app.get("/api/last-ironing-record-id/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const lastRecord = await Ironing.findOne(
+      { emp_id },
+      {},
+      { sort: { ironing_record_id: -1 } }
+    );
+    const lastRecordId = lastRecord ? lastRecord.ironing_record_id : 0;
+    res.json({ lastRecordId });
+  } catch (error) {
+    console.error("Error fetching last ironing record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last ironing record ID" });
+  }
+});
+
+
 // Save ironing record
 app.post("/api/save-ironing", async (req, res) => {
   try {
@@ -649,6 +655,306 @@ app.post("/api/save-ironing", async (req, res) => {
     }
   }
 });
+
+// Update qc2_orderdata with ironing details
+app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
+  try {
+    const { bundleId } = req.params;
+    const {
+      passQtyIron,
+      ironing_updated_date,
+      ironing_update_time,
+      emp_id_ironing,
+      eng_name_ironing,
+      kh_name_ironing,
+      job_title_ironing,
+      dept_name_ironing,
+      sect_name_ironing,
+    } = req.body;
+
+    const updatedRecord = await QC2OrderData.findOneAndUpdate(
+      { bundle_id: bundleId },
+      {
+        passQtyIron,
+        ironing_updated_date,
+        ironing_update_time,
+        emp_id_ironing,
+        eng_name_ironing,
+        kh_name_ironing,
+        job_title_ironing,
+        dept_name_ironing,
+        sect_name_ironing,
+      },
+      { new: true }
+    );
+
+    if (!updatedRecord) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+
+    res.json({ message: "Record updated successfully", data: updatedRecord });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update record" });
+  }
+});
+
+// For Data tab display records in a table
+app.get("/api/ironing-records", async (req, res) => {
+  try {
+    const records = await Ironing.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch ironing records" });
+  }
+});
+
+/* ------------------------------
+   End Points - Washing
+------------------------------ */
+
+// Check if washing record exists
+app.get("/api/check-washing-exists/:bundleId", async (req, res) => {
+  try {
+    const record = await Washing.findOne({
+      washing_bundle_id: req.params.bundleId,
+    });
+    res.json({ exists: !!record });
+  } catch (error) {
+    res.status(500).json({ error: "Error checking record" });
+  }
+});
+
+// New endpoint to get the last washing record ID for a specific emp_id
+app.get("/api/last-washing-record-id/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const lastRecord = await Washing.findOne(
+      { emp_id },
+      {},
+      { sort: { washing_record_id: -1 } }
+    );
+    const lastRecordId = lastRecord ? lastRecord.washing_record_id : 0;
+    res.json({ lastRecordId });
+  } catch (error) {
+    console.error("Error fetching last washing record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last washing record ID" });
+  }
+});
+
+// Save washing record
+app.post("/api/save-washing", async (req, res) => {
+  try {
+    const newRecord = new Washing(req.body);
+    await newRecord.save();
+    res.status(201).json({ message: "Record saved successfully" });
+  } catch (error) {
+    if (error.code === 11000) {
+      res.status(400).json({ error: "Duplicate record found" });
+    } else {
+      res.status(500).json({ error: "Failed to save record" });
+    }
+  }
+});
+
+// Update qc2_orderdata with washing details
+app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
+  try {
+    const { bundleId } = req.params;
+    const { passQtyWash, washing_updated_date, washing_update_time } = req.body;
+    const updatedRecord = await QC2OrderData.findOneAndUpdate(
+      { bundle_id: bundleId },
+      {
+        passQtyWash,
+        washing_updated_date,
+        washing_update_time,
+      },
+      { new: true }
+    );
+    if (!updatedRecord) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+    res.json({ message: "Record updated successfully", data: updatedRecord });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update record" });
+  }
+});
+
+// For Data tab display records in a table
+app.get("/api/washing-records", async (req, res) => {
+  try {
+    const records = await Washing.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch washing records" });
+  }
+});
+
+/* ------------------------------
+   End Points - OPA
+------------------------------ */
+
+// Check if OPA record exists
+app.get("/api/check-opa-exists/:bundleId", async (req, res) => {
+  try {
+    const record = await OPA.findOne({
+      opa_bundle_id: req.params.bundleId,
+    });
+    res.json({ exists: !!record });
+  } catch (error) {
+    res.status(500).json({ error: "Error checking record" });
+  }
+});
+
+// New endpoint to get the last OPA record ID for a specific emp_id
+app.get("/api/last-opa-record-id/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const lastRecord = await OPA.findOne(
+      { emp_id },
+      {},
+      { sort: { opa_record_id: -1 } }
+    );
+    const lastRecordId = lastRecord ? lastRecord.opa_record_id : 0;
+    res.json({ lastRecordId });
+  } catch (error) {
+    console.error("Error fetching last OPA record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last OPA record ID" });
+  }
+});
+
+// Save OPA record
+app.post("/api/save-opa", async (req, res) => {
+  try {
+    const newRecord = new OPA(req.body);
+    await newRecord.save();
+    res.status(201).json({ message: "Record saved successfully" });
+  } catch (error) {
+    if (error.code === 11000) {
+      res.status(400).json({ error: "Duplicate record found" });
+    } else {
+      res.status(500).json({ error: "Failed to save record" });
+    }
+  }
+});
+
+// Update qc2_orderdata with OPA details
+app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
+  try {
+    const { bundleId } = req.params;
+    const { passQtyOPA, opa_updated_date, opa_update_time } = req.body;
+
+    const updatedRecord = await QC2OrderData.findOneAndUpdate(
+      { bundle_id: bundleId },
+      {
+        passQtyOPA,
+        opa_updated_date,
+        opa_update_time,
+      },
+      { new: true }
+    );
+
+    if (!updatedRecord) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+
+    res.json({ message: "Record updated successfully", data: updatedRecord });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update record" });
+  }
+});
+
+// For Data tab display records in a table
+app.get("/api/opa-records", async (req, res) => {
+  try {
+    const records = await OPA.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch OPA records" });
+  }
+});
+
+/* ------------------------------
+   End Points - Packing
+------------------------------ */
+
+// Check if Packing record exists
+app.get("/api/check-packing-exists/:bundleId", async (req, res) => {
+  try {
+    const record = await Packing.findOne({
+      packing_bundle_id: req.params.bundleId,
+    });
+    res.json({ exists: !!record });
+  } catch (error) {
+    res.status(500).json({ error: "Error checking record" });
+  }
+});
+
+// New endpoint to get the last Packing record ID for a specific emp_id
+app.get("/api/last-packing-record-id/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const lastRecord = await Packing.findOne(
+      { emp_id },
+      {},
+      { sort: { packing_record_id: -1 } }
+    );
+    const lastRecordId = lastRecord ? lastRecord.packing_record_id : 0;
+    res.json({ lastRecordId });
+  } catch (error) {
+    console.error("Error fetching last Packing record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last Packing record ID" });
+  }
+});
+
+// Save Packing record
+app.post("/api/save-packing", async (req, res) => {
+  try {
+    const newRecord = new Packing(req.body);
+    await newRecord.save();
+    res.status(201).json({ message: "Record saved successfully" });
+  } catch (error) {
+    if (error.code === 11000) {
+      res.status(400).json({ error: "Duplicate record found" });
+    } else {
+      res.status(500).json({ error: "Failed to save record" });
+    }
+  }
+});
+
+// Update qc2_orderdata with Packing details
+app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
+  try {
+    const { bundleId } = req.params;
+    const { passQtyPacking, packing_updated_date, packing_update_time } =
+      req.body;
+    const updatedRecord = await QC2OrderData.findOneAndUpdate(
+      { bundle_id: bundleId },
+      {
+        passQtyPacking,
+        packing_updated_date,
+        packing_update_time,
+      },
+      { new: true }
+    );
+    if (!updatedRecord) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+    res.json({ message: "Record updated successfully", data: updatedRecord });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update record" });
+  }
+});
+
+// For Data tab display records in a table
+app.get("/api/packing-records", async (req, res) => {
+  try {
+    const records = await Packing.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch Packing records" });
+  }
+});
+
 
 /* ------------------------------
    End Points - Live Dashboard - QC1
@@ -1183,30 +1489,6 @@ app.get("/api/download-data", async (req, res) => {
 
 // Schema for qc2_inspection_pass_bundle with header fields as separate fields
 
-
-// Schema for qc2_reworks with separate header fields
-const qc2ReworksSchema = new mongoose.Schema(
-  {
-    bundleNo: { type: String, required: true },
-    moNo: { type: String, required: true },
-    custStyle: { type: String, required: true },
-    color: { type: String, required: true },
-    size: { type: String, required: true },
-    lineNo: { type: String, required: true },
-    department: { type: String, required: true },
-    reworkGarments: [
-      {
-        defectName: { type: String, required: true },
-        count: { type: Number, required: true },
-        time: { type: String, required: true }, // "HH:MM:SS"
-      },
-    ],
-  },
-  { collection: "qc2_reworks" }
-);
-
-const QC2Reworks = mongoose.model("qc2_reworks", qc2ReworksSchema);
-
 // Endpoint to save inspection pass bundle data
 app.post("/api/inspection-pass-bundle", async (req, res) => {
   try {
@@ -1221,10 +1503,21 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       checkedQty,
       totalPass,
       totalRejects,
+      totalRepair,
       defectQty,
       defectArray,
+      rejectGarments,
       inspection_time,
       inspection_date,
+      emp_id_inspection,
+      eng_name_inspection,
+      kh_name_inspection,
+      job_title_inspection,
+      dept_name_inspection,
+      sect_name_inspection,
+      bundle_id,
+      bundle_random_id,
+      printArray,
     } = req.body;
 
     const newRecord = new QC2InspectionPassBundle({
@@ -1238,10 +1531,21 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       checkedQty,
       totalPass,
       totalRejects,
+      totalRepair: totalRepair || 0,
       defectQty,
-      defectArray,
+      defectArray: defectArray || [],
+      rejectGarments: rejectGarments || [],
       inspection_time,
       inspection_date,
+      emp_id_inspection,
+      eng_name_inspection,
+      kh_name_inspection,
+      job_title_inspection,
+      dept_name_inspection,
+      sect_name_inspection,
+      bundle_id,
+      bundle_random_id,
+      printArray: printArray || [],
     });
 
     await newRecord.save();
@@ -1258,48 +1562,45 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
   }
 });
 
+//Update QC2 inspection records for each of reject garments - PUT endpoint to update inspection records
 app.put(
   "/api/qc2-inspection-pass-bundle/:bundle_random_id",
   async (req, res) => {
     try {
       const { bundle_random_id } = req.params;
-      const { printArray, ...updateData } = req.body;
+      const { updateOperations, arrayFilters } = req.body || {};
 
-      // Validate required fields
-      if (
-        updateData.totalPass === undefined ||
-        updateData.totalRejects === undefined ||
-        updateData.defectQty === undefined
-      ) {
-        return res
-          .status(400)
-          .json({
-            error:
-              "Missing required fields: totalPass, totalRejects, defectQty",
-          });
+      let updateData = req.body;
+      if (updateOperations) {
+        updateData = updateOperations;
       }
 
-      const updateOperations = { $set: updateData };
-      if (printArray && Array.isArray(printArray)) {
-        // Validate printArray entries
-        for (const print of printArray) {
-          if (
-            !print.method ||
-            !print.defect_print_id ||
-            print.totalRejectGarmentCount === undefined ||
-            print.totalPrintDefectCount === undefined ||
-            !print.printData
-          ) {
-            return res.status(400).json({ error: "Invalid printArray entry" });
-          }
-        }
-        updateOperations.$push = { printArray: { $each: printArray } };
+      const updateOperationsFinal = {};
+      if (updateData.$set) {
+        updateOperationsFinal.$set = updateData.$set;
+      }
+      if (updateData.$push) {
+        updateOperationsFinal.$push = updateData.$push;
+      }
+      if (updateData.$inc) {
+        updateOperationsFinal.$inc = updateData.$inc;
+      }
+      if (!updateData.$set && !updateData.$push && !updateData.$inc) {
+        updateOperationsFinal.$set = updateData;
+      }
+
+      const options = {
+        new: true,
+        runValidators: true,
+      };
+      if (arrayFilters) {
+        options.arrayFilters = arrayFilters;
       }
 
       const updatedRecord = await QC2InspectionPassBundle.findOneAndUpdate(
         { bundle_random_id },
-        updateOperations,
-        { new: true }
+        updateOperationsFinal,
+        options
       );
 
       if (!updatedRecord) {
@@ -1307,7 +1608,6 @@ app.put(
       }
 
       io.emit("qc2_data_updated");
-
       res.json({
         message: "Inspection pass bundle updated successfully",
         data: updatedRecord,
@@ -1322,6 +1622,50 @@ app.put(
   }
 );
 
+// New endpoint to fetch by bundle_random_id
+app.get(
+  "/api/qc2-inspection-pass-bundle-by-random-id/:bundle_random_id",
+  async (req, res) => {
+    try {
+      const { bundle_random_id } = req.params;
+      const record = await QC2InspectionPassBundle.findOne({
+        bundle_random_id,
+      });
+      if (record) {
+        res.json(record);
+      } else {
+        res.status(404).json({ message: "Record not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+);
+
+// New GET endpoint to fetch record by defect_print_id
+app.get(
+  "/api/qc2-inspection-pass-bundle-by-defect-print-id/:defect_print_id",
+  async (req, res) => {
+    try {
+      const { defect_print_id } = req.params;
+      const record = await QC2InspectionPassBundle.findOne({
+        "printArray.defect_print_id": defect_print_id,
+        "printArray.isCompleted": false,
+      });
+      if (record) {
+        res.json(record);
+      } else {
+        res
+          .status(404)
+          .json({ message: "Record not found or already completed" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+);
+
+// GET endpoint to fetch all inspection records
 app.get("/api/qc2-inspection-pass-bundle", async (req, res) => {
   try {
     const dataCards = await QC2InspectionPassBundle.find().sort({
@@ -2624,10 +2968,10 @@ app.post("/api/update-user-roles", async (req, res) => {
 //   console.log(`Server is running on http://localhost:${PORT}`);
 // });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running at https://0.0.0.0:${PORT}/`);
-});
-
-// server.listen(PORT, "0.0.0.0", () => {
-//   console.log(`HTTPS Server is running on https://localhost:${PORT}`);
+// app.listen(PORT, '0.0.0.0', () => {
+//   console.log(`Server running at https://0.0.0.0:${PORT}/`);
 // });
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`HTTPS Server is running on https://0.0.0.0:${PORT}`);
+});

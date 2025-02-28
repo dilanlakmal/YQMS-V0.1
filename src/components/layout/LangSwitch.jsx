@@ -32,7 +32,7 @@ const LanguageSwitcher = () => {
         </Menu.Button>
       </div>
 
-      <Menu.Items className="origin-top-right absolute right-0 mt-2 w-36 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
+      <Menu.Items className="origin-top-right absolute left-0 mt-2 w-36 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
         <div className="py-1">
         {Object.keys(languageOptions).map((lng) => (
             <Menu.Item key={lng}>

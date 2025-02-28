@@ -239,16 +239,16 @@ const PackingPage = () => {
                     {t("pack.packing_id")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("pack.task_no")}
+                    {t("iro.task_no")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                     {t("bundle.department")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("pack.updated_date")}
+                    {t("iro.updated_date")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                    {t("pack.updated_time")}
+                    {t("iro.updated_time")}
                     </th>
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200">
                     {t("bundle.mono")}

@@ -8,14 +8,24 @@ export default function QRCodePreview({
   onClose,
   qrData,
   onPrint,
-  mode = "inspection", // Default to "inspection"
+  mode = "inspection",
 }) {
   const {t} = useTranslation();
-  // Ensure qrData is always an array
   const data = Array.isArray(qrData) ? qrData : [];
 
-  // Debugging: Log the data structure
+  // Debugging logs to inspect data
   // console.log("QRCodePreview Data:", data);
+  // data.forEach((item, index) => {
+  //   // console.log(`Item ${index}:`, item);
+  //   // console.log(
+  //   //   `Item ${index} defects source:`,
+  //   //   mode === "inspection"
+  //   //     ? item.defects
+  //   //     : mode === "garment"
+  //   //     ? item.rejectGarments?.[0]?.defects
+  //   //     : item.defects || item.printData
+  //   // );
+  // });
 
   const handlePrint = async () => {
     try {
@@ -24,7 +34,11 @@ export default function QRCodePreview({
           await onPrint({
             ...item,
             bundle_id:
-              mode === "inspection" ? item.defect_id : item.bundle_random_id,
+              mode === "inspection"
+                ? item.defect_id
+                : mode === "garment"
+                ? item.rejectGarments?.[0]?.garment_defect_id
+                : item.defect_print_id,
           });
         }
       }
@@ -32,6 +46,26 @@ export default function QRCodePreview({
       console.error("Print error:", error);
       alert("Failed to print. Please check printer connection.");
     }
+  };
+
+  const getDefects = (item) => {
+    if (mode === "inspection") {
+      return item.defects && Array.isArray(item.defects) ? item.defects : [];
+    } else if (mode === "garment") {
+      return item.rejectGarments?.[0]?.defects &&
+        Array.isArray(item.rejectGarments[0].defects)
+        ? item.rejectGarments[0].defects
+        : [];
+    } else if (mode === "bundle") {
+      // Handle both QC2Inspection.jsx (defects) and DefectPrint.jsx (printData)
+      if (item.defects && Array.isArray(item.defects)) {
+        return item.defects;
+      } else if (item.printData && Array.isArray(item.printData)) {
+        return item.printData;
+      }
+      return [];
+    }
+    return [];
   };
 
   return (
@@ -66,10 +100,13 @@ export default function QRCodePreview({
                   className="text-lg font-medium leading-6 text-gray-900"
                 >
                   {mode === "inspection"
-                    ? "Defect QR Codes"
+                    ? "Defect QR Codes - By Repair"
+                    : mode === "garment"
+                    ? "Defect QR Codes - By Garments"
+                    : mode === "bundle"
+                    ? "Defect QR Codes - By Bundle"
                     : "Production QR Codes"}
                 </Dialog.Title>
-
                 <div className="mt-4 space-y-4 h-96 overflow-y-auto">
                   {data.map((item, index) => (
                     <div
@@ -77,81 +114,128 @@ export default function QRCodePreview({
                       className="space-y-2 text-xs border p-4 rounded-lg"
                     >
                       <div className="grid grid-cols-2 gap-2">
+                        <p>
+                          <strong>{t("bundle.mono")}:</strong>{" "}
+                          {item.moNo || item.selectedMono || "N/A"}
+                        </p>
+                        <p>
+                          <strong>{t("bundle.color")}:</strong> {item.color || "N/A"}
+                        </p>
+                        <p>
+                          <strong>{t("bundle.size")}:</strong> {item.size || "N/A"}
+                        </p>
                         {mode === "inspection" ? (
                           <>
                             <p>
-                              <strong>{t("bundle.factory")}:</strong> {item.factory}
+                              <strong>{t("qrCodePrev.repair")}:</strong> {item.repair || "N/A"}
                             </p>
                             <p>
-                              <strong>{t("bundle.mono")}:</strong> {item.moNo}
+                              <strong>{t("bundle.count")}:</strong>{" "}
+                              {item.count_print || item.count || "N/A"}
+                            </p>
+                          </>
+                        ) : mode === "garment" ? (
+                          <p>
+                            <strong>{t("bundle.count")}:</strong>{" "}
+                            {item.rejectGarments?.[0]?.totalCount ||
+                              item.count ||
+                              "N/A"}
+                          </p>
+                        ) : mode === "bundle" ? (
+                          <>
+                            <p>
+                              <strong>{t("bundle.bundle_qty")}:</strong>{" "}
+                              {item.bundleQty || item.checkedQty || "N/A"}
                             </p>
                             <p>
-                              <strong>{t("bundle.customer_style")}:</strong> {item.custStyle}
+                              <strong>Total Reject Garments:</strong>{" "}
+                              {item.totalRejectGarments || "N/A"}
                             </p>
                             <p>
-                              <strong>{t("bundle.color")}:</strong> {item.color}
-                            </p>
-                            <p>
-                              <strong>{t("bundle.size")}:</strong> {item.size}
-                            </p>
-                            <p>
-                              <strong>{t("bundle.count")}:</strong> {item.count_print}
-                            </p>
-                            <p>
-                              <strong>{t("qrCodePrev.repair")}:</strong> {item.repair}
+                              <strong>Total Defect Count:</strong>{" "}
+                              {item.totalDefectCount ||
+                                item.totalPrintDefectCount ||
+                                "N/A"}
                             </p>
                           </>
                         ) : (
                           <>
                             <p>
-                              <strong>{t("bundle.factory")}:</strong> {item.factory}
+                              <strong>Buyer:</strong> {item.buyer || "N/A"}
                             </p>
                             <p>
-                              <strong>{t("bundle.mono")}:</strong> {item.selectedMono}
+                              <strong>Line No:</strong> {item.lineNo || "N/A"}
                             </p>
                             <p>
-                              <strong>{t("bundle.customer_style")}:</strong> {item.custStyle}
-                            </p>
-                            <p>
-                              <strong>{t("bundle.buyer")}:</strong> {item.buyer}
-                            </p>
-                            <p>
-                              <strong>{t("bundle.line_no")}:</strong> {item.lineNo}
-                            </p>
-                            <p>
-                              <strong>{t("bundle.color")}:</strong> {item.color}
-                            </p>
-                            <p>
-                              <strong>{t("bundle.size")}:</strong> {item.size}
-                            </p>
-                            <p>
-                              <strong>{t("bundle.count")}:</strong> {item.count}
-                            </p>
-                            <p>
-                              <strong>{t("bundle.package_no")}:</strong> {item.package_no}
+                              <strong>Count:</strong> {item.count || "N/A"}
                             </p>
                           </>
                         )}
+                        <p>
+                          <strong>Package No:</strong>{" "}
+                          {item.package_no || "N/A"}
+                        </p>
                       </div>
-
-                      {mode === "inspection" && (
+                      {(mode === "inspection" ||
+                        mode === "garment" ||
+                        mode === "bundle") && (
                         <div className="mt-2">
-                          <p className="font-semibold">{t("qrCodePrev.defects")}:</p>
-                          <ul className="list-disc pl-4">
-                            {item.defects?.map((defect, idx) => (
-                              <li key={idx}>
-                                {defect.defectName} ({defect.count})
-                              </li>
-                            ))}
-                          </ul>
+                          <p className="font-semibold">Defects:</p>
+                          {(() => {
+                            const defects = getDefects(item);
+                            if (!defects || defects.length === 0) {
+                              return <p>No defects available</p>;
+                            }
+                            return (
+                              <ul className="list-disc pl-4">
+                                {mode === "inspection"
+                                  ? defects.map((defect, idx) => (
+                                      <li key={idx}>
+                                        {defect.defectName} ({defect.count})
+                                      </li>
+                                    ))
+                                  : mode === "garment"
+                                  ? defects.map((defect, idx) => (
+                                      <li key={idx}>
+                                        {defect.name} ({defect.count})
+                                      </li>
+                                    ))
+                                  : mode === "bundle"
+                                  ? defects.flatMap((garment, garmentIdx) =>
+                                      garment.defects &&
+                                      Array.isArray(garment.defects) ? (
+                                        garment.defects.map(
+                                          (defect, defectIdx) => (
+                                            <li
+                                              key={`${garment.garmentNumber}-${defect.name}-${defectIdx}`}
+                                            >
+                                              ({garment.garmentNumber}){" "}
+                                              {defect.name}: {defect.count}
+                                            </li>
+                                          )
+                                        )
+                                      ) : (
+                                        <li key={`no-defects-${garmentIdx}`}>
+                                          ({garment.garmentNumber || "N/A"}) No
+                                          defects
+                                        </li>
+                                      )
+                                    )
+                                  : null}
+                              </ul>
+                            );
+                          })()}
                         </div>
                       )}
-
                       <div className="flex justify-center mt-4">
                         <QRCodeSVG
                           value={
                             mode === "inspection"
                               ? item.defect_id
+                              : mode === "garment"
+                              ? item.rejectGarments?.[0]?.garment_defect_id
+                              : mode === "bundle"
+                              ? item.defect_print_id
                               : item.bundle_random_id
                           }
                           size={180}
@@ -163,18 +247,17 @@ export default function QRCodePreview({
                     </div>
                   ))}
                 </div>
-
                 <div className="mt-4 flex justify-end space-x-2">
                   <button
                     type="button"
-                    className="inline-flex justify-center rounded-md border border-transparent bg-green-100 px-4 py-2 text-sm font-medium text-green-900 hover:bg-green-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
+                    className="inline-flex justify-center rounded-md border border-transparent bg-green-100 px-4 py-2 text-sm font-medium text-green-900 hover:bg-green-200"
                     onClick={handlePrint}
                   >
                     {t("qrCodePrev.print")}
                   </button>
                   <button
                     type="button"
-                    className="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                    className="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200"
                     onClick={onClose}
                   >
                    {t("previewMode.close")}

@@ -18,3 +18,8 @@ body {
 #root {
   min-height: 100vh;
 }
+
+@font-face {
+  font-family: "Khmer OS";
+  src: url("./fonts/KhmerOS.ttf") format("truetype");
+}

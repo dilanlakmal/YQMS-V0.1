@@ -4,12 +4,14 @@ import { API_BASE_URL } from "../../../config";
 import QRCodePreview from "../forms/QRCodePreview";
 import { useTranslation } from "react-i18next";
 
-const DefectPrint = ({ bluetoothRef }) => {
+const DefectPrint = ({ bluetoothRef, printMethod }) => {
   const {t} = useTranslation();
+  const [mode, setMode] = useState("repair"); // "repair", "garment", or "bundle"
   const [defectCards, setDefectCards] = useState([]);
   const [searchMoNo, setSearchMoNo] = useState("");
   const [searchPackageNo, setSearchPackageNo] = useState("");
   const [searchRepairGroup, setSearchRepairGroup] = useState("");
+  const [searchStatus, setSearchStatus] = useState("both"); // "inProgress", "completed", "both"
   const [moNoOptions, setMoNoOptions] = useState([]);
   const [packageNoOptions, setPackageNoOptions] = useState([]);
   const [repairGroupOptions, setRepairGroupOptions] = useState([]);
@@ -21,17 +23,50 @@ const DefectPrint = ({ bluetoothRef }) => {
   useEffect(() => {
     fetchDefectCards();
     fetchSearchOptions();
-  }, []);
+  }, [mode]);
 
   const fetchDefectCards = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/qc2-defect-print`);
-      if (!response.ok) throw new Error("Failed to fetch defect cards");
-      const data = await response.json();
-      setDefectCards(data);
+      if (mode === "repair") {
+        const response = await fetch(`${API_BASE_URL}/api/qc2-defect-print`);
+        if (!response.ok) throw new Error("Failed to fetch repair cards");
+        const data = await response.json();
+        setDefectCards(data);
+      } else if (mode === "garment" || mode === "bundle") {
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc2-inspection-pass-bundle`
+        );
+        if (!response.ok) throw new Error("Failed to fetch bundle cards");
+        const data = await response.json();
+        if (mode === "garment") {
+          setDefectCards(data);
+        } else {
+          // For "bundle" mode, extract QR codes from printArray where method is "bundle"
+          const bundleQrCards = data.flatMap((bundle) =>
+            bundle.printArray
+              .filter((print) => print.method === "bundle")
+              .map((print) => ({
+                package_no: bundle.package_no,
+                moNo: bundle.moNo,
+                custStyle: bundle.custStyle,
+                color: bundle.color,
+                size: bundle.size,
+                checkedQty: bundle.checkedQty,
+                defectQty: bundle.defectQty,
+                totalRejectGarments: print.totalRejectGarmentCount || 0, // Default to 0 if undefined
+                totalPrintDefectCount: print.totalPrintDefectCount || 0, // Default to 0 if undefined
+                printData: print.printData || [], // Ensure array even if empty
+                defect_print_id: print.defect_print_id,
+                isCompleted: print.isCompleted || false,
+                rejectGarmentsLength: bundle.rejectGarments?.length || 0, // Default to 0 if undefined
+              }))
+          );
+          setDefectCards(bundleQrCards);
+        }
+      }
     } catch (error) {
-      console.error("Error fetching defect cards:", error);
+      console.error(`Error fetching ${mode} cards:`, error);
     } finally {
       setLoading(false);
     }
@@ -39,33 +74,56 @@ const DefectPrint = ({ bluetoothRef }) => {
 
   const fetchSearchOptions = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/qc2-defect-print`);
-      if (!response.ok) throw new Error("Failed to fetch search options");
+      const url =
+        mode === "repair"
+          ? `${API_BASE_URL}/api/qc2-defect-print`
+          : `${API_BASE_URL}/api/qc2-inspection-pass-bundle`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to fetch ${mode} options`);
       const data = await response.json();
 
-      // Extract unique values and sort them
-      const moNos = [...new Set(data.map((card) => card.moNo))].sort();
-      const packageNos = [...new Set(data.map((card) => card.package_no))].sort(
-        (a, b) => a - b
-      );
-      const repairGroups = [...new Set(data.map((card) => card.repair))].sort();
-
-      setMoNoOptions(moNos);
-      setPackageNoOptions(packageNos);
-      setRepairGroupOptions(repairGroups);
+      if (mode === "repair") {
+        const moNos = [
+          ...new Set(data.map((card) => card.moNo).filter(Boolean)),
+        ].sort();
+        const packageNos = [
+          ...new Set(data.map((card) => card.package_no).filter(Boolean)),
+        ].sort((a, b) => a - b);
+        const repairGroups = [
+          ...new Set(data.map((card) => card.repair).filter(Boolean)),
+        ].sort();
+        setMoNoOptions(moNos);
+        setPackageNoOptions(packageNos);
+        setRepairGroupOptions(repairGroups);
+      } else {
+        const moNos = [
+          ...new Set(data.map((card) => card.moNo).filter(Boolean)),
+        ].sort();
+        const packageNos = [
+          ...new Set(data.map((card) => card.package_no).filter(Boolean)),
+        ].sort((a, b) => a - b);
+        setMoNoOptions(moNos);
+        setPackageNoOptions(packageNos);
+        setRepairGroupOptions([]);
+      }
     } catch (error) {
-      console.error("Error fetching search options:", error);
+      console.error(`Error fetching ${mode} search options:`, error);
     }
   };
 
   const handleSearch = async () => {
     try {
       setLoading(true);
-      let url = `${API_BASE_URL}/api/qc2-defect-print`;
+      let url =
+        mode === "repair"
+          ? `${API_BASE_URL}/api/qc2-defect-print/search`
+          : `${API_BASE_URL}/api/qc2-inspection-pass-bundle/search`;
       const hasSearchParams =
-        searchMoNo.trim() || searchPackageNo.trim() || searchRepairGroup.trim();
+        searchMoNo.trim() ||
+        searchPackageNo.trim() ||
+        (mode === "repair" && searchRepairGroup.trim());
 
-      if (hasSearchParams) {
+      if (hasSearchParams || mode === "bundle") {
         const params = new URLSearchParams();
 
         if (searchMoNo.trim()) {
@@ -81,25 +139,57 @@ const DefectPrint = ({ bluetoothRef }) => {
           params.append("package_no", packageNo.toString());
         }
 
-        if (searchRepairGroup.trim()) {
+        if (mode === "repair" && searchRepairGroup.trim()) {
           params.append("repair", searchRepairGroup.trim());
         }
 
-        url = `${url}/search?${params.toString()}`;
+        url = `${url}?${params.toString()}`;
       }
 
       const response = await fetch(url);
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to search defect cards");
+        throw new Error(errorData.error || `Failed to search ${mode} cards`);
       }
 
       const data = await response.json();
-      setDefectCards(data);
+      if (mode === "bundle") {
+        const bundleQrCards = data.flatMap((bundle) =>
+          bundle.printArray
+            .filter((print) => print.method === "bundle")
+            .map((print) => ({
+              package_no: bundle.package_no,
+              moNo: bundle.moNo,
+              custStyle: bundle.custStyle,
+              color: bundle.color,
+              size: bundle.size,
+              checkedQty: bundle.checkedQty,
+              defectQty: bundle.defectQty,
+              totalRejectGarments: print.totalRejectGarmentCount || 0,
+              totalPrintDefectCount: print.totalPrintDefectCount || 0,
+              printData: print.printData || [],
+              defect_print_id: print.defect_print_id,
+              isCompleted: print.isCompleted || false,
+              rejectGarmentsLength: bundle.rejectGarments?.length || 0,
+            }))
+            .filter((card) =>
+              searchStatus === "both"
+                ? true
+                : searchStatus === "inProgress"
+                ? card.totalRejectGarments > 0
+                : card.totalRejectGarments === 0
+            )
+        );
+        setDefectCards(bundleQrCards);
+      } else if (mode === "garment") {
+        setDefectCards(data);
+      } else {
+        setDefectCards(data);
+      }
     } catch (error) {
-      console.error("Error searching defect cards:", error);
+      console.error(`Error searching ${mode} cards:`, error);
       alert(
-        error.message || "Failed to search defect cards. Please try again."
+        error.message || `Failed to search ${mode} cards. Please try again.`
       );
     } finally {
       setLoading(false);
@@ -110,6 +200,7 @@ const DefectPrint = ({ bluetoothRef }) => {
     setSearchMoNo("");
     setSearchPackageNo("");
     setSearchRepairGroup("");
+    setSearchStatus("both");
     fetchDefectCards();
   };
 
@@ -127,7 +218,13 @@ const DefectPrint = ({ bluetoothRef }) => {
     try {
       setPrintDisabled(true);
       setTimeout(() => setPrintDisabled(false), 5000);
-      await bluetoothRef.current.printDefectData(card);
+      if (mode === "repair") {
+        await bluetoothRef.current.printDefectData(card);
+      } else if (mode === "garment") {
+        await bluetoothRef.current.printGarmentDefectData(card);
+      } else if (mode === "bundle") {
+        await bluetoothRef.current.printBundleDefectData(card);
+      }
       alert("QR code printed successfully!");
     } catch (error) {
       console.error("Print error:", error);
@@ -137,60 +234,225 @@ const DefectPrint = ({ bluetoothRef }) => {
 
   return (
     <div className="p-4">
+      {/* Mode Selection Buttons */}
       <div className="flex flex-col md:flex-row justify-between mb-4 gap-4">
-        <div className="relative w-full md:w-1/3">
-          <label className="block mb-1 font-bold">{t("bundle.mono")}</label>
-          <input
-            type="text"
-            placeholder="Search MO No"
-            value={searchMoNo}
-            onChange={(e) => setSearchMoNo(e.target.value)}
-            className="border p-2 rounded w-full"
-            list="moNoOptions"
-          />
-          <datalist id="moNoOptions">
-            {moNoOptions
-              .filter((option) =>
-                option.toLowerCase().includes(searchMoNo.toLowerCase())
-              )
-              .map((option) => (
-                <option key={option} value={option} />
-              ))}
-          </datalist>
-        </div>
-        <div className="relative w-full md:w-1/3">
-          <label className="block mb-1 font-bold">{t("bundle.package_no")}</label>
-          <input
-            type="text"
-            placeholder={t("defectPrint.search_package")}
-            value={searchPackageNo}
-            onChange={(e) => setSearchPackageNo(e.target.value)}
-            className="border p-2 rounded w-full"
-            list="packageNoOptions"
-          />
-          <datalist id="packageNoOptions">
-            {packageNoOptions
-              .filter((option) => option.toString().includes(searchPackageNo))
-              .map((option) => (
-                <option key={option} value={option} />
-              ))}
-          </datalist>
-        </div>
-        <div className="relative w-full md:w-1/3">
-          <label className="block mb-1 font-bold">{t("defectPrint.repair_group")}</label>
-          <select
-            value={searchRepairGroup}
-            onChange={(e) => setSearchRepairGroup(e.target.value)}
-            className="border p-2 rounded w-full"
+        <div className="flex space-x-2 w-full md:w-1/3">
+          <button
+            onClick={() => setMode("repair")}
+            className={`p-2 rounded border ${
+              mode === "repair" ? "bg-blue-600 text-white" : "bg-gray-200"
+            }`}
           >
-            <option value="">{t("defectPrint.select_repair")}</option>
-            {repairGroupOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+            By Repair
+          </button>
+          <button
+            onClick={() => setMode("garment")}
+            className={`p-2 rounded border ${
+              mode === "garment" ? "bg-blue-600 text-white" : "bg-gray-200"
+            }`}
+          >
+            By Garment
+          </button>
+          <button
+            onClick={() => setMode("bundle")}
+            className={`p-2 rounded border ${
+              mode === "bundle" ? "bg-blue-600 text-white" : "bg-gray-200"
+            }`}
+          >
+            By Bundle
+          </button>
         </div>
+
+        {/* Filter Inputs */}
+        {mode === "repair" ? (
+          <>
+            <div className="relative w-full md:w-1/3">
+              <label className="block mb-1 font-bold">MO No</label>
+              <input
+                type="text"
+                placeholder="Search MO No"
+                value={searchMoNo}
+                onChange={(e) => setSearchMoNo(e.target.value)}
+                className="border p-2 rounded w-full"
+                list="moNoOptions"
+              />
+              <datalist id="moNoOptions">
+                {moNoOptions
+                  .filter((option) =>
+                    option.toLowerCase().includes(searchMoNo.toLowerCase())
+                  )
+                  .map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+              </datalist>
+            </div>
+            <div className="relative w-full md:w-1/3">
+              <label className="block mb-1 font-bold">Package No</label>
+              <input
+                type="text"
+                placeholder="Search Package No"
+                value={searchPackageNo}
+                onChange={(e) => setSearchPackageNo(e.target.value)}
+                className="border p-2 rounded w-full"
+                list="packageNoOptions"
+              />
+              <datalist id="packageNoOptions">
+                {packageNoOptions
+                  .filter(
+                    (option) =>
+                      option !== undefined &&
+                      option !== null &&
+                      option.toString().includes(searchPackageNo)
+                  )
+                  .map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+              </datalist>
+            </div>
+            <div className="relative w-full md:w-1/3">
+              <label className="block mb-1 font-bold">Repair Group</label>
+              <select
+                value={searchRepairGroup}
+                onChange={(e) => setSearchRepairGroup(e.target.value)}
+                className="border p-2 rounded w-full"
+              >
+                <option value="">Select Repair Group</option>
+                {repairGroupOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        ) : mode === "garment" ? (
+          <>
+            <div className="relative w-full md:w-1/3">
+              <label className="block mb-1 font-bold">MO No</label>
+              <input
+                type="text"
+                placeholder="Search MO No"
+                value={searchMoNo}
+                onChange={(e) => setSearchMoNo(e.target.value)}
+                className="border p-2 rounded w-full"
+                list="moNoOptions"
+              />
+              <datalist id="moNoOptions">
+                {moNoOptions
+                  .filter((option) =>
+                    option.toLowerCase().includes(searchMoNo.toLowerCase())
+                  )
+                  .map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+              </datalist>
+            </div>
+            <div className="relative w-full md:w-1/3">
+              <label className="block mb-1 font-bold">Package No</label>
+              <input
+                type="text"
+                placeholder="Search Package No"
+                value={searchPackageNo}
+                onChange={(e) => setSearchPackageNo(e.target.value)}
+                className="border p-2 rounded w-full"
+                list="packageNoOptions"
+              />
+              <datalist id="packageNoOptions">
+                {packageNoOptions
+                  .filter(
+                    (option) =>
+                      option !== undefined &&
+                      option !== null &&
+                      option.toString().includes(searchPackageNo)
+                  )
+                  .map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+              </datalist>
+            </div>
+          </>
+        ) : mode === "bundle" ? (
+          <>
+            <div className="relative w-full md:w-1/4">
+              <label className="block mb-1 font-bold">MO No</label>
+              <input
+                type="text"
+                placeholder="Search MO No"
+                value={searchMoNo}
+                onChange={(e) => setSearchMoNo(e.target.value)}
+                className="border p-2 rounded w-full"
+                list="moNoOptions"
+              />
+              <datalist id="moNoOptions">
+                {moNoOptions
+                  .filter((option) =>
+                    option.toLowerCase().includes(searchMoNo.toLowerCase())
+                  )
+                  .map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+              </datalist>
+            </div>
+            <div className="relative w-full md:w-1/4">
+              <label className="block mb-1 font-bold">Package No</label>
+              <input
+                type="text"
+                placeholder="Search Package No"
+                value={searchPackageNo}
+                onChange={(e) => setSearchPackageNo(e.target.value)}
+                className="border p-2 rounded w-full"
+                list="packageNoOptions"
+              />
+              <datalist id="packageNoOptions">
+                {packageNoOptions
+                  .filter(
+                    (option) =>
+                      option !== undefined &&
+                      option !== null &&
+                      option.toString().includes(searchPackageNo)
+                  )
+                  .map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+              </datalist>
+            </div>
+            <div className="relative w-full md:w-1/4">
+              <label className="block mb-1 font-bold">Status</label>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setSearchStatus("inProgress")}
+                  className={`p-2 rounded border ${
+                    searchStatus === "inProgress"
+                      ? "bg-yellow-600 text-white"
+                      : "bg-gray-200"
+                  }`}
+                >
+                  In Progress
+                </button>
+                <button
+                  onClick={() => setSearchStatus("completed")}
+                  className={`p-2 rounded border ${
+                    searchStatus === "completed"
+                      ? "bg-green-600 text-white"
+                      : "bg-gray-200"
+                  }`}
+                >
+                  Completed
+                </button>
+                <button
+                  onClick={() => setSearchStatus("both")}
+                  className={`p-2 rounded border ${
+                    searchStatus === "both"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200"
+                  }`}
+                >
+                  Both
+                </button>
+              </div>
+            </div>
+          </>
+        ) : null}
         <div className="flex gap-2 w-full md:w-auto">
           <button
             onClick={handleSearch}
@@ -213,108 +475,356 @@ const DefectPrint = ({ bluetoothRef }) => {
         </div>
       </div>
 
+      {/* Loading or Empty State */}
       {loading ? (
         <div className="flex justify-center items-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
         </div>
       ) : defectCards.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          {t("defectPrint.no_defect_card")}
+          No{" "}
+          {mode === "repair"
+            ? "defect"
+            : mode === "garment"
+            ? "garment"
+            : "bundle"}{" "}
+          cards found
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden border-collapse">
+            {/* Table Header */}
             <thead className="bg-gray-50">
               <tr>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                 {t("bundle.factory")}
-                </th>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  {t("bundle.package_no")}
-                </th>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  {t("bundle.mono")}
-                </th>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  {t("bundle.customer_style")}
-                </th>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  {t("bundle.color")}
-                </th>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  {t("bundle.size")}
-                </th>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  {t("defectPrint.repair_group")}
-                </th>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  {t("defectPrint.defect_count")}
-                </th>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                 {t("preview.defect_details")}
-                </th>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                  {t("bundle.action")}
-                </th>
+                {mode === "repair" ? (
+                  <>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Factory
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Package No
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      MO No
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Cust. Style
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Color
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Size
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Repair Group
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Defect Count
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Defect Details
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Action
+                    </th>
+                  </>
+                ) : mode === "garment" ? (
+                  <>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Package No
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      MO No
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Cust. Style
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Color
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Size
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Defect Count
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Defect Details
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Action
+                    </th>
+                  </>
+                ) : mode === "bundle" ? (
+                  <>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Package No
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      MO No
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Cust. Style
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Color
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Size
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Bundle Qty
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Total Defects
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Total Reject Garments
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Printed Reject Garments
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Print Details
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Status
+                    </th>
+                    <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
+                      Action
+                    </th>
+                  </>
+                ) : null}
               </tr>
             </thead>
+            {/* Table Body */}
             <tbody>
-              {defectCards.map((card) => (
-                <tr key={card.defect_id} className="hover:bg-gray-100">
-                  <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                    {card.factory}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                    {card.package_no}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                    {card.moNo}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                    {card.custStyle}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                    {card.color}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                    {card.size}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                    {card.repair}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                    {card.count_print}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                    {card.defects.map((defect) => (
-                      <div
-                        key={defect.defectName}
-                        className="flex justify-between text-sm"
+              {mode === "repair"
+                ? defectCards.map((card) => (
+                    <tr key={card.defect_id} className="hover:bg-gray-100">
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.factory || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.package_no || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.moNo || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.custStyle || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.color || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.size || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.repair || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.count_print || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.defects && Array.isArray(card.defects)
+                          ? card.defects.map((defect) => (
+                              <div
+                                key={defect.defectName}
+                                className="flex justify-between text-sm"
+                              >
+                                <span>{defect.defectName}:</span>
+                                <span>{defect.count}</span>
+                              </div>
+                            ))
+                          : "No defects"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        <button
+                          onClick={() => handlePreviewQR(card)}
+                          className="text-blue-500 hover:text-blue-700 mr-2"
+                        >
+                          <Eye className="inline" />
+                        </button>
+                        <button
+                          onClick={() => handlePrintQR(card)}
+                          disabled={printDisabled}
+                          className={`text-blue-500 hover:text-blue-700 ${
+                            printDisabled ? "opacity-50 cursor-not-allowed" : ""
+                          }`}
+                        >
+                          <Printer className="inline" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                : mode === "garment"
+                ? defectCards.map((card) =>
+                    (card.rejectGarments && card.rejectGarments.length > 0
+                      ? card.rejectGarments
+                      : []
+                    ).map((garment, idx) => (
+                      <tr
+                        key={`${card.bundle_id}-${garment.garment_defect_id}`}
+                        className="hover:bg-gray-100"
                       >
-                        <span>{defect.defectName}:</span>
-                        <span>{defect.count}</span>
-                      </div>
-                    ))}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                    <button
-                      onClick={() => handlePreviewQR(card)}
-                      className="text-blue-500 hover:text-blue-700 mr-2"
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          {card.package_no || "N/A"}
+                        </td>
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          {card.moNo || "N/A"}
+                        </td>
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          {card.custStyle || "N/A"}
+                        </td>
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          {card.color || "N/A"}
+                        </td>
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          {card.size || "N/A"}
+                        </td>
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          {garment.totalCount || "N/A"}
+                        </td>
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          {garment.defects && Array.isArray(garment.defects)
+                            ? garment.defects.map((defect) => (
+                                <div
+                                  key={defect.name}
+                                  className="flex justify-between text-sm"
+                                >
+                                  <span>{defect.name}:</span>
+                                  <span>{defect.count}</span>
+                                </div>
+                              ))
+                            : "No defects"}
+                        </td>
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          <button
+                            onClick={() =>
+                              handlePreviewQR({
+                                ...card,
+                                rejectGarments: [garment],
+                              })
+                            }
+                            className="text-blue-500 hover:text-blue-700 mr-2"
+                          >
+                            <Eye className="inline" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              handlePrintQR({
+                                ...card,
+                                rejectGarments: [garment],
+                              })
+                            }
+                            disabled={printDisabled}
+                            className={`text-blue-500 hover:text-blue-700 ${
+                              printDisabled
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }`}
+                          >
+                            <Printer className="inline" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )
+                : mode === "bundle"
+                ? defectCards.map((card) => (
+                    <tr
+                      key={card.defect_print_id}
+                      className="hover:bg-gray-100"
                     >
-                      <Eye className="inline" />
-                    </button>
-                    <button
-                      onClick={() => handlePrintQR(card)}
-                      disabled={printDisabled}
-                      className={`text-blue-500 hover:text-blue-700 ${
-                        printDisabled ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
-                    >
-                      <Printer className="inline" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.package_no || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.moNo || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.custStyle || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.color || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.size || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.checkedQty || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.defectQty || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.rejectGarmentsLength || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.totalRejectGarments === 0
+                          ? "0"
+                          : card.totalRejectGarments || "N/A"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {card.printData && Array.isArray(card.printData)
+                          ? card.printData.flatMap((garment) =>
+                              garment.defects &&
+                              Array.isArray(garment.defects) ? (
+                                garment.defects.map((defect) => (
+                                  <div
+                                    key={`${garment.garmentNumber}-${defect.name}`}
+                                    className="text-sm"
+                                  >
+                                    ({garment.garmentNumber}) {defect.name}:{" "}
+                                    {defect.count}
+                                  </div>
+                                ))
+                              ) : (
+                                <div
+                                  key={garment.garmentNumber}
+                                  className="text-sm"
+                                >
+                                  ({garment.garmentNumber}) No defects
+                                </div>
+                              )
+                            )
+                          : "No print data"}
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        <span
+                          className={`inline-block px-2 py-1 rounded-full text-white text-sm ${
+                            card.totalRejectGarments > 0
+                              ? "bg-yellow-500"
+                              : "bg-green-500"
+                          }`}
+                        >
+                          {card.totalRejectGarments > 0
+                            ? "In Progress"
+                            : "Completed"}
+                        </span>
+                      </td>
+                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        <button
+                          onClick={() => handlePreviewQR(card)}
+                          className="text-blue-500 hover:text-blue-700 mr-2"
+                        >
+                          <Eye className="inline" />
+                        </button>
+                        <button
+                          onClick={() => handlePrintQR(card)}
+                          disabled={printDisabled}
+                          className={`text-blue-500 hover:text-blue-700 ${
+                            printDisabled ? "opacity-50 cursor-not-allowed" : ""
+                          }`}
+                        >
+                          <Printer className="inline" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                : null}
             </tbody>
           </table>
         </div>
@@ -324,7 +834,14 @@ const DefectPrint = ({ bluetoothRef }) => {
         isOpen={showQRPreview}
         onClose={() => setShowQRPreview(false)}
         qrData={selectedCard ? [selectedCard] : []}
-        mode="inspection"
+        onPrint={handlePrintQR}
+        mode={
+          mode === "repair"
+            ? "inspection"
+            : mode === "garment"
+            ? "garment"
+            : "bundle"
+        }
       />
     </div>
   );
