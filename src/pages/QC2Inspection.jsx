@@ -248,6 +248,7 @@ const QC2InspectionPage = () => {
           size: data.size,
           lineNo: data.lineNo,
           department: data.department,
+          buyer: data.buyer,
           checkedQty: data.passQtyIron,
           totalPass: data.passQtyIron,
           totalRejects: 0,

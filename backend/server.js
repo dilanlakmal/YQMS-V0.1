@@ -1531,6 +1531,7 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
     size: { type: String, required: true }, // from bundleData.size
     lineNo: { type: String, required: true }, // from bundleData.lineNo
     department: { type: String, required: true }, // from bundleData.department
+    buyer: { type: String, required: false }, // from bundleData.buyer
     checkedQty: { type: Number, required: true }, // e.g. bundleData.count
     totalPass: { type: Number, required: true },
     totalRejects: { type: Number, required: true },
@@ -1617,10 +1618,10 @@ const QC2InspectionPassBundle = mongoose.model(
 
 // Socket.io connection handler
 io.on("connection", (socket) => {
-  console.log("A client connected:", socket.id);
+  //console.log("A client connected:", socket.id);
 
   socket.on("disconnect", () => {
-    console.log("A client disconnected:", socket.id);
+    //console.log("A client disconnected:", socket.id);
   });
 });
 
@@ -1636,6 +1637,7 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       size,
       lineNo,
       department,
+      buyer,
       checkedQty,
       totalPass,
       totalRejects,
@@ -1665,6 +1667,7 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       size,
       lineNo,
       department,
+      buyer: buyer || "N/A",
       checkedQty,
       totalPass,
       totalRejects,
@@ -1912,6 +1915,7 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
       color,
       size,
       department,
+      buyer, // Add buyer filter
     } = req.query;
     let match = {};
     if (moNo) {
@@ -1931,6 +1935,7 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     if (department) {
       match.department = department;
     }
+    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") }; // Add buyer match
     let exprConditions = [];
     if (startDate) {
       const [sm, sd, sy] = startDate.split("/");
@@ -2034,6 +2039,7 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
       color,
       size,
       department,
+      buyer, // Add buyer filter
     } = req.query;
     let match = {};
     if (moNo) {
@@ -2053,6 +2059,7 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
     if (department) {
       match.department = department;
     }
+    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") }; // Add buyer match
     let exprConditions = [];
     if (startDate) {
       const [sm, sd, sy] = startDate.split("/");
@@ -2139,6 +2146,7 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
       color,
       size,
       department,
+      buyer, // Add buyer filter
     } = req.query;
     let match = {};
     if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
@@ -2149,6 +2157,7 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
     if (color) match.color = color;
     if (size) match.size = size;
     if (department) match.department = department;
+    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") }; // Add buyer match
     let exprConditions = [];
     if (startDate) {
       const [sm, sd, sy] = startDate.split("/");
@@ -2192,6 +2201,9 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
           totalRejects: { $sum: "$totalRejects" },
           defectsQty: { $sum: "$defectQty" },
           totalBundles: { $sum: 1 },
+          defectiveBundles: {
+            $sum: { $cond: [{ $gt: ["$totalRepair", 0] }, 1, 0] },
+          }, // Count bundles with totalRepair > 0
           defectArray: { $push: "$defectArray" }, // Include defectArray
         },
       },
@@ -2203,6 +2215,7 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
           totalRejects: 1,
           defectsQty: 1,
           totalBundles: 1,
+          defectiveBundles: 1,
           defectArray: {
             $reduce: {
               input: "$defectArray",

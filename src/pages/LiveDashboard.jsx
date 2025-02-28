@@ -13,8 +13,9 @@ import {
   Archive,
   BarChart,
   CheckCircle,
-  Filter, // using Filter icon from lucide-react
+  Filter,
   List,
+  PackageX,
   PieChart,
   Table as TableIcon,
   TrendingDown,
@@ -22,9 +23,9 @@ import {
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { Bar } from "react-chartjs-2";
-import { io } from "socket.io-client"; // Import Socket.io client
+import { io } from "socket.io-client";
 import { API_BASE_URL } from "../../config";
-import DateSelector from "../components/forms/DateSelector"; // make sure this version does NOT render its own label
+import DateSelector from "../components/forms/DateSelector";
 import LiveStyleCard from "../components/inspection/LiveStyleCard";
 
 ChartJS.register(
@@ -38,10 +39,9 @@ ChartJS.register(
 );
 
 const LiveDashboard = () => {
-  // --- Tabs state ---
   const [activeTab, setActiveTab] = useState("QC2");
 
-  // --- Filter state (7 filters) ---
+  // Filter states (8 filters including buyer)
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [moNo, setMoNo] = useState("");
@@ -49,21 +49,20 @@ const LiveDashboard = () => {
   const [size, setSize] = useState("");
   const [department, setDepartment] = useState("");
   const [empId, setEmpId] = useState("");
+  const [buyer, setBuyer] = useState("");
 
-  // --- For showing/hiding filter pane ---
   const [showFilters, setShowFilters] = useState(true);
-
-  // --- Applied filters (to display as badges) ---
   const [appliedFilters, setAppliedFilters] = useState({});
 
-  // --- Options for suggestions/dropdowns ---
+  // Options for suggestions/dropdowns
   const [moNoOptions, setMoNoOptions] = useState([]);
   const [colorOptions, setColorOptions] = useState([]);
   const [sizeOptions, setSizeOptions] = useState([]);
   const [departmentOptions, setDepartmentOptions] = useState([]);
   const [empIdOptions, setEmpIdOptions] = useState([]);
+  const [buyerOptions, setBuyerOptions] = useState([]);
 
-  // --- Data states ---
+  // Data states
   const [summaryData, setSummaryData] = useState({
     checkedQty: 0,
     totalPass: 0,
@@ -74,15 +73,12 @@ const LiveDashboard = () => {
     defectRatio: 0,
   });
   const [defectRates, setDefectRates] = useState([]);
+  const [moSummaries, setMoSummaries] = useState([]);
   const [viewMode, setViewMode] = useState("chart");
-
-  //New State for MO No Data
-
-  const [moSummaries, setMoSummaries] = useState([]); // New state for MO No summaries
 
   const filtersRef = useRef({});
 
-  // --- Helper: Format Date to "MM/DD/YYYY" (ensure two-digit month/day) ---
+  // Format Date to "MM/DD/YYYY"
   const formatDate = (date) => {
     if (!date) return "";
     const month = ("0" + (date.getMonth() + 1)).slice(-2);
@@ -91,7 +87,7 @@ const LiveDashboard = () => {
     return `${month}/${day}/${year}`;
   };
 
-  // --- Fetch filter options from qc2-inspection-pass-bundle collection ---
+  // Fetch filter options from qc2-inspection-pass-bundle collection
   const fetchFilterOptions = async () => {
     try {
       const response = await axios.get(
@@ -123,12 +119,17 @@ const LiveDashboard = () => {
           new Set(data.map((item) => item.emp_id_inspection).filter(Boolean))
         ).sort()
       );
+      setBuyerOptions(
+        Array.from(
+          new Set(data.map((item) => item.buyer).filter(Boolean))
+        ).sort()
+      );
     } catch (error) {
       console.error("Error fetching filter options:", error);
     }
   };
 
-  // --- Fetch summary data with filters ---
+  // Fetch summary data with filters
   const fetchSummaryData = async (filters = {}) => {
     try {
       const response = await axios.get(
@@ -141,13 +142,12 @@ const LiveDashboard = () => {
     }
   };
 
-  // --- Fetch defect rates with filters ---
+  // Fetch defect rates with filters
   const fetchDefectRates = async (filters = {}) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/qc2-defect-rates`, {
         params: filters,
       });
-      // Sort by defect rate descending and calculate ranks
       const sorted = response.data.sort((a, b) => b.defectRate - a.defectRate);
       let rank = 1;
       let previousRate = null;
@@ -164,7 +164,7 @@ const LiveDashboard = () => {
     }
   };
 
-  //Fetch MO No Summaries
+  // Fetch MO No Summaries
   const fetchMoSummaries = async (filters = {}) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/qc2-mo-summaries`, {
@@ -176,8 +176,8 @@ const LiveDashboard = () => {
     }
   };
 
-  // --- Apply and Reset Filters ---
-  const handleApplyFilters = () => {
+  // Apply Filters
+  const handleApplyFilters = async () => {
     const filters = {};
     if (moNo) filters.moNo = moNo;
     if (color) filters.color = color;
@@ -186,7 +186,8 @@ const LiveDashboard = () => {
     if (empId) filters.emp_id_inspection = empId;
     if (startDate) filters.startDate = formatDate(startDate);
     if (endDate) filters.endDate = formatDate(endDate);
-    // Save applied filters for badge display
+    if (buyer) filters.buyer = buyer;
+
     const applied = {};
     if (startDate) applied["Start Date"] = formatDate(startDate);
     if (endDate) applied["End Date"] = formatDate(endDate);
@@ -195,13 +196,22 @@ const LiveDashboard = () => {
     if (size) applied["Size"] = size;
     if (department) applied["Department"] = department;
     if (empId) applied["Emp ID"] = empId;
+    if (buyer) applied["Buyer"] = buyer;
+
+    // Update applied filters and fetch all data with the filters
     setAppliedFilters(applied);
-    fetchSummaryData(filters);
-    fetchDefectRates(filters);
-    fetchMoSummaries(filters); // Add this line
+    filtersRef.current = filters; // Ensure filtersRef is updated immediately
+
+    // Fetch all data with the applied filters
+    await Promise.all([
+      fetchSummaryData(filters),
+      fetchDefectRates(filters),
+      fetchMoSummaries(filters),
+    ]);
   };
 
-  const handleResetFilters = () => {
+  // Reset Filters
+  const handleResetFilters = async () => {
     setStartDate(null);
     setEndDate(null);
     setMoNo("");
@@ -209,78 +219,83 @@ const LiveDashboard = () => {
     setSize("");
     setDepartment("");
     setEmpId("");
+    setBuyer("");
     setAppliedFilters({});
-    fetchSummaryData();
-    fetchDefectRates();
-    fetchMoSummaries(); // Add this line
+    filtersRef.current = {}; // Reset filtersRef
+
+    // Fetch all data without filters
+    await Promise.all([
+      fetchSummaryData(),
+      fetchDefectRates(),
+      fetchMoSummaries(),
+    ]);
   };
 
+  // Initial data fetch
   useEffect(() => {
-    // Initial fetch of options and data
-    fetchFilterOptions();
-    fetchSummaryData();
-    fetchDefectRates();
-    fetchMoSummaries(); // Add this line
+    const fetchInitialData = async () => {
+      await fetchFilterOptions();
+      await Promise.all([
+        fetchSummaryData(),
+        fetchDefectRates(),
+        fetchMoSummaries(),
+      ]);
+    };
+    fetchInitialData();
 
-    const intervalId = setInterval(() => {
+    const intervalId = setInterval(async () => {
       const currentFilters = filtersRef.current;
-      fetchSummaryData(currentFilters);
-      fetchDefectRates(currentFilters);
-      fetchMoSummaries(currentFilters); // Add this line
+      await Promise.all([
+        fetchSummaryData(currentFilters),
+        fetchDefectRates(currentFilters),
+        fetchMoSummaries(currentFilters),
+      ]);
     }, 5000);
 
     return () => clearInterval(intervalId);
   }, []);
 
-  // Update ref when filter states change
+  // Update filtersRef when filter states change
   useEffect(() => {
     filtersRef.current = {
       moNo,
       color,
       size,
       department,
-      empId,
+      emp_id_inspection: empId,
       startDate: startDate ? formatDate(startDate) : null,
       endDate: endDate ? formatDate(endDate) : null,
+      buyer,
     };
-  }, [moNo, color, size, department, empId, startDate, endDate]);
+  }, [moNo, color, size, department, empId, startDate, endDate, buyer]);
 
   // Socket.io connection
   useEffect(() => {
-    const socket = io(`${{ API_BASE_URL }}`, {
+    const socket = io(`${API_BASE_URL}`, {
       path: "/socket.io",
       transports: ["websocket"],
     });
 
-    socket.on("qc2_data_updated", () => {
+    socket.on("qc2_data_updated", async () => {
       console.log("Data updated event received");
       const currentFilters = filtersRef.current;
-
-      const filters = {
-        moNo: currentFilters.moNo,
-        color: currentFilters.color,
-        size: currentFilters.size,
-        department: currentFilters.department,
-        emp_id_inspection: currentFilters.empId,
-        startDate: currentFilters.startDate,
-        endDate: currentFilters.endDate,
-      };
-
-      fetchSummaryData(filters);
-      fetchDefectRates(filters);
-      fetchMoSummaries(filters); // Add this line
+      await Promise.all([
+        fetchSummaryData(currentFilters),
+        fetchDefectRates(currentFilters),
+        fetchMoSummaries(currentFilters),
+      ]);
     });
 
     return () => socket.disconnect();
   }, []);
 
-  // --- Calculate dynamic max defect rate for Y axis ---
+  // Calculate dynamic max defect rate for Y axis
   const maxDefectRateValue =
     defectRates.length > 0
       ? Math.max(...defectRates.map((item) => item.defectRate * 100)) + 2
       : 10;
 
-  // --- Chart data and options (with datalabels on top) ---
+  // Chart data and options
   const chartData = {
     labels: defectRates.map((item) => item.defectName),
     datasets: [
@@ -372,7 +387,7 @@ const LiveDashboard = () => {
             Live Dashboard
           </h1>
 
-          {/* Filter Pane Header with Filter Icon and Toggle */}
+          {/* Filter Pane Header */}
           <div className="flex items-center justify-between bg-white p-2 rounded-lg shadow mb-2">
             <div className="flex items-center space-x-2">
               <Filter className="text-blue-500" size={20} />
@@ -386,7 +401,7 @@ const LiveDashboard = () => {
             </button>
           </div>
 
-          {/* Filter Pane (only shown when expanded) */}
+          {/* Filter Pane */}
           {showFilters && (
             <div className="bg-white p-4 rounded-lg shadow mb-6">
               {/* First row: 5 filters */}
@@ -469,7 +484,7 @@ const LiveDashboard = () => {
                   </select>
                 </div>
               </div>
-              {/* Second row: 2 filters */}
+              {/* Second row: 3 filters (including buyer) */}
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mt-4">
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-gray-700 mb-1">
@@ -511,8 +526,25 @@ const LiveDashboard = () => {
                       ))}
                   </datalist>
                 </div>
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-gray-700 mb-1">
+                    Buyer
+                  </label>
+                  <select
+                    value={buyer}
+                    onChange={(e) => setBuyer(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="">Select Buyer</option>
+                    {buyerOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              {/* Apply / Reset buttons (only shown when filter pane is expanded) */}
+              {/* Apply / Reset buttons */}
               <div className="flex justify-end mt-4 space-x-2">
                 <button
                   onClick={handleApplyFilters}
@@ -530,7 +562,7 @@ const LiveDashboard = () => {
             </div>
           )}
 
-          {/* Display Applied Filters (if any) as badges */}
+          {/* Display Applied Filters */}
           {Object.keys(appliedFilters).length > 0 && (
             <div className="mb-4">
               <h3 className="text-sm font-medium text-gray-700 mb-2">
@@ -606,23 +638,59 @@ const LiveDashboard = () => {
               </div>
               <Archive className="text-blue-500 text-3xl" />
             </div>
-            <div className="p-6 bg-white shadow-md rounded-lg flex items-center justify-between">
+
+            {/* Defect Rate Card */}
+            <div
+              className={`p-6 shadow-md rounded-lg flex items-center justify-between ${
+                summaryData.defectRate * 100 > 3
+                  ? "bg-red-200"
+                  : summaryData.defectRate * 100 >= 2
+                  ? "bg-yellow-200"
+                  : "bg-green-200"
+              }`}
+            >
               <div>
                 <h2 className="text-lg font-semibold text-gray-700">
                   Defect Rate
                 </h2>
-                <p className="text-2xl font-bold text-gray-900">
+                <p
+                  className={`text-2xl font-bold ${
+                    summaryData.defectRate * 100 > 3
+                      ? "text-red-800"
+                      : summaryData.defectRate * 100 >= 2
+                      ? "text-orange-800"
+                      : "text-green-800"
+                  }`}
+                >
                   {(summaryData.defectRate * 100).toFixed(2)}%
                 </p>
               </div>
               <PieChart className="text-purple-500 text-3xl" />
             </div>
-            <div className="p-6 bg-white shadow-md rounded-lg flex items-center justify-between">
+
+            {/* Defect Ratio Card */}
+            <div
+              className={`p-6 shadow-md rounded-lg flex items-center justify-between ${
+                summaryData.defectRatio * 100 > 3
+                  ? "bg-red-300"
+                  : summaryData.defectRatio * 100 >= 2
+                  ? "bg-yellow-300"
+                  : "bg-green-300"
+              }`}
+            >
               <div>
                 <h2 className="text-lg font-semibold text-gray-700">
                   Defect Ratio
                 </h2>
-                <p className="text-2xl font-bold text-gray-900">
+                <p
+                  className={`text-2xl font-bold ${
+                    summaryData.defectRatio * 100 > 3
+                      ? "text-red-800"
+                      : summaryData.defectRatio * 100 >= 2
+                      ? "text-orange-800"
+                      : "text-green-800"
+                  }`}
+                >
                   {(summaryData.defectRatio * 100).toFixed(2)}%
                 </p>
               </div>
@@ -630,47 +698,31 @@ const LiveDashboard = () => {
             </div>
           </div>
 
-          {/* New MO No Cards Section */}
+          {/* MO No Cards Section */}
           <div className="mt-6">
             <h2 className="text-sm font-medium text-gray-900 mb-2">
               MO No Summaries
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {moSummaries.map((summary) => (
-                <LiveStyleCard
-                  key={summary.moNo}
-                  moNo={summary.moNo}
-                  summaryData={summary}
-                />
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] gap-4">
+              {moSummaries
+                .sort((a, b) => b.defectRate - a.defectRate)
+                .map((summary) => (
+                  <LiveStyleCard
+                    key={summary.moNo}
+                    moNo={summary.moNo}
+                    summaryData={summary}
+                  />
+                ))}
             </div>
           </div>
-          {/* <div className="mt-6">
-            <h2 className="text-sm font-medium text-gray-900 mb-2">
-              MO No Summaries
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {moSummaries.map((summary) => (
-                <LiveStyleCard
-                  key={summary.moNo}
-                  moNo={summary.moNo}
-                  summaryData={summary}
-                  defectRates={defectRates.filter(
-                    (rate) => rate.moNo === summary.moNo
-                  )}
-                />
-              ))}
-            </div>
-          </div> */}
 
-          {/* Chart/Table Toggle Section with Title */}
+          {/* Chart/Table Toggle Section */}
           <div className="mb-4">
             <h2 className="text-sm font-medium text-gray-900 mb-2">
-              QC2 Defect rate by Defect Name
+              QC2 Defect Rate by Defect Name
             </h2>
           </div>
 
-          {/* Toggle between Chart and Table for Defect Rates */}
           <div className="bg-white shadow-md rounded-lg p-6 overflow-auto">
             <div className="flex justify-end mb-4">
               <button
@@ -739,14 +791,12 @@ const LiveDashboard = () => {
                         </td>
                         <td className="py-2 px-4 border-b border-gray-200 block md:table-cell">
                           {item.defectRate * 100 > 5 ? (
-                            <span className="text-red-500 animate-ping">
-                              &#x25CF;
-                            </span>
+                            <span className="text-red-500 animate-ping">●</span>
                           ) : item.defectRate * 100 >= 1 &&
                             item.defectRate * 100 <= 5 ? (
-                            <span className="text-orange-500">&#x25CF;</span>
+                            <span className="text-orange-500">●</span>
                           ) : (
-                            <span className="text-green-500">&#x25CF;</span>
+                            <span className="text-green-500">●</span>
                           )}
                         </td>
                       </tr>
