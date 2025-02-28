@@ -7,6 +7,7 @@ import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
 import { useFormData } from "../components/context/FormDataContext";
 import BluetoothComponent from "../components/forms/Bluetooth";
+import EditModal from "../components/forms/EditBundleData";
 import MonoSearch from "../components/forms/MonoSearch";
 import NumLetterPad from "../components/forms/NumLetterPad";
 import NumberPad from "../components/forms/NumberPad";
@@ -14,7 +15,6 @@ import QRCodePreview from "../components/forms/QRCodePreview";
 import ReprintTab from "../components/forms/ReprintTab";
 import SubConSelection from "../components/forms/SubConSelection";
 import { useTranslation } from 'react-i18next';
-import EditModal from "../components/forms/EditBundleData";
 
 function BundleRegistration() {
   const { t } = useTranslation();

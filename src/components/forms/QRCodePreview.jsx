@@ -1,7 +1,6 @@
 import { Dialog, Transition } from "@headlessui/react";
 import { QRCodeSVG } from "qrcode.react";
 import { Fragment } from "react";
-import { useTranslation } from "react-i18next";
 
 export default function QRCodePreview({
   isOpen,
@@ -10,21 +9,20 @@ export default function QRCodePreview({
   onPrint,
   mode = "inspection",
 }) {
-  const {t} = useTranslation();
   const data = Array.isArray(qrData) ? qrData : [];
 
   // Debugging logs to inspect data
   // console.log("QRCodePreview Data:", data);
   // data.forEach((item, index) => {
-  //   // console.log(`Item ${index}:`, item);
-  //   // console.log(
-  //   //   `Item ${index} defects source:`,
-  //   //   mode === "inspection"
-  //   //     ? item.defects
-  //   //     : mode === "garment"
-  //   //     ? item.rejectGarments?.[0]?.defects
-  //   //     : item.defects || item.printData
-  //   // );
+    // console.log(`Item ${index}:`, item);
+    // console.log(
+    //   `Item ${index} defects source:`,
+    //   mode === "inspection"
+    //     ? item.defects
+    //     : mode === "garment"
+    //     ? item.rejectGarments?.[0]?.defects
+    //     : item.defects || item.printData
+    // );
   // });
 
   const handlePrint = async () => {
@@ -115,28 +113,28 @@ export default function QRCodePreview({
                     >
                       <div className="grid grid-cols-2 gap-2">
                         <p>
-                          <strong>{t("bundle.mono")}:</strong>{" "}
+                          <strong>MO No:</strong>{" "}
                           {item.moNo || item.selectedMono || "N/A"}
                         </p>
                         <p>
-                          <strong>{t("bundle.color")}:</strong> {item.color || "N/A"}
+                          <strong>Color:</strong> {item.color || "N/A"}
                         </p>
                         <p>
-                          <strong>{t("bundle.size")}:</strong> {item.size || "N/A"}
+                          <strong>Size:</strong> {item.size || "N/A"}
                         </p>
                         {mode === "inspection" ? (
                           <>
                             <p>
-                              <strong>{t("qrCodePrev.repair")}:</strong> {item.repair || "N/A"}
+                              <strong>Repair:</strong> {item.repair || "N/A"}
                             </p>
                             <p>
-                              <strong>{t("bundle.count")}:</strong>{" "}
+                              <strong>Count:</strong>{" "}
                               {item.count_print || item.count || "N/A"}
                             </p>
                           </>
                         ) : mode === "garment" ? (
                           <p>
-                            <strong>{t("bundle.count")}:</strong>{" "}
+                            <strong>Count:</strong>{" "}
                             {item.rejectGarments?.[0]?.totalCount ||
                               item.count ||
                               "N/A"}
@@ -144,7 +142,7 @@ export default function QRCodePreview({
                         ) : mode === "bundle" ? (
                           <>
                             <p>
-                              <strong>{t("bundle.bundle_qty")}:</strong>{" "}
+                              <strong>Bundle Qty:</strong>{" "}
                               {item.bundleQty || item.checkedQty || "N/A"}
                             </p>
                             <p>
@@ -253,14 +251,14 @@ export default function QRCodePreview({
                     className="inline-flex justify-center rounded-md border border-transparent bg-green-100 px-4 py-2 text-sm font-medium text-green-900 hover:bg-green-200"
                     onClick={handlePrint}
                   >
-                    {t("qrCodePrev.print")}
+                    Print
                   </button>
                   <button
                     type="button"
                     className="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200"
                     onClick={onClose}
                   >
-                   {t("previewMode.close")}
+                    Close
                   </button>
                 </div>
               </Dialog.Panel>

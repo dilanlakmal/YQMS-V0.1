@@ -25,7 +25,7 @@ import axios from 'axios';
 //import createRoleManagmentModel from "./models/RoleManagment.js";
 import createRoleManagmentModel from "./models/RoleManagment.js";
 import createQC2InspectionPassBundle from "./models/qc2_inspection_pass_bundle.js";
-
+import createQC2DefectPrintModel from "./models/QC2DefectPrint.js";
 
 /* ------------------------------
    Connection String
@@ -103,6 +103,7 @@ const Packing = createPackingModel(ymProdConnection);
 const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
 const RoleManagment = createRoleManagmentModel(ymProdConnection);
 const QC2InspectionPassBundle = createQC2InspectionPassBundle(ymProdConnection);
+const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
 
 //-----------------------------END DATABASE CONNECTIONS------------------------------------------------//
 
@@ -461,6 +462,13 @@ app.post("/api/save-bundle-data", async (req, res) => {
 
     // Save each bundle record
     for (const bundle of bundleData) {
+
+      const packageCount = await QC2OrderData.countDocuments({
+        selectedMono: bundle.selectedMono,
+        //color: bundle.color,
+        //size: bundle.size,
+      });
+
       const randomId = await generateRandomId();
 
       const now = new Date();
@@ -481,6 +489,7 @@ app.post("/api/save-bundle-data", async (req, res) => {
 
       const newBundle = new QC2OrderData({
         ...bundle,
+        package_no: packageCount + 1,
         bundle_random_id: randomId,
         factory: bundle.factory || "N/A", // Handle null factory
         custStyle: bundle.custStyle || "N/A", // Handle null custStyle
@@ -549,6 +558,104 @@ app.get("/api/user-batches", async (req, res) => {
     res.json(batches);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch user batches" });
+  }
+});
+
+// //For Data tab display records in a table
+// app.get("/api/user-batches", async (req, res) => {
+//   try {
+//     const { emp_id } = req.query;
+//     if (!emp_id) {
+//       return res.status(400).json({ message: "emp_id is required" });
+//     }
+//     const batches = await QC2OrderData.find({ emp_id });
+//     res.json(batches);
+//   } catch (error) {
+//     res.status(500).json({ message: "Failed to fetch user batches" });
+//   }
+// });
+
+
+/* ------------------------------
+   End Points - Reprint - qc2 orders
+------------------------------ */
+
+// Reprint endpoints
+app.get("/api/reprint-search-mono", async (req, res) => {
+  try {
+    const digits = req.query.digits;
+    const results = await QC2OrderData.aggregate([
+      {
+        $match: {
+          selectedMono: { $regex: `${digits}$` },
+        },
+      },
+      {
+        $group: {
+          _id: "$selectedMono",
+          count: { $sum: 1 },
+        },
+      },
+      { $limit: 100 },
+    ]);
+
+    res.json(results.map((r) => r._id));
+  } catch (error) {
+    res.status(500).json({ error: "Failed to search MONo" });
+  }
+});
+
+app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
+  try {
+    const mono = req.params.mono;
+    const result = await QC2OrderData.aggregate([
+      { $match: { selectedMono: mono } },
+      {
+        $group: {
+          _id: {
+            color: "$color",
+            size: "$size",
+          },
+          colorCode: { $first: "$colorCode" },
+          chnColor: { $first: "$chnColor" },
+          package_no: { $first: "$package_no" }, // Add this line
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.color",
+          sizes: { $push: "$_id.size" },
+          colorCode: { $first: "$colorCode" },
+          chnColor: { $first: "$chnColor" },
+        },
+      },
+    ]);
+
+    const colors = result.map((c) => ({
+      color: c._id,
+      sizes: c.sizes,
+      colorCode: c.colorCode,
+      chnColor: c.chnColor,
+    }));
+
+    res.json(colors);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch colors/sizes" });
+  }
+});
+
+app.get("/api/reprint-records", async (req, res) => {
+  try {
+    const { mono, color, size } = req.query;
+    const records = await QC2OrderData.find({
+      selectedMono: mono,
+      color: color,
+      size: size,
+    }).sort({ package_no: 1 });
+
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch records" });
   }
 });
 
@@ -1482,19 +1589,29 @@ app.get("/api/download-data", async (req, res) => {
    QC2 - Inspection Pass Bundle, Reworks
 ------------------------------ */
 
-// Schema for qc2_inspection_pass_bundle with header fields as separate fields
+
+// Socket.io connection handler
+io.on("connection", (socket) => {
+  //console.log("A client connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    //console.log("A client disconnected:", socket.id);
+  });
+});
 
 // Endpoint to save inspection pass bundle data
 app.post("/api/inspection-pass-bundle", async (req, res) => {
   try {
     const {
-      bundleNo,
+      package_no,
+      // bundleNo,
       moNo,
       custStyle,
       color,
       size,
       lineNo,
       department,
+      buyer,
       checkedQty,
       totalPass,
       totalRejects,
@@ -1516,13 +1633,15 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
     } = req.body;
 
     const newRecord = new QC2InspectionPassBundle({
-      bundleNo,
+      package_no,
+      //bundleNo,
       moNo,
       custStyle,
       color,
       size,
       lineNo,
       department,
+      buyer: buyer || "N/A",
       checkedQty,
       totalPass,
       totalRejects,
@@ -1755,6 +1874,11 @@ app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
   }
 });
 
+// Helper function to escape special characters in regex
+const escapeRegExp = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // Escapes . * + ? ^ $ { } ( ) | [ ] \
+};
+
 // Endpoint to get summary data
 app.get("/api/qc2-inspection-summary", async (req, res) => {
   try {
@@ -1766,6 +1890,7 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
       color,
       size,
       department,
+      buyer, // Add buyer filter
     } = req.query;
     let match = {};
     if (moNo) {
@@ -1785,6 +1910,8 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     if (department) {
       match.department = department;
     }
+    if (buyer)
+      match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
     let exprConditions = [];
     if (startDate) {
       const [sm, sd, sy] = startDate.split("/");
@@ -1888,6 +2015,7 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
       color,
       size,
       department,
+      buyer, // Add buyer filter
     } = req.query;
     let match = {};
     if (moNo) {
@@ -1907,6 +2035,8 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
     if (department) {
       match.department = department;
     }
+    if (buyer)
+      match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
     let exprConditions = [];
     if (startDate) {
       const [sm, sd, sy] = startDate.split("/");
@@ -1987,7 +2117,8 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
 app.post("/api/reworks", async (req, res) => {
   try {
     const {
-      bundleNo,
+      package_no,
+      // bundleNo,
       moNo,
       custStyle,
       color,
@@ -1998,7 +2129,8 @@ app.post("/api/reworks", async (req, res) => {
     } = req.body;
 
     const newRecord = new QC2Reworks({
-      bundleNo,
+      package_no,
+      //bundleNo,
       moNo,
       custStyle,
       color,
@@ -2021,7 +2153,144 @@ app.post("/api/reworks", async (req, res) => {
   }
 });
 
+/* ------------------------------
+   QC2 - Defect Print
+------------------------------ */
 
+// Create new defect print record
+app.post("/api/qc2-defect-print", async (req, res) => {
+  try {
+    const {
+      factory,
+      package_no,
+      moNo,
+      custStyle,
+      color,
+      size,
+      repair,
+      count,
+      count_print,
+      defects,
+      defect_id,
+      emp_id_inspection,
+      eng_name_inspection,
+      kh_name_inspection,
+      job_title_inspection,
+      dept_name_inspection,
+      sect_name_inspection,
+      bundle_id,
+      bundle_random_id,
+    } = req.body;
+
+    const now = new Date();
+    const print_time = now.toLocaleTimeString("en-US", { hour12: false });
+
+    const defectPrint = new QC2DefectPrint({
+      factory,
+      package_no,
+      moNo,
+      custStyle,
+      color,
+      size,
+      repair,
+      count,
+      count_print,
+      defects,
+      print_time,
+      defect_id,
+      emp_id_inspection,
+      eng_name_inspection,
+      kh_name_inspection,
+      job_title_inspection,
+      dept_name_inspection,
+      sect_name_inspection,
+      bundle_id,
+      bundle_random_id,
+    });
+
+    const savedDefectPrint = await defectPrint.save();
+    res.json(savedDefectPrint);
+  } catch (error) {
+    console.error("Error creating defect print record:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Search defect print records
+app.get("/api/qc2-defect-print/search", async (req, res) => {
+  try {
+    const { moNo, package_no, repair } = req.query;
+    const query = {};
+
+    // Build the query object based on provided parameters
+    if (moNo) {
+      query.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    }
+
+    if (package_no) {
+      const packageNoNumber = Number(package_no);
+      if (isNaN(packageNoNumber)) {
+        return res.status(400).json({ error: "Package No must be a number" });
+      }
+      query.package_no = packageNoNumber;
+    }
+
+    if (repair) {
+      query.repair = { $regex: new RegExp(repair.trim(), "i") };
+    }
+
+    // Execute the search query
+    const defectPrints = await QC2DefectPrint.find(query).sort({
+      createdAt: -1,
+    });
+
+    // Return empty array if no results found
+    if (!defectPrints || defectPrints.length === 0) {
+      return res.json([]);
+    }
+
+    res.json(defectPrints);
+  } catch (error) {
+    console.error("Error searching defect print records:", error);
+    res.status(500).json({
+      error: "Failed to search defect cards",
+      details: error.message,
+    });
+  }
+});
+
+// Fetch all defect print records
+app.get("/api/qc2-defect-print", async (req, res) => {
+  try {
+    const defectPrints = await QC2DefectPrint.find().sort({ createdAt: -1 });
+
+    if (!defectPrints || defectPrints.length === 0) {
+      return res.json([]);
+    }
+
+    res.json(defectPrints);
+  } catch (error) {
+    console.error("Error fetching defect print records:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get defect print records by defect_id
+app.get("/api/qc2-defect-print/:defect_id", async (req, res) => {
+  try {
+    const { defect_id } = req.params;
+    const defectPrint = await QC2DefectPrint.findOne({ defect_id });
+
+    if (!defectPrint) {
+      return res.status(404).json({ error: "Defect print record not found" });
+    }
+
+    res.json(defectPrint);
+  } catch (error) {
+    console.error("Error fetching defect print record:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 /* ------------------------------
    User Management old ENDPOINTS

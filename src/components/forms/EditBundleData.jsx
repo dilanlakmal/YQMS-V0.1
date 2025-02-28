@@ -28,16 +28,16 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
 
   const fetchSizes = async (selectedMono) => {
     try {
-      console.log(`Fetching sizes for styleNo: ${selectedMono}`); // Log the selectedMono
+      // console.log(`Fetching sizes for styleNo: ${selectedMono}`); // Log the selectedMono
       const response = await fetch(`${API_BASE_URL}/api/sizes?styleNo=${selectedMono}`);
-      console.log('Sizes API Response:', response); // Log the full response
+      // console.log('Sizes API Response:', response); // Log the full response
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Failed to fetch sizes:', errorText);
+        // console.error('Failed to fetch sizes:', errorText);
         throw new Error('Failed to fetch sizes');
       }
       const data = await response.json();
-      console.log('Sizes Data:', data); // Log the data
+      // console.log('Sizes Data:', data); // Log the data
       return data.sizes;
     } catch (error) {
       console.error('Error fetching sizes:', error);
@@ -47,16 +47,16 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
 
   const fetchColors = async (selectedMono) => {
     try {
-      console.log(`Fetching colors for styleNo: ${selectedMono}`); // Log the selectedMono
+      // console.log(`Fetching colors for styleNo: ${selectedMono}`); // Log the selectedMono
       const response = await fetch(`${API_BASE_URL}/api/colors?styleNo=${selectedMono}`);
-      console.log('Colors API Response:', response); // Log the full response
+      // console.log('Colors API Response:', response); // Log the full response
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Failed to fetch colors:', errorText);
+        // console.error('Failed to fetch colors:', errorText);
         throw new Error('Failed to fetch colors');
       }
       const data = await response.json();
-      console.log('Colors Data:', data); // Log the data
+      // console.log('Colors Data:', data); // Log the data
       return data.colors;
     } catch (error) {
       console.error('Error fetching colors:', error);

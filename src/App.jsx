@@ -26,6 +26,9 @@ import Return from "./pages/QC Inspection/Return";
 import Setting from "./pages/Setting";
 import WashingPage from "./pages/Washing";
 
+//Languages
+import "../src/lang/i18n";
+
 // Authentication components
 import UserList from "./components/users/userList";
 import ForgotPassword from "./pages/Auth/ForgotPassword";
