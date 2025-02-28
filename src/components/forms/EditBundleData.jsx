@@ -107,8 +107,8 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-5xl">
+    <div className="fixed inset-0 w-auto h-auto bg-black bg-opacity-50 flex items-center justify-center">
+      <div className="bg-white p-6 rounded-lg shadow-lg w-auto h-auto max-w-auto">
         <h2 className="text-2xl font-bold mb-4">{t("editBundle.edit_record")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-6">
           <div className="mb-6 p-4 bg-blue-50 rounded-md">

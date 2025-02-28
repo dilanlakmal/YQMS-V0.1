@@ -1,5 +1,5 @@
 import { AlertCircle, Bluetooth, Printer } from "lucide-react";
-import React, { forwardRef, useImperativeHandle, useState } from "react";
+import React, { forwardRef, useImperativeHandle, useState , useEffect} from "react";
 
 const PRINTER_CONFIG = {
   gainscha: {
@@ -21,6 +21,8 @@ const BluetoothComponent = forwardRef((props, ref) => {
     characteristic: null,
     counter: 1,
   });
+
+  const [showStatus, setShowStatus] = useState(false);
 
   useImperativeHandle(ref, () => ({
     isConnected: state.isConnected,
@@ -47,20 +49,25 @@ const BluetoothComponent = forwardRef((props, ref) => {
         isScanning: true,
         connectionStatus: "Scanning for devices...",
       });
+      setShowStatus(true);
+
       const device = await navigator.bluetooth.requestDevice({
         filters: [{ namePrefix: "GP-" }],
         optionalServices: [PRINTER_CONFIG.gainscha.serviceUUID],
       });
       const printerType = detectPrinterType(device.name);
       if (!printerType) throw new Error("Unsupported printer");
+
       updateState({
         connectionStatus: `Connecting to ${printerType} printer...`,
         printerType,
       });
+
       const server = await device.gatt.connect();
       const { serviceUUID, writeUUID } = PRINTER_CONFIG[printerType];
       const service = await server.getPrimaryService(serviceUUID);
       const characteristic = await service.getCharacteristic(writeUUID);
+      
       device.addEventListener("gattserverdisconnected", handleDisconnect);
       updateState({
         isConnected: true,
@@ -69,6 +76,8 @@ const BluetoothComponent = forwardRef((props, ref) => {
         characteristic,
         connectionStatus: `Connected to ${device.name}`,
       });
+
+      setShowStatus(true);
     } catch (error) {
       console.error("Bluetooth Error:", error);
       handleDisconnect(error.message);
@@ -84,7 +93,18 @@ const BluetoothComponent = forwardRef((props, ref) => {
       characteristic: null,
       connectionStatus: errorMessage,
     });
+    setShowStatus(true);
   };
+
+  useEffect(() => {
+    if (showStatus) {
+      const timer = setTimeout(() => {
+        setShowStatus(false);
+      }, 3000); // Hide after 3 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [showStatus]);
 
   const sendChunkedData = async (data) => {
     const { characteristic } = state;
@@ -320,6 +340,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
     }
   };
 
+
   return (
     <div className="relative">
       <button
@@ -328,22 +349,22 @@ const BluetoothComponent = forwardRef((props, ref) => {
         }
         className={`p-2 rounded-full transition-colors flex items-center gap-2 ${
           state.isConnected
-            ? "bg-green-100 text-green-600"
-            : "bg-gray-100 text-gray-400"
+            ? 'bg-green-100 text-green-600'
+            : 'bg-gray-100 text-gray-400'
         }`}
         disabled={state.isScanning}
       >
         <Bluetooth
-          className={`w-5 h-5 ${state.isScanning ? "animate-pulse" : ""}`}
+          className={`w-5 h-5 ${state.isScanning ? 'animate-pulse' : ''}`}
         />
         <Printer className="w-5 h-5" />
       </button>
-      {state.connectionStatus && (
+      {showStatus && state.connectionStatus && (
         <div
           className={`absolute top-full mt-2 w-64 p-2 rounded-md shadow-lg z-50 text-sm ${
             state.isConnected
-              ? "bg-green-50 text-green-700"
-              : "bg-white text-gray-700"
+              ? 'bg-green-50 text-green-700'
+              : 'bg-white text-gray-700'
           }`}
         >
           <div className="flex items-center gap-2">

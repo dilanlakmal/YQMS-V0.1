@@ -270,17 +270,12 @@ app.get("/api/order-details/:mono", async (req, res) => {
 app.get("/api/order-sizes/:mono/:color", async (req, res) => {
   try {
     const collection = ymProdConnection.db.collection("dt_orders");
-    
     const order = await collection.findOne({ Order_No: req.params.mono });
-
-    if (!order) return res.status(404).json({ error: "Order not found" });s
-
+    if (!order) return res.status(404).json({ error: "Order not found" });
     const colorObj = order.OrderColors.find(
       (c) => c.Color.toLowerCase() === req.params.color.toLowerCase().trim()
     );
-
     if (!colorObj) return res.json([]);
-
     const sizesWithDetails = colorObj.OrderQty.filter(
       (entry) => entry[Object.keys(entry)[0]] > 0
     )
