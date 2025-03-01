@@ -448,16 +448,18 @@ export default function Navbar({ onLogout }) {
 
       {/* Mobile menu */}
       {isMobileMenuOpen && (
-        <div className="sm:hidden">
+        <div className="sm:hidden w-full fixed h-1/2 bg-white z-50">
           <div className="px-2 pt-2 pb-3 ">
             {navItems.map((section) => (
               <div key={section.title}>
                 <div
-                  className="flex items-center justify-between px-4 py-1 text-base font-medium text-gray-700"
+                  className="flex items-center justify-between px-4 py-1 text-sm text-base font-medium text-gray-700"
                   onClick={() => handleSectionClick(section.title)}
                 >
-                  {section.icon}
-                  {section.title}
+                   <div className="flex items-center gap-1">
+                      {section.icon}
+                      {section.title}
+                    </div>
                   <ChevronRight
                     className={`h-4 w-4 transition-transform ${
                       expandedSection === section.title ? "rotate-90" : ""
@@ -471,7 +473,7 @@ export default function Navbar({ onLogout }) {
                       return (
                         <div
                           key={item.path}
-                          className={`block pl-4 pr-4 py-2 text-base font-medium ${
+                          className={`flex pl-4 pr-4 py-2 text-sm text-base font-medium ${
                             accessible
                               ? "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
                               : "text-gray-400 cursor-not-allowed"
@@ -488,14 +490,14 @@ export default function Navbar({ onLogout }) {
                 )}
               </div>
             ))}
-
+            
             <div className="flex items-center space-x-3 mr-3">
               <LanguageSwitcher />
             </div>
 
             {isAllowedSuperAdmin && (
               <div
-                className="block pl-4 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                className="flex pl-4 pr-4 py-2 text-base font-medium text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-50"
                 onClick={() => handleSubLinkClick("/settings")}
               >
                 <Settings className="h-4 w-4 mr-2" />
@@ -506,14 +508,14 @@ export default function Navbar({ onLogout }) {
             {showRoleManagement && (
               <>
                 <div
-                  className="block pl-4 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                  className="flex pl-4 pr-4 py-2 text-base text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
                   onClick={() => handleSubLinkClick("/role-management")}
                 >
                   <LayoutDashboard className="h-4 w-4 mr-2" />
                   Role Management
                 </div>
                 <div
-                  className="block pl-4 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                  className="flex pl-4 pr-4 py-2 text-base text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
                   onClick={() => handleSubLinkClick("/user-list")}
                 >
                   <User className="h-4 w-4 mr-2" />
