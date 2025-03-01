@@ -448,7 +448,7 @@ export default function Navbar({ onLogout }) {
 
       {/* Mobile menu */}
       {isMobileMenuOpen && (
-        <div className="sm:hidden w-full fixed h-1/2 bg-white z-50">
+        <div className="sm:hidden w-full fixed h-auto bg-white z-50">
           <div className="px-2 pt-2 pb-3 ">
             {navItems.map((section) => (
               <div key={section.title}>
