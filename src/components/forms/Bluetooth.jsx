@@ -470,7 +470,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
     if (showStatus) {
       const timer = setTimeout(() => {
         setShowStatus(false);
-      }, 3000); // Hide after 3 seconds
+      }, 500); // Hide after 3 seconds
 
       return () => clearTimeout(timer);
     }

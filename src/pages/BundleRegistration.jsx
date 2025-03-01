@@ -528,9 +528,9 @@ function BundleRegistration() {
   });
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-blue-50">
       {/* Header with tabs */}
-      <div className="bg-white shadow-sm p-3 sticky top-0 z-10">
+      <div className="bg-white shadow-sm p-4 sticky top-0 z-10">
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-900">
             {t('bundle.bundle_registration')}

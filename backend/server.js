@@ -26,6 +26,7 @@ import axios from 'axios';
 import createRoleManagmentModel from "./models/RoleManagment.js";
 import createQC2InspectionPassBundle from "./models/qc2_inspection_pass_bundle.js";
 import createQC2DefectPrintModel from "./models/QC2DefectPrint.js";
+import createQC2ReworksModel from "./models/qc2_reworks.js";
 
 /* ------------------------------
    Connection String
@@ -104,6 +105,7 @@ const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
 const RoleManagment = createRoleManagmentModel(ymProdConnection);
 const QC2InspectionPassBundle = createQC2InspectionPassBundle(ymProdConnection);
 const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
+const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 
 //-----------------------------END DATABASE CONNECTIONS------------------------------------------------//
 
@@ -2118,7 +2120,7 @@ app.post("/api/reworks", async (req, res) => {
   try {
     const {
       package_no,
-      // bundleNo,
+      //bundleNo,
       moNo,
       custStyle,
       color,
@@ -2126,6 +2128,14 @@ app.post("/api/reworks", async (req, res) => {
       lineNo,
       department,
       reworkGarments,
+      emp_id_inspection,
+      eng_name_inspection,
+      kh_name_inspection,
+      job_title_inspection,
+      dept_name_inspection,
+      sect_name_inspection,
+      bundle_id,
+      bundle_random_id,
     } = req.body;
 
     const newRecord = new QC2Reworks({
@@ -2138,6 +2148,14 @@ app.post("/api/reworks", async (req, res) => {
       lineNo,
       department,
       reworkGarments,
+      emp_id_inspection,
+      eng_name_inspection,
+      kh_name_inspection,
+      job_title_inspection,
+      dept_name_inspection,
+      sect_name_inspection,
+      bundle_id,
+      bundle_random_id,
     });
     await newRecord.save();
     res.status(201).json({

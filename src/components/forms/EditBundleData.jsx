@@ -5,11 +5,13 @@ import PropTypes from 'prop-types';
 import { API_BASE_URL } from "../../../config";
 import Swal from 'sweetalert2';
 import { useTranslation } from 'react-i18next';
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, setEditModalOpen }) => {
-  const {t} = useTranslation();
+  const { t } = useTranslation();
   const [availableSizes, setAvailableSizes] = useState([]);
   const [availableColors, setAvailableColors] = useState([]);
+  const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
     if (formData.selectedMono) {
@@ -22,22 +24,15 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
     const colors = await fetchColors(selectedMono);
     setAvailableSizes(sizes);
     setAvailableColors(colors);
-    // console.log('Available Sizes:', sizes); // Log the sizes data
-    // console.log('Available Colors:', colors); // Log the colors data
   };
 
   const fetchSizes = async (selectedMono) => {
     try {
-      // console.log(`Fetching sizes for styleNo: ${selectedMono}`); // Log the selectedMono
       const response = await fetch(`${API_BASE_URL}/api/sizes?styleNo=${selectedMono}`);
-      // console.log('Sizes API Response:', response); // Log the full response
       if (!response.ok) {
-        const errorText = await response.text();
-        // console.error('Failed to fetch sizes:', errorText);
         throw new Error('Failed to fetch sizes');
       }
       const data = await response.json();
-      // console.log('Sizes Data:', data); // Log the data
       return data.sizes;
     } catch (error) {
       console.error('Error fetching sizes:', error);
@@ -47,16 +42,11 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
 
   const fetchColors = async (selectedMono) => {
     try {
-      // console.log(`Fetching colors for styleNo: ${selectedMono}`); // Log the selectedMono
       const response = await fetch(`${API_BASE_URL}/api/colors?styleNo=${selectedMono}`);
-      // console.log('Colors API Response:', response); // Log the full response
       if (!response.ok) {
-        const errorText = await response.text();
-        // console.error('Failed to fetch colors:', errorText);
         throw new Error('Failed to fetch colors');
       }
       const data = await response.json();
-      // console.log('Colors Data:', data); // Log the data
       return data.colors;
     } catch (error) {
       console.error('Error fetching colors:', error);
@@ -107,13 +97,23 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 w-auto h-auto bg-black bg-opacity-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-auto h-auto max-w-auto">
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 overflow-auto">
+      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl mx-4 my-8 md:my-16">
         <h2 className="text-2xl font-bold mb-4">{t("editBundle.edit_record")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-6">
           <div className="mb-6 p-4 bg-blue-50 rounded-md">
+          <div className="flex justify-between items-center">
             <h2 className="text-lg font-bold text-gray-800 mb-4">{t("bundle.order_details")}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+                onClick={() => setShowDetails(!showDetails)}
+                className="mb-4 px-4 py-2 bg-blue-500 text-white rounded-md"
+              >
+                {showDetails ? <FaEyeSlash /> : <FaEye />}
+                
+              </button>
+              </div>
+            {showDetails && (
+            <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-700">
                   <span className="font-bold">{t("bundle.selected_mono")}:</span> {formData.selectedMono}
@@ -137,9 +137,11 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
                 </p>
               </div>
             </div>
+              )}
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+       
+        <div className="grid grid-cols-3 md:grid-cols-4 gap-6 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t("bundle.date")}</label>
             <DatePicker
@@ -208,6 +210,7 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
               value={formData.count.toString()} // Ensure count is a string
               onChange={(e) => setFormData((prev) => ({ ...prev, count: e.target.value.toString() }))}
               className="w-full px-3 py-1 border border-gray-300 rounded-md"
+              inputMode="numeric"
             />
           </div>
           <div>
@@ -226,7 +229,7 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
             onClick={onClose}
             className="px-4 py-2 bg-red-500 text-white rounded-md"
           >
-           {t("editU.cancel")}
+            {t("editU.cancel")}
           </button>
           <button
             onClick={handleSave}
