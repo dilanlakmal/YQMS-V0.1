@@ -543,34 +543,42 @@ app.get("/api/user-batches", async (req, res) => {
 // });
 
 /* ------------------------------
-   End Points - Reprint - qc2 orders
+   End Points - Reprint - qc2_orderdata
 ------------------------------ */
 
-// Reprint endpoints
-app.get("/api/reprint-search-mono", async (req, res) => {
+// Combined search endpoint for MONo, Package No, and Emp ID from qc2_orderdata
+app.get("/api/reprint-search", async (req, res) => {
   try {
-    const digits = req.query.digits;
-    const results = await QC2OrderData.aggregate([
-      {
-        $match: {
-          selectedMono: { $regex: `${digits}$` },
-        },
-      },
-      {
-        $group: {
-          _id: "$selectedMono",
-          count: { $sum: 1 },
-        },
-      },
-      { $limit: 100 },
-    ]);
+    const { mono, packageNo, empId } = req.query;
 
-    res.json(results.map((r) => r._id));
+    // Build the query dynamically based on provided parameters
+    const query = {};
+    if (mono) {
+      query.selectedMono = { $regex: mono, $options: "i" }; // Case-insensitive partial match
+    }
+    if (packageNo) {
+      const packageNoInt = parseInt(packageNo);
+      if (!isNaN(packageNoInt)) {
+        query.package_no = packageNoInt; // Exact match for integer
+      }
+    }
+    if (empId) {
+      query.emp_id = { $regex: empId, $options: "i" }; // Case-insensitive partial match
+    }
+
+    // Fetch matching records from qc2_orderdata
+    const records = await QC2OrderData.find(query)
+      .sort({ package_no: 1 }) // Sort by package_no ascending
+      .limit(100); // Limit to prevent overload
+
+    res.json(records);
   } catch (error) {
-    res.status(500).json({ error: "Failed to search MONo" });
+    console.error("Error searching qc2_orderdata:", error);
+    res.status(500).json({ error: "Failed to search records" });
   }
 });
 
+// Fetch colors and sizes for a specific MONo (unchanged)
 app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
   try {
     const mono = req.params.mono;
@@ -584,7 +592,7 @@ app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
           },
           colorCode: { $first: "$colorCode" },
           chnColor: { $first: "$chnColor" },
-          package_no: { $first: "$package_no" }, // Add this line
+          package_no: { $first: "$package_no" },
         },
       },
       {
@@ -610,20 +618,84 @@ app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
   }
 });
 
-app.get("/api/reprint-records", async (req, res) => {
-  try {
-    const { mono, color, size } = req.query;
-    const records = await QC2OrderData.find({
-      selectedMono: mono,
-      color: color,
-      size: size,
-    }).sort({ package_no: 1 });
+// Reprint endpoints
+// app.get("/api/reprint-search-mono", async (req, res) => {
+//   try {
+//     const digits = req.query.digits;
+//     const results = await QC2OrderData.aggregate([
+//       {
+//         $match: {
+//           selectedMono: { $regex: `${digits}$` },
+//         },
+//       },
+//       {
+//         $group: {
+//           _id: "$selectedMono",
+//           count: { $sum: 1 },
+//         },
+//       },
+//       { $limit: 100 },
+//     ]);
 
-    res.json(records);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch records" });
-  }
-});
+//     res.json(results.map((r) => r._id));
+//   } catch (error) {
+//     res.status(500).json({ error: "Failed to search MONo" });
+//   }
+// });
+
+// app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
+//   try {
+//     const mono = req.params.mono;
+//     const result = await QC2OrderData.aggregate([
+//       { $match: { selectedMono: mono } },
+//       {
+//         $group: {
+//           _id: {
+//             color: "$color",
+//             size: "$size",
+//           },
+//           colorCode: { $first: "$colorCode" },
+//           chnColor: { $first: "$chnColor" },
+//           package_no: { $first: "$package_no" }, // Add this line
+//         },
+//       },
+//       {
+//         $group: {
+//           _id: "$_id.color",
+//           sizes: { $push: "$_id.size" },
+//           colorCode: { $first: "$colorCode" },
+//           chnColor: { $first: "$chnColor" },
+//         },
+//       },
+//     ]);
+
+//     const colors = result.map((c) => ({
+//       color: c._id,
+//       sizes: c.sizes,
+//       colorCode: c.colorCode,
+//       chnColor: c.chnColor,
+//     }));
+
+//     res.json(colors);
+//   } catch (error) {
+//     res.status(500).json({ error: "Failed to fetch colors/sizes" });
+//   }
+// });
+
+// app.get("/api/reprint-records", async (req, res) => {
+//   try {
+//     const { mono, color, size } = req.query;
+//     const records = await QC2OrderData.find({
+//       selectedMono: mono,
+//       color: color,
+//       size: size,
+//     }).sort({ package_no: 1 });
+
+//     res.json(records);
+//   } catch (error) {
+//     res.status(500).json({ error: "Failed to fetch records" });
+//   }
+// });
 
 /* ------------------------------
    End Points - Ironing
