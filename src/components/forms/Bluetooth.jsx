@@ -369,7 +369,12 @@
 // export default BluetoothComponent;
 
 import { AlertCircle, Bluetooth, Printer } from "lucide-react";
-import React, { forwardRef, useImperativeHandle, useState } from "react";
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from "react";
 import { allDefects } from "../../constants/defects"; // Import allDefects from defects.js
 
 const PRINTER_CONFIG = {
@@ -392,6 +397,8 @@ const BluetoothComponent = forwardRef((props, ref) => {
     characteristic: null,
     counter: 1,
   });
+
+  const [showStatus, setShowStatus] = useState(false);
 
   useImperativeHandle(ref, () => ({
     isConnected: state.isConnected,
@@ -418,6 +425,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
         isScanning: true,
         connectionStatus: "Scanning for devices...",
       });
+      setShowStatus(true);
       const device = await navigator.bluetooth.requestDevice({
         filters: [{ namePrefix: "GP-" }],
         optionalServices: [PRINTER_CONFIG.gainscha.serviceUUID],
@@ -440,6 +448,8 @@ const BluetoothComponent = forwardRef((props, ref) => {
         characteristic,
         connectionStatus: `Connected to ${device.name}`,
       });
+
+      setShowStatus(true);
     } catch (error) {
       console.error("Bluetooth Error:", error);
       handleDisconnect(error.message);
@@ -455,7 +465,18 @@ const BluetoothComponent = forwardRef((props, ref) => {
       characteristic: null,
       connectionStatus: errorMessage,
     });
+    setShowStatus(true);
   };
+
+  useEffect(() => {
+    if (showStatus) {
+      const timer = setTimeout(() => {
+        setShowStatus(false);
+      }, 500); // Hide after 3 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [showStatus]);
 
   const sendChunkedData = async (data) => {
     const { characteristic } = state;
@@ -710,7 +731,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
         />
         <Printer className="w-5 h-5" />
       </button>
-      {state.connectionStatus && (
+      {showStatus && state.connectionStatus && (
         <div
           className={`absolute top-full mt-2 w-64 p-2 rounded-md shadow-lg z-50 text-sm ${
             state.isConnected

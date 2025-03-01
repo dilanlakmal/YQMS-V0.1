@@ -69,6 +69,7 @@ function MonoSearch({
             const digits = e.target.value.replace(/\D/g, "");
             setSearchTerm(digits);
           }}
+          inputMode="numeric"
           className={`w-full px-3 py-2 border ${
             isDropdownOpen ? "rounded-t-md" : "rounded-md"
           } border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500`}
