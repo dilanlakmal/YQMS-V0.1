@@ -696,15 +696,75 @@ app.get("/api/last-ironing-record-id/:emp_id", async (req, res) => {
   try {
     const { emp_id } = req.params;
     const lastRecord = await Ironing.findOne(
-      { emp_id },
+      { emp_id_ironing: emp_id }, // Filter by emp_id_ironing
       {},
-      { sort: { ironing_record_id: -1 } }
+      { sort: { ironing_record_id: -1 } } // Sort descending to get the highest ID
     );
-    const lastRecordId = lastRecord ? lastRecord.ironing_record_id : 0;
+    const lastRecordId = lastRecord ? lastRecord.ironing_record_id : 0; // Start at 0 if no records exist
     res.json({ lastRecordId });
   } catch (error) {
     console.error("Error fetching last ironing record ID:", error);
     res.status(500).json({ error: "Failed to fetch last ironing record ID" });
+  }
+});
+
+// Modified endpoint to fetch defect card data with logging
+app.get("/api/check-defect-card/:defectPrintId", async (req, res) => {
+  try {
+    const { defectPrintId } = req.params;
+    //console.log(`Searching for defect_print_id: "${defectPrintId}"`); // Debug log
+
+    const defectRecord = await QC2InspectionPassBundle.findOne({
+      "printArray.defect_print_id": defectPrintId,
+      "printArray.isCompleted": false,
+    });
+    if (!defectRecord) {
+      console.log(
+        `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
+      );
+      return res.status(404).json({ message: "Defect card not found" });
+    }
+
+    const printData = defectRecord.printArray.find(
+      (item) => item.defect_print_id === defectPrintId
+    );
+    if (!printData) {
+      console.log(
+        `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
+      );
+      return res
+        .status(404)
+        .json({ message: "Defect print ID not found in printArray" });
+    }
+
+    const formattedData = {
+      defect_print_id: printData.defect_print_id,
+      totalRejectGarmentCount: printData.totalRejectGarmentCount,
+      package_no: defectRecord.package_no, // Include package_no
+      moNo: defectRecord.moNo,
+      selectedMono: defectRecord.moNo,
+      custStyle: defectRecord.custStyle,
+      buyer: defectRecord.buyer,
+      color: defectRecord.color,
+      size: defectRecord.size,
+      factory: defectRecord.factory,
+      country: defectRecord.country,
+      lineNo: defectRecord.lineNo,
+      department: defectRecord.department,
+      count: defectRecord.checkedQty,
+      emp_id_inspection: defectRecord.emp_id_inspection,
+      inspection_date: defectRecord.inspection_date,
+      inspection_time: defectRecord.inspection_time,
+      sub_con: defectRecord.sub_con,
+      sub_con_factory: defectRecord.sub_con_factory,
+      bundle_id: defectRecord.bundle_id,
+      bundle_random_id: defectRecord.bundle_random_id,
+    };
+
+    res.json(formattedData);
+  } catch (error) {
+    console.error("Error checking defect card:", error);
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -860,7 +920,21 @@ app.get("/api/washing-records", async (req, res) => {
    End Points - OPA
 ------------------------------ */
 
-// Check if OPA record exists
+app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
+  try {
+    const bundle = await QC2OrderData.findOne({
+      bundle_random_id: req.params.randomId,
+    });
+    if (!bundle) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+    res.json(bundle);
+  } catch (error) {
+    console.error("Error fetching bundle:", error);
+    res.status(500).json({ error: "Failed to fetch bundle" });
+  }
+});
+
 app.get("/api/check-opa-exists/:bundleId", async (req, res) => {
   try {
     const record = await OPA.findOne({
@@ -872,12 +946,67 @@ app.get("/api/check-opa-exists/:bundleId", async (req, res) => {
   }
 });
 
-// New endpoint to get the last OPA record ID for a specific emp_id
+app.get("/api/check-defect-card-opa/:defectPrintId", async (req, res) => {
+  try {
+    const { defectPrintId } = req.params;
+    console.log(`Searching for defect_print_id: "${defectPrintId}"`);
+    const defectRecord = await QC2InspectionPassBundle.findOne({
+      "printArray.defect_print_id": defectPrintId,
+      "printArray.isCompleted": false,
+    });
+    if (!defectRecord) {
+      console.log(
+        `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
+      );
+      return res.status(404).json({ message: "Defect card not found" });
+    }
+    const printData = defectRecord.printArray.find(
+      (item) => item.defect_print_id === defectPrintId
+    );
+    if (!printData) {
+      console.log(
+        `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
+      );
+      return res
+        .status(404)
+        .json({ message: "Defect print ID not found in printArray" });
+    }
+    console.log(`Found printData: ${JSON.stringify(printData)}`);
+    const formattedData = {
+      defect_print_id: printData.defect_print_id,
+      totalRejectGarmentCount: printData.totalRejectGarmentCount,
+      package_no: defectRecord.package_no,
+      moNo: defectRecord.moNo,
+      selectedMono: defectRecord.moNo,
+      custStyle: defectRecord.custStyle,
+      buyer: defectRecord.buyer,
+      color: defectRecord.color,
+      size: defectRecord.size,
+      factory: defectRecord.factory,
+      country: defectRecord.country,
+      lineNo: defectRecord.lineNo,
+      department: defectRecord.department,
+      count: defectRecord.checkedQty,
+      emp_id_inspection: defectRecord.emp_id_inspection,
+      inspection_date: defectRecord.inspection_date,
+      inspection_time: defectRecord.inspection_time,
+      sub_con: defectRecord.sub_con,
+      sub_con_factory: defectRecord.sub_con_factory,
+      bundle_id: defectRecord.bundle_id,
+      bundle_random_id: defectRecord.bundle_random_id,
+    };
+    res.json(formattedData);
+  } catch (error) {
+    console.error("Error checking defect card for OPA:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 app.get("/api/last-opa-record-id/:emp_id", async (req, res) => {
   try {
     const { emp_id } = req.params;
     const lastRecord = await OPA.findOne(
-      { emp_id },
+      { emp_id_opa: emp_id },
       {},
       { sort: { opa_record_id: -1 } }
     );
@@ -889,7 +1018,6 @@ app.get("/api/last-opa-record-id/:emp_id", async (req, res) => {
   }
 });
 
-// Save OPA record
 app.post("/api/save-opa", async (req, res) => {
   try {
     const newRecord = new OPA(req.body);
@@ -904,11 +1032,20 @@ app.post("/api/save-opa", async (req, res) => {
   }
 });
 
-// Update qc2_orderdata with OPA details
 app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
   try {
     const { bundleId } = req.params;
-    const { passQtyOPA, opa_updated_date, opa_update_time } = req.body;
+    const {
+      passQtyOPA,
+      opa_updated_date,
+      opa_update_time,
+      emp_id_opa,
+      eng_name_opa,
+      kh_name_opa,
+      job_title_opa,
+      dept_name_opa,
+      sect_name_opa,
+    } = req.body;
 
     const updatedRecord = await QC2OrderData.findOneAndUpdate(
       { bundle_id: bundleId },
@@ -916,6 +1053,12 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
         passQtyOPA,
         opa_updated_date,
         opa_update_time,
+        emp_id_opa,
+        eng_name_opa,
+        kh_name_opa,
+        job_title_opa,
+        dept_name_opa,
+        sect_name_opa,
       },
       { new: true }
     );
@@ -930,7 +1073,6 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
   }
 });
 
-// For Data tab display records in a table
 app.get("/api/opa-records", async (req, res) => {
   try {
     const records = await OPA.find();
@@ -1532,6 +1674,10 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
     lineNo: { type: String, required: true }, // from bundleData.lineNo
     department: { type: String, required: true }, // from bundleData.department
     buyer: { type: String, required: false }, // from bundleData.buyer
+    factory: { type: String }, // Added
+    country: { type: String }, // Added
+    sub_con: { type: String }, // Added
+    sub_con_factory: { type: String }, // Added
     checkedQty: { type: Number, required: true }, // e.g. bundleData.count
     totalPass: { type: Number, required: true },
     totalRejects: { type: Number, required: true },
@@ -1630,7 +1776,6 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
   try {
     const {
       package_no,
-      //bundleNo,
       moNo,
       custStyle,
       color,
@@ -1638,6 +1783,10 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       lineNo,
       department,
       buyer,
+      factory,
+      country,
+      sub_con,
+      sub_con_factory,
       checkedQty,
       totalPass,
       totalRejects,
@@ -1668,6 +1817,10 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       lineNo,
       department,
       buyer: buyer || "N/A",
+      factory: factory || "N/A",
+      country: country || "N/A",
+      sub_con: sub_con || "No",
+      sub_con_factory: sub_con_factory || "N/A",
       checkedQty,
       totalPass,
       totalRejects,

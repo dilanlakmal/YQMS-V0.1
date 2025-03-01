@@ -17,11 +17,11 @@ const QrCodeScanner = ({
   passQtyWash,
   passQtyPack,
   handlePassQtyChange,
-  error,
   isIroningPage,
   isWashingPage,
   isPackingPage,
   isOPAPage,
+  isDefectCard,
 }) => {
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg">
@@ -34,7 +34,7 @@ const QrCodeScanner = ({
       {loadingData && (
         <div className="flex items-center justify-center gap-2 text-blue-600 mt-4">
           <Loader2 className="w-5 h-5 animate-spin" />
-          <p>Loading bundle data...</p>
+          <p>Loading data...</p>
         </div>
       )}
 
@@ -44,16 +44,24 @@ const QrCodeScanner = ({
             <Package className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
             <div className="flex-grow">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                Order Details
+                {isDefectCard ? "Defect Card Details" : "Order Details"}
               </h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-600">Bundle ID</p>
-                  <p className="font-medium">{scannedData.bundle_id}</p>
+                  <p className="text-sm text-gray-600">
+                    {isDefectCard ? "Defect Print ID" : "Bundle ID"}
+                  </p>
+                  <p className="font-medium">
+                    {isDefectCard
+                      ? scannedData.defect_print_id
+                      : scannedData.bundle_id}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">MO Number</p>
-                  <p className="font-medium">{scannedData.selectedMono}</p>
+                  <p className="font-medium">
+                    {scannedData.selectedMono || scannedData.moNo}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Style</p>
@@ -81,22 +89,40 @@ const QrCodeScanner = ({
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Count</p>
-                  <p className="font-medium">{scannedData.count}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Separator ID</p>
-                  <p className="font-medium">{scannedData.emp_id}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Registered Date</p>
                   <p className="font-medium">
-                    {scannedData.updated_date_seperator}
+                    {isDefectCard
+                      ? scannedData.totalRejectGarmentCount
+                      : scannedData.count}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Registered Time</p>
+                  <p className="text-sm text-gray-600">
+                    {isDefectCard ? "QC ID" : "Separator ID"}
+                  </p>
                   <p className="font-medium">
-                    {scannedData.updated_time_seperator}
+                    {isDefectCard
+                      ? scannedData.emp_id_inspection
+                      : scannedData.emp_id}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">
+                    {isDefectCard ? "Inspection Date" : "Registered Date"}
+                  </p>
+                  <p className="font-medium">
+                    {isDefectCard
+                      ? scannedData.inspection_date
+                      : scannedData.updated_date_seperator}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">
+                    {isDefectCard ? "Inspection Time" : "Registered Time"}
+                  </p>
+                  <p className="font-medium">
+                    {isDefectCard
+                      ? scannedData.inspection_time
+                      : scannedData.updated_time_seperator}
                   </p>
                 </div>
                 {scannedData.sub_con === "Yes" && (
@@ -107,62 +133,74 @@ const QrCodeScanner = ({
                     <p className="font-medium">{scannedData.sub_con_factory}</p>
                   </div>
                 )}
-                <div>
-                  {isIroningPage && (
-                    <p className="text-sm text-gray-600">Pass Qty (Iron)</p>
-                  )}
-                  {isWashingPage && (
-                    <p className="text-sm text-gray-600">Pass Qty (wash)</p>
-                  )}
-                  {isPackingPage && (
-                    <p className="text-sm text-gray-600">Pass Qty (pack)</p>
-                  )}
-                  {isOPAPage && (
-                    <p className="text-sm text-gray-600">Pass Qty (OPA)</p>
-                  )}
+              </div>
 
-                  {isIroningPage ? (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handlePassQtyChange(passQtyIron - 1)}
-                        className="px-2 py-1 rounded-md bg-gray-200 text-gray-700"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <input
-                        type="number"
-                        value={passQtyIron}
-                        onChange={(e) =>
-                          handlePassQtyChange(Number(e.target.value))
-                        }
-                        className="w-16 text-center border border-gray-300 rounded-md"
-                      />
-                      <button
-                        onClick={() => handlePassQtyChange(passQtyIron + 1)}
-                        className="px-2 py-1 rounded-md bg-gray-200 text-gray-700"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    // <p className="font-medium">{passQtyIron}</p>
+              {/* Horizontal Line Separator */}
+              <hr className="my-6 border-gray-300" />
+
+              {/* Pass Quantity Section */}
+              {(isIroningPage || isOPAPage) && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600 mb-2">
+                    {isIroningPage ? "Pass Iron Qty" : "Pass OPA Qty"}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() =>
+                        handlePassQtyChange(
+                          (isIroningPage ? passQtyIron : passQtyOPA) - 1
+                        )
+                      }
+                      className="p-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    >
+                      <Minus className="w-6 h-6" />
+                    </button>
                     <input
                       type="number"
-                      value={
-                        isWashingPage
-                          ? passQtyWash
-                          : isPackingPage
-                          ? passQtyPack
-                          : isOPAPage
-                          ? passQtyOPA
-                          : passQtyIron // Default to passQtyIron if none of the conditions match
+                      value={isIroningPage ? passQtyIron : passQtyOPA}
+                      onChange={(e) =>
+                        handlePassQtyChange(Number(e.target.value))
                       }
-                      readOnly
-                      className="w-16 text-center border border-gray-300 rounded-md bg-gray-100"
+                      className="w-20 text-lg text-center border border-gray-300 rounded-md py-2"
                     />
-                  )}
+                    <button
+                      onClick={() =>
+                        handlePassQtyChange(
+                          (isIroningPage ? passQtyIron : passQtyOPA) + 1
+                        )
+                      }
+                      className="p-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    >
+                      <Plus className="w-6 h-6" />
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {isWashingPage && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600 mb-2">Pass Wash Qty</p>
+                  <input
+                    type="number"
+                    value={passQtyWash}
+                    readOnly
+                    className="w-20 text-lg text-center border border-gray-300 rounded-md py-2 bg-gray-100"
+                  />
+                </div>
+              )}
+
+              {isPackingPage && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600 mb-2">Pass Pack Qty</p>
+                  <input
+                    type="number"
+                    value={passQtyPack}
+                    readOnly
+                    className="w-20 text-lg text-center border border-gray-300 rounded-md py-2 bg-gray-100"
+                  />
+                </div>
+              )}
+
               <div className="mt-6 flex items-center gap-4">
                 <button
                   onClick={handleAddRecord}
@@ -196,13 +234,6 @@ const QrCodeScanner = ({
           </div>
         </div>
       )}
-
-      {/* {error && (
-        <div className="mb-6 p-4 bg-red-100 border border-red-200 rounded-lg flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-red-500" />
-          <p className="text-red-700">{error}</p>
-        </div>
-      )} */}
     </div>
   );
 };

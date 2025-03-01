@@ -249,6 +249,10 @@ const QC2InspectionPage = () => {
           lineNo: data.lineNo,
           department: data.department,
           buyer: data.buyer,
+          factory: data.factory, // Added
+          country: data.country, // Added
+          sub_con: data.sub_con, // Added
+          sub_con_factory: data.sub_con_factory, // Added
           checkedQty: data.passQtyIron,
           totalPass: data.passQtyIron,
           totalRejects: 0,
