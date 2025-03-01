@@ -833,7 +833,7 @@ const QC2InspectionPage = () => {
       <div  
         className={`${
           navOpen ? "w-72" : "w-16"
-        } bg-gray-800 text-white h-screen p-2 transition-all duration-300`}
+        } bg-gray-800 text-white h-screen p-2 transition-all duration-300 overflow-y-auto`}
       >
         <div className="flex items-center justify-center mb-4">
           <button
@@ -969,7 +969,7 @@ const QC2InspectionPage = () => {
               <div className="flex items-center mb-1">
                 <span className="font-medium">Printing Method</span>
               </div>
-              <div className="flex space-x-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:flex space-x-1 md:space-x-2">
                 <button
                   onClick={() => setPrintMethod("repair")}
                   className={`p-1 text-sm rounded border ${
@@ -1067,16 +1067,16 @@ const QC2InspectionPage = () => {
                 </div>
               ) : (
                 <>
-                  <div className="p-2 bg-blue-100 border-b">
+                  <div className="p-2  bg-blue-100 border-b">
                     <div className="flex items-center">
-                      <div className="w-1/6 h-32 flex justify-center">
+                      <div className="w-20 md:w-1/4 h-32 md:h-23 flex justify-center">
                         <button
                           onClick={handleRejectGarment}
                           disabled={
                             !hasDefects ||
                             (isReturnInspection && totalPass <= 0)
                           }
-                          className={`px-4 py-2 rounded ${
+                          className={`px-2 md:px-4 py-2 rounded ${
                             !hasDefects ||
                             (isReturnInspection && totalPass <= 0)
                               ? "bg-gray-300 cursor-not-allowed"
@@ -1086,7 +1086,7 @@ const QC2InspectionPage = () => {
                           Reject Garment
                         </button>
                       </div>
-                      <div className="w-4/6 mx-4">
+                      <div className="w-64 md:w-4/6 mx-4">
                         <div className="overflow-x-auto whitespace-nowrap h-12 border-b mb-2">
                           <div className="flex space-x-4 items-center">
                             <div>
@@ -1134,7 +1134,7 @@ const QC2InspectionPage = () => {
                           </div>
                         </div>
                         <div className="flex justify-between">
-                          <div className="flex-1 mx-1 bg-gray-100 rounded p-2 flex items-center">
+                          <div className="flex md:flex-1 mx-1 bg-gray-100 rounded p-1 md:p-2 flex items-center">
                             <QrCode className="w-5 h-5 mr-2" />
                             <div className="hidden md:block">
                               <div className="text-xs">
@@ -1156,7 +1156,7 @@ const QC2InspectionPage = () => {
                               </div>
                             </div>
                           </div>
-                          <div className="flex-1 mx-1 bg-gray-100 rounded p-2 flex items-center">
+                          <div className="flex md:flex-1 mx-1 bg-gray-100 rounded p-1 md:p-2 flex items-center">
                             <CheckCircle className="w-5 h-5 mr-2 text-green-600" />
                             <div className="hidden md:block">
                               <div className="text-xs">Total Pass</div>
@@ -1170,7 +1170,7 @@ const QC2InspectionPage = () => {
                               </div>
                             </div>
                           </div>
-                          <div className="flex-1 mx-1 bg-gray-100 rounded p-2 flex items-center">
+                          <div className="flex md:flex-1 mx-1 bg-gray-100 rounded p-1 md:p-2 flex items-center">
                             <XCircle className="w-5 h-5 mr-2 text-red-600" />
                             <div className="hidden md:block">
                               <div className="text-xs">Total Rejects</div>
@@ -1184,7 +1184,7 @@ const QC2InspectionPage = () => {
                               </div>
                             </div>
                           </div>
-                          <div className="flex-1 mx-1 bg-gray-100 rounded p-2 flex items-center">
+                          <div className="flex md:flex-1 mx-1 bg-gray-100 rounded p-1 md:p-2 flex items-center">
                             <AlertCircle className="w-5 h-5 mr-2 text-orange-600" />
                             <div className="hidden md:block">
                               <div className="text-xs">Defects Qty</div>
@@ -1210,7 +1210,7 @@ const QC2InspectionPage = () => {
                                 qrCodesData.garment.length === 0) ||
                               printing)
                           }
-                          className={`px-4 py-2 rounded ${
+                          className={`px-2 md:px-4 py-1 md:py-2 rounded ${
                             !isReturnInspection &&
                             ((hasDefects && !rejectedOnce) ||
                               (printMethod === "garment" &&
@@ -1228,11 +1228,11 @@ const QC2InspectionPage = () => {
                             : ""}
                         </button>
                         {!isReturnInspection && (
-                          <div className="flex space-x-2">
+                          <div className="flex space-x-1">
                             <button
                               onClick={handleGenerateQRCodes}
                               disabled={!defectQty || generateQRDisabled}
-                              className={`p-2 rounded ${
+                              className={`p-1 md:p-2 rounded ${
                                 !defectQty || generateQRDisabled
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-blue-600 hover:bg-blue-700 text-white"
@@ -1244,7 +1244,7 @@ const QC2InspectionPage = () => {
                             <button
                               onClick={() => setShowQRPreview(true)}
                               disabled={qrCodesData[printMethod].length === 0}
-                              className={`p-2 rounded ${
+                              className={`p-1 md:p-2 rounded ${
                                 qrCodesData[printMethod].length === 0
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-blue-600 hover:bg-blue-700 text-white"
@@ -1259,7 +1259,7 @@ const QC2InspectionPage = () => {
                                 !bluetoothRef.current?.isConnected ||
                                 qrCodesData[printMethod].length === 0
                               }
-                              className={`p-2 rounded ${
+                              className={`p-1 md:p-2 rounded ${
                                 !bluetoothRef.current?.isConnected ||
                                 qrCodesData[printMethod].length === 0
                                   ? "bg-gray-300 cursor-not-allowed"
