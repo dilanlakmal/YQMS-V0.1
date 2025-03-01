@@ -25,38 +25,36 @@ const EditModal = ({
     }
   }, [isOpen, formData.selectedMono]);
 
+  // Replace fetchAvailableSizesAndColors function
   const fetchAvailableSizesAndColors = async (selectedMono) => {
     setLoading(true);
     try {
-      const sizesResponse = await fetch(
-        `${API_BASE_URL}/api/sizes?styleNo=${selectedMono}`
+      const response = await fetch(
+        `${API_BASE_URL}/api/order-details/${selectedMono}`
       );
-      const colorsResponse = await fetch(
-        `${API_BASE_URL}/api/colors?styleNo=${selectedMono}`
-      );
+      const data = await response.json();
 
-      if (!sizesResponse.ok || !colorsResponse.ok) {
-        throw new Error("Failed to fetch sizes or colors");
+      if (!response.ok) {
+        throw new Error("Failed to fetch order details");
       }
 
-      const sizesData = await sizesResponse.json();
-      const colorsData = await colorsResponse.json();
+      // Extract all colors and sizes from the response
+      const colors = data.colors.map((c) => c.original); // Full list of colors
+      const allSizes = Object.values(data.colorSizeMap).flatMap(
+        (colorData) => colorData.sizes
+      ); // Flatten all sizes across colors
+      const uniqueSizes = [...new Set(allSizes)]; // Remove duplicates
 
-      // Extract all sizes and colors from the API responses
-      const sizes = sizesData.sizes || []; // Assuming sizes is an array of strings
-      const colors = colorsData.colors.map((c) => c.original) || []; // Map to original color names
-
-      setAvailableSizes(sizes);
       setAvailableColors(colors);
+      setAvailableSizes(uniqueSizes);
 
-      // Log for debugging
-      console.log("Fetched Sizes:", sizes);
       console.log("Fetched Colors:", colors);
+      console.log("Fetched Sizes:", uniqueSizes);
     } catch (error) {
-      console.error("Error fetching sizes and colors:", error);
-      // On error, still try to include current values but don’t limit to them
-      setAvailableSizes([formData.size].filter(Boolean));
+      console.error("Error fetching order details:", error);
+      // On error, still include current values but don’t limit to them
       setAvailableColors([formData.color].filter(Boolean));
+      setAvailableSizes([formData.size].filter(Boolean));
     } finally {
       setLoading(false);
     }

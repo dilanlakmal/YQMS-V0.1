@@ -1227,7 +1227,7 @@ function BundleRegistration() {
                               <td className="px-2 py-1.5 text-left text-xs font-medium text-gray-700 border-r border-gray-200">
                                 <button
                                   onClick={() => handleEdit(batch._id)}
-                                  className="px-2 py-1.5 text-left text-xs font-medium text-gray-700 border border-gray-800 bg-green-400"
+                                  className="px-2 py-1.5 text-xs font-medium text-gray-700 border border-blue-800 bg-blue-200 rounded-md hover:bg-blue-300"
                                 >
                                   {t("bundle.edit")}
                                 </button>
@@ -1956,7 +1956,7 @@ function BundleRegistration() {
                         <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                           <button
                             onClick={() => handleEdit(batch._id)}
-                            className="ml-2 text-gray-900 font-m hover:text-blue-800 border px-4 py-2 bg-green-500 rounded-md"
+                            className="ml-2 text-gray-900 text-sm font-medium border border-blue-700 bg-blue-200 rounded-md px-4 py-2 hover:bg-blue-300"
                           >
                             {t("bundle.edit")}
                           </button>

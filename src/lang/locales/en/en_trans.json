@@ -140,7 +140,8 @@
     "total_bundle_qty": "Total Bundle Qty",
     "edit": "Edit",
     "action": "Action",
-    "print_qr": "Print QR"
+    "print_qr": "Print QR",
+    "printing": "Printing..."
   },
 
   "defIm": {
