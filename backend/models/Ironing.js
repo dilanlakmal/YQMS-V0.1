@@ -20,7 +20,7 @@ const ironingSchema = new mongoose.Schema(
     lineNo: String,
     color: String,
     size: String,
-    count: String,
+    count: Number,
     totalBundleQty: Number,
     passQtyIron: Number,
     sub_con: String,

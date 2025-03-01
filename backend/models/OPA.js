@@ -19,7 +19,7 @@ const opaSchema = new mongoose.Schema(
     lineNo: String,
     color: String,
     size: String,
-    count: String,
+    count: Number,
     totalBundleQty: Number,
     passQtyOPA: Number,
     sub_con: String,

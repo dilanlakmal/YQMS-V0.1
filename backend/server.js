@@ -839,7 +839,21 @@ app.get("/api/ironing-records", async (req, res) => {
    End Points - Washing
 ------------------------------ */
 
-// Check if washing record exists
+app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
+  try {
+    const bundle = await QC2OrderData.findOne({
+      bundle_random_id: req.params.randomId,
+    });
+    if (!bundle) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+    res.json(bundle);
+  } catch (error) {
+    console.error("Error fetching bundle:", error);
+    res.status(500).json({ error: "Failed to fetch bundle" });
+  }
+});
+
 app.get("/api/check-washing-exists/:bundleId", async (req, res) => {
   try {
     const record = await Washing.findOne({
@@ -851,12 +865,65 @@ app.get("/api/check-washing-exists/:bundleId", async (req, res) => {
   }
 });
 
-// New endpoint to get the last washing record ID for a specific emp_id
+app.get("/api/check-defect-card-washing/:defectPrintId", async (req, res) => {
+  try {
+    const { defectPrintId } = req.params;
+    const defectRecord = await QC2InspectionPassBundle.findOne({
+      "printArray.defect_print_id": defectPrintId,
+      "printArray.isCompleted": false,
+    });
+    if (!defectRecord) {
+      console.log(
+        `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
+      );
+      return res.status(404).json({ message: "Defect card not found" });
+    }
+    const printData = defectRecord.printArray.find(
+      (item) => item.defect_print_id === defectPrintId
+    );
+    if (!printData) {
+      console.log(
+        `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
+      );
+      return res
+        .status(404)
+        .json({ message: "Defect print ID not found in printArray" });
+    }
+    const formattedData = {
+      defect_print_id: printData.defect_print_id,
+      totalRejectGarmentCount: printData.totalRejectGarmentCount,
+      package_no: defectRecord.package_no,
+      moNo: defectRecord.moNo,
+      selectedMono: defectRecord.moNo,
+      custStyle: defectRecord.custStyle,
+      buyer: defectRecord.buyer,
+      color: defectRecord.color,
+      size: defectRecord.size,
+      factory: defectRecord.factory,
+      country: defectRecord.country,
+      lineNo: defectRecord.lineNo,
+      department: defectRecord.department,
+      count: defectRecord.checkedQty,
+      emp_id_inspection: defectRecord.emp_id_inspection,
+      inspection_date: defectRecord.inspection_date,
+      inspection_time: defectRecord.inspection_time,
+      sub_con: defectRecord.sub_con,
+      sub_con_factory: defectRecord.sub_con_factory,
+      bundle_id: defectRecord.bundle_id,
+      bundle_random_id: defectRecord.bundle_random_id,
+    };
+    res.json(formattedData);
+  } catch (error) {
+    console.error("Error checking defect card for washing:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 app.get("/api/last-washing-record-id/:emp_id", async (req, res) => {
   try {
     const { emp_id } = req.params;
     const lastRecord = await Washing.findOne(
-      { emp_id },
+      { emp_id_washing: emp_id },
       {},
       { sort: { washing_record_id: -1 } }
     );
@@ -868,7 +935,6 @@ app.get("/api/last-washing-record-id/:emp_id", async (req, res) => {
   }
 });
 
-// Save washing record
 app.post("/api/save-washing", async (req, res) => {
   try {
     const newRecord = new Washing(req.body);
@@ -883,30 +949,47 @@ app.post("/api/save-washing", async (req, res) => {
   }
 });
 
-// Update qc2_orderdata with washing details
 app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
   try {
     const { bundleId } = req.params;
-    const { passQtyWash, washing_updated_date, washing_update_time } = req.body;
+    const {
+      passQtyWash,
+      washing_updated_date,
+      washing_update_time,
+      emp_id_washing,
+      eng_name_washing,
+      kh_name_washing,
+      job_title_washing,
+      dept_name_washing,
+      sect_name_washing,
+    } = req.body;
+
     const updatedRecord = await QC2OrderData.findOneAndUpdate(
       { bundle_id: bundleId },
       {
         passQtyWash,
         washing_updated_date,
         washing_update_time,
+        emp_id_washing,
+        eng_name_washing,
+        kh_name_washing,
+        job_title_washing,
+        dept_name_washing,
+        sect_name_washing,
       },
       { new: true }
     );
+
     if (!updatedRecord) {
       return res.status(404).json({ error: "Bundle not found" });
     }
+
     res.json({ message: "Record updated successfully", data: updatedRecord });
   } catch (error) {
     res.status(500).json({ error: "Failed to update record" });
   }
 });
 
-// For Data tab display records in a table
 app.get("/api/washing-records", async (req, res) => {
   try {
     const records = await Washing.find();
@@ -949,7 +1032,6 @@ app.get("/api/check-opa-exists/:bundleId", async (req, res) => {
 app.get("/api/check-defect-card-opa/:defectPrintId", async (req, res) => {
   try {
     const { defectPrintId } = req.params;
-    console.log(`Searching for defect_print_id: "${defectPrintId}"`);
     const defectRecord = await QC2InspectionPassBundle.findOne({
       "printArray.defect_print_id": defectPrintId,
       "printArray.isCompleted": false,
@@ -971,7 +1053,6 @@ app.get("/api/check-defect-card-opa/:defectPrintId", async (req, res) => {
         .status(404)
         .json({ message: "Defect print ID not found in printArray" });
     }
-    console.log(`Found printData: ${JSON.stringify(printData)}`);
     const formattedData = {
       defect_print_id: printData.defect_print_id,
       totalRejectGarmentCount: printData.totalRejectGarmentCount,
