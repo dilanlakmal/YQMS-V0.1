@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useTranslation } from "react-i18next";
+import { FaEye, FaEyeSlash } from "react-icons/fa"; // Import Eye icons
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../config";
 
@@ -18,6 +19,7 @@ const EditModal = ({
   const [availableSizes, setAvailableSizes] = useState([]);
   const [availableColors, setAvailableColors] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showOrderDetails, setShowOrderDetails] = useState(false); // For mobile toggle
 
   useEffect(() => {
     if (isOpen && formData.selectedMono) {
@@ -25,7 +27,6 @@ const EditModal = ({
     }
   }, [isOpen, formData.selectedMono]);
 
-  // Replace fetchAvailableSizesAndColors function
   const fetchAvailableSizesAndColors = async (selectedMono) => {
     setLoading(true);
     try {
@@ -38,12 +39,11 @@ const EditModal = ({
         throw new Error("Failed to fetch order details");
       }
 
-      // Extract all colors and sizes from the response
-      const colors = data.colors.map((c) => c.original); // Full list of colors
+      const colors = data.colors.map((c) => c.original);
       const allSizes = Object.values(data.colorSizeMap).flatMap(
         (colorData) => colorData.sizes
-      ); // Flatten all sizes across colors
-      const uniqueSizes = [...new Set(allSizes)]; // Remove duplicates
+      );
+      const uniqueSizes = [...new Set(allSizes)];
 
       setAvailableColors(colors);
       setAvailableSizes(uniqueSizes);
@@ -52,7 +52,6 @@ const EditModal = ({
       console.log("Fetched Sizes:", uniqueSizes);
     } catch (error) {
       console.error("Error fetching order details:", error);
-      // On error, still include current values but don’t limit to them
       setAvailableColors([formData.color].filter(Boolean));
       setAvailableSizes([formData.size].filter(Boolean));
     } finally {
@@ -100,12 +99,16 @@ const EditModal = ({
     }
   };
 
+  const toggleOrderDetails = () => {
+    setShowOrderDetails(!showOrderDetails);
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-5xl">
-        <h2 className="text-2xl font-bold mb-4">
+      <div className="bg-white p-4 md:p-6 rounded-lg shadow-lg w-full max-w-5xl overflow-y-auto max-h-[90vh]">
+        <h2 className="text-xl md:text-2xl font-bold mb-4">
           {t("editBundle.edit_record")}
         </h2>
         {loading && (
@@ -113,11 +116,21 @@ const EditModal = ({
             Loading sizes and colors...
           </div>
         )}
-        <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-6">
-          <div className="mb-6 p-4 bg-blue-50 rounded-md">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">
+
+        {/* Order Details - Hidden on mobile with toggle, visible on laptop */}
+        <div className="mb-4 md:mb-6 p-4 bg-blue-50 rounded-md">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-bold text-gray-800 mb-2 md:mb-4">
               {t("bundle.order_details")}
             </h2>
+            <button
+              onClick={toggleOrderDetails}
+              className="text-gray-500 hover:text-gray-700 md:hidden" // Hidden on md and above
+            >
+              {showOrderDetails ? <FaEyeSlash /> : <FaEye />}
+            </button>
+          </div>
+          <div className={`${showOrderDetails ? "block" : "hidden"} md:block`}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-700">
@@ -154,7 +167,9 @@ const EditModal = ({
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+
+        {/* Form Fields - Two columns on mobile, four on laptop */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               {t("bundle.date")}
@@ -269,6 +284,7 @@ const EditModal = ({
             />
           </div>
         </div>
+
         <div className="flex justify-end space-x-4">
           <button
             onClick={onClose}
