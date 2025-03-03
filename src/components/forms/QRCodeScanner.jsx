@@ -19,7 +19,7 @@ const QrCodeScanner = ({
   passQtyPack, 
   handlePassQtyChange, 
   error,
-  isIroningPage, isWashingPage, isPackingPage, isOPAPage }) => {
+  isIroningPage, isWashingPage, isPackingPage, isOPAPage,isDefectCard }) => {
     const {t} = useTranslation();
 
   return (
@@ -89,13 +89,37 @@ const QrCodeScanner = ({
                 <div>
                   <p className="text-sm text-gray-600">{t("qrCodeScan.registered_date")}</p>
                   <p className="font-medium">
-                    {scannedData.updated_date_seperator}
+                    {isDefectCard
+                      ? scannedData.totalRejectGarmentCount
+                      : scannedData.count}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">{t("qrCodeScan.registered_time")}</p>
                   <p className="font-medium">
-                    {scannedData.updated_time_seperator}
+                    {isDefectCard
+                      ? scannedData.emp_id_inspection
+                      : scannedData.emp_id}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">
+                    {isDefectCard ? "Inspection Date" : "Registered Date"}
+                  </p>
+                  <p className="font-medium">
+                    {isDefectCard
+                      ? scannedData.inspection_date
+                      : scannedData.updated_date_seperator}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">
+                    {isDefectCard ? "Inspection Time" : "Registered Time"}
+                  </p>
+                  <p className="font-medium">
+                    {isDefectCard
+                      ? scannedData.inspection_time
+                      : scannedData.updated_time_seperator}
                   </p>
                 </div>
                 {scannedData.sub_con === "Yes" && (
@@ -104,7 +128,9 @@ const QrCodeScanner = ({
                     <p className="font-medium">{scannedData.sub_con_factory}</p>
                   </div>
                 )}
-                <div>
+              </div>
+
+              {/* <div>
                   <div>
                   {isIroningPage && <p className="text-sm text-gray-600">{t("iro.pass_qty")}</p>}
                   {isWashingPage && <p className="text-sm text-gray-600">{t("wash.pass_qty")}</p>}
@@ -139,9 +165,74 @@ const QrCodeScanner = ({
                     {isOPAPage && <p className="font-medium">{passQtyOPA}</p>}
                     {isPackingPage && <p className="font-medium">{passQtyPack}</p>}
                     </div>
-                  )}
+                  )} */}
+
+              {/* Horizontal Line Separator */}
+              <hr className="my-6 border-gray-300" />
+
+              {/* Pass Quantity Section */}
+              {(isIroningPage || isOPAPage) && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600 mb-2">
+                    {isIroningPage ? "Pass Iron Qty" : "Pass OPA Qty"}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() =>
+                        handlePassQtyChange(
+                          (isIroningPage ? passQtyIron : passQtyOPA) - 1
+                        )
+                      }
+                      className="p-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    >
+                      <Minus className="w-6 h-6" />
+                    </button>
+                    <input
+                      type="number"
+                      value={isIroningPage ? passQtyIron : passQtyOPA}
+                      onChange={(e) =>
+                        handlePassQtyChange(Number(e.target.value))
+                      }
+                      className="w-20 text-lg text-center border border-gray-300 rounded-md py-2"
+                    />
+                    <button
+                      onClick={() =>
+                        handlePassQtyChange(
+                          (isIroningPage ? passQtyIron : passQtyOPA) + 1
+                        )
+                      }
+                      className="p-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    >
+                      <Plus className="w-6 h-6" />
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {isWashingPage && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600 mb-2">Pass Wash Qty</p>
+                  <input
+                    type="number"
+                    value={passQtyWash}
+                    readOnly
+                    className="w-20 text-lg text-center border border-gray-300 rounded-md py-2 bg-gray-100"
+                  />
+                </div>
+              )}
+
+              {isPackingPage && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600 mb-2">Pass Pack Qty</p>
+                  <input
+                    type="number"
+                    value={passQtyPack}
+                    readOnly
+                    className="w-20 text-lg text-center border border-gray-300 rounded-md py-2 bg-gray-100"
+                  />
+                </div>
+              )}
+
               <div className="mt-6 flex items-center gap-4">
                 <button
                   onClick={handleAddRecord}
@@ -173,13 +264,6 @@ const QrCodeScanner = ({
           </div>
         </div>
       )}
-
-      {/* {error && (
-        <div className="mb-6 p-4 bg-red-100 border border-red-200 rounded-lg flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-red-500" />
-          <p className="text-red-700">{error}</p>
-        </div>
-      )} */}
     </div>
   );
 };

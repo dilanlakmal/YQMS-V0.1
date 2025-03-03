@@ -370,6 +370,7 @@
 
 import { AlertCircle, Bluetooth, Printer } from "lucide-react";
 import React, { forwardRef, useImperativeHandle, useState, useEffect } from "react";
+import { allDefects } from "../../constants/QC Inspection/defects";
 
 const PRINTER_CONFIG = {
   gainscha: {
@@ -420,7 +421,6 @@ const BluetoothComponent = forwardRef((props, ref) => {
         connectionStatus: "Scanning for devices...",
       });
       setShowStatus(true);
-
       const device = await navigator.bluetooth.requestDevice({
         filters: [{ namePrefix: "GP-" }],
         optionalServices: [PRINTER_CONFIG.gainscha.serviceUUID],

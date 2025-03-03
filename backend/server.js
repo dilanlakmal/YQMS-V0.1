@@ -579,34 +579,42 @@ app.get("/api/user-batches", async (req, res) => {
 
 
 /* ------------------------------
-   End Points - Reprint - qc2 orders
+   End Points - Reprint - qc2_orderdata
 ------------------------------ */
 
-// Reprint endpoints
-app.get("/api/reprint-search-mono", async (req, res) => {
+// Combined search endpoint for MONo, Package No, and Emp ID from qc2_orderdata
+app.get("/api/reprint-search", async (req, res) => {
   try {
-    const digits = req.query.digits;
-    const results = await QC2OrderData.aggregate([
-      {
-        $match: {
-          selectedMono: { $regex: `${digits}$` },
-        },
-      },
-      {
-        $group: {
-          _id: "$selectedMono",
-          count: { $sum: 1 },
-        },
-      },
-      { $limit: 100 },
-    ]);
+    const { mono, packageNo, empId } = req.query;
 
-    res.json(results.map((r) => r._id));
+    // Build the query dynamically based on provided parameters
+    const query = {};
+    if (mono) {
+      query.selectedMono = { $regex: mono, $options: "i" }; // Case-insensitive partial match
+    }
+    if (packageNo) {
+      const packageNoInt = parseInt(packageNo);
+      if (!isNaN(packageNoInt)) {
+        query.package_no = packageNoInt; // Exact match for integer
+      }
+    }
+    if (empId) {
+      query.emp_id = { $regex: empId, $options: "i" }; // Case-insensitive partial match
+    }
+
+    // Fetch matching records from qc2_orderdata
+    const records = await QC2OrderData.find(query)
+      .sort({ package_no: 1 }) // Sort by package_no ascending
+      .limit(100); // Limit to prevent overload
+
+    res.json(records);
   } catch (error) {
-    res.status(500).json({ error: "Failed to search MONo" });
+    console.error("Error searching qc2_orderdata:", error);
+    res.status(500).json({ error: "Failed to search records" });
   }
 });
 
+// Fetch colors and sizes for a specific MONo (unchanged)
 app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
   try {
     const mono = req.params.mono;
@@ -620,7 +628,7 @@ app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
           },
           colorCode: { $first: "$colorCode" },
           chnColor: { $first: "$chnColor" },
-          package_no: { $first: "$package_no" }, // Add this line
+          package_no: { $first: "$package_no" },
         },
       },
       {
@@ -646,20 +654,84 @@ app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
   }
 });
 
-app.get("/api/reprint-records", async (req, res) => {
-  try {
-    const { mono, color, size } = req.query;
-    const records = await QC2OrderData.find({
-      selectedMono: mono,
-      color: color,
-      size: size,
-    }).sort({ package_no: 1 });
+// Reprint endpoints
+// app.get("/api/reprint-search-mono", async (req, res) => {
+//   try {
+//     const digits = req.query.digits;
+//     const results = await QC2OrderData.aggregate([
+//       {
+//         $match: {
+//           selectedMono: { $regex: `${digits}$` },
+//         },
+//       },
+//       {
+//         $group: {
+//           _id: "$selectedMono",
+//           count: { $sum: 1 },
+//         },
+//       },
+//       { $limit: 100 },
+//     ]);
 
-    res.json(records);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch records" });
-  }
-});
+//     res.json(results.map((r) => r._id));
+//   } catch (error) {
+//     res.status(500).json({ error: "Failed to search MONo" });
+//   }
+// });
+
+// app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
+//   try {
+//     const mono = req.params.mono;
+//     const result = await QC2OrderData.aggregate([
+//       { $match: { selectedMono: mono } },
+//       {
+//         $group: {
+//           _id: {
+//             color: "$color",
+//             size: "$size",
+//           },
+//           colorCode: { $first: "$colorCode" },
+//           chnColor: { $first: "$chnColor" },
+//           package_no: { $first: "$package_no" }, // Add this line
+//         },
+//       },
+//       {
+//         $group: {
+//           _id: "$_id.color",
+//           sizes: { $push: "$_id.size" },
+//           colorCode: { $first: "$colorCode" },
+//           chnColor: { $first: "$chnColor" },
+//         },
+//       },
+//     ]);
+
+//     const colors = result.map((c) => ({
+//       color: c._id,
+//       sizes: c.sizes,
+//       colorCode: c.colorCode,
+//       chnColor: c.chnColor,
+//     }));
+
+//     res.json(colors);
+//   } catch (error) {
+//     res.status(500).json({ error: "Failed to fetch colors/sizes" });
+//   }
+// });
+
+// app.get("/api/reprint-records", async (req, res) => {
+//   try {
+//     const { mono, color, size } = req.query;
+//     const records = await QC2OrderData.find({
+//       selectedMono: mono,
+//       color: color,
+//       size: size,
+//     }).sort({ package_no: 1 });
+
+//     res.json(records);
+//   } catch (error) {
+//     res.status(500).json({ error: "Failed to fetch records" });
+//   }
+// });
 
 /* ------------------------------
    End Points - Ironing
@@ -732,11 +804,11 @@ app.get("/api/last-ironing-record-id/:emp_id", async (req, res) => {
   try {
     const { emp_id } = req.params;
     const lastRecord = await Ironing.findOne(
-      { emp_id },
+      { emp_id_ironing: emp_id }, // Filter by emp_id_ironing
       {},
-      { sort: { ironing_record_id: -1 } }
+      { sort: { ironing_record_id: -1 } } // Sort descending to get the highest ID
     );
-    const lastRecordId = lastRecord ? lastRecord.ironing_record_id : 0;
+    const lastRecordId = lastRecord ? lastRecord.ironing_record_id : 0; // Start at 0 if no records exist
     res.json({ lastRecordId });
   } catch (error) {
     console.error("Error fetching last ironing record ID:", error);
@@ -744,6 +816,65 @@ app.get("/api/last-ironing-record-id/:emp_id", async (req, res) => {
   }
 });
 
+// Modified endpoint to fetch defect card data with logging
+app.get("/api/check-defect-card/:defectPrintId", async (req, res) => {
+  try {
+    const { defectPrintId } = req.params;
+    //console.log(`Searching for defect_print_id: "${defectPrintId}"`); // Debug log
+
+    const defectRecord = await QC2InspectionPassBundle.findOne({
+      "printArray.defect_print_id": defectPrintId,
+      "printArray.isCompleted": false,
+    });
+    if (!defectRecord) {
+      console.log(
+        `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
+      );
+      return res.status(404).json({ message: "Defect card not found" });
+    }
+
+    const printData = defectRecord.printArray.find(
+      (item) => item.defect_print_id === defectPrintId
+    );
+    if (!printData) {
+      console.log(
+        `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
+      );
+      return res
+        .status(404)
+        .json({ message: "Defect print ID not found in printArray" });
+    }
+
+    const formattedData = {
+      defect_print_id: printData.defect_print_id,
+      totalRejectGarmentCount: printData.totalRejectGarmentCount,
+      package_no: defectRecord.package_no, // Include package_no
+      moNo: defectRecord.moNo,
+      selectedMono: defectRecord.moNo,
+      custStyle: defectRecord.custStyle,
+      buyer: defectRecord.buyer,
+      color: defectRecord.color,
+      size: defectRecord.size,
+      factory: defectRecord.factory,
+      country: defectRecord.country,
+      lineNo: defectRecord.lineNo,
+      department: defectRecord.department,
+      count: defectRecord.checkedQty,
+      emp_id_inspection: defectRecord.emp_id_inspection,
+      inspection_date: defectRecord.inspection_date,
+      inspection_time: defectRecord.inspection_time,
+      sub_con: defectRecord.sub_con,
+      sub_con_factory: defectRecord.sub_con_factory,
+      bundle_id: defectRecord.bundle_id,
+      bundle_random_id: defectRecord.bundle_random_id,
+    };
+
+    res.json(formattedData);
+  } catch (error) {
+    console.error("Error checking defect card:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
 
 // Save ironing record
 app.post("/api/save-ironing", async (req, res) => {
@@ -816,7 +947,21 @@ app.get("/api/ironing-records", async (req, res) => {
    End Points - Washing
 ------------------------------ */
 
-// Check if washing record exists
+app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
+  try {
+    const bundle = await QC2OrderData.findOne({
+      bundle_random_id: req.params.randomId,
+    });
+    if (!bundle) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+    res.json(bundle);
+  } catch (error) {
+    console.error("Error fetching bundle:", error);
+    res.status(500).json({ error: "Failed to fetch bundle" });
+  }
+});
+
 app.get("/api/check-washing-exists/:bundleId", async (req, res) => {
   try {
     const record = await Washing.findOne({
@@ -828,12 +973,65 @@ app.get("/api/check-washing-exists/:bundleId", async (req, res) => {
   }
 });
 
-// New endpoint to get the last washing record ID for a specific emp_id
+app.get("/api/check-defect-card-washing/:defectPrintId", async (req, res) => {
+  try {
+    const { defectPrintId } = req.params;
+    const defectRecord = await QC2InspectionPassBundle.findOne({
+      "printArray.defect_print_id": defectPrintId,
+      "printArray.isCompleted": false,
+    });
+    if (!defectRecord) {
+      console.log(
+        `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
+      );
+      return res.status(404).json({ message: "Defect card not found" });
+    }
+    const printData = defectRecord.printArray.find(
+      (item) => item.defect_print_id === defectPrintId
+    );
+    if (!printData) {
+      console.log(
+        `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
+      );
+      return res
+        .status(404)
+        .json({ message: "Defect print ID not found in printArray" });
+    }
+    const formattedData = {
+      defect_print_id: printData.defect_print_id,
+      totalRejectGarmentCount: printData.totalRejectGarmentCount,
+      package_no: defectRecord.package_no,
+      moNo: defectRecord.moNo,
+      selectedMono: defectRecord.moNo,
+      custStyle: defectRecord.custStyle,
+      buyer: defectRecord.buyer,
+      color: defectRecord.color,
+      size: defectRecord.size,
+      factory: defectRecord.factory,
+      country: defectRecord.country,
+      lineNo: defectRecord.lineNo,
+      department: defectRecord.department,
+      count: defectRecord.checkedQty,
+      emp_id_inspection: defectRecord.emp_id_inspection,
+      inspection_date: defectRecord.inspection_date,
+      inspection_time: defectRecord.inspection_time,
+      sub_con: defectRecord.sub_con,
+      sub_con_factory: defectRecord.sub_con_factory,
+      bundle_id: defectRecord.bundle_id,
+      bundle_random_id: defectRecord.bundle_random_id,
+    };
+    res.json(formattedData);
+  } catch (error) {
+    console.error("Error checking defect card for washing:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 app.get("/api/last-washing-record-id/:emp_id", async (req, res) => {
   try {
     const { emp_id } = req.params;
     const lastRecord = await Washing.findOne(
-      { emp_id },
+      { emp_id_washing: emp_id },
       {},
       { sort: { washing_record_id: -1 } }
     );
@@ -845,7 +1043,6 @@ app.get("/api/last-washing-record-id/:emp_id", async (req, res) => {
   }
 });
 
-// Save washing record
 app.post("/api/save-washing", async (req, res) => {
   try {
     const newRecord = new Washing(req.body);
@@ -860,30 +1057,47 @@ app.post("/api/save-washing", async (req, res) => {
   }
 });
 
-// Update qc2_orderdata with washing details
 app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
   try {
     const { bundleId } = req.params;
-    const { passQtyWash, washing_updated_date, washing_update_time } = req.body;
+    const {
+      passQtyWash,
+      washing_updated_date,
+      washing_update_time,
+      emp_id_washing,
+      eng_name_washing,
+      kh_name_washing,
+      job_title_washing,
+      dept_name_washing,
+      sect_name_washing,
+    } = req.body;
+
     const updatedRecord = await QC2OrderData.findOneAndUpdate(
       { bundle_id: bundleId },
       {
         passQtyWash,
         washing_updated_date,
         washing_update_time,
+        emp_id_washing,
+        eng_name_washing,
+        kh_name_washing,
+        job_title_washing,
+        dept_name_washing,
+        sect_name_washing,
       },
       { new: true }
     );
+
     if (!updatedRecord) {
       return res.status(404).json({ error: "Bundle not found" });
     }
+
     res.json({ message: "Record updated successfully", data: updatedRecord });
   } catch (error) {
     res.status(500).json({ error: "Failed to update record" });
   }
 });
 
-// For Data tab display records in a table
 app.get("/api/washing-records", async (req, res) => {
   try {
     const records = await Washing.find();
@@ -897,7 +1111,21 @@ app.get("/api/washing-records", async (req, res) => {
    End Points - OPA
 ------------------------------ */
 
-// Check if OPA record exists
+app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
+  try {
+    const bundle = await QC2OrderData.findOne({
+      bundle_random_id: req.params.randomId,
+    });
+    if (!bundle) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+    res.json(bundle);
+  } catch (error) {
+    console.error("Error fetching bundle:", error);
+    res.status(500).json({ error: "Failed to fetch bundle" });
+  }
+});
+
 app.get("/api/check-opa-exists/:bundleId", async (req, res) => {
   try {
     const record = await OPA.findOne({
@@ -909,12 +1137,65 @@ app.get("/api/check-opa-exists/:bundleId", async (req, res) => {
   }
 });
 
-// New endpoint to get the last OPA record ID for a specific emp_id
+app.get("/api/check-defect-card-opa/:defectPrintId", async (req, res) => {
+  try {
+    const { defectPrintId } = req.params;
+    const defectRecord = await QC2InspectionPassBundle.findOne({
+      "printArray.defect_print_id": defectPrintId,
+      "printArray.isCompleted": false,
+    });
+    if (!defectRecord) {
+      console.log(
+        `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
+      );
+      return res.status(404).json({ message: "Defect card not found" });
+    }
+    const printData = defectRecord.printArray.find(
+      (item) => item.defect_print_id === defectPrintId
+    );
+    if (!printData) {
+      console.log(
+        `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
+      );
+      return res
+        .status(404)
+        .json({ message: "Defect print ID not found in printArray" });
+    }
+    const formattedData = {
+      defect_print_id: printData.defect_print_id,
+      totalRejectGarmentCount: printData.totalRejectGarmentCount,
+      package_no: defectRecord.package_no,
+      moNo: defectRecord.moNo,
+      selectedMono: defectRecord.moNo,
+      custStyle: defectRecord.custStyle,
+      buyer: defectRecord.buyer,
+      color: defectRecord.color,
+      size: defectRecord.size,
+      factory: defectRecord.factory,
+      country: defectRecord.country,
+      lineNo: defectRecord.lineNo,
+      department: defectRecord.department,
+      count: defectRecord.checkedQty,
+      emp_id_inspection: defectRecord.emp_id_inspection,
+      inspection_date: defectRecord.inspection_date,
+      inspection_time: defectRecord.inspection_time,
+      sub_con: defectRecord.sub_con,
+      sub_con_factory: defectRecord.sub_con_factory,
+      bundle_id: defectRecord.bundle_id,
+      bundle_random_id: defectRecord.bundle_random_id,
+    };
+    res.json(formattedData);
+  } catch (error) {
+    console.error("Error checking defect card for OPA:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 app.get("/api/last-opa-record-id/:emp_id", async (req, res) => {
   try {
     const { emp_id } = req.params;
     const lastRecord = await OPA.findOne(
-      { emp_id },
+      { emp_id_opa: emp_id },
       {},
       { sort: { opa_record_id: -1 } }
     );
@@ -926,7 +1207,6 @@ app.get("/api/last-opa-record-id/:emp_id", async (req, res) => {
   }
 });
 
-// Save OPA record
 app.post("/api/save-opa", async (req, res) => {
   try {
     const newRecord = new OPA(req.body);
@@ -941,11 +1221,20 @@ app.post("/api/save-opa", async (req, res) => {
   }
 });
 
-// Update qc2_orderdata with OPA details
 app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
   try {
     const { bundleId } = req.params;
-    const { passQtyOPA, opa_updated_date, opa_update_time } = req.body;
+    const {
+      passQtyOPA,
+      opa_updated_date,
+      opa_update_time,
+      emp_id_opa,
+      eng_name_opa,
+      kh_name_opa,
+      job_title_opa,
+      dept_name_opa,
+      sect_name_opa,
+    } = req.body;
 
     const updatedRecord = await QC2OrderData.findOneAndUpdate(
       { bundle_id: bundleId },
@@ -953,6 +1242,12 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
         passQtyOPA,
         opa_updated_date,
         opa_update_time,
+        emp_id_opa,
+        eng_name_opa,
+        kh_name_opa,
+        job_title_opa,
+        dept_name_opa,
+        sect_name_opa,
       },
       { new: true }
     );
@@ -967,7 +1262,6 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
   }
 });
 
-// For Data tab display records in a table
 app.get("/api/opa-records", async (req, res) => {
   try {
     const records = await OPA.find();
@@ -1614,6 +1908,10 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       lineNo,
       department,
       buyer,
+      factory,
+      country,
+      sub_con,
+      sub_con_factory,
       checkedQty,
       totalPass,
       totalRejects,
@@ -1644,6 +1942,10 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       lineNo,
       department,
       buyer: buyer || "N/A",
+      factory: factory || "N/A",
+      country: country || "N/A",
+      sub_con: sub_con || "No",
+      sub_con_factory: sub_con_factory || "N/A",
       checkedQty,
       totalPass,
       totalRejects,
@@ -2114,6 +2416,446 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
   }
 });
 
+// Endpoint to get summaries per MO No
+app.get("/api/qc2-mo-summaries", async (req, res) => {
+  try {
+    const {
+      moNo,
+      emp_id_inspection,
+      startDate,
+      endDate,
+      color,
+      size,
+      department,
+      buyer, // Add buyer filter
+    } = req.query;
+    let match = {};
+    if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    if (emp_id_inspection)
+      match.emp_id_inspection = {
+        $regex: new RegExp(emp_id_inspection.trim(), "i"),
+      };
+    if (color) match.color = color;
+    if (size) match.size = size;
+    if (department) match.department = department;
+    if (buyer)
+      match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+    let exprConditions = [];
+    if (startDate) {
+      const [sm, sd, sy] = startDate.split("/");
+      const startObj = new Date(sy, sm - 1, sd);
+      exprConditions.push({
+        $gte: [
+          {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+            },
+          },
+          startObj,
+        ],
+      });
+    }
+    if (endDate) {
+      const [em, ed, ey] = endDate.split("/");
+      const endObj = new Date(ey, em - 1, ed);
+      exprConditions.push({
+        $lte: [
+          {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+            },
+          },
+          endObj,
+        ],
+      });
+    }
+    if (exprConditions.length > 0) match.$expr = { $and: exprConditions };
+
+    const data = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: "$moNo",
+          checkedQty: { $sum: "$checkedQty" },
+          totalPass: { $sum: "$totalPass" },
+          totalRejects: { $sum: "$totalRejects" },
+          defectsQty: { $sum: "$defectQty" },
+          totalBundles: { $sum: 1 },
+          defectiveBundles: {
+            $sum: { $cond: [{ $gt: ["$totalRepair", 0] }, 1, 0] },
+          }, // Count bundles with totalRepair > 0
+          defectArray: { $push: "$defectArray" }, // Include defectArray
+        },
+      },
+      {
+        $project: {
+          moNo: "$_id",
+          checkedQty: 1,
+          totalPass: 1,
+          totalRejects: 1,
+          defectsQty: 1,
+          totalBundles: 1,
+          defectiveBundles: 1,
+          defectArray: {
+            $reduce: {
+              input: "$defectArray",
+              initialValue: [],
+              in: { $concatArrays: ["$$value", "$$this"] },
+            },
+          }, // Flatten defectArray
+          defectRate: {
+            $cond: [
+              { $eq: ["$checkedQty", 0] },
+              0,
+              { $divide: ["$defectsQty", "$checkedQty"] },
+            ],
+          },
+          defectRatio: {
+            $cond: [
+              { $eq: ["$checkedQty", 0] },
+              0,
+              { $divide: ["$totalRejects", "$checkedQty"] },
+            ],
+          },
+          _id: 0,
+        },
+      },
+      { $sort: { moNo: 1 } }, // Consistent sorting by MO No
+    ]);
+
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching MO summaries:", error);
+    res.status(500).json({ error: "Failed to fetch MO summaries" });
+  }
+});
+
+app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
+  try {
+    const {
+      moNo,
+      emp_id_inspection,
+      startDate,
+      endDate,
+      color,
+      size,
+      department,
+      buyer,
+    } = req.query;
+    let match = {};
+    if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    if (emp_id_inspection)
+      match.emp_id_inspection = {
+        $regex: new RegExp(emp_id_inspection.trim(), "i"),
+      };
+    if (color) match.color = color;
+    if (size) match.size = size;
+    if (department) match.department = department;
+    if (buyer)
+      match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+    let exprConditions = [];
+    if (startDate) {
+      const [sm, sd, sy] = startDate.split("/");
+      const startObj = new Date(sy, sm - 1, sd);
+      exprConditions.push({
+        $gte: [
+          {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+            },
+          },
+          startObj,
+        ],
+      });
+    }
+    if (endDate) {
+      const [em, ed, ey] = endDate.split("/");
+      const endObj = new Date(ey, em - 1, ed);
+      exprConditions.push({
+        $lte: [
+          {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+            },
+          },
+          endObj,
+        ],
+      });
+    }
+    if (exprConditions.length > 0) match.$expr = { $and: exprConditions };
+
+    const data = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $project: {
+          moNo: 1,
+          checkedQty: 1,
+          defectQty: 1,
+          defectArray: 1,
+          inspection_time: 1,
+          hour: { $toInt: { $substr: ["$inspection_time", 0, 2] } },
+          minute: { $toInt: { $substr: ["$inspection_time", 3, 2] } },
+          second: { $toInt: { $substr: ["$inspection_time", 6, 2] } },
+        },
+      },
+      // Ensure records fall within the correct hour range (e.g., 07:00:00 - 07:59:59)
+      {
+        $match: {
+          minute: { $gte: 0, $lte: 59 },
+          second: { $gte: 0, $lte: 59 },
+        },
+      },
+      // First, group all records by MO No and hour to get total checkedQty (including non-defective records)
+      {
+        $group: {
+          _id: { moNo: "$moNo", hour: "$hour" },
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$defectQty" },
+          defectRecords: { $push: "$defectArray" }, // Collect defect arrays for further processing
+        },
+      },
+      // Unwind defectRecords to process defects, preserving totalCheckedQty
+      { $unwind: { path: "$defectRecords", preserveNullAndEmptyArrays: true } },
+      // Unwind individual defects within defectRecords
+      { $unwind: { path: "$defectRecords", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: {
+            moNo: "$_id.moNo",
+            hour: "$_id.hour",
+            defectName: "$defectRecords.defectName",
+          },
+          totalCheckedQty: { $first: "$totalCheckedQty" }, // Keep the total checkedQty from all records
+          totalDefectQty: { $first: "$totalDefectQty" }, // Total defect qty from all records
+          defectCount: { $sum: "$defectRecords.totalCount" }, // Sum defect counts per defect name
+        },
+      },
+      {
+        $group: {
+          _id: { moNo: "$_id.moNo", hour: "$_id.hour" },
+          checkedQty: { $first: "$totalCheckedQty" },
+          totalDefectQty: { $first: "$totalDefectQty" },
+          defects: {
+            $push: {
+              name: "$_id.defectName",
+              count: {
+                $cond: [
+                  { $eq: ["$defectCount", null] }, // Handle null counts from empty defectArrays
+                  0,
+                  "$defectCount",
+                ],
+              },
+            },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.moNo",
+          hours: {
+            $push: {
+              hour: "$_id.hour",
+              checkedQty: "$checkedQty",
+              defects: "$defects",
+              defectQty: "$totalDefectQty",
+            },
+          },
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$totalDefectQty" },
+        },
+      },
+      {
+        $project: {
+          moNo: "$_id",
+          hourData: {
+            $arrayToObject: {
+              $map: {
+                input: "$hours",
+                as: "h",
+                in: {
+                  k: { $toString: { $add: ["$$h.hour", 1] } },
+                  v: {
+                    rate: {
+                      $cond: [
+                        { $eq: ["$$h.checkedQty", 0] },
+                        0,
+                        {
+                          $multiply: [
+                            { $divide: ["$$h.defectQty", "$$h.checkedQty"] },
+                            100,
+                          ],
+                        },
+                      ],
+                    },
+                    hasCheckedQty: { $gt: ["$$h.checkedQty", 0] },
+                    checkedQty: "$$h.checkedQty",
+                    defects: "$$h.defects",
+                  },
+                },
+              },
+            },
+          },
+          totalRate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                  100,
+                ],
+              },
+            ],
+          },
+          _id: 0,
+        },
+      },
+      { $sort: { moNo: 1 } },
+    ]);
+
+    const totalData = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $project: {
+          checkedQty: 1,
+          defectQty: 1,
+          hour: { $toInt: { $substr: ["$inspection_time", 0, 2] } },
+        },
+      },
+      {
+        $group: {
+          _id: "$hour",
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$defectQty" },
+        },
+      },
+      {
+        $project: {
+          hour: "$_id",
+          rate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                  100,
+                ],
+              },
+            ],
+          },
+          hasCheckedQty: { $gt: ["$totalCheckedQty", 0] },
+          _id: 0,
+        },
+      },
+    ]);
+
+    const grandTotal = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: null,
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$defectQty" },
+        },
+      },
+      {
+        $project: {
+          rate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                  100,
+                ],
+              },
+            ],
+          },
+          _id: 0,
+        },
+      },
+    ]);
+
+    const result = {};
+    data.forEach((item) => {
+      result[item.moNo] = {};
+      Object.keys(item.hourData).forEach((hour) => {
+        const formattedHour = `${hour}:00`.padStart(5, "0");
+        const hourData = item.hourData[hour];
+        result[item.moNo][formattedHour] = {
+          rate: hourData.rate,
+          hasCheckedQty: hourData.hasCheckedQty,
+          checkedQty: hourData.checkedQty,
+          defects: hourData.defects.map((defect) => ({
+            name: defect.name || "No Defect", // Handle null names for non-defective records
+            count: defect.count,
+            rate:
+              hourData.checkedQty > 0
+                ? (defect.count / hourData.checkedQty) * 100
+                : 0,
+          })),
+        };
+      });
+      result[item.moNo].totalRate = item.totalRate;
+    });
+
+    result.total = {};
+    totalData.forEach((item) => {
+      const formattedHour = `${item.hour + 1}:00`.padStart(5, "0");
+      if (item.hour >= 6 && item.hour <= 20) {
+        result.total[formattedHour] = {
+          rate: item.rate,
+          hasCheckedQty: item.hasCheckedQty,
+        };
+      }
+    });
+
+    result.grand = grandTotal.length > 0 ? grandTotal[0] : { rate: 0 };
+
+    const hours = [
+      "07:00",
+      "08:00",
+      "09:00",
+      "10:00",
+      "11:00",
+      "12:00",
+      "13:00",
+      "14:00",
+      "15:00",
+      "16:00",
+      "17:00",
+      "18:00",
+      "19:00",
+      "20:00",
+      "21:00",
+    ];
+    Object.keys(result).forEach((key) => {
+      if (key !== "grand") {
+        hours.forEach((hour) => {
+          if (!result[key][hour]) {
+            result[key][hour] = {
+              rate: 0,
+              hasCheckedQty: false,
+              checkedQty: 0,
+              defects: [],
+            };
+          }
+        });
+      }
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching defect rates by hour:", error);
+    res.status(500).json({ error: "Failed to fetch defect rates by hour" });
+  }
+});
 
 // Endpoint to save reworks (reject garment) data
 app.post("/api/reworks", async (req, res) => {

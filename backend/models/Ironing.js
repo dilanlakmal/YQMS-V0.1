@@ -4,10 +4,12 @@ const ironingSchema = new mongoose.Schema(
   {
     ironing_record_id: Number,
     task_no_ironing: { type: Number, default: 53 },
+    package_no: Number, // Added package_no
     ironing_bundle_id: { type: String, required: true, unique: true },
     ironing_updated_date: String,
     ironing_update_time: String,
     bundle_id: String,
+    bundle_random_id: String, // Added to store bundle_random_id from qc2_orderdata or qc2_inspection_pass_bundle
     department: String,
     selectedMono: String,
     custStyle: String,
@@ -17,7 +19,7 @@ const ironingSchema = new mongoose.Schema(
     lineNo: String,
     color: String,
     size: String,
-    count: String,
+    count: Number,
     totalBundleQty: Number,
     passQtyIron: Number,
     sub_con: String,

@@ -12,6 +12,8 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
   const [availableSizes, setAvailableSizes] = useState([]);
   const [availableColors, setAvailableColors] = useState([]);
   const [showDetails, setShowDetails] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [showOrderDetails, setShowOrderDetails] = useState(false); // For mobile toggle
 
   useEffect(() => {
     if (formData.selectedMono) {
@@ -28,29 +30,55 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
 
   const fetchSizes = async (selectedMono) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/sizes?styleNo=${selectedMono}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch sizes');
-      }
-      const data = await response.json();
-      return data.sizes;
-    } catch (error) {
-      console.error('Error fetching sizes:', error);
-      return [];
-    }
-  };
+  //     const response = await fetch(`${API_BASE_URL}/api/sizes?styleNo=${selectedMono}`);
+  //     if (!response.ok) {
+  //       throw new Error('Failed to fetch sizes');
+  //     }
+  //     const data = await response.json();
+  //     return data.sizes;
+  //   } catch (error) {
+  //     console.error('Error fetching sizes:', error);
+  //     return [];
+  //   }
+  // };
 
-  const fetchColors = async (selectedMono) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/colors?styleNo=${selectedMono}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch colors');
-      }
+  // const fetchColors = async (selectedMono) => {
+  //   try {
+  //     const response = await fetch(`${API_BASE_URL}/api/colors?styleNo=${selectedMono}`);
+  //     if (!response.ok) {
+  //       throw new Error('Failed to fetch colors');
+  //     }
+  //     const data = await response.json();
+  //     return data.colors;
+  //   } catch (error) {
+  //     console.error('Error fetching colors:', error);
+  //     return [];
+      const response = await fetch(
+        `${API_BASE_URL}/api/order-details/${selectedMono}`
+      );
       const data = await response.json();
-      return data.colors;
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch order details");
+      }
+
+      const colors = data.colors.map((c) => c.original);
+      const allSizes = Object.values(data.colorSizeMap).flatMap(
+        (colorData) => colorData.sizes
+      );
+      const uniqueSizes = [...new Set(allSizes)];
+
+      setAvailableColors(colors);
+      setAvailableSizes(uniqueSizes);
+
+      console.log("Fetched Colors:", colors);
+      console.log("Fetched Sizes:", uniqueSizes);
     } catch (error) {
-      console.error('Error fetching colors:', error);
-      return [];
+      console.error("Error fetching order details:", error);
+      setAvailableColors([formData.color].filter(Boolean));
+      setAvailableSizes([formData.size].filter(Boolean));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -94,26 +122,56 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
     }
   };
 
+  const toggleOrderDetails = () => {
+    setShowOrderDetails(!showOrderDetails);
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 overflow-auto">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl mx-4 my-8 md:my-16">
-        <h2 className="text-2xl font-bold mb-4">{t("editBundle.edit_record")}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-6">
-          <div className="mb-6 p-4 bg-blue-50 rounded-md">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">{t("bundle.order_details")}</h2>
-            <button
-                onClick={() => setShowDetails(!showDetails)}
-                className="mb-4 px-4 py-2 bg-blue-500 text-white rounded-md"
-              >
-                {showDetails ? <FaEyeSlash /> : <FaEye />}
+    // <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 overflow-auto">
+    //   <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl mx-4 my-8 md:my-16">
+    //     <h2 className="text-2xl font-bold mb-4">{t("editBundle.edit_record")}</h2>
+    //     <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-6">
+    //       <div className="mb-6 p-4 bg-blue-50 rounded-md">
+    //       <div className="flex justify-between items-center">
+    //         <h2 className="text-lg font-bold text-gray-800 mb-4">{t("bundle.order_details")}</h2>
+    //         <button
+    //             onClick={() => setShowDetails(!showDetails)}
+    //             className="mb-4 px-4 py-2 bg-blue-500 text-white rounded-md"
+    //           >
+    //             {showDetails ? <FaEyeSlash /> : <FaEye />}
                 
-              </button>
-              </div>
-            {showDetails && (
-            <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
+    //           </button>
+    //           </div>
+    //         {showDetails && (
+    //         <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+      <div className="bg-white p-4 md:p-6 rounded-lg shadow-lg w-full max-w-5xl overflow-y-auto max-h-[90vh]">
+        <h2 className="text-xl md:text-2xl font-bold mb-4">
+          {t("editBundle.edit_record")}
+        </h2>
+        {loading && (
+          <div className="text-center text-gray-500 mb-4">
+            Loading sizes and colors...
+          </div>
+        )}
+
+        {/* Order Details - Hidden on mobile with toggle, visible on laptop */}
+        <div className="mb-4 md:mb-6 p-4 bg-blue-50 rounded-md">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-bold text-gray-800 mb-2 md:mb-4">
+              {t("bundle.order_details")}
+            </h2>
+            <button
+              onClick={toggleOrderDetails}
+              className="text-gray-500 hover:text-gray-700 md:hidden" // Hidden on md and above
+            >
+              {showOrderDetails ? <FaEyeSlash /> : <FaEye />}
+            </button>
+          </div>
+          <div className={`${showOrderDetails ? "block" : "hidden"} md:block`}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-700">
                   <span className="font-bold">{t("bundle.selected_mono")}:</span> {formData.selectedMono}
@@ -137,11 +195,14 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
                 </p>
               </div>
             </div>
-              )}
+              {/* )} */}
           </div>
         </div>
        
-        <div className="grid grid-cols-3 md:grid-cols-4 gap-6 mb-6">
+        {/* <div className="grid grid-cols-3 md:grid-cols-4 gap-6 mb-6"> */}
+
+        {/* Form Fields - Two columns on mobile, four on laptop */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t("bundle.date")}</label>
             <DatePicker
@@ -224,6 +285,7 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
             />
           </div>
         </div>
+
         <div className="flex justify-end space-x-4">
           <button
             onClick={onClose}

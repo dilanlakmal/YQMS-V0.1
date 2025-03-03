@@ -1,56 +1,64 @@
 import { useEffect, useRef, useState } from "react";
-import { FaPrint, FaQrcode } from "react-icons/fa";
-import { useFormData } from "../../components/context/FormDataContext"; // Import the useFormData hook
-import BluetoothComponent from "./Bluetooth";
-import MonoSearch from "./MonoSearch";
-import QRCodePreview from "./QRCodePreview";
-// Import the API_BASE_URL from our config file
+import { FaFilter, FaPrint, FaQrcode, FaTimes } from "react-icons/fa";
 import { API_BASE_URL } from "../../../config";
 import { useTranslation } from 'react-i18next';
+import BluetoothComponent from "./Bluetooth";
+import QRCodePreview from "./QRCodePreview";
 
 export default function ReprintTab() {
   const { t } = useTranslation();
-  const { formData, updateFormData } = useFormData(); // Access context
+  const { formData, updateFormData } = useFormData();
+  const [monoSearch, setMonoSearch] = useState("");
+  const [packageNoSearch, setPackageNoSearch] = useState("");
+  const [empIdSearch, setEmpIdSearch] = useState("");
   const [selectedMono, setSelectedMono] = useState("");
+  const [selectedPackageNo, setSelectedPackageNo] = useState("");
+  const [selectedEmpId, setSelectedEmpId] = useState("");
   const [color, setColor] = useState("");
   const [size, setSize] = useState("");
-
   const [colors, setColors] = useState([]);
   const [sizes, setSizes] = useState([]);
   const [records, setRecords] = useState([]);
+  const [filteredRecords, setFilteredRecords] = useState([]);
   const [selectedRecords, setSelectedRecords] = useState([]);
   const [showQRPreview, setShowQRPreview] = useState(false);
-  const [orderDetails, setOrderDetails] = useState(null); // New
-  const bluetoothComponentRef = useRef();
+  const [showFilters, setShowFilters] = useState(false);
+  const [showMonoDropdown, setShowMonoDropdown] = useState(false);
+  const [showPackageNoDropdown, setShowPackageNoDropdown] = useState(false);
+  const [showEmpIdDropdown, setShowEmpIdDropdown] = useState(false);
 
-  // Fetch order details when selectedMono changes
+  const bluetoothComponentRef = useRef();
+  const monoInputRef = useRef(null);
+  const packageNoInputRef = useRef(null);
+  const empIdInputRef = useRef(null);
+
+  // Fetch records based on search inputs
   useEffect(() => {
-    const fetchOrderDetails = async () => {
-      if (!selectedMono) {
-        setOrderDetails(null);
-        return;
-      }
+    const fetchRecords = async () => {
       try {
         const response = await fetch(
-          `${API_BASE_URL}/api/order-details/${selectedMono}`
+          `${API_BASE_URL}/api/reprint-search?mono=${monoSearch}&packageNo=${packageNoSearch}&empId=${empIdSearch}`
         );
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
         const data = await response.json();
-        setOrderDetails(data);
+        setRecords(data);
+        setFilteredRecords(data);
       } catch (error) {
-        console.error("Error fetching order details:", error);
-        setOrderDetails(null);
+        console.error("Error fetching records:", error);
+        setRecords([]);
+        setFilteredRecords([]);
       }
     };
+    fetchRecords();
+  }, [monoSearch, packageNoSearch, empIdSearch]);
 
-    fetchOrderDetails();
-  }, [selectedMono]);
-
+  // Fetch colors and sizes when a MONo is selected
   useEffect(() => {
     const fetchColorsSizes = async () => {
-      if (!selectedMono) return;
+      if (!selectedMono) {
+        setColors([]);
+        setSizes([]);
+        return;
+      }
       const response = await fetch(
         `${API_BASE_URL}/api/reprint-colors-sizes/${selectedMono}`
       );
@@ -60,17 +68,68 @@ export default function ReprintTab() {
     fetchColorsSizes();
   }, [selectedMono]);
 
+  // Filter records based on selections
   useEffect(() => {
-    const fetchRecords = async () => {
-      if (!selectedMono || !color || !size) return;
-      const response = await fetch(
-        `${API_BASE_URL}/api/reprint-records?mono=${selectedMono}&color=${color}&size=${size}`
-      );
-      const data = await response.json();
-      setRecords(data);
+    if (
+      !selectedMono &&
+      !selectedPackageNo &&
+      !selectedEmpId &&
+      !color &&
+      !size
+    ) {
+      setFilteredRecords(records);
+    } else {
+      const filtered = records.filter((record) => {
+        const matchesMono = selectedMono
+          ? record.selectedMono === selectedMono
+          : true;
+        const matchesPackageNo = selectedPackageNo
+          ? record.package_no?.toString() === selectedPackageNo
+          : true;
+        const matchesEmpId = selectedEmpId
+          ? record.emp_id === selectedEmpId
+          : true;
+        const matchesColor = color ? record.color === color : true;
+        const matchesSize = size ? record.size === size : true;
+        return (
+          matchesMono &&
+          matchesPackageNo &&
+          matchesEmpId &&
+          matchesColor &&
+          matchesSize
+        );
+      });
+      setFilteredRecords(filtered);
+    }
+  }, [selectedMono, selectedPackageNo, selectedEmpId, color, size, records]);
+
+  // Handle click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        monoInputRef.current &&
+        !monoInputRef.current.contains(event.target)
+      ) {
+        setShowMonoDropdown(false);
+      }
+      if (
+        packageNoInputRef.current &&
+        !packageNoInputRef.current.contains(event.target)
+      ) {
+        setShowPackageNoDropdown(false);
+      }
+      if (
+        empIdInputRef.current &&
+        !empIdInputRef.current.contains(event.target)
+      ) {
+        setShowEmpIdDropdown(false);
+      }
     };
-    fetchRecords();
-  }, [selectedMono, color, size]);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const handlePrint = async (record) => {
     try {
@@ -84,65 +143,175 @@ export default function ReprintTab() {
   };
 
   const handlePreviewQR = (record) => {
-    setSelectedRecords([record]); // Set the selected record for preview
-    setShowQRPreview(true); // Show the QR preview modal
+    setSelectedRecords([record]);
+    setShowQRPreview(true);
+  };
+
+  const handleMonoSelect = (mono) => {
+    setSelectedMono(mono);
+    setMonoSearch(mono);
+    setShowMonoDropdown(false); // Close dropdown immediately after selection
+    setColor("");
+    setSize("");
+  };
+
+  const handlePackageNoSelect = (packageNo) => {
+    setSelectedPackageNo(packageNo);
+    setPackageNoSearch(packageNo);
+    setShowPackageNoDropdown(false); // Close dropdown immediately after selection
+    setColor("");
+    setSize("");
+  };
+
+  const handleEmpIdSelect = (empId) => {
+    setSelectedEmpId(empId);
+    setEmpIdSearch(empId);
+    setShowEmpIdDropdown(false); // Close dropdown immediately after selection
+    setColor("");
+    setSize("");
+  };
+
+  const handleClearFilters = () => {
+    setMonoSearch("");
+    setPackageNoSearch("");
+    setEmpIdSearch("");
+    setSelectedMono("");
+    setSelectedPackageNo("");
+    setSelectedEmpId("");
+    setColor("");
+    setSize("");
+    setFilteredRecords(records);
   };
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {t("bundle.search_mono")}
-          </label>
-          <MonoSearch
-            value={selectedMono}
-            onSelect={setSelectedMono}
-            placeholder="Search Last 3 Digits of MONo..."
-            endpoint="/api/reprint-search-mono"
-          />
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-bold text-gray-800">Reprint Records</h2>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center text-sm bg-blue-500 text-white px-3 py-1 rounded-md"
+          >
+            <FaFilter className="mr-1" size={10} />
+            {showFilters ? "Hide Filters" : "Show Filters"}
+          </button>
+          {showFilters && (
+            <button
+              onClick={handleClearFilters}
+              className="flex items-center text-sm bg-gray-200 px-3 py-1 rounded-md"
+            >
+              <FaTimes className="mr-1" size={10} />
+              Clear
+            </button>
+          )}
+          <BluetoothComponent ref={bluetoothComponentRef} />
         </div>
-        <BluetoothComponent ref={bluetoothComponentRef} />
       </div>
 
-      {/* Order Details Box */}
-      {orderDetails && (
-        <div className="mb-6 p-4 bg-gray-50 rounded-md">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">
-          {t("bundle.order_details")}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-700">
-                <span className="font-bold">{t("bundle.selected_mono")}:</span> {selectedMono}
-              </p>
-              <p className="text-sm text-gray-700">
-                <span className="font-bold">{t("bundle.customer_style")}:</span>{" "}
-                {orderDetails.custStyle || "N/A"}
-              </p>
-              <p className="text-sm text-gray-700">
-                <span className="font-bold">{t("bundle.buyer")}:</span> {orderDetails.engName}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-700">
-                <span className="font-bold">{t("bundle.country")}:</span>{" "}
-                {orderDetails.country || "N/A"}
-              </p>
-              <p className="text-sm text-gray-700">
-                <span className="font-bold">{t("bundle.order_qty")}:</span>{" "}
-                {orderDetails.totalQty || "N/A"}
-              </p>
-              <p className="text-sm text-gray-700">
-                <span className="font-bold">{t("bundle.factory")}:</span>{" "}
-                {orderDetails.factoryname || "N/A"}
-              </p>
-            </div>
+      {showFilters && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div ref={monoInputRef}>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+            {t("bundle.search_mono")}
+            </label>
+            <input
+              type="text"
+              value={monoSearch}
+              onChange={(e) => {
+                setMonoSearch(e.target.value);
+                setShowMonoDropdown(true);
+              }}
+              onFocus={() => setShowMonoDropdown(true)}
+              placeholder="Search MONo..."
+              className="w-full p-2 border rounded"
+            />
+            {showMonoDropdown && monoSearch && records.length > 0 && (
+              <ul className="mt-2 max-h-40 overflow-y-auto border rounded bg-white absolute z-10">
+                {[...new Set(records.map((r) => r.selectedMono))].map(
+                  (mono) => (
+                    <li
+                      key={mono}
+                      onClick={() => handleMonoSelect(mono)}
+                      className="p-2 hover:bg-gray-100 cursor-pointer"
+                    >
+                      {mono}
+                    </li>
+                  )
+                )}
+              </ul>
+            )}
+          </div>
+
+          <div ref={packageNoInputRef}>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Package No
+            </label>
+            <input
+              type="text"
+              value={packageNoSearch}
+              onChange={(e) => {
+                setPackageNoSearch(e.target.value);
+                setShowPackageNoDropdown(true);
+              }}
+              onFocus={() => setShowPackageNoDropdown(true)}
+              placeholder="Search Package No..."
+              inputMode="numeric" // Numeric keyboard for mobile/tablet
+              className="w-full p-2 border rounded"
+            />
+            {showPackageNoDropdown && packageNoSearch && records.length > 0 && (
+              <ul className="mt-2 max-h-40 overflow-y-auto border rounded bg-white absolute z-10">
+                {[
+                  ...new Set(
+                    records.map((r) => r.package_no?.toString() || "N/A")
+                  ),
+                ].map((pkg) => (
+                  <li
+                    key={pkg}
+                    onClick={() => handlePackageNoSelect(pkg)}
+                    className="p-2 hover:bg-gray-100 cursor-pointer"
+                  >
+                    {pkg}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div ref={empIdInputRef}>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Emp ID
+            </label>
+            <input
+              type="text"
+              value={empIdSearch}
+              onChange={(e) => {
+                setEmpIdSearch(e.target.value);
+                setShowEmpIdDropdown(true);
+              }}
+              onFocus={() => setShowEmpIdDropdown(true)}
+              placeholder="Search Emp ID..."
+              className="w-full p-2 border rounded"
+            />
+            {showEmpIdDropdown && empIdSearch && records.length > 0 && (
+              <ul className="mt-2 max-h-40 overflow-y-auto border rounded bg-white absolute z-10">
+                {[...new Set(records.map((r) => r.emp_id || "N/A"))].map(
+                  (empId) => (
+                    <li
+                      key={empId}
+                      onClick={() => handleEmpIdSelect(empId)}
+                      className="p-2 hover:bg-gray-100 cursor-pointer"
+                    >
+                      {empId}
+                    </li>
+                  )
+                )}
+              </ul>
+            )}
           </div>
         </div>
       )}
 
-      {selectedMono && (
+      {selectedMono && showFilters && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div>
             <label>{t("bundle.color")}</label>
@@ -183,7 +352,7 @@ export default function ReprintTab() {
         </div>
       )}
 
-      {records.length > 0 && (
+      {filteredRecords.length > 0 && (
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse border border-gray-200">
             <thead>
@@ -201,36 +370,12 @@ export default function ReprintTab() {
               </tr>
             </thead>
             <tbody>
-              {records.map((record) => (
+              {filteredRecords.map((record) => (
                 <tr key={record._id} className="hover:bg-gray-50">
-                  <td className="p-2 border border-gray-300 text-center">
-                    {record.package_no}
+                  <td className="p-2 border border-gray-300 text-center text-sm">
+                    {record.package_no || "N/A"}
                   </td>
                   <td className="p-2 border border-gray-300 text-center">
-                    {record.selectedMono}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-center">
-                    {record.color}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-center">
-                    {record.size}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-center">
-                    {record.custStyle}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-center">
-                    {record.lineNo}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-center">
-                    {record.updated_date_seperator}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-center">
-                    {record.updated_time_seperator}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-center">
-                    {record.emp_id}
-                  </td>
-                  <td>
                     <button
                       onClick={() => handlePreviewQR(record)}
                       className="text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100"
@@ -244,6 +389,30 @@ export default function ReprintTab() {
                       <FaPrint className="w-5 h-5" />
                     </button>
                   </td>
+                  <td className="p-2 border border-gray-300 text-center text-sm">
+                    {record.selectedMono}
+                  </td>
+                  <td className="p-2 border border-gray-300 text-center text-sm">
+                    {record.color}
+                  </td>
+                  <td className="p-2 border border-gray-300 text-center text-sm">
+                    {record.size}
+                  </td>
+                  <td className="p-2 border border-gray-300 text-center text-sm">
+                    {record.custStyle}
+                  </td>
+                  <td className="p-2 border border-gray-300 text-center text-sm">
+                    {record.lineNo}
+                  </td>
+                  <td className="p-2 border border-gray-300 text-center text-sm">
+                    {record.updated_date_seperator}
+                  </td>
+                  <td className="p-2 border border-gray-300 text-center text-sm">
+                    {record.updated_time_seperator}
+                  </td>
+                  <td className="p-2 border border-gray-300 text-center text-sm">
+                    {record.emp_id || "N/A"}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -256,7 +425,7 @@ export default function ReprintTab() {
         onClose={() => setShowQRPreview(false)}
         qrData={selectedRecords}
         onPrint={handlePrint}
-        mode="production" // Add this line
+        mode="production"
       />
     </div>
   );
