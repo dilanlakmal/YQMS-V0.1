@@ -45,7 +45,9 @@ const QC2InspectionPage = () => {
   const [sortOption, setSortOption] = useState("alphaAsc");
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [selectedFeature, setSelectedFeature] = useState(null);
   const [language, setLanguage] = useState("english");
+  const [menuClicked, setMenuClicked] = useState(false);
   const [defectTypeFilter, setDefectTypeFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [qrCodesData, setQrCodesData] = useState({
@@ -63,6 +65,7 @@ const QC2InspectionPage = () => {
   const [sessionData, setSessionData] = useState(null);
 
   const bluetoothRef = useRef();
+  const [isBluetoothConnected, setIsBluetoothConnected] = useState(false);
 
   const activeFilter = categoryFilter || defectTypeFilter;
   const categoryOptions = [
@@ -828,45 +831,53 @@ const QC2InspectionPage = () => {
     setPassBundleCountdown(null);
   };
 
+  const handleIconClick = (feature) => {
+    setSelectedFeature(feature);
+    setMenuClicked(false);
+    setNavOpen(true);
+  };
+
+  const handleMenuClick = () => {
+    setNavOpen(!navOpen);
+    setMenuClicked(true);
+  };
+  
+  useEffect(() => {
+    if (bluetoothRef.current) {
+      bluetoothRef.current.onConnect = () => setIsBluetoothConnected(true);
+      bluetoothRef.current.onDisconnect = () => setIsBluetoothConnected(false);
+    }
+  }, []);
+
   return (
     <div className="flex h-screen">
-      <div  
-        className={`${
-          navOpen ? "w-72" : "w-16"
-        } bg-gray-800 text-white h-screen p-2 transition-all duration-300 overflow-y-auto`}
-      >
-        <div className="flex items-center justify-center mb-4">
-          <button
-            onClick={() => setNavOpen(!navOpen)}
-            className="p-2 focus:outline-none"
-          >
-            {navOpen ? <ArrowLeft /> : <Menu />}
-          </button>
-        </div>
-        {navOpen && (
-          <div className="space-y-6">
-            <div>
+       <div className={`${navOpen ? "w-80 md:w-72" : "w-16"
+        } bg-gray-800 text-white h-screen p-2 transition-all duration-300 overflow-y-auto`}>
+      <div className="flex items-center justify-center mb-4">
+        <button onClick={handleMenuClick} className="p-2 focus:outline-none">
+          {navOpen ? <ArrowLeft /> : <Menu />}
+        </button>
+      </div>
+      {navOpen ? (
+        <div className="space-y-6">
+          {menuClicked ? (
+            <>
               <div className="flex items-center mb-1">
                 <Globe className="w-5 h-5 mr-1" />
                 <span className="font-medium">Language</span>
               </div>
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="w-full p-1 text-black rounded"
-              >
+              <select value={language} onChange={(e) => setLanguage(e.target.value)} className="w-full p-1 text-black rounded">
                 <option value="english">English</option>
                 <option value="khmer">Khmer</option>
                 <option value="chinese">Chinese</option>
                 <option value="all">All Languages</option>
               </select>
-            </div>
-            <div>
+
               <div className="flex items-center mb-1">
                 <Filter className="w-5 h-5 mr-1" />
                 <span className="font-medium">Defect Type</span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+              <div className="grid grid-cols- md:grid-cols-2 gap-1">
                 {["all", "common", "type1", "type2"].map((type) => (
                   <button
                     key={type}
@@ -874,18 +885,14 @@ const QC2InspectionPage = () => {
                       setDefectTypeFilter(type);
                       setCategoryFilter("");
                     }}
-                    className={`p-1 text-sm rounded border ${
-                      defectTypeFilter === type && !categoryFilter
-                        ? "bg-blue-600"
-                        : "bg-gray-700"
-                    }`}
+                    className={`p-1 text-sm rounded border ${defectTypeFilter === type && !categoryFilter ? "bg-blue-600" : "bg-gray-700"}`}
                   >
                     {type.toUpperCase()}
                   </button>
                 ))}
+
               </div>
-            </div>
-            <div>
+
               <div className="flex items-center mb-1">
                 <Tag className="w-5 h-5 mr-1" />
                 <span className="font-medium">Category</span>
@@ -898,25 +905,19 @@ const QC2InspectionPage = () => {
                       setCategoryFilter(cat === categoryFilter ? "" : cat);
                       setDefectTypeFilter("all");
                     }}
-                    className={`p-1 text-sm rounded border ${
-                      categoryFilter === cat ? "bg-blue-600" : "bg-gray-700"
-                    }`}
+                    className={`p-1 text-sm rounded border ${categoryFilter === cat ? "bg-blue-600" : "bg-gray-700"}`}
                   >
                     {cat.toUpperCase()}
                   </button>
                 ))}
               </div>
-            </div>
-            <div>
+
               <div className="flex items-center mb-1">
                 <ArrowUpDown className="w-5 h-5 mr-1" />
                 <span className="font-medium">Sort</span>
               </div>
               <div className="relative">
-                <button
-                  onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
-                  className="w-full p-1 rounded bg-gray-700 text-left text-sm"
-                >
+                <button onClick={() => setSortDropdownOpen(!sortDropdownOpen)} className="w-full p-1 rounded bg-gray-700 text-left text-sm">
                   {sortOption === "alphaAsc"
                     ? "A-Z"
                     : sortOption === "alphaDesc"
@@ -957,54 +958,228 @@ const QC2InspectionPage = () => {
                   </div>
                 )}
               </div>
-            </div>
-            <div>
+
               <div className="flex items-center mb-1">
                 <Printer className="w-5 h-5 mr-1" />
                 <span className="font-medium">Printer</span>
               </div>
               <BluetoothComponent ref={bluetoothRef} />
-            </div>
-            <div>
+
               <div className="flex items-center mb-1">
                 <span className="font-medium">Printing Method</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:flex space-x-1 md:space-x-2">
                 <button
                   onClick={() => setPrintMethod("repair")}
-                  className={`p-1 text-sm rounded border ${
-                    printMethod === "repair" ? "bg-blue-600" : "bg-gray-700"
-                  }`}
+                  className={`p-1 text-sm rounded border ${printMethod === "repair" ? "bg-blue-600" : "bg-gray-700"}`}
                 >
                   By Repair
                 </button>
                 <button
                   onClick={() => setPrintMethod("garment")}
-                  className={`p-1 text-sm rounded border ${
-                    printMethod === "garment" ? "bg-blue-600" : "bg-gray-700"
-                  }`}
+                  className={`p-1 text-sm rounded border ${printMethod === "garment" ? "bg-blue-600" : "bg-gray-700"}`}
                 >
                   By Garments
                 </button>
                 <button
                   onClick={() => setPrintMethod("bundle")}
-                  className={`p-1 text-sm rounded border ${
-                    printMethod === "bundle" ? "bg-blue-600" : "bg-gray-700"
-                  }`}
+                  className={`p-1 text-sm rounded border ${printMethod === "bundle" ? "bg-blue-600" : "bg-gray-700"}`}
                 >
                   By Bundle
                 </button>
               </div>
-            </div>
+            </>
+          ) : (
+            <>
+              {selectedFeature === 'language' && (
+                <div>
+                  <div className="flex items-center mb-1">
+                    <Globe className="w-5 h-5 mr-1" />
+                    <span className="font-medium">Language</span>
+                  </div>
+                  <select value={language} onChange={(e) => setLanguage(e.target.value)} className="w-full p-1 text-black rounded">
+                    <option value="english">English</option>
+                    <option value="khmer">Khmer</option>
+                    <option value="chinese">Chinese</option>
+                    <option value="all">All Languages</option>
+                  </select>
+                </div>
+              )}
+
+              {selectedFeature === 'defectType' && (
+                <div>
+                  <div className="flex items-center mb-1">
+                    <Filter className="w-5 h-5 mr-1" />
+                    <span className="font-medium">Defect Type</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                    {["all", "common", "type1", "type2"].map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => {
+                          setDefectTypeFilter(type);
+                          setCategoryFilter("");
+                        }}
+                        className={`p-1 text-sm rounded border ${defectTypeFilter === type && !categoryFilter ? "bg-blue-600" : "bg-gray-700"}`}
+                      >
+                        {type.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedFeature === 'category' && (
+                <div>
+                  <div className="flex items-center mb-1">
+                    <Tag className="w-5 h-5 mr-1" />
+                    <span className="font-medium">Category</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                    {categoryOptions.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => {
+                          setCategoryFilter(cat === categoryFilter ? "" : cat);
+                          setDefectTypeFilter("all");
+                        }}
+                        className={`p-1 text-sm rounded border ${categoryFilter === cat ? "bg-blue-600" : "bg-gray-700"}`}
+                      >
+                        {cat.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedFeature === 'sort' && (
+                <div>
+                  <div className="flex items-center mb-1">
+                    <ArrowUpDown className="w-5 h-5 mr-1" />
+                    <span className="font-medium">Sort</span>
+                  </div>
+                  <div className="relative">
+                    <button onClick={() => setSortDropdownOpen(!sortDropdownOpen)} className="w-full p-1 rounded bg-gray-700 text-left text-sm">
+                      {sortOption === "alphaAsc"
+                        ? "A-Z"
+                        : sortOption === "alphaDesc"
+                        ? "Z-A"
+                        : sortOption === "countDesc"
+                        ? "Count (High-Low)"
+                        : "Select Sort"}
+                    </button>
+                    {sortDropdownOpen && (
+                      <div className="absolute z-10 mt-1 w-full bg-white text-black rounded shadow p-2">
+                        <button
+                          onClick={() => {
+                            setSortOption("alphaAsc");
+                            setSortDropdownOpen(false);
+                          }}
+                          className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
+                        >
+                          A-Z
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSortOption("alphaDesc");
+                            setSortDropdownOpen(false);
+                          }}
+                          className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
+                        >
+                          Z-A
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSortOption("countDesc");
+                            setSortDropdownOpen(false);
+                          }}
+                          className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
+                        >
+                          Count (High-Low)
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {selectedFeature === 'printer' && (
+                <div>
+                  <div className="flex items-center mb-1">
+                    <Printer className="w-5 h-5 mr-1" />
+                    <span className="font-medium">Printer</span>
+                  </div>
+                  <BluetoothComponent ref={bluetoothRef} />
+                </div>
+              )}
+
+              {selectedFeature === 'printingMethod' && (
+                <div>
+                  <div className="flex items-center mb-1">
+                    <span className="font-medium">Printing Method</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:flex space-x-1 md:space-x-2">
+                    <button
+                      onClick={() => setPrintMethod("repair")}
+                      className={`p-1 text-sm rounded border ${printMethod === "repair" ? "bg-blue-600" : "bg-gray-700"}`}
+                    >
+                      By Repair
+                    </button>
+                    <button
+                      onClick={() => setPrintMethod("garment")}
+                      className={`p-1 text-sm rounded border ${printMethod === "garment" ? "bg-blue-600" : "bg-gray-700"}`}
+                    >
+                      By Garments
+                    </button>
+                    <button
+                      onClick={() => setPrintMethod("bundle")}
+                      className={`p-1 text-sm rounded border ${printMethod === "bundle" ? "bg-blue-600" : "bg-gray-700"}`}
+                    >
+                      By Bundle
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center justify-center">
+            <button onClick={() => handleIconClick('language')}>
+              <Globe className="w-5 h-5" />
+            </button>
           </div>
-        )}
+          <div className="flex items-center justify-center">
+            <button onClick={() => handleIconClick('defectType')}>
+              <Filter className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex items-center justify-center">
+            <button onClick={() => handleIconClick('category')}>
+              <Tag className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex items-center justify-center">
+            <button onClick={() => handleIconClick('sort')}>
+              <ArrowUpDown className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex items-center justify-center">
+            <button onClick={() => handleIconClick('printer')}>
+              <Printer className={`w-5 h-5 ${isBluetoothConnected ? "text-green-500" : ""}`} />
+            </button>
+          </div>
+        </div>
+      )}
       </div>
 
       <div className={`${navOpen ? "w-3/4" : "w-11/12"} flex flex-col`}>
         {!inDefectWindow && (
           <div className="bg-gray-200 p-2">
             <div className="flex space-x-4">
-              {["first", "return", "data", "dashboard", "defect-cards"].map(
+              {["first", "return", "data",  "defect-cards"].map(
                 (tab) => (
                   <button
                     key={tab}
@@ -1021,8 +1196,8 @@ const QC2InspectionPage = () => {
                       ? "Defect Names"
                       : tab === "data"
                       ? "Data"
-                      : tab === "dashboard"
-                      ? "Dashboard"
+                      // : tab === "dashboard"
+                      // ? "Dashboard"
                       : "Defect Cards"}
                   </button>
                 )
@@ -1069,7 +1244,7 @@ const QC2InspectionPage = () => {
                 <>
                   <div className="p-2  bg-blue-100 border-b">
                     <div className="flex items-center">
-                      <div className="w-20 md:w-1/4 h-32 md:h-23 flex justify-center">
+                      <div className="w-1/6 h-32 flex flex-col justify-center items-center space-y-2">
                         <button
                           onClick={handleRejectGarment}
                           disabled={
@@ -1085,6 +1260,22 @@ const QC2InspectionPage = () => {
                         >
                           Reject Garment
                         </button>
+                        {!isReturnInspection && (
+                          <div className="flex space-x-1">
+                            <button
+                              onClick={() => setShowQRPreview(true)}
+                              disabled={qrCodesData[printMethod].length === 0}
+                              className={`p-2 md:p-2 rounded ${
+                                qrCodesData[printMethod].length === 0
+                                  ? "bg-gray-300 cursor-not-allowed"
+                                  : "bg-blue-600 hover:bg-blue-700 text-white"
+                              }`}
+                              title="Preview QR"
+                            >
+                              <Eye className="w-5 h-5" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div className="w-64 md:w-4/6 mx-4">
                         <div className="overflow-x-auto whitespace-nowrap h-12 border-b mb-2">
@@ -1232,7 +1423,7 @@ const QC2InspectionPage = () => {
                             <button
                               onClick={handleGenerateQRCodes}
                               disabled={!defectQty || generateQRDisabled}
-                              className={`p-1 md:p-2 rounded ${
+                              className={`p-2 md:p-2 rounded ${
                                 !defectQty || generateQRDisabled
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-blue-600 hover:bg-blue-700 text-white"
@@ -1241,7 +1432,7 @@ const QC2InspectionPage = () => {
                             >
                               <QrCode className="w-5 h-5" />
                             </button>
-                            <button
+                            {/* <button
                               onClick={() => setShowQRPreview(true)}
                               disabled={qrCodesData[printMethod].length === 0}
                               className={`p-1 md:p-2 rounded ${
@@ -1252,14 +1443,14 @@ const QC2InspectionPage = () => {
                               title="Preview QR"
                             >
                               <Eye className="w-5 h-5" />
-                            </button>
+                            </button> */}
                             <button
                               onClick={handlePrintQRCode}
                               disabled={
                                 !bluetoothRef.current?.isConnected ||
                                 qrCodesData[printMethod].length === 0
                               }
-                              className={`p-1 md:p-2 rounded ${
+                              className={`p-2 md:p-2 rounded ${
                                 !bluetoothRef.current?.isConnected ||
                                 qrCodesData[printMethod].length === 0
                                   ? "bg-gray-300 cursor-not-allowed"
