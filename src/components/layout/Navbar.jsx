@@ -349,10 +349,6 @@ export default function Navbar({ onLogout }) {
               </div>
             ))}
 
-            <div className="flex items-center space-x-3 mr-3">
-              <LanguageSwitcher />
-            </div>
-
             {isAllowedSuperAdmin && (
               <Link
                 to="/settings"
@@ -381,8 +377,13 @@ export default function Navbar({ onLogout }) {
                 </Link>
               </>
             )}
+            <div className="flex items-center space-x-3 mr-3">
+              <LanguageSwitcher />
+            </div>
+
           </div>
 
+          
           <div className="flex items-center">
             {user && (
               <div className="relative">

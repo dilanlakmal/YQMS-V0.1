@@ -66,6 +66,15 @@ const QC2InspectionPage = () => {
 
   const bluetoothRef = useRef();
   const [isBluetoothConnected, setIsBluetoothConnected] = useState(false);
+  const [bluetoothState, setBluetoothState] = useState({
+    isConnected: false,
+    isScanning: false,
+    selectedDevice: null,
+    connectionStatus: "",
+    printerType: null,
+    characteristic: null,
+    counter: 1,
+  });
 
   const activeFilter = categoryFilter || defectTypeFilter;
   const categoryOptions = [
@@ -253,10 +262,6 @@ const QC2InspectionPage = () => {
           lineNo: data.lineNo,
           department: data.department,
           buyer: data.buyer,
-          factory: data.factory, // Added
-          country: data.country, // Added
-          sub_con: data.sub_con, // Added
-          sub_con_factory: data.sub_con_factory, // Added
           checkedQty: data.passQtyIron,
           totalPass: data.passQtyIron,
           totalRejects: 0,
@@ -848,10 +853,28 @@ const QC2InspectionPage = () => {
   
   useEffect(() => {
     if (bluetoothRef.current) {
-      bluetoothRef.current.onConnect = () => setIsBluetoothConnected(true);
-      bluetoothRef.current.onDisconnect = () => setIsBluetoothConnected(false);
+      bluetoothRef.current.onConnect = () => {
+        console.log("Bluetooth Connected");
+        setIsBluetoothConnected(true);
+        setBluetoothState((prevState) => ({
+          ...prevState,
+          isConnected: true,
+        }));
+      };
+
+      // Ensure onDisconnect is only set ONCE
+      if (!bluetoothRef.current.onDisconnect) {
+        bluetoothRef.current.onDisconnect = () => {
+          console.log("Bluetooth Disconnected");
+          setIsBluetoothConnected(false);
+          setBluetoothState((prevState) => ({
+            ...prevState,
+            isConnected: false,
+          }));
+        };
+      }
     }
-  }, []);
+  }, []); // Run only once on component mount
 
   return (
     <div className="flex h-screen">
@@ -967,7 +990,11 @@ const QC2InspectionPage = () => {
                 <Printer className="w-5 h-5 mr-1" />
                 <span className="font-medium">Printer</span>
               </div>
-              <BluetoothComponent ref={bluetoothRef} />
+              <BluetoothComponent 
+                      ref={bluetoothRef}
+                      bluetoothState={bluetoothState}
+                      setBluetoothState={setBluetoothState}
+                       />
 
               <div className="flex items-center mb-1">
                 <span className="font-medium">Printing Method</span>
@@ -1113,7 +1140,11 @@ const QC2InspectionPage = () => {
                     <Printer className="w-5 h-5 mr-1" />
                     <span className="font-medium">Printer</span>
                   </div>
-                  <BluetoothComponent ref={bluetoothRef} />
+                  <BluetoothComponent
+                      ref={bluetoothRef}
+                      bluetoothState={bluetoothState}
+                      setBluetoothState={setBluetoothState}
+                    />
                 </div>
               )}
 
@@ -1490,7 +1521,7 @@ const QC2InspectionPage = () => {
         isOpen={showQRPreview}
         onClose={() => setShowQRPreview(false)}
         qrData={(() => {
-          console.log("QRCodePreview qrData:", qrCodesData[printMethod]);
+          // console.log("QRCodePreview qrData:", qrCodesData[printMethod]);
           return qrCodesData[printMethod];
         })()}
         onPrint={handlePrintQRCode}

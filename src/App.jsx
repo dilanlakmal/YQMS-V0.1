@@ -36,6 +36,7 @@ import Login from "./pages/Auth/Login";
 import Profile from "./pages/Auth/Profile";
 import Register from "./pages/Auth/Register";
 import '../src/lang/i18n';
+import { BluetoothProvider } from './components/context/BluetoothContext.jsx';
 
 // Context
 import { AuthProvider } from "./components/authentication/AuthContext.jsx";
@@ -349,7 +350,9 @@ function App() {
     <Router>
       <AuthProvider>
         <FormDataProvider>
+        <BluetoothProvider>
           <AppContent />
+          </BluetoothProvider>
         </FormDataProvider>
       </AuthProvider>
     </Router>
