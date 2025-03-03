@@ -109,14 +109,14 @@ const DefectBox = ({
             className="relative bg-white rounded-lg shadow-md overflow-hidden border-2 transition-all cursor-pointer"
             style={{ borderColor: totalCount > 0 ? "#ef4444" : "#e5e7eb" }}
           >
-            <div className="h-40 bg-gray-100 overflow-hidden">
+            <div className="h-16 md:h-40 bg-gray-100 overflow-hidden">
               <img
                 src={defectItems[index]?.imageUrl}
                 alt="Defect"
                 className="w-full h-full object-cover"
               />
             </div>
-            <div className="p-3">
+            <div className="p-2">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-medium text-sm line-clamp-2">
                   {defectItems[index]?.name}
@@ -127,7 +127,7 @@ const DefectBox = ({
                   </span>
                 )}
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between ">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

@@ -377,6 +377,14 @@
   "styleDig":{
     "style_digit":"ខ្ទង់រចនាប័ទ្ម",
     "enter_style_digit":"បញ្ចូលលេខរចនាប័ទ្ម"
+  },
+  
+  "rePrint":{
+    "reprint_records":"Reprint Records",
+    "clear":"Clear",
+    "search_mono":"Search MONo...",
+    "search_package_no":"Search Package No...",
+    "search_emp_id":"Search Emp ID..."
   }
   
   }

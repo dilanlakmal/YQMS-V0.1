@@ -1500,7 +1500,7 @@ const QC2InspectionPage = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="h-[calc(100vh-200px)] overflow-y-auto p-4">
+                  <div className="h-[calc(100vh-200px)] overflow-y-auto p-2">
                     <DefectBox
                       language={language}
                       tempDefects={tempDefects}

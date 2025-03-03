@@ -7,7 +7,6 @@ import QRCodePreview from "./QRCodePreview";
 
 export default function ReprintTab() {
   const { t } = useTranslation();
-  const { formData, updateFormData } = useFormData();
   const [monoSearch, setMonoSearch] = useState("");
   const [packageNoSearch, setPackageNoSearch] = useState("");
   const [empIdSearch, setEmpIdSearch] = useState("");
@@ -186,7 +185,7 @@ export default function ReprintTab() {
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold text-gray-800">Reprint Records</h2>
+        <h2 className="text-lg font-bold text-gray-800">{t("rePrint.reprint_records")}</h2>
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setShowFilters(!showFilters)}
@@ -201,7 +200,7 @@ export default function ReprintTab() {
               className="flex items-center text-sm bg-gray-200 px-3 py-1 rounded-md"
             >
               <FaTimes className="mr-1" size={10} />
-              Clear
+              {t("rePrint.clear")}
             </button>
           )}
           <BluetoothComponent ref={bluetoothComponentRef} />
@@ -222,7 +221,7 @@ export default function ReprintTab() {
                 setShowMonoDropdown(true);
               }}
               onFocus={() => setShowMonoDropdown(true)}
-              placeholder="Search MONo..."
+              placeholder={t("rePrint.search_mono")}
               className="w-full p-2 border rounded"
             />
             {showMonoDropdown && monoSearch && records.length > 0 && (
@@ -244,7 +243,7 @@ export default function ReprintTab() {
 
           <div ref={packageNoInputRef}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Package No
+              {t("bundle.package_no")}
             </label>
             <input
               type="text"
@@ -254,7 +253,7 @@ export default function ReprintTab() {
                 setShowPackageNoDropdown(true);
               }}
               onFocus={() => setShowPackageNoDropdown(true)}
-              placeholder="Search Package No..."
+              placeholder={t("rePrint.search_package_no")}
               inputMode="numeric" // Numeric keyboard for mobile/tablet
               className="w-full p-2 border rounded"
             />
@@ -279,7 +278,7 @@ export default function ReprintTab() {
 
           <div ref={empIdInputRef}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Emp ID
+             {t("bundle.emp_id")}
             </label>
             <input
               type="text"
@@ -289,7 +288,7 @@ export default function ReprintTab() {
                 setShowEmpIdDropdown(true);
               }}
               onFocus={() => setShowEmpIdDropdown(true)}
-              placeholder="Search Emp ID..."
+              placeholder={t("rePrint.search_emp_id")}
               className="w-full p-2 border rounded"
             />
             {showEmpIdDropdown && empIdSearch && records.length > 0 && (
@@ -361,7 +360,7 @@ export default function ReprintTab() {
                 <th className="p-2 border border-gray-300">{t("bundle.mono")}</th>
                 <th className="p-2 border border-gray-300">{t("bundle.color")}</th>
                 <th className="p-2 border border-gray-300">{t("bundle.size")}</th>
-                <th className="p-2 border border-gray-300">{t("bundle.style_no")}</th>
+                <th className="p-2 border border-gray-300">{t("downDa.style_no")}</th>
                 <th className="p-2 border border-gray-300">{t("bundle.line_no")}</th>
                 <th className="p-2 border border-gray-300">{t("bundle.date")}</th>
                 <th className="p-2 border border-gray-300">{t("bundle.time")}</th>

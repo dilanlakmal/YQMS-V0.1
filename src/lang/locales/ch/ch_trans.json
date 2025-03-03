@@ -377,6 +377,14 @@
   "styleDig":{
     "style_digit":"风格数字",
     "enter_style_digit":"输入款式数字"
+  },
+
+  "rePrint":{
+    "reprint_records":"Reprint Records",
+    "clear":"Clear",
+    "search_mono":"Search MONo...",
+    "search_package_no":"Search Package No...",
+    "search_emp_id":"Search Emp ID..."
   }
 
   }
