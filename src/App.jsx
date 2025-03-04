@@ -22,6 +22,7 @@ import Logs from "./pages/Logs";
 import OPAPage from "./pages/OPA";
 import PackingPage from "./pages/Packing";
 import QC2InspectionPage from "./pages/QC2Inspection";
+import QCSunriseReport from "./pages/QCSunriseReport.jsx";
 import Return from "./pages/Return";
 import Setting from "./pages/Setting";
 import WashingPage from "./pages/Washing";
@@ -323,6 +324,7 @@ function AppContent() {
               />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/live-dashboard" element={<LiveDashboard />} />
+              <Route path="/qc1-sunrise" element={<QCSunriseReport />} />
               <Route
                 path="/bundle-registration"
                 element={<BundleRegistration />}

@@ -376,6 +376,28 @@ function Home() {
           title: t("home.live_dashboard"),
           description: "Click here to see Live Dashboard.",
         },
+        {
+          path: "/qc1-sunrise",
+          roles: ["Admin", "Data Analytics"],
+          icon: (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="w-6 h-6 text-blue-600 group-hover:text-white"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8v-6h-8v6zm0-18v6h8V3h-8z"
+              />
+            </svg>
+          ),
+          title: "QC1 Sunriser",
+          description: "QC1 BI Report",
+        },
       ],
     },
   ];

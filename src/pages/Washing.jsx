@@ -63,13 +63,16 @@ const WashingPage = () => {
       if (response.ok) {
         const data = await response.json();
         console.log("Order card data fetched:", data);
-        const existsResponse = await fetch(
-          `${API_BASE_URL}/api/check-washing-exists/${data.bundle_id}-53`
+
+        // Check if this bundle_random_id already exists in Washing (via bundle_id)
+        const orderExistsResponse = await fetch(
+          `${API_BASE_URL}/api/check-washing-exists/${data.bundle_id}-55`
         );
-        const existsData = await existsResponse.json();
-        if (existsData.exists) {
+        const orderExistsData = await orderExistsResponse.json();
+        if (orderExistsData.exists) {
           throw new Error("This order data already exists in washing");
         }
+
         setScannedData({ ...data, bundle_random_id: trimmedId });
         setPassQtyWash(data.count);
       } else {
@@ -89,6 +92,15 @@ const WashingPage = () => {
         const defectData = JSON.parse(defectResponseText);
         console.log("Defect card data fetched:", defectData);
 
+        // Check if this defect_print_id already exists in Washing (using washing_bundle_id format: defect_print_id-86)
+        const existsResponse = await fetch(
+          `${API_BASE_URL}/api/check-washing-exists/${trimmedId}-86`
+        );
+        const existsData = await existsResponse.json();
+        if (existsData.exists) {
+          throw new Error("This defect card already scanned");
+        }
+
         const formattedData = {
           defect_print_id: defectData.defect_print_id,
           totalRejectGarmentCount: defectData.totalRejectGarmentCount,
@@ -103,7 +115,7 @@ const WashingPage = () => {
           country: defectData.country || "N/A",
           lineNo: defectData.lineNo,
           department: defectData.department,
-          count: defectData.checkedQty,
+          count: defectData.totalRejectGarmentCount, // Use totalRejectGarmentCount for Washing defect cards
           totalBundleQty: 1,
           emp_id_inspection: defectData.emp_id_inspection,
           inspection_date: defectData.inspection_date,
@@ -114,7 +126,7 @@ const WashingPage = () => {
           bundle_random_id: defectData.bundle_random_id,
         };
         setScannedData(formattedData);
-        setPassQtyWash(defectData.totalRejectGarmentCount);
+        setPassQtyWash(defectData.totalRejectGarmentCount); // Use totalRejectGarmentCount for Pass Wash Qty
         setIsDefectCard(true);
       }
 
@@ -124,7 +136,7 @@ const WashingPage = () => {
     } catch (err) {
       console.error("Fetch error:", err.message);
       setError(err.message);
-      setScannedData(null);
+      setScannedData(null); // Prevent the scanned box from opening
       setIsAdding(false);
     } finally {
       setLoadingData(false);

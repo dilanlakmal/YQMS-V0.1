@@ -91,6 +91,15 @@ const IroningPage = () => {
         const defectData = JSON.parse(defectResponseText);
         console.log("Defect card data fetched:", defectData);
 
+        // Check if this defect_print_id already exists in Ironing (using ironing_bundle_id format: defect_print_id-84)
+        const existsResponse = await fetch(
+          `${API_BASE_URL}/api/check-ironing-exists/${trimmedId}-84`
+        );
+        const existsData = await existsResponse.json();
+        if (existsData.exists) {
+          throw new Error("This defect card already scanned");
+        }
+
         const formattedData = {
           defect_print_id: defectData.defect_print_id,
           totalRejectGarmentCount: defectData.totalRejectGarmentCount,
@@ -105,7 +114,7 @@ const IroningPage = () => {
           country: defectData.country || "N/A", // Use if available, else empty
           lineNo: defectData.lineNo,
           department: defectData.department, // Use from qc2_inspection_pass_bundle
-          count: defectData.checkedQty, // Use checkedQty as count
+          count: defectData.totalRejectGarmentCount, // Use totalRejectGarmentCount for Ironing defect cards
           totalBundleQty: 1, // Set hardcoded as 1 for defect card
           emp_id_inspection: defectData.emp_id_inspection,
           inspection_date: defectData.inspection_date,
@@ -116,7 +125,7 @@ const IroningPage = () => {
           bundle_random_id: defectData.bundle_random_id,
         };
         setScannedData(formattedData);
-        setPassQtyIron(defectData.totalRejectGarmentCount);
+        setPassQtyIron(defectData.totalRejectGarmentCount); // Use totalRejectGarmentCount for Pass Iron Qty
         setIsDefectCard(true);
       }
 
@@ -126,7 +135,7 @@ const IroningPage = () => {
     } catch (err) {
       console.error("Fetch error:", err.message);
       setError(err.message);
-      setScannedData(null);
+      setScannedData(null); // Prevent the scanned box from opening
       setIsAdding(false);
     } finally {
       setLoadingData(false);
