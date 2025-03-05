@@ -79,8 +79,8 @@ const BluetoothComponent = forwardRef((props, ref) => {
       
       
       // Set up disconnection listener
-      // device.addEventListener("gattserverdisconnected", handleDisconnect);
-      device.addEventListener("gattserverdisconnected", () => handleDisconnect());
+      device.addEventListener("gattserverdisconnected", handleDisconnect);
+      // device.addEventListener("gattserverdisconnected", () => handleDisconnect());
       
       updateBluetoothState({
         isConnected: true,

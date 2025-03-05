@@ -707,7 +707,7 @@ const handlePrintQRCode = async () => {
     return;
   }
 
-  console.log("Bluetooth Reference:", bluetoothRef.current); 
+  // console.log("Bluetooth Reference:", bluetoothRef.current); 
 
   if (!bluetoothRef.current) {
     alert("Bluetooth reference is not initialized.");
@@ -717,11 +717,11 @@ const handlePrintQRCode = async () => {
   try {
     setPrinting(true);
     const selectedQrCodes = qrCodesData[printMethod];
-    console.log("Selected QR Codes:", selectedQrCodes);
-    console.log("Bluetooth Connected:", isBluetoothConnected);
+    // console.log("Selected QR Codes:", selectedQrCodes);
+    // console.log("Bluetooth Connected:", isBluetoothConnected);
 
     for (const qrCode of selectedQrCodes) {
-      console.log(`Printing ${printMethod} QR Code:`, qrCode);
+      // console.log(`Printing ${printMethod} QR Code:`, qrCode);
       if (printMethod === "repair") {
         await bluetoothRef.current.printDefectData(qrCode);
       } else if (printMethod === "garment") {
