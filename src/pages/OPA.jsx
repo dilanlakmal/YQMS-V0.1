@@ -91,6 +91,14 @@ const OPAPage = () => {
         const defectData = JSON.parse(defectResponseText);
         console.log("Defect card data fetched:", defectData);
 
+        const existsResponse = await fetch(
+          `${API_BASE_URL}/api/check-opa-exists/${trimmedId}-85`
+        );
+        const existsData = await existsResponse.json();
+        if (existsData.exists) {
+          throw new Error("This defect card already scanned");
+        }
+
         const formattedData = {
           defect_print_id: defectData.defect_print_id,
           totalRejectGarmentCount: defectData.totalRejectGarmentCount,
@@ -105,7 +113,7 @@ const OPAPage = () => {
           country: defectData.country || "N/A",
           lineNo: defectData.lineNo,
           department: defectData.department,
-          count: defectData.checkedQty,
+          count: defectData.totalRejectGarmentCount, //defectData.totalRejectGarment_Var,
           totalBundleQty: 1,
           emp_id_inspection: defectData.emp_id_inspection,
           inspection_date: defectData.inspection_date,

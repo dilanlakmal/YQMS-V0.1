@@ -90,8 +90,12 @@ const QrCodeScanner = ({
                   <p className="text-sm text-gray-600">{t("qrCodeScan.registered_date")}</p>
                   <p className="font-medium">
                     {isDefectCard
-                      ? scannedData.totalRejectGarmentCount
-                      : scannedData.count}
+                      ? isOPAPage || isIroningPage || isWashingPage
+                        ? scannedData.totalRejectGarmentCount || 0
+                        : isPackingPage
+                        ? scannedData.totalRejectGarment_Var || 0
+                        : scannedData.count || 0
+                      : scannedData.count || 0}
                   </p>
                 </div>
                 <div>
@@ -224,12 +228,43 @@ const QrCodeScanner = ({
               {isPackingPage && (
                 <div className="mt-4">
                   <p className="text-sm text-gray-600 mb-2">Pass Pack Qty</p>
-                  <input
-                    type="number"
-                    value={passQtyPack}
-                    readOnly
-                    className="w-20 text-lg text-center border border-gray-300 rounded-md py-2 bg-gray-100"
-                  />
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => handlePassQtyChange(passQtyPack - 1)}
+                      className="p-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      disabled={passQtyPack <= 0}
+                    >
+                      <Minus className="w-6 h-6" />
+                    </button>
+                    <input
+                      type="number"
+                      value={passQtyPack}
+                      onChange={(e) =>
+                        handlePassQtyChange(Number(e.target.value))
+                      }
+                      className="w-20 text-lg text-center border border-gray-300 rounded-md py-2"
+                      min="0"
+                      max={
+                        isDefectCard
+                          ? scannedData.totalRejectGarment_Var ||
+                            scannedData.count
+                          : scannedData.count
+                      }
+                    />
+                    <button
+                      onClick={() => handlePassQtyChange(passQtyPack + 1)}
+                      className="p-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      disabled={
+                        passQtyPack >=
+                        (isDefectCard
+                          ? scannedData.totalRejectGarment_Var ||
+                            scannedData.count
+                          : scannedData.count)
+                      }
+                    >
+                      <Plus className="w-6 h-6" />
+                    </button>
+                  </div>
                 </div>
               )}
 

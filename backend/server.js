@@ -654,85 +654,6 @@ app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
   }
 });
 
-// Reprint endpoints
-// app.get("/api/reprint-search-mono", async (req, res) => {
-//   try {
-//     const digits = req.query.digits;
-//     const results = await QC2OrderData.aggregate([
-//       {
-//         $match: {
-//           selectedMono: { $regex: `${digits}$` },
-//         },
-//       },
-//       {
-//         $group: {
-//           _id: "$selectedMono",
-//           count: { $sum: 1 },
-//         },
-//       },
-//       { $limit: 100 },
-//     ]);
-
-//     res.json(results.map((r) => r._id));
-//   } catch (error) {
-//     res.status(500).json({ error: "Failed to search MONo" });
-//   }
-// });
-
-// app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
-//   try {
-//     const mono = req.params.mono;
-//     const result = await QC2OrderData.aggregate([
-//       { $match: { selectedMono: mono } },
-//       {
-//         $group: {
-//           _id: {
-//             color: "$color",
-//             size: "$size",
-//           },
-//           colorCode: { $first: "$colorCode" },
-//           chnColor: { $first: "$chnColor" },
-//           package_no: { $first: "$package_no" }, // Add this line
-//         },
-//       },
-//       {
-//         $group: {
-//           _id: "$_id.color",
-//           sizes: { $push: "$_id.size" },
-//           colorCode: { $first: "$colorCode" },
-//           chnColor: { $first: "$chnColor" },
-//         },
-//       },
-//     ]);
-
-//     const colors = result.map((c) => ({
-//       color: c._id,
-//       sizes: c.sizes,
-//       colorCode: c.colorCode,
-//       chnColor: c.chnColor,
-//     }));
-
-//     res.json(colors);
-//   } catch (error) {
-//     res.status(500).json({ error: "Failed to fetch colors/sizes" });
-//   }
-// });
-
-// app.get("/api/reprint-records", async (req, res) => {
-//   try {
-//     const { mono, color, size } = req.query;
-//     const records = await QC2OrderData.find({
-//       selectedMono: mono,
-//       color: color,
-//       size: size,
-//     }).sort({ package_no: 1 });
-
-//     res.json(records);
-//   } catch (error) {
-//     res.status(500).json({ error: "Failed to fetch records" });
-//   }
-// });
-
 /* ------------------------------
    End Points - Ironing
 ------------------------------ */
@@ -1271,15 +1192,73 @@ app.get("/api/opa-records", async (req, res) => {
   }
 });
 
-/* ------------------------------
-   End Points - Packing
------------------------------- */
+// /* ------------------------------
+//    End Points - Packing
+// ------------------------------ */
 
-// Check if Packing record exists
+// New Endpoint to Get Bundle by Random ID (from qc2_inspection_pass_bundle for order cards)
+app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
+  try {
+    const randomId = req.params.randomId.trim(); // Trim to avoid whitespace issues
+    console.log("Searching for bundle_random_id:", randomId);
+
+    // First, check qc2_inspection_pass_bundle for order card
+    const bundle = await QC2InspectionPassBundle.findOne({
+      bundle_random_id: randomId,
+      "printArray.isCompleted": false, // Ensure bundle is not completed
+    });
+
+    if (!bundle) {
+      return res
+        .status(404)
+        .json({ error: "This bundle has not been inspected yet" });
+    }
+
+    // Use the first printArray entry (assuming one bundle_random_id per document for simplicity)
+    const printData = bundle.printArray.find(
+      (item) => item.isCompleted === false
+    );
+    if (!printData) {
+      return res
+        .status(404)
+        .json({ error: "No active print data found for this bundle" });
+    }
+
+    const formattedData = {
+      bundle_id: bundle.bundle_id,
+      bundle_random_id: bundle.bundle_random_id,
+      package_no: bundle.package_no, // Include package_no
+      moNo: bundle.moNo,
+      selectedMono: bundle.moNo,
+      custStyle: bundle.custStyle,
+      buyer: bundle.buyer,
+      color: bundle.color,
+      size: bundle.size,
+      factory: bundle.factory || "N/A",
+      country: bundle.country || "N/A",
+      lineNo: bundle.lineNo,
+      department: bundle.department,
+      count: bundle.totalPass, // Use totalPass as checkedQty for order cards
+      totalBundleQty: 1, // Set hardcoded as 1 for order card
+      emp_id_inspection: bundle.emp_id_inspection,
+      inspection_date: bundle.inspection_date,
+      inspection_time: bundle.inspection_time,
+      sub_con: bundle.sub_con,
+      sub_con_factory: bundle.sub_con_factory,
+    };
+
+    res.json(formattedData);
+  } catch (error) {
+    console.error("Error fetching bundle:", error);
+    res.status(500).json({ error: "Failed to fetch bundle" });
+  }
+});
+
+// Check if Packing record exists (updated for task_no 62)
 app.get("/api/check-packing-exists/:bundleId", async (req, res) => {
   try {
     const record = await Packing.findOne({
-      packing_bundle_id: req.params.bundleId,
+      packing_bundle_id: req.params.bundleId, // No change needed here, but ensure it matches task_no 62 in Packing.jsx
     });
     res.json({ exists: !!record });
   } catch (error) {
@@ -1287,16 +1266,16 @@ app.get("/api/check-packing-exists/:bundleId", async (req, res) => {
   }
 });
 
-// New endpoint to get the last Packing record ID for a specific emp_id
+// New endpoint to get the last Packing record ID for a specific emp_id (no change needed)
 app.get("/api/last-packing-record-id/:emp_id", async (req, res) => {
   try {
     const { emp_id } = req.params;
     const lastRecord = await Packing.findOne(
-      { emp_id },
+      { emp_id_packing: emp_id }, // Filter by emp_id_packing
       {},
-      { sort: { packing_record_id: -1 } }
+      { sort: { packing_record_id: -1 } } // Sort descending to get the highest ID
     );
-    const lastRecordId = lastRecord ? lastRecord.packing_record_id : 0;
+    const lastRecordId = lastRecord ? lastRecord.packing_record_id : 0; // Start at 0 if no records exist
     res.json({ lastRecordId });
   } catch (error) {
     console.error("Error fetching last Packing record ID:", error);
@@ -1304,7 +1283,70 @@ app.get("/api/last-packing-record-id/:emp_id", async (req, res) => {
   }
 });
 
-// Save Packing record
+// Modified endpoint to fetch defect card data from qc2_inspection_pass_bundle with defect_print_id (updated for task_no 62)
+app.get("/api/check-defect-card/:defectPrintId", async (req, res) => {
+  try {
+    const { defectPrintId } = req.params;
+    console.log(`Searching for defect_print_id: "${defectPrintId}"`); // Debug log
+
+    const defectRecord = await QC2InspectionPassBundle.findOne({
+      "printArray.defect_print_id": defectPrintId,
+      "printArray.isCompleted": false,
+    });
+
+    if (!defectRecord) {
+      console.log(
+        `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
+      );
+      return res.status(404).json({ message: "Defect card not found" });
+    }
+
+    const printData = defectRecord.printArray.find(
+      (item) => item.defect_print_id === defectPrintId
+    );
+    if (!printData) {
+      console.log(
+        `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
+      );
+      return res
+        .status(404)
+        .json({ message: "Defect print ID not found in printArray" });
+    }
+
+    const formattedData = {
+      defect_print_id: printData.defect_print_id,
+      totalRejectGarmentCount: printData.totalRejectGarmentCount,
+      totalRejectGarment_Var: printData.totalRejectGarment_Var, // Use totalRejectGarment_Var for defect cards
+      package_no: defectRecord.package_no, // Include package_no
+      moNo: defectRecord.moNo,
+      selectedMono: defectRecord.moNo,
+      custStyle: defectRecord.custStyle,
+      buyer: defectRecord.buyer,
+      color: defectRecord.color,
+      size: defectRecord.size,
+      factory: defectRecord.factory,
+      country: defectRecord.country,
+      lineNo: defectRecord.lineNo,
+      department: defectRecord.department,
+      count: printData.totalRejectGarment_Var, // Use totalRejectGarment_Var as count for defect cards
+      totalBundleQty: 1, // Set hardcoded as 1 for defect card
+      emp_id_inspection: defectRecord.emp_id_inspection,
+      inspection_date: defectRecord.inspection_date,
+      inspection_time: defectRecord.inspection_time,
+      sub_con: defectRecord.sub_con,
+      sub_con_factory: defectRecord.sub_con_factory,
+      bundle_id: defectRecord.bundle_id,
+      bundle_random_id: defectRecord.bundle_random_id,
+    };
+
+    res.json(formattedData);
+  } catch (error) {
+    console.error("Error checking defect card:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Save Packing record (no change needed, but ensure task_no is 62 in Packing.jsx)
 app.post("/api/save-packing", async (req, res) => {
   try {
     const newRecord = new Packing(req.body);
@@ -1319,31 +1361,49 @@ app.post("/api/save-packing", async (req, res) => {
   }
 });
 
-// Update qc2_orderdata with Packing details
+// Update qc2_orderdata with Packing details (no change needed)
 app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
   try {
     const { bundleId } = req.params;
-    const { passQtyPacking, packing_updated_date, packing_update_time } =
-      req.body;
+    const {
+      passQtyPack,
+      packing_updated_date,
+      packing_update_time,
+      emp_id_packing,
+      eng_name_packing,
+      kh_name_packing,
+      job_title_packing,
+      dept_name_packing,
+      sect_name_packing,
+    } = req.body;
+
     const updatedRecord = await QC2OrderData.findOneAndUpdate(
       { bundle_id: bundleId },
       {
-        passQtyPacking,
+        passQtyPack,
         packing_updated_date,
         packing_update_time,
+        emp_id_packing,
+        eng_name_packing,
+        kh_name_packing,
+        job_title_packing,
+        dept_name_packing,
+        sect_name_packing,
       },
       { new: true }
     );
+
     if (!updatedRecord) {
       return res.status(404).json({ error: "Bundle not found" });
     }
+
     res.json({ message: "Record updated successfully", data: updatedRecord });
   } catch (error) {
     res.status(500).json({ error: "Failed to update record" });
   }
 });
 
-// For Data tab display records in a table
+// For Data tab display records in a table (no change needed)
 app.get("/api/packing-records", async (req, res) => {
   try {
     const records = await Packing.find();
@@ -2007,6 +2067,17 @@ app.put(
         updateOperationsFinal.$set = updateData;
       }
 
+      // Ensure totalRejectGarment_Var remains unchanged when updating printArray
+      if (updateOperationsFinal.$set?.printArray) {
+        updateOperationsFinal.$set.printArray =
+          updateOperationsFinal.$set.printArray.map((printEntry) => ({
+            ...printEntry,
+            totalRejectGarment_Var:
+              printEntry.totalRejectGarment_Var ||
+              printEntry.totalRejectGarmentCount, // Preserve or initialize
+          }));
+      }
+
       const options = {
         new: true,
         runValidators: true,
@@ -2066,10 +2137,18 @@ app.get(
   async (req, res) => {
     try {
       const { defect_print_id } = req.params;
-      const record = await QC2InspectionPassBundle.findOne({
+      const { includeCompleted } = req.query;
+
+      let query = {
         "printArray.defect_print_id": defect_print_id,
-        "printArray.isCompleted": false,
-      });
+      };
+
+      if (includeCompleted !== "true") {
+        query["printArray.isCompleted"] = false;
+      }
+
+      const record = await QC2InspectionPassBundle.findOne(query);
+
       if (record) {
         res.json(record);
       } else {
@@ -2588,6 +2667,9 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
     }
     if (exprConditions.length > 0) match.$expr = { $and: exprConditions };
 
+    // Add filter for valid inspection_time format
+    match.inspection_time = { $regex: /^\d{2}:\d{2}:\d{2}$/ };
+
     const data = await QC2InspectionPassBundle.aggregate([
       { $match: match },
       {
@@ -2793,7 +2875,7 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
           hasCheckedQty: hourData.hasCheckedQty,
           checkedQty: hourData.checkedQty,
           defects: hourData.defects.map((defect) => ({
-            name: defect.name || "No Defect", // Handle null names for non-defective records
+            name: defect.name || "No Defect",
             count: defect.count,
             rate:
               hourData.checkedQty > 0
