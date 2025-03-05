@@ -127,27 +127,43 @@ const QC2InspectionPage = () => {
     }
   }, [tempDefects, rejectedOnce]);
 
+  // CHANGE: Added useEffect to manage the 3-second countdown for Pass Bundle
   useEffect(() => {
     let timer;
-    if (
-      printing &&
-      qrCodesData[printMethod].length > 0 &&
-      printMethod === "garment"
-    ) {
-      setPassBundleCountdown(5);
-      timer = setInterval(() => {
-        setPassBundleCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            handlePassBundle();
-            return null;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    if (passBundleCountdown !== null) {
+      if (passBundleCountdown > 0) {
+        timer = setInterval(() => {
+          setPassBundleCountdown((prev) => prev - 1);
+        }, 1000);
+      } else {
+        handlePassBundle(); // Automatically trigger Pass Bundle when countdown reaches 0
+        setPassBundleCountdown(null); // Reset countdown state
+      }
     }
-    return () => clearInterval(timer);
-  }, [printing, qrCodesData, printMethod]);
+    return () => clearInterval(timer); // Cleanup interval on unmount or state change
+  }, [passBundleCountdown]);
+
+  // useEffect(() => {
+  //   let timer;
+  //   if (
+  //     printing &&
+  //     qrCodesData[printMethod].length > 0 &&
+  //     printMethod === "garment"
+  //   ) {
+  //     setPassBundleCountdown(5);
+  //     timer = setInterval(() => {
+  //       setPassBundleCountdown((prev) => {
+  //         if (prev <= 1) {
+  //           clearInterval(timer);
+  //           handlePassBundle();
+  //           return null;
+  //         }
+  //         return prev - 1;
+  //       });
+  //     }, 1000);
+  //   }
+  //   return () => clearInterval(timer);
+  // }, [printing, qrCodesData, printMethod]);
 
   const generateDefectId = () => {
     return Math.random().toString(36).substring(2, 12).toUpperCase();
@@ -741,7 +757,12 @@ const QC2InspectionPage = () => {
           await bluetoothRef.current.printBundleDefectData(qrCode);
         }
       }
-      alert("All QR codes printed successfully!");
+      //alert("All QR codes printed successfully!");
+
+      // CHANGE: Start the 3-second countdown for Pass Bundle only if there are rejected garments
+      if (totalRejects > 0) {
+        setPassBundleCountdown(3); // Initiate countdown from 3 seconds
+      }
     } catch (error) {
       console.error("Print error:", error);
       alert(`Failed to print QR codes: ${error.message || "Unknown error"}`);
@@ -867,203 +888,7 @@ const QC2InspectionPage = () => {
     setMenuClicked(true);
   };
 
-  // useEffect(() => {
-  //   if (bluetoothRef.current) {
-  //     bluetoothRef.current.onConnect = () => {
-  //       console.log("Bluetooth Connected");
-  //       setIsBluetoothConnected(true);
-  //       setBluetoothState((prevState) => ({
-  //         ...prevState,
-  //         isConnected: true,
-  //       }));
-  //     };
-
-  //     // Ensure onDisconnect is only set ONCE
-  //     if (!bluetoothRef.current.onDisconnect) {
-  //       bluetoothRef.current.onDisconnect = () => {
-  //         console.log("Bluetooth Disconnected");
-  //         setIsBluetoothConnected(false);
-  //         setBluetoothState((prevState) => ({
-  //           ...prevState,
-  //           isConnected: false,
-  //         }));
-  //       };
-  //     }
-  //   }
-  // }, []); // Run only once on component mount
-
   return (
-    // <div className="flex h-screen">
-    //   <div
-    //     className={`${
-    //       navOpen ? "w-64" : "w-16"
-    //     } bg-gray-800 text-white h-screen p-2 transition-all duration-300`}
-    //   >
-    //     <div className="flex items-center justify-center mb-4">
-    //       <button
-    //         onClick={() => setNavOpen(!navOpen)}
-    //         className="p-2 focus:outline-none"
-    //       >
-    //         {navOpen ? <ArrowLeft /> : <Menu />}
-    //       </button>
-    //     </div>
-    //     {navOpen && (
-    //       <div className="space-y-6">
-    //         <div>
-    //           <div className="flex items-center mb-1">
-    //             <Globe className="w-5 h-5 mr-1" />
-    //             <span className="font-medium">Language</span>
-    //           </div>
-    //           <select
-    //             value={language}
-    //             onChange={(e) => setLanguage(e.target.value)}
-    //             className="w-full p-1 text-black rounded"
-    //           >
-    //             <option value="english">English</option>
-    //             <option value="khmer">Khmer</option>
-    //             <option value="chinese">Chinese</option>
-    //             <option value="all">All Languages</option>
-    //           </select>
-    //         </div>
-    //         <div>
-    //           <div className="flex items-center mb-1">
-    //             <Filter className="w-5 h-5 mr-1" />
-    //             <span className="font-medium">Defect Type</span>
-    //           </div>
-    //           <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
-    //             {["all", "common", "type1", "type2"].map((type) => (
-    //               <button
-    //                 key={type}
-    //                 onClick={() => {
-    //                   setDefectTypeFilter(type);
-    //                   setCategoryFilter("");
-    //                 }}
-    //                 className={`p-1 text-sm rounded border ${
-    //                   defectTypeFilter === type && !categoryFilter
-    //                     ? "bg-blue-600"
-    //                     : "bg-gray-700"
-    //                 }`}
-    //               >
-    //                 {type.toUpperCase()}
-    //               </button>
-    //             ))}
-    //           </div>
-    //         </div>
-    //         <div>
-    //           <div className="flex items-center mb-1">
-    //             <Tag className="w-5 h-5 mr-1" />
-    //             <span className="font-medium">Category</span>
-    //           </div>
-    //           <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
-    //             {categoryOptions.map((cat) => (
-    //               <button
-    //                 key={cat}
-    //                 onClick={() => {
-    //                   setCategoryFilter(cat === categoryFilter ? "" : cat);
-    //                   setDefectTypeFilter("all");
-    //                 }}
-    //                 className={`p-1 text-sm rounded border ${
-    //                   categoryFilter === cat ? "bg-blue-600" : "bg-gray-700"
-    //                 }`}
-    //               >
-    //                 {cat.toUpperCase()}
-    //               </button>
-    //             ))}
-    //           </div>
-    //         </div>
-    //         <div>
-    //           <div className="flex items-center mb-1">
-    //             <ArrowUpDown className="w-5 h-5 mr-1" />
-    //             <span className="font-medium">Sort</span>
-    //           </div>
-    //           <div className="relative">
-    //             <button
-    //               onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
-    //               className="w-full p-1 rounded bg-gray-700 text-left text-sm"
-    //             >
-    //               {sortOption === "alphaAsc"
-    //                 ? "A-Z"
-    //                 : sortOption === "alphaDesc"
-    //                 ? "Z-A"
-    //                 : sortOption === "countDesc"
-    //                 ? "Count (High-Low)"
-    //                 : "Select Sort"}
-    //             </button>
-    //             {sortDropdownOpen && (
-    //               <div className="absolute z-10 mt-1 w-full bg-white text-black rounded shadow p-2">
-    //                 <button
-    //                   onClick={() => {
-    //                     setSortOption("alphaAsc");
-    //                     setSortDropdownOpen(false);
-    //                   }}
-    //                   className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
-    //                 >
-    //                   A-Z
-    //                 </button>
-    //                 <button
-    //                   onClick={() => {
-    //                     setSortOption("alphaDesc");
-    //                     setSortDropdownOpen(false);
-    //                   }}
-    //                   className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
-    //                 >
-    //                   Z-A
-    //                 </button>
-    //                 <button
-    //                   onClick={() => {
-    //                     setSortOption("countDesc");
-    //                     setSortDropdownOpen(false);
-    //                   }}
-    //                   className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
-    //                 >
-    //                   Count (High-Low)
-    //                 </button>
-    //               </div>
-    //             )}
-    //           </div>
-    //         </div>
-    //         <div>
-    //           <div className="flex items-center mb-1">
-    //             <Printer className="w-5 h-5 mr-1" />
-    //             <span className="font-medium">Printer</span>
-    //           </div>
-    //           <BluetoothComponent ref={bluetoothRef} />
-    //         </div>
-    //         <div>
-    //           <div className="flex items-center mb-1">
-    //             <span className="font-medium">Printing Method</span>
-    //           </div>
-    //           <div className="flex space-x-2">
-    //             <button
-    //               onClick={() => setPrintMethod("repair")}
-    //               className={`p-1 text-sm rounded border ${
-    //                 printMethod === "repair" ? "bg-blue-600" : "bg-gray-700"
-    //               }`}
-    //             >
-    //               By Repair
-    //             </button>
-    //             <button
-    //               onClick={() => setPrintMethod("garment")}
-    //               className={`p-1 text-sm rounded border ${
-    //                 printMethod === "garment" ? "bg-blue-600" : "bg-gray-700"
-    //               }`}
-    //             >
-    //               By Garments
-    //             </button>
-    //             <button
-    //               onClick={() => setPrintMethod("bundle")}
-    //               className={`p-1 text-sm rounded border ${
-    //                 printMethod === "bundle" ? "bg-blue-600" : "bg-gray-700"
-    //               }`}
-    //             >
-    //               By Bundle
-    //             </button>
-    //           </div>
-    //         </div>
-    //       </div>
-    //     )}
-    //   </div>
-
     <div className="flex h-screen">
       <div
         className={`${
@@ -1707,18 +1532,6 @@ const QC2InspectionPage = () => {
                             >
                               <QrCode className="w-5 h-5" />
                             </button>
-                            {/* <button
-                              onClick={() => setShowQRPreview(true)}
-                              disabled={qrCodesData[printMethod].length === 0}
-                              className={`p-2 rounded ${
-                                qrCodesData[printMethod].length === 0
-                                  ? "bg-gray-300 cursor-not-allowed"
-                                  : "bg-blue-600 hover:bg-blue-700 text-white"
-                              }`}
-                              title="Preview QR"
-                            >
-                              <Eye className="w-5 h-5" />
-                            </button> */}
                             <button
                               onClick={handlePrintQRCode}
                               disabled={
