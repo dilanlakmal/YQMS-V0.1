@@ -39,6 +39,7 @@ import Register from "./pages/Auth/Register";
 
 // Context
 import { AuthProvider } from "./components/authentication/AuthContext.jsx";
+import { BluetoothProvider } from "./components/context/BluetoothContext.jsx";
 import { FormDataProvider } from "./components/context/FormDataContext";
 
 export const BluetoothContext = createContext(null);
@@ -350,7 +351,9 @@ function App() {
     <Router>
       <AuthProvider>
         <FormDataProvider>
-          <AppContent />
+          <BluetoothProvider>
+            <AppContent />
+          </BluetoothProvider>
         </FormDataProvider>
       </AuthProvider>
     </Router>

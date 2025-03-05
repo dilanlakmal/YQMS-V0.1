@@ -109,7 +109,7 @@ const DefectBox = ({
             className="relative bg-white rounded-lg shadow-md overflow-hidden border-2 transition-all cursor-pointer"
             style={{ borderColor: totalCount > 0 ? "#ef4444" : "#e5e7eb" }}
           >
-            <div className="h-40 bg-gray-100 overflow-hidden">
+            <div className="h-16 md:h-40 bg-gray-100 overflow-hidden">
               <img
                 src={defectItems[index]?.imageUrl}
                 alt="Defect"
