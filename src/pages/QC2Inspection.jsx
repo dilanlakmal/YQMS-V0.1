@@ -25,9 +25,11 @@ import { useAuth } from "../components/authentication/AuthContext";
 import DefectNames from "../components/inspection/DefectNames";
 import DefectPrint from "../components/inspection/DefectPrint";
 import QC2Data from "../components/inspection/QC2Data";
+import { useBluetooth } from "../components/context/BluetoothContext";
 
 const QC2InspectionPage = () => {
   const { user, loading } = useAuth();
+  const { bluetoothState } = useBluetooth();
 
   const [error, setError] = useState(null);
   const [bundleData, setBundleData] = useState(null);
@@ -58,23 +60,14 @@ const QC2InspectionPage = () => {
   const [showQRPreview, setShowQRPreview] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [generateQRDisabled, setGenerateQRDisabled] = useState(false);
-  const [printMethod, setPrintMethod] = useState("repair");
+  const [printMethod, setPrintMethod] = useState("bundle");
   const [rejectedGarments, setRejectedGarments] = useState([]);
   const [passBundleCountdown, setPassBundleCountdown] = useState(null);
   const [isReturnInspection, setIsReturnInspection] = useState(false);
   const [sessionData, setSessionData] = useState(null);
 
   const bluetoothRef = useRef();
-  const [isBluetoothConnected, setIsBluetoothConnected] = useState(false);
-  const [bluetoothState, setBluetoothState] = useState({
-    isConnected: false,
-    isScanning: false,
-    selectedDevice: null,
-    connectionStatus: "",
-    printerType: null,
-    characteristic: null,
-    counter: 1,
-  });
+  const isBluetoothConnected = bluetoothState.isConnected;
 
   const activeFilter = categoryFilter || defectTypeFilter;
   const categoryOptions = [
@@ -707,32 +700,46 @@ const QC2InspectionPage = () => {
     }
   };
 
-  const handlePrintQRCode = async () => {
-    if (!bluetoothRef.current?.isConnected || isReturnInspection) {
-      alert("Please connect to a printer first");
-      return;
-    }
-    try {
-      setPrinting(true);
-      const selectedQrCodes = qrCodesData[printMethod];
-      for (const qrCode of selectedQrCodes) {
-        if (printMethod === "repair") {
-          await bluetoothRef.current.printDefectData(qrCode);
-        } else if (printMethod === "garment") {
-          await bluetoothRef.current.printGarmentDefectData(qrCode);
-          if (!passBundleCountdown) setPassBundleCountdown(5);
-        } else if (printMethod === "bundle") {
-          await bluetoothRef.current.printBundleDefectData(qrCode);
-        }
+
+const handlePrintQRCode = async () => {
+  if (!isBluetoothConnected || isReturnInspection) {
+    alert("Please connect to a printer first");
+    return;
+  }
+
+  console.log("Bluetooth Reference:", bluetoothRef.current); 
+
+  if (!bluetoothRef.current) {
+    alert("Bluetooth reference is not initialized.");
+    return;
+  }
+
+  try {
+    setPrinting(true);
+    const selectedQrCodes = qrCodesData[printMethod];
+    console.log("Selected QR Codes:", selectedQrCodes);
+    console.log("Bluetooth Connected:", isBluetoothConnected);
+
+    for (const qrCode of selectedQrCodes) {
+      console.log(`Printing ${printMethod} QR Code:`, qrCode);
+      if (printMethod === "repair") {
+        await bluetoothRef.current.printDefectData(qrCode);
+      } else if (printMethod === "garment") {
+        await bluetoothRef.current.printGarmentDefectData(qrCode);
+        if (!passBundleCountdown) setPassBundleCountdown(5);
+      } else if (printMethod === "bundle") {
+        await bluetoothRef.current.printBundleDefectData(qrCode);
       }
-      alert("All QR codes printed successfully!");
-    } catch (error) {
-      console.error("Print error:", error);
-      alert(`Failed to print QR codes: ${error.message}`);
-    } finally {
-      setPrinting(false);
     }
-  };
+    alert("All QR codes printed successfully!");
+  } catch (error) {
+    console.error("Print error:", error);
+    alert(`Failed to print QR codes: ${error.message || "Unknown error"}`);
+  } finally {
+    setPrinting(false);
+  }
+};
+  
 
   const handlePassBundle = async () => {
     const hasDefects = Object.values(tempDefects).some((count) => count > 0);
@@ -850,31 +857,31 @@ const QC2InspectionPage = () => {
     setNavOpen(!navOpen);
     setMenuClicked(true);
   };
-  
-  useEffect(() => {
-    if (bluetoothRef.current) {
-      bluetoothRef.current.onConnect = () => {
-        console.log("Bluetooth Connected");
-        setIsBluetoothConnected(true);
-        setBluetoothState((prevState) => ({
-          ...prevState,
-          isConnected: true,
-        }));
-      };
 
-      // Ensure onDisconnect is only set ONCE
-      if (!bluetoothRef.current.onDisconnect) {
-        bluetoothRef.current.onDisconnect = () => {
-          console.log("Bluetooth Disconnected");
-          setIsBluetoothConnected(false);
-          setBluetoothState((prevState) => ({
-            ...prevState,
-            isConnected: false,
-          }));
-        };
-      }
-    }
-  }, []); // Run only once on component mount
+  // useEffect(() => {
+  //   if (bluetoothRef.current) {
+  //     bluetoothRef.current.onConnect = () => {
+  //       console.log("Bluetooth Connected");
+  //       setIsBluetoothConnected(true);
+  //       setBluetoothState((prevState) => ({
+  //         ...prevState,
+  //         isConnected: true,
+  //       }));
+  //     };
+
+  //     // Ensure onDisconnect is only set ONCE
+  //     if (!bluetoothRef.current.onDisconnect) {
+  //       bluetoothRef.current.onDisconnect = () => {
+  //         console.log("Bluetooth Disconnected");
+  //         setIsBluetoothConnected(false);
+  //         setBluetoothState((prevState) => ({
+  //           ...prevState,
+  //           isConnected: false,
+  //         }));
+  //       };
+  //     }
+  //   }
+  // }, []); // Run only once on component mount
 
   return (
     <div className="flex h-screen">
@@ -904,7 +911,7 @@ const QC2InspectionPage = () => {
                 <Filter className="w-5 h-5 mr-1" />
                 <span className="font-medium">Defect Type</span>
               </div>
-              <div className="grid grid-cols- md:grid-cols-2 gap-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
                 {["all", "common", "type1", "type2"].map((type) => (
                   <button
                     key={type}
@@ -992,9 +999,7 @@ const QC2InspectionPage = () => {
               </div>
               <BluetoothComponent 
                       ref={bluetoothRef}
-                      bluetoothState={bluetoothState}
-                      setBluetoothState={setBluetoothState}
-                       />
+                      />
 
               <div className="flex items-center mb-1">
                 <span className="font-medium">Printing Method</span>
@@ -1142,8 +1147,8 @@ const QC2InspectionPage = () => {
                   </div>
                   <BluetoothComponent
                       ref={bluetoothRef}
-                      bluetoothState={bluetoothState}
-                      setBluetoothState={setBluetoothState}
+                      // bluetoothState={bluetoothState}
+                      // setBluetoothState={setBluetoothState}
                     />
                 </div>
               )}
@@ -1209,7 +1214,9 @@ const QC2InspectionPage = () => {
         </div>
       )}
       </div>
-
+      <div style={{ position: 'absolute', left: '-9999px' }}>
+        <BluetoothComponent ref={bluetoothRef} />
+      </div>
       <div className={`${navOpen ? "w-3/4" : "w-11/12"} flex flex-col`}>
         {!inDefectWindow && (
           <div className="bg-gray-200 p-2">
@@ -1467,26 +1474,16 @@ const QC2InspectionPage = () => {
                             >
                               <QrCode className="w-5 h-5" />
                             </button>
-                            {/* <button
-                              onClick={() => setShowQRPreview(true)}
-                              disabled={qrCodesData[printMethod].length === 0}
-                              className={`p-1 md:p-2 rounded ${
-                                qrCodesData[printMethod].length === 0
-                                  ? "bg-gray-300 cursor-not-allowed"
-                                  : "bg-blue-600 hover:bg-blue-700 text-white"
-                              }`}
-                              title="Preview QR"
-                            >
-                              <Eye className="w-5 h-5" />
-                            </button> */}
                             <button
                               onClick={handlePrintQRCode}
                               disabled={
-                                !bluetoothRef.current?.isConnected ||
+                                // !bluetoothRef.current?.isConnected ||
+                                !isBluetoothConnected ||
                                 qrCodesData[printMethod].length === 0
                               }
                               className={`p-2 md:p-2 rounded ${
-                                !bluetoothRef.current?.isConnected ||
+                                // !bluetoothRef.current?.isConnected ||
+                                !isBluetoothConnected ||
                                 qrCodesData[printMethod].length === 0
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-blue-600 hover:bg-blue-700 text-white"
@@ -1533,20 +1530,6 @@ const QC2InspectionPage = () => {
             : "bundle"
         }
       />
-
-      {/* <QRCodePreview
-        isOpen={showQRPreview}
-        onClose={() => setShowQRPreview(false)}
-        qrData={qrCodesData[printMethod]}
-        onPrint={handlePrintQRCode}
-        mode={
-          printMethod === "repair"
-            ? "inspection"
-            : printMethod === "garment"
-            ? "garment"
-            : "bundle"
-        }
-      /> */}
     </div>
   );
 };

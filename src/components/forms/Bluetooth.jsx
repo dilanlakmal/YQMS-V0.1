@@ -20,11 +20,35 @@ const BluetoothComponent = forwardRef((props, ref) => {
   useImperativeHandle(ref, () => ({
     isConnected: bluetoothState.isConnected,
     selectedDevice: bluetoothState.selectedDevice,
+    characteristic: bluetoothState.characteristic,
+    connectPrinter,
     printData: async (data) => await handlePrint(data),
     printDefectData: async (data) => await handleDefectPrint(data),
     printGarmentDefectData: async (data) => await handleGarmentDefectPrint(data),
     printBundleDefectData: async (data) => await handleBundleDefectPrint(data),
+    onConnect: null, // Will be set by parent component
+    onDisconnect: null, // Will be set by parent component
   }));
+
+  // Show connection status when it changes
+  useEffect(() => {
+    if (bluetoothState.connectionStatus) {
+      setShowStatus(true);
+      const timer = setTimeout(() => {
+        setShowStatus(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [bluetoothState.connectionStatus]);
+
+  // Notify parent component of connection changes
+  useEffect(() => {
+    if (bluetoothState.isConnected && ref.current?.onConnect) {
+      ref.current.onConnect();
+    } else if (!bluetoothState.isConnected && ref.current?.onDisconnect) {
+      ref.current.onDisconnect();
+    }
+  }, [bluetoothState.isConnected]);
 
   const detectPrinterType = (deviceName) => {
     if (deviceName?.startsWith("GP-")) return "gainscha";
@@ -52,7 +76,12 @@ const BluetoothComponent = forwardRef((props, ref) => {
       const { serviceUUID, writeUUID } = PRINTER_CONFIG[printerType];
       const service = await server.getPrimaryService(serviceUUID);
       const characteristic = await service.getCharacteristic(writeUUID);
-      device.addEventListener("gattserverdisconnected", handleDisconnect);
+      
+      
+      // Set up disconnection listener
+      // device.addEventListener("gattserverdisconnected", handleDisconnect);
+      device.addEventListener("gattserverdisconnected", () => handleDisconnect());
+      
       updateBluetoothState({
         isConnected: true,
         isScanning: false,
@@ -60,7 +89,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
         characteristic,
         connectionStatus: `Connected to ${device.name}`,
       });
-      // console.log("Device Connected");
+      console.log("Device Connected");
       setShowStatus(true);
     } catch (error) {
       console.error("Bluetooth Error:", error);
@@ -71,10 +100,9 @@ const BluetoothComponent = forwardRef((props, ref) => {
   const handleDisconnect = (errorMessage = "Disconnected") => {
     if (bluetoothState.selectedDevice) {
       if (bluetoothState.selectedDevice.gatt.connected) {
-        // console.log("Manually Disconnecting Bluetooth");
+        console.log("Manually Disconnecting Bluetooth");
         bluetoothState.selectedDevice.gatt.disconnect();
       }
-      // console.log("Auto Disconnecting Bluetooth");
     }
     updateBluetoothState({
       isConnected: false,
@@ -94,6 +122,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
       return () => clearTimeout(timer);
     }
   }, [showStatus]);
+
 
   const sendChunkedData = async (data) => {
     const { characteristic } = bluetoothState;
@@ -357,17 +386,16 @@ const BluetoothComponent = forwardRef((props, ref) => {
             <span>{bluetoothState.connectionStatus}</span>
           </div>
           {bluetoothState.selectedDevice && (
-                        <div className="mt-1 text-xs text-gray-500">
-                        {bluetoothState.selectedDevice.name}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          });
-          
-          BluetoothComponent.displayName = "BluetoothComponent";
-          
-          export default BluetoothComponent;
-          
+            <div className="mt-1 text-xs text-gray-500">
+              {bluetoothState.selectedDevice.name}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
+BluetoothComponent.displayName = "BluetoothComponent";
+
+export default BluetoothComponent;

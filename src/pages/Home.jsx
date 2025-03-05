@@ -209,7 +209,7 @@ function Home() {
             {errorMessage}
           </div>
         )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
           {cards.map((section, index) => (
             <div key={index} className="space-y-8">
               <h2 className="text-2xl font-bold text-blue-900 mb-4 text-center">
@@ -220,9 +220,9 @@ function Home() {
                   <div
                     key={idx}
                     onClick={() => handleNavigation(item.path, item.roles)}
-                    className="group bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
+                    className="group bg-white p-4 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
                   >
-                    <div className="flex flex-col items-center justify-center mb-6 w-12 h-12 bg-cover bg-center" style={{ backgroundImage: `url(${item.image})` }}></div>
+                    <div className="flex flex-col items-center justify-center mb-2 w-16 h-16 bg-cover bg-center" style={{ backgroundImage: `url(${item.image})` }}></div>
                     <h2 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-600">
                       {item.title}
                     </h2>
