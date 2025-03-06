@@ -23,6 +23,7 @@ import Scanner from "../components/forms/Scanner";
 import DefectBox from "../components/inspection/DefectBox";
 import DefectNames from "../components/inspection/DefectNames"; // Import the new component
 import DefectPrint from "../components/inspection/DefectPrint";
+import EditInspection from "../components/inspection/EditInspection";
 import QC2Data from "../components/inspection/QC2Data";
 import { allDefects, defectsList } from "../constants/defects";
 
@@ -1281,42 +1282,49 @@ const QC2InspectionPage = () => {
         {!inDefectWindow && (
           <div className="bg-gray-200 p-2">
             <div className="flex space-x-4">
-              {["first", "return", "data", "defect-cards"].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 rounded ${
-                    activeTab === tab
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-black"
-                  }`}
-                >
-                  {tab === "first"
-                    ? "Inspection"
-                    : tab === "return"
-                    ? "Defect Names"
-                    : tab === "data"
-                    ? "Data"
-                    : // : tab === "dashboard"
-                      // ? "Dashboard"
-                      "Defect Cards"}
-                </button>
-              ))}
+              {["first", "edit", "return", "data", "defect-cards"].map(
+                (tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-4 py-2 rounded ${
+                      activeTab === tab
+                        ? "bg-blue-600 text-white"
+                        : "bg-white text-black"
+                    }`}
+                  >
+                    {tab === "first"
+                      ? "Inspection"
+                      : tab === "edit"
+                      ? "Edit Inspection"
+                      : tab === "return"
+                      ? "Defect Names"
+                      : tab === "data"
+                      ? "Data"
+                      : // : tab === "dashboard"
+                        // ? "Dashboard"
+                        "Defect Cards"}
+                  </button>
+                )
+              )}
             </div>
           </div>
         )}
 
+        {activeTab === "edit" && <EditInspection />}
+
+        {activeTab === "return" && <DefectNames />}
+
+        {activeTab === "data" && <QC2Data />}
+
         {activeTab === "defect-cards" && (
           <DefectPrint bluetoothRef={bluetoothRef} printMethod={printMethod} />
         )}
-        {activeTab === "data" && <QC2Data />}
-
-        {activeTab === "return" && <DefectNames />}
 
         <div className="flex-grow overflow-hidden bg-gray-50">
           {activeTab !== "first" ? (
             <div className="h-full flex items-center justify-center">
-              <p className="text-gray-500">Coming Soon</p>
+              {/* <p className="text-gray-500">Coming Soon</p> */}
             </div>
           ) : (
             <>

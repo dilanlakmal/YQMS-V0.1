@@ -2168,6 +2168,7 @@ app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {
           department: { $addToSet: "$department" },
           emp_id_inspection: { $addToSet: "$emp_id_inspection" },
           buyer: { $addToSet: "$buyer" },
+          package_no: { $addToSet: "$package_no" }, // Added package_no
         },
       },
       {
@@ -2179,6 +2180,7 @@ app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {
           department: 1,
           emp_id_inspection: 1,
           buyer: 1,
+          package_no: 1,
         },
       },
     ]);
@@ -2193,14 +2195,49 @@ app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {
             department: [],
             emp_id_inspection: [],
             buyer: [],
+            package_no: [],
           };
 
     Object.keys(result).forEach((key) => {
       result[key] = result[key]
         .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b));
+        .sort((a, b) => (key === "package_no" ? a - b : a.localeCompare(b))); // Numeric sort for package_no
+      //.sort((a, b) => a.localeCompare(b));
     });
 
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching filter options:", error);
+    res.status(500).json({ error: "Failed to fetch filter options" });
+  }
+});
+
+app.get("/api/qc2-defect-print/filter-options", async (req, res) => {
+  try {
+    const filterOptions = await QC2DefectPrint.aggregate([
+      {
+        $group: {
+          _id: null,
+          moNo: { $addToSet: "$moNo" },
+          package_no: { $addToSet: "$package_no" },
+          repair: { $addToSet: "$repair" },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          moNo: 1,
+          package_no: 1,
+          repair: 1,
+        },
+      },
+    ]);
+    const result = filterOptions[0] || { moNo: [], package_no: [], repair: [] };
+    Object.keys(result).forEach((key) => {
+      result[key] = result[key]
+        .filter(Boolean)
+        .sort((a, b) => (key === "package_no" ? a - b : a.localeCompare(b)));
+    });
     res.json(result);
   } catch (error) {
     console.error("Error fetching filter options:", error);
@@ -2278,6 +2315,8 @@ app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
       color,
       size,
       department,
+      page = 1,
+      limit = 50, // Default to 50 records per page
     } = req.query;
 
     let match = {};
@@ -2304,14 +2343,94 @@ app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
       if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
     }
 
-    const pipeline = [{ $match: match }, { $sort: { createdAt: -1 } }];
-    const dataCards = await QC2InspectionPassBundle.aggregate(pipeline);
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
 
-    console.log("Search result:", dataCards);
-    res.json(dataCards);
+    const pipeline = [
+      { $match: match },
+      { $sort: { createdAt: -1 } },
+      {
+        $facet: {
+          data: [{ $skip: skip }, { $limit: limitNum }],
+          total: [{ $count: "count" }],
+        },
+      },
+    ];
+
+    const result = await QC2InspectionPassBundle.aggregate(pipeline);
+    const data = result[0].data || [];
+    const total = result[0].total.length > 0 ? result[0].total[0].count : 0;
+
+    console.log("Search result:", { data, total });
+    res.json({ data, total });
   } catch (error) {
     console.error("Error searching data cards:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/qc2-defect-print/search", async (req, res) => {
+  try {
+    const { moNo, package_no, repair, page = 1, limit = 50 } = req.query;
+    let match = {};
+    if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    if (package_no) {
+      const packageNoNumber = Number(package_no);
+      if (isNaN(packageNoNumber))
+        return res.status(400).json({ error: "Package No must be a number" });
+      match.package_no = packageNoNumber;
+    }
+    if (repair) match.repair = { $regex: new RegExp(repair.trim(), "i") };
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const pipeline = [
+      { $match: match },
+      { $sort: { createdAt: -1 } },
+      {
+        $facet: {
+          data: [{ $skip: skip }, { $limit: limitNum }],
+          total: [{ $count: "count" }],
+        },
+      },
+    ];
+
+    const result = await QC2DefectPrint.aggregate(pipeline);
+    const data = result[0].data || [];
+    const total = result[0].total.length > 0 ? result[0].total[0].count : 0;
+
+    res.json({ data, total });
+  } catch (error) {
+    console.error("Error searching defect print cards:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Edit the Inspection Data
+app.put("/api/qc2-inspection-pass-bundle/:id", async (req, res) => {
+  const { id } = req.params;
+  const updateData = req.body;
+
+  try {
+    console.log(`Received request to update record with ID: ${id}`);
+    console.log(`Update Data: ${JSON.stringify(updateData)}`);
+    const updatedRecord = await QC2InspectionPassBundle.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true }
+    );
+    if (!updatedRecord) {
+      console.log(`Record with ID: ${id} not found`);
+      return res.status(404).send({ message: "Record not found" });
+    }
+    console.log(`Record with ID: ${id} updated successfully`);
+    res.send(updatedRecord);
+  } catch (error) {
+    console.error("Error updating record:", error);
+    res.status(500).send({ message: "Internal Server Error" });
   }
 });
 
