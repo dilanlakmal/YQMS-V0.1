@@ -219,7 +219,7 @@ const QC2Data = () => {
                 {t("bundle.customer_style")}
                 </th>
                 <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
-                {t("bundle.bundle")}
+                {t("bundle.color")}
                 </th>
                 <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm">
                 {t("bundle.size")}

@@ -25,6 +25,7 @@ import { useAuth } from "../components/authentication/AuthContext";
 import DefectNames from "../components/inspection/DefectNames";
 import DefectPrint from "../components/inspection/DefectPrint";
 import QC2Data from "../components/inspection/QC2Data";
+import EditInspection from "../components/inspection/EditInspection";
 import { useBluetooth } from "../components/context/BluetoothContext";
 
 const QC2InspectionPage = () => {
@@ -1221,7 +1222,7 @@ const handlePrintQRCode = async () => {
         {!inDefectWindow && (
           <div className="bg-gray-200 p-2">
             <div className="flex space-x-4">
-              {["first", "return", "data",  "defect-cards"].map(
+              {["first","edit", "return", "data",  "defect-cards"].map(
                 (tab) => (
                   <button
                     key={tab}
@@ -1234,6 +1235,8 @@ const handlePrintQRCode = async () => {
                   >
                     {tab === "first"
                       ? "Inspection"
+                      :tab==="edit"
+                      ?"Edit Inspection"
                       : tab === "return"
                       ? "Defect Names"
                       : tab === "data"
@@ -1254,6 +1257,8 @@ const handlePrintQRCode = async () => {
         {activeTab === "data" && <QC2Data />}
 
         {activeTab === "return" && <DefectNames />}
+
+        {activeTab === "edit" && <EditInspection />}
 
         <div className="flex-grow overflow-hidden bg-gray-50">
           {activeTab !== "first" ? (
