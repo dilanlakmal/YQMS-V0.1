@@ -15,7 +15,6 @@ import {
   CheckCircle,
   Filter,
   List,
-  PackageX,
   PieChart,
   Table as TableIcon,
   TrendingDown,
@@ -90,42 +89,19 @@ const LiveDashboard = () => {
   };
 
   // Fetch filter options from qc2-inspection-pass-bundle collection
+  // Replace the existing fetchFilterOptions function
   const fetchFilterOptions = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/qc2-inspection-pass-bundle`
+        `${API_BASE_URL}/api/qc2-inspection-pass-bundle/filter-options`
       );
       const data = response.data;
-      setMoNoOptions(
-        Array.from(
-          new Set(data.map((item) => item.moNo).filter(Boolean))
-        ).sort()
-      );
-      setColorOptions(
-        Array.from(
-          new Set(data.map((item) => item.color).filter(Boolean))
-        ).sort()
-      );
-      setSizeOptions(
-        Array.from(
-          new Set(data.map((item) => item.size).filter(Boolean))
-        ).sort()
-      );
-      setDepartmentOptions(
-        Array.from(
-          new Set(data.map((item) => item.department).filter(Boolean))
-        ).sort()
-      );
-      setEmpIdOptions(
-        Array.from(
-          new Set(data.map((item) => item.emp_id_inspection).filter(Boolean))
-        ).sort()
-      );
-      setBuyerOptions(
-        Array.from(
-          new Set(data.map((item) => item.buyer).filter(Boolean))
-        ).sort()
-      );
+      setMoNoOptions(data.moNo || []);
+      setColorOptions(data.color || []);
+      setSizeOptions(data.size || []);
+      setDepartmentOptions(data.department || []);
+      setEmpIdOptions(data.emp_id_inspection || []);
+      setBuyerOptions(data.buyer || []);
     } catch (error) {
       console.error("Error fetching filter options:", error);
     }

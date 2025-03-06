@@ -90,13 +90,13 @@ function Home() {
 
   const cards = [
     {
-      title: "Fabric/Cutting/SCC",
+      title: t("home.fabric/cutting/scc"),
       items: [
         {
           path: "/Fabric",
           roles: ["Admin", "QC2"],
           image: "assets/Home/fabric-logo.png",
-          title: "Fabric",
+          title: t("home.fabric"),
           description: "Fabric Inspection Reports",
         },
         {
@@ -188,7 +188,7 @@ function Home() {
           path: "/final-inspection",
           roles: ["Admin", "QA"],
           image: "assets/Home/qafinal.png",
-          title: "Final Inspection",
+          title: t("home.final_inspection"),
           description: "QA Final Inspection.",
         },
       ],
