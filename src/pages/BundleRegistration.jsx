@@ -480,7 +480,7 @@ function BundleRegistration() {
         setUserBatches(batchesData);
       }
 
-      alert("QR codes printed successfully!");
+      //alert("QR codes printed successfully!");
     } catch (error) {
       alert(`Print failed: ${error.message}`);
       setIsGenerateDisabled(false);

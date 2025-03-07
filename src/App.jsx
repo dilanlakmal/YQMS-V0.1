@@ -21,6 +21,7 @@ import LiveDashboard from "./pages/LiveDashboard";
 import Logs from "./pages/QC Inspection/Logs";
 import OPAPage from "./pages/OPA";
 import PackingPage from "./pages/Packing";
+import PowerBI from "./pages/PowerBI.jsx";
 import QC2InspectionPage from "./pages/QC2Inspection";
 import Return from "./pages/QC Inspection/Return";
 import QCSunriseReport from "./pages/QCSunriseReport.jsx";
@@ -327,6 +328,7 @@ function AppContent() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/live-dashboard" element={<LiveDashboard />} />
               <Route path="/qc1-sunrise" element={<QCSunriseReport />} />
+              <Route path="/powerbi" element={<PowerBI />} />
               <Route
                 path="/bundle-registration"
                 element={<BundleRegistration />}

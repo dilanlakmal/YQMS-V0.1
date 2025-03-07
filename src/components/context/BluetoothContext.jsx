@@ -3,7 +3,6 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const BluetoothContext = createContext();
 
 export const useBluetooth = () => useContext(BluetoothContext);
-
 export const BluetoothProvider = ({ children }) => {
   const [bluetoothState, setBluetoothState] = useState({
     isConnected: false,

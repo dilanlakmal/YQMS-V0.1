@@ -85,21 +85,28 @@ function Home() {
 
   const cards = [
     {
-      title: t("home.cutting/scc"),
+      title: t("home.fabric/cutting/scc"),
       items: [
+        {
+          path: "/Fabric",
+          roles: ["Admin", "QC2"],
+          image: "assets/Home/fabric-logo.png",
+          title: t("home.fabric"),
+          description: "Fabric Inspection Reports",
+        },
         {
           path: "/cutting",
           roles: ["Admin", "QC1"],
           image: "/IMG/cutting.webp",
           title: t("home.cutting"),
-          description: "Begin a new Cutting Inspection Reports here."
+          description: "Cutting Inspection Check Point."
         },
         {
           path: "/scc",
           roles: ["Admin", "QC2"],
           image: "/IMG/bundle.avif",
           title: t("SCC"),
-          description: "Begin a new SCC Inspection Report here."
+          description: "SCC Inspection Check Point."
         },
       ]
     },
@@ -111,35 +118,35 @@ function Home() {
           roles: ["Admin", "Bundle Registration"],
           image: "/IMG/bundle.avif",
           title: t("home.bundle_registration"),
-          description: "Click here to register orders for QC2 Inspection."
+          description: "Order Registration: QC2."
         },
         {
           path: "/washing",
           roles: ["Admin", "Washing"],
           image: "/IMG/washing.jpg",
           title: t("home.washing"),
-          description: "Click here to register orders for Washing."
+          description: "Scan orders for Washing."
         },
         {
           path: "/opa",
           roles: ["Admin", "OPA"],
           image: "/IMG/dyeing.png",
           title: t("home.opa"),
-          description: "Click here to scan orders in OPA."
+          description: "Scan orders in OPA."
         },
         {
           path: "/ironing",
           roles: ["Admin", "Ironing"],
           image: "/IMG/ironing.png",
           title: t("home.ironing"),
-          description: "Click here to register orders for Ironing."
+          description: "Scan orders for Ironing."
         },
         {
           path: "/packing",
           roles: ["Admin", "Packing"],
           image: "/IMG/packing.webp",
           title: t("home.packing"),
-          description: "Click here to register orders for Packing."
+          description: "Scan orders for Packing."
         }
       ]
     },
@@ -151,14 +158,14 @@ function Home() {
           roles: ["Admin", "QC1"],
           image: "/IMG/qcc.png",
           title:  t("home.qc1_inspection"),
-          description: "Begin a new QC1 Endline Inspection here."
+          description: "QC1 Inspection Check Point."
         },
         {
           path: "/qc2-inspection",
           roles: ["Admin", "QC2"],
           image: "/IMG/qc2.png",
           title:  t("home.qc2_inspection"),
-          description: "Begin a new QC2 Inspection Report here."
+          description: "QC2 Inspection Check Point."
         }
       ]
     },
@@ -170,9 +177,16 @@ function Home() {
           roles: ["Admin", "QA"],
           image: "/IMG/qaa.png",
           title:  t("home.qa_audit"),
-          description: "Start a QA Audit Report here."
-        }
-      ]
+          description: "QA Audit Check Point."
+        },
+        {
+          path: "/final-inspection",
+          roles: ["Admin", "QA"],
+          image: "/IMG/qafinal.png",
+          title: t("home.final_inspection"),
+          description: "QA Final Inspection.",
+        },
+      ],
     },
     {
       title:  t("home.data_analytics"),
@@ -182,17 +196,31 @@ function Home() {
           roles: ["Admin", "Data Analytics"],
           image: "/IMG/download.jpg",
           title:  t("home.download_data"),
-          description: "Click here to Download Data."
+          description: "Download Raw Data."
         },
         {
           path: "/live-dashboard",
           roles: ["Admin", "Data Analytics"],
           image: "/IMG/dash.png",
           title:  t("home.live_dashboard"),
-          description: "Click here to see Live Dashboard."
-        }
-      ]
-    }
+          description: "YQMS QC2 Live Dashboard."
+        },
+        {
+          path: "/powerbi",
+          roles: ["Admin", "Data Analytics"],
+          image: "/IMG/powerbi.png",
+          title: "Power BI",
+          description: "Power BI Report",
+        },
+        {
+          path: "/qc1-sunrise",
+          roles: ["Admin", "Data Analytics"],
+          image: "/IMG/sunrise.png",
+          title: "QC1 Sunriser",
+          description: "Upload Excel file here...",
+        },
+      ],
+    },
   ];
 
   return (

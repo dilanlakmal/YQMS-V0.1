@@ -24,8 +24,8 @@ import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
 import DefectNames from "../components/inspection/DefectNames";
 import DefectPrint from "../components/inspection/DefectPrint";
-import QC2Data from "../components/inspection/QC2Data";
 import EditInspection from "../components/inspection/EditInspection";
+import QC2Data from "../components/inspection/QC2Data";
 import { useBluetooth } from "../components/context/BluetoothContext";
 
 const QC2InspectionPage = () => {
@@ -118,27 +118,43 @@ const QC2InspectionPage = () => {
     }
   }, [tempDefects, rejectedOnce]);
 
+  // CHANGE: Added useEffect to manage the 3-second countdown for Pass Bundle
   useEffect(() => {
     let timer;
-    if (
-      printing &&
-      qrCodesData[printMethod].length > 0 &&
-      printMethod === "garment"
-    ) {
-      setPassBundleCountdown(5);
-      timer = setInterval(() => {
-        setPassBundleCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            handlePassBundle();
-            return null;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    if (passBundleCountdown !== null) {
+      if (passBundleCountdown > 0) {
+        timer = setInterval(() => {
+          setPassBundleCountdown((prev) => prev - 1);
+        }, 1000);
+      } else {
+        handlePassBundle(); // Automatically trigger Pass Bundle when countdown reaches 0
+        setPassBundleCountdown(null); // Reset countdown state
+      }
     }
-    return () => clearInterval(timer);
-  }, [printing, qrCodesData, printMethod]);
+    return () => clearInterval(timer); // Cleanup interval on unmount or state change
+  }, [passBundleCountdown]);
+
+  // useEffect(() => {
+  //   let timer;
+  //   if (
+  //     printing &&
+  //     qrCodesData[printMethod].length > 0 &&
+  //     printMethod === "garment"
+  //   ) {
+  //     setPassBundleCountdown(5);
+  //     timer = setInterval(() => {
+  //       setPassBundleCountdown((prev) => {
+  //         if (prev <= 1) {
+  //           clearInterval(timer);
+  //           handlePassBundle();
+  //           return null;
+  //         }
+  //         return prev - 1;
+  //       });
+  //     }, 1000);
+  //   }
+  //   return () => clearInterval(timer);
+  // }, [printing, qrCodesData, printMethod]);
 
   const generateDefectId = () => {
     return Math.random().toString(36).substring(2, 12).toUpperCase();
@@ -732,7 +748,12 @@ const handlePrintQRCode = async () => {
         await bluetoothRef.current.printBundleDefectData(qrCode);
       }
     }
-    alert("All QR codes printed successfully!");
+      //alert("All QR codes printed successfully!");
+
+      // CHANGE: Start the 3-second countdown for Pass Bundle only if there are rejected garments
+      if (totalRejects > 0) {
+        setPassBundleCountdown(3); // Initiate countdown from 3 seconds
+      }
   } catch (error) {
     console.error("Print error:", error);
     alert(`Failed to print QR codes: ${error.message || "Unknown error"}`);
@@ -858,31 +879,6 @@ const handlePrintQRCode = async () => {
     setNavOpen(!navOpen);
     setMenuClicked(true);
   };
-
-  // useEffect(() => {
-  //   if (bluetoothRef.current) {
-  //     bluetoothRef.current.onConnect = () => {
-  //       console.log("Bluetooth Connected");
-  //       setIsBluetoothConnected(true);
-  //       setBluetoothState((prevState) => ({
-  //         ...prevState,
-  //         isConnected: true,
-  //       }));
-  //     };
-
-  //     // Ensure onDisconnect is only set ONCE
-  //     if (!bluetoothRef.current.onDisconnect) {
-  //       bluetoothRef.current.onDisconnect = () => {
-  //         console.log("Bluetooth Disconnected");
-  //         setIsBluetoothConnected(false);
-  //         setBluetoothState((prevState) => ({
-  //           ...prevState,
-  //           isConnected: false,
-  //         }));
-  //       };
-  //     }
-  //   }
-  // }, []); // Run only once on component mount
 
   return (
     <div className="flex h-screen">
@@ -1251,19 +1247,22 @@ const handlePrintQRCode = async () => {
           </div>
         )}
 
+        {activeTab === "edit" && <EditInspection />}
+
+        {activeTab === "return" && <DefectNames />}
+
+        {activeTab === "data" && <QC2Data />}
+
         {activeTab === "defect-cards" && (
           <DefectPrint bluetoothRef={bluetoothRef} printMethod={printMethod} />
         )}
-        {activeTab === "data" && <QC2Data />}
-
-        {activeTab === "return" && <DefectNames />}
 
         {activeTab === "edit" && <EditInspection />}
 
         <div className="flex-grow overflow-hidden bg-gray-50">
           {activeTab !== "first" ? (
             <div className="h-full flex items-center justify-center">
-              <p className="text-gray-500">Coming Soon</p>
+              {/* <p className="text-gray-500">Coming Soon</p> */}
             </div>
           ) : (
             <>
