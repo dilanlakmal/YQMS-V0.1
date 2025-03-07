@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { allDefects } from "../../constants/QC Inspection/defects"; // Adjust the path as necessary
+import { allDefects } from "../..//constants/QC Inspection/defects"; // Adjust the path as necessary
 
 const EditModal = ({ isOpen, onClose, data, onSave }) => {
   const [garmentNumber, setGarmentNumber] = useState("");
@@ -94,12 +94,12 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center z-50 overflow-y-auto">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl md:w-1/2 m-4 p-4 md:p-6">
+      <div className="bg-white rounded-lg shadow-lg w-5/6  max-w-3xl md:w-1/2 m-4 p-4 md:p-6">
         <h2 className="text-xl md:text-2xl font-bold mb-4">Edit Garment</h2>
 
         {/* Attractive Box for Form Fields */}
-        <div className="bg-blue-100 p-4 rounded-lg shadow-inner mb-4 overflow-x-auto">
-          <div className="flex flex-row md:flex-row gap-4 min-w-[600px] md:min-w-0">
+        <div className="bg-blue-100 p-4 rounded-lg shadow-inner mb-2 md:mb-4 overflow-x-auto">
+          <div className="flex flex-row md:flex-row gap-2 md:gap-4 min-w-[400px] md:min-w-0">
             <div className="flex-1">
               <label className="block mb-1 text-sm font-semibold text-gray-700">
                 MO No
@@ -108,7 +108,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
                 type="text"
                 value={garmentNumber}
                 onChange={(e) => setGarmentNumber(e.target.value)}
-                className="border p-2 rounded w-full bg-gray-100 text-gray-800"
+                className="border p-1 md:p-2 rounded w-full bg-gray-100 text-gray-800"
                 readOnly
               />
             </div>
@@ -120,7 +120,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
                 type="text"
                 value={packageNo}
                 onChange={(e) => setPackageNo(e.target.value)}
-                className="border p-2 rounded w-full bg-gray-100 text-gray-800"
+                className="border p-1 md:p-2 rounded w-full bg-gray-100 text-gray-800"
                 readOnly
               />
             </div>
@@ -132,7 +132,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
                 type="text"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                className="border p-2 rounded w-full bg-gray-100 text-gray-800"
+                className="border p-1 md:p-2 rounded w-full bg-gray-100 text-gray-800"
                 readOnly
               />
             </div>
@@ -144,7 +144,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
                 type="text"
                 value={size}
                 onChange={(e) => setSize(e.target.value)}
-                className="border p-2 rounded w-full bg-gray-100 text-gray-800"
+                className="border p-1 md:p-2 rounded w-full bg-gray-100 text-gray-800"
                 readOnly
               />
             </div>
@@ -164,33 +164,35 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
               <option value="khmer">Khmer</option>
               <option value="chinese">Chinese</option>
             </select>
-            <select
-              value={selectedGarment}
-              onChange={(e) => setSelectedGarment(e.target.value)}
-              className="border p-2 rounded w-full md:w-1/3"
-            >
-              <option value="">Select a garment</option>
-              {rejectGarments.map((garment, index) => (
-                <option key={index} value={garment.garment_defect_id}>
-                  Garment {index + 1}
-                </option>
-              ))}
-            </select>
-            <select
-              value={selectedDefect}
-              onChange={(e) => setSelectedDefect(e.target.value)}
-              className="border p-2 rounded w-full md:w-1/3"
-            >
-              <option value="">Select a defect</option>
-              {allDefects.map((defect) => (
-                <option key={defect.code} value={defect.english}>
-                  {getDefectName(defect.english)}
-                </option>
-              ))}
-            </select>
+            <div className="flex flex-row w-full space-x-2">
+                <select
+                  value={selectedGarment}
+                  onChange={(e) => setSelectedGarment(e.target.value)}
+                  className="border p-2 rounded w-1/2"
+                >
+                  <option value="">Select a garment</option>
+                  {rejectGarments.map((garment, index) => (
+                    <option key={index} value={garment.garment_defect_id}>
+                      Garment {index + 1}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={selectedDefect}
+                  onChange={(e) => setSelectedDefect(e.target.value)}
+                  className="border p-2 rounded w-1/2"
+                >
+                  <option value="">Select a defect</option>
+                  {allDefects.map((defect) => (
+                    <option key={defect.code} value={defect.english}>
+                      {getDefectName(defect.english)}
+                    </option>
+                  ))}
+                </select>
+              </div>
             <button
               onClick={handleAddDefect}
-              className="bg-blue-500 text-white px-4 py-2 rounded w-full md:w-auto"
+              className="bg-blue-500 text-white px-4 py-2 rounded w-1/2 md:w-auto"
             >
               Add Defect
             </button>
@@ -201,9 +203,6 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
             <table className="min-w-full bg-white shadow-md rounded-lg border-collapse">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
-                  <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm whitespace-nowrap">
-                    No
-                  </th>
                   <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm whitespace-nowrap">
                     Garment No
                   </th>
@@ -226,10 +225,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
                       className="hover:bg-gray-100"
                     >
                       <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                        {garmentIndex + 1}
-                      </td>
-                      <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                        Garment {garmentIndex + 1}
+                        G. {garmentIndex + 1}
                       </td>
                       <td className="py-2 px-4 border-b border-gray-200 text-sm">
                         {getDefectName(defect.name)}
@@ -276,7 +272,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
         </div>
 
         {/* Buttons */}
-        <div className="flex flex-col md:flex-row justify-end gap-2">
+        <div className="flex flex-row md:flex-row justify-end gap-2">
           <button
             onClick={onClose}
             className="bg-gray-500 text-white px-4 py-2 rounded w-full md:w-auto"
