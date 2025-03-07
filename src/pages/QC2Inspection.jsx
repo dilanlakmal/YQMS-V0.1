@@ -12,6 +12,9 @@ import {
   QrCode,
   Tag,
   XCircle,
+  Languages,
+  Plug,
+  Link,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import BluetoothComponent from "../components/forms/Bluetooth";
@@ -894,7 +897,7 @@ const handlePrintQRCode = async () => {
           {menuClicked ? (
             <>
               <div className="flex items-center mb-1">
-                <Globe className="w-5 h-5 mr-1" />
+                <Languages className="w-5 h-5 mr-1" />
                 <span className="font-medium">Language</span>
               </div>
               <select value={language} onChange={(e) => setLanguage(e.target.value)} className="w-full p-1 text-black rounded">
@@ -1027,7 +1030,7 @@ const handlePrintQRCode = async () => {
               {selectedFeature === 'language' && (
                 <div>
                   <div className="flex items-center mb-1">
-                    <Globe className="w-5 h-5 mr-1" />
+                    <Languages className="w-5 h-5 mr-1" />
                     <span className="font-medium">Language</span>
                   </div>
                   <select value={language} onChange={(e) => setLanguage(e.target.value)} className="w-full p-1 text-black rounded">
@@ -1139,8 +1142,8 @@ const handlePrintQRCode = async () => {
               {selectedFeature === 'printer' && (
                 <div>
                   <div className="flex items-center mb-1">
-                    <Printer className="w-5 h-5 mr-1" />
-                    <span className="font-medium">Printer</span>
+                    <Link className="w-5 h-5 mr-1" />
+                    <span className="font-medium">Connect Printer</span>
                   </div>
                   <BluetoothComponent
                       ref={bluetoothRef}
@@ -1153,6 +1156,7 @@ const handlePrintQRCode = async () => {
               {selectedFeature === 'printingMethod' && (
                 <div>
                   <div className="flex items-center mb-1">
+                  <Printer className="w-5 h-5 mr-1" />
                     <span className="font-medium">Printing Method</span>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:flex space-x-1 md:space-x-2">
@@ -1179,13 +1183,12 @@ const handlePrintQRCode = async () => {
               )}
             </>
           )}
-          
         </div>
       ) : (
         <div className="space-y-4">
           <div className="flex items-center justify-center">
             <button onClick={() => handleIconClick('language')}>
-              <Globe className="w-5 h-5" />
+              <Languages className="w-5 h-5" />
             </button>
           </div>
           <div className="flex items-center justify-center">
@@ -1205,6 +1208,11 @@ const handlePrintQRCode = async () => {
           </div>
           <div className="flex items-center justify-center">
             <button onClick={() => handleIconClick('printer')}>
+              <Link className={`w-5 h-5 ${isBluetoothConnected ? "text-green-500" : ""}`} />
+            </button>
+          </div>
+          <div className="flex items-center justify-center">
+            <button onClick={() => handleIconClick('printingMethod')}>
               <Printer className={`w-5 h-5 ${isBluetoothConnected ? "text-green-500" : ""}`} />
             </button>
           </div>
@@ -1223,7 +1231,7 @@ const handlePrintQRCode = async () => {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 rounded ${
+                    className={`px-3 py-2 rounded ${
                       activeTab === tab
                         ? "bg-blue-600 text-white"
                         : "bg-white text-black"
@@ -1256,8 +1264,6 @@ const handlePrintQRCode = async () => {
         {activeTab === "defect-cards" && (
           <DefectPrint bluetoothRef={bluetoothRef} printMethod={printMethod} />
         )}
-
-        {activeTab === "edit" && <EditInspection />}
 
         <div className="flex-grow overflow-hidden bg-gray-50">
           {activeTab !== "first" ? (
