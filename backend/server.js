@@ -80,18 +80,15 @@ app.use(
 );
 //"mongodb://localhost:27017/ym_prod"
 
-//-----------------------------DATABASE CONNECTIONS------------------------------------------------//
-
+//-----------------------------DATABASE CONNECTIONS------------------------------------------------/
 
 // const mainUserConnection = mongoose.createConnection("mongodb://yasomi:Yasomi%40YM2025@192.167.1.10:29000/ym_eco_board?authSource=admin");
-// const mainUserConnection = mongoose.createConnection("mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin");
 const ymProdConnection = mongoose.createConnection("mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin");
 const ymEcoConnection = mongoose.createConnection("mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin");
-// // Log connection status
+
+// Log connection status
 ymProdConnection.on('connected', () => console.log("Connected to ym_prod database"));
 ymProdConnection.on('error', (err) => console.error("ym_prod connection error:", err));
-// mainUserConnection.on('connected', () => console.log("Connected to eco_development database"));
-// mainUserConnection.on('error', (err) => console.error("eco_development connection error:", err));
 ymEcoConnection.on('connected', () => console.log("Connected to ym_Eco database"));
 ymEcoConnection.on('error', (err) => console.error("ym_Eco connection error:", err));
 
@@ -104,7 +101,7 @@ const Ironing = createIroningModel(ymProdConnection);
 const Washing = createWashingModel(ymProdConnection);
 const OPA = createOPAModel(ymProdConnection);
 const Packing = createPackingModel(ymProdConnection);
-const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
+const QC2OrderData = createQc2OrderDataModel(ymEcoConnection);
 const RoleManagment = createRoleManagmentModel(ymProdConnection);
 const QC2InspectionPassBundle = createQC2InspectionPassBundle(ymProdConnection);
 const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
@@ -136,7 +133,7 @@ app.get("/api/search-mono", async (req, res) => {
   try {
     const digits = req.query.digits;
 
-    const collection = ymProdConnection.db.collection("dt_orders");
+    const collection = ymEcoConnection.db.collection("dt_orders");
 
     // More robust regex pattern to match last 3 digits before any non-digit characters
     const regexPattern = new RegExp(
@@ -205,7 +202,7 @@ app.get("/api/search-mono", async (req, res) => {
 // Update /api/order-details endpoint
 app.get("/api/order-details/:mono", async (req, res) => {
   try {
-    const collection = ymProdConnection.db.collection("dt_orders");
+    const collection = ymEcoConnection.db.collection("dt_orders");
     const order = await collection.findOne({
       Order_No: req.params.mono,
     });
@@ -275,7 +272,7 @@ app.get("/api/order-details/:mono", async (req, res) => {
 // Update /api/order-sizes endpoint
 app.get("/api/order-sizes/:mono/:color", async (req, res) => {
   try {
-    const collection = ymProdConnection.db.collection("dt_orders");
+    const collection = ymEcoConnection.db.collection("dt_orders");
     const order = await collection.findOne({ Order_No: req.params.mono });
     if (!order) return res.status(404).json({ error: "Order not found" });
     const colorObj = order.OrderColors.find(
@@ -352,7 +349,7 @@ app.get("/api/colors", async (req, res) => {
       return res.status(400).json({ error: "styleNo is required" });
     }
 
-    const collection = ymProdConnection.db.collection("dt_orders");
+    const collection = ymEcoConnection.db.collection("dt_orders");
     const order = await collection.findOne({ Order_No: styleNo });
 
     if (!order) {
@@ -375,7 +372,7 @@ app.get("/api/sizes", async (req, res) => {
       return res.status(400).json({ error: "styleNo is required" });
     }
 
-    const collection = ymProdConnection.db.collection("dt_orders");
+    const collection = ymEcoConnection.db.collection("dt_orders");
     const order = await collection.findOne({ Order_No: styleNo });
 
     if (!order) {
@@ -401,7 +398,7 @@ app.get("/api/sizes", async (req, res) => {
 
 // This endpoint is unused
 async function fetchOrderDetails(mono) {
-  const collection = mongoose.connection.db.collection("dt_orders");
+  const collection = ymEcoConnection.db.collection("dt_orders");
   const order = await collection.findOne({ Order_No: mono });
 
   const colorMap = new Map();
@@ -3403,7 +3400,7 @@ app.post("/api/refresh-token", async (req, res) => {
 app.post("/api/login", async (req, res) => {
   try {
     const { username, password, rememberMe } = req.body;
-    if (!ymEcoConnection.readyState) {
+    if (!ymProdConnection.readyState) {
       return res.status(500).json({ message: "Database not connected" });
     }
 

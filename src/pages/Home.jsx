@@ -90,7 +90,7 @@ function Home() {
         {
           path: "/Fabric",
           roles: ["Admin", "QC2"],
-          image: "assets/Home/fabric-logo.png",
+          image: "/IMG/fabric-logo.png",
           title: t("home.fabric"),
           description: "Fabric Inspection Reports",
         },
