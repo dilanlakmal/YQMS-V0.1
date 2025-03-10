@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { FaInfoCircle } from "react-icons/fa"; // Using react-icons for the 'i' icon
 import { allDefects } from "../../constants/QC Inspection/defects";
+import { useTranslation } from "react-i18next";
 
 const DefectNames = () => {
+  const {t}= useTranslation();
   const [selectedImage, setSelectedImage] = useState(null);
 
   const handleImageClick = (imagePath) => {
@@ -15,28 +17,28 @@ const DefectNames = () => {
 
   return (
     <div className="h-full w-full p-4 bg-white rounded-lg shadow-md overflow-hidden">
-      <h2 className="text-lg font-bold text-gray-800 mb-4">Defect Names</h2>
+      <h2 className="text-lg font-bold text-gray-800 mb-4">{t("defIm.defect_name")}</h2>
       <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-150px)]">
         <table className="min-w-full divide-y divide-gray-200 border border-gray-200 table-auto">
           <thead className="bg-sky-100 sticky top-0 z-10">
             <tr>
               <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200 whitespace-nowrap w-16">
-                Defect Code
+                {t("defName.defect_code")}
               </th>
               <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200 whitespace-nowrap w-48">
-                Defect Image
+              {t("defIm.defect_images")}
               </th>
               <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200 min-w-[150px]">
-                English Name
+              {t("set.english_name")}
               </th>
               <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200 min-w-[150px]">
-                Khmer Name
+              {t("set.khmer_name")}
               </th>
               <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200 min-w-[150px]">
-                Chinese Name
+              {t("defName.chinese_name")}
               </th>
               <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-200 min-w-[150px]">
-                Printing Name
+              {t("defName.printing_name")}
               </th>
             </tr>
           </thead>
@@ -99,7 +101,7 @@ const DefectNames = () => {
               onClick={handleClosePreview}
               className="absolute top-2 right-2 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 focus:outline-none"
             >
-              Close
+             {t("previewMode.close")}
             </button>
           </div>
         </div>

@@ -204,7 +204,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="col-span-1">
             <label className="block mb-1 text-sm font-semibold text-gray-700">
-              Mode
+            {t("defectPrint.mode")}
             </label>
             <div className="flex space-x-2">
               <button
@@ -213,7 +213,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                   mode === "repair" ? "bg-blue-600 text-white" : "bg-gray-200"
                 }`}
               >
-                By Repair
+                {t("qc2In.repair")}
               </button>
               <button
                 onClick={() => setMode("garment")}
@@ -221,7 +221,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                   mode === "garment" ? "bg-blue-600 text-white" : "bg-gray-200"
                 }`}
               >
-                By Garment
+                {t("qc2In.garment")}
               </button>
               <button
                 onClick={() => setMode("bundle")}
@@ -229,19 +229,19 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                   mode === "bundle" ? "bg-blue-600 text-white" : "bg-gray-200"
                 }`}
               >
-                By Bundle
+                {t("qc2In.bundle")}
               </button>
             </div>
           </div>
           <div>
             <label className="block mb-1 text-sm font-semibold text-gray-700">
-              MO No
+            {t("bundle.mono")}
             </label>
             <input
               type="text"
               value={searchMoNo}
               onChange={(e) => setSearchMoNo(e.target.value)}
-              placeholder="Search MO No"
+              placeholder={t("bundle.search_mono")}
               list="moNoList"
               className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
             />
@@ -253,13 +253,13 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
           </div>
           <div>
             <label className="block mb-1 text-sm font-semibold text-gray-700">
-              Package No
+            {t("bundle.package_no")}
             </label>
             <input
               type="text"
               value={searchPackageNo}
               onChange={(e) => setSearchPackageNo(e.target.value)}
-              placeholder="Search Package No"
+              placeholder={t("defectPrint.search_package")}
               list="packageNoList"
               className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
             />
@@ -272,7 +272,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
           {mode === "repair" && (
             <div>
               <label className="block mb-1 text-sm font-semibold text-gray-700">
-                Repair Group
+                {t("defectPrint.repair_group")}
               </label>
               <input
                 type="text"
@@ -292,7 +292,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
           {mode === "bundle" && (
             <div>
               <label className="block mb-1 text-sm font-semibold text-gray-700">
-                Status
+                {t("defectPrint.status")}
               </label>
               <div className="flex space-x-2">
                 <button
@@ -303,7 +303,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                       : "bg-gray-200"
                   }`}
                 >
-                  In Progress
+                  {t("defectPrint.in_progress")}
                 </button>
                 <button
                   onClick={() => setSearchStatus("completed")}
@@ -313,7 +313,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                       : "bg-gray-200"
                   }`}
                 >
-                  Completed
+                 {t("defectPrint.completed")}
                 </button>
                 <button
                   onClick={() => setSearchStatus("both")}
@@ -323,7 +323,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                       : "bg-gray-200"
                   }`}
                 >
-                  Both
+                  {t("defectPrint.both")}
                 </button>
               </div>
             </div>
@@ -338,7 +338,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                   : "bg-blue-600 hover:bg-blue-700"
               }`}
             >
-              {loading ? "Searching..." : "Apply"}
+              {loading ? t("downDa.searching") : t("dash.apply")}
             </button>
             <button
               onClick={handleResetFilters}
@@ -349,7 +349,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                   : "bg-gray-600 hover:bg-gray-700"
               }`}
             >
-              Reset
+              {t("dash.reset")}
             </button>
           </div>
         </div>
@@ -359,7 +359,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
       <div className="mb-4 text-sm text-gray-700">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2">
-            <label className="font-semibold">Records per page:</label>
+            <label className="font-semibold">{t("downDa.record_per")}:</label>
             <select
               value={recordsPerPage}
               onChange={handleRecordsPerPageChange}
@@ -372,7 +372,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
               ))}
             </select>
           </div>
-          <div>Total Records: {totalRecords}</div>
+          <div>{t("downDa.total_record")}: {totalRecords}</div>
         </div>
         <div className="flex justify-between items-center">
           <button
@@ -451,100 +451,100 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                   {mode === "repair" ? (
                     <>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Factory
+                        {t("bundle.factory")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Package No
+                      {t("bundle.package_no")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        MO No
+                      {t("bundle.mono")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Cust. Style
+                      {t("bundle.customer_style")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Color
+                      {t("bundle.color")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Size
+                      {t("bundle.size")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Repair Group
+                      {t("defectPrint.repair_group")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Defect Count
+                      {t("defectPrint.defect_count")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Defect Details
+                      {t("preview.defect_details")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Action
+                      {t("bundle.action")}
                       </th>
                     </>
                   ) : mode === "garment" ? (
                     <>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Package No
+                      {t("bundle.package_no")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        MO No
+                      {t("bundle.mono")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Cust. Style
+                      {t("bundle.customer_style")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Color
+                      {t("bundle.color")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Size
+                      {t("bundle.size")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Defect Count
+                      {t("defectPrint.defect_count")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Defect Details
+                      {t("preview.defect_details")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Action
+                      {t("bundle.action")}
                       </th>
                     </>
                   ) : mode === "bundle" ? (
                     <>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Package No
+                      {t("bundle.package_no")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Status
+                      {t("defectPrint.status")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Action
+                      {t("bundle.action")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        MO No
+                      {t("bundle.mono")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Cust. Style
+                      {t("bundle.customer_style")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Color
+                      {t("bundle.color")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Size
+                      {t("bundle.size")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Checked #
+                      {t("defectPrint.checked")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Defects #
+                      {t("defectPrint.defectN")}
                       </th>
                       <th className="py-3 px-2 border-b border-gray-300 font-semibold text-sm text-gray-700 break-words">
-                        Reject #
+                      {t("defectPrint.rejectN")}
                       </th>
                       <th className="py-3 px-2 border-b border-gray-300 font-semibold text-sm text-gray-700 break-words">
-                        Reworking #
+                      {t("defectPrint.reworking")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Print Details
+                      {t("defectPrint.print_details")}
                       </th>
                     </>
                   ) : null}

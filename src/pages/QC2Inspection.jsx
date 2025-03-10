@@ -5,7 +5,6 @@ import {
   CheckCircle,
   Eye,
   Filter,
-  Globe,
   Loader2,
   Menu,
   Printer,
@@ -13,8 +12,7 @@ import {
   Tag,
   XCircle,
   Languages,
-  Plug,
-  Link,
+  Paperclip, 
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import BluetoothComponent from "../components/forms/Bluetooth";
@@ -30,8 +28,12 @@ import DefectPrint from "../components/inspection/DefectPrint";
 import EditInspection from "../components/inspection/EditInspection";
 import QC2Data from "../components/inspection/QC2Data";
 import { useBluetooth } from "../components/context/BluetoothContext";
+import { useTranslation } from "react-i18next";
+import i18next from 'i18next';
 
 const QC2InspectionPage = () => {
+  const {t} = useTranslation();
+  const currentLanguage = i18next.language;
   const { user, loading } = useAuth();
   const { bluetoothState } = useBluetooth();
 
@@ -84,6 +86,7 @@ const QC2InspectionPage = () => {
     "finishing",
     "miscellaneous",
   ];
+  const defectTypes = ["all", "common", "type1", "type2"];
 
   const defectQty = isReturnInspection
     ? sessionData?.sessionDefectsQty || 0
@@ -898,21 +901,21 @@ const handlePrintQRCode = async () => {
             <>
               <div className="flex items-center mb-1">
                 <Languages className="w-5 h-5 mr-1" />
-                <span className="font-medium">Language</span>
+                <span className="font-medium">{t("qc2In.language")}</span>
               </div>
               <select value={language} onChange={(e) => setLanguage(e.target.value)} className="w-full p-1 text-black rounded">
-                <option value="english">English</option>
-                <option value="khmer">Khmer</option>
-                <option value="chinese">Chinese</option>
-                <option value="all">All Languages</option>
+                <option value="english">{t("languages.en")}</option>
+                <option value="khmer">{t("languages.kh")}</option>
+                <option value="chinese">{t("languages.ch")}</option>
+                <option value="all">{t("qc2In.all_languages")}</option>
               </select>
 
               <div className="flex items-center mb-1">
                 <Filter className="w-5 h-5 mr-1" />
-                <span className="font-medium">Defect Type</span>
+                <span className="font-medium">{t("preview.defect_type")}</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
-                {["all", "common", "type1", "type2"].map((type) => (
+                {defectTypes.map((type) => (
                   <button
                     key={type}
                     onClick={() => {
@@ -921,7 +924,7 @@ const handlePrintQRCode = async () => {
                     }}
                     className={`p-1 text-sm rounded border ${defectTypeFilter === type && !categoryFilter ? "bg-blue-600" : "bg-gray-700"}`}
                   >
-                    {type.toUpperCase()}
+                    {currentLanguage === 'en' ?t(`qc2In.${type}`).toUpperCase():t(`qc2In.${type}`)}
                   </button>
                 ))}
 
@@ -929,7 +932,7 @@ const handlePrintQRCode = async () => {
 
               <div className="flex items-center mb-1">
                 <Tag className="w-5 h-5 mr-1" />
-                <span className="font-medium">Category</span>
+                <span className="font-medium">{t("ana.category")}</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
                 {categoryOptions.map((cat) => (
@@ -941,14 +944,14 @@ const handlePrintQRCode = async () => {
                     }}
                     className={`p-1 text-sm rounded border ${categoryFilter === cat ? "bg-blue-600" : "bg-gray-700"}`}
                   >
-                    {cat.toUpperCase()}
+                    {currentLanguage === 'en' ? t(`qc2In.${cat}`).toUpperCase() : t(`qc2In.${cat}`)}
                   </button>
                 ))}
               </div>
 
               <div className="flex items-center mb-1">
                 <ArrowUpDown className="w-5 h-5 mr-1" />
-                <span className="font-medium">Sort</span>
+                <span className="font-medium">{t("qc2In.sort")}</span>
               </div>
               <div className="relative">
                 <button onClick={() => setSortDropdownOpen(!sortDropdownOpen)} className="w-full p-1 rounded bg-gray-700 text-left text-sm">
@@ -995,33 +998,34 @@ const handlePrintQRCode = async () => {
 
               <div className="flex items-center mb-1">
                 <Printer className="w-5 h-5 mr-1" />
-                <span className="font-medium">Printer</span>
+                <span className="font-medium">{t("qc2In.printer")}</span>
               </div>
               <BluetoothComponent 
                       ref={bluetoothRef}
                       />
 
               <div className="flex items-center mb-1">
-                <span className="font-medium">Printing Method</span>
+              <Paperclip className="w-5 h-5 mr-1" />
+                <span className="font-medium">{t("qc2In.printing_method")}</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:flex space-x-1 md:space-x-2">
                 <button
                   onClick={() => setPrintMethod("repair")}
                   className={`p-1 text-sm rounded border ${printMethod === "repair" ? "bg-blue-600" : "bg-gray-700"}`}
                 >
-                  By Repair
+                 {t("qc2In.repair")}
                 </button>
                 <button
                   onClick={() => setPrintMethod("garment")}
                   className={`p-1 text-sm rounded border ${printMethod === "garment" ? "bg-blue-600" : "bg-gray-700"}`}
                 >
-                  By Garments
+                  {t("qc2In.garment")}
                 </button>
                 <button
                   onClick={() => setPrintMethod("bundle")}
                   className={`p-1 text-sm rounded border ${printMethod === "bundle" ? "bg-blue-600" : "bg-gray-700"}`}
                 >
-                  By Bundle
+                 {t("qc2In.bundle")}
                 </button>
               </div>
             </>
@@ -1031,13 +1035,13 @@ const handlePrintQRCode = async () => {
                 <div>
                   <div className="flex items-center mb-1">
                     <Languages className="w-5 h-5 mr-1" />
-                    <span className="font-medium">Language</span>
+                    <span className="font-medium">{t("qc2In.language")}</span>
                   </div>
                   <select value={language} onChange={(e) => setLanguage(e.target.value)} className="w-full p-1 text-black rounded">
-                    <option value="english">English</option>
-                    <option value="khmer">Khmer</option>
-                    <option value="chinese">Chinese</option>
-                    <option value="all">All Languages</option>
+                    <option value="english">{t("languages.en")}</option>
+                    <option value="khmer">{t("languages.kh")}</option>
+                    <option value="chinese">{t("languages.ch")}</option>
+                    <option value="all">{t("qc2In.all_languages")}</option>
                   </select>
                 </div>
               )}
@@ -1046,10 +1050,10 @@ const handlePrintQRCode = async () => {
                 <div>
                   <div className="flex items-center mb-1">
                     <Filter className="w-5 h-5 mr-1" />
-                    <span className="font-medium">Defect Type</span>
+                    <span className="font-medium">{t("preview.defect_type")}</span>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
-                    {["all", "common", "type1", "type2"].map((type) => (
+                    {defectTypes.map((type) => (
                       <button
                         key={type}
                         onClick={() => {
@@ -1058,9 +1062,10 @@ const handlePrintQRCode = async () => {
                         }}
                         className={`p-1 text-sm rounded border ${defectTypeFilter === type && !categoryFilter ? "bg-blue-600" : "bg-gray-700"}`}
                       >
-                        {type.toUpperCase()}
+                        {currentLanguage === 'en' ?t(`qc2In.${type}`).toUpperCase():t(`qc2In.${type}`)}
                       </button>
                     ))}
+
                   </div>
                 </div>
               )}
@@ -1069,7 +1074,7 @@ const handlePrintQRCode = async () => {
                 <div>
                   <div className="flex items-center mb-1">
                     <Tag className="w-5 h-5 mr-1" />
-                    <span className="font-medium">Category</span>
+                    <span className="font-medium">{t("ana.category")}</span>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
                     {categoryOptions.map((cat) => (
@@ -1081,7 +1086,7 @@ const handlePrintQRCode = async () => {
                         }}
                         className={`p-1 text-sm rounded border ${categoryFilter === cat ? "bg-blue-600" : "bg-gray-700"}`}
                       >
-                        {cat.toUpperCase()}
+                      {currentLanguage === 'en' ? t(`qc2In.${cat}`).toUpperCase() : t(`qc2In.${cat}`)}
                       </button>
                     ))}
                   </div>
@@ -1092,7 +1097,7 @@ const handlePrintQRCode = async () => {
                 <div>
                   <div className="flex items-center mb-1">
                     <ArrowUpDown className="w-5 h-5 mr-1" />
-                    <span className="font-medium">Sort</span>
+                    <span className="font-medium">{t("qc2In.sort")}</span>
                   </div>
                   <div className="relative">
                     <button onClick={() => setSortDropdownOpen(!sortDropdownOpen)} className="w-full p-1 rounded bg-gray-700 text-left text-sm">
@@ -1142,8 +1147,8 @@ const handlePrintQRCode = async () => {
               {selectedFeature === 'printer' && (
                 <div>
                   <div className="flex items-center mb-1">
-                    <Link className="w-5 h-5 mr-1" />
-                    <span className="font-medium">Connect Printer</span>
+                    <Printer className="w-5 h-5 mr-1" />
+                    <span className="font-medium">{t("qc2In.printer")}</span>
                   </div>
                   <BluetoothComponent
                       ref={bluetoothRef}
@@ -1156,27 +1161,27 @@ const handlePrintQRCode = async () => {
               {selectedFeature === 'printingMethod' && (
                 <div>
                   <div className="flex items-center mb-1">
-                  <Printer className="w-5 h-5 mr-1" />
-                    <span className="font-medium">Printing Method</span>
+                  <Paperclip className="w-5 h-5 mr-1" />
+                    <span className="font-medium">{t("qc2In.printing_method")}</span>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:flex space-x-1 md:space-x-2">
                     <button
                       onClick={() => setPrintMethod("repair")}
                       className={`p-1 text-sm rounded border ${printMethod === "repair" ? "bg-blue-600" : "bg-gray-700"}`}
                     >
-                      By Repair
+                     {t("qc2In.repair")}
                     </button>
                     <button
                       onClick={() => setPrintMethod("garment")}
                       className={`p-1 text-sm rounded border ${printMethod === "garment" ? "bg-blue-600" : "bg-gray-700"}`}
                     >
-                      By Garments
+                      {t("qc2In.garment")}
                     </button>
                     <button
                       onClick={() => setPrintMethod("bundle")}
                       className={`p-1 text-sm rounded border ${printMethod === "bundle" ? "bg-blue-600" : "bg-gray-700"}`}
                     >
-                      By Bundle
+                      {t("qc2In.bundle")}
                     </button>
                   </div>
                 </div>
@@ -1208,12 +1213,12 @@ const handlePrintQRCode = async () => {
           </div>
           <div className="flex items-center justify-center">
             <button onClick={() => handleIconClick('printer')}>
-              <Link className={`w-5 h-5 ${isBluetoothConnected ? "text-green-500" : ""}`} />
+              <Printer className={`w-5 h-5 ${isBluetoothConnected ? "text-green-500" : ""}`} />
             </button>
           </div>
           <div className="flex items-center justify-center">
             <button onClick={() => handleIconClick('printingMethod')}>
-              <Printer className={`w-5 h-5 ${isBluetoothConnected ? "text-green-500" : ""}`} />
+              <Paperclip className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -1238,16 +1243,16 @@ const handlePrintQRCode = async () => {
                     }`}
                   >
                     {tab === "first"
-                      ? "Inspection"
+                      ? t("qc2In.inspection")
                       :tab==="edit"
-                      ?"Edit Inspection"
+                      ? t("qc2In.edit_inspection")
                       : tab === "return"
-                      ? "Defect Names"
+                      ? t("defIm.defect_name")
                       : tab === "data"
-                      ? "Data"
+                      ? t("bundle.data")
                       // : tab === "dashboard"
                       // ? "Dashboard"
-                      : "Defect Cards"}
+                      : t("qc2In.defect_card")}
                   </button>
                 )
               )}
@@ -1283,7 +1288,7 @@ const handlePrintQRCode = async () => {
                       {loadingData && (
                         <div className="flex items-center justify-center gap-2 text-blue-600 mt-4">
                           <Loader2 className="w-5 h-5 animate-spin" />
-                          <p>Loading data...</p>
+                          <p>{t("qc2In.loading_data")}</p>
                         </div>
                       )}
                       {error && (
@@ -1310,7 +1315,7 @@ const handlePrintQRCode = async () => {
                               : "bg-red-600 hover:bg-red-700 text-white"
                           }`}
                         >
-                          Reject Garment
+                          {t("qc2In.reject_garment")}
                         </button>
                         {!isReturnInspection && (
                           <div className="flex space-x-1">
@@ -1333,43 +1338,43 @@ const handlePrintQRCode = async () => {
                         <div className="overflow-x-auto whitespace-nowrap h-12 border-b mb-2">
                           <div className="flex space-x-4 items-center">
                             <div>
-                              <span className="text-xs">Department: </span>
+                              <span className="text-xs">{t("bundle.department")}: </span>
                               <span className="text-xs font-bold">
                                 {bundleData.department}
                               </span>
                             </div>
                             <div>
-                              <span className="text-xs">MO No: </span>
+                              <span className="text-xs">{t("bundle.mono")}: </span>
                               <span className="text-xs font-bold">
                                 {bundleData.selectedMono}
                               </span>
                             </div>
                             <div>
-                              <span className="text-xs">Cust. Style: </span>
+                              <span className="text-xs">{t("bundle.customer_style")}: </span>
                               <span className="text-xs font-bold">
                                 {bundleData.custStyle}
                               </span>
                             </div>
                             <div>
-                              <span className="text-xs">Color: </span>
+                              <span className="text-xs">{t("bundle.color")}: </span>
                               <span className="text-xs font-bold">
                                 {bundleData.color}
                               </span>
                             </div>
                             <div>
-                              <span className="text-xs">Size: </span>
+                              <span className="text-xs">{t("bundle.size")}: </span>
                               <span className="text-xs font-bold">
                                 {bundleData.size}
                               </span>
                             </div>
                             <div>
-                              <span className="text-xs">Line No: </span>
+                              <span className="text-xs">{t("bundle.line_no")}: </span>
                               <span className="text-xs font-bold">
                                 {bundleData.lineNo}
                               </span>
                             </div>
                             <div>
-                              <span className="text-xs">Package No: </span>
+                              <span className="text-xs">{t("bundle.package_no")}: </span>
                               <span className="text-xs font-bold">
                                 {bundleData.package_no}
                               </span>
@@ -1402,7 +1407,7 @@ const handlePrintQRCode = async () => {
                           <div className="flex md:flex-1 mx-1 bg-gray-100 rounded p-1 md:p-2 flex items-center">
                             <CheckCircle className="w-5 h-5 mr-2 text-green-600" />
                             <div className="hidden md:block">
-                              <div className="text-xs">Total Pass</div>
+                              <div className="text-xs">{t("downDa.total_pages")}</div>
                               <div className="text-xl font-bold text-green-600">
                                 {totalPass}
                               </div>
@@ -1416,7 +1421,7 @@ const handlePrintQRCode = async () => {
                           <div className="flex md:flex-1 mx-1 bg-gray-100 rounded p-1 md:p-2 flex items-center">
                             <XCircle className="w-5 h-5 mr-2 text-red-600" />
                             <div className="hidden md:block">
-                              <div className="text-xs">Total Rejects</div>
+                              <div className="text-xs">{t("dash.total_rejects")}</div>
                               <div className="text-xl font-bold text-red-600">
                                 {totalRejects}
                               </div>
@@ -1430,7 +1435,7 @@ const handlePrintQRCode = async () => {
                           <div className="flex md:flex-1 mx-1 bg-gray-100 rounded p-1 md:p-2 flex items-center">
                             <AlertCircle className="w-5 h-5 mr-2 text-orange-600" />
                             <div className="hidden md:block">
-                              <div className="text-xs">Defects Qty</div>
+                              <div className="text-xs">{t("qc2In.defect_qty")}</div>
                               <div className="text-xl font-bold text-orange-600">
                                 {defectQty}
                               </div>
@@ -1465,7 +1470,7 @@ const handlePrintQRCode = async () => {
                               : "bg-green-600 hover:bg-green-700"
                           } text-white`}
                         >
-                          Pass Bundle{" "}
+                          {t("qc2In.pass_bundle")}{" "}
                           {passBundleCountdown !== null
                             ? `(${passBundleCountdown}s)`
                             : ""}
@@ -1480,7 +1485,7 @@ const handlePrintQRCode = async () => {
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-blue-600 hover:bg-blue-700 text-white"
                               }`}
-                              title="Generate QR"
+                              title= {t("bundle.generate_qr")}
                             >
                               <QrCode className="w-5 h-5" />
                             </button>
@@ -1498,7 +1503,7 @@ const handlePrintQRCode = async () => {
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-blue-600 hover:bg-blue-700 text-white"
                               }`}
-                              title="Print QR"
+                              title={t("bundle.print_qr")}
                             >
                               <Printer className="w-5 h-5" />
                             </button>

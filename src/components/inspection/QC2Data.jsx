@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { API_BASE_URL } from "../../../config";
+import { useTranslation } from "react-i18next";
 
 const QC2Data = () => {
+  const {t} = useTranslation();
   const [dataCards, setDataCards] = useState([]);
   const [searchMoNo, setSearchMoNo] = useState("");
   const [searchPackageNo, setSearchPackageNo] = useState("");
@@ -109,13 +111,13 @@ const QC2Data = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block mb-1 text-sm font-semibold text-gray-700">
-              MO No
+             {t("bundle.mono")}
             </label>
             <input
               type="text"
               value={searchMoNo}
               onChange={(e) => setSearchMoNo(e.target.value)}
-              placeholder="Search MO No"
+              placeholder={t("bundle.search_mono")}
               list="moNoList"
               className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
             />
@@ -127,13 +129,13 @@ const QC2Data = () => {
           </div>
           <div>
             <label className="block mb-1 text-sm font-semibold text-gray-700">
-              Package No
+            {t("bundle.package_no")}
             </label>
             <input
               type="text"
               value={searchPackageNo}
               onChange={(e) => setSearchPackageNo(e.target.value)}
-              placeholder="Search Package No"
+              placeholder={t("defectPrint.search_package")}
               list="packageNoList"
               className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
             />
@@ -145,13 +147,13 @@ const QC2Data = () => {
           </div>
           <div>
             <label className="block mb-1 text-sm font-semibold text-gray-700">
-              EMP ID
+            {t("bundle.emp_id")}
             </label>
             <input
               type="text"
               value={searchEmpId}
               onChange={(e) => setSearchEmpId(e.target.value)}
-              placeholder="Search EMP ID"
+              placeholder={t("set.search_emp_id")}
               list="empIdList"
               className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
             />
@@ -171,7 +173,7 @@ const QC2Data = () => {
                   : "bg-blue-600 hover:bg-blue-700"
               }`}
             >
-              {loading ? "Searching..." : "Apply"}
+              {loading ? t("downDa.searching") : t("dash.apply")}
             </button>
             <button
               onClick={handleResetFilters}
@@ -182,7 +184,7 @@ const QC2Data = () => {
                   : "bg-gray-600 hover:bg-gray-700"
               }`}
             >
-              Reset
+              {t("dash.reset")}
             </button>
           </div>
         </div>
@@ -192,7 +194,7 @@ const QC2Data = () => {
       <div className="mb-4 text-sm text-gray-700">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2">
-            <label className="font-semibold">Records per page:</label>
+            <label className="font-semibold">{t("downDa.record_per")}:</label>
             <select
               value={recordsPerPage}
               onChange={handleRecordsPerPageChange}
@@ -205,7 +207,7 @@ const QC2Data = () => {
               ))}
             </select>
           </div>
-          <div>Total Records: {totalRecords}</div>
+          <div>{t("downDa.total_record")}: {totalRecords}</div>
         </div>
         <div className="flex justify-between items-center">
           <button
@@ -255,7 +257,7 @@ const QC2Data = () => {
             disabled={currentPage === totalPages || loading}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition duration-200"
           >
-            Next
+            {t("userL.next")}
           </button>
         </div>
       </div>
@@ -267,7 +269,7 @@ const QC2Data = () => {
         </div>
       ) : dataCards.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          No data cards found
+         {t("previewMode.no_data_card")}
         </div>
       ) : (
         <div className="flex-grow overflow-auto bg-white rounded-lg shadow-md">
@@ -276,46 +278,46 @@ const QC2Data = () => {
               <thead className="bg-gray-200 sticky top-0 z-10">
                 <tr>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    MO No
+                  {t("bundle.mono")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Cust. Style
+                  {t("bundle.customer_style")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Color
+                  {t("bundle.color")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Size
+                  {t("bundle.size")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Package No
+                  {t("bundle.package_no")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    EMP ID
+                  {t("bundle.emp_id")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    EMP Name
+                  {t("previewMode.emp_name")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Inspection Time
+                  {t("previewMode.inspection_time")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Inspection Date
+                  {t("previewMode.inspection_date")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Checked Qty
+                  {t("ana.checked_qty")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Total Pass
+                  {t("dash.total_pass")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Total Rejects
+                  {t("dash.total_rejects")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Defects Qty
+                  {t("dash.defects_qty")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Defect Details
+                  {t("preview.defect_details")}
                   </th>
                 </tr>
               </thead>

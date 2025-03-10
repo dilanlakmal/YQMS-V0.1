@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { allDefects } from "../..//constants/QC Inspection/defects"; // Adjust the path as necessary
+import { useTranslation } from "react-i18next";
 
 const EditModal = ({ isOpen, onClose, data, onSave }) => {
+  const {t} =useTranslation();
   const [garmentNumber, setGarmentNumber] = useState("");
   const [packageNo, setPackageNo] = useState("");
   const [color, setColor] = useState("");
@@ -95,14 +97,14 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center z-50 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-lg w-5/6  max-w-3xl md:w-1/2 m-4 p-4 md:p-6">
-        <h2 className="text-xl md:text-2xl font-bold mb-4">Edit Garment</h2>
+        <h2 className="text-xl md:text-2xl font-bold mb-4">{t("editGar.edit_garment")}</h2>
 
         {/* Attractive Box for Form Fields */}
         <div className="bg-blue-100 p-4 rounded-lg shadow-inner mb-2 md:mb-4 overflow-x-auto">
           <div className="flex flex-row md:flex-row gap-2 md:gap-4 min-w-[400px] md:min-w-0">
             <div className="flex-1">
               <label className="block mb-1 text-sm font-semibold text-gray-700">
-                MO No
+              {t("bundle.mono")}
               </label>
               <input
                 type="text"
@@ -114,7 +116,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
             </div>
             <div className="flex-1">
               <label className="block mb-1 text-sm font-semibold text-gray-700">
-                Package No
+              {t("bundle.package_no")}
               </label>
               <input
                 type="text"
@@ -126,7 +128,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
             </div>
             <div className="flex-1">
               <label className="block mb-1 text-sm font-semibold text-gray-700">
-                Color
+              {t("bundle.color")}
               </label>
               <input
                 type="text"
@@ -138,7 +140,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
             </div>
             <div className="flex-1">
               <label className="block mb-1 text-sm font-semibold text-gray-700">
-                Size
+              {t("bundle.size")}
               </label>
               <input
                 type="text"
@@ -153,16 +155,16 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
 
         {/* Defects Section */}
         <div className="mb-4">
-          <h3 className="text-lg md:text-xl font-semibold mb-2">Defects</h3>
+          <h3 className="text-lg md:text-xl font-semibold mb-2">{t("qrCodePrev.defects")}</h3>
           <div className="flex flex-col md:flex-row items-center mb-4 space-y-2 md:space-y-0 md:space-x-2">
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
               className="border p-2 rounded w-full md:w-1/5"
             >
-              <option value="english">English</option>
-              <option value="khmer">Khmer</option>
-              <option value="chinese">Chinese</option>
+              <option value="english">{t("languages.en")}</option>
+              <option value="khmer">{t("languages.kh")}</option>
+              <option value="chinese">{t("languages.ch")}</option>
             </select>
             <div className="flex flex-row w-full space-x-2">
                 <select
@@ -170,10 +172,10 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
                   onChange={(e) => setSelectedGarment(e.target.value)}
                   className="border p-2 rounded w-1/2"
                 >
-                  <option value="">Select a garment</option>
+                  <option value="">{t("editGar.select_garment")}</option>
                   {rejectGarments.map((garment, index) => (
                     <option key={index} value={garment.garment_defect_id}>
-                      Garment {index + 1}
+                      {t("qc2In.garment")} {index + 1}
                     </option>
                   ))}
                 </select>
@@ -182,7 +184,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
                   onChange={(e) => setSelectedDefect(e.target.value)}
                   className="border p-2 rounded w-1/2"
                 >
-                  <option value="">Select a defect</option>
+                  <option value="">{t("editGar.select_defect")}</option>
                   {allDefects.map((defect) => (
                     <option key={defect.code} value={defect.english}>
                       {getDefectName(defect.english)}
@@ -194,7 +196,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
               onClick={handleAddDefect}
               className="bg-blue-500 text-white px-4 py-2 rounded w-1/2 md:w-auto"
             >
-              Add Defect
+              {t("editGar.add_defect")}
             </button>
           </div>
 
@@ -204,16 +206,16 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm whitespace-nowrap">
-                    Garment No
+                  {t("editGar.garment_no")}
                   </th>
                   <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm whitespace-nowrap">
-                    Defect Name
+                  {t("defIm.defect_name")}
                   </th>
                   <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm whitespace-nowrap">
-                    Count
+                  {t("bundle.count")}
                   </th>
                   <th className="py-2 px-4 border-b border-gray-200 font-bold text-sm whitespace-nowrap">
-                    Action
+                  {t("bundle.action")}
                   </th>
                 </tr>
               </thead>
@@ -260,7 +262,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
                           }
                           className="bg-red-500 text-white px-2 py-1 rounded w-full md:w-auto"
                         >
-                          Delete
+                          {t("set.delete")}
                         </button>
                       </td>
                     </tr>
@@ -277,13 +279,13 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
             onClick={onClose}
             className="bg-gray-500 text-white px-4 py-2 rounded w-full md:w-auto"
           >
-            Cancel
+            {t("editU.cancel")}
           </button>
           <button
             onClick={handleSave}
             className="bg-blue-500 text-white px-4 py-2 rounded w-full md:w-auto"
           >
-            Save
+            {t("editBundle.save")}
           </button>
         </div>
       </div>
