@@ -86,15 +86,18 @@ app.use(
 // const mainUserConnection = mongoose.createConnection("mongodb://yasomi:Yasomi%40YM2025@192.167.1.10:29000/ym_eco_board?authSource=admin");
 // const mainUserConnection = mongoose.createConnection("mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin");
 const ymProdConnection = mongoose.createConnection("mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin");
-
+const ymEcoConnection = mongoose.createConnection("mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin");
 // // Log connection status
 ymProdConnection.on('connected', () => console.log("Connected to ym_prod database"));
 ymProdConnection.on('error', (err) => console.error("ym_prod connection error:", err));
 // mainUserConnection.on('connected', () => console.log("Connected to eco_development database"));
 // mainUserConnection.on('error', (err) => console.error("eco_development connection error:", err));
+ymEcoConnection.on('connected', () => console.log("Connected to ym_Eco database"));
+ymEcoConnection.on('error', (err) => console.error("ym_Eco connection error:", err));
 
 // Define model on connections
-const UserMain = createUserModel(ymProdConnection);
+// const UserMain = createUserModel(ymProdConnection);
+const UserMain = createUserModel(ymEcoConnection);
 const QCData = createQCDataModel(ymProdConnection);
 const Role = createRoleModel(ymProdConnection);
 const Ironing = createIroningModel(ymProdConnection);
@@ -3400,7 +3403,7 @@ app.post("/api/refresh-token", async (req, res) => {
 app.post("/api/login", async (req, res) => {
   try {
     const { username, password, rememberMe } = req.body;
-    if (!ymProdConnection.readyState) {
+    if (!ymEcoConnection.readyState) {
       return res.status(500).json({ message: "Database not connected" });
     }
 
