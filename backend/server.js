@@ -143,14 +143,14 @@ ymEcoConnection.on("error", (err) => console.error("unexpected error:", err));
 
 // Define model on connections
 
-const UserMain = createUserModel(ymProdConnection);
-//const UserMain = createUserModel(ymEcoConnection);
+//const UserMain = createUserModel(ymProdConnection);
+const UserMain = createUserModel(ymEcoConnection);
 
 const Role = createRoleModel(ymProdConnection);
 const QCData = createQCDataModel(ymProdConnection);
 
-//const QC2OrderData = createQc2OrderDataModel(ymEcoConnection);
-const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
+const QC2OrderData = createQc2OrderDataModel(ymEcoConnection);
+//const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
 
 const Ironing = createIroningModel(ymProdConnection);
 const Washing = createWashingModel(ymProdConnection);
@@ -179,7 +179,7 @@ app.get("/api/health", (req, res) => {
 app.get("/api/search-mono", async (req, res) => {
   try {
     const digits = req.query.digits;
-    const collection = mongoose.connection.db.collection("dt_orders");
+    const collection = ymEcoConnection.db.collection("dt_orders");
 
     // More robust regex pattern to match last 3 digits before any non-digit characters
     const regexPattern = new RegExp(
@@ -246,7 +246,7 @@ app.get("/api/search-mono", async (req, res) => {
 // Update /api/order-details endpoint
 app.get("/api/order-details/:mono", async (req, res) => {
   try {
-    const collection = mongoose.connection.db.collection("dt_orders");
+    const collection = ymEcoConnection.db.collection("dt_orders");
     const order = await collection.findOne({
       Order_No: req.params.mono,
     });
@@ -316,7 +316,7 @@ app.get("/api/order-details/:mono", async (req, res) => {
 // Update /api/order-sizes endpoint
 app.get("/api/order-sizes/:mono/:color", async (req, res) => {
   try {
-    const collection = mongoose.connection.db.collection("dt_orders");
+    const collection = ymEcoConnection.db.collection("dt_orders");
     const order = await collection.findOne({ Order_No: req.params.mono });
 
     if (!order) return res.status(404).json({ error: "Order not found" });
@@ -391,7 +391,7 @@ app.get("/api/total-garments-count/:mono/:color/:size", async (req, res) => {
 
 // This endpoint is unused
 async function fetchOrderDetails(mono) {
-  const collection = mongoose.connection.db.collection("dt_orders");
+  const collection = ymEcoConnection.db.collection("dt_orders");
   const order = await collection.findOne({ Order_No: mono });
 
   const colorMap = new Map();
