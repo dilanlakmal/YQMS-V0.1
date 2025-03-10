@@ -1,0 +1,384 @@
+{
+  "home": {
+    "welcome": "Welcome to Quality Data Management System",
+    "click_cards": "Click on the cards below to start inspection Reports or Live monitoring",
+    "unauthorized_access": "Unauthorized Access",
+    "loading": "Loading...",
+    "fabric/cutting/scc": "Fabric/Cutting/SCC",
+    "order_data": "Order Data",
+    "quality_inspection": "Quality Inspection",
+    "qa_audit": "QA Audit",
+    "data_analytics": "Data Analytics",
+    "bundle_registration": "Bundle Registration",
+    "fabric": "Fabric",
+    "cutting": "Cutting",
+    "washing": "Washing",
+    "opa": "OPA",
+    "scc": "SCC",
+    "packing": "Packing",
+    "dyeing": "Dyeing",
+    "ironing": "Ironing",
+    "final_inspection": "Final Inspection",
+    "qc1_inspection": "QC1 Inspection",
+    "qc2_inspection": "QC2 Inspection",
+    "qa_audit_report": "QA Audit Report",
+    "download_data": "Download Data",
+    "live_dashboard": "Live Dashboard"
+  },
+
+  "nav": {
+    "orders": "Orders",
+    "qc": "QC",
+    "qa": "QA",
+    "report": "Report",
+    "setting": "Setting",
+    "roles": "Roles",
+    "users": "Users"
+  },
+
+  "iro": {
+    "header": "Ironing Process Scanner",
+    "card": "Scan the QR code on the bundle to record ironing details",
+    "qr_scan": "QR Scan",
+    "auto_add": "Auto Add",
+    "ironing_id": "Ironing ID",
+    "task_no": "Task No",
+    "updated_date": "Updated Date",
+    "updated_time": "Updated Time",
+    "pass_qty": "Pass Qty (Iron)"
+  },
+
+  "wash": {
+    "header": "Washing Process Scanner",
+    "card": "Scan the QR code on the bundle to record washing details",
+    "washing_id": "WashingID",
+    "pass_qty": "Pass Qty (Wash)"
+  },
+
+  "opa": {
+    "header": "OPA Process Scanner",
+    "card": "Scan the QR code on the bundle to record OPA details",
+    "opa_id": "OPA ID",
+    "pass_qty": "Pass Qty (OPA)"
+  },
+
+  "pack": {
+    "header": "Packing Process Scanner",
+    "card": "Scan the QR code on the bundle to record packing details",
+    "packing_id": "Packing ID",
+    "pass_qty": "Pass Qty (Pack)"
+  },
+
+  "ana": {
+    "total_defects": "Total Defects",
+    "checked_qty": "Checked Qty",
+    "good_output": "Good Output",
+    "defect_pieces": "Defect Pieces",
+    "return_defect": "Return Defect #",
+    "defect_rate": "Defect Rate",
+    "defect_ratio": "Defect Ratio",
+    "defect_rate_by": "Defect Rate by Defect Name",
+    "all_categories": "All Categories",
+    "defect_rate_over": "Defect Rate Over Time",
+    "all_defects": "All Defects",
+    "time": "Time",
+    "min": "Minutes",
+    "hr": "Hour",
+    "defect_rate_by_ca": "Defect Rate By Category",
+    "category": "Category"
+  },
+
+  "cut": {
+    "ok": "OK"
+  },
+
+  "bundle": {
+    "bundle_registration": "Bundle Registration",
+    "registration": "Registration",
+    "data": "Data",
+    "reprint": "Reprint",
+    "date": "Date",
+    "department": "Department",
+    "select_department": "Select Department",
+    "qc1_endline": "QC1 Endline",
+    "washing": "Washing",
+    "sub_con": "Sub-con",
+    "search_mono": "Search MONo",
+    "order_details": "Order Details",
+    "selected_mono": "Selected MONo",
+    "customer_style": "Customer Style",
+    "buyer": "Buyer",
+    "country": "Country",
+    "order_qty": "Order Qty",
+    "factory": "Factory",
+    "line_no": "Line No",
+    "color": "Color",
+    "select_color": "Select Color",
+    "no_colors_available": "No Colors Available",
+    "size": "Size",
+    "select_size": "Select Size",
+    "no_size_available": "No Size Available",
+    "size_order_qty": "Size Order Qty",
+    "plan_cut_qty": "Plan Cut Qty",
+    "total_garment_count": "Total Garment Count",
+    "count": "Count",
+    "bundle_qty": "Bundle Qty",
+    "total_registered_bundle_qty": "Total Registered Bundle Qty",
+    "sub_con_factory": "Sub-con Factory",
+    "select_seb_con_factory": "Select Sub-con Factory",
+    "generate_qr": "Generate QR",
+    "preview_qr": "Preview QR",
+    "record_id": "Record ID",
+    "package_no": "Package No",
+    "modify": "Modify",
+    "time": "Time",
+    "emp_id": "Employee ID",
+    "eng_name": "EngName",
+    "kh_name": "KhName",
+    "mono": "MONo",
+    "total_order_qty": "Total Order Qty",
+    "color_chi": "Color-Chi",
+    "order_cut_qty": "Order Cut Qty",
+    "total_bundle_qty": "Total Bundle Qty",
+    "edit": "Edit",
+    "action": "Action",
+    "print_qr": "Print QR",
+    "printing": "Printing..."
+  },
+
+  "defIm": {
+    "defect_images": "Defect Images",
+    "defect_name": "Defect Name",
+    "images": "Images"
+  },
+
+  "downDa": {
+    "start_date": "Start Date",
+    "end_date": "End Date",
+    "type": "Type",
+    "record_per": "Record Per Page",
+    "style_no": "Style No",
+    "bundle_id": "Bundle ID",
+    "no_data": "No Data Found",
+    "summary": "Summary",
+    "total_record": "Total Records",
+    "total_pages": "Total Pages",
+    "search": "Search",
+    "searching": "Searching...",
+    "download_excel": "Download Excel",
+    "download_pdf": "Download PDF"
+  },
+
+  "dash": {
+    "coming_soon": "Coming Soon",
+    "filters": "Filters",
+    "apply": "Apply",
+    "reset": "Reset",
+    "applied_filters": "Applied Filters",
+    "total_pass": "Total pass",
+    "total_rejects": "Total Rejects",
+    "defects_qty": "Defect Qty",
+    "total_bundle": "Total Bundle",
+    "rank": "Rank",
+    "level": "Level",
+    "hide": "Hide",
+    "show": "Show",
+    "qc2": "QC2"
+  },
+
+  "set": {
+    "head": "You do not have permission to access this page.",
+    "super_admin": "Super Admin Registration",
+    "role": "Role",
+    "job_title": "Job Title",
+    "search_emp_id": "Search Employee ID",
+    "selected_user_details": "Selected User Details",
+    "name": "Name",
+    "english_name": "English Name",
+    "khmer_name": "Khmer Name",
+    "section": "Section",
+    "phone_no": "Phone Number",
+    "working_status": "Working Status",
+    "current_super_admins": "Current Super Admins",
+    "delete": "Delete",
+    "register_super_admin": "Register Super Admin"
+  },
+
+  "insp": {
+    "submit": "Submit",
+    "pass": "Pass",
+    "reject": "Reject"
+  },
+
+  "detail": {
+    "head": "Quality Inspection Details",
+    "fill_below": "Fill Below",
+    "style_info": "Style Info",
+    "customer": "Customer",
+    "order_info": "Order Info",
+    "select_factory": "Select Factory",
+    "continue": "Continue to Inspection",
+    "submit_details": "Submit Details"
+  },
+
+  "return": {
+    "pass_return": "Pass Return",
+    "reject_return": "Reject_return"
+  },
+
+  "sideBar": {
+    "qc2_order": "QC2 Order",
+    "defect": "Defect",
+    "output": "Output"
+  },
+
+  "languages": {
+    "en": "English",
+    "kh": "Khmer",
+    "ch": "Chinese"
+  },
+
+  "userL": {
+    "search_here": "Search Here...",
+    "add_user": "Add User",
+    "full_name": "Full Name",
+    "created_at": "Created At",
+    "action": "Action",
+    "previous": "Previous",
+    "next": "Next"
+  },
+
+  "roleMan": {
+    "role_management": "Role Management",
+    "current_roles": "Current Roles",
+    "add": "Add",
+    "update_role": "Update Role",
+    "select_role": "Select Role",
+    "job_titles": "Job Titles",
+    "search_job_titles": "Search Job Titles"
+  },
+
+  "editU": {
+    "update_user": "Update User",
+    "close_modal": "Close Modal",
+    "email": "Email",
+    "optional": "Optional",
+    "super_admin_user": "This user is a Super Admin",
+    "admin_user": "This user is an Admin",
+    "access": "All Access Granted",
+    "cancel": "Cancel",
+    "update": "Update"
+  },
+
+  "delU": {
+    "confirm": "Are you sure you want to delete this account user",
+    "yes": "Yes, I'm sure",
+    "no": "No, cancel"
+  },
+
+  "createU": {
+    "create_user": "Create an External User",
+    "device": "Device",
+    "default_password": "Default Password"
+  },
+
+  "preview": {
+    "defect_details": "Defect Details",
+    "defect_type": "Defect Type",
+    "quantity": "Quantity"
+  },
+
+  "prevHeader": {
+    "style": "Style"
+  },
+
+  "checkQty": {
+    "value": "Value"
+  },
+
+  "controlBut": {
+    "on": "ON",
+    "return": "Return"
+  },
+
+  "defectPrint": {
+    "search_package": "Search Package No",
+    "repair_group": "Repair Group",
+    "select_repair": "Select Repair Group",
+    "no_defect_card": "No defect cards found",
+    "defect_count": "Defect Count"
+  },
+
+  "imageUpload": {
+    "upload_image": "Upload Images",
+    "capture": "Capture",
+    "upload": "Upload",
+    "upload_message": "Drop images here or use the buttons above."
+  },
+
+  "previewMode": {
+    "qc_inspection_report": "QC Inspection Report",
+    "close": "Close",
+    "no_data_card": "No data cards found",
+    "emp_name": "Employee Name",
+    "inspection_time": "Inspection Time",
+    "inspection_date": "Inspection Date"
+  },
+
+  "summary": {
+    "defect_garment": "Defect Garments",
+    "return_defect": "Return Def. Qty"
+  },
+
+  "editBundle": {
+    "edit_record": "Edit Record",
+    "save": "Save"
+  },
+
+  "numPad": {
+    "enter_number": "Enter Number",
+    "done": "Done",
+    "enter_details": "Enter Details"
+  },
+
+  "qrCodePrev": {
+    "repair": "Repair",
+    "defects": "Defects",
+    "print": "Print"
+  },
+
+  "qrCodeScan": {
+    "loading_bundle": "Loading bundle data...",
+    "separator_id": "Separator ID",
+    "registered_date": "Registered Date",
+    "registered_time": "Registered Time",
+    "sub_con_factory_name": "Sub-con Factory Name",
+    "adding": "Adding"
+  },
+
+  "scan": {
+    "start": "Start Scanner",
+    "using": "Using",
+    "stop": "Stop Scanner"
+  },
+
+  "subCon": {
+    "yes": "Yes",
+    "no": "No",
+    "select_sub_con_factory": "Select Sub-con Factory"
+  },
+
+  "lineIn": {
+    "enter_line_no": "Enter Line Number"
+  },
+
+  "styleCode": {
+    "style_code": "Style Code",
+    "select_style_code": "Select Style Code"
+  },
+
+  "styleDig": {
+    "style_digit": "Style Digit",
+    "enter_style_digit": "Enter Style Digit"
+  }
+}
