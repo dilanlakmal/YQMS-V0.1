@@ -28,6 +28,7 @@ import createQCDataModel from "./models/qc1_data.js";
 import createQc2OrderDataModel from "./models/qc2_orderdata.js";
 import createQC2InspectionPassBundleModel from "./models/qc2_inspection.js";
 import createQC2ReworksModel from "./models/qc2_rework.js";
+import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
 
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "./config.js";
@@ -60,7 +61,7 @@ const certificate = fs.readFileSync(
 
 const credentials = {
   key: privateKey,
-  cert: certificate,
+  cert: certificate
 };
 
 // Create HTTPS server
@@ -72,8 +73,8 @@ const io = new Server(server, {
     origin: "https://192.167.12.14:3001", //"https://192.165.2.175:3001", // Update with your frontend URL  //"https://localhost:3001"
     methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  },
+    credentials: true
+  }
   //path: "/socket.io",
   //transports: ["websocket"],
 });
@@ -105,7 +106,7 @@ app.use(
   cors({
     origin: "*", //["http://localhost:3001", "https://localhost:3001"], // Allow both HTTP and HTTPS, // Update with your frontend URL
     methods: ["GET", "POST", "PUT"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization"]
   })
 );
 //    "mongodb://localhost:27017/ym_prod"
@@ -160,6 +161,7 @@ const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
 const QC2InspectionPassBundle =
   createQC2InspectionPassBundleModel(ymProdConnection);
 const QC2Reworks = createQC2ReworksModel(ymProdConnection);
+const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -192,7 +194,7 @@ app.get("/api/search-mono", async (req, res) => {
 
     const results = await collection
       .find({
-        Order_No: { $regex: regexPattern },
+        Order_No: { $regex: regexPattern }
       })
       .project({ Order_No: 1, _id: 0 }) // Only return Order_No field
       .limit(100) // Limit results to prevent overwhelming the UI
@@ -280,7 +282,7 @@ app.get("/api/order-details/:mono", async (req, res) => {
   try {
     const collection = ymEcoConnection.db.collection("dt_orders");
     const order = await collection.findOne({
-      Order_No: req.params.mono,
+      Order_No: req.params.mono
     });
 
     if (!order) return res.status(404).json({ error: "Order not found" });
@@ -296,7 +298,7 @@ app.get("/api/order-details/:mono", async (req, res) => {
           colorCode: colorObj.ColorCode,
           chnColor: colorObj.ChnColor,
           colorKey: colorObj.ColorKey,
-          sizes: new Map(),
+          sizes: new Map()
         });
       }
 
@@ -308,7 +310,7 @@ app.get("/api/order-details/:mono", async (req, res) => {
         if (quantity > 0) {
           colorMap.get(colorKey).sizes.set(cleanSize, {
             orderQty: quantity,
-            planCutQty: colorObj.CutQty?.[sizeName]?.PlanCutQty || 0,
+            planCutQty: colorObj.CutQty?.[sizeName]?.PlanCutQty || 0
           });
         }
       });
@@ -324,7 +326,7 @@ app.get("/api/order-details/:mono", async (req, res) => {
         original: c.originalColor,
         code: c.colorCode,
         chn: c.chnColor,
-        key: c.colorKey,
+        key: c.colorKey
       })),
       colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
         acc[curr.originalColor.toLowerCase()] = {
@@ -332,11 +334,11 @@ app.get("/api/order-details/:mono", async (req, res) => {
           details: Array.from(curr.sizes.entries()).map(([size, data]) => ({
             size,
             orderQty: data.orderQty,
-            planCutQty: data.planCutQty,
-          })),
+            planCutQty: data.planCutQty
+          }))
         };
         return acc;
-      }, {}),
+      }, {})
     };
 
     res.json(response);
@@ -368,7 +370,7 @@ app.get("/api/order-sizes/:mono/:color", async (req, res) => {
         return {
           size: cleanSize,
           orderQty: entry[sizeName],
-          planCutQty: colorObj.CutQty?.[sizeName]?.PlanCutQty || 0,
+          planCutQty: colorObj.CutQty?.[sizeName]?.PlanCutQty || 0
         };
       })
       .filter((v, i, a) => a.findIndex((t) => t.size === v.size) === i);
@@ -388,9 +390,9 @@ app.get("/api/total-bundle-qty/:mono", async (req, res) => {
       {
         $group: {
           _id: null, // Group all matched documents
-          total: { $sum: "$totalBundleQty" }, // Correct sum using field reference with $
-        },
-      },
+          total: { $sum: "$totalBundleQty" } // Correct sum using field reference with $
+        }
+      }
     ]);
     res.json({ total: total[0]?.total || 0 }); // Return the summed total or 0 if no documents
   } catch (error) {
@@ -409,9 +411,9 @@ app.get("/api/total-garments-count/:mono/:color/:size", async (req, res) => {
       {
         $group: {
           _id: null,
-          totalCount: { $sum: "$count" }, // Sum the count field
-        },
-      },
+          totalCount: { $sum: "$count" } // Sum the count field
+        }
+      }
     ]);
 
     res.json({ totalCount: totalCount[0]?.totalCount || 0 }); // Return total count or 0
@@ -432,7 +434,7 @@ async function fetchOrderDetails(mono) {
     if (!colorMap.has(key)) {
       colorMap.set(key, {
         originalColor: c.Color.trim(),
-        sizes: new Map(),
+        sizes: new Map()
       });
     }
 
@@ -455,7 +457,7 @@ async function fetchOrderDetails(mono) {
     colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
       acc[curr.originalColor.toLowerCase()] = Array.from(curr.sizes.values());
       return acc;
-    }, {}),
+    }, {})
   };
 }
 
@@ -487,7 +489,7 @@ app.post("/api/save-bundle-data", async (req, res) => {
     for (const bundle of bundleData) {
       // Get current package number for this MONo-Color-Size combination
       const packageCount = await QC2OrderData.countDocuments({
-        selectedMono: bundle.selectedMono,
+        selectedMono: bundle.selectedMono
         //color: bundle.color,
         //size: bundle.size,
       });
@@ -500,14 +502,14 @@ app.post("/api/save-bundle-data", async (req, res) => {
       const updated_date_seperator = now.toLocaleDateString("en-US", {
         month: "2-digit",
         day: "2-digit",
-        year: "numeric",
+        year: "numeric"
       });
 
       const updated_time_seperator = now.toLocaleTimeString("en-US", {
         hour12: false,
         hour: "2-digit",
         minute: "2-digit",
-        second: "2-digit",
+        second: "2-digit"
       });
 
       const newBundle = new QC2OrderData({
@@ -529,7 +531,7 @@ app.post("/api/save-bundle-data", async (req, res) => {
         kh_name: bundle.kh_name || "",
         job_title: bundle.job_title || "",
         dept_name: bundle.dept_name,
-        sect_name: bundle.sect_name || "",
+        sect_name: bundle.sect_name || ""
       });
       await newBundle.save();
       savedRecords.push(newBundle);
@@ -538,13 +540,13 @@ app.post("/api/save-bundle-data", async (req, res) => {
 
     res.status(201).json({
       message: "Bundle data saved successfully",
-      data: savedRecords,
+      data: savedRecords
     });
   } catch (error) {
     console.error("Error saving bundle data:", error);
     res.status(500).json({
       message: "Failed to save bundle data",
-      error: error.message,
+      error: error.message
     });
   }
 });
@@ -559,7 +561,7 @@ app.put("/api/update-bundle-data/:id", async (req, res) => {
 
   try {
     const updatedOrder = await QC2OrderData.findByIdAndUpdate(id, updateData, {
-      new: true,
+      new: true
     });
     if (!updatedOrder) {
       return res.status(404).send({ message: "Order not found" });
@@ -645,28 +647,28 @@ app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
         $group: {
           _id: {
             color: "$color",
-            size: "$size",
+            size: "$size"
           },
           colorCode: { $first: "$colorCode" },
           chnColor: { $first: "$chnColor" },
-          package_no: { $first: "$package_no" },
-        },
+          package_no: { $first: "$package_no" }
+        }
       },
       {
         $group: {
           _id: "$_id.color",
           sizes: { $push: "$_id.size" },
           colorCode: { $first: "$colorCode" },
-          chnColor: { $first: "$chnColor" },
-        },
-      },
+          chnColor: { $first: "$chnColor" }
+        }
+      }
     ]);
 
     const colors = result.map((c) => ({
       color: c._id,
       sizes: c.sizes,
       colorCode: c.colorCode,
-      chnColor: c.chnColor,
+      chnColor: c.chnColor
     }));
 
     res.json(colors);
@@ -683,7 +685,7 @@ app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
 app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
   try {
     const bundle = await QC2OrderData.findOne({
-      bundle_random_id: req.params.randomId,
+      bundle_random_id: req.params.randomId
     });
 
     if (!bundle) {
@@ -705,8 +707,8 @@ app.post("/api/check-bundle-id", async (req, res) => {
     // Find all bundle IDs matching the criteria
     const existingBundles = await QC2OrderData.find({
       bundle_id: {
-        $regex: `^${date}:${lineNo}:${selectedMono}:${color}:${size}`,
-      },
+        $regex: `^${date}:${lineNo}:${selectedMono}:${color}:${size}`
+      }
     });
 
     // Extract the largest number from the bundle IDs
@@ -724,7 +726,7 @@ app.post("/api/check-bundle-id", async (req, res) => {
     console.error("Error checking bundle ID:", error);
     res.status(500).json({
       message: "Failed to check bundle ID",
-      error: error.message,
+      error: error.message
     });
   }
 });
@@ -733,7 +735,7 @@ app.post("/api/check-bundle-id", async (req, res) => {
 app.get("/api/check-ironing-exists/:bundleId", async (req, res) => {
   try {
     const record = await Ironing.findOne({
-      ironing_bundle_id: req.params.bundleId,
+      ironing_bundle_id: req.params.bundleId
     });
     res.json({ exists: !!record });
   } catch (error) {
@@ -766,7 +768,7 @@ app.get("/api/check-defect-card/:defectPrintId", async (req, res) => {
 
     const defectRecord = await QC2InspectionPassBundle.findOne({
       "printArray.defect_print_id": defectPrintId,
-      "printArray.isCompleted": false,
+      "printArray.isCompleted": false
     });
     if (!defectRecord) {
       console.log(
@@ -808,7 +810,7 @@ app.get("/api/check-defect-card/:defectPrintId", async (req, res) => {
       sub_con: defectRecord.sub_con,
       sub_con_factory: defectRecord.sub_con_factory,
       bundle_id: defectRecord.bundle_id,
-      bundle_random_id: defectRecord.bundle_random_id,
+      bundle_random_id: defectRecord.bundle_random_id
     };
 
     res.json(formattedData);
@@ -846,7 +848,7 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
       kh_name_ironing,
       job_title_ironing,
       dept_name_ironing,
-      sect_name_ironing,
+      sect_name_ironing
     } = req.body;
 
     const updatedRecord = await QC2OrderData.findOneAndUpdate(
@@ -860,7 +862,7 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
         kh_name_ironing,
         job_title_ironing,
         dept_name_ironing,
-        sect_name_ironing,
+        sect_name_ironing
       },
       { new: true }
     );
@@ -892,7 +894,7 @@ app.get("/api/ironing-records", async (req, res) => {
 app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
   try {
     const bundle = await QC2OrderData.findOne({
-      bundle_random_id: req.params.randomId,
+      bundle_random_id: req.params.randomId
     });
     if (!bundle) {
       return res.status(404).json({ error: "Bundle not found" });
@@ -907,7 +909,7 @@ app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
 app.get("/api/check-washing-exists/:bundleId", async (req, res) => {
   try {
     const record = await Washing.findOne({
-      washing_bundle_id: req.params.bundleId,
+      washing_bundle_id: req.params.bundleId
     });
     res.json({ exists: !!record });
   } catch (error) {
@@ -920,7 +922,7 @@ app.get("/api/check-defect-card-washing/:defectPrintId", async (req, res) => {
     const { defectPrintId } = req.params;
     const defectRecord = await QC2InspectionPassBundle.findOne({
       "printArray.defect_print_id": defectPrintId,
-      "printArray.isCompleted": false,
+      "printArray.isCompleted": false
     });
     if (!defectRecord) {
       console.log(
@@ -960,7 +962,7 @@ app.get("/api/check-defect-card-washing/:defectPrintId", async (req, res) => {
       sub_con: defectRecord.sub_con,
       sub_con_factory: defectRecord.sub_con_factory,
       bundle_id: defectRecord.bundle_id,
-      bundle_random_id: defectRecord.bundle_random_id,
+      bundle_random_id: defectRecord.bundle_random_id
     };
     res.json(formattedData);
   } catch (error) {
@@ -1011,7 +1013,7 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
       kh_name_washing,
       job_title_washing,
       dept_name_washing,
-      sect_name_washing,
+      sect_name_washing
     } = req.body;
 
     const updatedRecord = await QC2OrderData.findOneAndUpdate(
@@ -1025,7 +1027,7 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
         kh_name_washing,
         job_title_washing,
         dept_name_washing,
-        sect_name_washing,
+        sect_name_washing
       },
       { new: true }
     );
@@ -1056,7 +1058,7 @@ app.get("/api/washing-records", async (req, res) => {
 app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
   try {
     const bundle = await QC2OrderData.findOne({
-      bundle_random_id: req.params.randomId,
+      bundle_random_id: req.params.randomId
     });
     if (!bundle) {
       return res.status(404).json({ error: "Bundle not found" });
@@ -1071,7 +1073,7 @@ app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
 app.get("/api/check-opa-exists/:bundleId", async (req, res) => {
   try {
     const record = await OPA.findOne({
-      opa_bundle_id: req.params.bundleId,
+      opa_bundle_id: req.params.bundleId
     });
     res.json({ exists: !!record });
   } catch (error) {
@@ -1084,7 +1086,7 @@ app.get("/api/check-defect-card-opa/:defectPrintId", async (req, res) => {
     const { defectPrintId } = req.params;
     const defectRecord = await QC2InspectionPassBundle.findOne({
       "printArray.defect_print_id": defectPrintId,
-      "printArray.isCompleted": false,
+      "printArray.isCompleted": false
     });
     if (!defectRecord) {
       console.log(
@@ -1124,7 +1126,7 @@ app.get("/api/check-defect-card-opa/:defectPrintId", async (req, res) => {
       sub_con: defectRecord.sub_con,
       sub_con_factory: defectRecord.sub_con_factory,
       bundle_id: defectRecord.bundle_id,
-      bundle_random_id: defectRecord.bundle_random_id,
+      bundle_random_id: defectRecord.bundle_random_id
     };
     res.json(formattedData);
   } catch (error) {
@@ -1175,7 +1177,7 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
       kh_name_opa,
       job_title_opa,
       dept_name_opa,
-      sect_name_opa,
+      sect_name_opa
     } = req.body;
 
     const updatedRecord = await QC2OrderData.findOneAndUpdate(
@@ -1189,7 +1191,7 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
         kh_name_opa,
         job_title_opa,
         dept_name_opa,
-        sect_name_opa,
+        sect_name_opa
       },
       { new: true }
     );
@@ -1226,7 +1228,7 @@ app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
     // First, check qc2_inspection_pass_bundle for order card
     const bundle = await QC2InspectionPassBundle.findOne({
       bundle_random_id: randomId,
-      "printArray.isCompleted": false, // Ensure bundle is not completed
+      "printArray.isCompleted": false // Ensure bundle is not completed
     });
 
     if (!bundle) {
@@ -1265,7 +1267,7 @@ app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
       inspection_date: bundle.inspection_date,
       inspection_time: bundle.inspection_time,
       sub_con: bundle.sub_con,
-      sub_con_factory: bundle.sub_con_factory,
+      sub_con_factory: bundle.sub_con_factory
     };
 
     res.json(formattedData);
@@ -1279,7 +1281,7 @@ app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
 app.get("/api/check-packing-exists/:bundleId", async (req, res) => {
   try {
     const record = await Packing.findOne({
-      packing_bundle_id: req.params.bundleId, // No change needed here, but ensure it matches task_no 62 in Packing.jsx
+      packing_bundle_id: req.params.bundleId // No change needed here, but ensure it matches task_no 62 in Packing.jsx
     });
     res.json({ exists: !!record });
   } catch (error) {
@@ -1312,7 +1314,7 @@ app.get("/api/check-defect-card/:defectPrintId", async (req, res) => {
 
     const defectRecord = await QC2InspectionPassBundle.findOne({
       "printArray.defect_print_id": defectPrintId,
-      "printArray.isCompleted": false,
+      "printArray.isCompleted": false
     });
 
     if (!defectRecord) {
@@ -1357,7 +1359,7 @@ app.get("/api/check-defect-card/:defectPrintId", async (req, res) => {
       sub_con: defectRecord.sub_con,
       sub_con_factory: defectRecord.sub_con_factory,
       bundle_id: defectRecord.bundle_id,
-      bundle_random_id: defectRecord.bundle_random_id,
+      bundle_random_id: defectRecord.bundle_random_id
     };
 
     res.json(formattedData);
@@ -1395,7 +1397,7 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
       kh_name_packing,
       job_title_packing,
       dept_name_packing,
-      sect_name_packing,
+      sect_name_packing
     } = req.body;
 
     const updatedRecord = await QC2OrderData.findOneAndUpdate(
@@ -1409,7 +1411,7 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
         kh_name_packing,
         job_title_packing,
         dept_name_packing,
-        sect_name_packing,
+        sect_name_packing
       },
       { new: true }
     );
@@ -1457,9 +1459,9 @@ app.get("/api/dashboard-stats", async (req, res) => {
           factories: { $addToSet: "$headerData.factory" },
           lineNos: { $addToSet: "$headerData.lineNo" },
           moNos: { $addToSet: "$headerData.moNo" },
-          customers: { $addToSet: "$headerData.customer" },
-        },
-      },
+          customers: { $addToSet: "$headerData.customer" }
+        }
+      }
     ]);
 
     // Get overall stats
@@ -1474,9 +1476,9 @@ app.get("/api/dashboard-stats", async (req, res) => {
           totalReturnDefectQty: { $sum: "$returnDefectQty" },
           totalGoodOutput: { $sum: "$goodOutput" },
           latestDefectArray: { $last: "$defectArray" },
-          latestHeaderData: { $last: "$headerData" },
-        },
-      },
+          latestHeaderData: { $last: "$headerData" }
+        }
+      }
     ]);
 
     // Get defect rate by line
@@ -1486,8 +1488,8 @@ app.get("/api/dashboard-stats", async (req, res) => {
         $group: {
           _id: "$headerData.lineNo",
           checkedQty: { $sum: "$checkedQty" },
-          defectQty: { $sum: "$defectQty" },
-        },
+          defectQty: { $sum: "$defectQty" }
+        }
       },
       {
         $project: {
@@ -1495,12 +1497,12 @@ app.get("/api/dashboard-stats", async (req, res) => {
           defectRate: {
             $multiply: [
               { $divide: ["$defectQty", { $max: ["$checkedQty", 1] }] },
-              100,
-            ],
-          },
-        },
+              100
+            ]
+          }
+        }
       },
-      { $sort: { defectRate: -1 } },
+      { $sort: { defectRate: -1 } }
     ]);
 
     // Get defect rate by MO
@@ -1510,8 +1512,8 @@ app.get("/api/dashboard-stats", async (req, res) => {
         $group: {
           _id: "$headerData.moNo",
           checkedQty: { $sum: "$checkedQty" },
-          defectQty: { $sum: "$defectQty" },
-        },
+          defectQty: { $sum: "$defectQty" }
+        }
       },
       {
         $project: {
@@ -1519,12 +1521,12 @@ app.get("/api/dashboard-stats", async (req, res) => {
           defectRate: {
             $multiply: [
               { $divide: ["$defectQty", { $max: ["$checkedQty", 1] }] },
-              100,
-            ],
-          },
-        },
+              100
+            ]
+          }
+        }
       },
-      { $sort: { defectRate: -1 } },
+      { $sort: { defectRate: -1 } }
     ]);
 
     // Get defect rate by customer
@@ -1534,8 +1536,8 @@ app.get("/api/dashboard-stats", async (req, res) => {
         $group: {
           _id: "$headerData.customer",
           checkedQty: { $sum: "$checkedQty" },
-          defectQty: { $sum: "$defectQty" },
-        },
+          defectQty: { $sum: "$defectQty" }
+        }
       },
       {
         $project: {
@@ -1543,12 +1545,12 @@ app.get("/api/dashboard-stats", async (req, res) => {
           defectRate: {
             $multiply: [
               { $divide: ["$defectQty", { $max: ["$checkedQty", 1] }] },
-              100,
-            ],
-          },
-        },
+              100
+            ]
+          }
+        }
       },
-      { $sort: { defectRate: -1 } },
+      { $sort: { defectRate: -1 } }
     ]);
 
     // Get the latest record with defect array to get accurate defect counts
@@ -1558,10 +1560,10 @@ app.get("/api/dashboard-stats", async (req, res) => {
       {
         $group: {
           _id: "$defectArray.name",
-          count: { $sum: "$defectArray.count" },
-        },
+          count: { $sum: "$defectArray.count" }
+        }
       },
-      { $sort: { count: -1 } },
+      { $sort: { count: -1 } }
     ]);
 
     // In server.js, replace the timeSeriesData aggregation with:
@@ -1572,29 +1574,29 @@ app.get("/api/dashboard-stats", async (req, res) => {
           timeComponents: {
             $let: {
               vars: {
-                timeParts: { $split: ["$formattedTimestamp", ":"] },
+                timeParts: { $split: ["$formattedTimestamp", ":"] }
               },
               in: {
                 hours: { $toInt: { $arrayElemAt: ["$$timeParts", 0] } },
                 minutes: { $toInt: { $arrayElemAt: ["$$timeParts", 1] } },
-                seconds: { $toInt: { $arrayElemAt: ["$$timeParts", 2] } },
-              },
-            },
-          },
-        },
+                seconds: { $toInt: { $arrayElemAt: ["$$timeParts", 2] } }
+              }
+            }
+          }
+        }
       },
       {
         $addFields: {
           totalMinutes: {
             $add: [
               { $multiply: ["$timeComponents.hours", 60] },
-              "$timeComponents.minutes",
-            ],
-          },
-        },
+              "$timeComponents.minutes"
+            ]
+          }
+        }
       },
       {
-        $sort: { timestamp: 1 },
+        $sort: { timestamp: 1 }
       },
       {
         $group: {
@@ -1606,45 +1608,45 @@ app.get("/api/dashboard-stats", async (req, res) => {
                   then: {
                     $multiply: [
                       { $floor: { $divide: ["$totalMinutes", 1] } },
-                      1,
-                    ],
-                  },
+                      1
+                    ]
+                  }
                 },
                 {
                   case: { $eq: [parseInt(timeInterval), 15] },
                   then: {
                     $multiply: [
                       { $floor: { $divide: ["$totalMinutes", 15] } },
-                      15,
-                    ],
-                  },
+                      15
+                    ]
+                  }
                 },
                 {
                   case: { $eq: [parseInt(timeInterval), 30] },
                   then: {
                     $multiply: [
                       { $floor: { $divide: ["$totalMinutes", 30] } },
-                      30,
-                    ],
-                  },
+                      30
+                    ]
+                  }
                 },
                 {
                   case: { $eq: [parseInt(timeInterval), 60] },
                   then: {
                     $multiply: [
                       { $floor: { $divide: ["$totalMinutes", 60] } },
-                      60,
-                    ],
-                  },
-                },
+                      60
+                    ]
+                  }
+                }
               ],
-              default: "$totalMinutes",
-            },
+              default: "$totalMinutes"
+            }
           },
           // Use last record for the time period to get cumulative values
           cumulativeChecked: { $last: "$cumulativeChecked" },
-          cumulativeDefects: { $last: "$cumulativeDefects" },
-        },
+          cumulativeDefects: { $last: "$cumulativeDefects" }
+        }
       },
       {
         $project: {
@@ -1653,11 +1655,11 @@ app.get("/api/dashboard-stats", async (req, res) => {
               branches: [
                 {
                   case: { $eq: [parseInt(timeInterval), 60] },
-                  then: { $toString: { $divide: ["$_id", 60] } },
-                },
+                  then: { $toString: { $divide: ["$_id", 60] } }
+                }
               ],
-              default: { $toString: "$_id" },
-            },
+              default: { $toString: "$_id" }
+            }
           },
           checkedQty: "$cumulativeChecked",
           defectQty: "$cumulativeDefects",
@@ -1668,18 +1670,18 @@ app.get("/api/dashboard-stats", async (req, res) => {
                   {
                     $divide: [
                       "$cumulativeDefects",
-                      { $max: ["$cumulativeChecked", 1] },
-                    ],
+                      { $max: ["$cumulativeChecked", 1] }
+                    ]
                   },
-                  100,
-                ],
+                  100
+                ]
               },
-              2,
-            ],
-          },
-        },
+              2
+            ]
+          }
+        }
       },
-      { $sort: { _id: 1 } },
+      { $sort: { _id: 1 } }
     ]);
 
     const dashboardData = stats[0] || {
@@ -1688,7 +1690,7 @@ app.get("/api/dashboard-stats", async (req, res) => {
       totalDefectPieces: 0,
       totalReturnDefectQty: 0,
       totalGoodOutput: 0,
-      latestHeaderData: {},
+      latestHeaderData: {}
     };
 
     const totalInspected = dashboardData.totalCheckedQty || 0;
@@ -1698,7 +1700,7 @@ app.get("/api/dashboard-stats", async (req, res) => {
         factories: [],
         lineNos: [],
         moNos: [],
-        customers: [],
+        customers: []
       },
       headerInfo: dashboardData.latestHeaderData,
       stats: {
@@ -1714,13 +1716,13 @@ app.get("/api/dashboard-stats", async (req, res) => {
           ? ((dashboardData.totalDefectPieces / totalInspected) * 100).toFixed(
               2
             )
-          : 0,
+          : 0
       },
       defectRateByLine,
       defectRateByMO,
       defectRateByCustomer,
       topDefects,
-      timeSeriesData,
+      timeSeriesData
     });
   } catch (error) {
     console.error("Error fetching dashboard stats:", error);
@@ -1737,7 +1739,7 @@ app.post("/api/save-qc-data", async (req, res) => {
     // Sanitize defectDetails
     const sanitizedDefects = (req.body.defectDetails || []).map((defect) => ({
       name: defect.name.toString().trim(),
-      count: Math.abs(parseInt(defect.count)) || 0,
+      count: Math.abs(parseInt(defect.count)) || 0
     }));
     const sanitizedData = {
       ...req.body,
@@ -1746,8 +1748,8 @@ app.post("/api/save-qc-data", async (req, res) => {
         ...req.body.headerData,
         date: req.body.headerData.date
           ? new Date(req.body.headerData.date).toISOString()
-          : undefined,
-      },
+          : undefined
+      }
     };
 
     const qcData = new QCData(sanitizedData);
@@ -1755,7 +1757,7 @@ app.post("/api/save-qc-data", async (req, res) => {
 
     res.status(201).json({
       message: "QC data saved successfully",
-      data: savedData,
+      data: savedData
     });
   } catch (error) {
     console.error("Error saving QC data:", error);
@@ -1765,9 +1767,9 @@ app.post("/api/save-qc-data", async (req, res) => {
       details: error.errors
         ? Object.keys(error.errors).map((key) => ({
             field: key,
-            message: error.errors[key].message,
+            message: error.errors[key].message
           }))
-        : undefined,
+        : undefined
     });
   }
 });
@@ -1797,9 +1799,9 @@ app.get("/api/unique-values", async (req, res) => {
           lineNos: { $addToSet: "$lineNo" },
           colors: { $addToSet: "$color" },
           sizes: { $addToSet: "$size" },
-          buyers: { $addToSet: "$buyer" },
-        },
-      },
+          buyers: { $addToSet: "$buyer" }
+        }
+      }
     ]);
 
     const result = uniqueValues[0] || {
@@ -1808,7 +1810,7 @@ app.get("/api/unique-values", async (req, res) => {
       lineNos: [],
       colors: [],
       sizes: [],
-      buyers: [],
+      buyers: []
     };
 
     delete result._id;
@@ -1838,7 +1840,7 @@ app.get("/api/download-data", async (req, res) => {
       size,
       buyer,
       page = 1,
-      limit = 50,
+      limit = 50
     } = req.query;
 
     // Convert page and limit to numbers
@@ -1912,7 +1914,7 @@ app.get("/api/download-data", async (req, res) => {
       buyer: item.buyer,
       bundle_id: isIroning ? item.ironing_bundle_id : item.bundle_id,
       factory: item.factory,
-      count: item.count,
+      count: item.count
     }));
 
     res.json({
@@ -1920,7 +1922,7 @@ app.get("/api/download-data", async (req, res) => {
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / limit)
     });
   } catch (error) {
     console.error("Error fetching download data:", error);
@@ -1974,7 +1976,7 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       sect_name_inspection,
       bundle_id,
       bundle_random_id,
-      printArray,
+      printArray
     } = req.body;
 
     const newRecord = new QC2InspectionPassBundle({
@@ -2008,7 +2010,7 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       sect_name_inspection,
       bundle_id,
       bundle_random_id,
-      printArray: printArray || [],
+      printArray: printArray || []
     });
 
     await newRecord.save();
@@ -2018,13 +2020,13 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
 
     res.status(201).json({
       message: "Inspection pass bundle saved successfully",
-      data: newRecord,
+      data: newRecord
     });
   } catch (error) {
     console.error("Error saving inspection pass bundle:", error);
     res.status(500).json({
       message: "Failed to save inspection pass bundle",
-      error: error.message,
+      error: error.message
     });
   }
 });
@@ -2063,13 +2065,13 @@ app.put(
             ...printEntry,
             totalRejectGarment_Var:
               printEntry.totalRejectGarment_Var ||
-              printEntry.totalRejectGarmentCount, // Preserve or initialize
+              printEntry.totalRejectGarmentCount // Preserve or initialize
           }));
       }
 
       const options = {
         new: true,
-        runValidators: true,
+        runValidators: true
       };
       if (arrayFilters) {
         options.arrayFilters = arrayFilters;
@@ -2088,13 +2090,13 @@ app.put(
       io.emit("qc2_data_updated");
       res.json({
         message: "Inspection pass bundle updated successfully",
-        data: updatedRecord,
+        data: updatedRecord
       });
     } catch (error) {
       console.error("Error updating inspection pass bundle:", error);
       res.status(500).json({
         message: "Failed to update inspection pass bundle",
-        error: error.message,
+        error: error.message
       });
     }
   }
@@ -2113,8 +2115,8 @@ app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {
           department: { $addToSet: "$department" },
           emp_id_inspection: { $addToSet: "$emp_id_inspection" },
           buyer: { $addToSet: "$buyer" },
-          package_no: { $addToSet: "$package_no" }, // Added package_no
-        },
+          package_no: { $addToSet: "$package_no" } // Added package_no
+        }
       },
       {
         $project: {
@@ -2125,9 +2127,9 @@ app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {
           department: 1,
           emp_id_inspection: 1,
           buyer: 1,
-          package_no: 1,
-        },
-      },
+          package_no: 1
+        }
+      }
     ]);
 
     const result =
@@ -2140,7 +2142,7 @@ app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {
             department: [],
             emp_id_inspection: [],
             buyer: [],
-            package_no: [],
+            package_no: []
           };
 
     Object.keys(result).forEach((key) => {
@@ -2165,17 +2167,17 @@ app.get("/api/qc2-defect-print/filter-options", async (req, res) => {
           _id: null,
           moNo: { $addToSet: "$moNo" },
           package_no: { $addToSet: "$package_no" },
-          repair: { $addToSet: "$repair" },
-        },
+          repair: { $addToSet: "$repair" }
+        }
       },
       {
         $project: {
           _id: 0,
           moNo: 1,
           package_no: 1,
-          repair: 1,
-        },
-      },
+          repair: 1
+        }
+      }
     ]);
     const result = filterOptions[0] || { moNo: [], package_no: [], repair: [] };
     Object.keys(result).forEach((key) => {
@@ -2197,7 +2199,7 @@ app.get(
     try {
       const { bundle_random_id } = req.params;
       const record = await QC2InspectionPassBundle.findOne({
-        bundle_random_id,
+        bundle_random_id
       });
       if (record) {
         res.json(record);
@@ -2219,7 +2221,7 @@ app.get(
       const { includeCompleted } = req.query;
 
       let query = {
-        "printArray.defect_print_id": defect_print_id,
+        "printArray.defect_print_id": defect_print_id
       };
 
       if (includeCompleted !== "true") {
@@ -2261,7 +2263,7 @@ app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
       size,
       department,
       page = 1,
-      limit = 50, // Default to 50 records per page
+      limit = 50 // Default to 50 records per page
     } = req.query;
 
     let match = {};
@@ -2275,7 +2277,7 @@ app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
     }
     if (emp_id_inspection)
       match.emp_id_inspection = {
-        $regex: new RegExp(emp_id_inspection.trim(), "i"),
+        $regex: new RegExp(emp_id_inspection.trim(), "i")
       };
     if (color) match.color = color;
     if (size) match.size = size;
@@ -2298,9 +2300,9 @@ app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
       {
         $facet: {
           data: [{ $skip: skip }, { $limit: limitNum }],
-          total: [{ $count: "count" }],
-        },
-      },
+          total: [{ $count: "count" }]
+        }
+      }
     ];
 
     const result = await QC2InspectionPassBundle.aggregate(pipeline);
@@ -2338,9 +2340,9 @@ app.get("/api/qc2-defect-print/search", async (req, res) => {
       {
         $facet: {
           data: [{ $skip: skip }, { $limit: limitNum }],
-          total: [{ $count: "count" }],
-        },
-      },
+          total: [{ $count: "count" }]
+        }
+      }
     ];
 
     const result = await QC2DefectPrint.aggregate(pipeline);
@@ -2395,14 +2397,14 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
       color,
       size,
       department,
-      buyer,
+      buyer
     } = req.query;
 
     let match = {};
     if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
     if (emp_id_inspection)
       match.emp_id_inspection = {
-        $regex: new RegExp(emp_id_inspection.trim(), "i"),
+        $regex: new RegExp(emp_id_inspection.trim(), "i")
       };
     if (color) match.color = color;
     if (size) match.size = size;
@@ -2427,8 +2429,8 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
           totalPass: { $sum: "$totalPass" },
           totalRejects: { $sum: "$totalRejects" },
           defectsQty: { $sum: "$defectQty" },
-          totalBundles: { $sum: 1 },
-        },
+          totalBundles: { $sum: 1 }
+        }
       },
       {
         $project: {
@@ -2442,18 +2444,18 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
             $cond: [
               { $eq: ["$checkedQty", 0] },
               0,
-              { $divide: ["$defectsQty", "$checkedQty"] },
-            ],
+              { $divide: ["$defectsQty", "$checkedQty"] }
+            ]
           },
           defectRatio: {
             $cond: [
               { $eq: ["$checkedQty", 0] },
               0,
-              { $divide: ["$totalRejects", "$checkedQty"] },
-            ],
-          },
-        },
-      },
+              { $divide: ["$totalRejects", "$checkedQty"] }
+            ]
+          }
+        }
+      }
     ]);
 
     if (data.length > 0) {
@@ -2466,7 +2468,7 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
         defectsQty: 0,
         totalBundles: 0,
         defectRate: 0,
-        defectRatio: 0,
+        defectRatio: 0
       });
     }
   } catch (error) {
@@ -2486,14 +2488,14 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
       color,
       size,
       department,
-      buyer,
+      buyer
     } = req.query;
 
     let match = {};
     if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
     if (emp_id_inspection)
       match.emp_id_inspection = {
-        $regex: new RegExp(emp_id_inspection.trim(), "i"),
+        $regex: new RegExp(emp_id_inspection.trim(), "i")
       };
     if (color) match.color = color;
     if (size) match.size = size;
@@ -2514,16 +2516,16 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
       {
         $group: {
           _id: "$defectArray.defectName",
-          totalCount: { $sum: "$defectArray.totalCount" },
-        },
+          totalCount: { $sum: "$defectArray.totalCount" }
+        }
       },
       {
         $project: {
           _id: 0,
           defectName: "$_id",
-          totalCount: 1,
-        },
-      },
+          totalCount: 1
+        }
+      }
     ]);
 
     const totalCheckedQtyAgg = await QC2InspectionPassBundle.aggregate([
@@ -2531,15 +2533,15 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
       {
         $group: {
           _id: null,
-          totalCheckedQty: { $sum: "$checkedQty" },
-        },
-      },
+          totalCheckedQty: { $sum: "$checkedQty" }
+        }
+      }
     ]);
     const totalChecked =
       totalCheckedQtyAgg.length > 0 ? totalCheckedQtyAgg[0].totalCheckedQty : 1;
     const defectRates = data.map((item) => ({
       ...item,
-      defectRate: item.totalCount / totalChecked,
+      defectRate: item.totalCount / totalChecked
     }));
 
     res.json(defectRates);
@@ -2560,14 +2562,14 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
       color,
       size,
       department,
-      buyer,
+      buyer
     } = req.query;
 
     let match = {};
     if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
     if (emp_id_inspection)
       match.emp_id_inspection = {
-        $regex: new RegExp(emp_id_inspection.trim(), "i"),
+        $regex: new RegExp(emp_id_inspection.trim(), "i")
       };
     if (color) match.color = color;
     if (size) match.size = size;
@@ -2593,10 +2595,10 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
           defectsQty: { $sum: "$defectQty" },
           totalBundles: { $sum: 1 },
           defectiveBundles: {
-            $sum: { $cond: [{ $gt: ["$totalRepair", 0] }, 1, 0] },
+            $sum: { $cond: [{ $gt: ["$totalRepair", 0] }, 1, 0] }
           },
-          defectArray: { $push: "$defectArray" },
-        },
+          defectArray: { $push: "$defectArray" }
+        }
       },
       {
         $project: {
@@ -2611,27 +2613,27 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
             $reduce: {
               input: "$defectArray",
               initialValue: [],
-              in: { $concatArrays: ["$$value", "$$this"] },
-            },
+              in: { $concatArrays: ["$$value", "$$this"] }
+            }
           },
           defectRate: {
             $cond: [
               { $eq: ["$checkedQty", 0] },
               0,
-              { $divide: ["$defectsQty", "$checkedQty"] },
-            ],
+              { $divide: ["$defectsQty", "$checkedQty"] }
+            ]
           },
           defectRatio: {
             $cond: [
               { $eq: ["$checkedQty", 0] },
               0,
-              { $divide: ["$totalRejects", "$checkedQty"] },
-            ],
+              { $divide: ["$totalRejects", "$checkedQty"] }
+            ]
           },
-          _id: 0,
-        },
+          _id: 0
+        }
       },
-      { $sort: { moNo: 1 } },
+      { $sort: { moNo: 1 } }
     ]);
 
     res.json(data);
@@ -2652,14 +2654,14 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
       color,
       size,
       department,
-      buyer,
+      buyer
     } = req.query;
 
     let match = {};
     if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
     if (emp_id_inspection)
       match.emp_id_inspection = {
-        $regex: new RegExp(emp_id_inspection.trim(), "i"),
+        $regex: new RegExp(emp_id_inspection.trim(), "i")
       };
     if (color) match.color = color;
     if (size) match.size = size;
@@ -2687,22 +2689,22 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
           inspection_time: 1,
           hour: { $toInt: { $substr: ["$inspection_time", 0, 2] } },
           minute: { $toInt: { $substr: ["$inspection_time", 3, 2] } },
-          second: { $toInt: { $substr: ["$inspection_time", 6, 2] } },
-        },
+          second: { $toInt: { $substr: ["$inspection_time", 6, 2] } }
+        }
       },
       {
         $match: {
           minute: { $gte: 0, $lte: 59 },
-          second: { $gte: 0, $lte: 59 },
-        },
+          second: { $gte: 0, $lte: 59 }
+        }
       },
       {
         $group: {
           _id: { moNo: "$moNo", hour: "$hour" },
           totalCheckedQty: { $sum: "$checkedQty" },
           totalDefectQty: { $sum: "$defectQty" },
-          defectRecords: { $push: "$defectArray" },
-        },
+          defectRecords: { $push: "$defectArray" }
+        }
       },
       { $unwind: { path: "$defectRecords", preserveNullAndEmptyArrays: true } },
       { $unwind: { path: "$defectRecords", preserveNullAndEmptyArrays: true } },
@@ -2711,12 +2713,12 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
           _id: {
             moNo: "$_id.moNo",
             hour: "$_id.hour",
-            defectName: "$defectRecords.defectName",
+            defectName: "$defectRecords.defectName"
           },
           totalCheckedQty: { $first: "$totalCheckedQty" },
           totalDefectQty: { $first: "$totalDefectQty" },
-          defectCount: { $sum: "$defectRecords.totalCount" },
-        },
+          defectCount: { $sum: "$defectRecords.totalCount" }
+        }
       },
       {
         $group: {
@@ -2727,11 +2729,11 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
             $push: {
               name: "$_id.defectName",
               count: {
-                $cond: [{ $eq: ["$defectCount", null] }, 0, "$defectCount"],
-              },
-            },
-          },
-        },
+                $cond: [{ $eq: ["$defectCount", null] }, 0, "$defectCount"]
+              }
+            }
+          }
+        }
       },
       {
         $group: {
@@ -2741,12 +2743,12 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
               hour: "$_id.hour",
               checkedQty: "$checkedQty",
               defects: "$defects",
-              defectQty: "$totalDefectQty",
-            },
+              defectQty: "$totalDefectQty"
+            }
           },
           totalCheckedQty: { $sum: "$checkedQty" },
-          totalDefectQty: { $sum: "$totalDefectQty" },
-        },
+          totalDefectQty: { $sum: "$totalDefectQty" }
+        }
       },
       {
         $project: {
@@ -2766,18 +2768,18 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
                         {
                           $multiply: [
                             { $divide: ["$$h.defectQty", "$$h.checkedQty"] },
-                            100,
-                          ],
-                        },
-                      ],
+                            100
+                          ]
+                        }
+                      ]
                     },
                     hasCheckedQty: { $gt: ["$$h.checkedQty", 0] },
                     checkedQty: "$$h.checkedQty",
-                    defects: "$$h.defects",
-                  },
-                },
-              },
-            },
+                    defects: "$$h.defects"
+                  }
+                }
+              }
+            }
           },
           totalRate: {
             $cond: [
@@ -2786,15 +2788,15 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
               {
                 $multiply: [
                   { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
-                  100,
-                ],
-              },
-            ],
+                  100
+                ]
+              }
+            ]
           },
-          _id: 0,
-        },
+          _id: 0
+        }
       },
-      { $sort: { moNo: 1 } },
+      { $sort: { moNo: 1 } }
     ]);
 
     const totalData = await QC2InspectionPassBundle.aggregate([
@@ -2803,15 +2805,15 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
         $project: {
           checkedQty: 1,
           defectQty: 1,
-          hour: { $toInt: { $substr: ["$inspection_time", 0, 2] } },
-        },
+          hour: { $toInt: { $substr: ["$inspection_time", 0, 2] } }
+        }
       },
       {
         $group: {
           _id: "$hour",
           totalCheckedQty: { $sum: "$checkedQty" },
-          totalDefectQty: { $sum: "$defectQty" },
-        },
+          totalDefectQty: { $sum: "$defectQty" }
+        }
       },
       {
         $project: {
@@ -2823,15 +2825,15 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
               {
                 $multiply: [
                   { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
-                  100,
-                ],
-              },
-            ],
+                  100
+                ]
+              }
+            ]
           },
           hasCheckedQty: { $gt: ["$totalCheckedQty", 0] },
-          _id: 0,
-        },
-      },
+          _id: 0
+        }
+      }
     ]);
 
     const grandTotal = await QC2InspectionPassBundle.aggregate([
@@ -2840,8 +2842,8 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
         $group: {
           _id: null,
           totalCheckedQty: { $sum: "$checkedQty" },
-          totalDefectQty: { $sum: "$defectQty" },
-        },
+          totalDefectQty: { $sum: "$defectQty" }
+        }
       },
       {
         $project: {
@@ -2852,14 +2854,14 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
               {
                 $multiply: [
                   { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
-                  100,
-                ],
-              },
-            ],
+                  100
+                ]
+              }
+            ]
           },
-          _id: 0,
-        },
-      },
+          _id: 0
+        }
+      }
     ]);
 
     const result = {};
@@ -2878,8 +2880,8 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
             rate:
               hourData.checkedQty > 0
                 ? (defect.count / hourData.checkedQty) * 100
-                : 0,
-          })),
+                : 0
+          }))
         };
       });
       result[item.moNo].totalRate = item.totalRate;
@@ -2891,7 +2893,7 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
       if (item.hour >= 6 && item.hour <= 20) {
         result.total[formattedHour] = {
           rate: item.rate,
-          hasCheckedQty: item.hasCheckedQty,
+          hasCheckedQty: item.hasCheckedQty
         };
       }
     });
@@ -2913,7 +2915,7 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
       "18:00",
       "19:00",
       "20:00",
-      "21:00",
+      "21:00"
     ];
     Object.keys(result).forEach((key) => {
       if (key !== "grand") {
@@ -2923,7 +2925,7 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
               rate: 0,
               hasCheckedQty: false,
               checkedQty: 0,
-              defects: [],
+              defects: []
             };
           }
         });
@@ -2934,6 +2936,156 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
   } catch (error) {
     console.error("Error fetching defect rates by hour:", error);
     res.status(500).json({ error: "Failed to fetch defect rates by hour" });
+  }
+});
+
+/* ------------------------------
+   QC2 - Repair Tracking
+------------------------------ */
+// 1. Fetch Defect Data by defect_print_id
+app.get("/api/defect-track/:defect_print_id", async (req, res) => {
+  try {
+    const { defect_print_id } = req.params;
+
+    // Fetch from qc2_inspection_pass_bundle
+    const inspectionRecord = await QC2InspectionPassBundle.findOne({
+      "printArray.defect_print_id": defect_print_id
+    });
+
+    if (!inspectionRecord) {
+      return res.status(404).json({ message: "Defect print ID not found" });
+    }
+
+    const printData = inspectionRecord.printArray.find(
+      (item) => item.defect_print_id === defect_print_id
+    );
+
+    if (!printData) {
+      return res
+        .status(404)
+        .json({ message: "Defect print ID not found in printArray" });
+    }
+
+    // Fetch existing repair tracking data if it exists
+    const repairRecord = await QC2RepairTracking.findOne({ defect_print_id });
+
+    const formattedData = {
+      package_no: inspectionRecord.package_no,
+      moNo: inspectionRecord.moNo,
+      custStyle: inspectionRecord.custStyle,
+      color: inspectionRecord.color,
+      size: inspectionRecord.size,
+      lineNo: inspectionRecord.lineNo,
+      department: inspectionRecord.department,
+      buyer: inspectionRecord.buyer,
+      factory: inspectionRecord.factory,
+      sub_con: inspectionRecord.sub_con,
+      sub_con_factory: inspectionRecord.sub_con_factory,
+      defect_print_id: printData.defect_print_id,
+      garments: printData.printData.map((garment) => ({
+        garmentNumber: garment.garmentNumber,
+        defects: garment.defects.map((defect) => {
+          const repairItem = repairRecord
+            ? repairRecord.repairArray.find((r) => r.defectName === defect.name)
+            : null;
+          return {
+            name: defect.name,
+            count: defect.count,
+            repair: defect.repair,
+            status: repairItem ? repairItem.status : "Not Repaired",
+            repair_date: repairItem ? repairItem.repair_date : "",
+            repair_time: repairItem ? repairItem.repair_time : ""
+          };
+        })
+      }))
+    };
+
+    res.json(formattedData);
+  } catch (error) {
+    console.error("Error fetching defect track data:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// 2. Save/Update Repair Tracking Data
+app.post("/api/repair-tracking", async (req, res) => {
+  try {
+    const {
+      defect_print_id,
+      package_no,
+      moNo,
+      custStyle,
+      color,
+      size,
+      lineNo,
+      department,
+      buyer,
+      factory,
+      sub_con,
+      sub_con_factory,
+      repairArray
+    } = req.body;
+
+    // Check if a record already exists
+    let existingRecord = await QC2RepairTracking.findOne({ defect_print_id });
+
+    if (existingRecord) {
+      // Update existing record
+      existingRecord.repairArray = existingRecord.repairArray.map((item) => {
+        const updatedItem = repairArray.find(
+          (newItem) => newItem.defectName === item.defectName
+        );
+        if (updatedItem) {
+          return {
+            ...item,
+            status: updatedItem.status,
+            repair_date: updatedItem.repair_date,
+            repair_time: updatedItem.repair_time
+          };
+        }
+        return item;
+      });
+      await existingRecord.save();
+      res.status(200).json({
+        message: "Repair tracking updated successfully",
+        data: existingRecord
+      });
+    } else {
+      // Create new record
+      const newRecord = new QC2RepairTracking({
+        package_no,
+        moNo,
+        custStyle,
+        color,
+        size,
+        lineNo,
+        department,
+        buyer,
+        factory,
+        sub_con,
+        sub_con_factory,
+        defect_print_id,
+        repairArray: repairArray.map((item) => ({
+          defectName: item.defectName,
+          defectCount: item.defectCount,
+          repairGroup: item.repairGroup,
+          status: item.status || "Not Repaired",
+          repair_date: item.repair_date || "",
+          repair_time: item.repair_time || ""
+        }))
+      });
+      await newRecord.save();
+      res.status(201).json({
+        message: "Repair tracking saved successfully",
+        data: newRecord
+      });
+    }
+  } catch (error) {
+    console.error("Error saving/updating repair tracking:", error);
+    res.status(500).json({
+      message: "Failed to save/update repair tracking",
+      error: error.message
+    });
   }
 });
 
@@ -2963,7 +3115,7 @@ app.post("/api/reworks", async (req, res) => {
       dept_name_inspection,
       sect_name_inspection,
       bundle_id,
-      bundle_random_id,
+      bundle_random_id
     } = req.body;
 
     const newRecord = new QC2Reworks({
@@ -2983,18 +3135,18 @@ app.post("/api/reworks", async (req, res) => {
       dept_name_inspection,
       sect_name_inspection,
       bundle_id,
-      bundle_random_id,
+      bundle_random_id
     });
     await newRecord.save();
     res.status(201).json({
       message: "Reworks data saved successfully",
-      data: newRecord,
+      data: newRecord
     });
   } catch (error) {
     console.error("Error saving reworks data:", error);
     res.status(500).json({
       message: "Failed to save reworks data",
-      error: error.message,
+      error: error.message
     });
   }
 });
@@ -3025,7 +3177,7 @@ app.post("/api/qc2-defect-print", async (req, res) => {
       dept_name_inspection,
       sect_name_inspection,
       bundle_id,
-      bundle_random_id,
+      bundle_random_id
     } = req.body;
 
     const now = new Date();
@@ -3051,7 +3203,7 @@ app.post("/api/qc2-defect-print", async (req, res) => {
       dept_name_inspection,
       sect_name_inspection,
       bundle_id,
-      bundle_random_id,
+      bundle_random_id
     });
 
     const savedDefectPrint = await defectPrint.save();
@@ -3087,7 +3239,7 @@ app.get("/api/qc2-defect-print/search", async (req, res) => {
 
     // Execute the search query
     const defectPrints = await QC2DefectPrint.find(query).sort({
-      createdAt: -1,
+      createdAt: -1
     });
 
     // Return empty array if no results found
@@ -3100,7 +3252,7 @@ app.get("/api/qc2-defect-print/search", async (req, res) => {
     console.error("Error searching defect print records:", error);
     res.status(500).json({
       error: "Failed to search defect cards",
-      details: error.message,
+      details: error.message
     });
   }
 });
@@ -3185,7 +3337,7 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const randomString = Math.random().toString(36).substring(2, 34);
     cb(null, `${randomString}${path.extname(file.originalname)}`);
-  },
+  }
 });
 
 const upload = multer({
@@ -3202,7 +3354,7 @@ const upload = multer({
     } else {
       cb("Error: Images Only!");
     }
-  },
+  }
 }).single("profile");
 
 /* ------------------------------
@@ -3234,18 +3386,18 @@ app.post("/users", async (req, res) => {
       dept_name,
       sect_name,
       working_status, // Optional, but will default to "Working"
-      password,
+      password
     } = req.body;
 
     console.log("Request body:", req.body);
 
     // >>> NEW: Check if a user with the same name already exists (case-insensitive)
     const existingUserByName = await UserMain.findOne({
-      name: { $regex: new RegExp(`^${name}$`, "i") },
+      name: { $regex: new RegExp(`^${name}$`, "i") }
     });
     if (existingUserByName) {
       return res.status(400).json({
-        message: "User already exist! Please Use different Name",
+        message: "User already exist! Please Use different Name"
       });
     }
 
@@ -3254,7 +3406,7 @@ app.post("/users", async (req, res) => {
       const existingUser = await UserMain.findOne({ emp_id });
       if (existingUser) {
         return res.status(400).json({
-          message: "Employee ID already exists. Please use a different ID.",
+          message: "Employee ID already exists. Please use a different ID."
         });
       }
     }
@@ -3275,7 +3427,7 @@ app.post("/users", async (req, res) => {
       dept_name,
       sect_name,
       working_status: working_status || "Working",
-      password: hashedPassword,
+      password: hashedPassword
     });
 
     // Save the user to the database
@@ -3339,7 +3491,7 @@ app.post("/api/get-user-data", async (req, res) => {
       face_photo: user.face_photo, // Include face_photo
       //profile: user.profile,
       roles: user.roles,
-      sub_roles: user.sub_roles,
+      sub_roles: user.sub_roles
     });
   } catch (error) {
     console.error("Error fetching user data:", error);
@@ -3386,7 +3538,7 @@ app.post("/api/login", async (req, res) => {
     }
 
     const user = await UserMain.findOne({
-      $or: [{ email: username }, { name: username }, { emp_id: username }],
+      $or: [{ email: username }, { name: username }, { emp_id: username }]
     });
 
     if (!user) {
@@ -3440,8 +3592,8 @@ app.post("/api/login", async (req, res) => {
         roles: user.roles,
         sub_roles: user.sub_roles,
         profile: getProfileImageUrl(user), // Use helper function
-        face_photo: user.face_photo, // Include face_photo
-      },
+        face_photo: user.face_photo // Include face_photo
+      }
     });
   } catch (error) {
     // console.error("Login error:", error);
@@ -3459,13 +3611,13 @@ app.post("/api/register", async (req, res) => {
 
     if (!emp_id || !eng_name || !password || !confirmPassword) {
       return res.status(400).json({
-        message: "Employee ID, name, and password are required",
+        message: "Employee ID, name, and password are required"
       });
     }
 
     if (password !== confirmPassword) {
       return res.status(400).json({
-        message: "Passwords do not match",
+        message: "Passwords do not match"
       });
     }
 
@@ -3473,7 +3625,7 @@ app.post("/api/register", async (req, res) => {
 
     if (existingUser) {
       return res.status(400).json({
-        message: "Employee ID already registered",
+        message: "Employee ID already registered"
       });
     }
 
@@ -3487,18 +3639,18 @@ app.post("/api/register", async (req, res) => {
       kh_name: kh_name || "",
       password: hashedPassword,
       created_at: new Date(),
-      updated_at: new Date(),
+      updated_at: new Date()
     });
 
     await newUser.save();
 
     res.status(201).json({
-      message: "User registered successfully",
+      message: "User registered successfully"
     });
   } catch (error) {
     res.status(500).json({
       message: "Failed to register user",
-      error: error.message,
+      error: error.message
     });
   }
 });
@@ -3540,12 +3692,12 @@ app.get("/api/user-profile", authenticateUser, async (req, res) => {
       job_title: user.job_title,
       email: user.email,
       profile: getProfileImageUrl(user), // Use helper function --- profileImage,
-      face_photo: user.face_photo,
+      face_photo: user.face_photo
     });
   } catch (error) {
     res.status(500).json({
       message: "Failed to fetch user profile",
-      error: error.message,
+      error: error.message
     });
   }
 });
@@ -3570,7 +3722,7 @@ app.put("/api/user-profile", authenticateUser, upload, async (req, res) => {
       eng_name: req.body.eng_name,
       kh_name: req.body.kh_name,
       job_title: req.body.job_title,
-      email: req.body.email,
+      email: req.body.email
     };
 
     // If a new image was uploaded, update the profile field.
@@ -3580,7 +3732,7 @@ app.put("/api/user-profile", authenticateUser, upload, async (req, res) => {
 
     // Update the user document in the main collection.
     const user = await UserMain.findByIdAndUpdate(userId, updatedProfile, {
-      new: true,
+      new: true
     });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -3600,7 +3752,7 @@ app.put("/api/user-profile", authenticateUser, upload, async (req, res) => {
     console.error("Error updating user profile:", error);
     res.status(500).json({
       message: "Failed to update user profile",
-      error: error.message,
+      error: error.message
     });
   }
 });
@@ -3620,7 +3772,7 @@ app.post("/api/role-management/super-admin", async (req, res) => {
       superAdminRole = new RoleManagment({
         role: "Super Admin",
         jobTitles: ["Developer"],
-        users: [],
+        users: []
       });
     }
 
@@ -3651,7 +3803,7 @@ app.post("/api/role-management/super-admin", async (req, res) => {
       sect_name: userDetails.sect_name,
       working_status: userDetails.working_status,
       phone_number: userDetails.phone_number,
-      face_photo: userDetails.face_photo,
+      face_photo: userDetails.face_photo
     });
 
     await superAdminRole.save();
@@ -3678,7 +3830,7 @@ app.delete("/api/role-management/super-admin/:empId", async (req, res) => {
     const protectedEmpIds = ["YM6702", "YM7903"];
     if (protectedEmpIds.includes(empId)) {
       return res.status(403).json({
-        message: "Cannot delete protected Super Admin users",
+        message: "Cannot delete protected Super Admin users"
       });
     }
 
@@ -3689,7 +3841,7 @@ app.delete("/api/role-management/super-admin/:empId", async (req, res) => {
 
     if (userIndex === -1) {
       return res.status(404).json({
-        message: "User not found in Super Admin role",
+        message: "User not found in Super Admin role"
       });
     }
 
@@ -3698,14 +3850,14 @@ app.delete("/api/role-management/super-admin/:empId", async (req, res) => {
       { role: "Super Admin" },
       {
         $pull: {
-          users: { emp_id: empId },
-        },
+          users: { emp_id: empId }
+        }
       }
     );
 
     if (result.modifiedCount === 0) {
       return res.status(500).json({
-        message: "Failed to remove Super Admin",
+        message: "Failed to remove Super Admin"
       });
     }
 
@@ -3714,7 +3866,7 @@ app.delete("/api/role-management/super-admin/:empId", async (req, res) => {
 
     res.json({
       message: "Super Admin removed successfully",
-      updatedRole: updatedRole,
+      updatedRole: updatedRole
     });
   } catch (error) {
     console.error("Error removing super admin:", error);
@@ -3732,7 +3884,7 @@ app.get("/api/search-users", async (req, res) => {
     const users = await UserMain.find(
       {
         emp_id: { $regex: q, $options: "i" },
-        working_status: "Working",
+        working_status: "Working"
       },
       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo phone_number working_status"
     );
@@ -3769,7 +3921,7 @@ app.get("/api/user-details", async (req, res) => {
 app.get("/api/job-titles", async (req, res) => {
   try {
     const jobTitles = await UserMain.distinct("job_title", {
-      working_status: "Working",
+      working_status: "Working"
     });
     res.json(jobTitles.filter((title) => title));
   } catch (error) {
@@ -3784,7 +3936,7 @@ app.get("/api/users-by-job-title", async (req, res) => {
     const users = await UserMain.find(
       {
         job_title: jobTitle,
-        working_status: "Working",
+        working_status: "Working"
       },
       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo phone_number working_status"
     );
@@ -3802,7 +3954,7 @@ app.post("/api/role-management", async (req, res) => {
     const users = await UserMain.find(
       {
         job_title: { $in: jobTitles },
-        working_status: "Working",
+        working_status: "Working"
       },
       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo phone_number working_status"
     );
@@ -3821,7 +3973,7 @@ app.post("/api/role-management", async (req, res) => {
         sect_name: user.sect_name,
         working_status: user.working_status,
         phone_number: user.phone_number,
-        face_photo: user.face_photo,
+        face_photo: user.face_photo
       }));
     } else {
       roleDoc = new RoleManagment({
@@ -3837,8 +3989,8 @@ app.post("/api/role-management", async (req, res) => {
           sect_name: user.sect_name,
           working_status: user.working_status,
           phone_number: user.phone_number,
-          face_photo: user.face_photo,
-        })),
+          face_photo: user.face_photo
+        }))
       });
     }
 
@@ -3859,7 +4011,7 @@ app.get("/api/user-roles/:empId", async (req, res) => {
     // Check Super Admin role first
     const superAdminRole = await RoleManagment.findOne({
       role: "Super Admin",
-      "users.emp_id": empId,
+      "users.emp_id": empId
     });
 
     if (superAdminRole) {
@@ -3870,7 +4022,7 @@ app.get("/api/user-roles/:empId", async (req, res) => {
     // Check Admin role
     const adminRole = await RoleManagment.findOne({
       role: "Admin",
-      "users.emp_id": empId,
+      "users.emp_id": empId
     });
 
     if (adminRole) {
@@ -3881,7 +4033,7 @@ app.get("/api/user-roles/:empId", async (req, res) => {
     // Get other roles
     const otherRoles = await RoleManagment.find({
       role: { $nin: ["Super Admin", "Admin"] },
-      "users.emp_id": empId,
+      "users.emp_id": empId
     });
 
     otherRoles.forEach((roleDoc) => {
@@ -3898,7 +4050,7 @@ app.get("/api/user-roles/:empId", async (req, res) => {
 app.get("/api/role-management", async (req, res) => {
   try {
     const roles = await RoleManagment.find({}).sort({
-      role: 1, // Sort by role name
+      role: 1 // Sort by role name
     });
     res.json(roles);
   } catch (error) {
@@ -3930,7 +4082,7 @@ app.get("/api/user-roles/:empId", async (req, res) => {
 
     // Find all roles where this user exists
     const userRoles = await RoleManagment.find({
-      "users.emp_id": empId,
+      "users.emp_id": empId
     });
 
     userRoles.forEach((role) => {
@@ -4000,13 +4152,13 @@ app.post("/api/update-user-roles", async (req, res) => {
 
     res.json({
       success: true,
-      message: "User roles updated successfully",
+      message: "User roles updated successfully"
     });
   } catch (error) {
     console.error("Error updating user roles:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to update user roles",
+      message: "Failed to update user roles"
     });
   }
 });

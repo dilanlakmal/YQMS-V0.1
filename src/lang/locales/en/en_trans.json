@@ -20,6 +20,7 @@
     "ironing": "Ironing",
     "final_inspection": "Final Inspection",
     "qc1_inspection": "QC1 Inspection",
+    "qc2_repair": "QC2 Repair Tracking",
     "qc2_inspection": "QC2 Inspection",
     "qa_audit_report": "QA Audit Report",
     "download_data": "Download Data",

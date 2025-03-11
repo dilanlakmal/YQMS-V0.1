@@ -3,7 +3,7 @@ import {
   Navigate,
   Route,
   BrowserRouter as Router,
-  Routes,
+  Routes
 } from "react-router-dom";
 
 import "./App.css";
@@ -27,6 +27,7 @@ import QCSunriseReport from "./pages/QCSunriseReport.jsx";
 import Return from "./pages/Return";
 import Setting from "./pages/Setting";
 import WashingPage from "./pages/Washing";
+import DefectTrack from "./pages/DefectTrack.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -62,7 +63,7 @@ function AppContent() {
     returnDefectArray: [],
     returnDefectQty: 0,
     cumulativeReturnDefectQty: 0,
-    defectArray: [],
+    defectArray: []
   });
   const [inspectionState, setInspectionState] = useState(null);
   const [returnState, setReturnState] = useState(null);
@@ -70,7 +71,7 @@ function AppContent() {
     details: null,
     logs: [],
     startTime: null,
-    lastActionTime: null,
+    lastActionTime: null
   });
   const [timer, setTimer] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -89,7 +90,7 @@ function AppContent() {
   const handleUpdateSharedState = (newState) => {
     setSharedState((prev) => ({
       ...prev,
-      ...newState,
+      ...newState
     }));
   };
 
@@ -120,13 +121,13 @@ function AppContent() {
       returnDefectArray: [],
       returnDefectQty: 0,
       cumulativeReturnDefectQty: 0,
-      defectArray: [],
+      defectArray: []
     });
     setLogsState({
       details: null,
       logs: [],
       startTime: null,
-      lastActionTime: null,
+      lastActionTime: null
     });
     setDetailsSubmitted(false);
     setTimer(0);
@@ -144,18 +145,18 @@ function AppContent() {
       defectPieces: 0,
       language: "english",
       view: "list",
-      hasDefectSelected: false,
+      hasDefectSelected: false
     };
 
     setInspectionState(initialState);
     setReturnState({
       ...initialState,
       returnDefects: {},
-      returnDefectQty: 0,
+      returnDefectQty: 0
     });
     setLogsState((prev) => ({
       ...prev,
-      details,
+      details
     }));
     setDetailsSubmitted(true);
   };
@@ -172,13 +173,13 @@ function AppContent() {
 
     const newEntry = {
       ...entry,
-      inspectionTime: inspectionTime.toFixed(2),
+      inspectionTime: inspectionTime.toFixed(2)
     };
 
     setLogsState((prev) => ({
       ...prev,
       logs: [...prev.logs, newEntry],
-      lastActionTime: currentTime,
+      lastActionTime: currentTime
     }));
   };
 
@@ -190,7 +191,7 @@ function AppContent() {
       setInspectionStartTime(currentTime);
       setLogsState((prev) => ({
         ...prev,
-        startTime: currentTime.getTime(),
+        startTime: currentTime.getTime()
       }));
     }
   };
@@ -202,19 +203,19 @@ function AppContent() {
   const handleInspectionStateChange = (newState) => {
     setInspectionState((prev) => ({
       ...prev,
-      ...newState,
+      ...newState
     }));
   };
 
   const handleReturnStateChange = (newState) => {
     setReturnState((prev) => ({
       ...prev,
-      ...newState,
+      ...newState
     }));
     if (newState.goodOutput !== inspectionState?.goodOutput) {
       setInspectionState((prev) => ({
         ...prev,
-        goodOutput: newState.goodOutput,
+        goodOutput: newState.goodOutput
       }));
     }
   };
@@ -261,7 +262,7 @@ function AppContent() {
                         setLogsState((prev) => ({
                           ...prev,
                           startTime: time,
-                          lastActionTime: time,
+                          lastActionTime: time
                         }))
                       }
                       onSubmit={handleSubmit}
@@ -328,6 +329,7 @@ function AppContent() {
               <Route path="/live-dashboard" element={<LiveDashboard />} />
               <Route path="/qc1-sunrise" element={<QCSunriseReport />} />
               <Route path="/powerbi" element={<PowerBI />} />
+              <Route path="/qc2-repair-tracking" element={<DefectTrack />} />
               <Route
                 path="/bundle-registration"
                 element={<BundleRegistration />}
