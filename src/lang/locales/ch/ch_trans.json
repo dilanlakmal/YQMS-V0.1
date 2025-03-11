@@ -125,7 +125,7 @@
     "bundle_qty": "捆包数量",
     "total_registered_bundle_qty": "总注册捆绑数量",
     "sub_con_factory": "分包工厂",
-    "select_seb_con_factory": "选择分包工厂",
+    "select_sub_con_factory": "选择分包工厂",
     "generate_qr": "生成二维码",
     "preview_qr": "预览二维码",
     "record_id": "记录 ID",

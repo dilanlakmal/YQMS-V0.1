@@ -26,6 +26,9 @@ import createUserModel from "./models/User.js";
 import createWashingModel from "./models/Washing.js";
 import createQCDataModel from "./models/qc1_data.js";
 import createQc2OrderDataModel from "./models/qc2_orderdata.js";
+import createQC2InspectionPassBundleModel from "./models/qc2_inspection.js";
+import createQC2ReworksModel from "./models/qc2_rework.js";
+
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "./config.js";
 
@@ -145,19 +148,18 @@ ymEcoConnection.on("error", (err) => console.error("unexpected error:", err));
 
 //const UserMain = createUserModel(ymProdConnection);
 const UserMain = createUserModel(ymEcoConnection);
-
 const Role = createRoleModel(ymProdConnection);
 const QCData = createQCDataModel(ymProdConnection);
-
-const QC2OrderData = createQc2OrderDataModel(ymEcoConnection);
-//const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
-
+const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
 const Ironing = createIroningModel(ymProdConnection);
 const Washing = createWashingModel(ymProdConnection);
 const OPA = createOPAModel(ymProdConnection);
 const Packing = createPackingModel(ymProdConnection);
 const RoleManagment = createRoleManagmentModel(ymProdConnection);
 const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
+const QC2InspectionPassBundle =
+  createQC2InspectionPassBundleModel(ymProdConnection);
+const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -175,73 +177,103 @@ app.get("/api/health", (req, res) => {
 //   next();
 // };
 
-// Update the MONo search endpoint to handle complex pattern matching
+// Update the MONo search endpoint to handle partial matching
 app.get("/api/search-mono", async (req, res) => {
   try {
-    const digits = req.query.digits;
+    const term = req.query.term; // Changed from 'digits' to 'term'
+    if (!term) {
+      return res.status(400).json({ error: "Search term is required" });
+    }
+
     const collection = ymEcoConnection.db.collection("dt_orders");
 
-    // More robust regex pattern to match last 3 digits before any non-digit characters
-    const regexPattern = new RegExp(
-      `(\\d{3})(?=\\D*$)|(\\d{3}$)|(?<=\\D)(\\d{3})(?=\\D)`,
-      "i"
-    );
+    // Use a case-insensitive regex to match the term anywhere in Order_No
+    const regexPattern = new RegExp(term, "i");
 
     const results = await collection
-      .aggregate([
-        {
-          $addFields: {
-            matchParts: {
-              $regexFind: {
-                input: "$Order_No",
-                regex: regexPattern,
-              },
-            },
-          },
-        },
-        {
-          $match: {
-            $or: [
-              { "matchParts.match": { $regex: new RegExp(`${digits}$`, "i") } },
-              { "matchParts.match": { $regex: new RegExp(`^${digits}`, "i") } },
-            ],
-          },
-        },
-        {
-          $project: {
-            Order_No: 1,
-            numericMatch: {
-              $substr: [
-                { $ifNull: ["$matchParts.match", ""] },
-                { $subtract: [{ $strLenCP: "$matchParts.match" }, 3] },
-                3,
-              ],
-            },
-          },
-        },
-        {
-          $match: {
-            numericMatch: digits,
-          },
-        },
-        {
-          $group: {
-            _id: "$Order_No",
-            count: { $sum: 1 },
-          },
-        },
-        {
-          $limit: 100,
-        },
-      ])
+      .find({
+        Order_No: { $regex: regexPattern },
+      })
+      .project({ Order_No: 1, _id: 0 }) // Only return Order_No field
+      .limit(100) // Limit results to prevent overwhelming the UI
       .toArray();
 
-    res.json(results.map((r) => r._id));
+    // Extract unique Order_No values
+    const uniqueMONos = [...new Set(results.map((r) => r.Order_No))];
+
+    res.json(uniqueMONos);
   } catch (error) {
     console.error("Error searching MONo:", error);
     res.status(500).json({ error: "Failed to search MONo" });
   }
 });
+
+// app.get("/api/search-mono", async (req, res) => {
+//   try {
+//     const digits = req.query.digits;
+//     const collection = ymEcoConnection.db.collection("dt_orders");
+
+//     // More robust regex pattern to match last 3 digits before any non-digit characters
+//     const regexPattern = new RegExp(
+//       `(\\d{3})(?=\\D*$)|(\\d{3}$)|(?<=\\D)(\\d{3})(?=\\D)`,
+//       "i"
+//     );
+
+//     const results = await collection
+//       .aggregate([
+//         {
+//           $addFields: {
+//             matchParts: {
+//               $regexFind: {
+//                 input: "$Order_No",
+//                 regex: regexPattern,
+//               },
+//             },
+//           },
+//         },
+//         {
+//           $match: {
+//             $or: [
+//               { "matchParts.match": { $regex: new RegExp(`${digits}$`, "i") } },
+//               { "matchParts.match": { $regex: new RegExp(`^${digits}`, "i") } },
+//             ],
+//           },
+//         },
+//         {
+//           $project: {
+//             Order_No: 1,
+//             numericMatch: {
+//               $substr: [
+//                 { $ifNull: ["$matchParts.match", ""] },
+//                 { $subtract: [{ $strLenCP: "$matchParts.match" }, 3] },
+//                 3,
+//               ],
+//             },
+//           },
+//         },
+//         {
+//           $match: {
+//             numericMatch: digits,
+//           },
+//         },
+//         {
+//           $group: {
+//             _id: "$Order_No",
+//             count: { $sum: 1 },
+//           },
+//         },
+//         {
+//           $limit: 100,
+//         },
+//       ])
+//       .toArray();
+
+//     res.json(results.map((r) => r._id));
+//   } catch (error) {
+//     console.error("Error searching MONo:", error);
+//     res.status(500).json({ error: "Failed to search MONo" });
+//   }
+// });
 
 // Update /api/order-details endpoint
 app.get("/api/order-details/:mono", async (req, res) => {
@@ -1900,116 +1932,6 @@ app.get("/api/download-data", async (req, res) => {
    QC2 - Inspection Pass Bundle
 ------------------------------ */
 
-// Schema for qc2_inspection_pass_bundle with header fields as separate fields
-const qc2InspectionPassBundleSchema = new mongoose.Schema(
-  {
-    //bundleNo: { type: String, required: true }, // extracted from bundleData.bundle_id
-    package_no: { type: Number, required: true }, // extracted from bundleData.package_no
-    moNo: { type: String, required: true }, // from bundleData.selectedMono
-    custStyle: { type: String, required: true }, // from bundleData.custStyle
-    color: { type: String, required: true }, // from bundleData.color
-    size: { type: String, required: true }, // from bundleData.size
-    lineNo: { type: String, required: true }, // from bundleData.lineNo
-    department: { type: String, required: true }, // from bundleData.department
-    buyer: { type: String, required: false }, // from bundleData.buyer
-    factory: { type: String }, // Added
-    country: { type: String }, // Added
-    sub_con: { type: String }, // Added
-    sub_con_factory: { type: String }, // Added
-    checkedQty: { type: Number, required: true }, // e.g. bundleData.count
-    totalPass: { type: Number, required: true },
-    totalRejects: { type: Number, required: true },
-    totalRepair: { type: Number, required: true, default: 0 }, // New field
-    defectQty: { type: Number, required: true },
-    defectArray: [
-      {
-        defectName: { type: String, required: true },
-        totalCount: { type: Number, required: true },
-      },
-    ],
-    rejectGarments: [
-      {
-        totalCount: { type: Number, required: true },
-        defects: [
-          {
-            name: { type: String, required: true },
-            count: { type: Number, required: true },
-            repair: { type: String, required: true },
-          },
-        ],
-        garment_defect_id: { type: String, required: true },
-        rejectTime: { type: String, required: true }, // "HH:MM:SS"
-      },
-    ],
-    inspection_time: {
-      type: String,
-      // validate: {
-      //   validator: function (v) {
-      //     return v === undefined || v === null || /^\d{2}:\d{2}:\d{2}$/.test(v);
-      //   },
-      //   message: (props) =>
-      //     `${props.value} is not a valid time format! Use HH:MM:SS.`,
-      // },
-    }, // "HH:MM:SS"
-    inspection_date: { type: String, required: true }, // "MM/DD/YYYY"
-    emp_id_inspection: { type: String, required: true },
-    eng_name_inspection: { type: String, required: true },
-    kh_name_inspection: { type: String, required: true },
-    job_title_inspection: { type: String, required: true },
-    dept_name_inspection: { type: String, required: true },
-    sect_name_inspection: { type: String, required: true },
-    bundle_id: { type: String, required: true }, // Add this line
-    bundle_random_id: { type: String, required: true }, // Add this line
-    printArray: [
-      {
-        method: { type: String, required: true },
-        defect_print_id: { type: String, required: true },
-        totalRejectGarmentCount: { type: Number, required: true },
-        totalPrintDefectCount: { type: Number, required: true },
-        totalRejectGarment_Var: { type: Number, required: true }, // New field, remains constant
-        repairGarmentsDefects: [
-          // New field
-          {
-            inspectionNo: { type: Number, required: true },
-            repairGarments: [
-              {
-                totalDefectCount: { type: Number, required: true },
-                repairDefectArray: [
-                  {
-                    name: { type: String, required: true },
-                    count: { type: Number, required: true },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-        printData: [
-          {
-            garmentNumber: { type: Number, required: true },
-            defects: [
-              {
-                name: { type: String, required: true },
-                count: { type: Number, required: true },
-                repair: { type: String, required: true },
-              },
-            ],
-          },
-        ],
-        isCompleted: { type: Boolean, default: false }, // New field
-        timestamp: { type: Date, default: Date.now },
-      },
-    ],
-    totalRepair: { type: Number, default: 0 },
-  },
-  { collection: "qc2_inspection_pass_bundle" }
-);
-
-const QC2InspectionPassBundle = mongoose.model(
-  "qc2_inspection_pass_bundle",
-  qc2InspectionPassBundleSchema
-);
-
 // Socket.io connection handler
 io.on("connection", (socket) => {
   //console.log("A client connected:", socket.id);
@@ -3018,37 +2940,8 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
 /* ------------------------------
    QC2 - Reworks
 ------------------------------ */
-// Schema for qc2_reworks with separate header fields
-const qc2ReworksSchema = new mongoose.Schema(
-  {
-    package_no: { type: Number, required: true }, // extracted from bundleData.package_no
-    //bundleNo: { type: String, required: true },
-    moNo: { type: String, required: true },
-    custStyle: { type: String, required: true },
-    color: { type: String, required: true },
-    size: { type: String, required: true },
-    lineNo: { type: String, required: true },
-    department: { type: String, required: true },
-    reworkGarments: [
-      {
-        defectName: { type: String, required: true },
-        count: { type: Number, required: true },
-        time: { type: String, required: true }, // "HH:MM:SS"
-      },
-    ],
-    emp_id_inspection: { type: String, required: true },
-    eng_name_inspection: { type: String, required: true },
-    kh_name_inspection: { type: String, required: true },
-    job_title_inspection: { type: String, required: true },
-    dept_name_inspection: { type: String, required: true },
-    sect_name_inspection: { type: String, required: true },
-    bundle_id: { type: String, required: true }, // Add this line
-    bundle_random_id: { type: String, required: true }, // Add this line
-  },
-  { collection: "qc2_reworks" }
-);
 
-const QC2Reworks = mongoose.model("qc2_reworks", qc2ReworksSchema);
+// const QC2Reworks = mongoose.model("qc2_reworks", qc2ReworksSchema);
 
 // Endpoint to save reworks (reject garment) data
 app.post("/api/reworks", async (req, res) => {

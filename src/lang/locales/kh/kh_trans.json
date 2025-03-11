@@ -125,7 +125,7 @@
     "bundle_qty": "បរិមាណកញ្ចប់",
     "total_registered_bundle_qty": "បរិមាណកញ្ចប់ដែលបានចុះឈ្មោះសរុប",
     "sub_con_factory": "រោងចក្របន្តកិច្ចសន្យា",
-    "select_seb_con_factory": "ជ្រើសរើសរោងចក្របន្តកិច្ចសន្យា",
+    "select_sub_con_factory": "ជ្រើសរើសរោងចក្របន្តកិច្ចសន្យា",
     "generate_qr": "បង្កើត QR",
     "preview_qr": "មើល QR ជាមុន",
     "record_id": "លេខសម្គាល់កំណត់ត្រា",

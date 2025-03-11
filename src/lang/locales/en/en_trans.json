@@ -125,7 +125,7 @@
     "bundle_qty": "Bundle Qty",
     "total_registered_bundle_qty": "Total Registered Bundle Qty",
     "sub_con_factory": "Sub-con Factory",
-    "select_seb_con_factory": "Select Sub-con Factory",
+    "select_sub_con_factory": "Select Sub-con Factory",
     "generate_qr": "Generate QR",
     "preview_qr": "Preview QR",
     "record_id": "Record ID",
