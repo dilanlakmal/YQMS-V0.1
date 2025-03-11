@@ -2115,7 +2115,8 @@ app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {
           department: { $addToSet: "$department" },
           emp_id_inspection: { $addToSet: "$emp_id_inspection" },
           buyer: { $addToSet: "$buyer" },
-          package_no: { $addToSet: "$package_no" } // Added package_no
+          package_no: { $addToSet: "$package_no" }, // Added package_no
+          lineNo: { $addToSet: "$lineNo" } // Add Line No
         }
       },
       {
@@ -2127,7 +2128,8 @@ app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {
           department: 1,
           emp_id_inspection: 1,
           buyer: 1,
-          package_no: 1
+          package_no: 1,
+          lineNo: 1 // Include Line No
         }
       }
     ]);
@@ -2142,7 +2144,8 @@ app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {
             department: [],
             emp_id_inspection: [],
             buyer: [],
-            package_no: []
+            package_no: [],
+            lineNo: [] // Include Line No
           };
 
     Object.keys(result).forEach((key) => {
@@ -2397,7 +2400,8 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
       color,
       size,
       department,
-      buyer
+      buyer,
+      lineNo // Add Line No
     } = req.query;
 
     let match = {};
@@ -2411,6 +2415,7 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     if (department) match.department = department;
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
 
     // Normalize dates and apply string comparison
     if (startDate || endDate) {
@@ -2488,7 +2493,8 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
       color,
       size,
       department,
-      buyer
+      buyer,
+      lineNo // Add Line No
     } = req.query;
 
     let match = {};
@@ -2502,6 +2508,7 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
     if (department) match.department = department;
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
 
     if (startDate || endDate) {
       match.inspection_date = {};
@@ -2936,6 +2943,364 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
   } catch (error) {
     console.error("Error fetching defect rates by hour:", error);
     res.status(500).json({ error: "Failed to fetch defect rates by hour" });
+  }
+});
+
+// Endpoint to get defect rates by line by hour
+app.get("/api/qc2-defect-rates-by-line", async (req, res) => {
+  try {
+    const {
+      moNo,
+      emp_id_inspection,
+      startDate,
+      endDate,
+      color,
+      size,
+      department,
+      buyer,
+      lineNo
+    } = req.query;
+
+    let match = {};
+    if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    if (emp_id_inspection)
+      match.emp_id_inspection = {
+        $regex: new RegExp(emp_id_inspection.trim(), "i")
+      };
+    if (color) match.color = color;
+    if (size) match.size = size;
+    if (department) match.department = department;
+    if (buyer)
+      match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") };
+
+    if (startDate || endDate) {
+      match.inspection_date = {};
+      if (startDate)
+        match.inspection_date.$gte = normalizeDateString(startDate);
+      if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
+    }
+
+    match.inspection_time = { $regex: /^\d{2}:\d{2}:\d{2}$/ };
+
+    const data = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $project: {
+          lineNo: 1,
+          moNo: 1,
+          checkedQty: 1,
+          defectQty: 1,
+          defectArray: 1,
+          inspection_time: 1,
+          hour: { $toInt: { $substr: ["$inspection_time", 0, 2] } },
+          minute: { $toInt: { $substr: ["$inspection_time", 3, 2] } },
+          second: { $toInt: { $substr: ["$inspection_time", 6, 2] } }
+        }
+      },
+      {
+        $match: {
+          minute: { $gte: 0, $lte: 59 },
+          second: { $gte: 0, $lte: 59 }
+        }
+      },
+      {
+        $group: {
+          _id: { lineNo: "$lineNo", moNo: "$moNo", hour: "$hour" },
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$defectQty" },
+          defectRecords: { $push: "$defectArray" }
+        }
+      },
+      { $unwind: { path: "$defectRecords", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$defectRecords", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: {
+            lineNo: "$_id.lineNo",
+            moNo: "$_id.moNo",
+            hour: "$_id.hour",
+            defectName: "$defectRecords.defectName"
+          },
+          totalCheckedQty: { $first: "$totalCheckedQty" },
+          totalDefectQty: { $first: "$totalDefectQty" },
+          defectCount: { $sum: "$defectRecords.totalCount" }
+        }
+      },
+      {
+        $group: {
+          _id: { lineNo: "$_id.lineNo", moNo: "$_id.moNo", hour: "$_id.hour" },
+          checkedQty: { $first: "$totalCheckedQty" },
+          totalDefectQty: { $first: "$totalDefectQty" },
+          defects: {
+            $push: {
+              name: "$_id.defectName",
+              count: {
+                $cond: [{ $eq: ["$defectCount", null] }, 0, "$defectCount"]
+              }
+            }
+          }
+        }
+      },
+      {
+        $group: {
+          _id: { lineNo: "$_id.lineNo", moNo: "$_id.moNo" },
+          hours: {
+            $push: {
+              hour: "$_id.hour",
+              checkedQty: "$checkedQty",
+              defects: "$defects",
+              defectQty: "$totalDefectQty"
+            }
+          },
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$totalDefectQty" }
+        }
+      },
+      {
+        $group: {
+          _id: "$_id.lineNo",
+          moNos: {
+            $push: {
+              moNo: "$_id.moNo",
+              hours: "$hours",
+              totalCheckedQty: "$totalCheckedQty",
+              totalDefectQty: "$totalDefectQty"
+            }
+          },
+          totalCheckedQty: { $sum: "$totalCheckedQty" },
+          totalDefectQty: { $sum: "$totalDefectQty" }
+        }
+      },
+      {
+        $project: {
+          lineNo: "$_id",
+          moData: {
+            $arrayToObject: {
+              $map: {
+                input: "$moNos",
+                as: "mo",
+                in: {
+                  k: "$$mo.moNo",
+                  v: {
+                    hourData: {
+                      $arrayToObject: {
+                        $map: {
+                          input: "$$mo.hours",
+                          as: "h",
+                          in: {
+                            k: { $toString: { $add: ["$$h.hour", 1] } },
+                            v: {
+                              rate: {
+                                $cond: [
+                                  { $eq: ["$$h.checkedQty", 0] },
+                                  0,
+                                  {
+                                    $multiply: [
+                                      {
+                                        $divide: [
+                                          "$$h.defectQty",
+                                          "$$h.checkedQty"
+                                        ]
+                                      },
+                                      100
+                                    ]
+                                  }
+                                ]
+                              },
+                              hasCheckedQty: { $gt: ["$$h.checkedQty", 0] },
+                              checkedQty: "$$h.checkedQty",
+                              defects: "$$h.defects"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    totalRate: {
+                      $cond: [
+                        { $eq: ["$$mo.totalCheckedQty", 0] },
+                        0,
+                        {
+                          $multiply: [
+                            {
+                              $divide: [
+                                "$$mo.totalDefectQty",
+                                "$$mo.totalCheckedQty"
+                              ]
+                            },
+                            100
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          totalRate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                  100
+                ]
+              }
+            ]
+          },
+          _id: 0
+        }
+      },
+      { $sort: { lineNo: 1 } }
+    ]);
+
+    const totalData = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $project: {
+          checkedQty: 1,
+          defectQty: 1,
+          hour: { $toInt: { $substr: ["$inspection_time", 0, 2] } }
+        }
+      },
+      {
+        $group: {
+          _id: "$hour",
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$defectQty" }
+        }
+      },
+      {
+        $project: {
+          hour: "$_id",
+          rate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                  100
+                ]
+              }
+            ]
+          },
+          hasCheckedQty: { $gt: ["$totalCheckedQty", 0] },
+          _id: 0
+        }
+      }
+    ]);
+
+    const grandTotal = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: null,
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$defectQty" }
+        }
+      },
+      {
+        $project: {
+          rate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                  100
+                ]
+              }
+            ]
+          },
+          _id: 0
+        }
+      }
+    ]);
+
+    const result = {};
+    data.forEach((item) => {
+      result[item.lineNo] = {};
+      Object.keys(item.moData).forEach((moNo) => {
+        result[item.lineNo][moNo] = {};
+        Object.keys(item.moData[moNo].hourData).forEach((hour) => {
+          const formattedHour = `${hour}:00`.padStart(5, "0");
+          const hourData = item.moData[moNo].hourData[hour];
+          result[item.lineNo][moNo][formattedHour] = {
+            rate: hourData.rate,
+            hasCheckedQty: hourData.hasCheckedQty,
+            checkedQty: hourData.checkedQty,
+            defects: hourData.defects.map((defect) => ({
+              name: defect.name || "No Defect",
+              count: defect.count,
+              rate:
+                hourData.checkedQty > 0
+                  ? (defect.count / hourData.checkedQty) * 100
+                  : 0
+            }))
+          };
+        });
+        result[item.lineNo][moNo].totalRate = item.moData[moNo].totalRate;
+      });
+      result[item.lineNo].totalRate = item.totalRate;
+    });
+
+    result.total = {};
+    totalData.forEach((item) => {
+      const formattedHour = `${item.hour + 1}:00`.padStart(5, "0");
+      if (item.hour >= 6 && item.hour <= 20) {
+        result.total[formattedHour] = {
+          rate: item.rate,
+          hasCheckedQty: item.hasCheckedQty
+        };
+      }
+    });
+
+    result.grand = grandTotal.length > 0 ? grandTotal[0] : { rate: 0 };
+
+    const hours = [
+      "07:00",
+      "08:00",
+      "09:00",
+      "10:00",
+      "11:00",
+      "12:00",
+      "13:00",
+      "14:00",
+      "15:00",
+      "16:00",
+      "17:00",
+      "18:00",
+      "19:00",
+      "20:00",
+      "21:00"
+    ];
+    Object.keys(result).forEach((key) => {
+      if (key !== "grand" && key !== "total") {
+        Object.keys(result[key]).forEach((moNo) => {
+          if (moNo !== "totalRate") {
+            hours.forEach((hour) => {
+              if (!result[key][moNo][hour]) {
+                result[key][moNo][hour] = {
+                  rate: 0,
+                  hasCheckedQty: false,
+                  checkedQty: 0,
+                  defects: []
+                };
+              }
+            });
+          }
+        });
+      }
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching defect rates by line:", error);
+    res.status(500).json({ error: "Failed to fetch defect rates by line" });
   }
 });
 
