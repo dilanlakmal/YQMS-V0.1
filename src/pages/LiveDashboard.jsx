@@ -817,7 +817,7 @@ const LiveDashboard = () => {
                 QC2 Defect Rate by Defect Name
               </h2>
               <DefectRateChart />
-              {/* <LiveSummary /> */}
+              <LiveSummary filters={filtersRef.current} /> {/* Add this line */}
             </div>
           </>
         )}

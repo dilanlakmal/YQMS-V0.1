@@ -2571,7 +2571,8 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
       color,
       size,
       department,
-      buyer
+      buyer,
+      lineNo
     } = req.query;
 
     let match = {};
@@ -2585,6 +2586,7 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
     if (department) match.department = department;
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add lineNo filter
 
     if (startDate || endDate) {
       match.inspection_date = {};
@@ -2598,6 +2600,7 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
       {
         $group: {
           _id: "$moNo",
+          lineNo: { $first: "$lineNo" }, // Include lineNo using $first
           checkedQty: { $sum: "$checkedQty" },
           totalPass: { $sum: "$totalPass" },
           totalRejects: { $sum: "$totalRejects" },
@@ -2612,6 +2615,7 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
       {
         $project: {
           moNo: "$_id",
+          lineNo: 1, // Include lineNo in the output
           checkedQty: 1,
           totalPass: 1,
           totalRejects: 1,
