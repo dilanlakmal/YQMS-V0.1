@@ -26,8 +26,10 @@ import { io } from "socket.io-client";
 import { API_BASE_URL } from "../../config";
 import DateSelector from "../components/forms/DateSelector";
 import LiveStyleCard from "../components/inspection/LiveStyleCard";
+import LineCard from "../components/inspection/LineCard";
 import TrendAnalysisMO from "../components/inspection/TrendAnalysisMO";
 import TrendAnalysisLine from "../components/inspection/TrendAnalysisLine";
+import TrendAnalysisLineDefects from "../components/inspection/TrendAnalysisLineDefects";
 import NavigationPanel from "../components/inspection/NavigationPanel";
 
 ChartJS.register(
@@ -44,6 +46,7 @@ const LiveDashboard = () => {
   const [activeSection, setActiveSection] = useState("Live Dashboard");
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [activeMoTab, setActiveMoTab] = useState("MO Summary"); // For MO Hr Trend tabs
+  const [activeLineTab, setActiveLineTab] = useState("Line Summary");
 
   // Filter states
   const [startDate, setStartDate] = useState(null);
@@ -787,7 +790,7 @@ const LiveDashboard = () => {
       {/* Main Content */}
       <div
         className={`flex-1 p-4 transition-all duration-300 ${
-          isNavOpen ? "ml-64" : "ml-0"
+          isNavOpen ? "ml-72" : "ml-0"
         }`}
       >
         <h1 className="text-2xl font-bold mb-4 text-center text-gray-800">
@@ -854,7 +857,97 @@ const LiveDashboard = () => {
         )}
 
         {activeSection === "Line Hr Trend" && (
-          <TrendAnalysisLine data={lineDefectRates} />
+          <>
+            <div className="mb-4">
+              <button
+                onClick={() => setActiveLineTab("Line Summary")}
+                className={`px-4 py-2 mr-2 rounded ${
+                  activeLineTab === "Line Summary"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                Line Summary
+              </button>
+              <button
+                onClick={() => setActiveLineTab("Line Trend")}
+                className={`px-4 py-2 mr-2 rounded ${
+                  activeLineTab === "Line Trend"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                Line-MO Trend
+              </button>
+              <button
+                onClick={() => setActiveLineTab("Line Rate")}
+                className={`px-4 py-2 mr-2 rounded ${
+                  activeLineTab === "Line Rate"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                Line Trend
+              </button>
+            </div>
+            {activeLineTab === "Line Summary" && (
+              <>
+                <SummaryCards />
+                <div className="mt-6">
+                  <h2 className="text-sm font-medium text-gray-900 mb-2">
+                    Line Summaries
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] gap-4">
+                    {Object.keys(lineDefectRates)
+                      .filter((key) => key !== "total" && key !== "grand")
+                      .filter((lineNum) => (lineNo ? lineNum === lineNo : true)) // Exact match filter using lineNo
+                      .map((lineNum) => ({
+                        lineNo: lineNum,
+                        defectRate: (() => {
+                          const moData = lineDefectRates[lineNum] || {};
+                          let totalCheckedQty = 0;
+                          let totalDefectsQty = 0;
+                          Object.keys(moData).forEach((moNum) => {
+                            if (moNum !== "totalRate") {
+                              Object.keys(moData[moNum]).forEach((hour) => {
+                                if (hour !== "totalRate") {
+                                  const hourData = moData[moNum][hour];
+                                  totalCheckedQty += hourData.checkedQty || 0;
+                                  totalDefectsQty += hourData.defects.reduce(
+                                    (sum, defect) => sum + defect.count,
+                                    0
+                                  );
+                                }
+                              });
+                            }
+                          });
+                          return totalCheckedQty > 0
+                            ? totalDefectsQty / totalCheckedQty
+                            : 0;
+                        })()
+                      }))
+                      .sort((a, b) => b.defectRate - a.defectRate) // Sort by defectRate descending
+                      .map(({ lineNo }) => (
+                        <LineCard
+                          key={lineNo}
+                          lineNo={lineNo}
+                          lineDefectRates={lineDefectRates}
+                        />
+                      ))}
+                  </div>
+                </div>
+              </>
+            )}
+            {activeLineTab === "Line Trend" && (
+              <TrendAnalysisLine data={lineDefectRates} />
+            )}
+            {activeLineTab === "Line Rate" && (
+              <TrendAnalysisLineDefects
+                data={lineDefectRates}
+                lineNo={lineNo}
+              />
+            )}
+          </>
         )}
 
         {["Order Data", "Washing", "Ironing", "OPA", "Packing"].includes(

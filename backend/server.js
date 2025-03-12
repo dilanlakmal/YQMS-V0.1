@@ -3138,18 +3138,18 @@ app.get("/api/qc2-defect-rates-by-line", async (req, res) => {
               }
             }
           },
-          totalRate: {
-            $cond: [
-              { $eq: ["$totalCheckedQty", 0] },
-              0,
-              {
-                $multiply: [
-                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
-                  100
-                ]
-              }
-            ]
-          },
+          // totalRate: {
+          //   $cond: [
+          //     { $eq: ["$totalCheckedQty", 0] },
+          //     0,
+          //     {
+          //       $multiply: [
+          //         { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+          //         100
+          //       ]
+          //     }
+          //   ]
+          // },
           _id: 0
         }
       },
