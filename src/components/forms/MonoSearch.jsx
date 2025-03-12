@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 // Import the API_BASE_URL from our config file
-import { API_BASE_URL } from "../../../config";
+import { API_BASE_URL } from "../../../config"; 
 
 function MonoSearch({
   value,

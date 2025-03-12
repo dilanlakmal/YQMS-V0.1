@@ -668,7 +668,7 @@ function BundleRegistration() {
                       onSelect={(mono) =>
                         setFormData({ ...formData, selectedMono: mono })
                       }
-                      placeholder="Search Last 3 Digits of MONo..."
+                      placeholder={t("bundle.search_digits")}
                       showSearchIcon={true}
                       closeOnOutsideClick={true}
                       inputMode="numeric"
@@ -1405,7 +1405,7 @@ function BundleRegistration() {
                     onSelect={(mono) =>
                       setFormData({ ...formData, selectedMono: mono })
                     }
-                    placeholder="Search Last 3 Digits of MONo..."
+                    placeholder={t("bundle.search_digits")}
                     showSearchIcon={true}
                     closeOnOutsideClick={true}
                     inputMode="numeric"

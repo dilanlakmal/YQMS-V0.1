@@ -23,7 +23,8 @@
     "qc2_inspection": "QC2检验",
     "qa_audit_report": "质量保证审计报告",
     "download_data": "下载数据",
-    "live_dashboard": "实时仪表板"
+    "live_dashboard": "实时仪表板",
+    "qc_inline_roving":"Qc 在线粗纱"
   },
 
   "nav":{
@@ -143,7 +144,8 @@
     "edit":"编辑",
     "action":"行动",
     "print_qr":"打印二维码",
-    "printing": "印刷..."
+    "printing": "印刷...",
+    "search_digits":"搜索 MONo 的最后 3 位数字..."
   },
 
   "defIm":{
@@ -302,7 +304,7 @@
 
   "defectPrint":{
     "search_package":"搜索包裹编号",
-    "repair_group":"维修组",
+    "repair_group":"搜索维修组",
     "search_repair":"搜索维修组",
     "no_defect_card":"未发现缺陷卡",
     "defect_count":"缺陷数量",

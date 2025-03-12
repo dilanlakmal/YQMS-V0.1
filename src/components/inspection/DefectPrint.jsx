@@ -233,7 +233,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
               </button>
             </div>
           </div>
-          <div>
+          <div className="col-span-1">
             <label className="block mb-1 text-sm font-semibold text-gray-700">
             {t("bundle.mono")}
             </label>
@@ -278,7 +278,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                 type="text"
                 value={searchRepairGroup}
                 onChange={(e) => setSearchRepairGroup(e.target.value)}
-                placeholder="Search Repair Group"
+                placeholder={t("defectPrint.search_repair")}
                 list="repairGroupList"
                 className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
               />

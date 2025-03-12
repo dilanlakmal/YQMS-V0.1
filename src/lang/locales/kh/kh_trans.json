@@ -23,7 +23,8 @@
     "qc2_inspection": "ការត្រួតពិនិត្យ QC2",
     "qa_audit_report": "របាយការណ៍សវនកម្ម QA",
     "download_data": "ទាញយកទិន្នន័យ",
-    "live_dashboard": "ផ្ទាំងគ្រប់គ្រងផ្ទាល់"
+    "live_dashboard": "ផ្ទាំងគ្រប់គ្រងផ្ទាល់",
+    "qc_inline_roving":"QC Inline Roving"
   },
 
   "nav":{
@@ -143,7 +144,8 @@
     "edit":"កែសម្រួល",
     "action":"សកម្មភាព",
     "print_qr":"បោះពុម្ព QR",
-    "printing": "បោះពុម្ព..."
+    "printing": "បោះពុម្ព...",
+    "search_digits":"ស្វែងរក 3 ខ្ទង់ចុងក្រោយនៃ MONo..."
   },
 
   "defIm":{

@@ -23,7 +23,8 @@
     "qc2_inspection": "QC2 Inspection",
     "qa_audit_report": "QA Audit Report",
     "download_data": "Download Data",
-    "live_dashboard": "Live Dashboard"
+    "live_dashboard": "Live Dashboard",
+    "qc_inline_roving":"QC Inline Roving"
   },
 
   "nav":{
@@ -142,7 +143,8 @@
     "total_bundle_qty": "Total Bundle Qty",
     "edit": "Edit",
     "action": "Action",
-    "print_qr": "Print QR"
+    "print_qr": "Print QR",
+    "search_digits":"Search Last 3 Digits of MONo..."
   },
 
   "defIm":{
@@ -303,7 +305,7 @@
   "defectPrint":{
     "search_package":"Search Package No",
     "repair_group":"Repair Group",
-    "search_repair":"Select Repair Group",
+    "search_repair":"Search Repair Group",
     "no_defect_card":"No defect cards found",
     "defect_count":"Defect Count",
     "mode":"Mode",

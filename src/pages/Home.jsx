@@ -154,6 +154,13 @@ function Home() {
       title:  t("home.quality_inspection"),
       items: [
         {
+          path: "/roving",
+          roles: ["Admin", "QC1"],
+          image: "/IMG/qcc.png",
+          title:  t("home.qc_inline_roving"),
+          description: "QC Inline Roving Check Point."
+        },
+        {
           path: "/details",
           roles: ["Admin", "QC1"],
           image: "/IMG/qcc.png",

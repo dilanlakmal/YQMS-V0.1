@@ -27,6 +27,7 @@ import Return from "./pages/QC Inspection/Return";
 import QCSunriseReport from "./pages/QCSunriseReport.jsx";
 import Setting from "./pages/Setting";
 import WashingPage from "./pages/Washing";
+import RovingPage from "./pages/Roving";
 
 //Languages
 import "../src/lang/i18n";
@@ -335,6 +336,7 @@ function AppContent() {
               />
               <Route path="/ironing" element={<IroningPage />} />
               <Route path="/washing" element={<WashingPage />} />
+              <Route path="/roving" element={<RovingPage />} />
               <Route path="/opa" element={<OPAPage />} />
               <Route path="/packing" element={<PackingPage />} />
               <Route path="/qc2-inspection" element={<QC2InspectionPage />} />

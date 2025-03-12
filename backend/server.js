@@ -27,6 +27,7 @@ import createRoleManagmentModel from "./models/RoleManagment.js";
 import createQC2InspectionPassBundle from "./models/qc2_inspection_pass_bundle.js";
 import createQC2DefectPrintModel from "./models/QC2DefectPrint.js";
 import createQC2ReworksModel from "./models/qc2_reworks.js";
+import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
 
 /* ------------------------------
    Connection String
@@ -101,11 +102,12 @@ const Ironing = createIroningModel(ymProdConnection);
 const Washing = createWashingModel(ymProdConnection);
 const OPA = createOPAModel(ymProdConnection);
 const Packing = createPackingModel(ymProdConnection);
-const QC2OrderData = createQc2OrderDataModel(ymEcoConnection);
+const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
 const RoleManagment = createRoleManagmentModel(ymProdConnection);
 const QC2InspectionPassBundle = createQC2InspectionPassBundle(ymProdConnection);
 const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
 const QC2Reworks = createQC2ReworksModel(ymProdConnection);
+const QCInlineRoving =createQCInlineRovingModel(ymProdConnection);
 
 //-----------------------------END DATABASE CONNECTIONS------------------------------------------------//
 
@@ -1200,7 +1202,7 @@ app.get("/api/opa-records", async (req, res) => {
 app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
   try {
     const randomId = req.params.randomId.trim(); // Trim to avoid whitespace issues
-    console.log("Searching for bundle_random_id:", randomId);
+    // console.log("Searching for bundle_random_id:", randomId);
 
     // First, check qc2_inspection_pass_bundle for order card
     const bundle = await QC2InspectionPassBundle.findOne({
@@ -1287,7 +1289,7 @@ app.get("/api/last-packing-record-id/:emp_id", async (req, res) => {
 app.get("/api/check-defect-card/:defectPrintId", async (req, res) => {
   try {
     const { defectPrintId } = req.params;
-    console.log(`Searching for defect_print_id: "${defectPrintId}"`); // Debug log
+    // console.log(`Searching for defect_print_id: "${defectPrintId}"`); // Debug log
 
     const defectRecord = await QC2InspectionPassBundle.findOne({
       "printArray.defect_print_id": defectPrintId,
@@ -1896,7 +1898,7 @@ app.get("/api/download-data", async (req, res) => {
       matchQuery.task_no = parseInt(taskNo);
     }
 
-    console.log("Match Query:", JSON.stringify(matchQuery, null, 2)); // For debugging
+    // console.log("Match Query:", JSON.stringify(matchQuery, null, 2)); // For debugging
 
     // Get total count
     const total = await collection.countDocuments(matchQuery);
@@ -1909,7 +1911,7 @@ app.get("/api/download-data", async (req, res) => {
       .limit(limit)
       .lean();
 
-    console.log("Found records:", data.length); // For debugging
+    // console.log("Found records:", data.length); // For debugging
 
     // Transform data for consistent response
     const transformedData = data.map((item) => {
@@ -2318,7 +2320,7 @@ app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
     const data = result[0].data || [];
     const total = result[0].total.length > 0 ? result[0].total[0].count : 0;
 
-    console.log("Search result:", { data, total });
+    // console.log("Search result:", { data, total });
     res.json({ data, total });
   } catch (error) {
     console.error("Error searching data cards:", error);
@@ -2371,18 +2373,18 @@ app.put("/api/qc2-inspection-pass-bundle/:id", async (req, res) => {
   const updateData = req.body;
 
   try {
-    console.log(`Received request to update record with ID: ${id}`);
-    console.log(`Update Data: ${JSON.stringify(updateData)}`);
+    // console.log(`Received request to update record with ID: ${id}`);
+    // console.log(`Update Data: ${JSON.stringify(updateData)}`);
     const updatedRecord = await QC2InspectionPassBundle.findByIdAndUpdate(
       id,
       updateData,
       { new: true }
     );
     if (!updatedRecord) {
-      console.log(`Record with ID: ${id} not found`);
+      // console.log(`Record with ID: ${id} not found`);
       return res.status(404).send({ message: "Record not found" });
     }
-    console.log(`Record with ID: ${id} updated successfully`);
+    // console.log(`Record with ID: ${id} updated successfully`);
     res.send(updatedRecord);
   } catch (error) {
     console.error("Error updating record:", error);
@@ -3144,6 +3146,32 @@ app.get("/api/qc2-defect-print/:defect_id", async (req, res) => {
 });
 
 /* ------------------------------
+   QC Inline Roving ENDPOINTS
+------------------------------ */
+app.post("/api/save-qc-inline-roving", async (req, res) => {
+  try {
+    const qcInlineRovingData = req.body;
+
+    // Create a new instance of the QCInlineRoving model with the data from the request body
+    const newQCInlineRoving = new QCInlineRoving(qcInlineRovingData);
+
+    // Save the new QCInlineRoving document to the database
+    await newQCInlineRoving.save();
+
+    res.status(201).json({
+      message: "QC Inline Roving data saved successfully",
+      data: newQCInlineRoving,
+    });
+  } catch (error) {
+    console.error("Error saving QC Inline Roving data:", error);
+    res.status(500).json({
+      message: "Failed to save QC Inline Roving data",
+      error: error.message,
+    });
+  }
+});
+
+/* ------------------------------
    User Management old ENDPOINTS
 ------------------------------ */
 
@@ -3175,7 +3203,7 @@ app.post("/users", async (req, res) => {
       password,
     } = req.body;
 
-    console.log("Request body:", req.body);
+    // console.log("Request body:", req.body);
 
     // >>> NEW: Check if a user with the same name already exists (case-insensitive)
     const existingUserByName = await UserMain.findOne({
