@@ -26,6 +26,7 @@ import { io } from "socket.io-client";
 import { API_BASE_URL } from "../../config";
 import DateSelector from "../components/forms/DateSelector";
 import LiveStyleCard from "../components/inspection/LiveStyleCard";
+import LiveSummary from "../components/inspection/LiveSummary"; // New component
 import LineCard from "../components/inspection/LineCard";
 import TrendAnalysisMO from "../components/inspection/TrendAnalysisMO";
 import TrendAnalysisLine from "../components/inspection/TrendAnalysisLine";
@@ -816,6 +817,7 @@ const LiveDashboard = () => {
                 QC2 Defect Rate by Defect Name
               </h2>
               <DefectRateChart />
+              {/* <LiveSummary /> */}
             </div>
           </>
         )}

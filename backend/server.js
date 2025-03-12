@@ -29,6 +29,7 @@ import createQc2OrderDataModel from "./models/qc2_orderdata.js";
 import createQC2InspectionPassBundleModel from "./models/qc2_inspection.js";
 import createQC2ReworksModel from "./models/qc2_rework.js";
 import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
+import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
 
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "./config.js";
@@ -162,6 +163,7 @@ const QC2InspectionPassBundle =
   createQC2InspectionPassBundleModel(ymProdConnection);
 const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
+const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -3652,6 +3654,32 @@ app.get("/api/qc2-defect-print/:defect_id", async (req, res) => {
   } catch (error) {
     console.error("Error fetching defect print record:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+/* ------------------------------
+   QC Inline Roving ENDPOINTS
+------------------------------ */
+app.post("/api/save-qc-inline-roving", async (req, res) => {
+  try {
+    const qcInlineRovingData = req.body;
+
+    // Create a new instance of the QCInlineRoving model with the data from the request body
+    const newQCInlineRoving = new QCInlineRoving(qcInlineRovingData);
+
+    // Save the new QCInlineRoving document to the database
+    await newQCInlineRoving.save();
+
+    res.status(201).json({
+      message: "QC Inline Roving data saved successfully",
+      data: newQCInlineRoving
+    });
+  } catch (error) {
+    console.error("Error saving QC Inline Roving data:", error);
+    res.status(500).json({
+      message: "Failed to save QC Inline Roving data",
+      error: error.message
+    });
   }
 });
 
