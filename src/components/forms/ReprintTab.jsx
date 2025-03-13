@@ -366,6 +366,7 @@ export default function ReprintTab() {
                 <th className="p-2 border border-gray-300">{t("bundle.time")}</th>
                 <th className="p-2 border border-gray-300">{t("bundle.emp_id")}</th>
                 <th className="p-2 border border-gray-300">{t("bundle.action")}</th>
+                {/* // p-2 border border-gray-300 text-sm font-medium text-gray-700 */}
               </tr>
             </thead>
             <tbody>

@@ -38,125 +38,6 @@ ChartJS.register(
   Legend
 );
 
-// LineChart Component
-const LineChart = ({ timeSeriesData, maxDefectRate }) => {
-  const { t } = useTranslation();
-  const [interval, setInterval] = useState('1min');
-  const [filteredData, setFilteredData] = useState(timeSeriesData);
-
-  useEffect(() => {
-    filterData(interval);
-  }, [interval, timeSeriesData]);
-
-  const filterData = (interval) => {
-    const now = new Date();
-    let filtered;
-    switch (interval) {
-      case '1min':
-        filtered = timeSeriesData.filter(point => (now - new Date(point.timestamp)) <= 60000);
-        break;
-      case '10min':
-        filtered = timeSeriesData.filter(point => (now - new Date(point.timestamp)) <= 600000);
-        break;
-      case '15min':
-        filtered = timeSeriesData.filter(point => (now - new Date(point.timestamp)) <= 900000);
-        break;
-      case '30min':
-        filtered = timeSeriesData.filter(point => (now - new Date(point.timestamp)) <= 1800000);
-        break;
-      case '1hour':
-        filtered = timeSeriesData.filter(point => (now - new Date(point.timestamp)) <= 3600000);
-        break;
-      default:
-        filtered = timeSeriesData;
-    }
-    setFilteredData(filtered);
-  };
-
-  return (
-    <div className="bg-white overflow-hidden">
-      <div className="flex justify-between items-center mb-4">
-      <h3 className="text-lg font-semibold text-gray-800">{t("ana.defect_rate_over")}</h3>
-        <select
-          value={interval}
-          onChange={(e) => setInterval(e.target.value)}
-          className="px-4 py-2 rounded-md transition-colors bg-white-200 text-black-700 hover:bg-gray-100 border rounded p-2"
-        >
-          {['1min', '10min', '15min', '30min', '1hour'].map((int) => (
-            <option key={int} value={int}>
-              {int}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="h-64">
-        <div className="flex h-full">
-          <div className="flex flex-col justify-between text-xs text-gray-500">
-            {[100, 75, 50, 25, 0].map((tick) => (
-              <span key={tick}>{tick}%</span>
-            ))}
-          </div>
-          <div className="flex-1 ml-4">
-            <div className="relative h-full">
-              <svg className="absolute inset-0 w-full h-full">
-                {filteredData.map((point, index) => {
-                  if (index === 0) return null;
-                  const prevPoint = filteredData[index - 1];
-                  const x1 = ((index - 1) / (filteredData.length - 1)) * 100;
-                  const y1 = 100 - (prevPoint.defectRate / maxDefectRate) * 100;
-                  const x2 = (index / (filteredData.length - 1)) * 100;
-                  const y2 = 100 - (point.defectRate / maxDefectRate) * 100;
-                  return (
-                    <line
-                      key={`${prevPoint.timestamp}-${point.timestamp}`}
-                      x1={`${x1}%`}
-                      y1={`${y1}%`}
-                      x2={`${x2}%`}
-                      y2={`${y2}%`}
-                      stroke="rgb(79, 70, 229)"
-                      strokeWidth="2"
-                    />
-                  );
-                })}
-                {filteredData.map((point, index) => {
-                  const x = (index / (filteredData.length - 1)) * 100;
-                  const y = 100 - (point.defectRate / maxDefectRate) * 100;
-                  return (
-                    <circle
-                      key={point.timestamp}
-                      cx={`${x}%`}
-                      cy={`${y}%`}
-                      r="2"
-                      fill="rgb(79, 70, 229)"
-                    />
-                  );
-                })}
-              </svg>
-            </div>
-            <div className="flex justify-between mt-2 text-xs text-gray-500">
-              {filteredData.map((point) => (
-                <span key={point.timestamp}>
-                  {new Date(point.timestamp).toLocaleTimeString()}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-LineChart.propTypes = {
-  timeSeriesData: PropTypes.arrayOf(
-    PropTypes.shape({
-      timestamp: PropTypes.string.isRequired,
-      defectRate: PropTypes.number.isRequired,
-    })
-  ).isRequired,
-  maxDefectRate: PropTypes.number.isRequired,
-};
-
 function Dashboard() {
   const [stats, setStats] = useState(null);
   const [filters, setFilters] = useState({
@@ -247,8 +128,6 @@ function Dashboard() {
       setLoading(false);
     }
   };
-
-  const maxDefectRate = Math.max(...timeSeriesData.map(point => point.defectRate));
 
   useEffect(() => {
     fetchDashboardData();
@@ -379,13 +258,6 @@ function Dashboard() {
       </div>
     );
   }
-    // Function to format the date
-    const formatDate = (date) => {
-      if (!date) return "N/A";
-      const dateObj = new Date(date);
-      return dateObj.toLocaleDateString();
-    };
-  
 
   return (
     <div className="bg-gray-100 min-h-screen p-6">
@@ -396,7 +268,7 @@ function Dashboard() {
             <Calendar className="h-5 w-5 text-gray-500" />
             <div>
               <p className="text-sm text-gray-500">Date</p>
-              <p className="font-semibold">{formatDate(headerInfo?.date)}</p>
+              <p className="font-semibold">{headerInfo?.date || "N/A"}</p>
             </div>
           </div>
           <div className="flex items-center space-x-2">

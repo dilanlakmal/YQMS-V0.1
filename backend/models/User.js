@@ -20,7 +20,6 @@ const userSchema = new mongoose.Schema({
   device_token: { type: Map, of: String }, // Use Map for device_token
   remember_token: { type: String },
   face_id: { type: String },
-  face_photo: { type: String }, // Added face_photo field
   phone_number: { type: String },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },

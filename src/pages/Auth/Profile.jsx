@@ -18,7 +18,6 @@ function Profile() {
     profile: "", // Custom uploaded profile image
     face_photo: "", // Photo from users collection
   });
-
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
@@ -39,6 +38,7 @@ function Profile() {
         // Set profile data with proper fallback for images
         setProfile({
           ...response.data,
+          // profile: response.data.profile || "",
           face_photo: response.data.face_photo || "/IMG/default-profile.png",
         });
       } catch (error) {
@@ -68,7 +68,7 @@ function Profile() {
         localStorage.getItem("accessToken") ||
         sessionStorage.getItem("accessToken");
       if (!token) {
-        throw new Error("No token found in localStorage or sessionStorage");
+        throw new Error("No token found");
       }
 
       const formData = new FormData();
@@ -81,7 +81,6 @@ function Profile() {
       formData.append("kh_name", profile.kh_name);
       formData.append("job_title", profile.job_title);
       formData.append("email", profile.email);
-
       if (profile.profile && profile.profile instanceof File) {
         formData.append("profile", profile.profile);
       }
@@ -111,6 +110,9 @@ function Profile() {
     if (profile.profile) {
       return profile.profile;
     }
+    // if (profile.face_photo && profile.face_photo.trim() !== "") {
+    //   return profile.face_photo;
+    // }
     return profile.face_photo || "/IMG/default-profile.png";
   };
 

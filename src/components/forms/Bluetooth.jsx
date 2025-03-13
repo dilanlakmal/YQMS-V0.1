@@ -100,7 +100,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
   const handleDisconnect = (errorMessage = "Disconnected") => {
     if (bluetoothState.selectedDevice) {
       if (bluetoothState.selectedDevice.gatt.connected) {
-        console.log("Manually Disconnecting Bluetooth");
+        // console.log("Manually Disconnecting Bluetooth");
         bluetoothState.selectedDevice.gatt.disconnect();
       }
     }
@@ -122,7 +122,6 @@ const BluetoothComponent = forwardRef((props, ref) => {
       return () => clearTimeout(timer);
     }
   }, [showStatus]);
-
 
   const sendChunkedData = async (data) => {
     const { characteristic } = bluetoothState;

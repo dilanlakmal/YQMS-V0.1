@@ -34,6 +34,7 @@ function Login({ onLogin }) {
 
       if (response.status === 200) {
         onLogin(token);
+        // updateUser(response.data);
         navigate("/home");
       }
     } catch (error) {
@@ -50,7 +51,6 @@ function Login({ onLogin }) {
     e.preventDefault();
     setLoading(true);
     setError("");
-
     if (username && password) {
       try {
         const response = await axios.post(`${API_BASE_URL}/api/login`, {
@@ -75,6 +75,7 @@ function Login({ onLogin }) {
           onLogin(accessToken);
           navigate("/home");
           setUser(user);
+          // updateUser(user);
         }
       } catch (error) {
         setError("Invalid username or password");
@@ -97,7 +98,6 @@ function Login({ onLogin }) {
       const response = await axios.post(`${API_BASE_URL}/api/refresh-token`, {
         refreshToken,
       });
-
       if (response.status === 200) {
         const { accessToken } = response.data;
         if (localStorage.getItem("refreshToken")) {

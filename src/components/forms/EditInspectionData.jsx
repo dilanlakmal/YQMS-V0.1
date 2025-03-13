@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { allDefects } from "../..//constants/QC Inspection/defects"; // Adjust the path as necessary
+import { allDefects } from "../../constants/QC Inspection/defects"; // Adjust the path as necessary
 import { useTranslation } from "react-i18next";
 
 const EditModal = ({ isOpen, onClose, data, onSave }) => {

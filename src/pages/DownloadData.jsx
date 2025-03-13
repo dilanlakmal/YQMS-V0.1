@@ -95,7 +95,11 @@ function DownloadData() {
     }));
   };
 
+
   const [moNoOptions, setMoNoOptions] = useState([]);
+  const [empIdOptions, setEmpIdOptions] = useState([]);
+  const [engNameOptions, setEngNameOptions] = useState([]);
+  const [jobTitleOptions, setJobTietlOptions] = useState([]);
   const [styleNoOptions, setStyleNoOptions] = useState([]);
   const [lineNoOptions, setLineNoOptions] = useState([]);
   const [colorOptions, setColorOptions] = useState([]);

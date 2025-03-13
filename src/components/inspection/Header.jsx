@@ -55,5 +55,4 @@ function Header({ inspectionData, editable = false }) {
   );
 }
 
-
 export default Header;

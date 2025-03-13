@@ -252,16 +252,16 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
     }
 
     // Debugging: Log cumulative values and defect rate
-    // useEffect(() => {
-    //   cumulativeData.forEach((data) => {
-    //     console.log(
-    //       `Timestamp: ${formatTime(data.timestamp)}, ` +
-    //         `Cumulative Checked: ${data.cumulativeChecked}, ` +
-    //         `Cumulative Defects: ${data.cumulativeDefects}, ` +
-    //         `Defect Rate: ${data.defectRate.toFixed(2)}%`
-    //     );
-    //   });
-    // }, [cumulativeData]);
+    useEffect(() => {
+      cumulativeData.forEach((data) => {
+        console.log(
+          `Timestamp: ${formatTime(data.timestamp)}, ` +
+            `Cumulative Checked: ${data.cumulativeChecked}, ` +
+            `Cumulative Defects: ${data.cumulativeDefects}, ` +
+            `Defect Rate: ${data.defectRate.toFixed(2)}%`
+        );
+      });
+    }, [cumulativeData]);
 
     // Generate labels based on the time filter
     const labels = cumulativeData.map((data) => {
@@ -386,9 +386,9 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
     const categoryDefects = Object.entries(defects)
       .filter(([index]) => {
         const isInCategory = indices.includes(Number(index)); // Explicitly convert to number
-        // console.log(
-        //   `Defect Index: ${index}, Category Indices: ${indices}, Included: ${isInCategory}`
-        // );
+        console.log(
+          `Defect Index: ${index}, Category Indices: ${indices}, Included: ${isInCategory}`
+        );
         return isInCategory;
       })
       .reduce((sum, [_, count]) => sum + count, 0);

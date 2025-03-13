@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useTranslation } from "react-i18next";
@@ -102,6 +102,7 @@ function BundleRegistration() {
   });
 
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const memoizedQrData = useMemo(() => qrData, [qrData]);
 
   const toggleOrderDetails = () => {
     setShowOrderDetails(!showOrderDetails);
@@ -243,7 +244,7 @@ function BundleRegistration() {
           console.error("Error fetching updated total:", error);
         }
       }
-    }, 500);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [formData.selectedMono, formData.color, formData.size]);
@@ -265,7 +266,7 @@ function BundleRegistration() {
 
     fetchTotalBundleQty();
 
-    const interval = setInterval(fetchTotalBundleQty, 500);
+    const interval = setInterval(fetchTotalBundleQty, 3000);
 
     return () => clearInterval(interval);
   }, [formData.selectedMono]);
@@ -668,7 +669,7 @@ function BundleRegistration() {
                       onSelect={(mono) =>
                         setFormData({ ...formData, selectedMono: mono })
                       }
-                      placeholder={t("bundle.search_digits")}
+                      placeholder="Search MONo..."
                       showSearchIcon={true}
                       closeOnOutsideClick={true}
                       inputMode="numeric"
@@ -1405,7 +1406,7 @@ function BundleRegistration() {
                     onSelect={(mono) =>
                       setFormData({ ...formData, selectedMono: mono })
                     }
-                    placeholder={t("bundle.search_digits")}
+                    placeholder="Search MONo..."
                     showSearchIcon={true}
                     closeOnOutsideClick={true}
                     inputMode="numeric"
@@ -2103,7 +2104,8 @@ function BundleRegistration() {
         <QRCodePreview
           isOpen={showQRPreview}
           onClose={() => setShowQRPreview(false)}
-          qrData={qrData}
+          qrData={memoizedQrData} // Use memoized version of qrData
+          //qrData={qrData}
           onPrint={handlePrintQR}
           mode="production"
         />

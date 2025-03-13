@@ -16,20 +16,20 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
   const [showOrderDetails, setShowOrderDetails] = useState(false); // For mobile toggle
 
   useEffect(() => {
-    if (formData.selectedMono) {
-      fetchAvailableSizesAndColors(formData.selectedMono);
-    }
-  }, [formData.selectedMono]);
+  //   if (formData.selectedMono) {
+  //     fetchAvailableSizesAndColors(formData.selectedMono);
+  //   }
+  // }, [formData.selectedMono]);
 
-  const fetchAvailableSizesAndColors = async (selectedMono) => {
-    const sizes = await fetchSizes(selectedMono);
-    const colors = await fetchColors(selectedMono);
-    setAvailableSizes(sizes);
-    setAvailableColors(colors);
-  };
+  // const fetchAvailableSizesAndColors = async (selectedMono) => {
+  //   const sizes = await fetchSizes(selectedMono);
+  //   const colors = await fetchColors(selectedMono);
+  //   setAvailableSizes(sizes);
+  //   setAvailableColors(colors);
+  // };
 
-  const fetchSizes = async (selectedMono) => {
-    try {
+  // const fetchSizes = async (selectedMono) => {
+  //   try {
   //     const response = await fetch(`${API_BASE_URL}/api/sizes?styleNo=${selectedMono}`);
   //     if (!response.ok) {
   //       throw new Error('Failed to fetch sizes');
@@ -53,6 +53,14 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
   //   } catch (error) {
   //     console.error('Error fetching colors:', error);
   //     return [];
+    if (isOpen && formData.selectedMono) {
+      fetchAvailableSizesAndColors(formData.selectedMono);
+    }
+  }, [isOpen, formData.selectedMono]);
+
+  const fetchAvailableSizesAndColors = async (selectedMono) => {
+    setLoading(true);
+    try {
       const response = await fetch(
         `${API_BASE_URL}/api/order-details/${selectedMono}`
       );
@@ -97,6 +105,7 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
         setUserBatches((prevBatches) =>
           prevBatches.map((batch) =>
             batch.id === formData.id ? updatedRecord : batch
+            // batch._id === formData.id ? updatedRecord : batch
           )
         );
         setEditModalOpen(false);

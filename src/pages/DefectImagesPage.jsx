@@ -42,11 +42,14 @@ function DefectImagesPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-2">
-                      <img
-                        src={defect.imageUrl}
-                        alt={`Defect ${index} Image`}
-                        className="w-24 h-24 object-cover rounded"
-                      />
+                      {defect.images.map((image, i) => (
+                        <img
+                          key={i}
+                          src={URL.createObjectURL(image)}
+                          alt={`Defect ${index} Image ${i}`}
+                          className="w-24 h-24 object-cover rounded"
+                        />
+                      ))}
                     </div>
                   </td>
                 </tr>

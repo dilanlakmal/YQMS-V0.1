@@ -28,6 +28,7 @@ import createQC2InspectionPassBundle from "./models/qc2_inspection_pass_bundle.j
 import createQC2DefectPrintModel from "./models/QC2DefectPrint.js";
 import createQC2ReworksModel from "./models/qc2_reworks.js";
 import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
+import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
 
 /* ------------------------------
    Connection String
@@ -108,6 +109,7 @@ const QC2InspectionPassBundle = createQC2InspectionPassBundle(ymProdConnection);
 const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
 const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const QCInlineRoving =createQCInlineRovingModel(ymProdConnection);
+const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
 
 //-----------------------------END DATABASE CONNECTIONS------------------------------------------------//
 
@@ -578,7 +580,6 @@ app.get("/api/user-batches", async (req, res) => {
 //     res.status(500).json({ message: "Failed to fetch user batches" });
 //   }
 // });
-
 
 /* ------------------------------
    End Points - Reprint - qc2_orderdata
@@ -1415,14 +1416,13 @@ app.get("/api/packing-records", async (req, res) => {
   }
 });
 
-
 /* ------------------------------
    End Points - Live Dashboard - QC1
 ------------------------------ */
 
 app.get("/api/dashboard-stats", async (req, res) => {
   try {
-    const { factory, lineNo, moNo, customer, timeInterval } = req.query;
+    const { factory, lineNo, moNo, customer, timeInterval = "1" } = req.query;
     let matchQuery = {};
 
     // Apply filters if provided
@@ -1455,9 +1455,10 @@ app.get("/api/dashboard-stats", async (req, res) => {
           totalDefectPieces: { $sum: "$defectPieces" },
           totalReturnDefectQty: { $sum: "$returnDefectQty" },
           totalGoodOutput: { $sum: "$goodOutput" },
-          latestHeaderData: { $last: "$headerData" },
-        },
-      },
+          latestDefectArray: { $last: "$defectArray" },
+          latestHeaderData: { $last: "$headerData" }
+        }
+      }
     ]);
 
     // Get defect rate by line
@@ -1539,34 +1540,128 @@ app.get("/api/dashboard-stats", async (req, res) => {
       {
         $group: {
           _id: "$defectArray.name",
-          count: { $sum: "$defectArray.count" },
-        },
+          count: { $sum: "$defectArray.count" }
+        }
       },
-      { $sort: { count: -1 } },
+      { $sort: { count: -1 } }
     ]);
 
-    // Get time-series data
+    // In server.js, replace the timeSeriesData aggregation with:
     const timeSeriesData = await QCData.aggregate([
       { $match: matchQuery },
       {
+        $addFields: {
+          timeComponents: {
+            $let: {
+              vars: {
+                timeParts: { $split: ["$formattedTimestamp", ":"] }
+              },
+              in: {
+                hours: { $toInt: { $arrayElemAt: ["$$timeParts", 0] } },
+                minutes: { $toInt: { $arrayElemAt: ["$$timeParts", 1] } },
+                seconds: { $toInt: { $arrayElemAt: ["$$timeParts", 2] } }
+              }
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          totalMinutes: {
+            $add: [
+              { $multiply: ["$timeComponents.hours", 60] },
+              "$timeComponents.minutes"
+            ]
+          }
+        }
+      },
+      {
+        $sort: { timestamp: 1 }
+      },
+      {
         $group: {
-          _id: "$formattedTimestamp",
-          checkedQty: { $sum: "$checkedQty" },
-          defectQty: { $sum: "$defectQty" },
-        },
+          _id: {
+            $switch: {
+              branches: [
+                {
+                  case: { $eq: [parseInt(timeInterval), 1] },
+                  then: {
+                    $multiply: [
+                      { $floor: { $divide: ["$totalMinutes", 1] } },
+                      1
+                    ]
+                  }
+                },
+                {
+                  case: { $eq: [parseInt(timeInterval), 15] },
+                  then: {
+                    $multiply: [
+                      { $floor: { $divide: ["$totalMinutes", 15] } },
+                      15
+                    ]
+                  }
+                },
+                {
+                  case: { $eq: [parseInt(timeInterval), 30] },
+                  then: {
+                    $multiply: [
+                      { $floor: { $divide: ["$totalMinutes", 30] } },
+                      30
+                    ]
+                  }
+                },
+                {
+                  case: { $eq: [parseInt(timeInterval), 60] },
+                  then: {
+                    $multiply: [
+                      { $floor: { $divide: ["$totalMinutes", 60] } },
+                      60
+                    ]
+                  }
+                }
+              ],
+              default: "$totalMinutes"
+            }
+          },
+          // Use last record for the time period to get cumulative values
+          cumulativeChecked: { $last: "$cumulativeChecked" },
+          cumulativeDefects: { $last: "$cumulativeDefects" }
+        }
       },
       {
         $project: {
-          timestamp: "$_id",
-          defectRate: {
-            $multiply: [
-              { $divide: ["$defectQty", { $max: ["$checkedQty", 1] }] },
-              100,
-            ],
+          timestamp: {
+            $switch: {
+              branches: [
+                {
+                  case: { $eq: [parseInt(timeInterval), 60] },
+                  then: { $toString: { $divide: ["$_id", 60] } }
+                }
+              ],
+              default: { $toString: "$_id" }
+            }
           },
-        },
+          checkedQty: "$cumulativeChecked",
+          defectQty: "$cumulativeDefects",
+          defectRate: {
+            $round: [
+              {
+                $multiply: [
+                  {
+                    $divide: [
+                      "$cumulativeDefects",
+                      { $max: ["$cumulativeChecked", 1] }
+                    ]
+                  },
+                  100
+                ]
+              },
+              2
+            ]
+          }
+        }
       },
-      { $sort: { timestamp: 1 } },
+      { $sort: { _id: 1 } }
     ]);
 
     const dashboardData = stats[0] || {
@@ -1594,20 +1689,23 @@ app.get("/api/dashboard-stats", async (req, res) => {
         defectPieces: dashboardData.totalDefectPieces || 0,
         returnDefectQty: dashboardData.totalReturnDefectQty || 0,
         goodOutput: dashboardData.totalGoodOutput || 0,
-        defectRatio: totalInspected
+        defectRate: totalInspected
           ? ((dashboardData.totalDefectQty / totalInspected) * 100).toFixed(2)
           : 0,
-        defectRate: totalInspected
-          ? ((dashboardData.totalDefectPieces / totalInspected) * 100).toFixed(2)
-          : 0,
+        defectRatio: totalInspected
+          ? ((dashboardData.totalDefectPieces / totalInspected) * 100).toFixed(
+              2
+            )
+          : 0
       },
       defectRateByLine,
       defectRateByMO,
       defectRateByCustomer,
       topDefects,
-      timeSeriesData,
+      timeSeriesData
     });
   } catch (error) {
+    console.error("Error fetching dashboard stats:", error);
     res.status(500).json({ message: "Failed to fetch dashboard stats" });
   }
 });
@@ -1618,22 +1716,31 @@ app.get("/api/dashboard-stats", async (req, res) => {
 
 app.post("/api/save-qc-data", async (req, res) => {
   try {
+    // Sanitize defectDetails
+    const sanitizedDefects = (req.body.defectDetails || []).map((defect) => ({
+      name: defect.name.toString().trim(),
+      count: Math.abs(parseInt(defect.count)) || 0
+    }));
     const sanitizedData = {
       ...req.body,
+      defectArray: sanitizedDefects,
       headerData: {
         ...req.body.headerData,
         date: req.body.headerData.date
           ? new Date(req.body.headerData.date).toISOString()
-          : undefined,
-      },
+          : undefined
+      }
     };
+
     const qcData = new QCData(sanitizedData);
     const savedData = await qcData.save();
+
     res.status(201).json({
       message: "QC data saved successfully",
-      data: savedData,
+      data: savedData
     });
   } catch (error) {
+    console.error("Error saving QC data:", error);
     res.status(500).json({
       message: "Failed to save QC data",
       error: error.message,
@@ -1792,7 +1899,6 @@ function checkFileType(file, cb) {
 ------------------------------ */
 
 // Helper function to format date to MM/DD/YYYY
-
 const formatDate = (date) => {
   const d = new Date(date);
   return `${(d.getMonth() + 1).toString().padStart(2, "0")}/${d
@@ -1914,21 +2020,20 @@ app.get("/api/download-data", async (req, res) => {
     // console.log("Found records:", data.length); // For debugging
 
     // Transform data for consistent response
-    const transformedData = data.map((item) => {
-      const date = item[dateField]; // Log the date field
-      return {
-        date: date,
-        type: isIroning ? "Ironing" : "QC2 Order Data",
-        taskNo: isIroning ? "53" : "52",
-        selectedMono: item.selectedMono,
-        custStyle: item.custStyle,
-        lineNo: item.lineNo,
-        color: item.color,
-        size: item.size,
-        buyer: item.buyer,
-        bundle_id: isIroning ? item.ironing_bundle_id : item.bundle_id,
-      };
-    });
+    const transformedData = data.map((item) => ({
+      date: item[dateField],
+      type: isIroning ? "Ironing" : "QC2 Order Data",
+      taskNo: isIroning ? "53" : "52",
+      selectedMono: item.selectedMono,
+      custStyle: item.custStyle,
+      lineNo: item.lineNo,
+      color: item.color,
+      size: item.size,
+      buyer: item.buyer,
+      bundle_id: isIroning ? item.ironing_bundle_id : item.bundle_id,
+      factory: item.factory,
+      count: item.count
+    }));
 
     res.json({
       data: transformedData,
@@ -2025,13 +2130,17 @@ app.post("/api/inspection-pass-bundle", async (req, res) => {
       sect_name_inspection,
       bundle_id,
       bundle_random_id,
-      printArray: printArray || [],
+      printArray: printArray || []
     });
 
     await newRecord.save();
+
+    // Emit event to all clients
+    io.emit("qc2_data_updated");
+
     res.status(201).json({
       message: "Inspection pass bundle saved successfully",
-      data: newRecord,
+      data: newRecord
     });
   } catch (error) {
     console.error("Error saving inspection pass bundle:", error);
@@ -2127,7 +2236,8 @@ app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {
           emp_id_inspection: { $addToSet: "$emp_id_inspection" },
           buyer: { $addToSet: "$buyer" },
           package_no: { $addToSet: "$package_no" }, // Added package_no
-        },
+          lineNo: { $addToSet: "$lineNo" } // Add Line No
+        }
       },
       {
         $project: {
@@ -2139,8 +2249,9 @@ app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {
           emp_id_inspection: 1,
           buyer: 1,
           package_no: 1,
-        },
-      },
+          lineNo: 1 // Include Line No
+        }
+      }
     ]);
 
     const result =
@@ -2154,6 +2265,7 @@ app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {
             emp_id_inspection: [],
             buyer: [],
             package_no: [],
+            lineNo: [] // Include Line No
           };
 
     Object.keys(result).forEach((key) => {
@@ -2409,6 +2521,7 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
       size,
       department,
       buyer,
+      lineNo // Add Line No
     } = req.query;
 
     let match = {};
@@ -2422,6 +2535,7 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     if (department) match.department = department;
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
 
     // Normalize dates and apply string comparison
     if (startDate || endDate) {
@@ -2500,6 +2614,7 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
       size,
       department,
       buyer,
+      lineNo // Add Line No
     } = req.query;
 
     let match = {};
@@ -2513,6 +2628,7 @@ app.get("/api/qc2-defect-rates", async (req, res) => {
     if (department) match.department = department;
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
 
     if (startDate || endDate) {
       match.inspection_date = {};
@@ -2950,6 +3066,520 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
   }
 });
 
+// Endpoint to get defect rates by line by hour
+app.get("/api/qc2-defect-rates-by-line", async (req, res) => {
+  try {
+    const {
+      moNo,
+      emp_id_inspection,
+      startDate,
+      endDate,
+      color,
+      size,
+      department,
+      buyer,
+      lineNo
+    } = req.query;
+
+    let match = {};
+    if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    if (emp_id_inspection)
+      match.emp_id_inspection = {
+        $regex: new RegExp(emp_id_inspection.trim(), "i")
+      };
+    if (color) match.color = color;
+    if (size) match.size = size;
+    if (department) match.department = department;
+    if (buyer)
+      match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") };
+
+    if (startDate || endDate) {
+      match.inspection_date = {};
+      if (startDate)
+        match.inspection_date.$gte = normalizeDateString(startDate);
+      if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
+    }
+
+    match.inspection_time = { $regex: /^\d{2}:\d{2}:\d{2}$/ };
+
+    const data = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $project: {
+          lineNo: 1,
+          moNo: 1,
+          checkedQty: 1,
+          defectQty: 1,
+          defectArray: 1,
+          inspection_time: 1,
+          hour: { $toInt: { $substr: ["$inspection_time", 0, 2] } },
+          minute: { $toInt: { $substr: ["$inspection_time", 3, 2] } },
+          second: { $toInt: { $substr: ["$inspection_time", 6, 2] } }
+        }
+      },
+      {
+        $match: {
+          minute: { $gte: 0, $lte: 59 },
+          second: { $gte: 0, $lte: 59 }
+        }
+      },
+      {
+        $group: {
+          _id: { lineNo: "$lineNo", moNo: "$moNo", hour: "$hour" },
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$defectQty" },
+          defectRecords: { $push: "$defectArray" }
+        }
+      },
+      { $unwind: { path: "$defectRecords", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$defectRecords", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: {
+            lineNo: "$_id.lineNo",
+            moNo: "$_id.moNo",
+            hour: "$_id.hour",
+            defectName: "$defectRecords.defectName"
+          },
+          totalCheckedQty: { $first: "$totalCheckedQty" },
+          totalDefectQty: { $first: "$totalDefectQty" },
+          defectCount: { $sum: "$defectRecords.totalCount" }
+        }
+      },
+      {
+        $group: {
+          _id: { lineNo: "$_id.lineNo", moNo: "$_id.moNo", hour: "$_id.hour" },
+          checkedQty: { $first: "$totalCheckedQty" },
+          totalDefectQty: { $first: "$totalDefectQty" },
+          defects: {
+            $push: {
+              name: "$_id.defectName",
+              count: {
+                $cond: [{ $eq: ["$defectCount", null] }, 0, "$defectCount"]
+              }
+            }
+          }
+        }
+      },
+      {
+        $group: {
+          _id: { lineNo: "$_id.lineNo", moNo: "$_id.moNo" },
+          hours: {
+            $push: {
+              hour: "$_id.hour",
+              checkedQty: "$checkedQty",
+              defects: "$defects",
+              defectQty: "$totalDefectQty"
+            }
+          },
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$totalDefectQty" }
+        }
+      },
+      {
+        $group: {
+          _id: "$_id.lineNo",
+          moNos: {
+            $push: {
+              moNo: "$_id.moNo",
+              hours: "$hours",
+              totalCheckedQty: "$totalCheckedQty",
+              totalDefectQty: "$totalDefectQty"
+            }
+          },
+          totalCheckedQty: { $sum: "$totalCheckedQty" },
+          totalDefectQty: { $sum: "$totalDefectQty" }
+        }
+      },
+      {
+        $project: {
+          lineNo: "$_id",
+          moData: {
+            $arrayToObject: {
+              $map: {
+                input: "$moNos",
+                as: "mo",
+                in: {
+                  k: "$$mo.moNo",
+                  v: {
+                    hourData: {
+                      $arrayToObject: {
+                        $map: {
+                          input: "$$mo.hours",
+                          as: "h",
+                          in: {
+                            k: { $toString: { $add: ["$$h.hour", 1] } },
+                            v: {
+                              rate: {
+                                $cond: [
+                                  { $eq: ["$$h.checkedQty", 0] },
+                                  0,
+                                  {
+                                    $multiply: [
+                                      {
+                                        $divide: [
+                                          "$$h.defectQty",
+                                          "$$h.checkedQty"
+                                        ]
+                                      },
+                                      100
+                                    ]
+                                  }
+                                ]
+                              },
+                              hasCheckedQty: { $gt: ["$$h.checkedQty", 0] },
+                              checkedQty: "$$h.checkedQty",
+                              defects: "$$h.defects"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    totalRate: {
+                      $cond: [
+                        { $eq: ["$$mo.totalCheckedQty", 0] },
+                        0,
+                        {
+                          $multiply: [
+                            {
+                              $divide: [
+                                "$$mo.totalDefectQty",
+                                "$$mo.totalCheckedQty"
+                              ]
+                            },
+                            100
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          totalRate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                  100
+                ]
+              }
+            ]
+          },
+          _id: 0
+        }
+      },
+      { $sort: { lineNo: 1 } }
+    ]);
+
+    const totalData = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $project: {
+          checkedQty: 1,
+          defectQty: 1,
+          hour: { $toInt: { $substr: ["$inspection_time", 0, 2] } }
+        }
+      },
+      {
+        $group: {
+          _id: "$hour",
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$defectQty" }
+        }
+      },
+      {
+        $project: {
+          hour: "$_id",
+          rate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                  100
+                ]
+              }
+            ]
+          },
+          hasCheckedQty: { $gt: ["$totalCheckedQty", 0] },
+          _id: 0
+        }
+      }
+    ]);
+
+    const grandTotal = await QC2InspectionPassBundle.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: null,
+          totalCheckedQty: { $sum: "$checkedQty" },
+          totalDefectQty: { $sum: "$defectQty" }
+        }
+      },
+      {
+        $project: {
+          rate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                  100
+                ]
+              }
+            ]
+          },
+          _id: 0
+        }
+      }
+    ]);
+
+    const result = {};
+    data.forEach((item) => {
+      result[item.lineNo] = {};
+      Object.keys(item.moData).forEach((moNo) => {
+        result[item.lineNo][moNo] = {};
+        Object.keys(item.moData[moNo].hourData).forEach((hour) => {
+          const formattedHour = `${hour}:00`.padStart(5, "0");
+          const hourData = item.moData[moNo].hourData[hour];
+          result[item.lineNo][moNo][formattedHour] = {
+            rate: hourData.rate,
+            hasCheckedQty: hourData.hasCheckedQty,
+            checkedQty: hourData.checkedQty,
+            defects: hourData.defects.map((defect) => ({
+              name: defect.name || "No Defect",
+              count: defect.count,
+              rate:
+                hourData.checkedQty > 0
+                  ? (defect.count / hourData.checkedQty) * 100
+                  : 0
+            }))
+          };
+        });
+        result[item.lineNo][moNo].totalRate = item.moData[moNo].totalRate;
+      });
+      result[item.lineNo].totalRate = item.totalRate;
+    });
+
+    result.total = {};
+    totalData.forEach((item) => {
+      const formattedHour = `${item.hour + 1}:00`.padStart(5, "0");
+      if (item.hour >= 6 && item.hour <= 20) {
+        result.total[formattedHour] = {
+          rate: item.rate,
+          hasCheckedQty: item.hasCheckedQty
+        };
+      }
+    });
+
+    result.grand = grandTotal.length > 0 ? grandTotal[0] : { rate: 0 };
+
+    const hours = [
+      "07:00",
+      "08:00",
+      "09:00",
+      "10:00",
+      "11:00",
+      "12:00",
+      "13:00",
+      "14:00",
+      "15:00",
+      "16:00",
+      "17:00",
+      "18:00",
+      "19:00",
+      "20:00",
+      "21:00"
+    ];
+    Object.keys(result).forEach((key) => {
+      if (key !== "grand" && key !== "total") {
+        Object.keys(result[key]).forEach((moNo) => {
+          if (moNo !== "totalRate") {
+            hours.forEach((hour) => {
+              if (!result[key][moNo][hour]) {
+                result[key][moNo][hour] = {
+                  rate: 0,
+                  hasCheckedQty: false,
+                  checkedQty: 0,
+                  defects: []
+                };
+              }
+            });
+          }
+        });
+      }
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching defect rates by line:", error);
+    res.status(500).json({ error: "Failed to fetch defect rates by line" });
+  }
+});
+
+/* ------------------------------
+   QC2 - Repair Tracking
+------------------------------ */
+// 1. Fetch Defect Data by defect_print_id
+app.get("/api/defect-track/:defect_print_id", async (req, res) => {
+  try {
+    const { defect_print_id } = req.params;
+
+    // Fetch from qc2_inspection_pass_bundle
+    const inspectionRecord = await QC2InspectionPassBundle.findOne({
+      "printArray.defect_print_id": defect_print_id
+    });
+
+    if (!inspectionRecord) {
+      return res.status(404).json({ message: "Defect print ID not found" });
+    }
+
+    const printData = inspectionRecord.printArray.find(
+      (item) => item.defect_print_id === defect_print_id
+    );
+
+    if (!printData) {
+      return res
+        .status(404)
+        .json({ message: "Defect print ID not found in printArray" });
+    }
+
+    // Fetch existing repair tracking data if it exists
+    const repairRecord = await QC2RepairTracking.findOne({ defect_print_id });
+
+    const formattedData = {
+      package_no: inspectionRecord.package_no,
+      moNo: inspectionRecord.moNo,
+      custStyle: inspectionRecord.custStyle,
+      color: inspectionRecord.color,
+      size: inspectionRecord.size,
+      lineNo: inspectionRecord.lineNo,
+      department: inspectionRecord.department,
+      buyer: inspectionRecord.buyer,
+      factory: inspectionRecord.factory,
+      sub_con: inspectionRecord.sub_con,
+      sub_con_factory: inspectionRecord.sub_con_factory,
+      defect_print_id: printData.defect_print_id,
+      garments: printData.printData.map((garment) => ({
+        garmentNumber: garment.garmentNumber,
+        defects: garment.defects.map((defect) => {
+          const repairItem = repairRecord
+            ? repairRecord.repairArray.find((r) => r.defectName === defect.name)
+            : null;
+          return {
+            name: defect.name,
+            count: defect.count,
+            repair: defect.repair,
+            status: repairItem ? repairItem.status : "Not Repaired",
+            repair_date: repairItem ? repairItem.repair_date : "",
+            repair_time: repairItem ? repairItem.repair_time : ""
+          };
+        })
+      }))
+    };
+
+    res.json(formattedData);
+  } catch (error) {
+    console.error("Error fetching defect track data:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// 2. Save/Update Repair Tracking Data
+app.post("/api/repair-tracking", async (req, res) => {
+  try {
+    const {
+      defect_print_id,
+      package_no,
+      moNo,
+      custStyle,
+      color,
+      size,
+      lineNo,
+      department,
+      buyer,
+      factory,
+      sub_con,
+      sub_con_factory,
+      repairArray
+    } = req.body;
+
+    // Check if a record already exists
+    let existingRecord = await QC2RepairTracking.findOne({ defect_print_id });
+
+    if (existingRecord) {
+      // Update existing record
+      existingRecord.repairArray = existingRecord.repairArray.map((item) => {
+        const updatedItem = repairArray.find(
+          (newItem) => newItem.defectName === item.defectName
+        );
+        if (updatedItem) {
+          return {
+            ...item,
+            status: updatedItem.status,
+            repair_date: updatedItem.repair_date,
+            repair_time: updatedItem.repair_time
+          };
+        }
+        return item;
+      });
+      await existingRecord.save();
+      res.status(200).json({
+        message: "Repair tracking updated successfully",
+        data: existingRecord
+      });
+    } else {
+      // Create new record
+      const newRecord = new QC2RepairTracking({
+        package_no,
+        moNo,
+        custStyle,
+        color,
+        size,
+        lineNo,
+        department,
+        buyer,
+        factory,
+        sub_con,
+        sub_con_factory,
+        defect_print_id,
+        repairArray: repairArray.map((item) => ({
+          defectName: item.defectName,
+          defectCount: item.defectCount,
+          repairGroup: item.repairGroup,
+          status: item.status || "Not Repaired",
+          repair_date: item.repair_date || "",
+          repair_time: item.repair_time || ""
+        }))
+      });
+      await newRecord.save();
+      res.status(201).json({
+        message: "Repair tracking saved successfully",
+        data: newRecord
+      });
+    }
+  } catch (error) {
+    console.error("Error saving/updating repair tracking:", error);
+    res.status(500).json({
+      message: "Failed to save/update repair tracking",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   QC2 - Reworks
+------------------------------ */
+
+// const QC2Reworks = mongoose.model("qc2_reworks", qc2ReworksSchema);
+
 // Endpoint to save reworks (reject garment) data
 app.post("/api/reworks", async (req, res) => {
   try {
@@ -3171,6 +3801,16 @@ app.post("/api/save-qc-inline-roving", async (req, res) => {
   }
 });
 
+// Endpoint to fetch QC Inline Roving reports
+app.get('/api/qc-inline-roving-reports', async (req, res) => {
+  try {
+    const reports = await QCInlineRoving.find();
+    res.json(reports);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching reports', error });
+  }
+});
+
 /* ------------------------------
    User Management old ENDPOINTS
 ------------------------------ */
@@ -3230,15 +3870,17 @@ app.post("/users", async (req, res) => {
     // const salt = await bcrypt.genSalt(12);
     // const hashedPassword = await bcrypt.hash(password, salt);
 
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    // const saltRounds = 12;
+    // const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
     // Create a new user with the provided fields.
     const newUser = new UserMain({
       emp_id,
       name,
       email,
-      job_title,
+      job_title: job_title || "External",
       eng_name,
       kh_name,
       phone_number,
@@ -3253,133 +3895,48 @@ app.post("/users", async (req, res) => {
 
     res.status(201).json(newUser);
   } catch (error) {
-    console.error('Error creating user:', error);
-    res.status(500).json({ message: 'Failed to create user' });
+    console.error("Error creating user:", error);
+    res.status(500).json({ message: "Failed to create user" });
   }
 });
-
-// app.post("/users", async (req, res) => {
-//   try {
-//     const { emp_id, name, email, roles, sub_roles, keywords, password } =
-//       req.body;
-
-//     // Log the incoming request body
-//     console.log("Request body:", req.body);
-
-//     // Check if the emp_id already exists
-//     const existingUser = await UserMain.findOne({ emp_id });
-//     if (existingUser) {
-//       return res.status(400).json({
-//         message: "Employee ID already exists. Please use a different ID.",
-//       });
-//     }
-
-//     // Hash the password
-//     const salt = await bcrypt.genSalt(10);
-//     const hashedPassword = await bcrypt.hash(password, salt);
-
-//     // Create a new user
-//     const newUser = new UserMain({
-//       emp_id,
-//       name,
-//       email,
-//       roles,
-//       sub_roles,
-//       keywords,
-//       password: hashedPassword,
-//     });
-
-//     // Save the user to the database
-//     await newUser.save();
-
-//     res.status(201).json(newUser);
-//   } catch (error) {
-//     console.error("Error creating user:", error);
-//     res.status(500).json({ message: "Failed to create user" });
-//   }
-// });
-
-// //Update
-// app.put("/users/:id", async (req, res) => {
-//   try {
-//     const user = await UserMain.findByIdAndUpdate(req.params.id, req.body, {
-//       new: true,
-//     });
-//     res.json(user);
-//   } catch (error) {
-//     console.error("Error updating user:", error);
-//     res.status(500).json({ message: "Failed to update user" });
-//   }
-// });
 
 //Delete
-app.delete('/users/:id', async (req, res) => {
+app.delete("/users/:id", async (req, res) => {
   try {
     await UserMain.findByIdAndDelete(req.params.id);
-    res.json({ message: 'User deleted' });
+    res.json({ message: "User deleted" });
   } catch (error) {
-    console.error('Error deleting user:', error);
-    res.status(500).json({ message: 'Failed to delete user' });
+    console.error("Error deleting user:", error);
+    res.status(500).json({ message: "Failed to delete user" });
   }
 });
-
-//-----------------------------------------------------------//
-// // Getting Roles
-// app.get("/roles", async (req, res) => {
-//   try {
-//     const roles = await Role.find();
-//     res.json(roles);
-//   } catch (error) {
-//     console.error("Error fetching roles:", error);
-//     res.status(500).json({ error: "Failed to fetch roles" });
-//   }
-// });
-
-// // Change role
-// app.put("/users/:id", async (req, res) => {
-//   try {
-//     const { name, email, roles, sub_roles, keywords, password } = req.body;
-//     const updatedUser = { name, email, keywords };
-
-//     if (roles) {
-//       updatedUser.roles = [...new Set(roles)]; // Remove duplicates
-//     }
-
-//     if (sub_roles) {
-//       updatedUser.sub_roles = [...new Set(sub_roles)]; // Remove duplicates
-//     }
-
-//     if (password) {
-//       const saltRounds = 12;
-//       updatedUser.password = await bcrypt.hash(password, saltRounds); // Ensure you hash the password before saving
-//     }
-
-//     const user = await UserMain.findByIdAndUpdate(req.params.id, updatedUser, {
-//       new: true,
-//     });
-//     res.json(user);
-//   } catch (error) {
-//     console.error("Error updating user:", error);
-//     res.status(500).json({ message: "Failed to update user" });
-//   }
-// });
-//-----------------------------------------------------------//
 
 /* ------------------------------
    Login Authentication ENDPOINTS
 ------------------------------ */
+
+// Helper function to get profile image URL
+const getProfileImageUrl = (user) => {
+  if (user.profile && user.profile.trim() !== "") {
+    return `${API_BASE_URL}/public/storage/profiles/${user._id}/${path.basename(
+      user.profile
+    )}`;
+  }
+  return user.face_photo || "/IMG/default-profile.png";
+};
+
 // When Login get user data
-app.post('/api/get-user-data', async (req, res) => {
+app.post("/api/get-user-data", async (req, res) => {
   try {
     const { token } = req.body;
     if (!token) {
-      return res.status(400).json({ message: 'Token is required' });
+      return res.status(400).json({ message: "Token is required" });
     }
 
-    const decoded = jwt.verify(token, 'your_jwt_secret');
+    const decoded = jwt.verify(token, "your_jwt_secret");
     const user = await UserMain.findById(decoded.userId);
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     res.status(200).json({
@@ -3388,6 +3945,7 @@ app.post('/api/get-user-data', async (req, res) => {
       dept_name: user.dept_name,
       sect_name: user.sect_name,
       profile: user.profile,
+      face_photo: user.face_photo,
       roles: user.roles, 
       sub_roles: user.sub_roles, 
     });
@@ -3479,18 +4037,25 @@ app.post("/api/login", async (req, res) => {
       refreshToken,
       user: {
         emp_id: user.emp_id,
+        eng_name: user.eng_name,
+        kh_name: user.kh_name,
+        job_title: user.job_title,
+        dept_name: user.dept_name,
+        sect_name: user.sect_name,
         name: user.name,
         email: user.email,
         roles: user.roles,
         sub_roles: user.sub_roles,
-      },
+        profile: user.profile,
+        // profile: getProfileImageUrl(user), // Use helper function
+        face_photo: user.face_photo // Include face_photo
+      }
     });
   } catch (error) {
-    console.error("Login error:", error);
+    // console.error("Login error:", error);
     res.status(500).json({ message: "Failed to log in", error: error.message });
   }
 });
-
 
 /* ------------------------------
    Registration - Login Page ENDPOINTS
@@ -3603,7 +4168,7 @@ app.get("/api/user-profile", authenticateUser, async (req, res) => {
     // Use the custom uploaded image if available; otherwise use face_photo; else fallback.
     let profileImage = "";
     if (user.profile && user.profile.trim() !== "") {
-      profileImage = `http://localhost:5001/public/storage/profiles/${
+      profileImage = `${API_BASE_URL}/public/storage/profiles/${
         decoded.userId
       }/${path.basename(user.profile)}`;
     } else if (user.face_photo && user.face_photo.trim() !== "") {
@@ -3976,12 +4541,36 @@ app.get("/api/user-roles/:empId", async (req, res) => {
     const { empId } = req.params;
     const roles = [];
 
-    const userRoles = await RoleManagment.find({
-      "users.emp_id": empId,
+    // Check Super Admin role first
+    const superAdminRole = await RoleManagment.findOne({
+      role: "Super Admin",
+      "users.emp_id": empId
     });
 
-    userRoles.forEach((role) => {
-      roles.push(role.role);
+    if (superAdminRole) {
+      roles.push("Super Admin");
+      return res.json({ roles }); // Return early if Super Admin
+    }
+
+    // Check Admin role
+    const adminRole = await RoleManagment.findOne({
+      role: "Admin",
+      "users.emp_id": empId
+    });
+
+    if (adminRole) {
+      roles.push("Admin");
+      return res.json({ roles }); // Return early if Admin
+    }
+
+    // Get other roles
+    const otherRoles = await RoleManagment.find({
+      role: { $nin: ["Super Admin", "Admin"] },
+      "users.emp_id": empId
+    });
+
+    otherRoles.forEach((roleDoc) => {
+      roles.push(roleDoc.role);
     });
 
     res.json({ roles });

@@ -28,6 +28,7 @@ function MonoSearch({
           setIsDropdownOpen(true);
         } catch (error) {
           console.error("Search failed:", error);
+          setSuggestions([]);
         } finally {
           setIsLoading(false);
         }
@@ -56,21 +57,24 @@ function MonoSearch({
     };
   }, [closeOnOutsideClick]);
 
+  const handleSelect = (mono) => {
+    onSelect(mono);
+    setSearchTerm(mono); // Display the selected MO No in the input
+    setSuggestions([]);
+    setIsDropdownOpen(false);
+  };
+
   return (
     <div className="mb-4 relative" ref={searchRef}>
-      {/* <label className="block text-sm font-medium text-gray-700 mb-1">
-        ...
-      </label> */}
       <div className="relative">
         <input
           type="text"
           value={searchTerm}
           onChange={(e) => {
-            const digits = e.target.value.replace(/\D/g, "");
-            setSearchTerm(digits);
+            const input = e.target.value;
+            setSearchTerm(input); // Allow any input, not just digits
           }}
-          inputMode="numeric"
-          className={`w-full px-3 py-1 border ${
+          className={`w-full px-3 py-2 border ${
             isDropdownOpen ? "rounded-t-md" : "rounded-md"
           } border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500`}
           placeholder={placeholder}
@@ -88,12 +92,7 @@ function MonoSearch({
             <li
               key={mono}
               className="px-3 py-2 hover:bg-indigo-50 cursor-pointer transition-colors"
-              onClick={() => {
-                onSelect(mono);
-                setSuggestions([]);
-                setSearchTerm("");
-                setIsDropdownOpen(false);
-              }}
+              onClick={() => handleSelect(mono)}
             >
               <span className="font-mono">{mono}</span>
             </li>

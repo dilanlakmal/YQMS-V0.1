@@ -278,6 +278,10 @@ const QC2InspectionPage = () => {
           lineNo: data.lineNo,
           department: data.department,
           buyer: data.buyer,
+          factory: data.factory, // Added
+          country: data.country, // Added
+          sub_con: data.sub_con, // Added
+          sub_con_factory: data.sub_con_factory, // Added
           checkedQty: data.passQtyIron,
           totalPass: data.passQtyIron,
           totalRejects: 0,
@@ -641,6 +645,7 @@ const QC2InspectionPage = () => {
       chunks.forEach((chunk) => {
         const defectPrintId = generateGarmentDefectId();
         const totalRejectGarmentCount = chunk.length;
+        const totalRejectGarment_Var = totalRejectGarmentCount; // Set constant value
         const totalPrintDefectCount = chunk.reduce(
           (sum, garment) => sum + garment.totalCount,
           0
@@ -676,6 +681,7 @@ const QC2InspectionPage = () => {
           size: bundleData.size,
           bundleQty: bundleData.passQtyIron,
           totalRejectGarments: totalRejectGarmentCount,
+          totalRejectGarment_Var, // New field, remains constant
           totalDefectCount: totalPrintDefectCount,
           defects: printData,
           defect_print_id: defectPrintId,
@@ -699,6 +705,7 @@ const QC2InspectionPage = () => {
         method: "bundle",
         defect_print_id: qrCode.defect_print_id,
         totalRejectGarmentCount: qrCode.totalRejectGarments,
+        totalRejectGarment_Var: qrCode.totalRejectGarment_Var, // Remains constant
         totalPrintDefectCount: qrCode.totalDefectCount,
         repairGarmentsDefects: [],
         printData: qrCode.defects,

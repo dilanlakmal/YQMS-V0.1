@@ -11,19 +11,20 @@ export default function QRCodePreview({
 }) {
   const data = Array.isArray(qrData) ? qrData : [];
 
-  // Debugging logs to inspect data
-  // console.log("QRCodePreview Data:", data);
-  // data.forEach((item, index) => {
-    // console.log(`Item ${index}:`, item);
-    // console.log(
-    //   `Item ${index} defects source:`,
-    //   mode === "inspection"
-    //     ? item.defects
-    //     : mode === "garment"
-    //     ? item.rejectGarments?.[0]?.defects
-    //     : item.defects || item.printData
-    // );
-  // });
+  useEffect(() => {
+    console.log("QRCodePreview Data:", data);
+    data.forEach((item, index) => {
+      console.log(`Item ${index}:`, item);
+      console.log(
+        `Item ${index} defects source:`,
+        mode === "inspection"
+          ? item.defects
+          : mode === "garment"
+          ? item.rejectGarments?.[0]?.defects
+          : item.defects || item.printData
+      );
+    });
+  }, [data, mode]); // Only log when data or mode changes
 
   const handlePrint = async () => {
     try {

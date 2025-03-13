@@ -28,6 +28,7 @@ import QCSunriseReport from "./pages/QCSunriseReport.jsx";
 import Setting from "./pages/Setting";
 import WashingPage from "./pages/Washing";
 import RovingPage from "./pages/Roving";
+import DefectTrack from "./pages/DefectTrack.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -330,6 +331,7 @@ function AppContent() {
               <Route path="/live-dashboard" element={<LiveDashboard />} />
               <Route path="/qc1-sunrise" element={<QCSunriseReport />} />
               <Route path="/powerbi" element={<PowerBI />} />
+              <Route path="/qc2-repair-tracking" element={<DefectTrack />} />
               <Route
                 path="/bundle-registration"
                 element={<BundleRegistration />}

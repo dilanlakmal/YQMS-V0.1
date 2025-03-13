@@ -75,12 +75,16 @@ function Home() {
       setErrorMessage(t('Unauthorized Access'));
       setTimeout(() => {
         setErrorMessage('');
-      }, 1000);
+      }, 3000);
     }
   };
 
   if (loading || pageLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-xl text-gray-600">Loading...</div>
+      </div>
+    );
   }
 
   const cards = [
