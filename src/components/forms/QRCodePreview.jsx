@@ -1,6 +1,7 @@
 import { Dialog, Transition } from "@headlessui/react";
 import { QRCodeSVG } from "qrcode.react";
 import { Fragment } from "react";
+import { useEffect } from "react";
 
 export default function QRCodePreview({
   isOpen,

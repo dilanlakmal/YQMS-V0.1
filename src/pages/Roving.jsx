@@ -5,6 +5,7 @@ import { API_BASE_URL } from "../../config";
 import { useAuth } from '../components/authentication/AuthContext';
 import { XCircle } from 'lucide-react';
 import Swal from 'sweetalert2';
+import DatePicker from 'react-datepicker';
 
 const RovingPage = () => {
   const { user, loading: authLoading } = useAuth();
@@ -13,7 +14,7 @@ const RovingPage = () => {
   const [garments, setGarments] = useState([]);
   const [inspectionStartTime, setInspectionStartTime] = useState(null);
   const [currentGarmentIndex, setCurrentGarmentIndex] = useState(0);
-  const [currentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDefect, setSelectedDefect] = useState('');
   const [language, setLanguage] = useState('khmer');
   const [garmentQuantity, setGarmentQuantity] = useState(5);
@@ -143,6 +144,7 @@ const RovingPage = () => {
       inline_roving_id: Date.now(),
       report_name: 'QC Inline Roving',
       emp_id: user?.emp_id || 'Guest',
+      eng_name: user?.eng_name || 'Guest',
       inspection_date: currentDate.toLocaleDateString("en-US"),
       inlineData: [
         {
@@ -163,6 +165,7 @@ const RovingPage = () => {
 
     try {
       await axios.post(`${API_BASE_URL}/api/save-qc-inline-roving`, report);
+    //  console.log(report);
       Swal.fire({
         icon: 'success',
         title: 'Success',
@@ -224,7 +227,7 @@ const RovingPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 p-6">
-      <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-6">
+      <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6">
         <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">
           QC Inline Roving Inspection
         </h1>
@@ -251,10 +254,9 @@ const RovingPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Date</label>
-                  <input
-                    type="text"
-                    value={currentDate.toLocaleDateString()}
-                    readOnly
+                  <DatePicker
+                    selected={currentDate}
+                    onChange={(date) => setCurrentDate(date)}
                     className="mt-1 w-full p-2 border border-gray-300 rounded-lg bg-gray-100"
                   />
                 </div>
@@ -466,34 +468,50 @@ const RovingPage = () => {
               <thead className="bg-gray-200">
                 <tr>
                   {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th> */}
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-500">Report Name</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-500">Employee ID</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-500">Inspection Date</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-500">Inspection Time</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-500">Type</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-500">SPI</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-500">Checked Quantity</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-500">Quality Status</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-500">Total Defects</th>
+                  {/* <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border border-gray-500">Report Name</th> */}
+                  <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">Emp ID</th>
+                  <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">Emp Name</th>
+                  <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">Inspection Date</th>
+                  <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">Inspection Time</th>
+                  <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">Type</th>
+                  <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">SPI</th>
+                  <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">Checked Qty</th>
+                  <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">Quality Status</th>
+                  <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">Total Defects</th>
+                  <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">Details</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {reports.map((report) => (
                   <tr key={report.inline_roving_id}>
                     {/* <td className="px-6 py-4 whitespace-nowrap">{report.inline_roving_id}</td> */}
-                    <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">{report.report_name}</td>
-                    <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">{report.emp_id}</td>
-                    <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">{report.inspection_date}</td>
-                    <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">{report.inlineData[0].inspection_time}</td>
-                    <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">{report.inlineData[0].type}</td>
-                    <td className={`px-4 py-2 text-sm border border-gray-200 ${report.inlineData[0].spi === 'Pass' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-600'}`}>
+                    {/* <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">{report.report_name}</td> */}
+                    <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{report.emp_id}</td>
+                    <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{report.eng_name}</td>
+                    <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{report.inspection_date}</td>
+                    <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{report.inlineData[0].inspection_time}</td>
+                    <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{report.inlineData[0].type}</td>
+                    <td className={`px-2 py-1 text-sm border border-gray-200 ${report.inlineData[0].spi === 'Pass' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-600'}`}>
                       {report.inlineData[0].spi}
                     </td>
-                    <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">{report.inlineData[0].checked_quantity}</td>
-                    <td className={`px-4 py-2 text-sm border border-gray-200 ${report.inlineData[0].qualityStatus === 'Pass' ? 'text-green-600' : 'bg-red-100 text-red-600'}`}>
+                    <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{report.inlineData[0].checked_quantity}</td>
+                    <td className={`px-2 py-1 text-sm border border-gray-200 ${report.inlineData[0].qualityStatus === 'Pass' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-600'}`}>
                       {report.inlineData[0].qualityStatus}
                     </td>
-                    <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">{report.inlineData[0].rejectGarments[0].totalCount}</td>
+                    <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{report.inlineData[0].rejectGarments[0].totalCount}</td>
+                    <td className="px-2 py-1 text-xsm text-gray-700 border border-gray-200">
+                      {report.inlineData[0].rejectGarments[0].garments.map((garment, index) => (
+                        <div key={index}>
+                          <ul>
+                            {garment.defects.map((defect, defectIndex) => (
+                              <li key={defectIndex}>
+                                {defect.name} : {defect.count}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </td>
                   </tr>
                 ))}
               </tbody>

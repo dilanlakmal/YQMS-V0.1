@@ -21,6 +21,7 @@ import { API_BASE_URL } from "../../../config";
 import LanguageSwitcher from './LangSwitch';
 import { useTranslation } from 'react-i18next';
 
+
 export default function Navbar({ onLogout }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
