@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "../../components/inspection/Header";
-import ViewToggle from "../../components/inspection/ViewToggle";
-import DefectsList from "../../components/inspection/DefectsList";
-import Summary from "../../components/inspection/Summary";
+import Header from "../../components/inspection/qc1_inspection/Header";
+import ViewToggle from "../../components/inspection/qc1_inspection/ViewToggle";
+import DefectsList from "../../components/inspection/qc1_inspection/DefectsList";
+import Summary from "../../components/inspection/qc1_inspection/Summary";
 import { defectsList } from "../../constants/QC Inspection/defects";
 import FormatTime from "../../components/formatting/FormatTime";
 import { formatTimeString } from "../../components/formatting/FormatedTime";

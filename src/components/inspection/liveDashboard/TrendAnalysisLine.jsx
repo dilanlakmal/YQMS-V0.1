@@ -204,7 +204,7 @@ const TrendAnalysisLine = ({ data }) => {
             <>
               {/* Line No Row */}
               <tr
-                className={`hover:bg-blue-100 ${
+                className={`hover:bg-gray-400 ${
                   expandedLines[lineNo] ? "bg-black text-white" : ""
                 }`}
               >
@@ -216,7 +216,7 @@ const TrendAnalysisLine = ({ data }) => {
                   {lineNo}
                   <button
                     onClick={() => toggleLine(lineNo)}
-                    className="ml-2 text-blue-500 hover:text-blue-700 focus:outline-none"
+                    className="ml-2 text-blue-500 hover:text-blue-300 focus:outline-none"
                   >
                     {expandedLines[lineNo] ? "−" : "+"}
                   </button>
@@ -267,14 +267,13 @@ const TrendAnalysisLine = ({ data }) => {
               </tr>
 
               {/* MO No Rows (Expanded) */}
-              {/* MO No Rows (Expanded) */}
               {expandedLines[lineNo] &&
                 Object.keys(data[lineNo] || {})
                   .sort()
                   .map((moNo) => (
                     <>
                       <tr
-                        className={`hover:bg-gray-50 ${
+                        className={`hover:bg-gray-400 ${
                           expandedMos[`${lineNo}-${moNo}`]
                             ? "bg-gray-800 text-white"
                             : ""

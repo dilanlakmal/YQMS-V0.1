@@ -19,12 +19,13 @@
     "dyeing": "Dyeing",
     "ironing": "Ironing",
     "final_inspection": "Final Inspection",
+    "qc_inline_roving": "QC Inline Roving",
     "qc1_inspection": "QC1 Inspection",
     "qc2_inspection": "QC2 Inspection",
     "qa_audit_report": "QA Audit Report",
     "download_data": "Download Data",
     "live_dashboard": "Live Dashboard",
-    "qc_inline_roving":"QC Inline Roving"
+    "qc2_repair": "QC2 Repair Tracking"
   },
 
   "nav":{

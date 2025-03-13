@@ -160,7 +160,7 @@ function Home() {
         {
           path: "/roving",
           roles: ["Admin", "QC1"],
-          image: "/IMG/qcc.png",
+          image: "/IMG/roving.png",
           title:  t("home.qc_inline_roving"),
           description: "QC Inline Roving Check Point."
         },
@@ -170,6 +170,13 @@ function Home() {
           image: "/IMG/qcc.png",
           title:  t("home.qc1_inspection"),
           description: "QC1 Inspection Check Point."
+        },
+        {
+          path: "/qc2-repair-tracking",
+          roles: ["Admin", "QC2"],
+          image: "/IMG/repair.png",
+          title: t("home.qc2_repair"),
+          description: "QC2 Repair Tracking System."
         },
         {
           path: "/qc2-inspection",

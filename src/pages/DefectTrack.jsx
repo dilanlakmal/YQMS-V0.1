@@ -20,6 +20,7 @@ const DefectTrack = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [language, setLanguage] = useState("khmer"); // Default to Khmer
+  const [showScanner, setShowScanner] = useState(true); // State to control the visibility of the scanner
 
   const onScanSuccess = async (decodedText) => {
     setLoading(true);
@@ -32,7 +33,6 @@ const DefectTrack = () => {
         throw new Error("Failed to fetch defect data");
       }
       const data = await response.json();
-
       // Map defect names to selected language
       const mappedData = {
         ...data,
@@ -52,6 +52,7 @@ const DefectTrack = () => {
         }))
       };
       setScannedData(mappedData);
+      setShowScanner(false); // Hide the scanner section
     } catch (err) {
       setError(err.message);
     } finally {
@@ -100,6 +101,7 @@ const DefectTrack = () => {
     if (!scannedData) return;
 
     const repairArray = [];
+
     scannedData.garments.forEach((garment) => {
       garment.defects.forEach((defect) => {
         repairArray.push({
@@ -133,13 +135,12 @@ const DefectTrack = () => {
           repairArray
         })
       });
-
       if (!response.ok) {
         throw new Error("Failed to save repair tracking");
       }
-
       alert("Repair tracking saved successfully");
       setScannedData(null); // Reset scanned data to return to scanner window
+      setShowScanner(true); // Show the scanner section again
     } catch (err) {
       setError(err.message);
     }
@@ -147,6 +148,7 @@ const DefectTrack = () => {
 
   const handleCancel = () => {
     setScannedData(null); // Clear scanned data to return to scanner window
+    setShowScanner(true); // Show the scanner section again
   };
 
   const handleLanguageChange = (event) => {
@@ -176,14 +178,26 @@ const DefectTrack = () => {
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Defect Tracking</h1>
-
       {/* Language Selection Dropdown with Enhanced Styling */}
       <FormControl
         variant="outlined"
         className="mb-6" // Increased margin-bottom for spacing
         style={{ minWidth: 200 }}
       >
-        <InputLabel style={{ color: "#1976d2", fontWeight: "bold" }}>
+      </FormControl>
+      {showScanner && (
+        <QrCodeScannerRepair
+          onScanSuccess={onScanSuccess}
+          onScanError={onScanError}
+        />
+      )}
+      {loading && <p className="mt-4">Loading...</p>}
+      {error && <p className="mt-4 text-red-500">Error: {error}</p>}
+      {scannedData && (
+        <div className="mt-6">
+          <h2 className="text-xl font-semibold">Defect Card Details</h2>
+          <div className="mt-2">
+          <InputLabel style={{ color: "#1976d2", fontWeight: "bold" }}>
           Select Language
         </InputLabel>
         <Select
@@ -202,18 +216,6 @@ const DefectTrack = () => {
           <MenuItem value="khmer">Khmer</MenuItem>
           <MenuItem value="chinese">Chinese</MenuItem>
         </Select>
-      </FormControl>
-
-      <QrCodeScannerRepair
-        onScanSuccess={onScanSuccess}
-        onScanError={onScanError}
-      />
-      {loading && <p className="mt-4">Loading...</p>}
-      {error && <p className="mt-4 text-red-500">Error: {error}</p>}
-      {scannedData && (
-        <div className="mt-6">
-          <h2 className="text-xl font-semibold">Defect Card Details</h2>
-          <div className="grid grid-cols-2 gap-4 mt-2">
             <p>
               <strong>MO No:</strong> {scannedData.moNo}
             </p>

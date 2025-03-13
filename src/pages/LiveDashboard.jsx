@@ -1,51 +1,28 @@
 import axios from "axios";
-import {
-  BarElement,
-  CategoryScale,
-  Chart as ChartJS,
-  Legend,
-  LinearScale,
-  Title,
-  Tooltip,
-} from "chart.js";
-import ChartDataLabels from "chartjs-plugin-datalabels";
-import {
-  Archive,
-  BarChart,
-  CheckCircle,
-  Filter,
-  List,
-  PieChart,
-  Table as TableIcon,
-  TrendingDown,
-  XCircle,
-} from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
-import { Bar } from "react-chartjs-2";
-import { io } from "socket.io-client"; // Import Socket.io client
+import { io } from "socket.io-client";
 import { API_BASE_URL } from "../../config";
-import DateSelector from "../components/forms/QC Inspection/DateSelector"; // make sure this version does NOT render its own label
-import { useTranslation } from 'react-i18next';
-import LiveStyleCard from "../components/inspection/LiveStyleCard";
-import TrendAnalysisMO from "../components/inspection/TrendAnalysisMO"; // New component import
-import TrendAnalysisLine from "../components/inspection/TrendAnalysisLine";
-import NavigationPanel from "../components/inspection/NavigationPanel";
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ChartDataLabels
-);
+import React, { useEffect, useRef, useState } from "react";
+import LiveStyleCard from "../components/inspection/liveDashboard/LiveStyleCard";
+import LineCard from "../components/inspection/liveDashboard/LineCard";
+import TrendAnalysisMO from "../components/inspection/liveDashboard/TrendAnalysisMO";
+import TrendAnalysisLine from "../components/inspection/liveDashboard/TrendAnalysisLine";
+import TrendAnalysisLineDefects from "../components/inspection/liveDashboard/TrendAnalysisLineDefects";
+import NavigationPanel from "../components/inspection/liveDashboard/NavigationPanel";
+import LiveSummary from "../components/inspection/liveDashboard/LiveSummary";
+import SummaryCard from "../components/inspection/liveDashboard/SummaryCard";
+import DefectBarChart from "../components/inspection/liveDashboard/DefectBarChart";
+import MOBarChart from "../components/inspection/liveDashboard/MOBarChart";
+import LineBarChart from "../components/inspection/liveDashboard/LineBarChart";
+import FilterPane from "../components/inspection/liveDashboard/FilterPane";
+import { useTranslation } from "react-i18next";
 
 const LiveDashboard = () => {
   const { t } = useTranslation();
   const [activeSection, setActiveSection] = useState("Live Dashboard");
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [activeMoTab, setActiveMoTab] = useState("MO Summary"); // For MO Hr Trend tabs
+  const [activeLineTab, setActiveLineTab] = useState("Line Summary");
+  const [activeDashboardTab, setActiveDashboardTab] = useState("Bar Chart"); // For Live Dashboard tabs
 
   // Filter states
   const [startDate, setStartDate] = useState(null);
@@ -57,17 +34,7 @@ const LiveDashboard = () => {
   const [empId, setEmpId] = useState("");
   const [buyer, setBuyer] = useState("");
   const [lineNo, setLineNo] = useState("");
-  const [showFilters, setShowFilters] = useState(true);
   const [appliedFilters, setAppliedFilters] = useState({});
-
-  // Options for suggestions/dropdowns
-  const [moNoOptions, setMoNoOptions] = useState([]);
-  const [colorOptions, setColorOptions] = useState([]);
-  const [sizeOptions, setSizeOptions] = useState([]);
-  const [departmentOptions, setDepartmentOptions] = useState([]);
-  const [empIdOptions, setEmpIdOptions] = useState([]);
-  const [buyerOptions, setBuyerOptions] = useState([]);
-  const [lineNoOptions, setLineNoOptions] = useState([]);
 
   // Data states
   const [summaryData, setSummaryData] = useState({
@@ -83,7 +50,6 @@ const LiveDashboard = () => {
   const [moSummaries, setMoSummaries] = useState([]);
   const [hourlyDefectRates, setHourlyDefectRates] = useState({});
   const [lineDefectRates, setLineDefectRates] = useState({});
-  const [viewMode, setViewMode] = useState("chart");
 
   const filtersRef = useRef({});
 
@@ -94,25 +60,6 @@ const LiveDashboard = () => {
     const day = ("0" + date.getDate()).slice(-2);
     const year = date.getFullYear();
     return `${month}/${day}/${year}`;
-  };
-
-  // Fetch filter options
-  const fetchFilterOptions = async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/qc2-inspection-pass-bundle/filter-options`
-      );
-      const data = response.data;
-      setMoNoOptions(data.moNo || []);
-      setColorOptions(data.color || []);
-      setSizeOptions(data.size || []);
-      setDepartmentOptions(data.department || []);
-      setEmpIdOptions(data.emp_id_inspection || []);
-      setBuyerOptions(data.buyer || []);
-      setLineNoOptions(data.lineNo || []);
-    } catch (error) {
-      console.error("Error fetching filter options:", error);
-    }
   };
 
   // Fetch summary data
@@ -236,7 +183,6 @@ const LiveDashboard = () => {
     setBuyer("");
     setLineNo("");
     setAppliedFilters({});
-    filtersRef.current = {};
 
     await Promise.all([
       fetchSummaryData(),
@@ -250,7 +196,6 @@ const LiveDashboard = () => {
   // Initial data fetch
   useEffect(() => {
     const fetchInitialData = async () => {
-      await fetchFilterOptions();
       await Promise.all([
         fetchSummaryData(),
         fetchDefectRates(),
@@ -312,447 +257,44 @@ const LiveDashboard = () => {
     return () => socket.disconnect();
   }, []);
 
-  // Chart data and options
-  const maxDefectRateValue =
-    defectRates.length > 0
-      ? Math.max(...defectRates.map((item) => item.defectRate * 100)) + 2
-      : 10;
-
-  const chartData = {
-    labels: defectRates.map((item) => item.defectName),
-    datasets: [
-      {
-        label: "Defect Rate (%)",
-        data: defectRates.map((item) => (item.defectRate * 100).toFixed(2)),
-        backgroundColor: defectRates.map((item) => {
-          const rate = item.defectRate * 100;
-          if (rate > 5) return "rgba(220,20,60,0.8)"; // Dark Red
-          if (rate >= 1 && rate <= 5) return "rgba(255,165,0,0.8)"; // Orange
-          return "rgba(0,128,0,0.8)"; // Green
-        }),
-        datalabels: {
-          anchor: "end",
-          align: "top",
-          color: "black",
-          font: { weight: "bold", size: 12 },
-          formatter: (value) => `${value}%`
-        }
-      }
-    ]
-  };
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: {
-        ticks: { color: "black", autoSkip: false },
-        grid: { display: false }
-      },
-      y: {
-        max: maxDefectRateValue,
-        grid: { display: false },
-        beginAtZero: true
-      }
-    },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        callbacks: {
-          label: (context) => `${context.dataset.label}: ${context.parsed.y}%`
-        }
-      },
-      datalabels: { display: "auto" }
-    }
-  };
-
-  // Common Filter Pane Component
-  const FilterPane = () => (
-    <>
-      <div className="flex items-center justify-between bg-white p-2 rounded-lg shadow mb-2">
-        <div className="flex items-center space-x-2">
-          <Filter className="text-blue-500" size={20} />
-          <h2 className="text-lg font-medium text-gray-700">Filters</h2>
-        </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="text-blue-500 flex items-center hover:text-blue-600"
-        >
-          {showFilters ? "Hide" : "Show"}
-        </button>
-      </div>
-      {showFilters && (
-        <div className="bg-white p-4 rounded-lg shadow mb-6">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Start Date
-              </label>
-              <DateSelector
-                selectedDate={startDate}
-                hideLabel={true}
-                onChange={(date) => setStartDate(date)}
-              />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                End Date
-              </label>
-              <DateSelector
-                selectedDate={endDate}
-                hideLabel={true}
-                onChange={(date) => setEndDate(date)}
-              />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                MO No
-              </label>
-              <input
-                type="text"
-                value={moNo}
-                onChange={(e) => setMoNo(e.target.value)}
-                list="moNoOptions"
-                placeholder="Search MO No"
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              />
-              <datalist id="moNoOptions">
-                {moNoOptions
-                  .filter(
-                    (opt) =>
-                      opt && opt.toLowerCase().includes(moNo.toLowerCase())
-                  )
-                  .map((opt) => (
-                    <option key={opt} value={opt} />
-                  ))}
-              </datalist>
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Color
-              </label>
-              <select
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">Select Color</option>
-                {colorOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Size
-              </label>
-              <select
-                value={size}
-                onChange={(e) => setSize(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">Select Size</option>
-                {sizeOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mt-4">
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Department
-              </label>
-              <select
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">Select Department</option>
-                {departmentOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Emp ID
-              </label>
-              <input
-                type="text"
-                value={empId}
-                onChange={(e) => setEmpId(e.target.value)}
-                list="empIdOptions"
-                placeholder="Search Emp ID"
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              />
-              <datalist id="empIdOptions">
-                {empIdOptions
-                  .filter(
-                    (opt) =>
-                      opt && opt.toLowerCase().includes(empId.toLowerCase())
-                  )
-                  .map((opt) => (
-                    <option key={opt} value={opt} />
-                  ))}
-              </datalist>
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Buyer
-              </label>
-              <select
-                value={buyer}
-                onChange={(e) => setBuyer(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">Select Buyer</option>
-                {buyerOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Line No
-              </label>
-              <select
-                value={lineNo}
-                onChange={(e) => setLineNo(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">Select Line No</option>
-                {lineNoOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="flex justify-end mt-4 space-x-2">
-            <button
-              onClick={handleApplyFilters}
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-            >
-              Apply
-            </button>
-            <button
-              onClick={handleResetFilters}
-              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-      )}
-      {Object.keys(appliedFilters).length > 0 && (
-        <div className="mb-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">
-            Applied Filters:
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(appliedFilters).map(([key, value]) => (
-              <div
-                key={key}
-                className="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs"
-              >
-                {key}: {value}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </>
-  );
-
-  // Summary Cards Component
+  // Summary Cards Component (Common for all tabs)
   const SummaryCards = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-6">
-      <div className="p-6 bg-white shadow-md rounded-lg flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-700">Checked Qty</h2>
-          <p className="text-2xl font-bold text-gray-900">
-            {summaryData.checkedQty}
-          </p>
-        </div>
-        <CheckCircle className="text-green-500 text-3xl" />
-      </div>
-      <div className="p-6 bg-white shadow-md rounded-lg flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-700">Total Pass</h2>
-          <p className="text-2xl font-bold text-gray-900">
-            {summaryData.totalPass}
-          </p>
-        </div>
-        <CheckCircle className="text-green-500 text-3xl" />
-      </div>
-      <div className="p-6 bg-white shadow-md rounded-lg flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-700">Total Rejects</h2>
-          <p className="text-2xl font-bold text-gray-900">
-            {summaryData.totalRejects}
-          </p>
-        </div>
-        <XCircle className="text-red-500 text-3xl" />
-      </div>
-      <div className="p-6 bg-white shadow-md rounded-lg flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-700">Defects Qty</h2>
-          <p className="text-2xl font-bold text-gray-900">
-            {summaryData.defectsQty}
-          </p>
-        </div>
-        <List className="text-yellow-500 text-3xl" />
-      </div>
-      <div className="p-6 bg-white shadow-md rounded-lg flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-700">Total Bundles</h2>
-          <p className="text-2xl font-bold text-gray-900">
-            {summaryData.totalBundles}
-          </p>
-        </div>
-        <Archive className="text-blue-500 text-3xl" />
-      </div>
-      <div
-        className={`p-6 shadow-md rounded-lg flex items-center justify-between ${
-          summaryData.defectRate * 100 > 3
-            ? "bg-red-200"
-            : summaryData.defectRate * 100 >= 2
-            ? "bg-yellow-200"
-            : "bg-green-200"
-        }`}
-      >
-        <div>
-          <h2 className="text-lg font-semibold text-gray-700">Defect Rate</h2>
-          <p
-            className={`text-2xl font-bold ${
-              summaryData.defectRate * 100 > 3
-                ? "text-red-800"
-                : summaryData.defectRate * 100 >= 2
-                ? "text-orange-800"
-                : "text-green-800"
-            }`}
-          >
-            {(summaryData.defectRate * 100).toFixed(2)}%
-          </p>
-        </div>
-        <PieChart className="text-purple-500 text-3xl" />
-      </div>
-      <div
-        className={`p-6 shadow-md rounded-lg flex items-center justify-between ${
-          summaryData.defectRatio * 100 > 3
-            ? "bg-red-300"
-            : summaryData.defectRatio * 100 >= 2
-            ? "bg-yellow-300"
-            : "bg-green-300"
-        }`}
-      >
-        <div>
-          <h2 className="text-lg font-semibold text-gray-700">Defect Ratio</h2>
-          <p
-            className={`text-2xl font-bold ${
-              summaryData.defectRatio * 100 > 3
-                ? "text-red-800"
-                : summaryData.defectRatio * 100 >= 2
-                ? "text-orange-800"
-                : "text-green-800"
-            }`}
-          >
-            {(summaryData.defectRatio * 100).toFixed(2)}%
-          </p>
-        </div>
-        <TrendingDown className="text-orange-500 text-3xl" />
-      </div>
-    </div>
-  );
-
-  // Defect Rate Chart Component
-  const DefectRateChart = () => (
-    <div className="bg-white shadow-md rounded-lg p-6 overflow-auto">
-      <div className="flex justify-end mb-4">
-        <button
-          onClick={() => setViewMode("chart")}
-          className={`mr-2 p-2 rounded ${
-            viewMode === "chart" ? "bg-blue-500 text-white" : "bg-gray-200"
-          }`}
-        >
-          <BarChart className="text-gray-700" />
-        </button>
-        <button
-          onClick={() => setViewMode("table")}
-          className={`p-2 rounded ${
-            viewMode === "table" ? "bg-blue-500 text-white" : "bg-gray-200"
-          }`}
-        >
-          <TableIcon className="text-gray-700" />
-        </button>
-      </div>
-      {viewMode === "chart" ? (
-        <div style={{ height: "450px", width: "100%" }}>
-          <Bar data={chartData} options={chartOptions} />
-        </div>
-      ) : (
-        <div className="overflow-y-auto" style={{ maxHeight: "450px" }}>
-          <table className="min-w-full bg-white border-collapse block md:table">
-            <thead className="bg-blue-100">
-              <tr>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-left block md:table-cell">
-                  Defect Name
-                </th>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-left block md:table-cell">
-                  Rank
-                </th>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-left block md:table-cell">
-                  Defect Qty
-                </th>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-left block md:table-cell">
-                  Defect Rate (%)
-                </th>
-                <th className="py-2 px-4 border-b border-gray-200 font-bold text-left block md:table-cell">
-                  Level
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {defectRates.map((item) => (
-                <tr key={item.defectName} className="hover:bg-gray-100">
-                  <td className="py-2 px-4 border-b border-gray-200 block md:table-cell">
-                    {item.defectName}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-200 block md:table-cell">
-                    {item.rank}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-200 block md:table-cell">
-                    {item.totalCount}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-200 block md:table-cell">
-                    {(item.defectRate * 100).toFixed(2)}%
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-200 block md:table-cell">
-                    {item.defectRate * 100 > 5 ? (
-                      <span className="text-red-500 animate-ping">●</span>
-                    ) : item.defectRate * 100 >= 1 &&
-                      item.defectRate * 100 <= 5 ? (
-                      <span className="text-orange-500">●</span>
-                    ) : (
-                      <span className="text-green-500">●</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <SummaryCard
+        title="Checked Qty"
+        value={summaryData.checkedQty}
+        icon="checkCircle"
+      />
+      <SummaryCard
+        title="Total Pass"
+        value={summaryData.totalPass}
+        icon="checkCircle"
+      />
+      <SummaryCard
+        title="Total Rejects"
+        value={summaryData.totalRejects}
+        icon="xCircle"
+      />
+      <SummaryCard
+        title="Defects Qty"
+        value={summaryData.defectsQty}
+        icon="list"
+      />
+      <SummaryCard
+        title="Total Bundles"
+        value={summaryData.totalBundles}
+        icon="archive"
+      />
+      <SummaryCard
+        title="Defect Rate"
+        value={summaryData.defectRate * 100}
+        icon="pieChart"
+      />
+      <SummaryCard
+        title="Defect Ratio"
+        value={summaryData.defectRatio * 100}
+        icon="trendingDown"
+      />
     </div>
   );
 
@@ -789,7 +331,7 @@ const LiveDashboard = () => {
       {/* Main Content */}
       <div
         className={`flex-1 p-4 transition-all duration-300 ${
-          isNavOpen ? "ml-64" : "ml-0"
+          isNavOpen ? "ml-72" : "ml-0"
         }`}
       >
         <h1 className="text-2xl font-bold mb-4 text-center text-gray-800">
@@ -804,18 +346,102 @@ const LiveDashboard = () => {
           "Daily Summary",
           "Weekly Analysis",
           "Monthly Analysis"
-        ].includes(activeSection) && <FilterPane />}
+        ].includes(activeSection) && (
+          <FilterPane
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
+            moNo={moNo}
+            setMoNo={setMoNo}
+            color={color}
+            setColor={setColor}
+            size={size}
+            setSize={setSize}
+            department={department}
+            setDepartment={setDepartment}
+            empId={empId}
+            setEmpId={setEmpId}
+            buyer={buyer}
+            setBuyer={setBuyer}
+            lineNo={lineNo}
+            setLineNo={setLineNo}
+            appliedFilters={appliedFilters}
+            setAppliedFilters={setAppliedFilters}
+            onApplyFilters={handleApplyFilters}
+            onResetFilters={handleResetFilters}
+          />
+        )}
 
         {/* Section Content */}
         {activeSection === "Live Dashboard" && (
           <>
+            {/* Summary Cards (Common for all tabs) */}
             <SummaryCards />
-            <div className="mt-6">
-              <h2 className="text-sm font-medium text-gray-900 mb-2">
-                QC2 Defect Rate by Defect Name
-              </h2>
-              <DefectRateChart />
+
+            {/* Tabs for Live Dashboard */}
+            <div className="mb-4">
+              <button
+                onClick={() => setActiveDashboardTab("Bar Chart")}
+                className={`px-4 py-2 mr-2 rounded ${
+                  activeDashboardTab === "Bar Chart"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                Bar Chart
+              </button>
+              <button
+                onClick={() => setActiveDashboardTab("Summary Table")}
+                className={`px-4 py-2 mr-2 rounded ${
+                  activeDashboardTab === "Summary Table"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                Summary Table
+              </button>
+              <button
+                onClick={() => setActiveDashboardTab("Inspector Data")}
+                className={`px-4 py-2 rounded ${
+                  activeDashboardTab === "Inspector Data"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                Inspector Data
+              </button>
             </div>
+
+            {/* Tab Content */}
+            {activeDashboardTab === "Bar Chart" && (
+              <div className="mt-6">
+                <h2 className="text-sm font-medium text-gray-900 mb-2">
+                  QC2 Defect Rate by Defect Name
+                </h2>
+                <DefectBarChart defectRates={defectRates} />
+                <h2 className="text-sm font-medium text-gray-900 mt-6 mb-2">
+                  QC2 Defect Rate by MO No
+                </h2>
+                <MOBarChart filters={filtersRef.current} />
+                <h2 className="text-sm font-medium text-gray-900 mt-6 mb-2">
+                  QC2 Defect Rate by Line No
+                </h2>
+                <LineBarChart filters={filtersRef.current} />
+              </div>
+            )}
+
+            {activeDashboardTab === "Summary Table" && (
+              <div className="mt-6">
+                <LiveSummary filters={filtersRef.current} />
+              </div>
+            )}
+
+            {activeDashboardTab === "Inspector Data" && (
+              <div className="text-center mt-8 text-gray-700">
+                <h2 className="text-xl font-medium">Coming soon</h2>
+              </div>
+            )}
           </>
         )}
 
@@ -856,7 +482,97 @@ const LiveDashboard = () => {
         )}
 
         {activeSection === "Line Hr Trend" && (
-          <TrendAnalysisLine data={lineDefectRates} />
+          <>
+            <div className="mb-4">
+              <button
+                onClick={() => setActiveLineTab("Line Summary")}
+                className={`px-4 py-2 mr-2 rounded ${
+                  activeLineTab === "Line Summary"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                Line Summary
+              </button>
+              <button
+                onClick={() => setActiveLineTab("Line Trend")}
+                className={`px-4 py-2 mr-2 rounded ${
+                  activeLineTab === "Line Trend"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                Line-MO Trend
+              </button>
+              <button
+                onClick={() => setActiveLineTab("Line Rate")}
+                className={`px-4 py-2 mr-2 rounded ${
+                  activeLineTab === "Line Rate"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                Line Trend
+              </button>
+            </div>
+            {activeLineTab === "Line Summary" && (
+              <>
+                <SummaryCards />
+                <div className="mt-6">
+                  <h2 className="text-sm font-medium text-gray-900 mb-2">
+                    Line Summaries
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] gap-4">
+                    {Object.keys(lineDefectRates)
+                      .filter((key) => key !== "total" && key !== "grand")
+                      .filter((lineNum) => (lineNo ? lineNum === lineNo : true)) // Exact match filter using lineNo
+                      .map((lineNum) => ({
+                        lineNo: lineNum,
+                        defectRate: (() => {
+                          const moData = lineDefectRates[lineNum] || {};
+                          let totalCheckedQty = 0;
+                          let totalDefectsQty = 0;
+                          Object.keys(moData).forEach((moNum) => {
+                            if (moNum !== "totalRate") {
+                              Object.keys(moData[moNum]).forEach((hour) => {
+                                if (hour !== "totalRate") {
+                                  const hourData = moData[moNum][hour];
+                                  totalCheckedQty += hourData.checkedQty || 0;
+                                  totalDefectsQty += hourData.defects.reduce(
+                                    (sum, defect) => sum + defect.count,
+                                    0
+                                  );
+                                }
+                              });
+                            }
+                          });
+                          return totalCheckedQty > 0
+                            ? totalDefectsQty / totalCheckedQty
+                            : 0;
+                        })()
+                      }))
+                      .sort((a, b) => b.defectRate - a.defectRate) // Sort by defectRate descending
+                      .map(({ lineNo }) => (
+                        <LineCard
+                          key={lineNo}
+                          lineNo={lineNo}
+                          lineDefectRates={lineDefectRates}
+                        />
+                      ))}
+                  </div>
+                </div>
+              </>
+            )}
+            {activeLineTab === "Line Trend" && (
+              <TrendAnalysisLine data={lineDefectRates} />
+            )}
+            {activeLineTab === "Line Rate" && (
+              <TrendAnalysisLineDefects
+                data={lineDefectRates}
+                lineNo={lineNo}
+              />
+            )}
+          </>
         )}
 
         {["Order Data", "Washing", "Ironing", "OPA", "Packing"].includes(

@@ -5,12 +5,12 @@ import { useNavigate } from "react-router-dom";
 import FormatTime from "../../components/formatting/FormatTime";
 import { formatTimeString } from "../../components/formatting/FormatedTime";
 import HandleDownloadPDF from "../../components/handlefunc/HandleDownloadPDF";
-import DefectsList from "../../components/inspection/DefectsList";
-import Header from "../../components/inspection/Header";
-import PlayPauseButton from "../../components/inspection/PlayPauseButton";
-import PreviewModal from "../../components/inspection/PreviewModal";
-import Summary from "../../components/inspection/Summary";
-import ViewToggle from "../../components/inspection/ViewToggle";
+import DefectsList from "../../components/inspection/qc1_inspection/DefectsList";
+import Header from "../../components/inspection/qc1_inspection/Header";
+import PlayPauseButton from "../../components/inspection/qc1_inspection/PlayPauseButton";
+import PreviewModal from "../../components/inspection/preview/PreviewModal";
+import Summary from "../../components/inspection/qc1_inspection/Summary";
+import ViewToggle from "../../components/inspection/qc1_inspection/ViewToggle";
 import { defectsList } from "../../constants/QC Inspection/defects";
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "../../../config";

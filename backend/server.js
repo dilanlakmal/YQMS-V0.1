@@ -111,6 +111,7 @@ const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
 const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const QCInlineRoving =createQCInlineRovingModel(ymProdConnection);
 const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
+const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
 
 //-----------------------------END DATABASE CONNECTIONS------------------------------------------------//
 
@@ -2691,6 +2692,7 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
       size,
       department,
       buyer,
+      lineNo
     } = req.query;
 
     let match = {};
@@ -2704,6 +2706,7 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
     if (department) match.department = department;
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add lineNo filter
 
     if (startDate || endDate) {
       match.inspection_date = {};
@@ -2716,7 +2719,9 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
       { $match: match },
       {
         $group: {
-          _id: "$moNo",
+          //_id: "$moNo",
+          _id: { moNo: "$moNo", lineNo: "$lineNo" }, // Group by both moNo and lineNo
+          lineNo: { $first: "$lineNo" }, // Include lineNo using $first
           checkedQty: { $sum: "$checkedQty" },
           totalPass: { $sum: "$totalPass" },
           totalRejects: { $sum: "$totalRejects" },
@@ -2730,7 +2735,10 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
       },
       {
         $project: {
-          moNo: "$_id",
+          // moNo: "$_id",
+          // lineNo: 1, // Include lineNo in the output
+          moNo: "$_id.moNo", // Include moNo in the output
+          lineNo: "$_id.lineNo", // Include lineNo in the output
           checkedQty: 1,
           totalPass: 1,
           totalRejects: 1,
@@ -2761,7 +2769,8 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
           _id: 0,
         },
       },
-      { $sort: { moNo: 1 } },
+      { $sort: { moNo: 1, lineNo: 1 } } // Sort by moNo and then lineNo
+      // { $sort: { moNo: 1 } }
     ]);
 
     res.json(data);
@@ -3259,18 +3268,18 @@ app.get("/api/qc2-defect-rates-by-line", async (req, res) => {
               }
             }
           },
-          totalRate: {
-            $cond: [
-              { $eq: ["$totalCheckedQty", 0] },
-              0,
-              {
-                $multiply: [
-                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
-                  100
-                ]
-              }
-            ]
-          },
+          // totalRate: {
+          //   $cond: [
+          //     { $eq: ["$totalCheckedQty", 0] },
+          //     0,
+          //     {
+          //       $multiply: [
+          //         { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+          //         100
+          //       ]
+          //     }
+          //   ]
+          // },
           _id: 0
         }
       },
