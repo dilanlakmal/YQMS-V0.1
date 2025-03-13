@@ -1,6 +1,6 @@
 // src/components/inspection/PlayPauseButton.jsx
 import { FaPlay, FaPause } from "react-icons/fa";
-import FormatTime from "../formatting/FormatTime"; // Import FormatTime
+import FormatTime from "../../formatting/FormatTime"; // Import FormatTime
 
 function PlayPauseButton({ isPlaying, onToggle, timer }) {
   return (

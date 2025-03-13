@@ -5,12 +5,12 @@ import { useNavigate } from "react-router-dom";
 import FormatTime from "../components/formatting/FormatTime";
 import { formatTimeString } from "../components/formatting/FormatedTime";
 import HandleDownloadPDF from "../components/handlefunc/HandleDownloadPDF";
-import DefectsList from "../components/inspection/DefectsList";
-import Header from "../components/inspection/Header";
-import PlayPauseButton from "../components/inspection/PlayPauseButton";
-import PreviewModal from "../components/inspection/PreviewModal";
-import Summary from "../components/inspection/Summary";
-import ViewToggle from "../components/inspection/ViewToggle";
+import DefectsList from "../components/inspection/qc1_inspection/DefectsList";
+import Header from "../components/inspection/qc1_inspection/Header";
+import PlayPauseButton from "../components/inspection/qc1_inspection/PlayPauseButton";
+import PreviewModal from "../components/inspection/preview/PreviewModal";
+import Summary from "../components/inspection/qc1_inspection/Summary";
+import ViewToggle from "../components/inspection/qc1_inspection/ViewToggle";
 import { defectsList } from "../constants/defects";
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "../../config";
@@ -25,7 +25,7 @@ function Inspection({
   isPlaying,
   onPlayPause,
   sharedState = {},
-  onUpdateSharedState = () => {},
+  onUpdateSharedState = () => {}
 }) {
   const navigate = useNavigate();
   const [view, setView] = useState(savedState?.view || "list");
@@ -60,7 +60,7 @@ function Inspection({
       defectPieces,
       language,
       view,
-      hasDefectSelected,
+      hasDefectSelected
     });
   }, [
     defects,
@@ -70,7 +70,7 @@ function Inspection({
     defectPieces,
     language,
     view,
-    hasDefectSelected,
+    hasDefectSelected
   ]);
 
   // Convert the date field to an ISO string
@@ -79,7 +79,7 @@ function Inspection({
     date:
       savedState?.inspectionData?.date instanceof Date
         ? savedState.inspectionData.date.toISOString()
-        : savedState?.inspectionData?.date,
+        : savedState?.inspectionData?.date
   };
 
   const saveQCDataToBackend = async (qcData) => {
@@ -88,9 +88,9 @@ function Inspection({
       const response = await fetch(`${API_BASE_URL}/api/save-qc-data`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify(qcData),
+        body: JSON.stringify(qcData)
       });
 
       if (!response.ok) {
@@ -122,7 +122,7 @@ function Inspection({
         (sum, count) => sum + count,
         0
       ),
-      cumulativeDefectPieces: defectPieces,
+      cumulativeDefectPieces: defectPieces
     });
 
     const qcData = {
@@ -141,7 +141,7 @@ function Inspection({
       defectPieces: 0,
       defectArray: Object.entries(defects).map(([index, count]) => ({
         name: defectsList["english"][index].name,
-        count: count,
+        count: count
       })),
       cumulativeChecked: newCheckedQuantity,
       cumulativeDefects: Object.values(defects).reduce(
@@ -153,7 +153,7 @@ function Inspection({
       returnDefectList: [],
       returnDefectArray: sharedState.returnDefectArray || [],
       returnDefectQty: 0,
-      cumulativeReturnDefectQty: sharedState.cumulativeReturnDefectQty || 0,
+      cumulativeReturnDefectQty: sharedState.cumulativeReturnDefectQty || 0
     };
 
     // console.log("QC Data to be sent:", qcData); // Debugging line
@@ -185,7 +185,7 @@ function Inspection({
         name: defectsList["english"][index].name,
         count,
         timestamp: timer,
-        actualtime: currentTime.getTime(),
+        actualtime: currentTime.getTime()
       }));
 
     // Create a map of all defects (previous + current) by defect name
@@ -209,7 +209,7 @@ function Inspection({
     const mergedDefectArray = Array.from(defectMap.entries()).map(
       ([name, count]) => ({
         name,
-        count,
+        count
       })
     );
 
@@ -225,7 +225,7 @@ function Inspection({
       cumulativeGoodOutput: goodOutput,
       cumulativeDefectPieces: newDefectPieces,
       defectArray: mergedDefectArray,
-      currentDefectQty: totalDefects,
+      currentDefectQty: totalDefects
     });
 
     const qcData = {
@@ -250,7 +250,7 @@ function Inspection({
       returnDefectList: [],
       returnDefectArray: sharedState.returnDefectArray || [],
       returnDefectQty: 0,
-      cumulativeReturnDefectQty: sharedState.cumulativeReturnDefectQty || 0,
+      cumulativeReturnDefectQty: sharedState.cumulativeReturnDefectQty || 0
     };
 
     saveQCDataToBackend(qcData);
@@ -261,7 +261,7 @@ function Inspection({
       if (count > 0) {
         setDefects((prev) => ({
           ...prev,
-          [index]: (prev[index] || 0) + count,
+          [index]: (prev[index] || 0) + count
         }));
       }
     });
@@ -354,7 +354,7 @@ function Inspection({
                 onCurrentDefectUpdate={(index, value) => {
                   setCurrentDefectCount((prev) => ({
                     ...prev,
-                    [index]: value,
+                    [index]: value
                   }));
                 }}
                 onLogEntry={onLogEntry}

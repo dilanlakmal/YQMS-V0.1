@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import Header from "../components/inspection/Header";
+import Header from "../components/inspection/qc1_inspection/Header";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -10,7 +10,7 @@ import {
   Legend,
   LineElement,
   PointElement,
-  TimeScale,
+  TimeScale
 } from "chart.js";
 import { Bar, Line } from "react-chartjs-2";
 import { defectsList } from "../constants/defects";
@@ -25,7 +25,7 @@ import {
   faExchangeAlt,
   faChartLine,
   faChartBar,
-  faClock,
+  faClock
 } from "@fortawesome/free-solid-svg-icons";
 
 // Import category indices from defects.js
@@ -37,7 +37,7 @@ import {
   typeMeasurementDefectIndices,
   typeWashingDefectIndices,
   typeFinishingDefectIndices,
-  typeMiscellaneousDefectIndices,
+  typeMiscellaneousDefectIndices
 } from "../constants/defects";
 
 // Register Chart.js components
@@ -70,7 +70,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
     { name: "Measurement", indices: typeMeasurementDefectIndices },
     { name: "Washing", indices: typeWashingDefectIndices },
     { name: "Finishing", indices: typeFinishingDefectIndices },
-    { name: "Miscellaneous", indices: typeMiscellaneousDefectIndices },
+    { name: "Miscellaneous", indices: typeMiscellaneousDefectIndices }
   ];
 
   // Format time to HH:MM:SS
@@ -100,11 +100,11 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
     .map(([index, count]) => ({
       name: defectsList.english[index].name,
       rate:
-        checkedQuantity > 0 ? ((count / checkedQuantity) * 100).toFixed(2) : 0,
+        checkedQuantity > 0 ? ((count / checkedQuantity) * 100).toFixed(2) : 0
     }))
     .map((entry) => ({
       ...entry,
-      rate: parseFloat(entry.rate), // Convert rate to a number
+      rate: parseFloat(entry.rate) // Convert rate to a number
     }))
     .sort((a, b) => b.rate - a.rate); // Sort by defect rate in descending order
 
@@ -117,9 +117,9 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
         data: defectEntries.map((entry) => entry.rate),
         backgroundColor: "rgba(75, 192, 192, 0.2)",
         borderColor: "rgba(75, 192, 192, 1)",
-        borderWidth: 1,
-      },
-    ],
+        borderWidth: 1
+      }
+    ]
   };
 
   // Add data labels to the bar chart
@@ -134,40 +134,40 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
         formatter: (value) => `${value}%`, // Format the label as a percentage
         color: "black", // Label text color
         font: {
-          weight: "bold", // Make the label text bold
-        },
+          weight: "bold" // Make the label text bold
+        }
       },
       legend: {
-        display: false, // Hide legend for bar chart
-      },
+        display: false // Hide legend for bar chart
+      }
     },
     scales: {
       y: {
         beginAtZero: true,
         title: {
           display: true,
-          text: "Defect Rate (%)",
+          text: "Defect Rate (%)"
         },
         ticks: {
-          padding: 20, // Add padding to the top of the y-axis
+          padding: 20 // Add padding to the top of the y-axis
         },
-        suggestedMax: Math.max(...barChartData.datasets[0].data) + 10, // Add 10% buffer
+        suggestedMax: Math.max(...barChartData.datasets[0].data) + 10 // Add 10% buffer
       },
       x: {
         title: {
           display: true,
-          text: "Defect Name",
+          text: "Defect Name"
         },
         ticks: {
           autoSkip: false, // Ensure all labels are shown
           maxRotation: barChartData.labels.length > 8 ? 60 : 0, // Rotate labels if defect names > 8
-          minRotation: barChartData.labels.length > 8 ? 60 : 0, // Rotate labels if defect names > 8
+          minRotation: barChartData.labels.length > 8 ? 60 : 0 // Rotate labels if defect names > 8
         },
         grid: {
-          display: false, // Hide grid lines for the x-axis
-        },
-      },
-    },
+          display: false // Hide grid lines for the x-axis
+        }
+      }
+    }
   };
 
   // Prepare data for the line chart (defect rate vs. time)
@@ -245,7 +245,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
         cumulativeChecked,
         cumulativeDefects,
         defectRate,
-        isReject: logsUpToCurrentTime.some((log) => log.type === "reject"), // Flag for rejections
+        isReject: logsUpToCurrentTime.some((log) => log.type === "reject") // Flag for rejections
       });
     }
 
@@ -284,14 +284,14 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
           data: cumulativeData.map((data) => ({
             x: data.timestamp,
             y: data.defectRate,
-            isReject: data.isReject,
+            isReject: data.isReject
           })),
           borderColor: "rgba(255, 99, 132, 1)",
           backgroundColor: "rgba(255, 99, 132, 0.2)",
           borderWidth: 2,
-          fill: true,
-        },
-      ],
+          fill: true
+        }
+      ]
     };
   };
 
@@ -300,22 +300,22 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: true,
+        display: true
       },
       zoom: {
         zoom: {
           wheel: {
-            enabled: true, // Enable zoom with mouse wheel
+            enabled: true // Enable zoom with mouse wheel
           },
           pinch: {
-            enabled: true, // Enable zoom with pinch gesture
+            enabled: true // Enable zoom with pinch gesture
           },
-          mode: "x", // Zoom only on the X-axis
+          mode: "x" // Zoom only on the X-axis
         },
         pan: {
           enabled: true, // Enable panning
-          mode: "x", // Pan only on the X-axis
-        },
+          mode: "x" // Pan only on the X-axis
+        }
       },
       datalabels: {
         display: (context) => context.dataset.data[context.dataIndex].isReject,
@@ -324,23 +324,23 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
         },
         color: "black",
         font: {
-          weight: "bold",
-        },
-      },
+          weight: "bold"
+        }
+      }
     },
     scales: {
       y: {
         beginAtZero: true,
         title: {
           display: true,
-          text: "Defect Rate (%)",
+          text: "Defect Rate (%)"
         },
         ticks: {
           callback: (value) => `${value}%`, // Display Y-axis values as percentages
-          padding: 20, // Add padding to the top of the y-axis
+          padding: 20 // Add padding to the top of the y-axis
         },
         // Set a maximum value for the y-axis to ensure labels fit
-        suggestedMax: Math.max(...barChartData.datasets[0].data) + 10, // Add 10% buffer
+        suggestedMax: Math.max(...barChartData.datasets[0].data) + 10 // Add 10% buffer
       },
       x: {
         title: {
@@ -350,17 +350,17 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
               ? "Hour"
               : timeFilter === "min"
               ? "Minutes"
-              : "Time (HH:MM:SS)",
-        },
-      },
-    },
+              : "Time (HH:MM:SS)"
+        }
+      }
+    }
   };
 
   // Get unique defect names for the filter dropdown
   const defectNames = [
     ...new Set(
       Object.keys(defects).map((index) => defectsList.english[index].name)
-    ),
+    )
   ];
 
   // Calculate summary values
@@ -398,7 +398,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
 
     return {
       category: name,
-      defectRate,
+      defectRate
     };
   });
 
@@ -518,7 +518,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
               style={{
                 overflowX: defectEntries.length > 8 ? "auto" : "hidden", // Show scrollbar only if defect names > 10
                 height: "400px", // Fixed height for the chart container
-                width: "100%", // Full width of the parent container
+                width: "100%" // Full width of the parent container
               }}
             >
               {/* Bar chart with dynamic width */}
@@ -528,7 +528,7 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
                     defectEntries.length > 8
                       ? `${barChartData.labels.length * 100}px`
                       : "100%", // Set dynamic width if defect names > 10
-                  height: "100%", // Full height of the container
+                  height: "100%" // Full height of the container
                 }}
               >
                 <Bar
@@ -576,14 +576,14 @@ function Analytics({ savedState, defects, checkedQuantity, logsState }) {
               style={{
                 overflowX: "auto", // Enable horizontal scrolling
                 height: "400px", // Fixed height for the chart container
-                width: "100%", // Full width of the parent container
+                width: "100%" // Full width of the parent container
               }}
             >
               {/* Line chart with dynamic width */}
               <div
                 style={{
                   minWidth: `${getLineChartData().labels.length * 50}px`, // Dynamic width based on the number of labels
-                  height: "100%", // Full height of the container
+                  height: "100%" // Full height of the container
                 }}
               >
                 <Line data={getLineChartData()} options={lineChartOptions} />

@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FormatTime from "../components/formatting/FormatTime";
 import { formatTimeString } from "../components/formatting/FormatedTime";
-import DefectsList from "../components/inspection/DefectsList";
-import Header from "../components/inspection/Header";
-import Summary from "../components/inspection/Summary";
-import ViewToggle from "../components/inspection/ViewToggle";
+import DefectsList from "../components/inspection/qc1_inspection/DefectsList";
+import Header from "../components/inspection/qc1_inspection/Header";
+import Summary from "../components/inspection/qc1_inspection/Summary";
+import ViewToggle from "../components/inspection/qc1_inspection/ViewToggle";
 import { defectsList } from "../constants/defects";
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "../../config";
@@ -17,7 +17,7 @@ function Return({
   timer,
   isPlaying,
   sharedState = {},
-  onUpdateSharedState = () => {},
+  onUpdateSharedState = () => {}
 }) {
   const navigate = useNavigate();
   const [view, setView] = useState("list");
@@ -97,7 +97,7 @@ function Return({
       returnDefectQty,
       language,
       view,
-      hasDefectSelected,
+      hasDefectSelected
     });
   }, [
     returnDefects,
@@ -106,7 +106,7 @@ function Return({
     returnDefectQty,
     language,
     view,
-    hasDefectSelected,
+    hasDefectSelected
   ]);
 
   const formatTime = (seconds) => {
@@ -125,7 +125,7 @@ function Return({
     date:
       savedState?.inspectionData?.date instanceof Date
         ? savedState.inspectionData.date.toISOString()
-        : savedState?.inspectionData?.date,
+        : savedState?.inspectionData?.date
   };
 
   const saveQCDataToBackend = async (qcData) => {
@@ -133,9 +133,9 @@ function Return({
       const response = await fetch(`${API_BASE_URL}/api/save-qc-data`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify(qcData),
+        body: JSON.stringify(qcData)
       });
 
       if (!response.ok) {
@@ -160,9 +160,9 @@ function Return({
       returnDefectArray: Object.entries(returnDefects).map(
         ([index, count]) => ({
           name: defectsList["english"][index].name,
-          count: count,
+          count: count
         })
-      ),
+      )
     });
 
     const qcData = {
@@ -188,11 +188,11 @@ function Return({
       returnDefectArray: Object.entries(returnDefects).map(
         ([index, count]) => ({
           name: defectsList["english"][index].name,
-          count: count,
+          count: count
         })
       ),
       returnDefectQty: 0,
-      cumulativeReturnDefectQty: returnDefectQty,
+      cumulativeReturnDefectQty: returnDefectQty
     };
 
     saveQCDataToBackend(qcData);
@@ -221,29 +221,29 @@ function Return({
       returnDefectArray: Object.entries(returnDefects).map(
         ([index, count]) => ({
           name: defectsList["english"][index].name,
-          count: count + (currentDefectCount[index] || 0),
+          count: count + (currentDefectCount[index] || 0)
         })
-      ),
+      )
     });
 
     const returnDefectList = Object.entries(currentDefectCount)
       .filter(([_, count]) => count > 0)
       .map(([index, count]) => ({
         name: defectsList["english"][index].name,
-        count,
+        count
       }));
 
     const mergedReturnDefectArray = Object.entries(returnDefects)
       .map(([index, count]) => ({
         name: defectsList["english"][index].name,
-        count: count + (currentDefectCount[index] || 0),
+        count: count + (currentDefectCount[index] || 0)
       }))
       .concat(
         Object.entries(currentDefectCount)
           .filter(([index]) => !returnDefects[index])
           .map(([index, count]) => ({
             name: defectsList["english"][index].name,
-            count,
+            count
           }))
       )
       .reduce((acc, defect) => {
@@ -278,7 +278,7 @@ function Return({
       returnDefectList: returnDefectList,
       returnDefectArray: mergedReturnDefectArray,
       returnDefectQty: totalNewDefects,
-      cumulativeReturnDefectQty: newReturnDefectQty,
+      cumulativeReturnDefectQty: newReturnDefectQty
     };
 
     saveQCDataToBackend(qcData);
@@ -288,7 +288,7 @@ function Return({
       if (count > 0) {
         setReturnDefects((prev) => ({
           ...prev,
-          [index]: (prev[index] || 0) + count,
+          [index]: (prev[index] || 0) + count
         }));
       }
     });

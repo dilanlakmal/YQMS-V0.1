@@ -6,7 +6,7 @@ import {
   Minus,
   Plus,
   Upload,
-  Info,
+  Info
 } from "lucide-react";
 import { ImageUploadDialog } from "./ImageUploadDialog";
 import { ImagePreviewDialog } from "./ImagePreviewDialog";
@@ -22,9 +22,12 @@ import {
   MeasurementDefects,
   WashingDefects,
   FinishingDefects,
-  MiscellaneousDefects,
-} from "../../constants/defects";
-import { defectImages, defaultDefectImage } from "../../constants/defectimages";
+  MiscellaneousDefects
+} from "../../../constants/defects";
+import {
+  defectImages,
+  defaultDefectImage
+} from "../../../constants/defectimages";
 
 function DefectsList({
   view,
@@ -36,7 +39,7 @@ function DefectsList({
   onDefectSelect,
   currentDefectCount,
   onCurrentDefectUpdate,
-  isReturnView = false,
+  isReturnView = false
 }) {
   const defectItems = defectsList[language];
   const [activeCell, setActiveCell] = useState(null);
@@ -69,7 +72,7 @@ function DefectsList({
         defectItems
           .filter((item) => item.name && item.name.length > 0)
           .map((item) => item.name.split(" \\ ")[0].charAt(0).toUpperCase())
-      ),
+      )
     ].sort();
   } else {
     // For other languages, use the first letter of the defect name
@@ -78,7 +81,7 @@ function DefectsList({
         defectItems
           .filter((item) => item.name && item.name.length > 0)
           .map((item) => item.name.charAt(0).toUpperCase())
-      ),
+      )
     ].sort();
   }
 
@@ -321,7 +324,7 @@ function DefectsList({
       type: isIncrement ? "defect-add" : "defect-remove",
       defectName: defectItems[index].name,
       count: isIncrement ? 1 : -1,
-      timestamp: new Date().getTime(),
+      timestamp: new Date().getTime()
     });
   };
 
@@ -329,7 +332,7 @@ function DefectsList({
   const handleImageUpload = (index, images) => {
     setDefectImages((prev) => ({
       ...prev,
-      [index]: images,
+      [index]: images
     }));
   };
 
@@ -338,7 +341,7 @@ function DefectsList({
     const isSelected = currentDefectCount[index] > 0;
     return {
       border: isSelected ? "2px solid #ef4444" : "1px solid #e5e7eb",
-      transition: "all 0.2s ease-in-out",
+      transition: "all 0.2s ease-in-out"
     };
   };
 

@@ -1,7 +1,7 @@
 import { Dialog } from "@headlessui/react";
-import PreviewHeader from "./preview/PreviewHeader";
-import PreviewDefects from "./preview/PreviewDefects";
-import PreviewSummary from "./preview/PreviewSummary";
+import PreviewHeader from "./PreviewHeader";
+import PreviewDefects from "./PreviewDefects";
+import PreviewSummary from "./PreviewSummary";
 
 function PreviewModal({
   isOpen,
@@ -11,7 +11,7 @@ function PreviewModal({
   checkedQuantity,
   goodOutput,
   defectPieces,
-  language,
+  language
 }) {
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
