@@ -297,24 +297,52 @@ const LiveDashboard = () => {
   );
 
   // MO Card Summaries Component
-  const MoCardSummaries = () => (
-    <div className="mt-6">
-      <h2 className="text-sm font-medium text-gray-900 mb-2">
-        MO No Summaries
-      </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] gap-4">
-        {moSummaries
-          .sort((a, b) => b.defectRate - a.defectRate)
-          .map((summary) => (
-            <LiveStyleCard
-              key={summary.moNo}
-              moNo={summary.moNo}
-              summaryData={summary}
-            />
-          ))}
+  const MoCardSummaries = () => {
+    // Aggregate moSummaries by moNo
+    const aggregatedMoSummaries = moSummaries.reduce((acc, summary) => {
+      const { moNo, lineNo, ...rest } = summary;
+      const existing = acc.find((item) => item.moNo === moNo);
+      if (existing) {
+        existing.checkedQty += rest.checkedQty;
+        existing.totalPass += rest.totalPass;
+        existing.totalRejects += rest.totalRejects;
+        existing.defectsQty += rest.defectsQty;
+        existing.totalBundles += rest.totalBundles;
+        existing.defectiveBundles += rest.defectiveBundles;
+        existing.defectArray = [...existing.defectArray, ...rest.defectArray];
+        existing.defectRate =
+          existing.checkedQty > 0
+            ? existing.defectsQty / existing.checkedQty
+            : 0;
+        existing.defectRatio =
+          existing.checkedQty > 0
+            ? existing.totalRejects / existing.checkedQty
+            : 0;
+      } else {
+        acc.push({ moNo, ...rest });
+      }
+      return acc;
+    }, []);
+
+    return (
+      <div className="mt-6">
+        <h2 className="text-sm font-medium text-gray-900 mb-2">
+          MO No Summaries
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] gap-4">
+          {aggregatedMoSummaries
+            .sort((a, b) => b.defectRate - a.defectRate)
+            .map((summary) => (
+              <LiveStyleCard
+                key={summary.moNo}
+                moNo={summary.moNo}
+                summaryData={summary}
+              />
+            ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="flex min-h-screen bg-gray-100">

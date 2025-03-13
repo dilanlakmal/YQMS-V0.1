@@ -5,6 +5,7 @@ const qcInlineRovingSchema = new mongoose.Schema(
     inline_roving_id: { type: Number, required: true },
     report_name: { type: String, required: true },
     emp_id: { type: String, required: true },
+    eng_name: { type: String, required: true },
     inspection_date: { type: String, required: true },
     inlineData: [
       {

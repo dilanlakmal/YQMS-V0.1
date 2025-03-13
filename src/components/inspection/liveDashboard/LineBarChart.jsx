@@ -13,7 +13,9 @@ import ChartDataLabels from "chartjs-plugin-datalabels";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../config";
 import { ArrowsUpDownIcon } from "@heroicons/react/24/outline"; // Sort icon
+import annotationPlugin from "chartjs-plugin-annotation";
 
+// Register Chart.js components and plugins
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -21,7 +23,8 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  ChartDataLabels
+  ChartDataLabels,
+  annotationPlugin // Register Annotation plugin for KPI line
 );
 
 const LineBarChart = ({ filters }) => {
@@ -119,7 +122,7 @@ const LineBarChart = ({ filters }) => {
   // Determine the maximum defect rate for the Y-axis
   const maxDefectRateValue =
     sortedData.length > 0
-      ? Math.max(...sortedData.map((item) => item.defectRate)) + 2
+      ? Math.max(...sortedData.map((item) => item.defectRate), 3) + 2 // Ensure KPI line at 3% is visible
       : 10;
 
   // Chart data
@@ -153,10 +156,16 @@ const LineBarChart = ({ filters }) => {
     ]
   };
 
-  // Chart options
+  // Chart options with KPI line
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    layout: {
+      padding: {
+        right: 10, // Increased padding to ensure the label is fully visible
+        top: 20 // Add padding to the top for better spacing
+      }
+    },
     scales: {
       x: {
         ticks: {
@@ -177,6 +186,9 @@ const LineBarChart = ({ filters }) => {
           color: "black",
           font: { size: 14, weight: "bold" }
         }
+        // ticks: {
+        //   stepSize: 1 // Ensure the Y-axis has a step size that includes the 3% mark
+        // }
       }
     },
     plugins: {
@@ -186,7 +198,33 @@ const LineBarChart = ({ filters }) => {
           label: (context) => `${context.dataset.label}: ${context.parsed.y}%`
         }
       },
-      datalabels: { display: "auto" }
+      datalabels: { display: "auto" },
+      annotation: {
+        annotations: [
+          {
+            type: "line",
+            scaleID: "y", // Reference the Y-axis
+            value: 3, // Position the line at 3% on the Y-axis
+            borderColor: "rgba(0, 0, 255, 0.8)", // Blue color for KPI line
+            borderWidth: 2,
+            borderDash: [5, 5], // Dotted line
+            label: {
+              display: true, // Ensure the label is displayed
+              content: "KPI = 3%",
+              position: "end", // Position the label at the end of the line
+              backgroundColor: "rgba(0, 0, 255, 0.8)",
+              color: "white",
+              font: {
+                size: 12,
+                weight: "bold"
+              },
+              padding: 6, // Increased padding for better readability
+              xAdjust: 10, // Adjusted to ensure the label is fully visible
+              yAdjust: 0 // Keep the label aligned with the line
+            }
+          }
+        ]
+      }
     }
   };
 
@@ -236,7 +274,7 @@ const LineBarChart = ({ filters }) => {
       <div className="w-full h-[450px] relative">
         {sortedData.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500">
-            <h2> No data available</h2>
+            <h2>No data available</h2>
           </div>
         ) : (
           <Bar data={chartData} options={chartOptions} />

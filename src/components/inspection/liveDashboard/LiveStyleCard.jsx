@@ -29,7 +29,7 @@ const LiveStyleCard = ({ moNo, summaryData }) => {
     .map(([defectName, totalCount]) => ({
       defectName,
       totalCount,
-      defectRate: totalCount / totalCheckedQty,
+      defectRate: totalCount / totalCheckedQty
     }))
     .sort((a, b) => b.defectRate - a.defectRate)
     .slice(0, 5);

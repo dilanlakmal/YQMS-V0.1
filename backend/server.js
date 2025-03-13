@@ -3691,6 +3691,16 @@ app.post("/api/save-qc-inline-roving", async (req, res) => {
   }
 });
 
+// Endpoint to fetch QC Inline Roving reports
+app.get("/api/qc-inline-roving-reports", async (req, res) => {
+  try {
+    const reports = await QCInlineRoving.find();
+    res.json(reports);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching reports", error });
+  }
+});
+
 /* ------------------------------
    User Auth ENDPOINTS
 ------------------------------ */
