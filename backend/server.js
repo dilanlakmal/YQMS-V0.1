@@ -2599,7 +2599,8 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
       { $match: match },
       {
         $group: {
-          _id: "$moNo",
+          //_id: "$moNo",
+          _id: { moNo: "$moNo", lineNo: "$lineNo" }, // Group by both moNo and lineNo
           lineNo: { $first: "$lineNo" }, // Include lineNo using $first
           checkedQty: { $sum: "$checkedQty" },
           totalPass: { $sum: "$totalPass" },
@@ -2614,8 +2615,10 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
       },
       {
         $project: {
-          moNo: "$_id",
-          lineNo: 1, // Include lineNo in the output
+          // moNo: "$_id",
+          // lineNo: 1, // Include lineNo in the output
+          moNo: "$_id.moNo", // Include moNo in the output
+          lineNo: "$_id.lineNo", // Include lineNo in the output
           checkedQty: 1,
           totalPass: 1,
           totalRejects: 1,
@@ -2646,7 +2649,8 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
           _id: 0
         }
       },
-      { $sort: { moNo: 1 } }
+      { $sort: { moNo: 1, lineNo: 1 } } // Sort by moNo and then lineNo
+      // { $sort: { moNo: 1 } }
     ]);
 
     res.json(data);

@@ -11,6 +11,8 @@ import NavigationPanel from "../components/inspection/liveDashboard/NavigationPa
 import LiveSummary from "../components/inspection/liveDashboard/LiveSummary";
 import SummaryCard from "../components/inspection/liveDashboard/SummaryCard";
 import DefectBarChart from "../components/inspection/liveDashboard/DefectBarChart";
+import MOBarChart from "../components/inspection/liveDashboard/MOBarChart";
+import LineBarChart from "../components/inspection/liveDashboard/LineBarChart";
 import FilterPane from "../components/inspection/liveDashboard/FilterPane";
 
 const LiveDashboard = () => {
@@ -18,6 +20,7 @@ const LiveDashboard = () => {
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [activeMoTab, setActiveMoTab] = useState("MO Summary"); // For MO Hr Trend tabs
   const [activeLineTab, setActiveLineTab] = useState("Line Summary");
+  const [activeDashboardTab, setActiveDashboardTab] = useState("Bar Chart"); // For Live Dashboard tabs
 
   // Filter states
   const [startDate, setStartDate] = useState(null);
@@ -252,7 +255,7 @@ const LiveDashboard = () => {
     return () => socket.disconnect();
   }, []);
 
-  // Summary Cards Component
+  // Summary Cards Component (Common for all tabs)
   const SummaryCards = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-6">
       <SummaryCard
@@ -293,7 +296,7 @@ const LiveDashboard = () => {
     </div>
   );
 
-  // Mo Card Summaries Component
+  // MO Card Summaries Component
   const MoCardSummaries = () => (
     <div className="mt-6">
       <h2 className="text-sm font-medium text-gray-900 mb-2">
@@ -371,14 +374,72 @@ const LiveDashboard = () => {
         {/* Section Content */}
         {activeSection === "Live Dashboard" && (
           <>
+            {/* Summary Cards (Common for all tabs) */}
             <SummaryCards />
-            <div className="mt-6">
-              <h2 className="text-sm font-medium text-gray-900 mb-2">
-                QC2 Defect Rate by Defect Name
-              </h2>
-              <DefectBarChart defectRates={defectRates} />
-              <LiveSummary filters={filtersRef.current} />
+
+            {/* Tabs for Live Dashboard */}
+            <div className="mb-4">
+              <button
+                onClick={() => setActiveDashboardTab("Bar Chart")}
+                className={`px-4 py-2 mr-2 rounded ${
+                  activeDashboardTab === "Bar Chart"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                Bar Chart
+              </button>
+              <button
+                onClick={() => setActiveDashboardTab("Summary Table")}
+                className={`px-4 py-2 mr-2 rounded ${
+                  activeDashboardTab === "Summary Table"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                Summary Table
+              </button>
+              <button
+                onClick={() => setActiveDashboardTab("Inspector Data")}
+                className={`px-4 py-2 rounded ${
+                  activeDashboardTab === "Inspector Data"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                Inspector Data
+              </button>
             </div>
+
+            {/* Tab Content */}
+            {activeDashboardTab === "Bar Chart" && (
+              <div className="mt-6">
+                <h2 className="text-sm font-medium text-gray-900 mb-2">
+                  QC2 Defect Rate by Defect Name
+                </h2>
+                <DefectBarChart defectRates={defectRates} />
+                <h2 className="text-sm font-medium text-gray-900 mt-6 mb-2">
+                  QC2 Defect Rate by MO No
+                </h2>
+                <MOBarChart filters={filtersRef.current} />
+                <h2 className="text-sm font-medium text-gray-900 mt-6 mb-2">
+                  QC2 Defect Rate by Line No
+                </h2>
+                <LineBarChart filters={filtersRef.current} />
+              </div>
+            )}
+
+            {activeDashboardTab === "Summary Table" && (
+              <div className="mt-6">
+                <LiveSummary filters={filtersRef.current} />
+              </div>
+            )}
+
+            {activeDashboardTab === "Inspector Data" && (
+              <div className="text-center mt-8 text-gray-700">
+                <h2 className="text-xl font-medium">Coming soon</h2>
+              </div>
+            )}
           </>
         )}
 

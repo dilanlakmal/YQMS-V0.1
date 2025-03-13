@@ -38,8 +38,8 @@ const DefectBarChart = ({ defectRates }) => {
         data: defectRates.map((item) => (item.defectRate * 100).toFixed(2)),
         backgroundColor: defectRates.map((item) => {
           const rate = item.defectRate * 100;
-          if (rate > 5) return "rgba(220,20,60,0.8)"; // Dark Red
-          if (rate >= 1 && rate <= 5) return "rgba(255,165,0,0.8)"; // Orange
+          if (rate > 3) return "rgba(220,20,60,0.8)"; // Dark Red
+          if (rate >= 2 && rate <= 3) return "rgba(255,165,0,0.8)"; // Orange
           return "rgba(0,128,0,0.8)"; // Green
         }),
         datalabels: {
