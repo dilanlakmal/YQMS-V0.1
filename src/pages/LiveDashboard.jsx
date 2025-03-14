@@ -14,6 +14,7 @@ import DefectBarChart from "../components/inspection/liveDashboard/DefectBarChar
 import MOBarChart from "../components/inspection/liveDashboard/MOBarChart";
 import LineBarChart from "../components/inspection/liveDashboard/LineBarChart";
 import FilterPane from "../components/inspection/liveDashboard/FilterPane";
+import OrderData from "../components/inspection/liveDashboard/OrderData";
 
 const LiveDashboard = () => {
   const [activeSection, setActiveSection] = useState("Live Dashboard");
@@ -400,6 +401,7 @@ const LiveDashboard = () => {
         )}
 
         {/* Section Content */}
+        {activeSection === "Order Data" && <OrderData />}
         {activeSection === "Live Dashboard" && (
           <>
             {/* Summary Cards (Common for all tabs) */}
@@ -601,9 +603,7 @@ const LiveDashboard = () => {
           </>
         )}
 
-        {["Order Data", "Washing", "Ironing", "OPA", "Packing"].includes(
-          activeSection
-        ) && (
+        {["Washing", "Ironing", "OPA", "Packing"].includes(activeSection) && (
           <div className="text-center mt-8 text-gray-700">
             <h2 className="text-xl font-medium">Coming soon</h2>
           </div>
