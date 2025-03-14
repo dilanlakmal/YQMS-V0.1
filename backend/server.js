@@ -3858,6 +3858,454 @@ app.get("/api/qc2-orderdata-summary", async (req, res) => {
 });
 
 /* ------------------------------
+   QC2 Washing Live Dashboard
+------------------------------ */
+app.get("/api/washing-autocomplete", async (req, res) => {
+  try {
+    const { field, query } = req.query;
+
+    // Validate field
+    const validFields = [
+      "selectedMono",
+      "custStyle",
+      "buyer",
+      "color",
+      "size",
+      "emp_id_washing"
+    ];
+    if (!validFields.includes(field)) {
+      return res.status(400).json({ error: "Invalid field" });
+    }
+
+    // Build match stage for partial search (optional)
+    const match = {};
+    if (query) {
+      match[field] = { $regex: new RegExp(query.trim(), "i") };
+    }
+
+    const pipeline = [
+      { $match: match },
+      {
+        $group: {
+          _id: `$${field}`
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          value: "$_id"
+        }
+      },
+      { $sort: { value: 1 } },
+      ...(query ? [{ $limit: 10 }] : []) // Limit only when searching
+    ];
+
+    const results = await Washing.aggregate(pipeline);
+    const suggestions = results.map((item) => item.value).filter(Boolean);
+
+    res.json(suggestions);
+  } catch (error) {
+    console.error("Error fetching autocomplete suggestions:", error);
+    res.status(500).json({ error: "Failed to fetch suggestions" });
+  }
+});
+
+app.get("/api/washing-summary", async (req, res) => {
+  try {
+    const {
+      moNo,
+      custStyle, // Added for filtering
+      color,
+      size,
+      empId,
+      buyer,
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    let match = {};
+    if (moNo) match.selectedMono = { $regex: new RegExp(moNo.trim(), "i") };
+    if (custStyle)
+      match.custStyle = { $regex: new RegExp(custStyle.trim(), "i") };
+    if (color) match.color = { $regex: new RegExp(color.trim(), "i") };
+    if (size) match.size = { $regex: new RegExp(size.trim(), "i") };
+    if (empId) match.emp_id_washing = { $regex: new RegExp(empId.trim(), "i") };
+    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") };
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const pipeline = [
+      { $match: match },
+      {
+        $group: {
+          _id: {
+            moNo: "$selectedMono",
+            custStyle: "$custStyle",
+            buyer: "$buyer",
+            color: "$color",
+            size: "$size"
+          },
+          goodBundleQty: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_washing", 55] }, "$totalBundleQty", 0]
+            }
+          },
+          defectiveBundleQty: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_washing", 86] }, "$totalBundleQty", 0]
+            }
+          },
+          goodGarments: {
+            $sum: {
+              $cond: [
+                { $eq: ["$task_no_washing", 55] },
+                { $toInt: "$passQtyWash" },
+                0
+              ]
+            }
+          },
+          defectiveGarments: {
+            $sum: {
+              $cond: [
+                { $eq: ["$task_no_washing", 86] },
+                { $toInt: "$passQtyWash" },
+                0
+              ]
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          moNo: "$_id.moNo",
+          custStyle: "$_id.custStyle",
+          buyer: "$_id.buyer",
+          color: "$_id.color",
+          size: "$_id.size",
+          goodBundleQty: 1,
+          defectiveBundleQty: 1,
+          goodGarments: 1,
+          defectiveGarments: 1
+        }
+      },
+      { $sort: { moNo: 1 } },
+      {
+        $facet: {
+          tableData: [{ $skip: skip }, { $limit: limitNum }],
+          total: [{ $count: "count" }]
+        }
+      }
+    ];
+
+    const result = await Washing.aggregate(pipeline);
+    const tableData = result[0].tableData || [];
+    const total = result[0].total.length > 0 ? result[0].total[0].count : 0;
+
+    res.json({ tableData, total });
+  } catch (error) {
+    console.error("Error fetching washing summary:", error);
+    res.status(500).json({ error: "Failed to fetch washing summary" });
+  }
+});
+
+/* ------------------------------
+   Ironing Live Dashboard Endpoints
+------------------------------ */
+
+// Summary endpoint for IroningLive table
+app.get("/api/ironing-summary", async (req, res) => {
+  try {
+    const {
+      moNo,
+      custStyle,
+      color,
+      size,
+      empId,
+      buyer,
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    let match = {};
+    if (moNo) match.selectedMono = { $regex: new RegExp(moNo.trim(), "i") };
+    if (custStyle)
+      match.custStyle = { $regex: new RegExp(custStyle.trim(), "i") };
+    if (color) match.color = { $regex: new RegExp(color.trim(), "i") };
+    if (size) match.size = { $regex: new RegExp(size.trim(), "i") };
+    if (empId) match.emp_id_ironing = { $regex: new RegExp(empId.trim(), "i") };
+    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") };
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const pipeline = [
+      { $match: match },
+      {
+        $group: {
+          _id: {
+            moNo: "$selectedMono",
+            custStyle: "$custStyle",
+            buyer: "$buyer",
+            color: "$color",
+            size: "$size"
+          },
+          goodBundleQty: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_ironing", 53] }, "$totalBundleQty", 0]
+            }
+          },
+          defectiveBundleQty: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_ironing", 84] }, "$totalBundleQty", 0]
+            }
+          },
+          goodGarments: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_ironing", 53] }, "$passQtyIron", 0]
+            }
+          },
+          defectiveGarments: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_ironing", 84] }, "$passQtyIron", 0]
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          moNo: "$_id.moNo",
+          custStyle: "$_id.custStyle",
+          buyer: "$_id.buyer",
+          color: "$_id.color",
+          size: "$_id.size",
+          goodBundleQty: 1,
+          defectiveBundleQty: 1,
+          goodGarments: 1,
+          defectiveGarments: 1
+        }
+      },
+      { $sort: { moNo: 1 } },
+      {
+        $facet: {
+          tableData: [{ $skip: skip }, { $limit: limitNum }],
+          total: [{ $count: "count" }]
+        }
+      }
+    ];
+
+    const result = await Ironing.aggregate(pipeline);
+    const tableData = result[0].tableData || [];
+    const total = result[0].total.length > 0 ? result[0].total[0].count : 0;
+
+    res.json({ tableData, total });
+  } catch (error) {
+    console.error("Error fetching ironing summary:", error);
+    res.status(500).json({ error: "Failed to fetch ironing summary" });
+  }
+});
+
+// Autocomplete endpoint for IroningLive filters
+app.get("/api/ironing-autocomplete", async (req, res) => {
+  try {
+    const { field, query } = req.query;
+
+    const validFields = [
+      "selectedMono",
+      "custStyle",
+      "buyer",
+      "color",
+      "size",
+      "emp_id_ironing"
+    ];
+    if (!validFields.includes(field)) {
+      return res.status(400).json({ error: "Invalid field" });
+    }
+
+    const match = {};
+    if (query) {
+      match[field] = { $regex: new RegExp(query.trim(), "i") };
+    }
+
+    const pipeline = [
+      { $match: match },
+      {
+        $group: {
+          _id: `$${field}`
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          value: "$_id"
+        }
+      },
+      { $sort: { value: 1 } },
+      ...(query ? [{ $limit: 10 }] : [])
+    ];
+
+    const results = await Ironing.aggregate(pipeline);
+    const suggestions = results.map((item) => item.value).filter(Boolean);
+
+    res.json(suggestions);
+  } catch (error) {
+    console.error("Error fetching ironing autocomplete suggestions:", error);
+    res.status(500).json({ error: "Failed to fetch suggestions" });
+  }
+});
+
+/* ------------------------------
+   OPA Live Dashboard Endpoints
+------------------------------ */
+
+// Summary endpoint for OPALive table
+app.get("/api/opa-summary", async (req, res) => {
+  try {
+    const {
+      moNo,
+      custStyle,
+      color,
+      size,
+      empId,
+      buyer,
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    let match = {};
+    if (moNo) match.selectedMono = { $regex: new RegExp(moNo.trim(), "i") };
+    if (custStyle)
+      match.custStyle = { $regex: new RegExp(custStyle.trim(), "i") };
+    if (color) match.color = { $regex: new RegExp(color.trim(), "i") };
+    if (size) match.size = { $regex: new RegExp(size.trim(), "i") };
+    if (empId) match.emp_id_opa = { $regex: new RegExp(empId.trim(), "i") };
+    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") };
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const pipeline = [
+      { $match: match },
+      {
+        $group: {
+          _id: {
+            moNo: "$selectedMono",
+            custStyle: "$custStyle",
+            buyer: "$buyer",
+            color: "$color",
+            size: "$size"
+          },
+          goodBundleQty: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_opa", 60] }, "$totalBundleQty", 0]
+            }
+          },
+          defectiveBundleQty: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_opa", 85] }, "$totalBundleQty", 0]
+            }
+          },
+          goodGarments: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_opa", 60] }, "$passQtyOPA", 0]
+            }
+          },
+          defectiveGarments: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_opa", 85] }, "$passQtyOPA", 0]
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          moNo: "$_id.moNo",
+          custStyle: "$_id.custStyle",
+          buyer: "$_id.buyer",
+          color: "$_id.color",
+          size: "$_id.size",
+          goodBundleQty: 1,
+          defectiveBundleQty: 1,
+          goodGarments: 1,
+          defectiveGarments: 1
+        }
+      },
+      { $sort: { moNo: 1 } },
+      {
+        $facet: {
+          tableData: [{ $skip: skip }, { $limit: limitNum }],
+          total: [{ $count: "count" }]
+        }
+      }
+    ];
+
+    const result = await OPA.aggregate(pipeline);
+    const tableData = result[0].tableData || [];
+    const total = result[0].total.length > 0 ? result[0].total[0].count : 0;
+
+    res.json({ tableData, total });
+  } catch (error) {
+    console.error("Error fetching OPA summary:", error);
+    res.status(500).json({ error: "Failed to fetch OPA summary" });
+  }
+});
+
+// Autocomplete endpoint for OPALive filters
+app.get("/api/opa-autocomplete", async (req, res) => {
+  try {
+    const { field, query } = req.query;
+
+    const validFields = [
+      "selectedMono",
+      "custStyle",
+      "buyer",
+      "color",
+      "size",
+      "emp_id_opa"
+    ];
+    if (!validFields.includes(field)) {
+      return res.status(400).json({ error: "Invalid field" });
+    }
+
+    const match = {};
+    if (query) {
+      match[field] = { $regex: new RegExp(query.trim(), "i") };
+    }
+
+    const pipeline = [
+      { $match: match },
+      {
+        $group: {
+          _id: `$${field}`
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          value: "$_id"
+        }
+      },
+      { $sort: { value: 1 } },
+      ...(query ? [{ $limit: 10 }] : [])
+    ];
+
+    const results = await OPA.aggregate(pipeline);
+    const suggestions = results.map((item) => item.value).filter(Boolean);
+
+    res.json(suggestions);
+  } catch (error) {
+    console.error("Error fetching OPA autocomplete suggestions:", error);
+    res.status(500).json({ error: "Failed to fetch suggestions" });
+  }
+});
+
+/* ------------------------------
    QC Inline Roving ENDPOINTS
 ------------------------------ */
 app.post("/api/save-qc-inline-roving", async (req, res) => {

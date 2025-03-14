@@ -15,6 +15,9 @@ import MOBarChart from "../components/inspection/liveDashboard/MOBarChart";
 import LineBarChart from "../components/inspection/liveDashboard/LineBarChart";
 import FilterPane from "../components/inspection/liveDashboard/FilterPane";
 import OrderData from "../components/inspection/liveDashboard/OrderData";
+import WashingLive from "../components/inspection/liveDashboard/WashingLive";
+import IroningLive from "../components/inspection/liveDashboard/IroningLive";
+import OPALive from "../components/inspection/liveDashboard/OPALive";
 
 const LiveDashboard = () => {
   const [activeSection, setActiveSection] = useState("Live Dashboard");
@@ -402,6 +405,9 @@ const LiveDashboard = () => {
 
         {/* Section Content */}
         {activeSection === "Order Data" && <OrderData />}
+        {activeSection === "Washing" && <WashingLive />}
+        {activeSection === "Ironing" && <IroningLive />}
+        {activeSection === "OPA" && <OPALive />}
         {activeSection === "Live Dashboard" && (
           <>
             {/* Summary Cards (Common for all tabs) */}
@@ -603,7 +609,7 @@ const LiveDashboard = () => {
           </>
         )}
 
-        {["Washing", "Ironing", "OPA", "Packing"].includes(activeSection) && (
+        {["Packing"].includes(activeSection) && (
           <div className="text-center mt-8 text-gray-700">
             <h2 className="text-xl font-medium">Coming soon</h2>
           </div>

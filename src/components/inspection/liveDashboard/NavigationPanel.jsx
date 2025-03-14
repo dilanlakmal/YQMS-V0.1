@@ -32,7 +32,7 @@ const NavigationPanel = ({
       name: "QC2",
       icon: <BarChart size={18} />,
       subMenus: [
-        { name: "Live TV", icon: <BarChart size={16} /> }, // Added Live TV as first submenu
+        // { name: "Live TV", icon: <BarChart size={16} /> }, // Added Live TV as first submenu
         { name: "Live Dashboard", icon: <BarChart size={16} /> },
         { name: "MO Hr Trend", icon: <Clock size={16} /> },
         { name: "Line Hr Trend", icon: <TrendingUp size={16} /> },
