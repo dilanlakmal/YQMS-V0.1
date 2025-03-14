@@ -3075,7 +3075,19 @@ app.get("/api/qc2-defect-rates-by-line", async (req, res) => {
               moNo: "$_id.moNo",
               hours: "$hours",
               totalCheckedQty: "$totalCheckedQty",
-              totalDefectQty: "$totalDefectQty"
+              totalDefectQty: "$totalDefectQty",
+              totalRate: {
+                $cond: [
+                  { $eq: ["$totalCheckedQty", 0] },
+                  0,
+                  {
+                    $multiply: [
+                      { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                      100
+                    ]
+                  }
+                ]
+              }
             }
           },
           totalCheckedQty: { $sum: "$totalCheckedQty" },
@@ -3126,40 +3138,24 @@ app.get("/api/qc2-defect-rates-by-line", async (req, res) => {
                         }
                       }
                     },
-                    totalRate: {
-                      $cond: [
-                        { $eq: ["$$mo.totalCheckedQty", 0] },
-                        0,
-                        {
-                          $multiply: [
-                            {
-                              $divide: [
-                                "$$mo.totalDefectQty",
-                                "$$mo.totalCheckedQty"
-                              ]
-                            },
-                            100
-                          ]
-                        }
-                      ]
-                    }
+                    totalRate: "$$mo.totalRate"
                   }
                 }
               }
             }
           },
-          // totalRate: {
-          //   $cond: [
-          //     { $eq: ["$totalCheckedQty", 0] },
-          //     0,
-          //     {
-          //       $multiply: [
-          //         { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
-          //         100
-          //       ]
-          //     }
-          //   ]
-          // },
+          totalRate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                  100
+                ]
+              }
+            ]
+          },
           _id: 0
         }
       },
