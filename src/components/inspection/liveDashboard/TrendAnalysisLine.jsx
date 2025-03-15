@@ -168,7 +168,9 @@ const TrendAnalysisLine = ({ data }) => {
     const trends = {};
     lineNos.forEach((lineNo) => {
       trends[lineNo] = {};
-      const moNos = Object.keys((data || {})[lineNo] || {}).sort();
+      const moNos = Object.keys((data || {})[lineNo] || {})
+        .filter((key) => key !== "totalRate")
+        .sort();
       moNos.forEach((moNo) => {
         const defectsByName = {};
         const totalCheckedQty = activeHours.reduce(
@@ -382,7 +384,33 @@ const TrendAnalysisLine = ({ data }) => {
   // Download PDF
   const downloadPDF = () => {
     try {
-      const { exportData, ratesMap } = prepareExportData();
+      // Use the current state values explicitly to avoid initialization issues
+      const currentExpandedLines = { ...expandedLines };
+      const currentExpandedMos = { ...expandedMos };
+      const { exportData, ratesMap } = prepareExportData(
+        currentExpandedLines,
+        currentExpandedMos
+      );
+
+      // Calculate defect count per MO No for accurate row mapping
+      const defectCountPerMoNo = {};
+      lineNos.forEach((lineNo) => {
+        const moNos = Object.keys((data || {})[lineNo] || {}).filter(
+          (key) => key !== "totalRate"
+        );
+        let moRowOffset = 0;
+        moNos.forEach((moNo) => {
+          defectCountPerMoNo[`${lineNo}-${moNo}`] = {
+            count: ((defectTrendsByLineMo[lineNo] || {})[moNo] || []).length,
+            offset: moRowOffset
+          };
+          moRowOffset +=
+            1 +
+            (((defectTrendsByLineMo[lineNo] || {})[moNo] || []).length || 0);
+        });
+        defectCountPerMoNo[lineNo] = moRowOffset;
+      });
+
       const doc = new jsPDF({
         orientation: "landscape"
       });
@@ -412,18 +440,73 @@ const TrendAnalysisLine = ({ data }) => {
           const rate = ratesMap.get(`${rowIndex}-${colIndex}`) || 0;
           const isTotalRow = rowIndex === exportData.length - 1;
 
-          // Apply background and font colors based on rate
+          // Determine which Line No and MO No this row corresponds to
+          let currentLineNo = null;
+          let currentMoNo = null;
+          let cumulativeRows = 4; // Start after title, empty row, and headers
+          for (const lineNo of lineNos) {
+            cumulativeRows += 1; // For the Line No row
+            if (rowIndex === cumulativeRows - 1) {
+              currentLineNo = lineNo;
+              break;
+            }
+            const moNos = Object.keys((data || {})[lineNo] || {})
+              .filter((key) => key !== "totalRate")
+              .sort();
+            for (const moNo of moNos) {
+              const defectCount = (
+                (defectTrendsByLineMo[lineNo] || {})[moNo] || []
+              ).length;
+              const moRows = 1 + defectCount; // 1 for MO No row + defect rows
+              if (
+                rowIndex >= cumulativeRows &&
+                rowIndex < cumulativeRows + moRows
+              ) {
+                currentLineNo = lineNo;
+                currentMoNo = moNo;
+                break;
+              }
+              cumulativeRows += moRows;
+            }
+            if (currentLineNo) break;
+          }
+
+          // Apply background and font colors based on rate and expanded state
           if (data.section === "body") {
             if (colIndex === 0) {
               // First column (Line No / MO No)
-              data.cell.styles.fillColor =
-                rowIndex === exportData.length - 1
-                  ? [173, 216, 230]
-                  : [255, 255, 255]; // White or light blue for total row
-              data.cell.styles.textColor = [55, 65, 81]; // text-gray-700
+              if (isTotalRow) {
+                data.cell.styles.fillColor = [173, 216, 230]; // Light blue for total row
+                data.cell.styles.textColor = [55, 65, 81]; // text-gray-700
+              } else if (
+                currentLineNo &&
+                currentExpandedLines[currentLineNo] &&
+                !currentMoNo
+              ) {
+                data.cell.styles.fillColor = [0, 0, 0]; // Black for expanded Line No
+                data.cell.styles.textColor = [255, 255, 255]; // White text
+              } else if (
+                currentLineNo &&
+                currentMoNo &&
+                currentExpandedLines[currentLineNo] &&
+                currentExpandedMos[`${currentLineNo}-${currentMoNo}`]
+              ) {
+                data.cell.styles.fillColor = [31, 41, 55]; // Gray-800/light black for expanded MO No
+                data.cell.styles.textColor = [255, 255, 255]; // White text
+              } else {
+                data.cell.styles.fillColor = [255, 255, 255]; // White for unexpanded
+                data.cell.styles.textColor = [55, 65, 81]; // text-gray-700
+              }
             } else {
               // Rate columns
-              if (rate > 0) {
+              const hasCheckedQty =
+                data.row.raw &&
+                data.row.raw[colIndex] &&
+                data.row.raw[colIndex].includes("%");
+              if (hasCheckedQty && rate === 0) {
+                data.cell.styles.fillColor = [204, 255, 204]; // Light green for rate = 0 with data
+                data.cell.styles.textColor = [0, 102, 0]; // Dark green
+              } else if (rate > 0) {
                 data.cell.styles.fillColor = getBackgroundColorRGB(rate);
                 data.cell.styles.textColor = getFontColorRGB(rate);
               } else {
@@ -593,6 +676,7 @@ const TrendAnalysisLine = ({ data }) => {
                 {/* MO No Rows (Expanded) */}
                 {expandedLines[lineNo] &&
                   Object.keys((data || {})[lineNo] || {})
+                    .filter((key) => key !== "totalRate")
                     .sort()
                     .map((moNo) => (
                       <>
