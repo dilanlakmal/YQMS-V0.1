@@ -36,7 +36,7 @@ const MOBarChart = ({ filters }) => {
   const fetchMoDefectRates = async (filters = {}) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/qc2-mo-summaries`, {
-        params: filters
+        params: { ...filters, groupByMO: "true" } // Add groupByMO parameter //filters
       });
       // Map and sort by defectRate in descending order
       const sortedData = response.data

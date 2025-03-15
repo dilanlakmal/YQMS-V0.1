@@ -74,6 +74,16 @@ const LiveDashboard = () => {
       setSummaryData(response.data);
     } catch (error) {
       console.error("Error fetching summary data:", error);
+      // Reset summary data to default values on error
+      setSummaryData({
+        checkedQty: 0,
+        totalPass: 0,
+        totalRejects: 0,
+        defectsQty: 0,
+        totalBundles: 0,
+        defectRate: 0,
+        defectRatio: 0
+      });
     }
   };
 
@@ -103,13 +113,23 @@ const LiveDashboard = () => {
   const fetchMoSummaries = async (filters = {}) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/qc2-mo-summaries`, {
-        params: filters
+        params: { ...filters, groupByMO: "true" }
       });
       setMoSummaries(response.data);
     } catch (error) {
       console.error("Error fetching MO summaries:", error);
     }
   };
+  // const fetchMoSummaries = async (filters = {}) => {
+  //   try {
+  //     const response = await axios.get(`${API_BASE_URL}/api/qc2-mo-summaries`, {
+  //       params: filters
+  //     });
+  //     setMoSummaries(response.data);
+  //   } catch (error) {
+  //     console.error("Error fetching MO summaries:", error);
+  //   }
+  // };
 
   // Fetch Hourly Defect Rates by MO No
   const fetchHourlyDefectRates = async (filters = {}) => {
@@ -140,7 +160,8 @@ const LiveDashboard = () => {
   // Apply Filters
   const handleApplyFilters = async () => {
     const filters = {};
-    if (moNo) filters.moNo = moNo;
+    if (moNo && moNo.trim()) filters.moNo = moNo; // Only include moNo if it has a value
+    //if (moNo) filters.moNo = moNo;
     if (color) filters.color = color;
     if (size) filters.size = size;
     if (department) filters.department = department;
@@ -302,39 +323,13 @@ const LiveDashboard = () => {
 
   // MO Card Summaries Component
   const MoCardSummaries = () => {
-    // Aggregate moSummaries by moNo
-    const aggregatedMoSummaries = moSummaries.reduce((acc, summary) => {
-      const { moNo, lineNo, ...rest } = summary;
-      const existing = acc.find((item) => item.moNo === moNo);
-      if (existing) {
-        existing.checkedQty += rest.checkedQty;
-        existing.totalPass += rest.totalPass;
-        existing.totalRejects += rest.totalRejects;
-        existing.defectsQty += rest.defectsQty;
-        existing.totalBundles += rest.totalBundles;
-        existing.defectiveBundles += rest.defectiveBundles;
-        existing.defectArray = [...existing.defectArray, ...rest.defectArray];
-        existing.defectRate =
-          existing.checkedQty > 0
-            ? existing.defectsQty / existing.checkedQty
-            : 0;
-        existing.defectRatio =
-          existing.checkedQty > 0
-            ? existing.totalRejects / existing.checkedQty
-            : 0;
-      } else {
-        acc.push({ moNo, ...rest });
-      }
-      return acc;
-    }, []);
-
     return (
       <div className="mt-6">
         <h2 className="text-sm font-medium text-gray-900 mb-2">
           MO No Summaries
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] gap-4">
-          {aggregatedMoSummaries
+          {moSummaries
             .sort((a, b) => b.defectRate - a.defectRate)
             .map((summary) => (
               <LiveStyleCard
@@ -347,6 +342,53 @@ const LiveDashboard = () => {
       </div>
     );
   };
+
+  // const MoCardSummaries = () => {
+  //   // Aggregate moSummaries by moNo
+  //   const aggregatedMoSummaries = moSummaries.reduce((acc, summary) => {
+  //     const { moNo, lineNo, ...rest } = summary;
+  //     const existing = acc.find((item) => item.moNo === moNo);
+  //     if (existing) {
+  //       existing.checkedQty += rest.checkedQty;
+  //       existing.totalPass += rest.totalPass;
+  //       existing.totalRejects += rest.totalRejects;
+  //       existing.defectsQty += rest.defectsQty;
+  //       existing.totalBundles += rest.totalBundles;
+  //       existing.defectiveBundles += rest.defectiveBundles;
+  //       existing.defectArray = [...existing.defectArray, ...rest.defectArray];
+  //       existing.defectRate =
+  //         existing.checkedQty > 0
+  //           ? existing.defectsQty / existing.checkedQty
+  //           : 0;
+  //       existing.defectRatio =
+  //         existing.checkedQty > 0
+  //           ? existing.totalRejects / existing.checkedQty
+  //           : 0;
+  //     } else {
+  //       acc.push({ moNo, ...rest });
+  //     }
+  //     return acc;
+  //   }, []);
+
+  //   return (
+  //     <div className="mt-6">
+  //       <h2 className="text-sm font-medium text-gray-900 mb-2">
+  //         MO No Summaries
+  //       </h2>
+  //       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] gap-4">
+  //         {aggregatedMoSummaries
+  //           .sort((a, b) => b.defectRate - a.defectRate)
+  //           .map((summary) => (
+  //             <LiveStyleCard
+  //               key={summary.moNo}
+  //               moNo={summary.moNo}
+  //               summaryData={summary}
+  //             />
+  //           ))}
+  //       </div>
+  //     </div>
+  //   );
+  // };
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -559,7 +601,8 @@ const LiveDashboard = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] gap-4">
                     {Object.keys(lineDefectRates)
                       .filter((key) => key !== "total" && key !== "grand")
-                      .filter((lineNum) => (lineNo ? lineNum === lineNo : true)) // Exact match filter using lineNo
+                      .filter((lineNum) => !lineNo || lineNum === lineNo) // Exact match filter using lineNo
+                      //.filter((lineNum) => (lineNo ? lineNum === lineNo : true)) // Exact match filter using lineNo
                       .map((lineNum) => ({
                         lineNo: lineNum,
                         defectRate: (() => {
@@ -598,7 +641,7 @@ const LiveDashboard = () => {
               </>
             )}
             {activeLineTab === "Line Trend" && (
-              <TrendAnalysisLine data={lineDefectRates} />
+              <TrendAnalysisLine data={lineDefectRates} lineNoFilter={lineNo} />
             )}
             {activeLineTab === "Line Rate" && (
               <TrendAnalysisLineDefects

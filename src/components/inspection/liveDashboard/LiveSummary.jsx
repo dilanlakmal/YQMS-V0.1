@@ -10,6 +10,20 @@ const LiveSummary = ({ filters = {} }) => {
   const [summaryData, setSummaryData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [customFilters, setCustomFilters] = useState({
+    addDates: false,
+    addLines: false,
+    addMO: false,
+    addBuyer: false,
+    addColors: false,
+    addSizes: false
+  });
+
+  // Determine if filters are applied (non-empty values)
+  const isMoNoFiltered = filters.moNo && filters.moNo.trim() !== "";
+  const isLineNoFiltered = filters.lineNo && filters.lineNo.trim() !== "";
+  const isColorFiltered = filters.color && filters.color.trim() !== "";
+  const isSizeFiltered = filters.size && filters.size.trim() !== "";
 
   // Fetch data from the /api/qc2-mo-summaries endpoint
   const fetchSummaryData = async () => {
@@ -22,6 +36,19 @@ const LiveSummary = ({ filters = {} }) => {
           ([_, value]) => value !== "" && value !== undefined && value !== null
         )
       );
+
+      // Add custom grouping parameters based on checkbox states or forced by filters
+      activeFilters.groupByDate = customFilters.addDates ? "true" : "false";
+      activeFilters.groupByLine =
+        customFilters.addLines || isLineNoFiltered ? "true" : "false";
+      activeFilters.groupByMO =
+        customFilters.addMO || isMoNoFiltered ? "true" : "false";
+      activeFilters.groupByBuyer = customFilters.addBuyer ? "true" : "false";
+      activeFilters.groupByColor =
+        customFilters.addColors || isColorFiltered ? "true" : "false";
+      activeFilters.groupBySize =
+        customFilters.addSizes || isSizeFiltered ? "true" : "false";
+
       const queryString = new URLSearchParams(activeFilters).toString();
       const url = queryString
         ? `${API_BASE_URL}/api/qc2-mo-summaries?${queryString}`
@@ -66,7 +93,7 @@ const LiveSummary = ({ filters = {} }) => {
       socket.off("qc2_data_updated", fetchSummaryData);
       socket.disconnect();
     };
-  }, [JSON.stringify(filters)]);
+  }, [JSON.stringify(filters), customFilters]); // Re-fetch when customFilters or filters change
 
   // Flatten defectArray and calculate defect-specific rates, then sort by rate
   const processDefectDetails = (defectArray, checkedQty) => {
@@ -107,31 +134,70 @@ const LiveSummary = ({ filters = {} }) => {
     else return "bg-blue-50";
   };
 
-  // Sort summaryData: Numeric Line Nos (1-30) first, then others (WA, Sub, etc.)
-  const sortedSummaryData = [...summaryData].sort((a, b) => {
-    const aLineNo = a.lineNo || "N/A";
-    const bLineNo = b.lineNo || "N/A";
-    const aIsNumeric = !isNaN(aLineNo) && aLineNo !== "N/A";
-    const bIsNumeric = !isNaN(bLineNo) && bLineNo !== "N/A";
+  // Process summaryData by adding defect details
+  const processedData = summaryData.map((row) => {
+    console.log("Processing row:", row); // Debug each row
+    return {
+      ...row,
+      defectArray: processDefectDetails(
+        row.defectArray || [],
+        row.checkedQty || 0
+      )
+    };
+  });
 
-    if (aIsNumeric && bIsNumeric) return Number(aLineNo) - Number(bLineNo);
-    else if (aIsNumeric && !bIsNumeric) return -1;
-    else if (!aIsNumeric && bIsNumeric) return 1;
-    else return aLineNo.localeCompare(bLineNo);
+  // Sort processed data based on the specified order
+  const sortedData = [...processedData].sort((a, b) => {
+    // Sort by inspection_date first (if present)
+    if (customFilters.addDates) {
+      const dateA = a.inspection_date || "";
+      const dateB = b.inspection_date || "";
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+    }
+
+    // Then sort by lineNo (if present)
+    if (customFilters.addLines || isLineNoFiltered) {
+      const lineA = a.lineNo || "N/A";
+      const lineB = b.lineNo || "N/A";
+      const aIsNumeric = !isNaN(lineA) && lineA !== "N/A";
+      const bIsNumeric = !isNaN(lineB) && lineB !== "N/A";
+      if (aIsNumeric && bIsNumeric) return Number(lineA) - Number(lineB);
+      else if (aIsNumeric && !bIsNumeric) return -1;
+      else if (!aIsNumeric && bIsNumeric) return 1;
+      else if (lineA !== lineB) return lineA.localeCompare(lineB);
+    }
+
+    // Then sort by moNo (if present)
+    if (customFilters.addMO || isMoNoFiltered) {
+      const moA = a.moNo || "";
+      const moB = b.moNo || "";
+      return moA.localeCompare(moB);
+    }
+
+    return 0; // Default: no sorting if none of the fields are selected
   });
 
   // Prepare data for Excel export with one row per defect
   const prepareExcelData = () => {
     const data = [];
-    sortedSummaryData.forEach((row) => {
-      const defectDetails = processDefectDetails(
-        row.defectArray,
-        row.checkedQty
-      );
+    sortedData.forEach((row) => {
+      const defectDetails = row.defectArray || [];
       if (defectDetails.length === 0) {
         data.push({
-          "Line No": row.lineNo || "N/A",
-          "MO No": row.moNo,
+          ...(customFilters.addDates && { Date: row.inspection_date || "N/A" }),
+          ...((customFilters.addLines || isLineNoFiltered) && {
+            "Line No": row.lineNo || "N/A"
+          }),
+          ...((customFilters.addMO || isMoNoFiltered) && {
+            "MO No": row.moNo || "N/A"
+          }),
+          ...(customFilters.addBuyer && { Buyer: row.buyer || "N/A" }),
+          ...((customFilters.addColors || isColorFiltered) && {
+            Color: row.color || "N/A"
+          }),
+          ...((customFilters.addSizes || isSizeFiltered) && {
+            Size: row.size || "N/A"
+          }),
           "Checked Qty": row.checkedQty?.toLocaleString() || "0",
           "Total Pass": row.totalPass?.toLocaleString() || "0",
           "Reject Units": row.totalRejects?.toLocaleString() || "0",
@@ -145,8 +211,24 @@ const LiveSummary = ({ filters = {} }) => {
       } else {
         defectDetails.forEach((defect, index) => {
           data.push({
-            "Line No": index === 0 ? row.lineNo || "N/A" : "",
-            "MO No": index === 0 ? row.moNo : "",
+            ...(customFilters.addDates && {
+              Date: index === 0 ? row.inspection_date || "N/A" : ""
+            }),
+            ...((customFilters.addLines || isLineNoFiltered) && {
+              "Line No": index === 0 ? row.lineNo || "N/A" : ""
+            }),
+            ...((customFilters.addMO || isMoNoFiltered) && {
+              "MO No": index === 0 ? row.moNo || "N/A" : ""
+            }),
+            ...(customFilters.addBuyer && {
+              Buyer: index === 0 ? row.buyer || "N/A" : ""
+            }),
+            ...((customFilters.addColors || isColorFiltered) && {
+              Color: index === 0 ? row.color || "N/A" : ""
+            }),
+            ...((customFilters.addSizes || isSizeFiltered) && {
+              Size: index === 0 ? row.size || "N/A" : ""
+            }),
             "Checked Qty":
               index === 0 ? row.checkedQty?.toLocaleString() || "0" : "",
             "Total Pass":
@@ -181,19 +263,26 @@ const LiveSummary = ({ filters = {} }) => {
 
   // Prepare data for PDF export (single cell with newlines)
   const preparePDFData = () => {
-    return sortedSummaryData.map((row) => {
-      const defectDetails = processDefectDetails(
-        row.defectArray,
-        row.checkedQty
-      );
+    return sortedData.map((row) => {
+      const defectDetails = row.defectArray || [];
       const defectDetailsText =
         defectDetails
           .map((d) => `${d.name}: ${d.count} (${d.defectRate.toFixed(1)}%)`)
           .join("\n") || "No Defects";
 
       return [
-        row.lineNo || "N/A",
-        row.moNo,
+        ...(customFilters.addDates ? [row.inspection_date || "N/A"] : []),
+        ...(customFilters.addLines || isLineNoFiltered
+          ? [row.lineNo || "N/A"]
+          : []),
+        ...(customFilters.addMO || isMoNoFiltered ? [row.moNo || "N/A"] : []),
+        ...(customFilters.addBuyer ? [row.buyer || "N/A"] : []),
+        ...(customFilters.addColors || isColorFiltered
+          ? [row.color || "N/A"]
+          : []),
+        ...(customFilters.addSizes || isSizeFiltered
+          ? [row.size || "N/A"]
+          : []),
         row.checkedQty?.toLocaleString() || "0",
         row.totalPass?.toLocaleString() || "0",
         row.totalRejects?.toLocaleString() || "0",
@@ -212,10 +301,14 @@ const LiveSummary = ({ filters = {} }) => {
     const data = prepareExcelData();
     const ws = XLSX.utils.json_to_sheet(data);
 
-    // Set column widths
+    // Set column widths dynamically
     ws["!cols"] = [
-      { wch: 10 }, // Line No
-      { wch: 15 }, // MO No
+      ...(customFilters.addDates ? [{ wch: 12 }] : []), // Date
+      ...(customFilters.addLines || isLineNoFiltered ? [{ wch: 10 }] : []), // Line No
+      ...(customFilters.addMO || isMoNoFiltered ? [{ wch: 15 }] : []), // MO No
+      ...(customFilters.addBuyer ? [{ wch: 20 }] : []), // Buyer
+      ...(customFilters.addColors || isColorFiltered ? [{ wch: 15 }] : []), // Color
+      ...(customFilters.addSizes || isSizeFiltered ? [{ wch: 10 }] : []), // Size
       { wch: 12 }, // Checked Qty
       { wch: 12 }, // Total Pass
       { wch: 12 }, // Reject Units
@@ -246,13 +339,17 @@ const LiveSummary = ({ filters = {} }) => {
   // Download as PDF
   const downloadPDF = () => {
     const doc = new jsPDF({ orientation: "landscape" });
-    doc.setFont("helvetica"); // Use Helvetica as a clean default font
+    doc.setFont("helvetica");
     doc.setFontSize(12);
     doc.text("Live Summary", 14, 10);
 
     const headers = [
-      "Line No",
-      "MO No",
+      ...(customFilters.addDates ? ["Date"] : []),
+      ...(customFilters.addLines || isLineNoFiltered ? ["Line No"] : []),
+      ...(customFilters.addMO || isMoNoFiltered ? ["MO No"] : []),
+      ...(customFilters.addBuyer ? ["Buyer"] : []),
+      ...(customFilters.addColors || isColorFiltered ? ["Color"] : []),
+      ...(customFilters.addSizes || isSizeFiltered ? ["Size"] : []),
       "Checked Qty",
       "Total Pass",
       "Reject Units",
@@ -264,37 +361,72 @@ const LiveSummary = ({ filters = {} }) => {
       "Defect Details"
     ];
 
+    // Calculate dynamic column indices
+    let currentIndex = 0;
+    const columnIndices = {};
+    if (customFilters.addDates) columnIndices.date = currentIndex++;
+    if (customFilters.addLines || isLineNoFiltered)
+      columnIndices.lineNo = currentIndex++;
+    if (customFilters.addMO || isMoNoFiltered)
+      columnIndices.moNo = currentIndex++;
+    if (customFilters.addBuyer) columnIndices.buyer = currentIndex++;
+    if (customFilters.addColors || isColorFiltered)
+      columnIndices.color = currentIndex++;
+    if (customFilters.addSizes || isSizeFiltered)
+      columnIndices.size = currentIndex++;
+    const checkedQtyIndex = currentIndex++;
+    const totalPassIndex = currentIndex++;
+    const rejectUnitsIndex = currentIndex++;
+    const defectsQtyIndex = currentIndex++;
+    const defectRateIndex = currentIndex++;
+    const defectRatioIndex = currentIndex++;
+    const totalBundlesIndex = currentIndex++;
+    const defectiveBundlesIndex = currentIndex++;
+    const defectDetailsIndex = currentIndex++;
+
+    // Build columnStyles dynamically
+    const columnStyles = {
+      ...(customFilters.addDates
+        ? { [columnIndices.date]: { cellWidth: 20 } }
+        : {}), // Date
+      ...(customFilters.addLines || isLineNoFiltered
+        ? { [columnIndices.lineNo]: { cellWidth: 15 } }
+        : {}), // Line No
+      ...(customFilters.addMO || isMoNoFiltered
+        ? { [columnIndices.moNo]: { cellWidth: 20 } }
+        : {}), // MO No
+      ...(customFilters.addBuyer
+        ? { [columnIndices.buyer]: { cellWidth: 25 } }
+        : {}), // Buyer
+      ...(customFilters.addColors || isColorFiltered
+        ? { [columnIndices.color]: { cellWidth: 15 } }
+        : {}), // Color
+      ...(customFilters.addSizes || isSizeFiltered
+        ? { [columnIndices.size]: { cellWidth: 10 } }
+        : {}), // Size
+      [checkedQtyIndex]: { cellWidth: 20 }, // Checked Qty
+      [totalPassIndex]: { cellWidth: 20 }, // Total Pass
+      [rejectUnitsIndex]: { cellWidth: 20 }, // Reject Units
+      [defectsQtyIndex]: { cellWidth: 20 }, // Defects Qty
+      [defectRateIndex]: { cellWidth: 20 }, // Defect Rate (%)
+      [defectRatioIndex]: { cellWidth: 20 }, // Defect Ratio (%)
+      [totalBundlesIndex]: { cellWidth: 20 }, // Total Bundles
+      [defectiveBundlesIndex]: { cellWidth: 20 }, // Defective Bundles
+      [defectDetailsIndex]: { cellWidth: 60 } // Defect Details
+    };
+
     autoTable(doc, {
       head: [headers],
       body: preparePDFData(),
       startY: 20,
       styles: { fontSize: 8, cellPadding: 2, font: "helvetica" },
-      columnStyles: {
-        0: { cellWidth: 15 }, // Line No
-        1: { cellWidth: 20 }, // MO No
-        2: { cellWidth: 20 }, // Checked Qty
-        3: { cellWidth: 20 }, // Total Pass
-        4: { cellWidth: 20 }, // Reject Units
-        5: { cellWidth: 20 }, // Defects Qty
-        6: { cellWidth: 20 }, // Defect Rate (%)
-        7: { cellWidth: 20 }, // Defect Ratio (%)
-        8: { cellWidth: 20 }, // Total Bundles
-        9: { cellWidth: 20 }, // Defective Bundles
-        10: { cellWidth: 60 } // Defect Details
-      },
+      columnStyles: columnStyles,
       didParseCell: (data) => {
-        if (data.section === "body" && data.column.index === 6) {
-          const rate = parseFloat(data.cell.text[0].replace("%", ""));
-          const style = getRateStyle(rate / 100);
-          data.cell.styles.fillColor =
-            style.bgColor === "bg-red-200"
-              ? [255, 204, 204]
-              : style.bgColor === "bg-yellow-200"
-              ? [255, 255, 204]
-              : [204, 255, 204];
-        }
-        if (data.section === "body" && data.column.index === 7) {
-          const rate = parseFloat(data.cell.text[0].replace("%", ""));
+        if (
+          data.section === "body" &&
+          [defectRateIndex, defectRatioIndex].includes(data.column.index)
+        ) {
+          const rate = parseFloat(data.cell.text[0]?.replace("%", "") || "0");
           const style = getRateStyle(rate / 100);
           data.cell.styles.fillColor =
             style.bgColor === "bg-red-200"
@@ -348,16 +480,141 @@ const LiveSummary = ({ filters = {} }) => {
           </button>
         </div>
       </div>
+
+      {/* Custom Filter Section */}
+      <div className="mb-4 p-2 bg-gray-100 rounded-lg flex flex-wrap gap-4">
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            checked={customFilters.addDates}
+            onChange={(e) =>
+              setCustomFilters((prev) => ({
+                ...prev,
+                addDates: e.target.checked
+              }))
+            }
+            className="mr-1"
+          />
+          Add Dates
+        </label>
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            checked={customFilters.addLines || isLineNoFiltered}
+            onChange={(e) =>
+              setCustomFilters((prev) => ({
+                ...prev,
+                addLines: e.target.checked
+              }))
+            }
+            disabled={isLineNoFiltered}
+            className={`mr-1 ${
+              isLineNoFiltered ? "cursor-not-allowed opacity-50" : ""
+            }`}
+          />
+          Add Lines
+        </label>
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            checked={customFilters.addMO || isMoNoFiltered}
+            onChange={(e) =>
+              setCustomFilters((prev) => ({
+                ...prev,
+                addMO: e.target.checked
+              }))
+            }
+            disabled={isMoNoFiltered}
+            className={`mr-1 ${
+              isMoNoFiltered ? "cursor-not-allowed opacity-50" : ""
+            }`}
+          />
+          Add MO
+        </label>
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            checked={customFilters.addBuyer}
+            onChange={(e) =>
+              setCustomFilters((prev) => ({
+                ...prev,
+                addBuyer: e.target.checked
+              }))
+            }
+            className="mr-1"
+          />
+          Add Buyer
+        </label>
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            checked={customFilters.addColors || isColorFiltered}
+            onChange={(e) =>
+              setCustomFilters((prev) => ({
+                ...prev,
+                addColors: e.target.checked
+              }))
+            }
+            disabled={isColorFiltered}
+            className={`mr-1 ${
+              isColorFiltered ? "cursor-not-allowed opacity-50" : ""
+            }`}
+          />
+          Add Colors
+        </label>
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            checked={customFilters.addSizes || isSizeFiltered}
+            onChange={(e) =>
+              setCustomFilters((prev) => ({
+                ...prev,
+                addSizes: e.target.checked
+              }))
+            }
+            disabled={isSizeFiltered}
+            className={`mr-1 ${
+              isSizeFiltered ? "cursor-not-allowed opacity-50" : ""
+            }`}
+          />
+          Add Sizes
+        </label>
+      </div>
+
       <div className="overflow-x-auto shadow-lg rounded-lg max-h-[500px]">
         <table className="min-w-full bg-white border-collapse">
           <thead className="bg-gray-800 text-white sticky top-0 z-10">
             <tr>
-              <th className="py-3 px-4 border-b border-gray-600 text-left text-sm font-bold">
-                Line No
-              </th>
-              <th className="py-3 px-4 border-b border-gray-600 text-left text-sm font-bold">
-                MO No
-              </th>
+              {customFilters.addDates && (
+                <th className="py-3 px-4 border-b border-gray-600 text-left text-sm font-bold">
+                  Date
+                </th>
+              )}
+              {(customFilters.addLines || isLineNoFiltered) && (
+                <th className="py-3 px-4 border-b border-gray-600 text-left text-sm font-bold">
+                  Line No
+                </th>
+              )}
+              {(customFilters.addMO || isMoNoFiltered) && (
+                <th className="py-3 px-4 border-b border-gray-600 text-left text-sm font-bold">
+                  MO No
+                </th>
+              )}
+              {customFilters.addBuyer && (
+                <th className="py-3 px-4 border-b border-gray-600 text-left text-sm font-bold">
+                  Buyer
+                </th>
+              )}
+              {(customFilters.addColors || isColorFiltered) && (
+                <th className="py-3 px-4 border-b border-gray-600 text-left text-sm font-bold">
+                  Color
+                </th>
+              )}
+              {(customFilters.addSizes || isSizeFiltered) && (
+                <th className="py-3 px-4 border-b border-gray-600 text-left text-sm font-bold">
+                  Size
+                </th>
+              )}
               <th className="py-3 px-4 border-b border-gray-600 text-right text-sm font-bold">
                 Checked Qty
               </th>
@@ -388,21 +645,26 @@ const LiveSummary = ({ filters = {} }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 overflow-y-auto">
-            {sortedSummaryData.length === 0 ? (
+            {sortedData.length === 0 ? (
               <tr>
                 <td
-                  colSpan="11"
+                  colSpan={
+                    9 +
+                    (customFilters.addDates ? 1 : 0) +
+                    (customFilters.addLines || isLineNoFiltered ? 1 : 0) +
+                    (customFilters.addMO || isMoNoFiltered ? 1 : 0) +
+                    (customFilters.addBuyer ? 1 : 0) +
+                    (customFilters.addColors || isColorFiltered ? 1 : 0) +
+                    (customFilters.addSizes || isSizeFiltered ? 1 : 0)
+                  }
                   className="py-4 text-center text-gray-500 text-sm font-bold"
                 >
                   No data available
                 </td>
               </tr>
             ) : (
-              sortedSummaryData.map((row, index) => {
-                const defectDetails = processDefectDetails(
-                  row.defectArray,
-                  row.checkedQty
-                );
+              sortedData.map((row, index) => {
+                const defectDetails = row.defectArray || [];
                 const defectRateStyle = getRateStyle(row.defectRate);
                 const defectRatioStyle = getRateStyle(row.defectRatio);
 
@@ -413,12 +675,36 @@ const LiveSummary = ({ filters = {} }) => {
                       index % 2 === 0 ? "bg-gray-50" : "bg-white"
                     }`}
                   >
-                    <td className="py-3 px-4 border-b border-gray-200 text-sm font-bold">
-                      {row.lineNo || "N/A"}
-                    </td>
-                    <td className="py-3 px-4 border-b border-gray-200 text-sm font-bold">
-                      {row.moNo}
-                    </td>
+                    {customFilters.addDates && (
+                      <td className="py-3 px-4 border-b border-gray-200 text-sm font-bold">
+                        {row.inspection_date || "N/A"}
+                      </td>
+                    )}
+                    {(customFilters.addLines || isLineNoFiltered) && (
+                      <td className="py-3 px-4 border-b border-gray-200 text-sm font-bold">
+                        {row.lineNo || "N/A"}
+                      </td>
+                    )}
+                    {(customFilters.addMO || isMoNoFiltered) && (
+                      <td className="py-3 px-4 border-b border-gray-200 text-sm font-bold">
+                        {row.moNo || "N/A"}
+                      </td>
+                    )}
+                    {customFilters.addBuyer && (
+                      <td className="py-3 px-4 border-b border-gray-200 text-sm font-bold">
+                        {row.buyer || "N/A"}
+                      </td>
+                    )}
+                    {(customFilters.addColors || isColorFiltered) && (
+                      <td className="py-3 px-4 border-b border-gray-200 text-sm font-bold">
+                        {row.color || "N/A"}
+                      </td>
+                    )}
+                    {(customFilters.addSizes || isSizeFiltered) && (
+                      <td className="py-3 px-4 border-b border-gray-200 text-sm font-bold">
+                        {row.size || "N/A"}
+                      </td>
+                    )}
                     <td className="py-3 px-4 border-b border-gray-200 text-right text-sm font-bold">
                       {row.checkedQty?.toLocaleString() || "0"}
                     </td>

@@ -9,7 +9,7 @@ const LiveStyleCard = ({ moNo, summaryData }) => {
   };
 
   // Calculate defect rate background color
-  const defectRate = summaryData.defectRate * 100;
+  const defectRate = summaryData.defectRate * 100 || 0; // Default to 0 if undefined
   const defectRateColor =
     defectRate > 3
       ? "bg-red-200 text-red-800"
@@ -18,8 +18,11 @@ const LiveStyleCard = ({ moNo, summaryData }) => {
       : "bg-green-200 text-green-800";
 
   // Aggregate defect counts from defectArray for this MO No
-  const defectTotals = summaryData.defectArray.reduce((acc, defect) => {
-    acc[defect.defectName] = (acc[defect.defectName] || 0) + defect.totalCount;
+  const defectTotals = (summaryData.defectArray || []).reduce((acc, defect) => {
+    if (defect && defect.defectName && defect.hasOwnProperty("totalCount")) {
+      acc[defect.defectName] =
+        (acc[defect.defectName] || 0) + defect.totalCount;
+    }
     return acc;
   }, {});
 
@@ -40,7 +43,7 @@ const LiveStyleCard = ({ moNo, summaryData }) => {
       <div
         className={`absolute top-2 right-2 ${defectRateColor} px-3 py-1 rounded text-lg font-bold`}
       >
-        {(summaryData.defectRate * 100).toFixed(2)}%
+        {defectRate.toFixed(2)}%
       </div>
 
       {/* Title */}
@@ -58,7 +61,7 @@ const LiveStyleCard = ({ moNo, summaryData }) => {
           <div>
             <p className="text-sm text-gray-600">No of Bundles</p>
             <p className="text-lg font-bold text-gray-900">
-              {summaryData.totalBundles}
+              {summaryData.totalBundles || 0}
             </p>
           </div>
         </div>
@@ -67,7 +70,7 @@ const LiveStyleCard = ({ moNo, summaryData }) => {
           <div>
             <p className="text-sm text-gray-600">Defective Bundles</p>
             <p className="text-lg font-bold text-gray-900">
-              {summaryData.defectiveBundles}
+              {summaryData.defectiveBundles || 0}
             </p>
           </div>
         </div>
@@ -76,7 +79,7 @@ const LiveStyleCard = ({ moNo, summaryData }) => {
           <div>
             <p className="text-sm text-gray-600">Checked Qty</p>
             <p className="text-lg font-bold text-gray-900">
-              {summaryData.checkedQty}
+              {summaryData.checkedQty || 0}
             </p>
           </div>
         </div>
@@ -85,7 +88,7 @@ const LiveStyleCard = ({ moNo, summaryData }) => {
           <div>
             <p className="text-sm text-gray-600">Total Pass</p>
             <p className="text-lg font-bold text-gray-900">
-              {summaryData.totalPass}
+              {summaryData.totalPass || 0}
             </p>
           </div>
         </div>
@@ -94,7 +97,7 @@ const LiveStyleCard = ({ moNo, summaryData }) => {
           <div>
             <p className="text-sm text-gray-600">Reject Units</p>
             <p className="text-lg font-bold text-gray-900">
-              {summaryData.totalRejects}
+              {summaryData.totalRejects || 0}
             </p>
           </div>
         </div>
@@ -103,7 +106,7 @@ const LiveStyleCard = ({ moNo, summaryData }) => {
           <div>
             <p className="text-sm text-gray-600">Defects Qty</p>
             <p className="text-lg font-bold text-gray-900">
-              {summaryData.defectsQty}
+              {summaryData.defectsQty || 0}
             </p>
           </div>
         </div>

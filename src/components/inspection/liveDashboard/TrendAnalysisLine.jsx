@@ -32,7 +32,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-const TrendAnalysisLine = ({ data }) => {
+const TrendAnalysisLine = ({ data, lineNoFilter }) => {
   // Define hour headers from 6-7 AM to 8-9 PM
   const hourLabels = {
     "07:00": "6-7",
@@ -73,6 +73,7 @@ const TrendAnalysisLine = ({ data }) => {
   // Sort Line Nos consistently
   const lineNos = Object.keys(data || {})
     .filter((key) => key !== "total" && key !== "grand")
+    .filter((lineNo) => !lineNoFilter || lineNo === lineNoFilter) // Exact match for lineNoFilter
     .sort();
 
   // Filter hours with at least one non-zero value for any Line No/MO No

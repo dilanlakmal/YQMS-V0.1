@@ -73,8 +73,18 @@ const SummaryCard = ({ title, value, icon }) => {
       <div>
         <h2 className="text-lg font-semibold text-gray-700">{title}</h2>
         <p className={`text-2xl font-bold ${getTextColor(title)}`}>
-          {typeof value === "number" ? value.toFixed(2) : value}
-          {title.includes("Rate") || title.includes("Ratio") ? "%" : ""}
+          {typeof value === "number"
+            ? [
+                "Checked Qty",
+                "Total Pass",
+                "Defects Qty",
+                "Total Rejects",
+                "Total Bundles"
+              ].includes(title)
+              ? Math.round(value) // Round to nearest integer
+              : Number(value).toFixed(2) // Keep two decimals for others
+            : value}
+          {title === "Defect Rate" || title === "Defect Ratio" ? "%" : ""}
         </p>
       </div>
       {getIconComponent()}

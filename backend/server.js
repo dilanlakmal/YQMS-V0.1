@@ -2248,12 +2248,35 @@ app.get(
   }
 );
 
-// Helper function to normalize date strings (remove leading zeros for consistency)
+// Helper function to normalize date strings with leading zeros
 const normalizeDateString = (dateStr) => {
   if (!dateStr) return null;
-  const [month, day, year] = dateStr.split("/");
-  return `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
+  try {
+    const [month, day, year] = dateStr.split("/").map((part) => part.trim());
+    if (!month || !day || !year || isNaN(month) || isNaN(day) || isNaN(year)) {
+      throw new Error("Invalid date format");
+    }
+    // Add leading zeros to month and day
+    const normalizedMonth = ("0" + parseInt(month, 10)).slice(-2);
+    const normalizedDay = ("0" + parseInt(day, 10)).slice(-2);
+    return `${normalizedMonth}/${normalizedDay}/${year}`;
+  } catch (error) {
+    console.error(`Invalid date string: ${dateStr}`, error);
+    return null;
+  }
 };
+
+// Helper function to escape special characters in regex
+const escapeRegExp = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // Escapes . * + ? ^ $ { } ( ) | [ ] \
+};
+
+// Helper function to normalize date strings (remove leading zeros for consistency)
+// const normalizeDateString = (dateStr) => {
+//   if (!dateStr) return null;
+//   const [month, day, year] = dateStr.split("/");
+//   return `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
+// };
 
 // GET endpoint to fetch all inspection records
 app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
@@ -2386,11 +2409,6 @@ app.put("/api/qc2-inspection-pass-bundle/:id", async (req, res) => {
   }
 });
 
-// Helper function to escape special characters in regex
-const escapeRegExp = (string) => {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // Escapes . * + ? ^ $ { } ( ) | [ ] \
-};
-
 // Endpoint to get summary data
 app.get("/api/qc2-inspection-summary", async (req, res) => {
   try {
@@ -2417,15 +2435,60 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     if (department) match.department = department;
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
-    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
+    if (lineNo) match.lineNo = lineNo.trim();
+    //if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
 
     // Normalize dates and apply string comparison
+    // Normalize and convert dates to Date objects for proper comparison
     if (startDate || endDate) {
-      match.inspection_date = {};
-      if (startDate)
-        match.inspection_date.$gte = normalizeDateString(startDate);
-      if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
+      match.$expr = match.$expr || {}; // Initialize $expr if not present
+      match.$expr.$and = match.$expr.$and || [];
+
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
     }
+    // if (startDate || endDate) {
+    //   match.inspection_date = {};
+    //   if (startDate)
+    //     match.inspection_date.$gte = normalizeDateString(startDate);
+    //   if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
+    // }
 
     const data = await QC2InspectionPassBundle.aggregate([
       { $match: match },
@@ -2484,83 +2547,7 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
   }
 });
 
-// Endpoint to get defect rates by defect names
-app.get("/api/qc2-defect-rates", async (req, res) => {
-  try {
-    const {
-      moNo,
-      emp_id_inspection,
-      startDate,
-      endDate,
-      color,
-      size,
-      department,
-      buyer,
-      lineNo // Add Line No
-    } = req.query;
-
-    let match = {};
-    if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
-    if (emp_id_inspection)
-      match.emp_id_inspection = {
-        $regex: new RegExp(emp_id_inspection.trim(), "i")
-      };
-    if (color) match.color = color;
-    if (size) match.size = size;
-    if (department) match.department = department;
-    if (buyer)
-      match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
-    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
-
-    if (startDate || endDate) {
-      match.inspection_date = {};
-      if (startDate)
-        match.inspection_date.$gte = normalizeDateString(startDate);
-      if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
-    }
-
-    const data = await QC2InspectionPassBundle.aggregate([
-      { $match: match },
-      { $unwind: "$defectArray" },
-      {
-        $group: {
-          _id: "$defectArray.defectName",
-          totalCount: { $sum: "$defectArray.totalCount" }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          defectName: "$_id",
-          totalCount: 1
-        }
-      }
-    ]);
-
-    const totalCheckedQtyAgg = await QC2InspectionPassBundle.aggregate([
-      { $match: match },
-      {
-        $group: {
-          _id: null,
-          totalCheckedQty: { $sum: "$checkedQty" }
-        }
-      }
-    ]);
-    const totalChecked =
-      totalCheckedQtyAgg.length > 0 ? totalCheckedQtyAgg[0].totalCheckedQty : 1;
-    const defectRates = data.map((item) => ({
-      ...item,
-      defectRate: item.totalCount / totalChecked
-    }));
-
-    res.json(defectRates);
-  } catch (error) {
-    console.error("Error fetching defect rates:", error);
-    res.status(500).json({ error: "Failed to fetch defect rates" });
-  }
-});
-
-// Endpoint to get summaries per MO No
+// Endpoint to get summaries per MO No with dynamic grouping
 app.get("/api/qc2-mo-summaries", async (req, res) => {
   try {
     const {
@@ -2572,11 +2559,22 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
       size,
       department,
       buyer,
-      lineNo
+      lineNo,
+      groupByDate, // "true" to group by date
+      groupByLine, // "true" to group by lineNo
+      groupByMO, // "true" to group by moNo
+      groupByBuyer, // "true" to group by buyer
+      groupByColor, // "true" to group by color
+      groupBySize // "true" to group by size
     } = req.query;
 
     let match = {};
-    if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+
+    if (moNo && moNo.trim()) {
+      match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    }
+
+    //if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
     if (emp_id_inspection)
       match.emp_id_inspection = {
         $regex: new RegExp(emp_id_inspection.trim(), "i")
@@ -2586,22 +2584,113 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
     if (department) match.department = department;
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
-    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add lineNo filter
+    if (lineNo) match.lineNo = lineNo.trim();
+    //if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") };
 
+    // if (moNo && groupByMO !== "true")
+    //   match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    // if (emp_id_inspection)
+    //   match.emp_id_inspection = {
+    //     $regex: new RegExp(emp_id_inspection.trim(), "i")
+    //   };
+    // if (color && groupByColor !== "true") match.color = color;
+    // if (size && groupBySize !== "true") match.size = size;
+    // if (department) match.department = department;
+    // if (buyer && groupByBuyer !== "true")
+    //   match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+    // if (lineNo && groupByLine !== "true")
+    //   match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") };
+
+    // Normalize and convert dates to Date objects for proper comparison
     if (startDate || endDate) {
-      match.inspection_date = {};
-      if (startDate)
-        match.inspection_date.$gte = normalizeDateString(startDate);
-      if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
+      match.$expr = match.$expr || {}; // Initialize $expr if not present
+      match.$expr.$and = match.$expr.$and || [];
+
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+    }
+
+    // Dynamically build the _id object for grouping based on query params
+    const groupBy = {};
+    const projectFields = {};
+
+    // Order matters: Date, Line No, MO No, Buyer, Color, Size
+    if (groupByDate === "true") {
+      groupBy.inspection_date = {
+        $dateToString: {
+          format: "%Y-%m-%d",
+          date: {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y" // Match the "MM/DD/YYYY" format of inspection_date
+            }
+          }
+        }
+      };
+      projectFields.inspection_date = "$_id.inspection_date";
+    }
+    if (groupByLine === "true") {
+      groupBy.lineNo = "$lineNo";
+      projectFields.lineNo = "$_id.lineNo";
+    }
+    if (groupByMO === "true") {
+      groupBy.moNo = "$moNo";
+      projectFields.moNo = "$_id.moNo";
+    }
+    if (groupByBuyer === "true") {
+      groupBy.buyer = "$buyer";
+      projectFields.buyer = "$_id.buyer";
+    }
+    if (groupByColor === "true") {
+      groupBy.color = "$color";
+      projectFields.color = "$_id.color";
+    }
+    if (groupBySize === "true") {
+      groupBy.size = "$size";
+      projectFields.size = "$_id.size";
     }
 
     const data = await QC2InspectionPassBundle.aggregate([
       { $match: match },
       {
         $group: {
-          //_id: "$moNo",
-          _id: { moNo: "$moNo", lineNo: "$lineNo" }, // Group by both moNo and lineNo
-          lineNo: { $first: "$lineNo" }, // Include lineNo using $first
+          _id: groupBy,
           checkedQty: { $sum: "$checkedQty" },
           totalPass: { $sum: "$totalPass" },
           totalRejects: { $sum: "$totalRejects" },
@@ -2610,15 +2699,27 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
           defectiveBundles: {
             $sum: { $cond: [{ $gt: ["$totalRepair", 0] }, 1, 0] }
           },
-          defectArray: { $push: "$defectArray" }
+          defectArray: { $push: "$defectArray" },
+          firstInspectionDate: { $first: "$inspection_date" }, // Preserve original string value
+          firstLineNo: { $first: "$lineNo" },
+          firstMoNo: { $first: "$moNo" },
+          firstBuyer: { $first: "$buyer" },
+          firstColor: { $first: "$color" },
+          firstSize: { $first: "$size" }
         }
       },
       {
         $project: {
-          // moNo: "$_id",
-          // lineNo: 1, // Include lineNo in the output
-          moNo: "$_id.moNo", // Include moNo in the output
-          lineNo: "$_id.lineNo", // Include lineNo in the output
+          ...projectFields,
+          inspection_date:
+            groupByDate !== "true"
+              ? "$firstInspectionDate" // Keep as string since grouping by date is not selected
+              : "$_id.inspection_date",
+          lineNo: groupByLine !== "true" ? "$firstLineNo" : "$_id.lineNo",
+          moNo: groupByMO !== "true" ? "$firstMoNo" : "$_id.moNo",
+          buyer: groupByBuyer !== "true" ? "$firstBuyer" : "$_id.buyer",
+          color: groupByColor !== "true" ? "$firstColor" : "$_id.color",
+          size: groupBySize !== "true" ? "$firstSize" : "$_id.size",
           checkedQty: 1,
           totalPass: 1,
           totalRejects: 1,
@@ -2649,14 +2750,148 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
           _id: 0
         }
       },
-      { $sort: { moNo: 1, lineNo: 1 } } // Sort by moNo and then lineNo
-      // { $sort: { moNo: 1 } }
+      {
+        $sort: {
+          inspection_date: 1, // Sort as string since inspection_date is a string
+          lineNo: 1,
+          moNo: 1
+        }
+      }
     ]);
 
     res.json(data);
   } catch (error) {
     console.error("Error fetching MO summaries:", error);
     res.status(500).json({ error: "Failed to fetch MO summaries" });
+  }
+});
+
+app.get("/api/qc2-defect-rates", async (req, res) => {
+  try {
+    const {
+      moNo,
+      emp_id_inspection,
+      startDate,
+      endDate,
+      color,
+      size,
+      department,
+      buyer,
+      lineNo
+    } = req.query;
+
+    // Build the match stage with filters
+    let match = {};
+    if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    if (emp_id_inspection)
+      match.emp_id_inspection = {
+        $regex: new RegExp(emp_id_inspection.trim(), "i")
+      };
+    if (color) match.color = color;
+    if (size) match.size = size;
+    if (department) match.department = department;
+    if (buyer)
+      match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+    if (lineNo) match.lineNo = lineNo.trim();
+
+    // Date filtering using $expr for string dates
+    if (startDate || endDate) {
+      match.$expr = match.$expr || {};
+      match.$expr.$and = match.$expr.$and || [];
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+    }
+
+    // Aggregation pipeline
+    const pipeline = [
+      { $match: match },
+      {
+        $facet: {
+          totalChecked: [
+            {
+              $group: {
+                _id: null,
+                totalCheckedQty: { $sum: "$checkedQty" }
+              }
+            }
+          ],
+          defects: [
+            { $unwind: "$defectArray" },
+            {
+              $group: {
+                _id: "$defectArray.defectName",
+                totalCount: { $sum: "$defectArray.totalCount" }
+              }
+            }
+          ]
+        }
+      },
+      {
+        $project: {
+          totalCheckedQty: {
+            $arrayElemAt: ["$totalChecked.totalCheckedQty", 0]
+          },
+          defects: "$defects"
+        }
+      },
+      { $unwind: "$defects" },
+      {
+        $project: {
+          defectName: "$defects._id",
+          totalCount: "$defects.totalCount",
+          defectRate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              { $divide: ["$defects.totalCount", "$totalCheckedQty"] }
+            ]
+          }
+        }
+      },
+      { $sort: { defectRate: -1 } }
+    ];
+
+    const data = await QC2InspectionPassBundle.aggregate(pipeline);
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching defect rates:", error);
+    res.status(500).json({ error: "Failed to fetch defect rates" });
   }
 });
 
@@ -2686,11 +2921,49 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
 
+    // Update date filtering using $expr and $dateFromString
     if (startDate || endDate) {
-      match.inspection_date = {};
-      if (startDate)
-        match.inspection_date.$gte = normalizeDateString(startDate);
-      if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
+      match.$expr = match.$expr || {}; // Initialize $expr if not present
+      match.$expr.$and = match.$expr.$and || [];
+
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
     }
 
     match.inspection_time = { $regex: /^\d{2}:\d{2}:\d{2}$/ };
@@ -2982,13 +3255,52 @@ app.get("/api/qc2-defect-rates-by-line", async (req, res) => {
     if (department) match.department = department;
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
-    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") };
+    if (lineNo) match.lineNo = lineNo.trim();
+    //if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") };
 
+    // Normalize and convert dates to Date objects for proper comparison using $expr
     if (startDate || endDate) {
-      match.inspection_date = {};
-      if (startDate)
-        match.inspection_date.$gte = normalizeDateString(startDate);
-      if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
+      match.$expr = match.$expr || {}; // Initialize $expr if not present
+      match.$expr.$and = match.$expr.$and || [];
+
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
     }
 
     match.inspection_time = { $regex: /^\d{2}:\d{2}:\d{2}$/ };
