@@ -11,7 +11,7 @@ import {
   Printer,
   QrCode,
   Tag,
-  XCircle,
+  XCircle
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "../../config";
@@ -54,7 +54,7 @@ const QC2InspectionPage = () => {
   const [qrCodesData, setQrCodesData] = useState({
     repair: [],
     garment: [],
-    bundle: [],
+    bundle: []
   });
   const [showQRPreview, setShowQRPreview] = useState(false);
   const [printing, setPrinting] = useState(false);
@@ -89,7 +89,7 @@ const QC2InspectionPage = () => {
     "measurement",
     "washing",
     "finishing",
-    "miscellaneous",
+    "miscellaneous"
   ];
 
   const defectQty = isReturnInspection
@@ -180,7 +180,7 @@ const QC2InspectionPage = () => {
       .filter((key) => confirmedDefects[key] > 0)
       .map((key) => ({
         defectName: englishDefectItems[key]?.name || "Unknown",
-        totalCount: confirmedDefects[key],
+        totalCount: confirmedDefects[key]
       }));
   };
 
@@ -206,7 +206,7 @@ const QC2InspectionPage = () => {
         if (tempDefects.length === chunkSize) {
           group.defectChunks.push({
             defects: tempDefects,
-            count_print: countPrint,
+            count_print: countPrint
           });
           tempDefects = [];
           countPrint = 0;
@@ -215,7 +215,7 @@ const QC2InspectionPage = () => {
       if (tempDefects.length > 0) {
         group.defectChunks.push({
           defects: tempDefects,
-          count_print: countPrint,
+          count_print: countPrint
         });
       }
     });
@@ -303,14 +303,14 @@ const QC2InspectionPage = () => {
           sect_name_inspection: user.sect_name,
           bundle_id: data.bundle_id,
           bundle_random_id: data.bundle_random_id,
-          printArray: [],
+          printArray: []
         };
         const createResponse = await fetch(
           `${API_BASE_URL}/api/inspection-pass-bundle`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(initialPayload),
+            body: JSON.stringify(initialPayload)
           }
         );
         if (!createResponse.ok)
@@ -359,7 +359,7 @@ const QC2InspectionPage = () => {
         sessionTotalRejects: 0,
         sessionDefectsQty: 0,
         sessionRejectedGarments: [],
-        inspectionNo,
+        inspectionNo
       };
 
       setSessionData(newSessionData);
@@ -424,7 +424,7 @@ const QC2InspectionPage = () => {
         .filter((key) => tempDefects[key] > 0)
         .map((key) => ({
           name: defectsList["english"][key].name,
-          count: tempDefects[key],
+          count: tempDefects[key]
         }));
       const totalDefectCount = garmentDefects.reduce(
         (sum, d) => sum + d.count,
@@ -433,7 +433,7 @@ const QC2InspectionPage = () => {
       newSessionData.sessionDefectsQty += totalDefectCount;
       newSessionData.sessionRejectedGarments.push({
         totalDefectCount,
-        repairDefectArray: garmentDefects,
+        repairDefectArray: garmentDefects
       });
       setSessionData(newSessionData);
       setTotalPass((prev) => prev - 1);
@@ -467,7 +467,7 @@ const QC2InspectionPage = () => {
           return {
             name: defect?.english || "Unknown",
             count: currentTempDefects[key],
-            repair: defect?.repair || "Unknown",
+            repair: defect?.repair || "Unknown"
           };
         });
 
@@ -476,7 +476,7 @@ const QC2InspectionPage = () => {
         totalCount,
         defects,
         garment_defect_id: garmentDefectId,
-        rejectTime: currentTime,
+        rejectTime: currentTime
       };
       const newRejectedGarments = [...rejectedGarments, newRejectGarment];
       setRejectedGarments(newRejectedGarments);
@@ -486,7 +486,7 @@ const QC2InspectionPage = () => {
         totalRejects: totalRejects + 1,
         totalRepair: totalRepair + 1,
         defectQty: defectQty + totalCount,
-        rejectGarments: newRejectedGarments,
+        rejectGarments: newRejectedGarments
       };
 
       try {
@@ -495,7 +495,7 @@ const QC2InspectionPage = () => {
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(updatePayload),
+            body: JSON.stringify(updatePayload)
           }
         );
         if (!response.ok) throw new Error("Failed to update inspection record");
@@ -506,7 +506,7 @@ const QC2InspectionPage = () => {
       const reworkGarments = defects.map((defect) => ({
         defectName: defect.name,
         count: defect.count,
-        time: currentTime,
+        time: currentTime
       }));
       const payload = {
         package_no: bundleData.package_no,
@@ -524,13 +524,13 @@ const QC2InspectionPage = () => {
         dept_name_inspection: user.dept_name,
         sect_name_inspection: user.sect_name,
         bundle_id: bundleData.bundle_id,
-        bundle_random_id: bundleData.bundle_random_id,
+        bundle_random_id: bundleData.bundle_random_id
       };
       try {
         const response = await fetch(`${API_BASE_URL}/api/reworks`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(payload)
         });
         if (!response.ok) throw new Error("Failed to save reworks data");
       } catch (err) {
@@ -578,13 +578,13 @@ const QC2InspectionPage = () => {
           dept_name_inspection: user.dept_name,
           sect_name_inspection: user.sect_name,
           bundle_id: bundleData.bundle_id,
-          bundle_random_id: bundleData.bundle_random_id,
+          bundle_random_id: bundleData.bundle_random_id
         };
         try {
           const response = await fetch(`${API_BASE_URL}/api/qc2-defect-print`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(qrData),
+            body: JSON.stringify(qrData)
           });
           if (!response.ok) throw new Error("Failed to save defect print data");
           repairQrCodes.push(qrData);
@@ -605,7 +605,7 @@ const QC2InspectionPage = () => {
           count: d.count,
           repair:
             allDefects.find((def) => def.english === d.name)?.repair ||
-            "Unknown",
+            "Unknown"
         }));
         return {
           factory: bundleData.factory || "YM",
@@ -624,8 +624,8 @@ const QC2InspectionPage = () => {
             {
               totalCount: garment.totalCount,
               defects: defectsWithRepair,
-              garment_defect_id: garmentDefectId,
-            },
+              garment_defect_id: garmentDefectId
+            }
           ],
           inspection_time: print_time,
           inspection_date,
@@ -639,7 +639,7 @@ const QC2InspectionPage = () => {
           bundle_random_id: bundleData.bundle_random_id,
           defect_id: defectId,
           count: garment.totalCount,
-          defects: defectsWithRepair,
+          defects: defectsWithRepair
         };
       })
     );
@@ -661,20 +661,20 @@ const QC2InspectionPage = () => {
                   ...garment.defects.slice(0, 6).map((d) => ({
                     name: d.name,
                     count: d.count,
-                    repair: d.repair || "Unknown",
+                    repair: d.repair || "Unknown"
                   })),
                   {
                     name: "Others",
                     count: garment.defects
                       .slice(6)
                       .reduce((sum, d) => sum + d.count, 0),
-                    repair: "Various",
-                  },
+                    repair: "Various"
+                  }
                 ]
               : garment.defects.map((d) => ({
                   name: d.name,
                   count: d.count,
-                  repair: d.repair || "Unknown",
+                  repair: d.repair || "Unknown"
                 }));
           return { garmentNumber: index + 1, defects };
         });
@@ -688,7 +688,7 @@ const QC2InspectionPage = () => {
           totalRejectGarment_Var, // New field, remains constant
           totalDefectCount: totalPrintDefectCount,
           defects: printData,
-          defect_print_id: defectPrintId,
+          defect_print_id: defectPrintId
         });
       });
     }
@@ -696,13 +696,13 @@ const QC2InspectionPage = () => {
     setQrCodesData({
       repair: repairQrCodes,
       garment: garmentQrCodes,
-      bundle: bundleQrCodes,
+      bundle: bundleQrCodes
     });
 
     const defectArray = computeDefectArray();
     const updatePayload = {
       inspection_time: print_time,
-      defectArray: defectArray,
+      defectArray: defectArray
     };
     if (bundleQrCodes.length > 0) {
       updatePayload.printArray = bundleQrCodes.map((qrCode) => ({
@@ -713,7 +713,7 @@ const QC2InspectionPage = () => {
         totalPrintDefectCount: qrCode.totalDefectCount,
         repairGarmentsDefects: [],
         printData: qrCode.defects,
-        isCompleted: false,
+        isCompleted: false
       }));
     }
 
@@ -723,7 +723,7 @@ const QC2InspectionPage = () => {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatePayload),
+          body: JSON.stringify(updatePayload)
         }
       );
       if (!response.ok) throw new Error("Failed to update inspection record");
@@ -783,7 +783,7 @@ const QC2InspectionPage = () => {
         sessionRejectedGarments,
         inspectionNo,
         printEntry,
-        initialTotalPass,
+        initialTotalPass
       } = sessionData;
 
       const initialTotalRepair = bundleData.totalRepair;
@@ -797,21 +797,21 @@ const QC2InspectionPage = () => {
           totalPass: initialTotalPassGlobal + sessionTotalPass, // Always add sessionTotalPass
           "printArray.$[elem].totalRejectGarmentCount":
             newTotalRejectGarmentCount,
-          "printArray.$[elem].isCompleted": newTotalRejectGarmentCount === 0,
-        },
+          "printArray.$[elem].isCompleted": newTotalRejectGarmentCount === 0
+        }
       };
 
       if (sessionTotalRejects > 0) {
         updatePayload.$push = {
           "printArray.$[elem].repairGarmentsDefects": {
             inspectionNo,
-            repairGarments: sessionRejectedGarments,
-          },
+            repairGarments: sessionRejectedGarments
+          }
         };
       }
 
       const arrayFilters = [
-        { "elem.defect_print_id": printEntry.defect_print_id },
+        { "elem.defect_print_id": printEntry.defect_print_id }
       ];
 
       try {
@@ -822,8 +822,8 @@ const QC2InspectionPage = () => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               updateOperations: updatePayload,
-              arrayFilters,
-            }),
+              arrayFilters
+            })
           }
         );
         if (!response.ok) throw new Error("Failed to update record");
@@ -843,8 +843,8 @@ const QC2InspectionPage = () => {
 
       const updatePayload = {
         $set: {
-          inspection_time: inspectionTime,
-        },
+          inspection_time: inspectionTime
+        }
       };
 
       try {
@@ -853,7 +853,7 @@ const QC2InspectionPage = () => {
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(updatePayload),
+            body: JSON.stringify(updatePayload)
           }
         );
         if (!response.ok) throw new Error("Failed to update inspection record");
@@ -1505,14 +1505,16 @@ const QC2InspectionPage = () => {
                           disabled={
                             !isReturnInspection &&
                             ((hasDefects && !rejectedOnce) ||
-                              (printMethod === "garment" &&
+                              ((printMethod === "garment" ||
+                                printMethod === "bundle") &&
                                 qrCodesData.garment.length === 0) ||
                               printing)
                           }
                           className={`px-4 py-2 rounded ${
                             !isReturnInspection &&
                             ((hasDefects && !rejectedOnce) ||
-                              (printMethod === "garment" &&
+                              ((printMethod === "garment" ||
+                                printMethod === "bundle") &&
                                 qrCodesData.garment.length === 0) ||
                               printing)
                               ? "bg-gray-300 cursor-not-allowed"
