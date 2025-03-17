@@ -20,6 +20,7 @@ import IroningLive from "../components/inspection/liveDashboard/IroningLive";
 import OPALive from "../components/inspection/liveDashboard/OPALive";
 import DailySummary from "../components/inspection/liveDashboard/DailySummary";
 import WeeklySummary from "../components/inspection/liveDashboard/WeeklySummary";
+import InspectorCard from "../components/inspection/liveDashboard/InspectorCard";
 
 const LiveDashboard = () => {
   const [activeSection, setActiveSection] = useState("Live Dashboard");
@@ -54,6 +55,7 @@ const LiveDashboard = () => {
   const [moSummaries, setMoSummaries] = useState([]);
   const [hourlyDefectRates, setHourlyDefectRates] = useState({});
   const [lineDefectRates, setLineDefectRates] = useState({});
+  const [inspectors, setInspectors] = useState([]); // New state for inspector list
 
   const filtersRef = useRef({});
 
@@ -122,16 +124,6 @@ const LiveDashboard = () => {
       console.error("Error fetching MO summaries:", error);
     }
   };
-  // const fetchMoSummaries = async (filters = {}) => {
-  //   try {
-  //     const response = await axios.get(`${API_BASE_URL}/api/qc2-mo-summaries`, {
-  //       params: filters
-  //     });
-  //     setMoSummaries(response.data);
-  //   } catch (error) {
-  //     console.error("Error fetching MO summaries:", error);
-  //   }
-  // };
 
   // Fetch Hourly Defect Rates by MO No
   const fetchHourlyDefectRates = async (filters = {}) => {
@@ -156,6 +148,25 @@ const LiveDashboard = () => {
       setLineDefectRates(response.data);
     } catch (error) {
       console.error("Error fetching line defect rates:", error);
+    }
+  };
+
+  // Fetch list of inspectors
+  const fetchInspectors = async (filters = {}) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/qc2-inspection-pass-bundle/filter-options`
+      );
+      const empIds = response.data.emp_id_inspection || [];
+      // Filter inspectors based on empId if set
+      if (filters.emp_id_inspection) {
+        setInspectors(empIds.filter((id) => id === filters.emp_id_inspection));
+      } else {
+        setInspectors(empIds);
+      }
+    } catch (error) {
+      console.error("Error fetching inspectors:", error);
+      setInspectors([]);
     }
   };
 
@@ -192,7 +203,8 @@ const LiveDashboard = () => {
       fetchDefectRates(filters),
       fetchMoSummaries(filters),
       fetchHourlyDefectRates(filters),
-      fetchLineDefectRates(filters)
+      fetchLineDefectRates(filters),
+      fetchInspectors(filters)
     ]);
   };
 
@@ -214,7 +226,8 @@ const LiveDashboard = () => {
       fetchDefectRates(),
       fetchMoSummaries(),
       fetchHourlyDefectRates(),
-      fetchLineDefectRates()
+      fetchLineDefectRates(),
+      fetchInspectors()
     ]);
   };
 
@@ -226,7 +239,8 @@ const LiveDashboard = () => {
         fetchDefectRates(),
         fetchMoSummaries(),
         fetchHourlyDefectRates(),
-        fetchLineDefectRates()
+        fetchLineDefectRates(),
+        fetchInspectors()
       ]);
     };
     fetchInitialData();
@@ -238,7 +252,8 @@ const LiveDashboard = () => {
         fetchDefectRates(currentFilters),
         fetchMoSummaries(currentFilters),
         fetchHourlyDefectRates(currentFilters),
-        fetchLineDefectRates(currentFilters)
+        fetchLineDefectRates(currentFilters),
+        fetchInspectors(currentFilters)
       ]);
     }, 5000);
 
@@ -289,7 +304,8 @@ const LiveDashboard = () => {
         fetchDefectRates(currentFilters),
         fetchMoSummaries(currentFilters),
         fetchHourlyDefectRates(currentFilters),
-        fetchLineDefectRates(currentFilters)
+        fetchLineDefectRates(currentFilters),
+        fetchInspectors(currentFilters)
       ]);
     });
 
@@ -359,53 +375,6 @@ const LiveDashboard = () => {
     );
   };
 
-  // const MoCardSummaries = () => {
-  //   // Aggregate moSummaries by moNo
-  //   const aggregatedMoSummaries = moSummaries.reduce((acc, summary) => {
-  //     const { moNo, lineNo, ...rest } = summary;
-  //     const existing = acc.find((item) => item.moNo === moNo);
-  //     if (existing) {
-  //       existing.checkedQty += rest.checkedQty;
-  //       existing.totalPass += rest.totalPass;
-  //       existing.totalRejects += rest.totalRejects;
-  //       existing.defectsQty += rest.defectsQty;
-  //       existing.totalBundles += rest.totalBundles;
-  //       existing.defectiveBundles += rest.defectiveBundles;
-  //       existing.defectArray = [...existing.defectArray, ...rest.defectArray];
-  //       existing.defectRate =
-  //         existing.checkedQty > 0
-  //           ? existing.defectsQty / existing.checkedQty
-  //           : 0;
-  //       existing.defectRatio =
-  //         existing.checkedQty > 0
-  //           ? existing.totalRejects / existing.checkedQty
-  //           : 0;
-  //     } else {
-  //       acc.push({ moNo, ...rest });
-  //     }
-  //     return acc;
-  //   }, []);
-
-  //   return (
-  //     <div className="mt-6">
-  //       <h2 className="text-sm font-medium text-gray-900 mb-2">
-  //         MO No Summaries
-  //       </h2>
-  //       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] gap-4">
-  //         {aggregatedMoSummaries
-  //           .sort((a, b) => b.defectRate - a.defectRate)
-  //           .map((summary) => (
-  //             <LiveStyleCard
-  //               key={summary.moNo}
-  //               moNo={summary.moNo}
-  //               summaryData={summary}
-  //             />
-  //           ))}
-  //       </div>
-  //     </div>
-  //   );
-  // };
-
   return (
     <div className="flex min-h-screen bg-gray-100">
       {/* Navigation Panel */}
@@ -429,7 +398,7 @@ const LiveDashboard = () => {
         {/* Common Filter Pane for QC2 Sections */}
         {[
           "Live Dashboard",
-          "MO Hr Trend",
+          "MO Analysis",
           "Line Hr Trend",
           "Daily Summary",
           "Weekly Analysis",
@@ -530,14 +499,30 @@ const LiveDashboard = () => {
             )}
 
             {activeDashboardTab === "Inspector Data" && (
-              <div className="text-center mt-8 text-gray-700">
-                <h2 className="text-xl font-medium">Coming soon</h2>
+              <div className="mt-6">
+                {inspectors.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {inspectors.map((inspectorId) => (
+                      <InspectorCard
+                        key={inspectorId}
+                        inspectorId={inspectorId}
+                        filters={filtersRef.current}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-700">
+                    <h2 className="text-xl font-medium">
+                      No inspectors found for the selected filters.
+                    </h2>
+                  </div>
+                )}
               </div>
             )}
           </>
         )}
 
-        {activeSection === "MO Hr Trend" && (
+        {activeSection === "MO Analysis" && (
           <>
             <div className="mb-4">
               <button
@@ -558,7 +543,7 @@ const LiveDashboard = () => {
                     : "bg-gray-200 text-gray-700"
                 }`}
               >
-                MO Trend
+                MO Hr Trend
               </button>
             </div>
             {activeMoTab === "MO Summary" && (
@@ -604,7 +589,7 @@ const LiveDashboard = () => {
                     : "bg-gray-200 text-gray-700"
                 }`}
               >
-                Line Trend
+                Line Hr Trend
               </button>
             </div>
             {activeLineTab === "Line Summary" && (

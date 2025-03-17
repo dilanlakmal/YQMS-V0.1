@@ -2871,276 +2871,6 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
   }
 });
 
-// app.get("/api/qc2-mo-summaries", async (req, res) => {
-//   try {
-//     const {
-//       moNo,
-//       emp_id_inspection,
-//       startDate,
-//       endDate,
-//       color,
-//       size,
-//       department,
-//       buyer,
-//       lineNo,
-//       groupByDate, // "true" to group by date
-//       groupByLine, // "true" to group by lineNo
-//       groupByMO, // "true" to group by moNo
-//       groupByBuyer, // "true" to group by buyer
-//       groupByColor, // "true" to group by color
-//       groupBySize, // "true" to group by size
-//       groupByWeek // New parameter for weekly grouping
-//     } = req.query;
-
-//     let match = {};
-
-//     if (moNo && moNo.trim()) {
-//       match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
-//     }
-
-//     //if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
-//     if (emp_id_inspection)
-//       match.emp_id_inspection = {
-//         $regex: new RegExp(emp_id_inspection.trim(), "i")
-//       };
-//     if (color) match.color = color;
-//     if (size) match.size = size;
-//     if (department) match.department = department;
-//     if (buyer)
-//       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
-//     if (lineNo) match.lineNo = lineNo.trim();
-//     //if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") };
-
-//     // if (moNo && groupByMO !== "true")
-//     //   match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
-//     // if (emp_id_inspection)
-//     //   match.emp_id_inspection = {
-//     //     $regex: new RegExp(emp_id_inspection.trim(), "i")
-//     //   };
-//     // if (color && groupByColor !== "true") match.color = color;
-//     // if (size && groupBySize !== "true") match.size = size;
-//     // if (department) match.department = department;
-//     // if (buyer && groupByBuyer !== "true")
-//     //   match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
-//     // if (lineNo && groupByLine !== "true")
-//     //   match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") };
-
-//     // Normalize and convert dates to Date objects for proper comparison
-//     if (startDate || endDate) {
-//       match.$expr = match.$expr || {}; // Initialize $expr if not present
-//       match.$expr.$and = match.$expr.$and || [];
-
-//       if (startDate) {
-//         const normalizedStartDate = normalizeDateString(startDate);
-//         match.$expr.$and.push({
-//           $gte: [
-//             {
-//               $dateFromString: {
-//                 dateString: "$inspection_date",
-//                 format: "%m/%d/%Y"
-//               }
-//             },
-//             {
-//               $dateFromString: {
-//                 dateString: normalizedStartDate,
-//                 format: "%m/%d/%Y"
-//               }
-//             }
-//           ]
-//         });
-//       }
-//       if (endDate) {
-//         const normalizedEndDate = normalizeDateString(endDate);
-//         match.$expr.$and.push({
-//           $lte: [
-//             {
-//               $dateFromString: {
-//                 dateString: "$inspection_date",
-//                 format: "%m/%d/%Y"
-//               }
-//             },
-//             {
-//               $dateFromString: {
-//                 dateString: normalizedEndDate,
-//                 format: "%m/%d/%Y"
-//               }
-//             }
-//           ]
-//         });
-//       }
-//     }
-
-//     // Dynamically build the _id object for grouping based on query params
-//     const groupBy = {};
-//     const projectFields = {};
-
-//     // Order matters: Date, Line No, MO No, Buyer, Color, Size
-//     if (groupByWeek === "true") {
-//       groupBy.weekInfo = {
-//         $let: {
-//           vars: {
-//             date: {
-//               $dateFromString: {
-//                 dateString: "$inspection_date",
-//                 format: "%m/%d/%Y"
-//               }
-//             },
-//             monday: {
-//               $dateSubtract: {
-//                 startDate: {
-//                   $dateFromString: {
-//                     dateString: "$inspection_date",
-//                     format: "%m/%d/%Y"
-//                   }
-//                 },
-//                 unit: "day",
-//                 amount: { $mod: [{ $dayOfWeek: "$$date" }, 7] }
-//               }
-//             }
-//           },
-//           in: {
-//             weekNumber: {
-//               $week: "$$monday"
-//             },
-//             startDate: {
-//               $dateToString: {
-//                 format: "%Y-%m-%d",
-//                 date: "$$monday"
-//               }
-//             },
-//             endDate: {
-//               $dateToString: {
-//                 format: "%Y-%m-%d",
-//                 date: {
-//                   $dateAdd: {
-//                     startDate: "$$monday",
-//                     unit: "day",
-//                     amount: 6
-//                   }
-//                 }
-//               }
-//             }
-//           }
-//         }
-//       };
-//       projectFields.weekInfo = "$_id.weekInfo";
-//     } else if (groupByDate === "true") {
-//       groupBy.inspection_date = {
-//         $dateToString: {
-//           format: "%Y-%m-%d",
-//           date: {
-//             $dateFromString: {
-//               dateString: "$inspection_date",
-//               format: "%m/%d/%Y" // Match the "MM/DD/YYYY" format of inspection_date
-//             }
-//           }
-//         }
-//       };
-//       projectFields.inspection_date = "$_id.inspection_date";
-//     }
-//     if (groupByLine === "true") {
-//       groupBy.lineNo = "$lineNo";
-//       projectFields.lineNo = "$_id.lineNo";
-//     }
-//     if (groupByMO === "true") {
-//       groupBy.moNo = "$moNo";
-//       projectFields.moNo = "$_id.moNo";
-//     }
-//     if (groupByBuyer === "true") {
-//       groupBy.buyer = "$buyer";
-//       projectFields.buyer = "$_id.buyer";
-//     }
-//     if (groupByColor === "true") {
-//       groupBy.color = "$color";
-//       projectFields.color = "$_id.color";
-//     }
-//     if (groupBySize === "true") {
-//       groupBy.size = "$size";
-//       projectFields.size = "$_id.size";
-//     }
-
-//     const data = await QC2InspectionPassBundle.aggregate([
-//       { $match: match },
-//       {
-//         $group: {
-//           _id: groupBy,
-//           checkedQty: { $sum: "$checkedQty" },
-//           totalPass: { $sum: "$totalPass" },
-//           totalRejects: { $sum: "$totalRejects" },
-//           defectsQty: { $sum: "$defectQty" },
-//           totalBundles: { $sum: 1 },
-//           defectiveBundles: {
-//             $sum: { $cond: [{ $gt: ["$totalRepair", 0] }, 1, 0] }
-//           },
-//           defectArray: { $push: "$defectArray" },
-//           firstInspectionDate: { $first: "$inspection_date" }, // Preserve original string value
-//           firstLineNo: { $first: "$lineNo" },
-//           firstMoNo: { $first: "$moNo" },
-//           firstBuyer: { $first: "$buyer" },
-//           firstColor: { $first: "$color" },
-//           firstSize: { $first: "$size" }
-//         }
-//       },
-//       {
-//         $project: {
-//           ...projectFields,
-//           inspection_date:
-//             groupByDate !== "true"
-//               ? "$firstInspectionDate" // Keep as string since grouping by date is not selected
-//               : "$_id.inspection_date",
-//           lineNo: groupByLine !== "true" ? "$firstLineNo" : "$_id.lineNo",
-//           moNo: groupByMO !== "true" ? "$firstMoNo" : "$_id.moNo",
-//           buyer: groupByBuyer !== "true" ? "$firstBuyer" : "$_id.buyer",
-//           color: groupByColor !== "true" ? "$firstColor" : "$_id.color",
-//           size: groupBySize !== "true" ? "$firstSize" : "$_id.size",
-//           checkedQty: 1,
-//           totalPass: 1,
-//           totalRejects: 1,
-//           defectsQty: 1,
-//           totalBundles: 1,
-//           defectiveBundles: 1,
-//           defectArray: {
-//             $reduce: {
-//               input: "$defectArray",
-//               initialValue: [],
-//               in: { $concatArrays: ["$$value", "$$this"] }
-//             }
-//           },
-//           defectRate: {
-//             $cond: [
-//               { $eq: ["$checkedQty", 0] },
-//               0,
-//               { $divide: ["$defectsQty", "$checkedQty"] }
-//             ]
-//           },
-//           defectRatio: {
-//             $cond: [
-//               { $eq: ["$checkedQty", 0] },
-//               0,
-//               { $divide: ["$totalRejects", "$checkedQty"] }
-//             ]
-//           },
-//           _id: 0
-//         }
-//       },
-//       {
-//         $sort: {
-//           ...(groupByWeek === "true" && { "weekInfo.startDate": 1 }),
-//           ...(groupByDate === "true" && { inspection_date: 1 }),
-//           //inspection_date: 1, // Sort as string since inspection_date is a string
-//           lineNo: 1,
-//           moNo: 1
-//         }
-//       }
-//     ]);
-
-//     res.json(data);
-//   } catch (error) {
-//     console.error("Error fetching MO summaries:", error);
-//     res.status(500).json({ error: "Failed to fetch MO summaries" });
-//   }
-// });
-
 app.get("/api/qc2-defect-rates", async (req, res) => {
   try {
     const {
@@ -3994,6 +3724,31 @@ app.get("/api/qc2-defect-rates-by-line", async (req, res) => {
   } catch (error) {
     console.error("Error fetching defect rates by line:", error);
     res.status(500).json({ error: "Failed to fetch defect rates by line" });
+  }
+});
+
+/* ------------------------------
+   Emp id for Inspector Data
+------------------------------ */
+
+// Endpoint to fetch a specific user by emp_id
+app.get("/api/users/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const user = await UserMain.findOne(
+      { emp_id },
+      "emp_id eng_name face_photo"
+    ).lean();
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.json(user);
+  } catch (error) {
+    console.error(
+      `Error fetching user with emp_id ${req.params.emp_id}:`,
+      error
+    );
+    res.status(500).json({ error: "Failed to fetch user" });
   }
 });
 
