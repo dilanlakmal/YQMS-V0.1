@@ -12,17 +12,17 @@ const SummaryCard = ({ title, value, icon }) => {
   const getIconComponent = () => {
     switch (icon) {
       case "checkCircle":
-        return <CheckCircle className="text-green-500 text-3xl" />;
+        return <CheckCircle className="text-green-500 text-xl" />;
       case "xCircle":
-        return <XCircle className="text-red-500 text-3xl" />;
+        return <XCircle className="text-red-500 text-xl" />;
       case "list":
-        return <List className="text-yellow-500 text-3xl" />;
+        return <List className="text-yellow-500 text-xl" />;
       case "archive":
-        return <Archive className="text-blue-500 text-3xl" />;
+        return <Archive className="text-blue-500 text-xl" />;
       case "pieChart":
-        return <PieChart className="text-purple-500 text-3xl" />;
+        return <PieChart className="text-purple-500 text-xl" />;
       case "trendingDown":
-        return <TrendingDown className="text-orange-500 text-3xl" />;
+        return <TrendingDown className="text-orange-500 text-xl" />;
       default:
         return null;
     }
@@ -71,7 +71,7 @@ const SummaryCard = ({ title, value, icon }) => {
       )} shadow-md rounded-lg flex items-center justify-between`}
     >
       <div>
-        <h2 className="text-lg font-semibold text-gray-700">{title}</h2>
+        <h2 className="text-sm font-semibold text-gray-700">{title}</h2>
         <p className={`text-2xl font-bold ${getTextColor(title)}`}>
           {typeof value === "number"
             ? [

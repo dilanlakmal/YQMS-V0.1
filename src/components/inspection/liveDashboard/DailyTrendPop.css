@@ -1,0 +1,68 @@
+/* Import Poppins font from Google Fonts for crisp typography */
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
+
+* {
+  font-family: "Poppins", sans-serif;
+  -webkit-font-smoothing: antialiased; /* Improve font rendering */
+  -moz-osx-font-smoothing: grayscale; /* Ensure sharpness on all platforms */
+}
+
+/* Custom Animations */
+@keyframes pulse-slow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s infinite ease-in-out;
+}
+
+/* Ensure no blurriness from transforms or filters */
+.transition-all {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Styles for SummaryCard customization */
+.daily-trend-pop .custom-card-stack {
+  padding: 0.5rem !important; /* Reduce padding to make card smaller */
+  min-height: 90px; /* Ensure enough height for stacked layout */
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important; /* Center content vertically */
+  align-items: center !important;
+  text-align: center !important;
+  overflow: hidden !important; /* Prevent overflow */
+}
+
+/* Reduce label font size and adjust icon/value sizes */
+.daily-trend-pop .custom-card-stack h2 {
+  font-size: 0.625rem !important; /* Reduce label to extra small (10px) */
+  line-height: 0.75rem;
+  margin: 0;
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden; /* Hide overflow if text is too long */
+  text-overflow: ellipsis; /* Add ellipsis for long titles */
+}
+
+.daily-trend-pop .custom-card-stack p {
+  font-size: 0.75rem !important; /* Reduce value to extra small (12px) */
+  line-height: 0.875rem;
+  margin: 0.25rem 0 0;
+}
+
+.daily-trend-pop .custom-card-stack svg {
+  width: 1.25rem !important; /* Further reduce icon size to fit */
+  height: 1.25rem !important;
+  margin-bottom: 0.25rem; /* Space between icon and label */
+}
+
+/* Hover effects for list items */
+.daily-trend-pop .defect-item:hover {
+  background-color: rgba(255, 255, 255, 1); /* Increase opacity on hover */
+  transform: translateY(-0.25rem); /* Lift effect */
+}
