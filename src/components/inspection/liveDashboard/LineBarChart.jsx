@@ -36,7 +36,7 @@ const LineBarChart = ({ filters }) => {
   const fetchMoDefectRates = async (filters = {}) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/qc2-mo-summaries`, {
-        params: { ...filters, groupByMO: "true" } // Add groupByMO parameter //filters
+        params: { ...filters, groupByLine: "true" } // Add groupByLine parameter //filters
       });
 
       // Aggregate data by Line No to ensure uniqueness and sum defectQty and checkedQty

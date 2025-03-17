@@ -18,6 +18,7 @@ import OrderData from "../components/inspection/liveDashboard/OrderData";
 import WashingLive from "../components/inspection/liveDashboard/WashingLive";
 import IroningLive from "../components/inspection/liveDashboard/IroningLive";
 import OPALive from "../components/inspection/liveDashboard/OPALive";
+import DailySummary from "../components/inspection/liveDashboard/DailySummary";
 
 const LiveDashboard = () => {
   const [activeSection, setActiveSection] = useState("Live Dashboard");
@@ -245,18 +246,32 @@ const LiveDashboard = () => {
 
   // Update filtersRef
   useEffect(() => {
-    filtersRef.current = {
-      moNo,
-      color,
-      size,
-      department,
-      emp_id_inspection: empId,
-      startDate: startDate ? formatDate(startDate) : null,
-      endDate: endDate ? formatDate(endDate) : null,
-      buyer,
-      lineNo
-    };
+    const filters = {};
+    if (moNo && moNo.trim()) filters.moNo = moNo;
+    if (color && color.trim()) filters.color = color;
+    if (size && size.trim()) filters.size = size;
+    if (department && department.trim()) filters.department = department;
+    if (empId && empId.trim()) filters.emp_id_inspection = empId;
+    if (startDate) filters.startDate = formatDate(startDate);
+    if (endDate) filters.endDate = formatDate(endDate);
+    if (buyer && buyer.trim()) filters.buyer = buyer;
+    if (lineNo && lineNo.trim()) filters.lineNo = lineNo;
+    filtersRef.current = filters;
   }, [moNo, color, size, department, empId, startDate, endDate, buyer, lineNo]);
+
+  // useEffect(() => {
+  //   filtersRef.current = {
+  //     moNo,
+  //     color,
+  //     size,
+  //     department,
+  //     emp_id_inspection: empId,
+  //     startDate: startDate ? formatDate(startDate) : null,
+  //     endDate: endDate ? formatDate(endDate) : null,
+  //     buyer,
+  //     lineNo
+  //   };
+  // }, [moNo, color, size, department, empId, startDate, endDate, buyer, lineNo]);
 
   // Socket.io connection
   useEffect(() => {
@@ -651,6 +666,9 @@ const LiveDashboard = () => {
             )}
           </>
         )}
+        {activeSection === "Daily Summary" && (
+          <DailySummary filters={filtersRef.current} />
+        )}
 
         {["Packing"].includes(activeSection) && (
           <div className="text-center mt-8 text-gray-700">
@@ -658,9 +676,7 @@ const LiveDashboard = () => {
           </div>
         )}
 
-        {["Daily Summary", "Weekly Analysis", "Monthly Analysis"].includes(
-          activeSection
-        ) && (
+        {["Weekly Analysis", "Monthly Analysis"].includes(activeSection) && (
           <div className="text-center mt-8 text-gray-700">
             <h2 className="text-xl font-medium">Coming soon</h2>
           </div>
