@@ -19,6 +19,7 @@ import WashingLive from "../components/inspection/liveDashboard/WashingLive";
 import IroningLive from "../components/inspection/liveDashboard/IroningLive";
 import OPALive from "../components/inspection/liveDashboard/OPALive";
 import DailySummary from "../components/inspection/liveDashboard/DailySummary";
+import WeeklySummary from "../components/inspection/liveDashboard/WeeklySummary";
 
 const LiveDashboard = () => {
   const [activeSection, setActiveSection] = useState("Live Dashboard");
@@ -670,13 +671,17 @@ const LiveDashboard = () => {
           <DailySummary filters={filtersRef.current} />
         )}
 
+        {activeSection === "Weekly Analysis" && (
+          <WeeklySummary filters={filtersRef.current} />
+        )}
+
         {["Packing"].includes(activeSection) && (
           <div className="text-center mt-8 text-gray-700">
             <h2 className="text-xl font-medium">Coming soon</h2>
           </div>
         )}
 
-        {["Weekly Analysis", "Monthly Analysis"].includes(activeSection) && (
+        {["Monthly Analysis"].includes(activeSection) && (
           <div className="text-center mt-8 text-gray-700">
             <h2 className="text-xl font-medium">Coming soon</h2>
           </div>

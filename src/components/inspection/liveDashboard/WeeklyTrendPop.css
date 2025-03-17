@@ -1,0 +1,68 @@
+/* Import Poppins font from Google Fonts for crisp typography */
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
+
+* {
+  font-family: "Poppins", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Animations */
+@keyframes pulse-slow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s infinite ease-in-out;
+}
+
+/* Ensure no blurriness from transforms or filters */
+.transition-all {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Styles for SummaryCard customization */
+.weekly-trend-pop .custom-card-stack {
+  padding: 0.5rem !important;
+  min-height: 90px;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  text-align: center !important;
+  overflow: hidden !important;
+}
+
+/* Reduce label font size and adjust icon/value sizes */
+.weekly-trend-pop .custom-card-stack h2 {
+  font-size: 0.625rem !important;
+  line-height: 0.75rem;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.weekly-trend-pop .custom-card-stack p {
+  font-size: 0.75rem !important;
+  line-height: 0.875rem;
+  margin: 0.25rem 0 0;
+}
+
+.weekly-trend-pop .custom-card-stack svg {
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  margin-bottom: 0.25rem;
+}
+
+/* Hover effects for list items */
+.weekly-trend-pop .defect-item:hover {
+  background-color: rgba(255, 255, 255, 1);
+  transform: translateY(-0.25rem);
+}
