@@ -52,12 +52,11 @@ const IroningPage = () => {
 
   const fetchBundleData = async (randomId) => {
     try {
-      const trimmedId = randomId.trim(); // Trim to avoid whitespace issues
+      const trimmedId = randomId.trim();
       setLoadingData(true);
       setIsDefectCard(false);
-      console.log("Scanned QR Code:", trimmedId); // Debug log
+      console.log("Scanned QR Code:", trimmedId);
 
-      // Try fetching order card from qc2_orderdata
       let response = await fetch(
         `${API_BASE_URL}/api/bundle-by-random-id/${trimmedId}`
       );
@@ -74,7 +73,6 @@ const IroningPage = () => {
         setScannedData({ ...data, bundle_random_id: trimmedId });
         setPassQtyIron(data.count);
       } else {
-        // Fetch defect card from qc2_inspection_pass_bundle
         const defectResponse = await fetch(
           `${API_BASE_URL}/api/check-defect-card/${trimmedId}`
         );
@@ -91,7 +89,6 @@ const IroningPage = () => {
         const defectData = JSON.parse(defectResponseText);
         console.log("Defect card data fetched:", defectData);
 
-        // Check if this defect_print_id already exists in Ironing (using ironing_bundle_id format: defect_print_id-84)
         const existsResponse = await fetch(
           `${API_BASE_URL}/api/check-ironing-exists/${trimmedId}-84`
         );
@@ -103,29 +100,29 @@ const IroningPage = () => {
         const formattedData = {
           defect_print_id: defectData.defect_print_id,
           totalRejectGarmentCount: defectData.totalRejectGarmentCount,
-          package_no: defectData.package_no, // Include package_no
+          package_no: defectData.package_no,
           moNo: defectData.moNo,
-          selectedMono: defectData.moNo, // Alias for consistency
+          selectedMono: defectData.moNo,
           custStyle: defectData.custStyle,
           buyer: defectData.buyer,
           color: defectData.color,
           size: defectData.size,
           factory: defectData.factory || "N/A",
-          country: defectData.country || "N/A", // Use if available, else empty
+          country: defectData.country || "N/A",
           lineNo: defectData.lineNo,
-          department: defectData.department, // Use from qc2_inspection_pass_bundle
-          count: defectData.totalRejectGarmentCount, // Use totalRejectGarmentCount for Ironing defect cards
-          totalBundleQty: 1, // Set hardcoded as 1 for defect card
+          department: defectData.department,
+          count: defectData.totalRejectGarmentCount,
+          totalBundleQty: 1,
           emp_id_inspection: defectData.emp_id_inspection,
           inspection_date: defectData.inspection_date,
           inspection_time: defectData.inspection_time,
           sub_con: defectData.sub_con,
           sub_con_factory: defectData.sub_con_factory,
           bundle_id: defectData.bundle_id,
-          bundle_random_id: defectData.bundle_random_id,
+          bundle_random_id: defectData.bundle_random_id
         };
         setScannedData(formattedData);
-        setPassQtyIron(defectData.totalRejectGarmentCount); // Use totalRejectGarmentCount for Pass Iron Qty
+        setPassQtyIron(defectData.totalRejectGarmentCount);
         setIsDefectCard(true);
       }
 
@@ -135,7 +132,7 @@ const IroningPage = () => {
     } catch (err) {
       console.error("Fetch error:", err.message);
       setError(err.message);
-      setScannedData(null); // Prevent the scanned box from opening
+      setScannedData(null);
       setIsAdding(false);
     } finally {
       setLoadingData(false);
@@ -145,24 +142,26 @@ const IroningPage = () => {
   const handleAddRecord = async () => {
     try {
       const now = new Date();
+      const taskNoIroning = isDefectCard ? 84 : 53;
+
       const newRecord = {
         ironing_record_id: isDefectCard ? 0 : ironingRecordId,
-        task_no_ironing: isDefectCard ? 84 : 53,
+        task_no_ironing: taskNoIroning,
         ironing_bundle_id: isDefectCard
           ? `${scannedData.defect_print_id}-84`
           : `${scannedData.bundle_id}-53`,
         ironing_updated_date: now.toLocaleDateString("en-US", {
           month: "2-digit",
           day: "2-digit",
-          year: "numeric",
+          year: "numeric"
         }),
         ironing_update_time: now.toLocaleTimeString("en-US", {
           hour12: false,
           hour: "2-digit",
           minute: "2-digit",
-          second: "2-digit",
+          second: "2-digit"
         }),
-        package_no: scannedData.package_no, // Include package_no
+        package_no: scannedData.package_no,
         ...scannedData,
         passQtyIron,
         emp_id_ironing: user.emp_id,
@@ -170,38 +169,46 @@ const IroningPage = () => {
         kh_name_ironing: user.kh_name,
         job_title_ironing: user.job_title,
         dept_name_ironing: user.dept_name,
-        sect_name_ironing: user.sect_name,
+        sect_name_ironing: user.sect_name
       };
       console.log("New Record to be saved:", newRecord);
+
       const response = await fetch(`${API_BASE_URL}/api/save-ironing`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newRecord),
+        body: JSON.stringify(newRecord)
       });
       if (!response.ok) throw new Error("Failed to save ironing record");
 
-      if (!isDefectCard) {
-        const updateResponse = await fetch(
-          `${API_BASE_URL}/api/update-qc2-orderdata/${scannedData.bundle_id}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              passQtyIron,
-              emp_id_ironing: user.emp_id,
-              eng_name_ironing: user.eng_name,
-              kh_name_ironing: user.kh_name,
-              job_title_ironing: user.job_title,
-              dept_name_ironing: user.dept_name,
-              sect_name_ironing: user.sect_name,
-              ironing_updated_date: newRecord.ironing_updated_date,
-              ironing_update_time: newRecord.ironing_update_time,
-            }),
-          }
-        );
-        if (!updateResponse.ok)
-          throw new Error("Failed to update qc2_orderdata");
-      }
+      // Update qc2_orderdata
+      const inspectionType = isDefectCard ? "defect" : "first";
+      const updateData = {
+        inspectionType,
+        process: "ironing",
+        data: {
+          task_no: taskNoIroning,
+          passQty: newRecord.passQtyIron,
+          updated_date: newRecord.ironing_updated_date,
+          update_time: newRecord.ironing_update_time,
+          emp_id: newRecord.emp_id_ironing,
+          eng_name: newRecord.eng_name_ironing,
+          kh_name: newRecord.kh_name_ironing,
+          job_title: newRecord.job_title_ironing,
+          dept_name: newRecord.dept_name_ironing,
+          sect_name: newRecord.sect_name_ironing,
+          ...(isDefectCard && { defect_print_id: scannedData.defect_print_id })
+        }
+      };
+
+      const updateResponse = await fetch(
+        `${API_BASE_URL}/api/update-qc2-orderdata/${scannedData.bundle_id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updateData)
+        }
+      );
+      if (!updateResponse.ok) throw new Error("Failed to update qc2_orderdata");
 
       setIroningRecords((prev) => [...prev, newRecord]);
       setScannedData(null);

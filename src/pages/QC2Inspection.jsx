@@ -265,7 +265,13 @@ const QC2InspectionPage = () => {
       );
       if (!response.ok) throw new Error("Bundle not found");
       const data = await response.json();
-      if (data.passQtyIron === undefined) {
+
+      // Check if the bundle has been ironed by looking in the inspectionFirst array
+      const ironingEntry = data.inspectionFirst?.find(
+        (entry) => entry.process === "ironing"
+      );
+
+      if (!ironingEntry) {
         setError(
           "This bundle has not been ironed yet. Please wait until it is ironed."
         );
@@ -273,6 +279,9 @@ const QC2InspectionPage = () => {
         setInDefectWindow(false);
         setScanning(false);
       } else {
+        const passQtyIron = ironingEntry.passQty || 0;
+
+        // Prepare the initial payload for inspection
         const initialPayload = {
           package_no: data.package_no,
           moNo: data.selectedMono,
@@ -282,12 +291,12 @@ const QC2InspectionPage = () => {
           lineNo: data.lineNo,
           department: data.department,
           buyer: data.buyer,
-          factory: data.factory, // Added
-          country: data.country, // Added
-          sub_con: data.sub_con, // Added
-          sub_con_factory: data.sub_con_factory, // Added
-          checkedQty: data.passQtyIron,
-          totalPass: data.passQtyIron,
+          factory: data.factory,
+          country: data.country,
+          sub_con: data.sub_con,
+          sub_con_factory: data.sub_con_factory,
+          checkedQty: passQtyIron,
+          totalPass: passQtyIron,
           totalRejects: 0,
           totalRepair: 0,
           defectQty: 0,
@@ -305,6 +314,8 @@ const QC2InspectionPage = () => {
           bundle_random_id: data.bundle_random_id,
           printArray: []
         };
+
+        // Save the initial inspection record
         const createResponse = await fetch(
           `${API_BASE_URL}/api/inspection-pass-bundle`,
           {
@@ -316,7 +327,7 @@ const QC2InspectionPage = () => {
         if (!createResponse.ok)
           throw new Error("Failed to create inspection record");
 
-        setBundleData(data);
+        setBundleData({ ...data, passQtyIron }); // Add passQtyIron to bundleData for consistency
         setTotalRepair(0);
         setInDefectWindow(true);
         setScanning(false);
@@ -329,6 +340,79 @@ const QC2InspectionPage = () => {
       setLoadingData(false);
     }
   };
+
+  // const fetchBundleData = async (randomId) => {
+  //   try {
+  //     setLoadingData(true);
+  //     const response = await fetch(
+  //       `${API_BASE_URL}/api/bundle-by-random-id/${randomId}`
+  //     );
+  //     if (!response.ok) throw new Error("Bundle not found");
+  //     const data = await response.json();
+  //     if (data.passQtyIron === undefined) {
+  //       setError(
+  //         "This bundle has not been ironed yet. Please wait until it is ironed."
+  //       );
+  //       setBundleData(null);
+  //       setInDefectWindow(false);
+  //       setScanning(false);
+  //     } else {
+  //       const initialPayload = {
+  //         package_no: data.package_no,
+  //         moNo: data.selectedMono,
+  //         custStyle: data.custStyle,
+  //         color: data.color,
+  //         size: data.size,
+  //         lineNo: data.lineNo,
+  //         department: data.department,
+  //         buyer: data.buyer,
+  //         factory: data.factory, // Added
+  //         country: data.country, // Added
+  //         sub_con: data.sub_con, // Added
+  //         sub_con_factory: data.sub_con_factory, // Added
+  //         checkedQty: data.passQtyIron,
+  //         totalPass: data.passQtyIron,
+  //         totalRejects: 0,
+  //         totalRepair: 0,
+  //         defectQty: 0,
+  //         defectArray: [],
+  //         rejectGarments: [],
+  //         inspection_time: "",
+  //         inspection_date: new Date().toLocaleDateString("en-US"),
+  //         emp_id_inspection: user.emp_id,
+  //         eng_name_inspection: user.eng_name,
+  //         kh_name_inspection: user.kh_name,
+  //         job_title_inspection: user.job_title,
+  //         dept_name_inspection: user.dept_name,
+  //         sect_name_inspection: user.sect_name,
+  //         bundle_id: data.bundle_id,
+  //         bundle_random_id: data.bundle_random_id,
+  //         printArray: []
+  //       };
+  //       const createResponse = await fetch(
+  //         `${API_BASE_URL}/api/inspection-pass-bundle`,
+  //         {
+  //           method: "POST",
+  //           headers: { "Content-Type": "application/json" },
+  //           body: JSON.stringify(initialPayload)
+  //         }
+  //       );
+  //       if (!createResponse.ok)
+  //         throw new Error("Failed to create inspection record");
+
+  //       setBundleData(data);
+  //       setTotalRepair(0);
+  //       setInDefectWindow(true);
+  //       setScanning(false);
+  //       setError(null);
+  //     }
+  //   } catch (err) {
+  //     setError(err.message || "Failed to fetch bundle data");
+  //     setBundleData(null);
+  //   } finally {
+  //     setLoadingData(false);
+  //   }
+  // };
 
   const handleDefectCardScan = async (bundleData, defect_print_id) => {
     try {

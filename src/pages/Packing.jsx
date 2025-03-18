@@ -57,7 +57,6 @@ const PackingPage = () => {
       setIsDefectCard(false);
       console.log("Scanned QR Code (10-digit):", trimmedId);
 
-      // Step 1: Try fetching as an order card using bundle_random_id
       let orderResponse = await fetch(
         `${API_BASE_URL}/api/qc2-inspection-pass-bundle-by-random-id/${trimmedId}`
       );
@@ -73,7 +72,6 @@ const PackingPage = () => {
           bundleData
         );
 
-        // Check if the order card already exists in Packing
         const existsResponse = await fetch(
           `${API_BASE_URL}/api/check-packing-exists/${bundleData.bundle_id}-62`
         );
@@ -82,7 +80,6 @@ const PackingPage = () => {
           throw new Error("This order card already exists");
         }
 
-        // Format order card data
         const formattedData = {
           bundle_id: bundleData.bundle_id,
           bundle_random_id: bundleData.bundle_random_id,
@@ -97,19 +94,18 @@ const PackingPage = () => {
           country: bundleData.country || "N/A",
           lineNo: bundleData.lineNo,
           department: bundleData.department,
-          count: bundleData.totalPass, // Use totalPass for order cards
+          count: bundleData.totalPass,
           totalBundleQty: 1,
           emp_id_inspection: bundleData.emp_id_inspection,
           inspection_date: bundleData.inspection_date,
           inspection_time: bundleData.inspection_time,
           sub_con: bundleData.sub_con,
-          sub_con_factory: bundleData.sub_con_factory,
+          sub_con_factory: bundleData.sub_con_factory
         };
 
         setScannedData(formattedData);
         setPassQtyPack(bundleData.totalPass);
       } else {
-        // Step 2: Try fetching as a defect card using defect_print_id
         const defectResponse = await fetch(
           `${API_BASE_URL}/api/qc2-inspection-pass-bundle-by-defect-print-id/${trimmedId}?includeCompleted=true`
         );
@@ -125,7 +121,6 @@ const PackingPage = () => {
             defectData
           );
 
-          // Find the specific defect print data in printArray
           const printData = defectData.printArray.find(
             (item) => item.defect_print_id === trimmedId
           );
@@ -133,7 +128,6 @@ const PackingPage = () => {
             throw new Error("Defect print ID not found in printArray");
           }
 
-          // Check if the defect card already exists in Packing
           const existsResponse = await fetch(
             `${API_BASE_URL}/api/check-packing-exists/${trimmedId}-62`
           );
@@ -142,7 +136,6 @@ const PackingPage = () => {
             throw new Error("This defect card already exists");
           }
 
-          // Format defect card data
           const formattedData = {
             defect_print_id: printData.defect_print_id,
             totalRejectGarmentCount: printData.totalRejectGarmentCount,
@@ -158,7 +151,7 @@ const PackingPage = () => {
             country: defectData.country || "N/A",
             lineNo: defectData.lineNo,
             department: defectData.department,
-            count: printData.totalRejectGarment_Var, // Use totalRejectGarment_Var for defect cards
+            count: printData.totalRejectGarment_Var,
             totalBundleQty: 1,
             emp_id_inspection: defectData.emp_id_inspection,
             inspection_date: defectData.inspection_date,
@@ -166,7 +159,7 @@ const PackingPage = () => {
             sub_con: defectData.sub_con,
             sub_con_factory: defectData.sub_con_factory,
             bundle_id: defectData.bundle_id,
-            bundle_random_id: defectData.bundle_random_id,
+            bundle_random_id: defectData.bundle_random_id
           };
 
           setScannedData(formattedData);
@@ -180,7 +173,6 @@ const PackingPage = () => {
         }
       }
 
-      // If we reach here, scannedData is set successfully
       setIsAdding(true);
       setCountdown(5);
       setError(null);
@@ -197,24 +189,26 @@ const PackingPage = () => {
   const handleAddRecord = async () => {
     try {
       const now = new Date();
+      const taskNoPacking = 62;
+
       const newRecord = {
-        packing_record_id: isDefectCard ? 0 : packingRecordId,
-        task_no_packing: 62, // Set task_no_packing to 62 for both order and defect cards
+        packing_record_id: packingRecordId,
+        task_no_packing: taskNoPacking,
         packing_bundle_id: isDefectCard
           ? `${scannedData.defect_print_id}-62`
-          : `${scannedData.bundle_id}-62`, // Updated task_no to 62
+          : `${scannedData.bundle_id}-62`,
         packing_updated_date: now.toLocaleDateString("en-US", {
           month: "2-digit",
           day: "2-digit",
-          year: "numeric",
+          year: "numeric"
         }),
         packing_update_time: now.toLocaleTimeString("en-US", {
           hour12: false,
           hour: "2-digit",
           minute: "2-digit",
-          second: "2-digit",
+          second: "2-digit"
         }),
-        package_no: scannedData.package_no, // Include package_no
+        package_no: scannedData.package_no,
         ...scannedData,
         passQtyPack,
         emp_id_packing: user.emp_id,
@@ -222,44 +216,53 @@ const PackingPage = () => {
         kh_name_packing: user.kh_name,
         job_title_packing: user.job_title,
         dept_name_packing: user.dept_name,
-        sect_name_packing: user.sect_name,
+        sect_name_packing: user.sect_name
       };
       console.log("New Record to be saved:", newRecord);
+
       const response = await fetch(`${API_BASE_URL}/api/save-packing`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newRecord),
+        body: JSON.stringify(newRecord)
       });
       if (!response.ok) throw new Error("Failed to save packing record");
 
-      if (!isDefectCard) {
-        const updateResponse = await fetch(
-          `${API_BASE_URL}/api/update-qc2-orderdata/${scannedData.bundle_id}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              passQtyPack,
-              packing_updated_date: newRecord.packing_updated_date,
-              packing_update_time: newRecord.packing_update_time,
-              emp_id_packing: user.emp_id,
-              eng_name_packing: user.eng_name,
-              kh_name_packing: user.kh_name,
-              job_title_packing: user.job_title,
-              dept_name_packing: user.dept_name,
-              sect_name_packing: user.sect_name,
-            }),
-          }
-        );
-        if (!updateResponse.ok)
-          throw new Error("Failed to update qc2_orderdata");
-      }
+      // Update qc2_orderdata
+      const inspectionType = isDefectCard ? "defect" : "first";
+      const updateData = {
+        inspectionType,
+        process: "packing",
+        data: {
+          task_no: taskNoPacking,
+          passQty: newRecord.passQtyPack,
+          updated_date: newRecord.packing_updated_date,
+          update_time: newRecord.packing_update_time,
+          emp_id: newRecord.emp_id_packing,
+          eng_name: newRecord.eng_name_packing,
+          kh_name: newRecord.kh_name_packing,
+          job_title: newRecord.job_title_packing,
+          dept_name: newRecord.dept_name_packing,
+          sect_name: newRecord.sect_name_packing,
+          packing_record_id: newRecord.packing_record_id,
+          ...(isDefectCard && { defect_print_id: scannedData.defect_print_id })
+        }
+      };
+
+      const updateResponse = await fetch(
+        `${API_BASE_URL}/api/update-qc2-orderdata/${scannedData.bundle_id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updateData)
+        }
+      );
+      if (!updateResponse.ok) throw new Error("Failed to update qc2_orderdata");
 
       setPackingRecords((prev) => [...prev, newRecord]);
       setScannedData(null);
       setIsAdding(false);
       setCountdown(5);
-      if (!isDefectCard) setPackingRecordId((prev) => prev + 1);
+      setPackingRecordId((prev) => prev + 1);
     } catch (err) {
       setError(err.message);
     }
@@ -278,7 +281,7 @@ const PackingPage = () => {
 
   const handlePassQtyChange = (value) => {
     const maxQty = isDefectCard
-      ? scannedData.totalRejectGarment_Var || scannedData.count // Use totalRejectGarment_Var for defect cards, fall back to count
+      ? scannedData.totalRejectGarment_Var || scannedData.count
       : scannedData.count;
     if (value >= 0 && value <= maxQty) {
       setPassQtyPack(value);
@@ -365,18 +368,9 @@ const PackingPage = () => {
             scannedData={scannedData}
             loadingData={loadingData}
             passQtyPack={passQtyPack}
-            handlePassQtyChange={(value) => {
-              const maxQty = isDefectCard
-                ? scannedData.totalRejectGarment_Var || scannedData.count
-                : scannedData.count;
-              if (value >= 0 && value <= maxQty) {
-                setPassQtyPack(value);
-              }
-            }}
-            //handlePassQtyChange={handlePassQtyChange}
-            error={error}
+            handlePassQtyChange={handlePassQtyChange}
             isIroningPage={false}
-            isPackingPage={true} // Updated to indicate Packing page
+            isPackingPage={true}
             isDefectCard={isDefectCard}
           />
         ) : (

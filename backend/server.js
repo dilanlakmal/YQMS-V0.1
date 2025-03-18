@@ -589,20 +589,6 @@ app.get("/api/user-batches", async (req, res) => {
   }
 });
 
-// //For Data tab display records in a table
-// app.get("/api/user-batches", async (req, res) => {
-//   try {
-//     const { emp_id } = req.query;
-//     if (!emp_id) {
-//       return res.status(400).json({ message: "emp_id is required" });
-//     }
-//     const batches = await QC2OrderData.find({ emp_id });
-//     res.json(batches);
-//   } catch (error) {
-//     res.status(500).json({ message: "Failed to fetch user batches" });
-//   }
-// });
-
 /* ------------------------------
    End Points - Reprint - qc2_orderdata
 ------------------------------ */
@@ -837,48 +823,6 @@ app.post("/api/save-ironing", async (req, res) => {
   }
 });
 
-// Update qc2_orderdata with ironing details
-app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
-  try {
-    const { bundleId } = req.params;
-    const {
-      passQtyIron,
-      ironing_updated_date,
-      ironing_update_time,
-      emp_id_ironing,
-      eng_name_ironing,
-      kh_name_ironing,
-      job_title_ironing,
-      dept_name_ironing,
-      sect_name_ironing
-    } = req.body;
-
-    const updatedRecord = await QC2OrderData.findOneAndUpdate(
-      { bundle_id: bundleId },
-      {
-        passQtyIron,
-        ironing_updated_date,
-        ironing_update_time,
-        emp_id_ironing,
-        eng_name_ironing,
-        kh_name_ironing,
-        job_title_ironing,
-        dept_name_ironing,
-        sect_name_ironing
-      },
-      { new: true }
-    );
-
-    if (!updatedRecord) {
-      return res.status(404).json({ error: "Bundle not found" });
-    }
-
-    res.json({ message: "Record updated successfully", data: updatedRecord });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update record" });
-  }
-});
-
 // For Data tab display records in a table
 app.get("/api/ironing-records", async (req, res) => {
   try {
@@ -1003,47 +947,6 @@ app.post("/api/save-washing", async (req, res) => {
   }
 });
 
-app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
-  try {
-    const { bundleId } = req.params;
-    const {
-      passQtyWash,
-      washing_updated_date,
-      washing_update_time,
-      emp_id_washing,
-      eng_name_washing,
-      kh_name_washing,
-      job_title_washing,
-      dept_name_washing,
-      sect_name_washing
-    } = req.body;
-
-    const updatedRecord = await QC2OrderData.findOneAndUpdate(
-      { bundle_id: bundleId },
-      {
-        passQtyWash,
-        washing_updated_date,
-        washing_update_time,
-        emp_id_washing,
-        eng_name_washing,
-        kh_name_washing,
-        job_title_washing,
-        dept_name_washing,
-        sect_name_washing
-      },
-      { new: true }
-    );
-
-    if (!updatedRecord) {
-      return res.status(404).json({ error: "Bundle not found" });
-    }
-
-    res.json({ message: "Record updated successfully", data: updatedRecord });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update record" });
-  }
-});
-
 app.get("/api/washing-records", async (req, res) => {
   try {
     const records = await Washing.find();
@@ -1164,47 +1067,6 @@ app.post("/api/save-opa", async (req, res) => {
     } else {
       res.status(500).json({ error: "Failed to save record" });
     }
-  }
-});
-
-app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
-  try {
-    const { bundleId } = req.params;
-    const {
-      passQtyOPA,
-      opa_updated_date,
-      opa_update_time,
-      emp_id_opa,
-      eng_name_opa,
-      kh_name_opa,
-      job_title_opa,
-      dept_name_opa,
-      sect_name_opa
-    } = req.body;
-
-    const updatedRecord = await QC2OrderData.findOneAndUpdate(
-      { bundle_id: bundleId },
-      {
-        passQtyOPA,
-        opa_updated_date,
-        opa_update_time,
-        emp_id_opa,
-        eng_name_opa,
-        kh_name_opa,
-        job_title_opa,
-        dept_name_opa,
-        sect_name_opa
-      },
-      { new: true }
-    );
-
-    if (!updatedRecord) {
-      return res.status(404).json({ error: "Bundle not found" });
-    }
-
-    res.json({ message: "Record updated successfully", data: updatedRecord });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update record" });
   }
 });
 
@@ -1386,36 +1248,51 @@ app.post("/api/save-packing", async (req, res) => {
   }
 });
 
-// Update qc2_orderdata with Packing details (no change needed)
+//For Data tab display records in a table (no change needed)
+app.get("/api/packing-records", async (req, res) => {
+  try {
+    const records = await Packing.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch Packing records" });
+  }
+});
+
+/* ------------------------------
+  PUT Endpoints - Update QC2 Order Data
+------------------------------ */
+
 app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
   try {
     const { bundleId } = req.params;
-    const {
-      passQtyPack,
-      packing_updated_date,
-      packing_update_time,
-      emp_id_packing,
-      eng_name_packing,
-      kh_name_packing,
-      job_title_packing,
-      dept_name_packing,
-      sect_name_packing
-    } = req.body;
+    const { inspectionType, process, data } = req.body;
+
+    if (!["first", "defect"].includes(inspectionType)) {
+      return res.status(400).json({ error: "Invalid inspection type" });
+    }
+
+    const updateField =
+      inspectionType === "first" ? "inspectionFirst" : "inspectionDefect";
+    const updateOperation = {
+      $push: {
+        [updateField]: {
+          process,
+          ...data
+        }
+      }
+    };
+
+    // For defect scans, ensure defect_print_id is provided
+    if (inspectionType === "defect" && !data.defect_print_id) {
+      return res
+        .status(400)
+        .json({ error: "defect_print_id is required for defect scans" });
+    }
 
     const updatedRecord = await QC2OrderData.findOneAndUpdate(
       { bundle_id: bundleId },
-      {
-        passQtyPack,
-        packing_updated_date,
-        packing_update_time,
-        emp_id_packing,
-        eng_name_packing,
-        kh_name_packing,
-        job_title_packing,
-        dept_name_packing,
-        sect_name_packing
-      },
-      { new: true }
+      updateOperation,
+      { new: true, upsert: true }
     );
 
     if (!updatedRecord) {
@@ -1424,17 +1301,10 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
 
     res.json({ message: "Record updated successfully", data: updatedRecord });
   } catch (error) {
-    res.status(500).json({ error: "Failed to update record" });
-  }
-});
-
-// For Data tab display records in a table (no change needed)
-app.get("/api/packing-records", async (req, res) => {
-  try {
-    const records = await Packing.find();
-    res.json(records);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch Packing records" });
+    console.error("Error updating qc2_orderdata:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to update record", details: error.message });
   }
 });
 
@@ -2438,7 +2308,6 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     if (lineNo) match.lineNo = lineNo.trim();
     //if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
 
-    // Normalize dates and apply string comparison
     // Normalize and convert dates to Date objects for proper comparison
     if (startDate || endDate) {
       match.$expr = match.$expr || {}; // Initialize $expr if not present
