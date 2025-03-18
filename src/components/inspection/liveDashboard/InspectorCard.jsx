@@ -4,7 +4,10 @@ import { API_BASE_URL } from "../../../../config";
 import { Camera, AlertCircle } from "lucide-react";
 
 // Placeholder image in case the inspector's photo is not available
-const placeholderImage = "https://via.placeholder.com/150?text=No+Photo";
+const placeholderImage = "https://picsum.photos/150/150?text=No+Photo";
+
+// Define the base URL for images (adjust if your domain differs)
+const IMAGE_BASE_URL = "https://ym.kottrahr.com//Uploads/Images/Employee/";
 
 const InspectorCard = ({ inspectorId, filters }) => {
   const [inspectorData, setInspectorData] = useState(null);
@@ -25,6 +28,7 @@ const InspectorCard = ({ inspectorId, filters }) => {
       const response = await axios.get(
         `${API_BASE_URL}/api/users/${inspectorId}`
       );
+      console.log("Inspector data response:", response.data); // Debug log
       setInspectorData(response.data);
     } catch (error) {
       console.error(
@@ -108,21 +112,43 @@ const InspectorCard = ({ inspectorId, filters }) => {
     return "bg-green-300";
   };
 
+  const getImageUrl = (photoPath) => {
+    if (!photoPath) return placeholderImage;
+
+    // Check if photoPath is already a full URL
+    if (photoPath.startsWith("http")) {
+      return photoPath; // Return as-is if it's a full URL
+    }
+
+    // Handle relative paths
+    const sanitizedPath = photoPath.startsWith("/")
+      ? photoPath.slice(1) // Remove leading slash
+      : photoPath;
+
+    return `${IMAGE_BASE_URL}${sanitizedPath}`;
+  };
+
   return (
     <div
       className={`bg-white rounded-lg shadow-md p-4 mb-4 transition-all duration-300 hover:shadow-lg ${getDefectRateColor(
         summaryData.defectRate
-      )} w-full max-w-md`} // Reduced width to fit 3 cards on large screens
+      )} w-full max-w-md`}
     >
       {/* Inspector Header */}
       <div className="flex items-center mb-4">
         <div className="relative w-16 h-16 mr-3">
           {inspectorData && inspectorData.face_photo ? (
             <img
-              src={`${API_BASE_URL}/public${inspectorData.face_photo}`}
+              src={getImageUrl(inspectorData.face_photo)}
               alt={inspectorData?.eng_name || "Inspector"}
               className="w-full h-full rounded-full object-cover border-2 border-blue-500"
-              onError={(e) => (e.target.src = placeholderImage)}
+              onError={(e) => {
+                console.error(
+                  "Image load failed, switching to placeholder:",
+                  e
+                );
+                e.target.src = placeholderImage;
+              }}
             />
           ) : (
             <div className="w-full h-full rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
