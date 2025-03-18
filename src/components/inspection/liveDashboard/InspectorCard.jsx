@@ -165,7 +165,7 @@ const InspectorCard = ({ inspectorId, filters }) => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 mb-4">
         <div className="bg-blue-50 rounded-lg p-2 text-center shadow-sm">
           <p className="text-xs font-medium text-gray-600">Checked Qty</p>
           <p className="text-sm font-bold text-blue-700">
@@ -182,6 +182,12 @@ const InspectorCard = ({ inspectorId, filters }) => {
           <p className="text-xs font-medium text-gray-600">Total Rejects</p>
           <p className="text-sm font-bold text-red-700">
             {summaryData.totalRejects}
+          </p>
+        </div>
+        <div className="bg-red-50 rounded-lg p-2 text-center shadow-sm">
+          <p className="text-xs font-medium text-gray-600">Defects Qty</p>
+          <p className="text-sm font-bold text-red-700">
+            {summaryData.defectsQty}
           </p>
         </div>
         <div

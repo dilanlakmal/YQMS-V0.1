@@ -515,44 +515,78 @@ const WeeklyDefectTrend = ({ filters }) => {
         </label>
       </div>
 
-      <table className="min-w-full border-collapse">
-        <thead>
-          <tr className="bg-blue-100">
-            <th className="py-2 px-4 border border-gray-800 text-left text-sm font-bold text-gray-700">
-              Group / Defect
-            </th>
-            {uniqueWeeks.map((week) => (
-              <th
-                key={week}
-                className="py-2 px-4 border border-gray-800 text-center text-sm font-bold text-gray-700 whitespace-pre-wrap"
-                style={{ whiteSpace: "pre-wrap" }}
-              >
-                {week.split(":").join("\n")}
+      <div className="overflow-y-auto" style={{ maxHeight: "500px" }}>
+        <table className="min-w-full border-collapse">
+          <thead>
+            <tr className="bg-blue-100 sticky top-0 z-10">
+              <th className="py-2 px-4 border border-gray-800 text-left text-sm font-bold text-gray-700">
+                Group / Defect
               </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr
-              key={index}
-              className={row.type === "group" ? "bg-gray-50" : ""}
-            >
-              <td
-                className={`py-2 px-4 border border-gray-800 text-sm ${
-                  row.type === "group" ? "font-bold" : ""
-                }`}
-                style={{ paddingLeft: `${row.level * 20}px` }}
+              {uniqueWeeks.map((week) => (
+                <th
+                  key={week}
+                  className="py-2 px-4 border border-gray-800 text-center text-sm font-bold text-gray-700 whitespace-pre-wrap"
+                  style={{ whiteSpace: "pre-wrap" }}
+                >
+                  {week.split(":").join("\n")}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr
+                key={index}
+                className={row.type === "group" ? "bg-gray-50" : ""}
               >
-                {row.key}
+                <td
+                  className={`py-2 px-4 border border-gray-800 text-sm ${
+                    row.type === "group" ? "font-bold" : ""
+                  }`}
+                  style={{ paddingLeft: `${row.level * 20}px` }}
+                >
+                  {row.key}
+                </td>
+                {uniqueWeeks.map((week) => {
+                  const rate = row.data[week] || 0;
+                  return (
+                    <td
+                      key={week}
+                      className={`py-2 px-4 border border-gray-800 text-center text-sm ${
+                        rate > 0 ? getBackgroundColor(rate) : "bg-gray-100"
+                      } ${rate > 0 ? getFontColor(rate) : "text-gray-700"}`}
+                    >
+                      {rate > 0 ? `${rate.toFixed(2)}%` : ""}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+            <tr className="bg-blue-100 font-bold">
+              <td className="py-2 px-4 border border-gray-800 text-sm font-bold text-gray-700">
+                Total
               </td>
               {uniqueWeeks.map((week) => {
-                const rate = row.data[week] || 0;
+                const weekData = summaryData.filter(
+                  (d) =>
+                    `${d.weekInfo.weekNumber}:${d.weekInfo.startDate}--${d.weekInfo.endDate}` ===
+                    week
+                );
+                const totalChecked = weekData.reduce(
+                  (sum, d) => sum + (d.checkedQty || 0),
+                  0
+                );
+                const totalDefects = weekData.reduce(
+                  (sum, d) => sum + (d.defectsQty || 0),
+                  0
+                );
+                const rate =
+                  totalChecked > 0 ? (totalDefects / totalChecked) * 100 : 0;
                 return (
                   <td
                     key={week}
                     className={`py-2 px-4 border border-gray-800 text-center text-sm ${
-                      rate > 0 ? getBackgroundColor(rate) : "bg-gray-100"
+                      rate > 0 ? getBackgroundColor(rate) : "bg-white"
                     } ${rate > 0 ? getFontColor(rate) : "text-gray-700"}`}
                   >
                     {rate > 0 ? `${rate.toFixed(2)}%` : ""}
@@ -560,41 +594,9 @@ const WeeklyDefectTrend = ({ filters }) => {
                 );
               })}
             </tr>
-          ))}
-          <tr className="bg-blue-100 font-bold">
-            <td className="py-2 px-4 border border-gray-800 text-sm font-bold text-gray-700">
-              Total
-            </td>
-            {uniqueWeeks.map((week) => {
-              const weekData = summaryData.filter(
-                (d) =>
-                  `${d.weekInfo.weekNumber}:${d.weekInfo.startDate}--${d.weekInfo.endDate}` ===
-                  week
-              );
-              const totalChecked = weekData.reduce(
-                (sum, d) => sum + (d.checkedQty || 0),
-                0
-              );
-              const totalDefects = weekData.reduce(
-                (sum, d) => sum + (d.defectsQty || 0),
-                0
-              );
-              const rate =
-                totalChecked > 0 ? (totalDefects / totalChecked) * 100 : 0;
-              return (
-                <td
-                  key={week}
-                  className={`py-2 px-4 border border-gray-800 text-center text-sm ${
-                    rate > 0 ? getBackgroundColor(rate) : "bg-white"
-                  } ${rate > 0 ? getFontColor(rate) : "text-gray-700"}`}
-                >
-                  {rate > 0 ? `${rate.toFixed(2)}%` : ""}
-                </td>
-              );
-            })}
-          </tr>
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
