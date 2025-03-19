@@ -26,6 +26,7 @@ import DefectPrint from "../components/inspection/DefectPrint";
 import EditInspection from "../components/inspection/EditInspection";
 import QC2Data from "../components/inspection/QC2Data";
 import { allDefects, defectsList } from "../constants/defects";
+import DefectTrack from "./DefectTrack"; // Import DefectTrack
 
 const QC2InspectionPage = () => {
   const { user, loading } = useAuth();
@@ -65,20 +66,10 @@ const QC2InspectionPage = () => {
   const [isReturnInspection, setIsReturnInspection] = useState(false);
   const [sessionData, setSessionData] = useState(null);
 
-  const bluetoothRef = useRef();
+  const [isPassingBundle, setIsPassingBundle] = useState(false); // New state for Pass Bundle
 
-  //New two states
+  const bluetoothRef = useRef();
   const isBluetoothConnected = bluetoothState.isConnected;
-  //const [isBluetoothConnected, setIsBluetoothConnected] = useState(false);
-  // const [bluetoothState, setBluetoothState] = useState({
-  //   isConnected: false,
-  //   isScanning: false,
-  //   selectedDevice: null,
-  //   connectionStatus: "",
-  //   printerType: null,
-  //   characteristic: null,
-  //   counter: 1,
-  // });
 
   const activeFilter = categoryFilter || defectTypeFilter;
   const categoryOptions = [
@@ -131,40 +122,37 @@ const QC2InspectionPage = () => {
   // CHANGE: Added useEffect to manage the 3-second countdown for Pass Bundle
   useEffect(() => {
     let timer;
-    if (passBundleCountdown !== null) {
+    if (passBundleCountdown !== null && !isPassingBundle) {
+      // Add !isPassingBundle
       if (passBundleCountdown > 0) {
         timer = setInterval(() => {
           setPassBundleCountdown((prev) => prev - 1);
         }, 1000);
       } else {
-        handlePassBundle(); // Automatically trigger Pass Bundle when countdown reaches 0
-        setPassBundleCountdown(null); // Reset countdown state
+        handlePassBundle(); // Trigger only if not already passing
+        setPassBundleCountdown(null);
       }
     }
-    return () => clearInterval(timer); // Cleanup interval on unmount or state change
-  }, [passBundleCountdown]);
+    return () => clearInterval(timer);
+  }, [passBundleCountdown, isPassingBundle]); // Add isPassingBundle as dependency
 
+  /* ------------------------------
+   Old Use Effect
+------------------------------ */
   // useEffect(() => {
   //   let timer;
-  //   if (
-  //     printing &&
-  //     qrCodesData[printMethod].length > 0 &&
-  //     printMethod === "garment"
-  //   ) {
-  //     setPassBundleCountdown(5);
-  //     timer = setInterval(() => {
-  //       setPassBundleCountdown((prev) => {
-  //         if (prev <= 1) {
-  //           clearInterval(timer);
-  //           handlePassBundle();
-  //           return null;
-  //         }
-  //         return prev - 1;
-  //       });
-  //     }, 1000);
+  //   if (passBundleCountdown !== null) {
+  //     if (passBundleCountdown > 0) {
+  //       timer = setInterval(() => {
+  //         setPassBundleCountdown((prev) => prev - 1);
+  //       }, 1000);
+  //     } else {
+  //       handlePassBundle(); // Automatically trigger Pass Bundle when countdown reaches 0
+  //       setPassBundleCountdown(null); // Reset countdown state
+  //     }
   //   }
-  //   return () => clearInterval(timer);
-  // }, [printing, qrCodesData, printMethod]);
+  //   return () => clearInterval(timer); // Cleanup interval on unmount or state change
+  // }, [passBundleCountdown]);
 
   const generateDefectId = () => {
     return Math.random().toString(36).substring(2, 12).toUpperCase();
@@ -340,79 +328,6 @@ const QC2InspectionPage = () => {
       setLoadingData(false);
     }
   };
-
-  // const fetchBundleData = async (randomId) => {
-  //   try {
-  //     setLoadingData(true);
-  //     const response = await fetch(
-  //       `${API_BASE_URL}/api/bundle-by-random-id/${randomId}`
-  //     );
-  //     if (!response.ok) throw new Error("Bundle not found");
-  //     const data = await response.json();
-  //     if (data.passQtyIron === undefined) {
-  //       setError(
-  //         "This bundle has not been ironed yet. Please wait until it is ironed."
-  //       );
-  //       setBundleData(null);
-  //       setInDefectWindow(false);
-  //       setScanning(false);
-  //     } else {
-  //       const initialPayload = {
-  //         package_no: data.package_no,
-  //         moNo: data.selectedMono,
-  //         custStyle: data.custStyle,
-  //         color: data.color,
-  //         size: data.size,
-  //         lineNo: data.lineNo,
-  //         department: data.department,
-  //         buyer: data.buyer,
-  //         factory: data.factory, // Added
-  //         country: data.country, // Added
-  //         sub_con: data.sub_con, // Added
-  //         sub_con_factory: data.sub_con_factory, // Added
-  //         checkedQty: data.passQtyIron,
-  //         totalPass: data.passQtyIron,
-  //         totalRejects: 0,
-  //         totalRepair: 0,
-  //         defectQty: 0,
-  //         defectArray: [],
-  //         rejectGarments: [],
-  //         inspection_time: "",
-  //         inspection_date: new Date().toLocaleDateString("en-US"),
-  //         emp_id_inspection: user.emp_id,
-  //         eng_name_inspection: user.eng_name,
-  //         kh_name_inspection: user.kh_name,
-  //         job_title_inspection: user.job_title,
-  //         dept_name_inspection: user.dept_name,
-  //         sect_name_inspection: user.sect_name,
-  //         bundle_id: data.bundle_id,
-  //         bundle_random_id: data.bundle_random_id,
-  //         printArray: []
-  //       };
-  //       const createResponse = await fetch(
-  //         `${API_BASE_URL}/api/inspection-pass-bundle`,
-  //         {
-  //           method: "POST",
-  //           headers: { "Content-Type": "application/json" },
-  //           body: JSON.stringify(initialPayload)
-  //         }
-  //       );
-  //       if (!createResponse.ok)
-  //         throw new Error("Failed to create inspection record");
-
-  //       setBundleData(data);
-  //       setTotalRepair(0);
-  //       setInDefectWindow(true);
-  //       setScanning(false);
-  //       setError(null);
-  //     }
-  //   } catch (err) {
-  //     setError(err.message || "Failed to fetch bundle data");
-  //     setBundleData(null);
-  //   } finally {
-  //     setLoadingData(false);
-  //   }
-  // };
 
   const handleDefectCardScan = async (bundleData, defect_print_id) => {
     try {
@@ -857,48 +772,73 @@ const QC2InspectionPage = () => {
   };
 
   const handlePassBundle = async () => {
+    if (isPassingBundle) return; // Prevent multiple calls
+    setIsPassingBundle(true);
+
     const hasDefects = Object.values(tempDefects).some((count) => count > 0);
-    if (!isReturnInspection && hasDefects && !rejectedOnce) return;
+    if (!isReturnInspection && hasDefects && !rejectedOnce) {
+      setIsPassingBundle(false);
+      return;
+    }
 
-    if (isReturnInspection) {
-      const {
-        sessionTotalPass,
-        sessionTotalRejects,
-        sessionRejectedGarments,
-        inspectionNo,
-        printEntry,
-        initialTotalPass
-      } = sessionData;
+    // Add console logs for debugging
+    console.log("handlePassBundle called", { isReturnInspection, sessionData });
 
-      const initialTotalRepair = bundleData.totalRepair;
-      const initialTotalPassGlobal = bundleData.totalPass;
-      const newTotalRejectGarmentCount = initialTotalPass - sessionTotalPass;
-
-      const updatePayload = {
-        $set: {
-          totalRepair:
-            sessionTotalRejects > 0 ? initialTotalRepair - sessionTotalPass : 0,
-          totalPass: initialTotalPassGlobal + sessionTotalPass, // Always add sessionTotalPass
-          "printArray.$[elem].totalRejectGarmentCount":
-            newTotalRejectGarmentCount,
-          "printArray.$[elem].isCompleted": newTotalRejectGarmentCount === 0
+    try {
+      if (isReturnInspection) {
+        // Validate required data
+        if (!sessionData || !bundleData || !sessionData.printEntry) {
+          throw new Error("Missing required session or bundle data");
         }
-      };
+        const {
+          sessionTotalPass,
+          sessionTotalRejects,
+          sessionRejectedGarments,
+          inspectionNo,
+          printEntry,
+          initialTotalPass
+        } = sessionData;
 
-      if (sessionTotalRejects > 0) {
-        updatePayload.$push = {
-          "printArray.$[elem].repairGarmentsDefects": {
-            inspectionNo,
-            repairGarments: sessionRejectedGarments
+        const initialTotalRepair = bundleData.totalRepair;
+        const initialTotalPassGlobal = bundleData.totalPass;
+        const newTotalRejectGarmentCount = initialTotalPass - sessionTotalPass;
+
+        const updatePayload = {
+          $set: {
+            totalRepair:
+              sessionTotalRejects > 0
+                ? initialTotalRepair - sessionTotalPass
+                : 0,
+            totalPass: initialTotalPassGlobal + sessionTotalPass,
+            "printArray.$[elem].totalRejectGarmentCount":
+              newTotalRejectGarmentCount,
+            "printArray.$[elem].isCompleted": newTotalRejectGarmentCount === 0
           }
+          // sessionData: {
+          //   sessionTotalPass,
+          //   sessionTotalRejects,
+          //   sessionDefectsQty,
+          //   sessionRejectedGarments,
+          //   inspectionNo,
+          //   defect_print_id: printEntry.defect_print_id
+          // }
         };
-      }
 
-      const arrayFilters = [
-        { "elem.defect_print_id": printEntry.defect_print_id }
-      ];
+        if (sessionTotalRejects > 0) {
+          updatePayload.$push = {
+            "printArray.$[elem].repairGarmentsDefects": {
+              inspectionNo,
+              repairGarments: sessionRejectedGarments
+            }
+          };
+        }
 
-      try {
+        const arrayFilters = [
+          { "elem.defect_print_id": printEntry.defect_print_id }
+        ];
+
+        console.log("Updating for return inspection", updatePayload);
+
         const response = await fetch(
           `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
           {
@@ -910,28 +850,28 @@ const QC2InspectionPage = () => {
             })
           }
         );
-        if (!response.ok) throw new Error("Failed to update record");
-      } catch (err) {
-        setError(err.message);
-      }
 
-      setIsReturnInspection(false);
-      setSessionData(null);
-    } else {
-      // Set inspection_time when directly passing the bundle
-      const now = new Date();
-      const hours = String(now.getHours()).padStart(2, "0");
-      const minutes = String(now.getMinutes()).padStart(2, "0");
-      const seconds = String(now.getSeconds()).padStart(2, "0");
-      const inspectionTime = `${hours}:${minutes}:${seconds}`;
-
-      const updatePayload = {
-        $set: {
-          inspection_time: inspectionTime
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to update record");
         }
-      };
 
-      try {
+        // Reset return inspection state
+        setIsReturnInspection(false);
+        setSessionData(null);
+      } else {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, "0");
+        const minutes = String(now.getMinutes()).padStart(2, "0");
+        const seconds = String(now.getSeconds()).padStart(2, "0");
+        const inspectionTime = `${hours}:${minutes}:${seconds}`;
+
+        const updatePayload = {
+          $set: {
+            inspection_time: inspectionTime
+          }
+        };
+
         const response = await fetch(
           `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
           {
@@ -940,27 +880,148 @@ const QC2InspectionPage = () => {
             body: JSON.stringify(updatePayload)
           }
         );
-        if (!response.ok) throw new Error("Failed to update inspection record");
-      } catch (err) {
-        setError(`Failed to update inspection record: ${err.message}`);
-      }
-    }
 
-    setTotalPass(0);
-    setTotalRejects(0);
-    setTotalRepair(0);
-    setConfirmedDefects({});
-    setTempDefects({});
-    setBundlePassed(true);
-    setRejectedOnce(false);
-    setBundleData(null);
-    setInDefectWindow(false);
-    setScanning(true);
-    setRejectedGarments([]);
-    setQrCodesData({ repair: [], garment: [], bundle: [] });
-    setGenerateQRDisabled(false);
-    setPassBundleCountdown(null);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.message || "Failed to update inspection record"
+          );
+        }
+      }
+
+      // Reset state after successful update
+      setTotalPass(0);
+      setTotalRejects(0);
+      setTotalRepair(0);
+      setConfirmedDefects({});
+      setTempDefects({});
+      setBundlePassed(true);
+      setRejectedOnce(false);
+      setBundleData(null);
+      setInDefectWindow(false);
+      setScanning(true);
+      setRejectedGarments([]);
+      setQrCodesData({ repair: [], garment: [], bundle: [] });
+      setGenerateQRDisabled(false);
+      setPassBundleCountdown(null);
+      setError(null); // Clear any previous errors
+    } catch (err) {
+      setError(err.message || "Failed to update inspection record");
+      console.error("Error in handlePassBundle:", err);
+    } finally {
+      setIsPassingBundle(false);
+    }
   };
+
+  /* ------------------------------
+   Old Function
+------------------------------ */
+
+  // const handlePassBundle = async () => {
+  //   const hasDefects = Object.values(tempDefects).some((count) => count > 0);
+  //   if (!isReturnInspection && hasDefects && !rejectedOnce) return;
+
+  //   if (isReturnInspection) {
+  //     const {
+  //       sessionTotalPass,
+  //       sessionTotalRejects,
+  //       sessionRejectedGarments,
+  //       inspectionNo,
+  //       printEntry,
+  //       initialTotalPass
+  //     } = sessionData;
+
+  //     const initialTotalRepair = bundleData.totalRepair;
+  //     const initialTotalPassGlobal = bundleData.totalPass;
+  //     const newTotalRejectGarmentCount = initialTotalPass - sessionTotalPass;
+
+  //     const updatePayload = {
+  //       $set: {
+  //         totalRepair:
+  //           sessionTotalRejects > 0 ? initialTotalRepair - sessionTotalPass : 0,
+  //         totalPass: initialTotalPassGlobal + sessionTotalPass, // Always add sessionTotalPass
+  //         "printArray.$[elem].totalRejectGarmentCount":
+  //           newTotalRejectGarmentCount,
+  //         "printArray.$[elem].isCompleted": newTotalRejectGarmentCount === 0
+  //       }
+  //     };
+
+  //     if (sessionTotalRejects > 0) {
+  //       updatePayload.$push = {
+  //         "printArray.$[elem].repairGarmentsDefects": {
+  //           inspectionNo,
+  //           repairGarments: sessionRejectedGarments
+  //         }
+  //       };
+  //     }
+
+  //     const arrayFilters = [
+  //       { "elem.defect_print_id": printEntry.defect_print_id }
+  //     ];
+
+  //     try {
+  //       const response = await fetch(
+  //         `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
+  //         {
+  //           method: "PUT",
+  //           headers: { "Content-Type": "application/json" },
+  //           body: JSON.stringify({
+  //             updateOperations: updatePayload,
+  //             arrayFilters
+  //           })
+  //         }
+  //       );
+  //       if (!response.ok) throw new Error("Failed to update record");
+  //     } catch (err) {
+  //       setError(err.message);
+  //     }
+
+  //     setIsReturnInspection(false);
+  //     setSessionData(null);
+  //   } else {
+  //     // Set inspection_time when directly passing the bundle
+  //     const now = new Date();
+  //     const hours = String(now.getHours()).padStart(2, "0");
+  //     const minutes = String(now.getMinutes()).padStart(2, "0");
+  //     const seconds = String(now.getSeconds()).padStart(2, "0");
+  //     const inspectionTime = `${hours}:${minutes}:${seconds}`;
+
+  //     const updatePayload = {
+  //       $set: {
+  //         inspection_time: inspectionTime
+  //       }
+  //     };
+
+  //     try {
+  //       const response = await fetch(
+  //         `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
+  //         {
+  //           method: "PUT",
+  //           headers: { "Content-Type": "application/json" },
+  //           body: JSON.stringify(updatePayload)
+  //         }
+  //       );
+  //       if (!response.ok) throw new Error("Failed to update inspection record");
+  //     } catch (err) {
+  //       setError(`Failed to update inspection record: ${err.message}`);
+  //     }
+  //   }
+
+  //   setTotalPass(0);
+  //   setTotalRejects(0);
+  //   setTotalRepair(0);
+  //   setConfirmedDefects({});
+  //   setTempDefects({});
+  //   setBundlePassed(true);
+  //   setRejectedOnce(false);
+  //   setBundleData(null);
+  //   setInDefectWindow(false);
+  //   setScanning(true);
+  //   setRejectedGarments([]);
+  //   setQrCodesData({ repair: [], garment: [], bundle: [] });
+  //   setGenerateQRDisabled(false);
+  //   setPassBundleCountdown(null);
+  // };
 
   const handleIconClick = (feature) => {
     setSelectedFeature(feature);
@@ -1587,20 +1648,22 @@ const QC2InspectionPage = () => {
                         <button
                           onClick={handlePassBundle}
                           disabled={
-                            !isReturnInspection &&
-                            ((hasDefects && !rejectedOnce) ||
-                              ((printMethod === "garment" ||
-                                printMethod === "bundle") &&
-                                qrCodesData.garment.length === 0) ||
-                              printing)
+                            isPassingBundle || // Add this condition
+                            (!isReturnInspection &&
+                              ((hasDefects && !rejectedOnce) ||
+                                ((printMethod === "garment" ||
+                                  printMethod === "bundle") &&
+                                  qrCodesData.garment.length === 0) ||
+                                printing))
                           }
                           className={`px-4 py-2 rounded ${
-                            !isReturnInspection &&
-                            ((hasDefects && !rejectedOnce) ||
-                              ((printMethod === "garment" ||
-                                printMethod === "bundle") &&
-                                qrCodesData.garment.length === 0) ||
-                              printing)
+                            isPassingBundle || // Add this condition
+                            (!isReturnInspection &&
+                              ((hasDefects && !rejectedOnce) ||
+                                ((printMethod === "garment" ||
+                                  printMethod === "bundle") &&
+                                  qrCodesData.garment.length === 0) ||
+                                printing))
                               ? "bg-gray-300 cursor-not-allowed"
                               : totalRejects > 0
                               ? "bg-yellow-500 hover:bg-yellow-600"
@@ -1649,6 +1712,7 @@ const QC2InspectionPage = () => {
                       </div>
                     </div>
                   </div>
+
                   <div className="h-[calc(100vh-200px)] overflow-y-auto p-4">
                     <DefectBox
                       language={language}

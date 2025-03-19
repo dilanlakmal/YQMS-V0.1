@@ -1,24 +1,31 @@
 import React, { useState } from "react";
-import { FaEye, FaEyeSlash, FaFileExcel, FaTimes } from "react-icons/fa";
+import {
+  FaEye,
+  FaEyeSlash,
+  FaFileExcel,
+  FaTimes,
+  FaDatabase
+} from "react-icons/fa";
 import Swal from "sweetalert2";
 import * as XLSX from "xlsx";
+import SunriseDB from "./SunriseDB"; // Import the new component
 
 const QCSunriseReport = () => {
   const [activeTab, setActiveTab] = useState("excelUpload");
   const [files, setFiles] = useState({
     rs01T38: null,
     rs01T39: null,
-    rs18: null,
+    rs18: null
   });
   const [previews, setPreviews] = useState({
     rs01T38: { data: null, visible: false },
     rs01T39: { data: null, visible: false },
-    rs18: { data: null, visible: false },
+    rs18: { data: null, visible: false }
   });
   const [currentPage, setCurrentPage] = useState({
     rs01T38: 1,
     rs01T39: 1,
-    rs18: 1,
+    rs18: 1
   });
   const [analyzeData, setAnalyzeData] = useState(null);
   const rowsPerPage = 10;
@@ -34,7 +41,7 @@ const QCSunriseReport = () => {
         "左右長短(裤和袖长)/សំរុងវែងខ្លីមិនស្មើគ្នា (ខោ ដៃអាវ)​ /Uneven leg/sleeve length",
       "Defect Name - English": "Uneven leg/sleeve length",
       "Defect Name - Khmer": "ដេរអត់ស្មើ",
-      "Defect Name - Chinese": "不對稱 / 長短不齊",
+      "Defect Name - Chinese": "不對稱 / 長短不齊"
     },
     {
       "Defect Code": "2",
@@ -43,7 +50,7 @@ const QCSunriseReport = () => {
       "Defect Name": "非本位返工 មិនមែនកែដេរ Non-defective",
       "Defect Name - English": "Non-defective",
       "Defect Name - Khmer": "មិនមែនកែដេរ",
-      "Defect Name - Chinese": "非本位返工",
+      "Defect Name - Chinese": "非本位返工"
     },
     {
       "Defect Code": "3",
@@ -52,7 +59,7 @@ const QCSunriseReport = () => {
       "Defect Name": "扭/變形 ដេររមួល Twisted",
       "Defect Name - English": "Twisted",
       "Defect Name - Khmer": "ដេររមួល",
-      "Defect Name - Chinese": "扭/變形",
+      "Defect Name - Chinese": "扭/變形"
     },
     {
       "Defect Code": "4",
@@ -62,7 +69,7 @@ const QCSunriseReport = () => {
         "起皺/波浪/起包 ជ្រួញនិងទឹករលក​និងប៉ោងសាច់ Puckering/ Wavy/ Fullness",
       "Defect Name - English": "Puckering/ Wavy/ Fullness",
       "Defect Name - Khmer": "ជ្រួញនិងទឹករលក​និងប៉ោងសាច់",
-      "Defect Name - Chinese": "起皺/波浪/起包",
+      "Defect Name - Chinese": "起皺/波浪/起包"
     },
     {
       "Defect Code": "5",
@@ -71,7 +78,7 @@ const QCSunriseReport = () => {
       "Defect Name": "斷線ដាច់អំបោះ Broken stitches",
       "Defect Name - English": "Broken stitches",
       "Defect Name - Khmer": "ដាច់អំបោះ",
-      "Defect Name - Chinese": "斷線",
+      "Defect Name - Chinese": "斷線"
     },
     {
       "Defect Code": "6",
@@ -80,7 +87,7 @@ const QCSunriseReport = () => {
       "Defect Name": "跳線លោតអំបោះ Skipped stitches",
       "Defect Name - English": "Skipped stitches",
       "Defect Name - Khmer": "លោតអំបោះ",
-      "Defect Name - Chinese": "跳線",
+      "Defect Name - Chinese": "跳線"
     },
     {
       "Defect Code": "7",
@@ -89,7 +96,7 @@ const QCSunriseReport = () => {
       "Defect Name": "油漬 ប្រឡាក់ប្រេង Oil stain",
       "Defect Name - English": "Oil stain",
       "Defect Name - Khmer": "ប្រឡាក់ប្រេង",
-      "Defect Name - Chinese": "油漬",
+      "Defect Name - Chinese": "油漬"
     },
     {
       "Defect Code": "8",
@@ -98,7 +105,7 @@ const QCSunriseReport = () => {
       "Defect Name": "破洞 (包括針洞) ធ្លុះរន្ធ Hole/ Needle hole",
       "Defect Name - English": "Hole/ Needle hole",
       "Defect Name - Khmer": "ធ្លុះរន្ធ",
-      "Defect Name - Chinese": "破洞 (包括針洞)",
+      "Defect Name - Chinese": "破洞 (包括針洞)"
     },
     {
       "Defect Code": "9",
@@ -107,7 +114,7 @@ const QCSunriseReport = () => {
       "Defect Name": "色差 ខុសពណ៏ Color shading",
       "Defect Name - English": "Color shading",
       "Defect Name - Khmer": "ខុសពណ៏",
-      "Defect Name - Chinese": "色差",
+      "Defect Name - Chinese": "色差"
     },
     {
       "Defect Code": "10",
@@ -116,7 +123,7 @@ const QCSunriseReport = () => {
       "Defect Name": "錯碼/車錯嘜頭 ដេរខុសសេរីនិងដេរខុសផ្លាក Wrong size/ label",
       "Defect Name - English": "Wrong size/ label",
       "Defect Name - Khmer": "ដេរខុសសេរីនិងដេរខុសផ្លាក",
-      "Defect Name - Chinese": "錯碼/車錯嘜頭",
+      "Defect Name - Chinese": "錯碼/車錯嘜頭"
     },
     {
       "Defect Code": "11",
@@ -125,7 +132,7 @@ const QCSunriseReport = () => {
       "Defect Name": "髒污 ប្រឡាក់ Dirty stain",
       "Defect Name - English": "Dirty stain",
       "Defect Name - Khmer": "ប្រឡាក់",
-      "Defect Name - Chinese": "髒污",
+      "Defect Name - Chinese": "髒污"
     },
     {
       "Defect Code": "12",
@@ -134,7 +141,7 @@ const QCSunriseReport = () => {
       "Defect Name": "爆縫 រហែកថ្នេរ Open seam",
       "Defect Name - English": "Open seam",
       "Defect Name - Khmer": "រហែកថ្នេរ",
-      "Defect Name - Chinese": "爆縫",
+      "Defect Name - Chinese": "爆縫"
     },
     {
       "Defect Code": "13",
@@ -143,7 +150,7 @@ const QCSunriseReport = () => {
       "Defect Name": "漏車縫/漏空 អត់បានដេរ Missed sewing",
       "Defect Name - English": "Missed sewing",
       "Defect Name - Khmer": "អត់បានដេរ",
-      "Defect Name - Chinese": "漏車縫/漏空",
+      "Defect Name - Chinese": "漏車縫/漏空"
     },
     {
       "Defect Code": "14",
@@ -152,7 +159,7 @@ const QCSunriseReport = () => {
       "Defect Name": "線頭 ព្រុយ​ Untrimmed thread ends",
       "Defect Name - English": "Untrimmed thread ends",
       "Defect Name - Khmer": "ព្រុយ",
-      "Defect Name - Chinese": "線頭",
+      "Defect Name - Chinese": "線頭"
     },
     {
       "Defect Code": "15",
@@ -161,7 +168,7 @@ const QCSunriseReport = () => {
       "Defect Name": "布疵 ខូចសាច់ក្រណាត់(មិនអាចកែ) Fabric defect",
       "Defect Name - English": "Fabric defect",
       "Defect Name - Khmer": "ខូចសាច់ក្រណាត់(មិនអាចកែ)",
-      "Defect Name - Chinese": "布疵",
+      "Defect Name - Chinese": "布疵"
     },
     {
       "Defect Code": "16",
@@ -170,7 +177,7 @@ const QCSunriseReport = () => {
       "Defect Name": "打折 គៀបសាច់ Pleated",
       "Defect Name - English": "Pleated",
       "Defect Name - Khmer": "គៀបសាច់",
-      "Defect Name - Chinese": "打折",
+      "Defect Name - Chinese": "打折"
     },
     {
       "Defect Code": "17",
@@ -180,7 +187,7 @@ const QCSunriseReport = () => {
         "燙畫/印花/繡花 ព្រីននិងប៉ាក់ Heat transfer/ Printing/ EMB defect",
       "Defect Name - English": "Heat transfer/ Printing/ EMB defect",
       "Defect Name - Khmer": "ព្រីននិងប៉ាក់",
-      "Defect Name - Chinese": "燙畫/印花/繡花",
+      "Defect Name - Chinese": "燙畫/印花/繡花"
     },
     {
       "Defect Code": "18",
@@ -189,7 +196,7 @@ const QCSunriseReport = () => {
       "Defect Name": "其它返工 អាវកែផ្សេងៗ Others",
       "Defect Name - English": "Others",
       "Defect Name - Khmer": "អាវកែផ្សេងៗ",
-      "Defect Name - Chinese": "其它返工",
+      "Defect Name - Chinese": "其它返工"
     },
     {
       "Defect Code": "19",
@@ -198,7 +205,7 @@ const QCSunriseReport = () => {
       "Defect Name": "熨燙不良 អ៊ុតអត់ជាប់ Insecure of Heat transfer",
       "Defect Name - English": "Insecure of Heat transfer",
       "Defect Name - Khmer": "អ៊ុតអត់ជាប់",
-      "Defect Name - Chinese": "熨燙不良",
+      "Defect Name - Chinese": "熨燙不良"
     },
     {
       "Defect Code": "20",
@@ -207,7 +214,7 @@ const QCSunriseReport = () => {
       "Defect Name": "左右大小不均匀/ទំហំទទឺងតូចធំមិនស្មើគ្នា/Uneven width",
       "Defect Name - English": "Uneven width",
       "Defect Name - Khmer": "ទំហំទទឺងតូចធំមិនស្មើគ្នា",
-      "Defect Name - Chinese": "左右大小不均匀",
+      "Defect Name - Chinese": "左右大小不均匀"
     },
     {
       "Defect Code": "21",
@@ -217,7 +224,7 @@ const QCSunriseReport = () => {
         "針距: 線緊/線鬆 គំលាតម្ជុល  តឹង និង ធូរអំបោះពេក Stitch density tight/loose",
       "Defect Name - English": "Stitch density tight/loose",
       "Defect Name - Khmer": "គំលាតម្ជុល  តឹង និង ធូរអំបោះពេក",
-      "Defect Name - Chinese": "針距: 線緊/線鬆",
+      "Defect Name - Chinese": "針距: 線緊/線鬆"
     },
     {
       "Defect Code": "22",
@@ -226,7 +233,7 @@ const QCSunriseReport = () => {
       "Defect Name": "毛邊 止口សល់ជាយ​ និង ព្រុយខាងៗ Fray edge / Raw edge",
       "Defect Name - English": "Fray edge / Raw edge",
       "Defect Name - Khmer": "止口សល់ជាយ​ និង ព្រុយខាងៗ",
-      "Defect Name - Chinese": "毛邊",
+      "Defect Name - Chinese": "毛邊"
     },
     {
       "Defect Code": "23",
@@ -236,7 +243,7 @@ const QCSunriseReport = () => {
         "染色不正確 - 次品/廢品 ជ្រលក់ពណ៏ខុស រឺក៏ ខូច Incorrect dying",
       "Defect Name - English": "Incorrect dying",
       "Defect Name - Khmer": "ជ្រលក់ពណ៏ខុស រឺក៏ ខូច",
-      "Defect Name - Chinese": "染色不正確 - 次品/廢品",
+      "Defect Name - Chinese": "染色不正確 - 次品/廢品"
     },
     {
       "Defect Code": "24",
@@ -245,7 +252,7 @@ const QCSunriseReport = () => {
       "Defect Name": "油漬2 ប្រឡាក់ប្រេង2 Oil stain 2",
       "Defect Name - English": "Oil stain 2",
       "Defect Name - Khmer": "ប្រឡាក់ប្រេង2",
-      "Defect Name - Chinese": "油漬2",
+      "Defect Name - Chinese": "油漬2"
     },
     {
       "Defect Code": "25",
@@ -254,7 +261,7 @@ const QCSunriseReport = () => {
       "Defect Name": "色差2 ខុសពណ៏2 Color variation 2",
       "Defect Name - English": "Color variation 2",
       "Defect Name - Khmer": "ខុសពណ៏2",
-      "Defect Name - Chinese": "色差2",
+      "Defect Name - Chinese": "色差2"
     },
     {
       "Defect Code": "26",
@@ -263,7 +270,7 @@ const QCSunriseReport = () => {
       "Defect Name": "髒污2 ប្រឡាក់2 Dirty stain 2",
       "Defect Name - English": "Dirty stain 2",
       "Defect Name - Khmer": "ប្រឡាក់2",
-      "Defect Name - Chinese": "髒污2",
+      "Defect Name - Chinese": "髒污2"
     },
     {
       "Defect Code": "27",
@@ -272,7 +279,7 @@ const QCSunriseReport = () => {
       "Defect Name": "布疵2 ឆ្នូតក្រណាហ់2 Fabric defect 2",
       "Defect Name - English": "Fabric defect 2",
       "Defect Name - Khmer": "ឆ្នូតក្រណាហ់2",
-      "Defect Name - Chinese": "布疵2",
+      "Defect Name - Chinese": "布疵2"
     },
     {
       "Defect Code": "28",
@@ -282,7 +289,7 @@ const QCSunriseReport = () => {
         "燙畫 / 印花 /繡花 2 ព្រីននិងប៉ាក់2 Heat transfer/ Printing/ EMB defect 2",
       "Defect Name - English": "Heat transfer/ Printing/ EMB defect 2",
       "Defect Name - Khmer": "ព្រីននិងប៉ាក់2",
-      "Defect Name - Chinese": "燙畫 / 印花 /繡花 2",
+      "Defect Name - Chinese": "燙畫 / 印花 /繡花 2"
     },
     {
       "Defect Code": "29",
@@ -291,7 +298,7 @@ const QCSunriseReport = () => {
       "Defect Name": "不牢固 ដេរអត់ជាប់ Insecure",
       "Defect Name - English": "Insecure",
       "Defect Name - Khmer": "ដេរអត់ជាប់",
-      "Defect Name - Chinese": "不牢固",
+      "Defect Name - Chinese": "不牢固"
     },
     {
       "Defect Code": "30",
@@ -300,7 +307,7 @@ const QCSunriseReport = () => {
       "Defect Name": "落坑 ដេរធ្លាក់ទឹក Drop stitch",
       "Defect Name - English": "Drop stitch",
       "Defect Name - Khmer": "ដេរធ្លាក់ទឹក",
-      "Defect Name - Chinese": "落坑",
+      "Defect Name - Chinese": "落坑"
     },
     {
       "Defect Code": "31",
@@ -309,7 +316,7 @@ const QCSunriseReport = () => {
       "Defect Name": "形状不良 ខូចទ្រង់ទ្រាយ Poor shape",
       "Defect Name - English": "Poor shape",
       "Defect Name - Khmer": "ខូចទ្រង់ទ្រាយ",
-      "Defect Name - Chinese": "形状不良",
+      "Defect Name - Chinese": "形状不良"
     },
     {
       "Defect Code": "32",
@@ -319,7 +326,7 @@ const QCSunriseReport = () => {
         "布有飞纱，勾纱(可修)បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន)Fabric fly yarn / snagging (repairable)",
       "Defect Name - English": "Fabric fly yarn / snagging (repairable)",
       "Defect Name - Khmer": "បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន)",
-      "Defect Name - Chinese": "布有飞纱，勾纱(可修)",
+      "Defect Name - Chinese": "布有飞纱，勾纱(可修)"
     },
     {
       "Defect Code": "33",
@@ -328,7 +335,7 @@ const QCSunriseReport = () => {
       "Defect Name": "不对称（骨位，间条）មិនចំគ្នាMismatched",
       "Defect Name - English": "Mismatched",
       "Defect Name - Khmer": "មិនចំគ្នា",
-      "Defect Name - Chinese": "不对称（骨位，间条）",
+      "Defect Name - Chinese": "不对称（骨位，间条）"
     },
     {
       "Defect Code": "34",
@@ -339,7 +346,7 @@ const QCSunriseReport = () => {
       "Defect Name - English": "Labeling defect",
       "Defect Name - Khmer":
         "បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំមិនស្មើរគ្នា វៀច។ល។",
-      "Defect Name - Chinese": "车标问题：车错位置，车反，大小，歪斜...",
+      "Defect Name - Chinese": "车标问题：车错位置，车反，大小，歪斜..."
     },
     {
       "Defect Code": "35",
@@ -348,7 +355,7 @@ const QCSunriseReport = () => {
       "Defect Name": "针孔/ស្មាមម្ជុល/Needle Mark",
       "Defect Name - English": "Needle Mark",
       "Defect Name - Khmer": "ស្មាមម្ជុល",
-      "Defect Name - Chinese": "针孔",
+      "Defect Name - Chinese": "针孔"
     },
     {
       "Defect Code": "36",
@@ -358,7 +365,7 @@ const QCSunriseReport = () => {
         "衣服錯碼(某部位/裁片)បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-)Wrong size of garment(cut panel/part)",
       "Defect Name - English": "Wrong size of garment(cut panel/part)",
       "Defect Name - Khmer": "បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-)",
-      "Defect Name - Chinese": "衣服錯碼(某部位/裁片)",
+      "Defect Name - Chinese": "衣服錯碼(某部位/裁片)"
     },
     {
       "Defect Code": "37",
@@ -367,7 +374,7 @@ const QCSunriseReport = () => {
       "Defect Name": "其它-做工不良/ផ្សេងៗ/Others - Poor Workmanship (Spare) 2",
       "Defect Name - English": "Others - Poor Workmanship (Spare) 2",
       "Defect Name - Khmer": "ផ្សេងៗ",
-      "Defect Name - Chinese": "其它-做工不良",
+      "Defect Name - Chinese": "其它-做工不良"
     },
     {
       "Defect Code": "38",
@@ -377,7 +384,7 @@ const QCSunriseReport = () => {
         "洗水 / 染色不正确/បញ្ហាបោកទឹក/ ជ្រលក់ពណ៌/Improper Washing / Dyeing",
       "Defect Name - English": "Improper Washing / Dyeing",
       "Defect Name - Khmer": "បញ្ហាបោកទឹក/ ជ្រលក់ពណ៌",
-      "Defect Name - Chinese": "洗水 / 染色不正确",
+      "Defect Name - Chinese": "洗水 / 染色不正确"
     },
     {
       "Defect Code": "39",
@@ -388,7 +395,7 @@ const QCSunriseReport = () => {
       "Defect Name - English":
         "Improper Ironing - Glazing / Mark / Scorch, etc…",
       "Defect Name - Khmer": "បញ្ហាអ៊ុត- ឡើងស/ ស្នាម/ ខ្លោច -ល-",
-      "Defect Name - Chinese": "烫工不良-起镜 / 压痕 / 烫焦",
+      "Defect Name - Chinese": "烫工不良-起镜 / 压痕 / 烫焦"
     },
     {
       "Defect Code": "40",
@@ -398,7 +405,7 @@ const QCSunriseReport = () => {
         "烫工不良-变形 / 外观不良/បញ្ហាអ៊ុត- ខូចទ្រង់ទ្រាយ/ ខូចរាង/Improper Ironing - Off Shape / Poor Appearance",
       "Defect Name - English": "Improper Ironing - Off Shape / Poor Appearance",
       "Defect Name - Khmer": "បញ្ហាអ៊ុត- ខូចទ្រង់ទ្រាយ/ ខូចរាង",
-      "Defect Name - Chinese": "烫工不良-变形 / 外观不良",
+      "Defect Name - Chinese": "烫工不良-变形 / 外观不良"
     },
     {
       "Defect Code": "41",
@@ -408,7 +415,7 @@ const QCSunriseReport = () => {
         "左右高低/不对称/ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា/Asymmetry / Hi-Low",
       "Defect Name - English": "Asymmetry / Hi-Low",
       "Defect Name - Khmer": "ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា",
-      "Defect Name - Chinese": "左右高低/不对称",
+      "Defect Name - Chinese": "左右高低/不对称"
     },
     {
       "Defect Code": "42",
@@ -418,7 +425,7 @@ const QCSunriseReport = () => {
         "车线大小不均匀/ថ្នេរតូចធំ មិនស្មើគ្នា/Uneven / Misalign stitches",
       "Defect Name - English": "Uneven / Misalign stitches",
       "Defect Name - Khmer": "ថ្នេរតូចធំ មិនស្មើគ្នា",
-      "Defect Name - Chinese": "车线大小不均匀",
+      "Defect Name - Chinese": "车线大小不均匀"
     },
     {
       "Defect Code": "43",
@@ -428,7 +435,7 @@ const QCSunriseReport = () => {
         "尺寸问题 (+大)/បញ្ហាលើសខ្នាត(+) / Measurement issue positive",
       "Defect Name - English": "Measurement issue positive",
       "Defect Name - Khmer": "បញ្ហាលើសខ្នាត(+)",
-      "Defect Name - Chinese": "尺寸问题 (+大)",
+      "Defect Name - Chinese": "尺寸问题 (+大)"
     },
     {
       "Defect Code": "44",
@@ -438,8 +445,8 @@ const QCSunriseReport = () => {
         "尺寸问题 (-小)/បញ្ហាខ្វះខ្នាត(-) /Measurement issue negative",
       "Defect Name - English": "Measurement issue negative",
       "Defect Name - Khmer": "បញ្ហាខ្វះខ្នាត(-)",
-      "Defect Name - Chinese": "尺寸问题 (-小)",
-    },
+      "Defect Name - Chinese": "尺寸问题 (-小)"
+    }
   ];
 
   // **Normalization function for defect names**
@@ -462,7 +469,7 @@ const QCSunriseReport = () => {
     ),
     normalizeDefectName(
       "其它-做工不良/ផ្សេងៗ/Others - Poor Workmanship (Spare) 2"
-    ),
+    )
   ]);
   const defectCategoryMap = defectData.reduce((acc, d) => {
     acc[normalizeDefectName(d["Defect Name"])] = d["Category Name"];
@@ -493,7 +500,7 @@ const QCSunriseReport = () => {
     "总产量(Total Output)",
     "总SAM(Total SAM)",
     "总时间(Total Mins)",
-    "总效率(Total Eff.)",
+    "总效率(Total Eff.)"
   ];
   const rs01T39Headers = rs01T38Headers;
   const rs18Headers = [
@@ -511,7 +518,7 @@ const QCSunriseReport = () => {
     "工序名称(Task Name)",
     "返工原因(Rework Reason)",
     "组别(WorkLine)",
-    "返工代码(ReworkCode)",
+    "返工代码(ReworkCode)"
   ];
 
   const englishHeaderMap = {
@@ -546,7 +553,7 @@ const QCSunriseReport = () => {
     "工序名称(Task Name)": "Task Name",
     "返工原因(Rework Reason)": "Rework Reason",
     "组别(WorkLine)": "WorkLine",
-    "返工代码(ReworkCode)": "ReworkCode",
+    "返工代码(ReworkCode)": "ReworkCode"
   };
 
   const handleFileUpload = (e, type) => {
@@ -566,7 +573,7 @@ const QCSunriseReport = () => {
       setFiles((prev) => ({ ...prev, [type]: file }));
       setPreviews((prev) => ({
         ...prev,
-        [type]: { data: cleanedData, visible: false },
+        [type]: { data: cleanedData, visible: false }
       }));
     };
     reader.readAsArrayBuffer(file);
@@ -601,7 +608,7 @@ const QCSunriseReport = () => {
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: "Incorrect file format. Please upload the correct file.",
+        text: "Incorrect file format. Please upload the correct file."
       });
       return null;
     }
@@ -636,7 +643,7 @@ const QCSunriseReport = () => {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: "TaskNo mismatch in uploaded file.",
+          text: "TaskNo mismatch in uploaded file."
         });
         return null;
       }
@@ -653,7 +660,7 @@ const QCSunriseReport = () => {
   const handlePreviewToggle = (type) => {
     setPreviews((prev) => ({
       ...prev,
-      [type]: { ...prev[type], visible: !prev[type].visible },
+      [type]: { ...prev[type], visible: !prev[type].visible }
     }));
     setCurrentPage((prev) => ({ ...prev, [type]: 1 }));
   };
@@ -662,7 +669,7 @@ const QCSunriseReport = () => {
     setFiles((prev) => ({ ...prev, [type]: null }));
     setPreviews((prev) => ({
       ...prev,
-      [type]: { data: null, visible: false },
+      [type]: { data: null, visible: false }
     }));
     setCurrentPage((prev) => ({ ...prev, [type]: 1 }));
   };
@@ -717,7 +724,7 @@ const QCSunriseReport = () => {
             onClick={() =>
               setCurrentPage((prev) => ({
                 ...prev,
-                [type]: Math.max(prev[type] - 1, 1),
+                [type]: Math.max(prev[type] - 1, 1)
               }))
             }
             disabled={currentPage[type] === 1}
@@ -732,7 +739,7 @@ const QCSunriseReport = () => {
             onClick={() =>
               setCurrentPage((prev) => ({
                 ...prev,
-                [type]: Math.min(prev[type] + 1, totalPages),
+                [type]: Math.min(prev[type] + 1, totalPages)
               }))
             }
             disabled={currentPage[type] === totalPages}
@@ -752,7 +759,7 @@ const QCSunriseReport = () => {
       Swal.fire({
         icon: "warning",
         title: "Warning",
-        text: "Please upload RS01-T38, RS01-T39, and RS18 files before analyzing.",
+        text: "Please upload RS01-T38, RS01-T39, and RS18 files before analyzing."
       });
       return;
     }
@@ -809,7 +816,7 @@ const QCSunriseReport = () => {
             StyleNo: styleNo,
             Customer: customer,
             CheckedQtyT38: 0,
-            CheckedQtyT39: 0,
+            CheckedQtyT39: 0
           };
         }
 
@@ -850,7 +857,7 @@ const QCSunriseReport = () => {
           MONo: mono,
           DefectsQty: 0,
           DefectsByCategory: {},
-          Type2Defects: {},
+          Type2Defects: {}
         };
       }
 
@@ -889,13 +896,13 @@ const QCSunriseReport = () => {
         StyleNo,
         Customer,
         CheckedQtyT38,
-        CheckedQtyT39,
+        CheckedQtyT39
       } = item;
       const rs18Key = `${WorkDate}|${WorkLine}|${MONo}`;
       const rs18Entry = rs18Groups[rs18Key] || {
         DefectsQty: 0,
         DefectsByCategory: {},
-        Type2Defects: {},
+        Type2Defects: {}
       };
 
       // Format Defect Details by category
@@ -923,7 +930,7 @@ const QCSunriseReport = () => {
         "CheckedQty-T39": CheckedQtyT39,
         "Defects Qty": rs18Entry.DefectsQty,
         "Defect Details": defectDetails || "N/A",
-        "Type 2 defects": type2DefectsDetails || "N/A",
+        "Type 2 defects": type2DefectsDetails || "N/A"
       };
     });
 
@@ -1029,8 +1036,17 @@ const QCSunriseReport = () => {
         >
           <FaFileExcel className="mr-2" /> Excel Upload
         </button>
+        <button
+          onClick={() => setActiveTab("sunriseDB")}
+          className={`flex items-center px-4 py-2 rounded-md ${
+            activeTab === "sunriseDB"
+              ? "bg-blue-500 text-white"
+              : "bg-gray-200 text-gray-700"
+          }`}
+        >
+          <FaDatabase className="mr-2" /> Sunrise Database
+        </button>
       </div>
-
       {activeTab === "excelUpload" && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1157,6 +1173,7 @@ const QCSunriseReport = () => {
           {renderAnalyzeTable()}
         </>
       )}
+      {activeTab === "sunriseDB" && <SunriseDB />} {/* Add this line */}
     </div>
   );
 };

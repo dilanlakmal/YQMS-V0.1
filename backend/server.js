@@ -30,6 +30,7 @@ import createQC2InspectionPassBundleModel from "./models/qc2_inspection.js";
 import createQC2ReworksModel from "./models/qc2_rework.js";
 import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
 import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
+import sql from "mssql"; // Import mssql for SQL Server connection
 
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "./config.js";
@@ -164,6 +165,96 @@ const QC2InspectionPassBundle =
 const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
 const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
+
+// SQL Server Configuration
+const sqlConfig = {
+  user: "ymdata",
+  password: "Kzw15947",
+  server: "192.167.1.13",
+  port: 1433,
+  database: "YMDataStore",
+  options: {
+    encrypt: false, // Use true if SSL is required
+    trustServerCertificate: true // For self-signed certificates
+  },
+  requestTimeout: 300000, // Set timeout to 5 minutes (300,000 ms)
+  pool: {
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000
+  }
+};
+
+// Connect to SQL Server
+async function connectToSqlServer() {
+  try {
+    await sql.connect(sqlConfig);
+    console.log("Connected to SQL Server (YMDataStore) at 192.167.1.13:1433");
+  } catch (err) {
+    console.error("SQL Server connection error:", err);
+  }
+}
+
+connectToSqlServer();
+
+// New Endpoint for RS18 Data
+app.get("/api/sunrise/rs18", async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        FORMAT(CAST(dDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+        DATEPART(HOUR, CAST(QcTime AS DATETIME)) AS StartHR,
+        DATEPART(HOUR, CAST(QcTime AS DATETIME)) + 1 AS EndHR,
+        WorkLine,
+        MONo,
+        EmpID,
+        EmpName,
+        EmpID_QC,
+        EmpName_QC,
+        SizeName,
+        ColorNo,
+        ColorName,
+        SeqNo,
+        SeqName,
+        ReworkCode,
+        ReworkName,
+        SUM(QtyRework) AS DefectsQty
+      FROM 
+        YMDataStore.SUNRISE.RS18 r 
+      WHERE 
+        TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+        AND SeqNo <> 700
+        AND TRY_CAST(ReworkCode AS INT) BETWEEN 1 AND 40
+        AND CAST(dDate AS DATE) > '2021-12-31'
+        AND CAST(dDate AS DATE) < DATEADD(DAY, 1, GETDATE())
+      GROUP BY 
+        CAST(dDate AS DATE),
+        DATEPART(HOUR, CAST(QcTime AS DATETIME)),
+        DATEPART(HOUR, CAST(QcTime AS DATETIME)) + 1,
+        WorkLine,
+        MONo,
+        EmpID,
+        EmpName,
+        EmpID_QC,
+        EmpName_QC,
+        SizeName,
+        ColorNo,
+        ColorName,
+        SeqNo,
+        SeqName,
+        ReworkCode,
+        ReworkName;
+    `;
+
+    const result = await sql.query(query);
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("Error fetching RS18 data:", err);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch RS18 data", error: err.message });
+  }
+});
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -1937,7 +2028,7 @@ app.put(
             ...printEntry,
             totalRejectGarment_Var:
               printEntry.totalRejectGarment_Var ||
-              printEntry.totalRejectGarmentCount // Preserve or initialize
+              printEntry.totalRejectGarmentCount
           }));
       }
 
@@ -1959,6 +2050,123 @@ app.put(
         return res.status(404).json({ error: "Record not found" });
       }
 
+      // Update qc2_orderdata for qc2InspectionFirst and qc2InspectionDefect
+      const qc2OrderDataRecord = await QC2OrderData.findOne({
+        bundle_random_id
+      });
+
+      // Case 1: Initial inspection completed (inspection_time is set)
+      if (
+        updateOperationsFinal.$set &&
+        updateOperationsFinal.$set.inspection_time
+      ) {
+        if (qc2OrderDataRecord) {
+          // Check if an entry with the same inspection_time, emp_id, and bundle_random_id already exists
+          const existingEntry = qc2OrderDataRecord.qc2InspectionFirst.find(
+            (entry) =>
+              entry.inspectionRecordId === updatedRecord._id.toString() ||
+              (entry.updated_date === updatedRecord.inspection_date &&
+                entry.update_time === updatedRecord.inspection_time &&
+                entry.emp_id === updatedRecord.emp_id_inspection)
+          );
+
+          if (!existingEntry) {
+            const inspectionFirstEntry = {
+              process: "qc2",
+              task_no: 100,
+              checkedQty: updatedRecord.checkedQty,
+              totalPass: updatedRecord.totalPass,
+              totalRejects: updatedRecord.totalRejects,
+              defectQty: updatedRecord.defectQty,
+              defectArray: updatedRecord.defectArray,
+              rejectGarments: updatedRecord.rejectGarments.map((rg) => ({
+                totalCount: rg.totalCount,
+                defects: rg.defects.map((d) => ({
+                  name: d.name,
+                  count: d.count,
+                  repair: d.repair,
+                  status: "Fail"
+                })),
+                garment_defect_id: rg.garment_defect_id,
+                rejectTime: rg.rejectTime
+              })),
+              updated_date: updatedRecord.inspection_date,
+              update_time: updatedRecord.inspection_time,
+              emp_id: updatedRecord.emp_id_inspection,
+              eng_name: updatedRecord.eng_name_inspection,
+              kh_name: updatedRecord.kh_name_inspection,
+              job_title: updatedRecord.job_title_inspection,
+              dept_name: updatedRecord.dept_name_inspection,
+              sect_name: updatedRecord.sect_name_inspection,
+              inspectionRecordId: updatedRecord._id.toString() // Add unique identifier
+            };
+            qc2OrderDataRecord.qc2InspectionFirst.push(inspectionFirstEntry);
+            await qc2OrderDataRecord.save();
+          } else {
+            console.log(
+              "Duplicate entry detected, skipping push to qc2InspectionFirst"
+            );
+          }
+        }
+      }
+
+      // Case 2: Return inspection completed (repairGarmentsDefects is pushed)
+      if (
+        updateOperationsFinal.$push &&
+        updateOperationsFinal.$push[
+          "printArray.$[elem].repairGarmentsDefects"
+        ] &&
+        updateData.sessionData
+      ) {
+        const sessionData = updateData.sessionData;
+        const {
+          sessionTotalPass,
+          sessionTotalRejects,
+          sessionDefectsQty,
+          sessionRejectedGarments,
+          inspectionNo,
+          defect_print_id
+        } = sessionData;
+
+        if (qc2OrderDataRecord) {
+          const now = new Date();
+          const inspectionDefectEntry = {
+            process: "qc2",
+            task_no: 101,
+            defect_print_id,
+            inspectionNo,
+            checkedQty: sessionTotalPass + sessionTotalRejects,
+            totalPass: sessionTotalPass,
+            totalRejects: sessionTotalRejects,
+            defectQty: sessionDefectsQty,
+            // Omit defectArray
+            rejectGarments: sessionRejectedGarments.map((rg) => ({
+              totalCount: rg.totalDefectCount,
+              defects: rg.repairDefectArray.map((d) => ({
+                name: d.name,
+                count: d.count,
+                repair:
+                  allDefects.find((def) => def.english === d.name)?.repair ||
+                  "Unknown",
+                status: "Fail"
+              })),
+              garment_defect_id: generateGarmentDefectId(),
+              rejectTime: now.toLocaleTimeString("en-US", { hour12: false })
+            })),
+            updated_date: now.toLocaleDateString("en-US"),
+            update_time: now.toLocaleTimeString("en-US", { hour12: false }),
+            emp_id: updatedRecord.emp_id_inspection,
+            eng_name: updatedRecord.eng_name_inspection,
+            kh_name: updatedRecord.kh_name_inspection,
+            job_title: updatedRecord.job_title_inspection,
+            dept_name: updatedRecord.dept_name_inspection,
+            sect_name: updatedRecord.sect_name_inspection
+          };
+          qc2OrderDataRecord.qc2InspectionDefect.push(inspectionDefectEntry);
+          await qc2OrderDataRecord.save();
+        }
+      }
+
       io.emit("qc2_data_updated");
       res.json({
         message: "Inspection pass bundle updated successfully",
@@ -1973,6 +2181,82 @@ app.put(
     }
   }
 );
+
+// // Helper function to generate garment_defect_id
+// const generateGarmentDefectId = () => {
+//   return Math.floor(1000000000 + Math.random() * 9000000000).toString();
+// };
+
+// old endpoint ---
+// app.put(
+//   "/api/qc2-inspection-pass-bundle/:bundle_random_id",
+//   async (req, res) => {
+//     try {
+//       const { bundle_random_id } = req.params;
+//       const { updateOperations, arrayFilters } = req.body || {};
+
+//       let updateData = req.body;
+//       if (updateOperations) {
+//         updateData = updateOperations;
+//       }
+
+//       const updateOperationsFinal = {};
+//       if (updateData.$set) {
+//         updateOperationsFinal.$set = updateData.$set;
+//       }
+//       if (updateData.$push) {
+//         updateOperationsFinal.$push = updateData.$push;
+//       }
+//       if (updateData.$inc) {
+//         updateOperationsFinal.$inc = updateData.$inc;
+//       }
+//       if (!updateData.$set && !updateData.$push && !updateData.$inc) {
+//         updateOperationsFinal.$set = updateData;
+//       }
+
+//       // Ensure totalRejectGarment_Var remains unchanged when updating printArray
+//       if (updateOperationsFinal.$set?.printArray) {
+//         updateOperationsFinal.$set.printArray =
+//           updateOperationsFinal.$set.printArray.map((printEntry) => ({
+//             ...printEntry,
+//             totalRejectGarment_Var:
+//               printEntry.totalRejectGarment_Var ||
+//               printEntry.totalRejectGarmentCount // Preserve or initialize
+//           }));
+//       }
+
+//       const options = {
+//         new: true,
+//         runValidators: true
+//       };
+//       if (arrayFilters) {
+//         options.arrayFilters = arrayFilters;
+//       }
+
+//       const updatedRecord = await QC2InspectionPassBundle.findOneAndUpdate(
+//         { bundle_random_id },
+//         updateOperationsFinal,
+//         options
+//       );
+
+//       if (!updatedRecord) {
+//         return res.status(404).json({ error: "Record not found" });
+//       }
+
+//       io.emit("qc2_data_updated");
+//       res.json({
+//         message: "Inspection pass bundle updated successfully",
+//         data: updatedRecord
+//       });
+//     } catch (error) {
+//       console.error("Error updating inspection pass bundle:", error);
+//       res.status(500).json({
+//         message: "Failed to update inspection pass bundle",
+//         error: error.message
+//       });
+//     }
+//   }
+// );
 
 // Filter Pane for Live Dashboard - EndPoints
 app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {
@@ -3674,7 +3958,7 @@ app.get("/api/defect-track/:defect_print_id", async (req, res) => {
             name: defect.name,
             count: defect.count,
             repair: defect.repair,
-            status: repairItem ? repairItem.status : "Not Repaired",
+            status: repairItem ? repairItem.status : "Fail",
             repair_date: repairItem ? repairItem.repair_date : "",
             repair_time: repairItem ? repairItem.repair_time : ""
           };
@@ -3751,7 +4035,8 @@ app.post("/api/repair-tracking", async (req, res) => {
           defectName: item.defectName,
           defectCount: item.defectCount,
           repairGroup: item.repairGroup,
-          status: item.status || "Not Repaired",
+          garmentNumber: item.garmentNumber,
+          status: item.status || "Fail",
           repair_date: item.repair_date || "",
           repair_time: item.repair_time || ""
         }))
