@@ -111,7 +111,6 @@ const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
 const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const QCInlineRoving =createQCInlineRovingModel(ymProdConnection);
 const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
-const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
 
 //-----------------------------END DATABASE CONNECTIONS------------------------------------------------//
 
@@ -3528,7 +3527,7 @@ app.post("/api/repair-tracking", async (req, res) => {
       // Update existing record
       existingRecord.repairArray = existingRecord.repairArray.map((item) => {
         const updatedItem = repairArray.find(
-          (newItem) => newItem.defectName === item.defectName
+          (newItem) => newItem.defectName === item.defectName && newItem.garmentNumber === item.garmentNumber
         );
         if (updatedItem) {
           return {
@@ -3540,6 +3539,16 @@ app.post("/api/repair-tracking", async (req, res) => {
         }
         return item;
       });
+
+       //Add new items
+       const newItems = repairArray.filter(newItem => !existingRecord.repairArray.some(
+        existingItem => existingItem.defectName === newItem.defectName && existingItem.garmentNumber === newItem.garmentNumber
+    ));
+
+    if (newItems.length > 0) {
+        existingRecord.repairArray.push(...newItems);
+    }
+
       await existingRecord.save();
       res.status(200).json({
         message: "Repair tracking updated successfully",
@@ -3564,9 +3573,11 @@ app.post("/api/repair-tracking", async (req, res) => {
           defectName: item.defectName,
           defectCount: item.defectCount,
           repairGroup: item.repairGroup,
+          garmentNumber: item.garmentNumber,
           status: item.status || "Not Repaired",
           repair_date: item.repair_date || "",
-          repair_time: item.repair_time || ""
+          repair_time: item.repair_time || "",
+
         }))
       });
       await newRecord.save();
@@ -3583,6 +3594,78 @@ app.post("/api/repair-tracking", async (req, res) => {
     });
   }
 });
+
+
+// Endpoint to update defect status for a rejected garment
+app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
+  const { defect_print_id, garmentNumber, failedDefectIds } = req.body;
+  try {
+    const repairTracking = await QC2RepairTracking.find({ defect_print_id });
+    if (!repairTracking || repairTracking.length == 0) {
+      return res.status(404).json({ message: "Repair tracking not found" });
+    }
+
+    const rt = repairTracking[0];
+    console.log("Before update:", rt.repairArray);
+
+    rt.repairArray = rt.repairArray.map(item => {
+      if (item.garmentNumber === garmentNumber && failedDefectIds.includes(item.id)) {
+        item.status = "Fail";
+        item.repair_date = null;
+        item.repair_time = null;
+      } else if (item.garmentNumber === garmentNumber) {
+        item.status = "OK";
+        const now = new Date();
+        item.repair_date = now.toLocaleDateString("en-US");
+        item.repair_time = now.toLocaleTimeString("en-US", { hour12: false });
+      }
+      return item;
+    });
+
+    console.log("After update:", rt.repairArray);
+
+    await rt.save();
+    res.status(200).json({ message: "Updated successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+
+// Endpoint to update defect status by defect name and garment number
+app.post("/api/qc2-repair-tracking/update-defect-status-by-name", async (req, res) => {
+  const { defect_print_id, garmentNumber, defectName, status } = req.body;
+  try {
+    const repairTracking = await QC2RepairTracking.findOne({ defect_print_id });
+    if (!repairTracking) {
+      return res.status(404).json({ message: "Repair tracking not found" });
+    }
+
+    // Find the specific defect and update it
+    const updatedRepairArray = repairTracking.repairArray.map(item => {
+      if (item.garmentNumber === garmentNumber && item.defectName === defectName) {
+        const now = new Date();
+        return {
+          ...item,
+          status: status,
+          repair_date: status === "OK" ? now.toLocaleDateString("en-US") : null,
+          repair_time: status === "OK" ? now.toLocaleTimeString("en-US", { hour12: false }) : null,
+        };
+      }
+      return item;
+    });
+
+    repairTracking.repairArray = updatedRepairArray;
+    await repairTracking.save();
+    res.status(200).json({ message: "Defect status updated successfully" });
+
+  } catch (error) {
+    console.error("Error updating defect status:", error);
+    res.status(500).json({ message: "Failed to update defect status", error: error.message });
+  }
+});
+
 
 /* ------------------------------
    QC2 - Reworks

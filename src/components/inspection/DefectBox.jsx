@@ -1,4 +1,5 @@
 import { Minus, Plus } from "lucide-react";
+
 import {
   CleanlinessDefects,
   EmbellishmentDefects,
@@ -65,7 +66,14 @@ const DefectBox = ({
       ? currentDelta + 1
       : Math.max(0, currentDelta - 1);
     const newTempDefects = { ...tempDefects, [index]: newDelta };
-    onDefectUpdate(newTempDefects);
+
+    // Automatically change the defect status to "Pass" if the defect count is removed
+    if (newDelta === 0) {
+      const defectName = defectItems[index].name;
+      onDefectUpdate(newTempDefects, defectName, "OK");
+    } else {
+      onDefectUpdate(newTempDefects, defectItems[index].name, "Fail");
+    }
   };
 
   // Total count is the sum of confirmed and temporary defects.
@@ -74,6 +82,7 @@ const DefectBox = ({
   };
 
   let filteredDefects = getFilteredDefects();
+
   if (sortOption) {
     if (sortOption === "alphaAsc") {
       filteredDefects = filteredDefects.slice().sort((a, b) => {
@@ -97,7 +106,7 @@ const DefectBox = ({
   return (
     <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
       {filteredDefects.map((index) => {
-        const totalCount = confirmedDefects[index] || 0;
+        const totalCount = getCurrentCount(index);
         const tempCount = tempDefects[index] || 0;
         return (
           <div
@@ -134,7 +143,7 @@ const DefectBox = ({
                     handleDefectChange(index, false);
                   }}
                   className="p-1 rounded hover:bg-gray-100 disabled:opacity-50"
-                  disabled={tempCount <= totalCount}
+                  disabled={tempCount <= 0}
                 >
                   <Minus className="w-5 h-5" />
                 </button>

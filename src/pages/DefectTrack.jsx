@@ -34,6 +34,7 @@ const DefectTrack = () => {
   const [language, setLanguage] = useState("khmer");
   const [showScanner, setShowScanner] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
+  
 
   const onScanSuccess = async (decodedText) => {
     setLoading(true);
@@ -91,6 +92,7 @@ const DefectTrack = () => {
                   minute: "2-digit",
                   second: "2-digit",
                 }),
+                garmentNumber : garment.garmentNumber
               };
             }
             return defect;
@@ -115,6 +117,7 @@ const DefectTrack = () => {
           status: defect.status || "Not Repaired",
           repair_date: defect.repair_date || "",
           repair_time: defect.repair_time || "",
+          garmentNumber:garment.garmentNumber,
         });
       });
     });

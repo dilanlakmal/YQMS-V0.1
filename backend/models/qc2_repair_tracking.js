@@ -20,9 +20,10 @@ const qc2RepairTrackingSchema = new mongoose.Schema(
         defectName: { type: String, required: true },
         defectCount: { type: Number, required: true },
         repairGroup: { type: String, required: true },
+        garmentNumber:{ type: Number, required: true },
         status: { type: String, default: "Not Repaired" }, // "Not Repaired" or "OK"
         repair_date: { type: String }, // "MM/DD/YYYY"
-        repair_time: { type: String } // "HH:MM:SS"
+        repair_time: { type: String }// "HH:MM:SS"
       }
     ]
   },
