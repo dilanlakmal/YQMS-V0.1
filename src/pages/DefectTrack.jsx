@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import { API_BASE_URL } from "../../config";
 import { allDefects } from "../constants/QC Inspection/defects";
 import Swal from "sweetalert2";
 import QrCodeScannerRepair from "../components/forms/QrCodeScannerRepair";
-import DatePicker from "react-datepicker";
 import { useAuth } from '../components/authentication/AuthContext';
-import { XCircle } from 'lucide-react';
 import {
   Button,
   Table,
@@ -20,10 +17,6 @@ import {
   InputLabel,
   TableContainer,
   Paper,
-  Typography,
-  Box,
-  Container,
-  Divider,
 } from "@mui/material";
 
 const DefectTrack = () => {
@@ -33,8 +26,7 @@ const DefectTrack = () => {
   const [error, setError] = useState(null);
   const [language, setLanguage] = useState("khmer");
   const [showScanner, setShowScanner] = useState(true);
-  const [currentDate, setCurrentDate] = useState(new Date());
-  
+  const [tempOkDefects, setTempOkDefects] = useState([]);
 
   const onScanSuccess = async (decodedText) => {
     setLoading(true);
@@ -54,12 +46,14 @@ const DefectTrack = () => {
             return {
               ...defect,
               displayName: defectEntry ? defectEntry[language] || defect.name : defect.name,
+              status: defect.status || "Not Repaired"|| "Fail",
             };
           }),
         })),
       };
       setScannedData(mappedData);
       setShowScanner(false);
+      setTempOkDefects([]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -72,6 +66,7 @@ const DefectTrack = () => {
   };
 
   const handleOkClick = (garmentNumber, defectName) => {
+    setTempOkDefects((prev) => [...prev, { garmentNumber, defectName }]);
     setScannedData((prev) => {
       const updatedGarments = prev.garments.map((garment) => {
         if (garment.garmentNumber === garmentNumber) {
@@ -151,6 +146,7 @@ const DefectTrack = () => {
       });
       setScannedData(null);
       setShowScanner(true);
+      setTempOkDefects([]);
     } catch (err) {
       setError(err.message);
       Swal.fire({
@@ -174,6 +170,7 @@ const DefectTrack = () => {
       if (result.isConfirmed) {
         setScannedData(null);
         setShowScanner(true);
+        setTempOkDefects([]);
       }
     });
   };
@@ -196,6 +193,14 @@ const DefectTrack = () => {
         })),
       }));
     }
+  };
+
+  const isDefectTemporarilyOk = (garmentNumber, defectName) => {
+    return tempOkDefects.some(
+      (tempDefect) =>
+        tempDefect.garmentNumber === garmentNumber &&
+        tempDefect.defectName === defectName
+    );
   };
 
   if (authLoading) {
@@ -263,8 +268,17 @@ const DefectTrack = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {scannedData.garments.map((garment) =>
-                    garment.defects.map((defect, index) => (
+                {scannedData.garments.map((garment) =>
+                    garment.defects
+                      .filter(
+                        (defect) =>
+                          defect.status !== "OK" ||
+                          isDefectTemporarilyOk(
+                            garment.garmentNumber,
+                            defect.name
+                          )
+                      )
+                      .map((defect, index) => (
                       <TableRow key={`${garment.garmentNumber}-${defect.name}-${index}`} className={defect.status === "OK" ? "bg-green-100" : "hover:bg-gray-100"}>
                         <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{garment.garmentNumber}</TableCell>
                         <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{defect.repair}</TableCell>
@@ -273,12 +287,30 @@ const DefectTrack = () => {
                         <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
                           <div className="flex justify-center">
                             <button
-                              onClick={() => handleOkClick(garment.garmentNumber, defect.name)}
-                              disabled={defect.status === "OK"}
-                              className={`px-4 py-2 rounded ${defect.status === "OK" ? "bg-green-600" : "bg-gray-400"} text-white`}
-                            >
-                              OK
-                            </button>
+                                onClick={() =>
+                                  handleOkClick(
+                                    garment.garmentNumber,
+                                    defect.name
+                                  )
+                                }
+                                disabled={
+                                  defect.status === "OK" &&
+                                  !isDefectTemporarilyOk(
+                                    garment.garmentNumber,
+                                    defect.name
+                                  )
+                                }
+                                className={`px-4 py-2 rounded ${
+                                  isDefectTemporarilyOk(garment.garmentNumber, defect.name)
+                                    ? "bg-green-600" // Green if temporarily OK
+                                    : defect.status === "OK"
+                                    ? "bg-green-600" // Green if already OK
+                                    : "bg-gray-400" // Gray if not OK
+                                } text-white`}
+                              >
+                                OK
+                              </button>
+                              
                           </div>
                         </TableCell>
                       </TableRow>

@@ -605,16 +605,12 @@ const QC2InspectionPage = () => {
 
       const actualGarmentNumber = currentGarment.garmentNumber;
 
-      // // Assign a garment number
-      // const garmentNumber = newSessionData.sessionRejectedGarments.length + 1;
-      // // Add the garment number to the set of rejected garment numbers
-      // setRejectedGarmentNumbers(prev => new Set(prev).add(garmentNumber));
       // Record the current time
       const now = new Date();
       const currentTime = now.toLocaleTimeString("en-US", { hour12: false });
       // Create re-return garment object
       const reReturnGarment = {
-        garment: { garmentNumber: actualGarmentNumber, time: currentTime }, // Use actualGarmentNumber here
+        garment: { garmentNumber: actualGarmentNumber, time: currentTime },
         defects: garmentDefects.map((defect) => {
           const defectIndex = allDefects.findIndex((d) => d.english === defect.name);
           const repair = defectIndex !== -1 ? allDefects[defectIndex].repair : "Unknown";
@@ -629,6 +625,7 @@ const QC2InspectionPage = () => {
       newSessionData.sessionRejectedGarments.push({
         totalDefectCount,
         repairDefectArray: garmentDefects,
+        garmentNumber: actualGarmentNumber,
       });
       setSessionData(newSessionData);
       setTotalPass((prev) => prev - 1);
@@ -1116,20 +1113,20 @@ const QC2InspectionPage = () => {
         (_, i) => rejectedCount + i + 1
       );
 
-      if (passedGarmentNumbers.length > 0) {
-        const passUpdateResponse = await fetch(
-          `${API_BASE_URL}/api/qc2-repair-tracking/update-passed-garments`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              defect_print_id: sessionData.printEntry.defect_print_id,
-              garmentNumbers: passedGarmentNumbers,
-            }),
-          }
-        );
-        if (!passUpdateResponse.ok) throw new Error("Failed to update repair tracking for passed garments");
-      }
+      // if (passedGarmentNumbers.length > 0) {
+      //   const passUpdateResponse = await fetch(
+      //     `${API_BASE_URL}/api/qc2-repair-tracking/update-passed-garments`,
+      //     {
+      //       method: "POST",
+      //       headers: { "Content-Type": "application/json" },
+      //       body: JSON.stringify({
+      //         defect_print_id: sessionData.printEntry.defect_print_id,
+      //         garmentNumbers: passedGarmentNumbers,
+      //       }),
+      //     }
+      //   );
+      //   if (!passUpdateResponse.ok) throw new Error("Failed to update repair tracking for passed garments");
+      // }
       } catch (err) {
         setError(err.message);
       }

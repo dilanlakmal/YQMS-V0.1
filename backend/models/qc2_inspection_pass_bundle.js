@@ -99,8 +99,10 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
         timestamp: { type: Date, default: Date.now },
         re_return_garment:[
           {
-            garment: {type: Object, required: true},
-            // garmentNumber:{ type: Number, required: true },
+            garment: {
+              garmentNumber: { type: Number, required: true }, // Added garmentNumber field
+              time: { type: String, required: true },
+            },
             defects: [
               {
                 name: { type: String, required: true },
