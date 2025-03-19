@@ -633,6 +633,7 @@ const QC2InspectionPage = () => {
       setSessionData(newSessionData);
       setTotalPass((prev) => prev - 1);
       setTotalRejects((prev) => prev + 1);
+      setTempDefects({});
       console.log("reReturnGarment created:", reReturnGarment);
       console.log("Updated sessionRejectedGarments:", newSessionData.sessionRejectedGarments);
       // Add re-return garment to qc2_inspection_pass_bundle
