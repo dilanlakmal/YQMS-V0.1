@@ -45,6 +45,7 @@
     "html2canvas": "^1.4.1",
     "html2pdf.js": "^0.10.1",
     "html5-qrcode": "^2.3.8",
+    "idb": "^8.0.2",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^5.0.2",
