@@ -183,7 +183,7 @@ const sqlConfig = {
     encrypt: false, // Use true if SSL is required
     trustServerCertificate: true // For self-signed certificates
   },
-  requestTimeout: 300000, // Set timeout to 5 minutes (300,000 ms)
+  requestTimeout: 3000000, // Set timeout to 5 minutes (300,000 ms)
   pool: {
     max: 10,
     min: 0,
@@ -211,15 +211,9 @@ app.get("/api/sunrise/rs18", async (req, res) => {
         FORMAT(CAST(dDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
         WorkLine,
         MONo,
-        EmpID,
-        EmpName,
-        EmpID_QC,
-        EmpName_QC,
         SizeName,
         ColorNo,
         ColorName,
-        SeqNo,
-        SeqName,
         ReworkCode,
         CASE ReworkCode
           WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
@@ -281,15 +275,9 @@ app.get("/api/sunrise/rs18", async (req, res) => {
         CAST(dDate AS DATE),
         WorkLine,
         MONo,
-        EmpID,
-        EmpName,
-        EmpID_QC,
-        EmpName_QC,
         SizeName,
         ColorNo,
         ColorName,
-        SeqNo,
-        SeqName,
         ReworkCode
       HAVING 
         CASE ReworkCode
@@ -348,6 +336,44 @@ app.get("/api/sunrise/rs18", async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to fetch RS18 data", error: err.message });
+  }
+});
+
+// New Endpoint for Sunrise Output Data
+app.get("/api/sunrise/output", async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        FORMAT(CAST(BillDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+        WorkLine,
+        MONo,
+        SizeName,
+        ColorNo,
+        ColorName,
+        SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END) AS TotalQtyT38,
+        SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END) AS TotalQtyT39
+      FROM 
+        YMDataStore.SunRise_G.tWork2024
+      WHERE 
+        SeqNo IN (38, 39)
+        AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+      GROUP BY 
+        CAST(BillDate AS DATE),
+        WorkLine,
+        MONo,
+        SizeName,
+        ColorNo,
+        ColorName;
+    `;
+
+    const result = await sql.query(query);
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("Error fetching Sunrise Output data:", err);
+    res.status(500).json({
+      message: "Failed to fetch Sunrise Output data",
+      error: err.message
+    });
   }
 });
 
