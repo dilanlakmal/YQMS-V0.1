@@ -3,6 +3,7 @@ import { API_BASE_URL } from "../../config";
 import Swal from "sweetalert2";
 import { openDB } from "idb";
 import { FaSync } from "react-icons/fa"; // Refresh icon
+import SunriseAnalyze from "./SunriseAnalyze"; // Import the new component
 
 const SunriseDB = () => {
   const [rs18Data, setRs18Data] = useState(null);
@@ -16,35 +17,47 @@ const SunriseDB = () => {
   const [showRs18Data, setShowRs18Data] = useState(false);
   const [showOutputData, setShowOutputData] = useState(false);
   const [showAnalyze, setShowAnalyze] = useState(false);
-  const [currentPage, setCurrentPage] = useState({
-    rs18: 1,
-    output: 1,
-    analyze: 1
-  });
-  const [filterDate, setFilterDate] = useState(""); // Date filter for Analyze table
+  const [currentPage, setCurrentPage] = useState({ rs18: 1, output: 1 });
   const rowsPerPage = 10;
 
   // Initialize IndexedDB
   const initDB = async () => {
-    return openDB("SunriseDB", 1, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains("rs18")) {
-          db.createObjectStore("rs18", { keyPath: "id" });
+    try {
+      const db = await openDB("SunriseDB", 2, {
+        upgrade(db, oldVersion, newVersion) {
+          console.log(
+            `Upgrading database from version ${oldVersion} to ${newVersion}`
+          );
+          if (!db.objectStoreNames.contains("rs18")) {
+            db.createObjectStore("rs18", { keyPath: "id" });
+            console.log("Created rs18 object store");
+          }
+          if (!db.objectStoreNames.contains("output")) {
+            db.createObjectStore("output", { keyPath: "id" });
+            console.log("Created output object store");
+          }
         }
-        if (!db.objectStoreNames.contains("output")) {
-          db.createObjectStore("output", { keyPath: "id" });
-        }
-      }
-    });
+      });
+      console.log("IndexedDB initialized successfully");
+      return db;
+    } catch (err) {
+      console.error("Error initializing IndexedDB:", err);
+      throw err;
+    }
   };
 
   // Save data to IndexedDB
   const saveDataToDB = async (storeName, data) => {
     try {
       const db = await initDB();
-      await db.put(storeName, { id: `${storeName}Data`, data });
+      const tx = db.transaction(storeName, "readwrite");
+      const store = tx.objectStore(storeName);
+      await store.put({ id: `${storeName}Data`, data });
+      await tx.done;
+      console.log(`Data saved to ${storeName} in IndexedDB successfully`);
     } catch (err) {
       console.error(`Error saving to IndexedDB (${storeName}):`, err);
+      throw err;
     }
   };
 
@@ -52,7 +65,18 @@ const SunriseDB = () => {
   const loadDataFromDB = async (storeName) => {
     try {
       const db = await initDB();
-      const result = await db.get(storeName, `${storeName}Data`);
+      if (!db.objectStoreNames.contains(storeName)) {
+        console.warn(`Object store ${storeName} does not exist yet`);
+        return null;
+      }
+      const tx = db.transaction(storeName, "readonly");
+      const store = tx.objectStore(storeName);
+      const result = await store.get(`${storeName}Data`);
+      await tx.done;
+      console.log(
+        `Data loaded from ${storeName} in IndexedDB:`,
+        result?.data ? "Data found" : "No data"
+      );
       return result?.data || null;
     } catch (err) {
       console.error(`Error loading from IndexedDB (${storeName}):`, err);
@@ -117,11 +141,28 @@ const SunriseDB = () => {
   // Load cached data on mount
   useEffect(() => {
     const loadCachedData = async () => {
-      const cachedRs18Data = await loadDataFromDB("rs18");
-      const cachedOutputData = await loadDataFromDB("output");
-      if (cachedRs18Data) setRs18Data(cachedRs18Data);
-      if (cachedOutputData) setOutputData(cachedOutputData);
+      try {
+        const cachedRs18Data = await loadDataFromDB("rs18");
+        const cachedOutputData = await loadDataFromDB("output");
+
+        if (cachedRs18Data) {
+          setRs18Data(cachedRs18Data);
+          console.log("RS18 data loaded from IndexedDB into state");
+        } else {
+          console.log("No RS18 data found in IndexedDB");
+        }
+
+        if (cachedOutputData) {
+          setOutputData(cachedOutputData);
+          console.log("Output data loaded from IndexedDB into state");
+        } else {
+          console.log("No Output data found in IndexedDB");
+        }
+      } catch (err) {
+        console.error("Error in loadCachedData:", err);
+      }
     };
+
     loadCachedData();
   }, []);
 
@@ -290,197 +331,6 @@ const SunriseDB = () => {
     );
   };
 
-  const renderAnalyzeTable = () => {
-    if (!rs18Data || !outputData || !showAnalyze) return null;
-
-    // Merge data based on common columns
-    const commonKeys = [
-      "InspectionDate",
-      "WorkLine",
-      "MONo",
-      "SizeName",
-      "ColorNo",
-      "ColorName"
-    ];
-    const mergedData = [];
-
-    // Create a map for output data
-    const outputMap = new Map();
-    outputData.forEach((row) => {
-      const key = commonKeys.map((k) => row[k]).join("|");
-      outputMap.set(key, {
-        TotalQtyT38: row.TotalQtyT38,
-        TotalQtyT39: row.TotalQtyT39
-      });
-    });
-
-    // Create a map for RS18 defect details
-    const defectMap = new Map();
-    rs18Data.forEach((row) => {
-      const key = commonKeys.map((k) => row[k]).join("|");
-      if (!defectMap.has(key)) defectMap.set(key, []);
-      defectMap
-        .get(key)
-        .push({ ReworkName: row.ReworkName, DefectsQty: row.DefectsQty });
-    });
-
-    // Build merged data
-    const allKeys = new Set([...outputMap.keys(), ...defectMap.keys()]);
-    allKeys.forEach((key) => {
-      const [InspectionDate, WorkLine, MONo, SizeName, ColorNo, ColorName] =
-        key.split("|");
-      const output = outputMap.get(key) || { TotalQtyT38: 0, TotalQtyT39: 0 };
-      const defects = defectMap.get(key) || [];
-      mergedData.push({
-        InspectionDate,
-        WorkLine,
-        MONo,
-        SizeName,
-        ColorNo,
-        ColorName,
-        TotalQtyT38: output.TotalQtyT38,
-        TotalQtyT39: output.TotalQtyT39,
-        DefectDetails: defects
-      });
-    });
-
-    // Apply date filter
-    const filteredData = filterDate
-      ? mergedData.filter((row) => row.InspectionDate === filterDate)
-      : mergedData;
-
-    const paginatedData = paginateData(filteredData, currentPage.analyze);
-    const totalPages = Math.ceil(filteredData.length / rowsPerPage);
-
-    return (
-      <div className="mt-4">
-        <div className="mb-4">
-          <label htmlFor="analyzeDatePicker" className="mr-2">
-            Filter by Date (MM-DD-YYYY):
-          </label>
-          <input
-            type="date"
-            id="analyzeDatePicker"
-            value={filterDate ? filterDate.split("-").reverse().join("-") : ""}
-            onChange={(e) => {
-              const date = e.target.value.split("-").reverse().join("-"); // Convert YYYY-MM-DD to MM-DD-YYYY
-              setFilterDate(date);
-              setCurrentPage((prev) => ({ ...prev, analyze: 1 }));
-            }}
-            className="p-2 border rounded-md"
-          />
-          <button
-            onClick={() => {
-              setFilterDate("");
-              setCurrentPage((prev) => ({ ...prev, analyze: 1 }));
-            }}
-            className="ml-2 px-3 py-1 bg-gray-200 rounded-md"
-          >
-            Clear Date
-          </button>
-        </div>
-        <div className="overflow-x-auto overflow-y-auto max-h-96">
-          <table className="min-w-full border-collapse border border-gray-200">
-            <thead className="bg-green-100 sticky top-0 z-10">
-              <tr>
-                {[
-                  "InspectionDate",
-                  "WorkLine",
-                  "MONo",
-                  "SizeName",
-                  "ColorNo",
-                  "ColorName",
-                  "TotalQtyT38",
-                  "TotalQtyT39",
-                  "Defect Details"
-                ].map((header) => (
-                  <th
-                    key={header}
-                    className="p-2 border border-gray-300 text-sm font-medium text-gray-700"
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedData.map((row, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="p-2 border border-gray-300 text-sm text-center">
-                    {row.InspectionDate}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-sm text-center">
-                    {row.WorkLine}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-sm text-center">
-                    {row.MONo}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-sm text-center">
-                    {row.SizeName}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-sm text-center">
-                    {row.ColorNo}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-sm text-center">
-                    {row.ColorName}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-sm text-center">
-                    {row.TotalQtyT38}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-sm text-center">
-                    {row.TotalQtyT39}
-                  </td>
-                  <td className="p-2 border border-gray-300 text-sm text-left">
-                    {row.DefectDetails.length > 0 ? (
-                      <ul>
-                        {row.DefectDetails.map((defect, i) => (
-                          <li
-                            key={i}
-                          >{`${defect.ReworkName}: ${defect.DefectsQty}`}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      "No defects"
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="flex justify-between items-center mt-2">
-            <button
-              onClick={() =>
-                setCurrentPage((prev) => ({
-                  ...prev,
-                  analyze: Math.max(prev.analyze - 1, 1)
-                }))
-              }
-              disabled={currentPage.analyze === 1}
-              className="px-2 py-1 bg-gray-200 rounded disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <span className="text-sm">
-              Page {currentPage.analyze} of {totalPages}
-            </span>
-            <button
-              onClick={() =>
-                setCurrentPage((prev) => ({
-                  ...prev,
-                  analyze: Math.min(prev.analyze + 1, totalPages)
-                }))
-              }
-              disabled={currentPage.analyze === totalPages}
-              className="px-2 py-1 bg-gray-200 rounded disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="p-4 space-y-6">
       <div className="flex justify-center">
@@ -552,7 +402,9 @@ const SunriseDB = () => {
         </button>
       </div>
 
-      {renderAnalyzeTable()}
+      {showAnalyze && (
+        <SunriseAnalyze rs18Data={rs18Data} outputData={outputData} />
+      )}
     </div>
   );
 };
