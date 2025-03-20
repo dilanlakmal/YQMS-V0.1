@@ -65,39 +65,79 @@ const DefectTrack = () => {
     setError(err);
   };
 
-  const handleOkClick = (garmentNumber, defectName) => {
-    setTempOkDefects((prev) => [...prev, { garmentNumber, defectName }]);
-    setScannedData((prev) => {
-      const updatedGarments = prev.garments.map((garment) => {
-        if (garment.garmentNumber === garmentNumber) {
-          const updatedDefects = garment.defects.map((defect) => {
-            if (defect.name === defectName) {
-              const now = new Date();
-              return {
-                ...defect,
-                status: "OK",
-                repair_date: now.toLocaleDateString("en-US", {
-                  month: "2-digit",
-                  day: "2-digit",
-                  year: "numeric",
-                }),
-                repair_time: now.toLocaleTimeString("en-US", {
-                  hour12: false,
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                }),
-                garmentNumber : garment.garmentNumber
-              };
-            }
-            return defect;
-          });
-          return { ...garment, defects: updatedDefects };
+  const updateDefectStatusInRepairTracking = async (defect_print_id, garmentNumber, defectName, status) => {
+    try {
+      const payload = {
+        defect_print_id,
+        garmentNumber,
+        defectName,
+        status,
+      };
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc2-repair-tracking/update-defect-status-by-name`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         }
-        return garment;
+      );
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update defect status in repair tracking: ${errorText}`);
+      }
+      console.log("Defect status updated in repair tracking successfully");
+    } catch (err) {
+      setError(`Failed to update defect status in repair tracking: ${err.message}`);
+      console.error("Error updating defect status in repair tracking:", err.message);
+    }
+  };
+
+  const handleOkClick = async (garmentNumber, defectName) => {
+    try {
+      setLoading(true);
+      await updateDefectStatusInRepairTracking(scannedData.defect_print_id, garmentNumber, defectName, "OK");
+      setTempOkDefects((prev) => [...prev, { garmentNumber, defectName }]);
+      setScannedData((prev) => {
+        const updatedGarments = prev.garments.map((garment) => {
+          if (garment.garmentNumber === garmentNumber) {
+            const updatedDefects = garment.defects.map((defect) => {
+              if (defect.name === defectName) {
+                const now = new Date();
+                return {
+                  ...defect,
+                  status: "OK",
+                  repair_date: now.toLocaleDateString("en-US", {
+                    month: "2-digit",
+                    day: "2-digit",
+                    year: "numeric",
+                  }),
+                  repair_time: now.toLocaleTimeString("en-US", {
+                    hour12: false,
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  }),
+                  garmentNumber : garment.garmentNumber
+                };
+              }
+              return defect;
+            });
+            return { ...garment, defects: updatedDefects };
+          }
+          return garment;
+        });
+        return { ...prev, garments: updatedGarments };
       });
-      return { ...prev, garments: updatedGarments };
-    });
+    } catch (error) {
+      setError(error.message);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.message,
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSave = async () => {

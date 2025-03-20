@@ -3488,7 +3488,8 @@ app.get("/api/defect-track/:defect_print_id", async (req, res) => {
             repair: defect.repair,
             status: repairItem ? repairItem.status : "Not Repaired",
             repair_date: repairItem ? repairItem.repair_date : "",
-            repair_time: repairItem ? repairItem.repair_time : ""
+            repair_time: repairItem ? repairItem.repair_time : "",
+            pass_bundle: repairItem ? repairItem.pass_bundle : "Not Checked",
           };
         })
       }))
@@ -3530,11 +3531,14 @@ app.post("/api/repair-tracking", async (req, res) => {
           (newItem) => newItem.defectName === item.defectName && newItem.garmentNumber === item.garmentNumber
         );
         if (updatedItem) {
+          const shouldUpdatePassBundle = item.status !== updatedItem.status;
+          const newPassBundle = shouldUpdatePassBundle ? (updatedItem.status === "OK" ? "Pass" : "Fail") : item.pass_bundle;
           return {
             ...item,
             status: updatedItem.status,
             repair_date: updatedItem.repair_date,
-            repair_time: updatedItem.repair_time
+            repair_time: updatedItem.repair_time,
+            pass_bundle: newPassBundle,
           };
         }
         return item;
@@ -3577,6 +3581,7 @@ app.post("/api/repair-tracking", async (req, res) => {
           status: item.status || "Not Repaired",
           repair_date: item.repair_date || "",
           repair_time: item.repair_time || "",
+          pass_bundle: item.pass_bundle || "Not Checked",
 
         }))
       });
@@ -3598,7 +3603,7 @@ app.post("/api/repair-tracking", async (req, res) => {
 
 // Endpoint to update defect status for a rejected garment
 app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
-  const { defect_print_id, garmentNumber, failedDefectIds } = req.body;
+  const { defect_print_id, garmentNumber, failedDefectIds, isRejecting } = req.body;
   try {
     const repairTracking = await QC2RepairTracking.find({ defect_print_id });
     if (!repairTracking || repairTracking.length == 0) {
@@ -3609,15 +3614,22 @@ app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
     console.log("Before update:", rt.repairArray);
 
     rt.repairArray = rt.repairArray.map(item => {
-      if (item.garmentNumber === garmentNumber && failedDefectIds.includes(item.id)) {
-        item.status = "Fail";
-        item.repair_date = null;
-        item.repair_time = null;
-      } else if (item.garmentNumber === garmentNumber) {
-        item.status = "OK";
-        const now = new Date();
-        item.repair_date = now.toLocaleDateString("en-US");
-        item.repair_time = now.toLocaleTimeString("en-US", { hour12: false });
+      if (item.garmentNumber === garmentNumber) {
+        if (isRejecting && failedDefectIds.includes(item.id)) {
+          item.status = "Fail";
+          item.repair_date = null;
+          item.repair_time = null;
+          item.pass_bundle = "Fail"; 
+        } else if (isRejecting) {
+          // If rejecting but not in failedDefectIds, don't change status or pass_bundle
+        } else {
+          item.status = "OK";
+          const now = new Date();
+          item.repair_date = now.toLocaleDateString("en-US");
+          item.repair_time = now.toLocaleTimeString("en-US", { hour12: false });
+          // Only set pass_bundle to "Pass" if not rejecting
+          item.pass_bundle = "Pass"; 
+        }
       }
       return item;
     });
@@ -3631,11 +3643,48 @@ app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
   }
 });
 
+// Endpoint to update pass_bundle status for all garments
+app.post("/api/qc2-repair-tracking/update-pass-bundle-status", async (req, res) => {
+  try {
+    const { defect_print_id, pass_bundle } =
+      req.body;
+
+    const repairTracking = await QC2RepairTracking.findOne({
+      defect_print_id,
+    });
+
+    if (!repairTracking) {
+      return res.status(404).json({ message: "Repair tracking not found" });
+    }
+
+    const updatedRepairArray = repairTracking.repairArray.map((item) => {
+        return {
+          ...item.toObject(),
+              pass_bundle: pass_bundle,
+        };
+    });
+
+    repairTracking.repairArray = updatedRepairArray;
+    await repairTracking.save();
+
+    res
+      .status(200)
+      .json({ message: "pass_bundle status updated successfully" });
+  } catch (error) {
+    console.error("Error updating pass_bundle status:", error);
+    res.status(500).json({
+      message: "Failed to update pass_bundle status",
+      error: error.message,
+    });
+  }
+}
+);
+
 
 
 // Endpoint to update defect status by defect name and garment number
 app.post("/api/qc2-repair-tracking/update-defect-status-by-name", async (req, res) => {
-  const { defect_print_id, garmentNumber, defectName, status } = req.body;
+  const { defect_print_id, garmentNumber, defectName, status} = req.body;
   try {
     const repairTracking = await QC2RepairTracking.findOne({ defect_print_id });
     if (!repairTracking) {
@@ -3645,17 +3694,24 @@ app.post("/api/qc2-repair-tracking/update-defect-status-by-name", async (req, re
     // Find the specific defect and update it
     const updatedRepairArray = repairTracking.repairArray.map(item => {
       if (item.garmentNumber === garmentNumber && item.defectName === defectName) {
-        const now = new Date();
-        return {
-          ...item,
-          status: status,
-          repair_date: status === "OK" ? now.toLocaleDateString("en-US") : null,
-          repair_time: status === "OK" ? now.toLocaleTimeString("en-US", { hour12: false }) : null,
-        };
+        const shouldUpdate = item.status !== status; 
+        if (shouldUpdate) {
+            const now = new Date();
+            return {
+                ...item,
+                status: status,
+                repair_date: status === "OK" ? now.toLocaleDateString("en-US") : null,
+                repair_time: status === "OK" ? now.toLocaleTimeString("en-US", { hour12: false }) : null,
+                
+            };
+            
+        } else {
+            return item; // Don't update if no change is needed
+        }
       }
       return item;
     });
-
+    console.log("Updated Repair Array:", updatedRepairArray);
     repairTracking.repairArray = updatedRepairArray;
     await repairTracking.save();
     res.status(200).json({ message: "Defect status updated successfully" });
