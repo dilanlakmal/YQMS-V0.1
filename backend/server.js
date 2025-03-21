@@ -3605,7 +3605,7 @@ app.post("/api/repair-tracking", async (req, res) => {
 
 // Endpoint to update defect status for a rejected garment
 app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
-  const { defect_print_id, garmentNumber, failedDefectIds, isRejecting } = req.body;
+  const { defect_print_id, garmentNumber, failedDefects, isRejecting } = req.body;
   try {
     const repairTracking = await QC2RepairTracking.find({ defect_print_id });
     if (!repairTracking || repairTracking.length == 0) {
@@ -3617,7 +3617,7 @@ app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
 
     rt.repairArray = rt.repairArray.map(item => {
       if (item.garmentNumber === garmentNumber) {
-        if (isRejecting && failedDefectIds.includes(item.id)) {
+        if (isRejecting && failedDefects.some(fd => fd.name === item.defectName)) {
           item.status = "Fail";
           item.repair_date = null;
           item.repair_time = null;
@@ -3686,13 +3686,14 @@ app.post("/api/qc2-repair-tracking/update-pass-bundle-status", async (req, res) 
 
 // Endpoint to update defect status by defect name and garment number
 app.post("/api/qc2-repair-tracking/update-defect-status-by-name", async (req, res) => {
-  const { defect_print_id, garmentNumber, defectName, status, pass_bundle} = req.body;
+  const { defect_print_id, garmentNumber, defectName, status} = req.body;
   try {
     const repairTracking = await QC2RepairTracking.findOne({ defect_print_id });
     if (!repairTracking) {
+      console.error(`No repair tracking found for defect_print_id: ${defect_print_id}`); // Add this line
       return res.status(404).json({ message: "Repair tracking not found" });
     }
-
+    
     // Find the specific defect and update it
     const updatedRepairArray = repairTracking.repairArray.map(item => {
       if (item.garmentNumber === garmentNumber && item.defectName === defectName) {
@@ -3704,7 +3705,8 @@ app.post("/api/qc2-repair-tracking/update-defect-status-by-name", async (req, re
                 status: status,
                 repair_date: status === "OK" ? now.toLocaleDateString("en-US") : null,
                 repair_time: status === "OK" ? now.toLocaleTimeString("en-US", { hour12: false }) : null,
-                pass_bundle: status === "OK" ? "Pass" : status === "Fail" ? "Fail" : item.pass_bundle
+                // pass_bundle: status === "OK" ? "Pass" : status === "Fail" ? "Fail" : item.pass_bundle
+                pass_bundle: status === "OK" ? "Pass" : "Fail"
             };
             
         } else {
