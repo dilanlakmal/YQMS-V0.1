@@ -92,7 +92,7 @@ const SunriseDB = () => {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes timeout
 
       const [rs18Response, outputResponse] = await Promise.all([
         fetch(`${API_BASE_URL}/api/sunrise/rs18`, {

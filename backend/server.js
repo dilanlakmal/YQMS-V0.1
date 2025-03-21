@@ -111,21 +111,6 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"]
   })
 );
-//    "mongodb://localhost:27017/ym_prod"
-
-// const mongoURI = //"mongodb://localhost:27017/ym_prod";
-//   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin";
-// mongoose
-//   .connect(mongoURI) //, { useNewUrlParser: true, useUnifiedTopology: true }
-//   .then(() => console.log("Successfully connected ym_prod......"))
-//   .catch((err) => console.error("MongoDB connection error:", err));
-
-// const mongoURI2 = //"mongodb://localhost:27017/ym_prod";
-//   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin";
-// mongoose
-//   .connect(mongoURI2) //, { useNewUrlParser: true, useUnifiedTopology: true }
-//   .then(() => console.log("Successfully connected ym_eco_board......"))
-//   .catch((err) => console.error("MongoDB connection error:", err));
 
 const ymProdConnection = mongoose.createConnection(
   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
@@ -269,7 +254,7 @@ app.get("/api/sunrise/rs18", async (req, res) => {
         TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
         AND SeqNo <> 700
         AND TRY_CAST(ReworkCode AS INT) BETWEEN 1 AND 44
-        AND CAST(dDate AS DATE) > '2021-12-31'
+        AND CAST(dDate AS DATE) > '2022-12-31'
         AND CAST(dDate AS DATE) < DATEADD(DAY, 1, GETDATE())
       GROUP BY 
         CAST(dDate AS DATE),
@@ -353,7 +338,13 @@ app.get("/api/sunrise/output", async (req, res) => {
         SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END) AS TotalQtyT38,
         SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END) AS TotalQtyT39
       FROM 
-        YMDataStore.SunRise_G.tWork2024
+      (
+        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2023
+        UNION ALL
+        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2024
+        UNION ALL
+        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2025
+      ) AS CombinedData
       WHERE 
         SeqNo IN (38, 39)
         AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
@@ -376,6 +367,43 @@ app.get("/api/sunrise/output", async (req, res) => {
     });
   }
 });
+
+// app.get("/api/sunrise/output", async (req, res) => {
+//   try {
+//     const query = `
+//       SELECT
+//         FORMAT(CAST(BillDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName,
+//         SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END) AS TotalQtyT38,
+//         SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END) AS TotalQtyT39
+//       FROM
+//         YMDataStore.SunRise_G.tWork2024
+//       WHERE
+//         SeqNo IN (38, 39)
+//         AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+//       GROUP BY
+//         CAST(BillDate AS DATE),
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName;
+//     `;
+
+//     const result = await sql.query(query);
+//     res.json(result.recordset);
+//   } catch (err) {
+//     console.error("Error fetching Sunrise Output data:", err);
+//     res.status(500).json({
+//       message: "Failed to fetch Sunrise Output data",
+//       error: err.message
+//     });
+//   }
+// });
 
 //Old Endpoint for RS18 Data
 
