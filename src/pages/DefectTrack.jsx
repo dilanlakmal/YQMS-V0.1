@@ -67,12 +67,17 @@ const DefectTrack = () => {
 
   const updateDefectStatusInRepairTracking = async (defect_print_id, garmentNumber, defectName, status) => {
     try {
+      console.log("Updating defect status with:", { defect_print_id, garmentNumber, defectName, status }); // Log the values
       const payload = {
         defect_print_id,
         garmentNumber,
         defectName,
         status,
       };
+      // // Only add pass_bundle if updatePassBundle is true
+      // if (updatePassBundle && (status === "OK" || status === "Fail")) {
+      //   payload.pass_bundle = passBundleStatus;
+      // }
       const response = await fetch(
         `${API_BASE_URL}/api/qc2-repair-tracking/update-defect-status-by-name`,
         {
@@ -95,7 +100,7 @@ const DefectTrack = () => {
   const handleOkClick = async (garmentNumber, defectName) => {
     try {
       setLoading(true);
-      await updateDefectStatusInRepairTracking(scannedData.defect_print_id, garmentNumber, defectName, "OK");
+      // await updateDefectStatusInRepairTracking(scannedData.defect_print_id, garmentNumber, defectName, "OK");
       setTempOkDefects((prev) => [...prev, { garmentNumber, defectName }]);
       setScannedData((prev) => {
         const updatedGarments = prev.garments.map((garment) => {
@@ -179,6 +184,20 @@ const DefectTrack = () => {
       if (!response.ok) {
         throw new Error("Failed to save repair tracking");
       }
+      // Update defect status in qc2_repair_tracking after saving
+      for (const garment of scannedData.garments) {
+        for (const defect of garment.defects) {
+          if (defect.status === "OK") {
+            await updateDefectStatusInRepairTracking(
+              scannedData.defect_print_id,
+              garment.garmentNumber,
+              defect.name,
+              "OK"
+            );
+          }
+        }
+      }
+
       Swal.fire({
         icon: "success",
         title: "Success",

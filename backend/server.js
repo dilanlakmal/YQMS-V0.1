@@ -3534,7 +3534,7 @@ app.post("/api/repair-tracking", async (req, res) => {
           // Determine if pass_bundle needs to be updated
           let newPassBundle = item.pass_bundle;
           if (updatedItem.status !== item.status) {
-            newPassBundle = updatedItem.status === "OK" ? "Pass" : "Fail";
+            newPassBundle = updatedItem.status === "Not Repaired" ? "Not Checked" : updatedItem.status === "OK" ? "Fail" : "OK";
           }
           return {
             ...item,
@@ -3584,7 +3584,7 @@ app.post("/api/repair-tracking", async (req, res) => {
           status: item.status || "Not Repaired",
           repair_date: item.repair_date || "",
           repair_time: item.repair_time || "",
-          pass_bundle: item.status === "OK" ? "Pass" : "Fail"|| "Not Checked",
+          pass_bundle: item.status === "Not Repaired" ? "Not Checked" : item.status === "OK" ? "Fail" : "OK",
         }))
       });
       await newRecord.save();
@@ -3686,7 +3686,7 @@ app.post("/api/qc2-repair-tracking/update-pass-bundle-status", async (req, res) 
 
 // Endpoint to update defect status by defect name and garment number
 app.post("/api/qc2-repair-tracking/update-defect-status-by-name", async (req, res) => {
-  const { defect_print_id, garmentNumber, defectName, status} = req.body;
+  const { defect_print_id, garmentNumber, defectName, status, pass_bundle} = req.body;
   try {
     const repairTracking = await QC2RepairTracking.findOne({ defect_print_id });
     if (!repairTracking) {
@@ -3704,7 +3704,7 @@ app.post("/api/qc2-repair-tracking/update-defect-status-by-name", async (req, re
                 status: status,
                 repair_date: status === "OK" ? now.toLocaleDateString("en-US") : null,
                 repair_time: status === "OK" ? now.toLocaleTimeString("en-US", { hour12: false }) : null,
-                
+                pass_bundle: status === "OK" ? "Pass" : status === "Fail" ? "Fail" : item.pass_bundle
             };
             
         } else {

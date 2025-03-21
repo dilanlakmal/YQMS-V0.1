@@ -414,12 +414,12 @@ const QC2InspectionPage = () => {
                   setRejectedOnce(true); // Set rejectedOnce to true when a defect is marked as Fail
                   // setLockedGarments((prevLocked) => new Set(prevLocked).add(garmentNumber));
                   //Call the function to update the defect status on qc2_repair_tracking
-                  updateDefectStatusInRepairTracking(sessionData.printEntry.defect_print_id, garmentNumber, defect.name, "Fail", false);
+                  updateDefectStatusInRepairTracking(sessionData.printEntry.defect_print_id, garmentNumber, defect.name, "Fail");
                 } else {
                   // When marking as OK, remove the defect count
                   delete newTempDefects[defectIndex];
                    //Call the function to update the defect status on qc2_repair_tracking
-                   updateDefectStatusInRepairTracking(sessionData.printEntry.defect_print_id, garmentNumber, defect.name, "OK", false);
+                   updateDefectStatusInRepairTracking(sessionData.printEntry.defect_print_id, garmentNumber, defect.name, "OK");
                 }
 
                 return newTempDefects;
@@ -1165,7 +1165,7 @@ const QC2InspectionPage = () => {
       for (const garment of trackingData.garments) {
         for (const defect of garment.defects) {
           if(defect.status === "OK"){
-            await updateDefectStatusInRepairTracking(sessionData.printEntry.defect_print_id, garment.garmentNumber, defect.name, "OK", true);
+            await updateDefectStatusInRepairTracking(sessionData.printEntry.defect_print_id, garment.garmentNumber, defect.name, "OK", "Pass");
           }
         }
       }
@@ -2069,6 +2069,5 @@ export default QC2InspectionPage;
 
 
  
-
 
 
