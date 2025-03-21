@@ -3531,8 +3531,11 @@ app.post("/api/repair-tracking", async (req, res) => {
           (newItem) => newItem.defectName === item.defectName && newItem.garmentNumber === item.garmentNumber
         );
         if (updatedItem) {
-          const shouldUpdatePassBundle = item.status !== updatedItem.status;
-          const newPassBundle = shouldUpdatePassBundle ? (updatedItem.status === "OK" ? "Pass" : "Fail") : item.pass_bundle;
+          // Determine if pass_bundle needs to be updated
+          let newPassBundle = item.pass_bundle;
+          if (updatedItem.status !== item.status) {
+            newPassBundle = updatedItem.status === "OK" ? "Pass" : "Fail";
+          }
           return {
             ...item,
             status: updatedItem.status,
@@ -3581,8 +3584,7 @@ app.post("/api/repair-tracking", async (req, res) => {
           status: item.status || "Not Repaired",
           repair_date: item.repair_date || "",
           repair_time: item.repair_time || "",
-          pass_bundle: item.pass_bundle || "Not Checked",
-
+          pass_bundle: item.status === "OK" ? "Pass" : "Fail"|| "Not Checked",
         }))
       });
       await newRecord.save();
