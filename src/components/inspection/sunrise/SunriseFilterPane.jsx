@@ -8,7 +8,8 @@ const SunriseFilterPane = ({
   clearFilters,
   uniqueWorkLines,
   uniqueMoNos,
-  uniqueColorNos,
+  uniqueColorNames,
+  //uniqueColorNos,
   uniqueSizeNames,
   formatToInputDate
 }) => {
@@ -94,13 +95,13 @@ const SunriseFilterPane = ({
             Color:
           </label>
           <select
-            name="colorNo"
-            value={filters.colorNo}
+            name="colorName"
+            value={filters.colorName}
             onChange={handleFilterChange}
             className="mt-1 p-2 border rounded-md w-full focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="">All</option>
-            {uniqueColorNos.map((color) => (
+            {uniqueColorNames.map((color) => (
               <option key={color} value={color}>
                 {color}
               </option>

@@ -20,7 +20,7 @@ const SunriseAnalyze = ({ rs18Data, outputData }) => {
     endDate: "",
     workLine: "",
     moNo: "",
-    colorNo: "",
+    colorName: "",
     sizeName: "",
     buyer: ""
   });
@@ -148,7 +148,7 @@ const SunriseAnalyze = ({ rs18Data, outputData }) => {
         (!endDate || rowDate <= endDate) &&
         (!filters.workLine || row.WorkLine === filters.workLine) &&
         (!filters.moNo || row.MONo === filters.moNo) &&
-        (!filters.colorNo || row.ColorNo === filters.colorNo) &&
+        (!filters.colorName || row.ColorName === filters.colorName) &&
         (!filters.sizeName || row.SizeName === filters.sizeName) &&
         (!filters.buyer || row.Buyer === filters.buyer)
       );
@@ -202,7 +202,7 @@ const SunriseAnalyze = ({ rs18Data, outputData }) => {
       endDate: "",
       workLine: "",
       moNo: "",
-      colorNo: "",
+      colorName: "",
       sizeName: "",
       buyer: ""
     });
@@ -266,7 +266,7 @@ const SunriseAnalyze = ({ rs18Data, outputData }) => {
                 clearFilters={clearFilters}
                 uniqueWorkLines={getUniqueValuesInDateRange("WorkLine")}
                 uniqueMoNos={getUniqueValuesInDateRange("MONo")}
-                uniqueColorNos={getUniqueValuesInDateRange("ColorNo")}
+                uniqueColorNames={getUniqueValuesInDateRange("ColorName")}
                 uniqueSizeNames={getUniqueValuesInDateRange("SizeName")}
                 formatToInputDate={formatToInputDate}
               />

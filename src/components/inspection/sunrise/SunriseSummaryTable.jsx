@@ -55,7 +55,7 @@ const SunriseSummaryTable = ({
   if (groupOptions.line) groupByColumns.push("WorkLine");
   if (groupOptions.mo) groupByColumns.push("MONo");
   if (groupOptions.buyer) groupByColumns.push("Buyer");
-  if (groupOptions.color) groupByColumns.push("ColorNo");
+  if (groupOptions.color) groupByColumns.push("ColorName");
   if (groupOptions.size) groupByColumns.push("SizeName");
 
   // Aggregate data based on selected group columns
@@ -70,7 +70,7 @@ const SunriseSummaryTable = ({
           WorkLine: groupOptions.line ? row.WorkLine : "-",
           MONo: groupOptions.mo ? row.MONo : "-",
           Buyer: groupOptions.buyer ? row.Buyer : "-",
-          ColorNo: groupOptions.color ? row.ColorNo : "-",
+          ColorName: groupOptions.color ? row.ColorName : "-",
           SizeName: groupOptions.size ? row.SizeName : "-",
           TotalQtyT38: 0,
           TotalQtyT39: 0,
@@ -274,7 +274,7 @@ const SunriseSummaryTable = ({
                   )}
                   {groupOptions.color && (
                     <td className="p-2 border border-gray-300 text-sm text-center">
-                      {row.ColorNo}
+                      {row.ColorName}
                     </td>
                   )}
                   {groupOptions.size && (
