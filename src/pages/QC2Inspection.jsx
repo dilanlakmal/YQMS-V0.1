@@ -379,7 +379,12 @@ const QC2InspectionPage = () => {
     //Check if a garment is already selected
     if (selectedGarment && selectedGarment !== garmentNumber) {
         // Display an error message or take other appropriate action
-        alert("Please resolve the defects for the currently selected garment before selecting another.");
+        Swal.fire({
+          icon: 'error',
+          title: 'Cannot Fail the defect.',
+          text: 'Please reject the selected garment defect first before selecting another.',
+        });
+        // alert("Please resolve the defects for the currently selected garment before selecting another.");
         return;
     }
 
@@ -1172,6 +1177,37 @@ const QC2InspectionPage = () => {
         if (!sessionData || !bundleData || !sessionData.printEntry) {
           throw new Error("Missing required session or bundle data");
         }
+
+        // Check if there are any "Fail" defects before proceeding
+        const hasFailDefects = defectTrackingDetails.garments.some(garment =>
+          garment.defects.some(defect => (defect.status === "Fail" || defect.status === "Not Repaired") && !lockedDefects.has(`${garment.garmentNumber}-${defect.name}`))
+        );
+
+        if (hasFailDefects) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Cannot Pass Bundle',
+            text: 'There are still failed defects. Please resolve them before passing the bundle.',
+          });
+          setIsPassingBundle(false);
+          return;
+        }
+
+        // **New check: Check if all defects for each garment are OK**
+        const allGarmentsPassed = defectTrackingDetails.garments.every(garment =>
+          garment.defects.every(defect => defect.status === "OK" || lockedDefects.has(`${garment.garmentNumber}-${defect.name}`))
+        );
+
+        if (!allGarmentsPassed) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Cannot Pass Bundle',
+            text: 'Not all defects for each garment are marked as OK. Please review and correct the defect status before passing the bundle.',
+          });
+          setIsPassingBundle(false);
+          return;
+        }
+
         const {
           sessionTotalPass,
           sessionTotalRejects,
