@@ -3662,7 +3662,7 @@ app.post("/api/qc2-repair-tracking/update-pass-bundle-status", async (req, res) 
     const updatedRepairArray = repairTracking.repairArray.map((item) => {
         return {
           ...item.toObject(),
-              pass_bundle: pass_bundle,
+          pass_bundle: item.status === "OK" ? "Pass" : item.pass_bundle,
         };
     });
 
@@ -3706,12 +3706,13 @@ app.post("/api/qc2-repair-tracking/update-defect-status-by-name", async (req, re
                 repair_date: status === "OK" ? now.toLocaleDateString("en-US") : null,
                 repair_time: status === "OK" ? now.toLocaleTimeString("en-US", { hour12: false }) : null,
                 // pass_bundle: status === "OK" ? "Pass" : status === "Fail" ? "Fail" : item.pass_bundle
-                pass_bundle: status === "OK" ? "Pass" : "Fail"
+                pass_bundle: status === "OK" ? "Pass" : item.pass_bundle,
             };
             
-        } else {
-            return item; // Don't update if no change is needed
-        }
+        } 
+        // else {
+        //     return item; // Don't update if no change is needed
+        // }
       }
       return item;
     });
