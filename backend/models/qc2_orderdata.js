@@ -25,8 +25,8 @@ const qc2OrderDataSchema = new mongoose.Schema(
     count: { type: Number, required: true },
     bundleQty: { type: Number, required: true },
     totalBundleQty: { type: Number, required: true },
-    sub_con: { type: String, default: "No" }, // New field
-    sub_con_factory: { type: String, default: "N/A" }, // New field
+    sub_con: { type: String, default: "No" },
+    sub_con_factory: { type: String, default: "N/A" },
     updated_date_seperator: { type: String, required: true },
     updated_time_seperator: { type: String, required: true },
     emp_id: { type: String, required: true },
@@ -35,24 +35,122 @@ const qc2OrderDataSchema = new mongoose.Schema(
     job_title: { type: String },
     dept_name: { type: String, required: true },
     sect_name: { type: String },
-    emp_id_ironing: { type: String },
-    eng_name_ironing: { type: String },
-    kh_name_ironing: { type: String },
-    job_title_ironing: { type: String },
-    dept_name_ironing: { type: String },
-    sect_name_ironing: { type: String },
-    passQtyIron: { type: Number },
-    passQtyWash: { type: Number },
-    passQtyPack: { type: Number },
-    passQtyOPA: { type: Number },
-    ironing_updated_date: { type: String },
-    ironing_update_time: { type: String },
-    washing_updated_date: { type: String },
-    washing_update_time: { type: String },
-    packing_updated_date: { type: String },
-    packing_update_time: { type: String },
-    opa_updated_date: { type: String },
-    opa_update_time: { type: String },
+    inspectionFirst: [
+      {
+        process: {
+          type: String,
+          enum: ["washing", "opa", "ironing", "packing"],
+          required: true
+        },
+        task_no: { type: Number, required: true },
+        passQty: Number,
+        updated_date: String,
+        update_time: String,
+        emp_id: String,
+        eng_name: String,
+        kh_name: String,
+        job_title: String,
+        dept_name: String,
+        sect_name: String,
+        packing_record_id: { type: Number, default: null }
+      }
+    ],
+    inspectionDefect: [
+      {
+        defect_print_id: { type: String, required: true },
+        process: {
+          type: String,
+          enum: ["washing", "opa", "ironing", "packing"],
+          required: true
+        },
+        task_no: { type: Number, required: true },
+        passQty: Number,
+        updated_date: String,
+        update_time: String,
+        emp_id: String,
+        eng_name: String,
+        kh_name: String,
+        job_title: String,
+        dept_name: String,
+        sect_name: String,
+        packing_record_id: { type: Number, default: null }
+      }
+    ],
+    qc2InspectionFirst: [
+      {
+        process: { type: String, default: "qc2" },
+        task_no: { type: Number, default: 100 },
+        inspectionRecordId: { type: String }, // Add this field
+        checkedQty: { type: Number },
+        totalPass: { type: Number },
+        totalRejects: { type: Number },
+        defectQty: { type: Number },
+        defectArray: [
+          {
+            defectName: { type: String, required: true },
+            totalCount: { type: Number, required: true }
+          }
+        ],
+        rejectGarments: [
+          {
+            totalCount: { type: Number, required: true },
+            defects: [
+              {
+                name: { type: String, required: true },
+                count: { type: Number, required: true },
+                repair: { type: String, required: true },
+                status: { type: String, default: "Fail" }
+              }
+            ],
+            garment_defect_id: { type: String, required: true },
+            rejectTime: { type: String, required: true }
+          }
+        ],
+        updated_date: { type: String },
+        update_time: { type: String },
+        emp_id: { type: String },
+        eng_name: { type: String },
+        kh_name: { type: String },
+        job_title: { type: String },
+        dept_name: { type: String },
+        sect_name: { type: String }
+      }
+    ],
+    qc2InspectionDefect: [
+      {
+        process: { type: String, default: "qc2" },
+        task_no: { type: Number, default: 101 },
+        defect_print_id: { type: String },
+        inspectionNo: { type: Number },
+        checkedQty: { type: Number },
+        totalPass: { type: Number },
+        totalRejects: { type: Number },
+        defectQty: { type: Number },
+        rejectGarments: [
+          {
+            totalCount: { type: Number, required: true },
+            defects: [
+              {
+                name: { type: String, required: true },
+                count: { type: Number, required: true },
+                repair: { type: String, required: true },
+                status: { type: String, default: "Fail" }
+              }
+            ],
+            garment_defect_id: { type: String, required: true },
+            rejectTime: { type: String, required: true }
+          }
+        ],
+        updated_date: { type: String },
+        update_time: { type: String },
+        emp_id: { type: String },
+        eng_name: { type: String },
+        kh_name: { type: String },
+        job_title: { type: String },
+        dept_name: { type: String },
+        sect_name: { type: String }
+      }
+    ]
   },
   { collection: "qc2_orderdata" }
 );

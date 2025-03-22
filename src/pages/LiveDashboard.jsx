@@ -14,6 +14,13 @@ import DefectBarChart from "../components/inspection/liveDashboard/DefectBarChar
 import MOBarChart from "../components/inspection/liveDashboard/MOBarChart";
 import LineBarChart from "../components/inspection/liveDashboard/LineBarChart";
 import FilterPane from "../components/inspection/liveDashboard/FilterPane";
+import OrderData from "../components/inspection/liveDashboard/OrderData";
+import WashingLive from "../components/inspection/liveDashboard/WashingLive";
+import IroningLive from "../components/inspection/liveDashboard/IroningLive";
+import OPALive from "../components/inspection/liveDashboard/OPALive";
+import DailySummary from "../components/inspection/liveDashboard/DailySummary";
+import WeeklySummary from "../components/inspection/liveDashboard/WeeklySummary";
+import InspectorCard from "../components/inspection/liveDashboard/InspectorCard";
 import { useTranslation } from "react-i18next";
 
 const LiveDashboard = () => {
@@ -50,6 +57,7 @@ const LiveDashboard = () => {
   const [moSummaries, setMoSummaries] = useState([]);
   const [hourlyDefectRates, setHourlyDefectRates] = useState({});
   const [lineDefectRates, setLineDefectRates] = useState({});
+  const [inspectors, setInspectors] = useState([]); // New state for inspector list
 
   const filtersRef = useRef({});
 
@@ -72,6 +80,16 @@ const LiveDashboard = () => {
       setSummaryData(response.data);
     } catch (error) {
       console.error("Error fetching summary data:", error);
+      // Reset summary data to default values on error
+      setSummaryData({
+        checkedQty: 0,
+        totalPass: 0,
+        totalRejects: 0,
+        defectsQty: 0,
+        totalBundles: 0,
+        defectRate: 0,
+        defectRatio: 0
+      });
     }
   };
 
@@ -101,7 +119,7 @@ const LiveDashboard = () => {
   const fetchMoSummaries = async (filters = {}) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/qc2-mo-summaries`, {
-        params: filters
+        params: { ...filters, groupByMO: "true" }
       });
       setMoSummaries(response.data);
     } catch (error) {
@@ -135,10 +153,30 @@ const LiveDashboard = () => {
     }
   };
 
+  // Fetch list of inspectors
+  const fetchInspectors = async (filters = {}) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/qc2-inspection-pass-bundle/filter-options`
+      );
+      const empIds = response.data.emp_id_inspection || [];
+      // Filter inspectors based on empId if set
+      if (filters.emp_id_inspection) {
+        setInspectors(empIds.filter((id) => id === filters.emp_id_inspection));
+      } else {
+        setInspectors(empIds);
+      }
+    } catch (error) {
+      console.error("Error fetching inspectors:", error);
+      setInspectors([]);
+    }
+  };
+
   // Apply Filters
   const handleApplyFilters = async () => {
     const filters = {};
-    if (moNo) filters.moNo = moNo;
+    if (moNo && moNo.trim()) filters.moNo = moNo; // Only include moNo if it has a value
+    //if (moNo) filters.moNo = moNo;
     if (color) filters.color = color;
     if (size) filters.size = size;
     if (department) filters.department = department;
@@ -167,7 +205,8 @@ const LiveDashboard = () => {
       fetchDefectRates(filters),
       fetchMoSummaries(filters),
       fetchHourlyDefectRates(filters),
-      fetchLineDefectRates(filters)
+      fetchLineDefectRates(filters),
+      fetchInspectors(filters)
     ]);
   };
 
@@ -189,7 +228,8 @@ const LiveDashboard = () => {
       fetchDefectRates(),
       fetchMoSummaries(),
       fetchHourlyDefectRates(),
-      fetchLineDefectRates()
+      fetchLineDefectRates(),
+      fetchInspectors()
     ]);
   };
 
@@ -201,7 +241,8 @@ const LiveDashboard = () => {
         fetchDefectRates(),
         fetchMoSummaries(),
         fetchHourlyDefectRates(),
-        fetchLineDefectRates()
+        fetchLineDefectRates(),
+        fetchInspectors()
       ]);
     };
     fetchInitialData();
@@ -213,7 +254,8 @@ const LiveDashboard = () => {
         fetchDefectRates(currentFilters),
         fetchMoSummaries(currentFilters),
         fetchHourlyDefectRates(currentFilters),
-        fetchLineDefectRates(currentFilters)
+        fetchLineDefectRates(currentFilters),
+        fetchInspectors(currentFilters)
       ]);
     }, 5000);
 
@@ -222,18 +264,32 @@ const LiveDashboard = () => {
 
   // Update filtersRef
   useEffect(() => {
-    filtersRef.current = {
-      moNo,
-      color,
-      size,
-      department,
-      emp_id_inspection: empId,
-      startDate: startDate ? formatDate(startDate) : null,
-      endDate: endDate ? formatDate(endDate) : null,
-      buyer,
-      lineNo
-    };
+    const filters = {};
+    if (moNo && moNo.trim()) filters.moNo = moNo;
+    if (color && color.trim()) filters.color = color;
+    if (size && size.trim()) filters.size = size;
+    if (department && department.trim()) filters.department = department;
+    if (empId && empId.trim()) filters.emp_id_inspection = empId;
+    if (startDate) filters.startDate = formatDate(startDate);
+    if (endDate) filters.endDate = formatDate(endDate);
+    if (buyer && buyer.trim()) filters.buyer = buyer;
+    if (lineNo && lineNo.trim()) filters.lineNo = lineNo;
+    filtersRef.current = filters;
   }, [moNo, color, size, department, empId, startDate, endDate, buyer, lineNo]);
+
+  // useEffect(() => {
+  //   filtersRef.current = {
+  //     moNo,
+  //     color,
+  //     size,
+  //     department,
+  //     emp_id_inspection: empId,
+  //     startDate: startDate ? formatDate(startDate) : null,
+  //     endDate: endDate ? formatDate(endDate) : null,
+  //     buyer,
+  //     lineNo
+  //   };
+  // }, [moNo, color, size, department, empId, startDate, endDate, buyer, lineNo]);
 
   // Socket.io connection
   useEffect(() => {
@@ -250,7 +306,8 @@ const LiveDashboard = () => {
         fetchDefectRates(currentFilters),
         fetchMoSummaries(currentFilters),
         fetchHourlyDefectRates(currentFilters),
-        fetchLineDefectRates(currentFilters)
+        fetchLineDefectRates(currentFilters),
+        fetchInspectors(currentFilters)
       ]);
     });
 
@@ -299,24 +356,26 @@ const LiveDashboard = () => {
   );
 
   // MO Card Summaries Component
-  const MoCardSummaries = () => (
-    <div className="mt-6">
-      <h2 className="text-sm font-medium text-gray-900 mb-2">
-        MO No Summaries
-      </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] gap-4">
-        {moSummaries
-          .sort((a, b) => b.defectRate - a.defectRate)
-          .map((summary) => (
-            <LiveStyleCard
-              key={summary.moNo}
-              moNo={summary.moNo}
-              summaryData={summary}
-            />
-          ))}
+  const MoCardSummaries = () => {
+    return (
+      <div className="mt-6">
+        <h2 className="text-sm font-medium text-gray-900 mb-2">
+          MO No Summaries
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] gap-4">
+          {moSummaries
+            .sort((a, b) => b.defectRate - a.defectRate)
+            .map((summary) => (
+              <LiveStyleCard
+                key={summary.moNo}
+                moNo={summary.moNo}
+                summaryData={summary}
+              />
+            ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -341,7 +400,7 @@ const LiveDashboard = () => {
         {/* Common Filter Pane for QC2 Sections */}
         {[
           "Live Dashboard",
-          "MO Hr Trend",
+          "MO Analysis",
           "Line Hr Trend",
           "Daily Summary",
           "Weekly Analysis",
@@ -374,6 +433,10 @@ const LiveDashboard = () => {
         )}
 
         {/* Section Content */}
+        {activeSection === "Order Data" && <OrderData />}
+        {activeSection === "Washing" && <WashingLive />}
+        {activeSection === "Ironing" && <IroningLive />}
+        {activeSection === "OPA" && <OPALive />}
         {activeSection === "Live Dashboard" && (
           <>
             {/* Summary Cards (Common for all tabs) */}
@@ -438,14 +501,30 @@ const LiveDashboard = () => {
             )}
 
             {activeDashboardTab === "Inspector Data" && (
-              <div className="text-center mt-8 text-gray-700">
-                <h2 className="text-xl font-medium">Coming soon</h2>
+              <div className="mt-6">
+                {inspectors.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {inspectors.map((inspectorId) => (
+                      <InspectorCard
+                        key={inspectorId}
+                        inspectorId={inspectorId}
+                        filters={filtersRef.current}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-700">
+                    <h2 className="text-xl font-medium">
+                      No inspectors found for the selected filters.
+                    </h2>
+                  </div>
+                )}
               </div>
             )}
           </>
         )}
 
-        {activeSection === "MO Hr Trend" && (
+        {activeSection === "MO Analysis" && (
           <>
             <div className="mb-4">
               <button
@@ -466,7 +545,7 @@ const LiveDashboard = () => {
                     : "bg-gray-200 text-gray-700"
                 }`}
               >
-                MO Trend
+                MO Hr Trend
               </button>
             </div>
             {activeMoTab === "MO Summary" && (
@@ -512,7 +591,7 @@ const LiveDashboard = () => {
                     : "bg-gray-200 text-gray-700"
                 }`}
               >
-                Line Trend
+                Line Hr Trend
               </button>
             </div>
             {activeLineTab === "Line Summary" && (
@@ -525,7 +604,8 @@ const LiveDashboard = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(20rem,1fr))] gap-4">
                     {Object.keys(lineDefectRates)
                       .filter((key) => key !== "total" && key !== "grand")
-                      .filter((lineNum) => (lineNo ? lineNum === lineNo : true)) // Exact match filter using lineNo
+                      .filter((lineNum) => !lineNo || lineNum === lineNo) // Exact match filter using lineNo
+                      //.filter((lineNum) => (lineNo ? lineNum === lineNo : true)) // Exact match filter using lineNo
                       .map((lineNum) => ({
                         lineNo: lineNum,
                         defectRate: (() => {
@@ -564,7 +644,7 @@ const LiveDashboard = () => {
               </>
             )}
             {activeLineTab === "Line Trend" && (
-              <TrendAnalysisLine data={lineDefectRates} />
+              <TrendAnalysisLine data={lineDefectRates} lineNoFilter={lineNo} />
             )}
             {activeLineTab === "Line Rate" && (
               <TrendAnalysisLineDefects
@@ -574,18 +654,21 @@ const LiveDashboard = () => {
             )}
           </>
         )}
+        {activeSection === "Daily Summary" && (
+          <DailySummary filters={filtersRef.current} />
+        )}
 
-        {["Order Data", "Washing", "Ironing", "OPA", "Packing"].includes(
-          activeSection
-        ) && (
+        {activeSection === "Weekly Analysis" && (
+          <WeeklySummary filters={filtersRef.current} />
+        )}
+
+        {["Packing"].includes(activeSection) && (
           <div className="text-center mt-8 text-gray-700">
             <h2 className="text-xl font-medium">Coming soon</h2>
           </div>
         )}
 
-        {["Daily Summary", "Weekly Analysis", "Monthly Analysis"].includes(
-          activeSection
-        ) && (
+        {["Monthly Analysis"].includes(activeSection) && (
           <div className="text-center mt-8 text-gray-700">
             <h2 className="text-xl font-medium">Coming soon</h2>
           </div>

@@ -26,7 +26,8 @@ const FilterPane = ({
   appliedFilters,
   setAppliedFilters,
   onApplyFilters,
-  onResetFilters
+  onResetFilters,
+  dataSource = "qc2-inspection-pass-bundle" // Default to original data source
 }) => {
   const [showFilters, setShowFilters] = useState(true);
   const [moNoOptions, setMoNoOptions] = useState([]);
@@ -46,18 +47,25 @@ const FilterPane = ({
     return `${month}/${day}/${year}`;
   };
 
-  // Fetch filter options
+  // Fetch filter options based on dataSource
   const fetchFilterOptions = async () => {
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/qc2-inspection-pass-bundle/filter-options`
-      );
+      const endpoint =
+        dataSource === "qc2-orderdata"
+          ? `${API_BASE_URL}/api/qc2-orderdata/filter-options`
+          : `${API_BASE_URL}/api/qc2-inspection-pass-bundle/filter-options`;
+      const response = await axios.get(endpoint);
       const data = response.data;
+
       setMoNoOptions(data.moNo || []);
       setColorOptions(data.color || []);
       setSizeOptions(data.size || []);
       setDepartmentOptions(data.department || []);
-      setEmpIdOptions(data.emp_id_inspection || []);
+      setEmpIdOptions(
+        dataSource === "qc2-orderdata"
+          ? data.empId || []
+          : data.emp_id_inspection || []
+      );
       setBuyerOptions(data.buyer || []);
       setLineNoOptions(data.lineNo || []);
     } catch (error) {
@@ -67,7 +75,7 @@ const FilterPane = ({
 
   useEffect(() => {
     fetchFilterOptions();
-  }, []);
+  }, [dataSource]); // Re-fetch when dataSource changes
 
   return (
     <>

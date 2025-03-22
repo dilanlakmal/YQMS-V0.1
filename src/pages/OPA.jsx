@@ -113,7 +113,7 @@ const OPAPage = () => {
           country: defectData.country || "N/A",
           lineNo: defectData.lineNo,
           department: defectData.department,
-          count: defectData.totalRejectGarmentCount, //defectData.totalRejectGarment_Var,
+          count: defectData.totalRejectGarmentCount,
           totalBundleQty: 1,
           emp_id_inspection: defectData.emp_id_inspection,
           inspection_date: defectData.inspection_date,
@@ -121,7 +121,7 @@ const OPAPage = () => {
           sub_con: defectData.sub_con,
           sub_con_factory: defectData.sub_con_factory,
           bundle_id: defectData.bundle_id,
-          bundle_random_id: defectData.bundle_random_id,
+          bundle_random_id: defectData.bundle_random_id
         };
         setScannedData(formattedData);
         setPassQtyOPA(defectData.totalRejectGarmentCount);
@@ -144,22 +144,24 @@ const OPAPage = () => {
   const handleAddRecord = async () => {
     try {
       const now = new Date();
+      const taskNoOPA = isDefectCard ? 85 : 60;
+
       const newRecord = {
         opa_record_id: isDefectCard ? 0 : opaRecordId,
-        task_no_opa: isDefectCard ? 85 : 60,
+        task_no_opa: taskNoOPA,
         opa_bundle_id: isDefectCard
           ? `${scannedData.defect_print_id}-85`
           : `${scannedData.bundle_id}-60`,
         opa_updated_date: now.toLocaleDateString("en-US", {
           month: "2-digit",
           day: "2-digit",
-          year: "numeric",
+          year: "numeric"
         }),
         opa_update_time: now.toLocaleTimeString("en-US", {
           hour12: false,
           hour: "2-digit",
           minute: "2-digit",
-          second: "2-digit",
+          second: "2-digit"
         }),
         package_no: scannedData.package_no,
         ...scannedData,
@@ -169,38 +171,46 @@ const OPAPage = () => {
         kh_name_opa: user.kh_name,
         job_title_opa: user.job_title,
         dept_name_opa: user.dept_name,
-        sect_name_opa: user.sect_name,
+        sect_name_opa: user.sect_name
       };
       console.log("New Record to be saved:", newRecord);
+
       const response = await fetch(`${API_BASE_URL}/api/save-opa`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newRecord),
+        body: JSON.stringify(newRecord)
       });
       if (!response.ok) throw new Error("Failed to save OPA record");
 
-      if (!isDefectCard) {
-        const updateResponse = await fetch(
-          `${API_BASE_URL}/api/update-qc2-orderdata/${scannedData.bundle_id}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              passQtyOPA,
-              emp_id_opa: user.emp_id,
-              eng_name_opa: user.eng_name,
-              kh_name_opa: user.kh_name,
-              job_title_opa: user.job_title,
-              dept_name_opa: user.dept_name,
-              sect_name_opa: user.sect_name,
-              opa_updated_date: newRecord.opa_updated_date,
-              opa_update_time: newRecord.opa_update_time,
-            }),
-          }
-        );
-        if (!updateResponse.ok)
-          throw new Error("Failed to update qc2_orderdata");
-      }
+      // Update qc2_orderdata
+      const inspectionType = isDefectCard ? "defect" : "first";
+      const updateData = {
+        inspectionType,
+        process: "opa",
+        data: {
+          task_no: taskNoOPA,
+          passQty: newRecord.passQtyOPA,
+          updated_date: newRecord.opa_updated_date,
+          update_time: newRecord.opa_update_time,
+          emp_id: newRecord.emp_id_opa,
+          eng_name: newRecord.eng_name_opa,
+          kh_name: newRecord.kh_name_opa,
+          job_title: newRecord.job_title_opa,
+          dept_name: newRecord.dept_name_opa,
+          sect_name: newRecord.sect_name_opa,
+          ...(isDefectCard && { defect_print_id: scannedData.defect_print_id })
+        }
+      };
+
+      const updateResponse = await fetch(
+        `${API_BASE_URL}/api/update-qc2-orderdata/${scannedData.bundle_id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updateData)
+        }
+      );
+      if (!updateResponse.ok) throw new Error("Failed to update qc2_orderdata");
 
       setOpaRecords((prev) => [...prev, newRecord]);
       setScannedData(null);

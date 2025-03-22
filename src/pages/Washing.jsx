@@ -125,7 +125,7 @@ const WashingPage = () => {
           sub_con: defectData.sub_con,
           sub_con_factory: defectData.sub_con_factory,
           bundle_id: defectData.bundle_id,
-          bundle_random_id: defectData.bundle_random_id,
+          bundle_random_id: defectData.bundle_random_id
         };
         setScannedData(formattedData);
         setPassQtyWash(defectData.totalRejectGarmentCount); // Use totalRejectGarmentCount for Pass Wash Qty
@@ -148,22 +148,24 @@ const WashingPage = () => {
   const handleAddRecord = async () => {
     try {
       const now = new Date();
+      const taskNoWashing = isDefectCard ? 86 : 55;
+
       const newRecord = {
         washing_record_id: isDefectCard ? 0 : washingRecordId,
-        task_no_washing: isDefectCard ? 86 : 55,
+        task_no_washing: taskNoWashing,
         washing_bundle_id: isDefectCard
           ? `${scannedData.defect_print_id}-86`
           : `${scannedData.bundle_id}-55`,
         washing_updated_date: now.toLocaleDateString("en-US", {
           month: "2-digit",
           day: "2-digit",
-          year: "numeric",
+          year: "numeric"
         }),
         washing_update_time: now.toLocaleTimeString("en-US", {
           hour12: false,
           hour: "2-digit",
           minute: "2-digit",
-          second: "2-digit",
+          second: "2-digit"
         }),
         package_no: scannedData.package_no,
         ...scannedData,
@@ -173,38 +175,47 @@ const WashingPage = () => {
         kh_name_washing: user.kh_name,
         job_title_washing: user.job_title,
         dept_name_washing: user.dept_name,
-        sect_name_washing: user.sect_name,
+        sect_name_washing: user.sect_name
       };
       console.log("New Record to be saved:", newRecord);
+
+      // Save to washing collection
       const response = await fetch(`${API_BASE_URL}/api/save-washing`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newRecord),
+        body: JSON.stringify(newRecord)
       });
       if (!response.ok) throw new Error("Failed to save washing record");
 
-      if (!isDefectCard) {
-        const updateResponse = await fetch(
-          `${API_BASE_URL}/api/update-qc2-orderdata/${scannedData.bundle_id}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              passQtyWash,
-              emp_id_washing: user.emp_id,
-              eng_name_washing: user.eng_name,
-              kh_name_washing: user.kh_name,
-              job_title_washing: user.job_title,
-              dept_name_washing: user.dept_name,
-              sect_name_washing: user.sect_name,
-              washing_updated_date: newRecord.washing_updated_date,
-              washing_update_time: newRecord.washing_update_time,
-            }),
-          }
-        );
-        if (!updateResponse.ok)
-          throw new Error("Failed to update qc2_orderdata");
-      }
+      // Update qc2_orderdata with inspectionFirst or inspectionDefect
+      const inspectionType = isDefectCard ? "defect" : "first";
+      const updateData = {
+        inspectionType,
+        process: "washing",
+        data: {
+          task_no: taskNoWashing,
+          passQty: newRecord.passQtyWash,
+          updated_date: newRecord.washing_updated_date,
+          update_time: newRecord.washing_update_time,
+          emp_id: newRecord.emp_id_washing,
+          eng_name: newRecord.eng_name_washing,
+          kh_name: newRecord.kh_name_washing,
+          job_title: newRecord.job_title_washing,
+          dept_name: newRecord.dept_name_washing,
+          sect_name: newRecord.sect_name_washing,
+          ...(isDefectCard && { defect_print_id: scannedData.defect_print_id })
+        }
+      };
+
+      const updateResponse = await fetch(
+        `${API_BASE_URL}/api/update-qc2-orderdata/${scannedData.bundle_id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updateData)
+        }
+      );
+      if (!updateResponse.ok) throw new Error("Failed to update qc2_orderdata");
 
       setWashingRecords((prev) => [...prev, newRecord]);
       setScannedData(null);

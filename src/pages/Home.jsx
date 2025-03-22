@@ -160,7 +160,7 @@ function Home() {
         {
           path: "/roving",
           roles: ["Admin", "QC1"],
-          image: "/IMG/roving.png",
+          image: "/IMG/qcinline.png",
           title:  t("home.qc_inline_roving"),
           description: "QC Inline Roving Check Point."
         },

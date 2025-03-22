@@ -46,7 +46,7 @@ const DefectTrack = () => {
             return {
               ...defect,
               displayName: defectEntry ? defectEntry[language] || defect.name : defect.name,
-              status: defect.status || "Not Repaired"|| "Fail",
+              status: defect.status || "Fail",
             };
           }),
         })),
@@ -154,7 +154,7 @@ const DefectTrack = () => {
           defectName: defect.name,
           defectCount: defect.count,
           repairGroup: defect.repair,
-          status: defect.status || "Not Repaired",
+          status: defect.status || "Fail",
           repair_date: defect.repair_date || "",
           repair_time: defect.repair_time || "",
           garmentNumber:garment.garmentNumber,

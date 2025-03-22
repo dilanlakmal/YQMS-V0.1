@@ -24,8 +24,8 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
     defectArray: [
       {
         defectName: { type: String, required: true },
-        totalCount: { type: Number, required: true },
-      },
+        totalCount: { type: Number, required: true }
+      }
     ],
     rejectGarments: [
       {
@@ -34,15 +34,15 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
           {
             name: { type: String, required: true },
             count: { type: Number, required: true },
-            repair: { type: String, required: true },
-          },
+            repair: { type: String, required: true }
+          }
         ],
         garment_defect_id: { type: String, required: true },
-        rejectTime: { type: String, required: true }, // "HH:MM:SS"
-      },
+        rejectTime: { type: String, required: true } // "HH:MM:SS"
+      }
     ],
     inspection_time: {
-      type: String,
+      type: String
       // validate: {
       //   validator: function (v) {
       //     return v === undefined || v === null || /^\d{2}:\d{2}:\d{2}$/.test(v);
@@ -77,12 +77,12 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
                 repairDefectArray: [
                   {
                     name: { type: String, required: true },
-                    count: { type: Number, required: true },
-                  },
-                ],
-              },
-            ],
-          },
+                    count: { type: Number, required: true }
+                  }
+                ]
+              }
+            ]
+          }
         ],
         printData: [
           {
@@ -91,16 +91,16 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
               {
                 name: { type: String, required: true },
                 count: { type: Number, required: true },
-                repair: { type: String, required: true },
-              },
-            ],
-          },
+                repair: { type: String, required: true }
+              }
+            ]
+          }
         ],
         isCompleted: { type: Boolean, default: false }, // New field
-        timestamp: { type: Date, default: Date.now },
-      },
+        timestamp: { type: Date, default: Date.now }
+      }
     ],
-    totalRepair: { type: Number, default: 0 },
+    totalRepair: { type: Number, default: 0 }
   },
   { collection: "qc2_inspection_pass_bundle" }
 );

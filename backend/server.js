@@ -30,6 +30,7 @@ import createQC2ReworksModel from "./models/qc2_reworks.js";
 import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
 import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
 import { API_BASE_URL } from "./config.js";
+import sql from "mssql"; 
 
 /* ------------------------------
    Connection String
@@ -112,97 +113,259 @@ const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const QCInlineRoving =createQCInlineRovingModel(ymProdConnection);
 const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
 
-//-----------------------------END DATABASE CONNECTIONS------------------------------------------------//
+// Set UTF-8 encoding for responses
+app.use((req, res, next) => {
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  next();
+});
 
-/* ------------------------------
-   End Points - dt_orders
------------------------------- */
+// SQL Server Configuration
+const sqlConfig = {
+  user: "ymdata",
+  password: "Kzw15947",
+  server: "192.167.1.13",
+  port: 1433,
+  database: "YMDataStore",
+  options: {
+    encrypt: false, // Use true if SSL is required
+    trustServerCertificate: true // For self-signed certificates
+  },
+  requestTimeout: 3000000, // Set timeout to 5 minutes (300,000 ms)
+  pool: {
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000
+  }
+};
 
-// const checkDbConnection = (req, res, next) => {
-//   if (ymProdConnection.readyState !== 1) {
-//     // 1 means connected
-//     return res.status(500).json({ error: "Mongoose connection is not ready" });
-//   }
-//   next();
-// };
+// Connect to SQL Server
+async function connectToSqlServer() {
+  try {
+    await sql.connect(sqlConfig);
+    console.log("Connected to SQL Server (YMDataStore) at 192.167.1.13:1433");
+  } catch (err) {
+    console.error("SQL Server connection error:", err);
+  }
+}
 
-// const checkDbConnection = (req, res, next) => {
-//   if (ymProdConnection.readyState !== 1) { // 1 means connected
-//     return res.status(500).json({ error: 'Mongoose connection is not ready' });
-//   }
-//   next();
-// };
+connectToSqlServer();
+
+// New Endpoint for RS18 Data
+app.get("/api/sunrise/rs18", async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        FORMAT(CAST(dDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+        WorkLine,
+        MONo,
+        SizeName,
+        ColorNo,
+        ColorName,
+        ReworkCode,
+        CASE ReworkCode
+          WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
+          WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
+          WHEN '3' THEN N'ដេររមួល / 扭 / Twisted'
+          WHEN '4' THEN N'ជ្រួញនិងទឹករលក និងប៉ោងសាច់ / 起皺/波浪/起包 / Puckering/ Wavy/ Fullness'
+          WHEN '5' THEN N'ដាច់អំបោះ / 斷線 / Broken stitches'
+          WHEN '6' THEN N'លោតអំបោះ / 跳線 / Skipped stitches'
+          WHEN '7' THEN N'ប្រឡាក់ប្រេង / 油漬 / Oil stain'
+          WHEN '8' THEN N'ធ្លុះរន្ធ / 破洞 (包括針洞) / Hole/ Needle hole'
+          WHEN '9' THEN N'ខុសពណ៏ / 色差 / Color shading'
+          WHEN '10' THEN N'ផ្លាកដេរខុសសេរីនិងដេរខុសផ្លាក / 嘜頭錯碼/車錯嘜頭 / Label sewn wrong size/style/po'
+          WHEN '11' THEN N'ប្រឡាក់ / 髒污 / Dirty stain'
+          WHEN '12' THEN N'រហែកថ្នេរ / 爆縫 / Open seam'
+          WHEN '13' THEN N'អត់បានដេរ / 漏車縫/漏空 / Missed sewing'
+          WHEN '14' THEN N'ព្រុយ / 線頭 / Untrimmed thread ends'
+          WHEN '15' THEN N'ខូចសាច់ក្រណាត់(មិនអាចកែ) / 布疵（改不了） / Fabric defect (unrepairable)'
+          WHEN '16' THEN N'គៀបសាច់ / 打折 / Pleated'
+          WHEN '17' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់ / 燙畫/印花/繡花 / Heat transfer/ Printing/ EMB defect'
+          WHEN '18' THEN N'អាវកែផ្សេងៗ / 其它返工 / Others'
+          WHEN '19' THEN N'អ៊ុតអត់ជាប់ / 熨燙不良 / Insecure of Heat transfer'
+          WHEN '20' THEN N'ទំហំទទឺងតូចធំមិនស្មើគ្នា / 左右大小不均匀 / Uneven width'
+          WHEN '21' THEN N'គំលាតម្ជុល តឹង និង ធូរអំបោះពេក / 針距: 線緊/線鬆 / Stitch density tight/loose'
+          WHEN '22' THEN N'សល់ជាយ និង ព្រុយខាងៗ / 毛邊 止口 / Fray edge / Raw edge'
+          WHEN '23' THEN N'ជ្រលក់ពណ៏ខុស រឺក៏ ខូច / 染色不正確 - 次品/廢品 / Incorrect dying'
+          WHEN '24' THEN N'ប្រឡាក់ប្រេង2 / 油漬2 / Oil stain 2'
+          WHEN '25' THEN N'ខុសពណ៏2 / 色差2 / Color variation 2'
+          WHEN '26' THEN N'ប្រឡាក់2 / 髒污2 / Dirty stain 2'
+          WHEN '27' THEN N'ឆ្នូតក្រណាត់2 / 布疵2 / Fabric defect 2'
+          WHEN '28' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់2 / 燙畫 / 印花 /繡花 2 / Heat transfer/ Printing/ EMB defect 2'
+          WHEN '29' THEN N'ដេរអត់ជាប់ / 不牢固 / Insecure'
+          WHEN '30' THEN N'ដេរធ្លាក់ទឹក / 落坑 / Run off stitching'
+          WHEN '31' THEN N'ខូចទ្រង់ទ្រាយ / 形状不良 / Poor shape'
+          WHEN '32' THEN N'បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន) / 布有飞纱，勾纱(可修) / Fabric fly yarn / snagging (repairable)'
+          WHEN '33' THEN N'មិនចំគ្នា / 不对称（骨位，间条） / Mismatched'
+          WHEN '34' THEN N'បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំ វៀច / 车标问题:错位置,反,高低,歪斜 / Label: misplace,invert,uneven,slant'
+          WHEN '35' THEN N'ស្មាមម្ជុល / 针孔 / Needle Mark'
+          WHEN '36' THEN N'បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-) / 衣服錯碼(某部位/裁片) / Wrong size of garment(cut panel/part)'
+          WHEN '37' THEN N'ផ្សេងៗ / 其它-做工不良 / Others - Poor Workmanship (Spare) 2'
+          WHEN '38' THEN N'បញ្ហាបោកទឹក / ជ្រលក់ពណ៌ / 洗水 / 染色不正确 / Improper Washing Dyeing'
+          WHEN '39' THEN N'បញ្ហាអ៊ុត- ឡើងស / ស្នាម / ខ្លោច -ល- / 烫工不良:起镜 / 压痕 / 烫焦 / Improper Ironing: Glazing / Mark / Scorch, etc…'
+          WHEN '40' THEN N'បញ្ហាអ៊ុត: ខូចទ្រង់ទ្រាយ / ខូចរាង / 烫工不良:变形 / 外观不良 / Improper Ironing: Off Shape / Poor Appearance'
+          WHEN '41' THEN N'ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា / 左右高低 / Asymmetry / Hi-Low'
+          WHEN '42' THEN N'ថ្នេរដេរមិនត្រួតគ្នា តូចធំមិនស្មើគ្នា / 车线不重叠 大小不均匀 / Uneven / Misalign stitches'
+          WHEN '43' THEN N'បញ្ហាលើសខ្នាត(+) / 尺寸问题 (+大) / Measurement issue positive'
+          WHEN '44' THEN N'បញ្ហាខ្វះខ្នាត(-) / 尺寸问题 (-小) / Measurement issue negative'
+          ELSE NULL
+        END AS ReworkName,
+        SUM(QtyRework) AS DefectsQty
+      FROM 
+        YMDataStore.SUNRISE.RS18 r 
+      WHERE 
+        TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+        AND SeqNo <> 700
+        AND TRY_CAST(ReworkCode AS INT) BETWEEN 1 AND 44
+        AND CAST(dDate AS DATE) > '2022-12-31'
+        AND CAST(dDate AS DATE) < DATEADD(DAY, 1, GETDATE())
+      GROUP BY 
+        CAST(dDate AS DATE),
+        WorkLine,
+        MONo,
+        SizeName,
+        ColorNo,
+        ColorName,
+        ReworkCode
+      HAVING 
+        CASE ReworkCode
+          WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
+          WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
+          WHEN '3' THEN N'ដេររមួល / 扭 / Twisted'
+          WHEN '4' THEN N'ជ្រួញនិងទឹករលក និងប៉ោងសាច់ / 起皺/波浪/起包 / Puckering/ Wavy/ Fullness'
+          WHEN '5' THEN N'ដាច់អំបោះ / 斷線 / Broken stitches'
+          WHEN '6' THEN N'លោតអំបោះ / 跳線 / Skipped stitches'
+          WHEN '7' THEN N'ប្រឡាក់ប្រេង / 油漬 / Oil stain'
+          WHEN '8' THEN N'ធ្លុះរន្ធ / 破洞 (包括針洞) / Hole/ Needle hole'
+          WHEN '9' THEN N'ខុសពណ៏ / 色差 / Color shading'
+          WHEN '10' THEN N'ផ្លាកដេរខុសសេរីនិងដេរខុសផ្លាក / 嘜頭錯碼/車錯嘜頭 / Label sewn wrong size/style/po'
+          WHEN '11' THEN N'ប្រឡាក់ / 髒污 / Dirty stain'
+          WHEN '12' THEN N'រហែកថ្នេរ / 爆縫 / Open seam'
+          WHEN '13' THEN N'អត់បានដេរ / 漏車縫/漏空 / Missed sewing'
+          WHEN '14' THEN N'ព្រុយ / 線頭 / Untrimmed thread ends'
+          WHEN '15' THEN N'ខូចសាច់ក្រណាត់(មិនអាចកែ) / 布疵（改不了） / Fabric defect (unrepairable)'
+          WHEN '16' THEN N'គៀបសាច់ / 打折 / Pleated'
+          WHEN '17' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់ / 燙畫/印花/繡花 / Heat transfer/ Printing/ EMB defect'
+          WHEN '18' THEN N'អាវកែផ្សេងៗ / 其它返工 / Others'
+          WHEN '19' THEN N'អ៊ុតអត់ជាប់ / 熨燙不良 / Insecure of Heat transfer'
+          WHEN '20' THEN N'ទំហំទទឺងតូចធំមិនស្មើគ្នា / 左右大小不均匀 / Uneven width'
+          WHEN '21' THEN N'គំលាតម្ជុល តឹង និង ធូរអំបោះពេក / 針距: 線緊/線鬆 / Stitch density tight/loose'
+          WHEN '22' THEN N'សល់ជាយ និង ព្រុយខាងៗ / 毛邊 止口 / Fray edge / Raw edge'
+          WHEN '23' THEN N'ជ្រលក់ពណ៏ខុស រឺក៏ ខូច / 染色不正確 - 次品/廢品 / Incorrect dying'
+          WHEN '24' THEN N'ប្រឡាក់ប្រេង2 / 油漬2 / Oil stain 2'
+          WHEN '25' THEN N'ខុសពណ៏2 / 色差2 / Color variation 2'
+          WHEN '26' THEN N'ប្រឡាក់2 / 髒污2 / Dirty stain 2'
+          WHEN '27' THEN N'ឆ្នូតក្រណាត់2 / 布疵2 / Fabric defect 2'
+          WHEN '28' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់2 / 燙畫 / 印花 /繡花 2 / Heat transfer/ Printing/ EMB defect 2'
+          WHEN '29' THEN N'ដេរអត់ជាប់ / 不牢固 / Insecure'
+          WHEN '30' THEN N'ដេរធ្លាក់ទឹក / 落坑 / Run off stitching'
+          WHEN '31' THEN N'ខូចទ្រង់ទ្រាយ / 形状不良 / Poor shape'
+          WHEN '32' THEN N'បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន) / 布有飞纱，勾纱(可修) / Fabric fly yarn / snagging (repairable)'
+          WHEN '33' THEN N'មិនចំគ្នា / 不对称（骨位，间条） / Mismatched'
+          WHEN '34' THEN N'បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំ វៀច / 车标问题:错位置,反,高低,歪斜 / Label: misplace,invert,uneven,slant'
+          WHEN '35' THEN N'ស្មាមម្ជុល / 针孔 / Needle Mark'
+          WHEN '36' THEN N'បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-) / 衣服錯碼(某部位/裁片) / Wrong size of garment(cut panel/part)'
+          WHEN '37' THEN N'ផ្សេងៗ / 其它-做工不良 / Others - Poor Workmanship (Spare) 2'
+          WHEN '38' THEN N'បញ្ហាបោកទឹក / ជ្រលក់ពណ៌ / 洗水 / 染色不正确 / Improper Washing Dyeing'
+          WHEN '39' THEN N'បញ្ហាអ៊ុត- ឡើងស / ស្នាម / ខ្លោច -ល- / 烫工不良:起镜 / 压痕 / 烫焦 / Improper Ironing: Glazing / Mark / Scorch, etc…'
+          WHEN '40' THEN N'បញ្ហាអ៊ុត: ខូចទ្រង់ទ្រាយ / ខូចរាង / 烫工不良:变形 / 外观不良 / Improper Ironing: Off Shape / Poor Appearance'
+          WHEN '41' THEN N'ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា / 左右高低 / Asymmetry / Hi-Low'
+          WHEN '42' THEN N'ថ្នេរដេរមិនត្រួតគ្នា តូចធំមិនស្មើគ្នា / 车线不重叠 大小不均匀 / Uneven / Misalign stitches'
+          WHEN '43' THEN N'បញ្ហាលើសខ្នាត(+) / 尺寸问题 (+大) / Measurement issue positive'
+          WHEN '44' THEN N'បញ្ហាខ្វះខ្នាត(-) / 尺寸问题 (-小) / Measurement issue negative'
+          ELSE NULL
+        END IS NOT NULL;
+    `;
+
+    const result = await sql.query(query);
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("Error fetching RS18 data:", err);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch RS18 data", error: err.message });
+  }
+});
+
+// New Endpoint for Sunrise Output Data
+app.get("/api/sunrise/output", async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        FORMAT(CAST(BillDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+        WorkLine,
+        MONo,
+        SizeName,
+        ColorNo,
+        ColorName,
+        SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END) AS TotalQtyT38,
+        SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END) AS TotalQtyT39
+      FROM 
+      (
+        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2023
+        UNION ALL
+        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2024
+        UNION ALL
+        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2025
+      ) AS CombinedData
+      WHERE 
+        SeqNo IN (38, 39)
+        AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+      GROUP BY 
+        CAST(BillDate AS DATE),
+        WorkLine,
+        MONo,
+        SizeName,
+        ColorNo,
+        ColorName;
+    `;
+
+    const result = await sql.query(query);
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("Error fetching Sunrise Output data:", err);
+    res.status(500).json({
+      message: "Failed to fetch Sunrise Output data",
+      error: err.message
+    });
+  }
+});
+
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
 
 // Update the MONo search endpoint to handle complex pattern matching
 app.get("/api/search-mono", async (req, res) => {
   try {
-    const digits = req.query.digits;
+    const term = req.query.term; // Changed from 'digits' to 'term'
+    if (!term) {
+      return res.status(400).json({ error: "Search term is required" });
+    }
 
     const collection = ymEcoConnection.db.collection("dt_orders");
 
-    // More robust regex pattern to match last 3 digits before any non-digit characters
-    const regexPattern = new RegExp(
-      `(\\d{3})(?=\\D*$)|(\\d{3}$)|(?<=\\D)(\\d{3})(?=\\D)`,
-      "i"
-    );
+    // Use a case-insensitive regex to match the term anywhere in Order_No
+    const regexPattern = new RegExp(term, "i");
 
     const results = await collection
-      .aggregate([
-        {
-          $addFields: {
-            matchParts: {
-              $regexFind: {
-                input: "$Order_No",
-                regex: regexPattern,
-              },
-            },
-          },
-        },
-        {
-          $match: {
-            $or: [
-              { "matchParts.match": { $regex: new RegExp(`${digits}$`, "i") } },
-              { "matchParts.match": { $regex: new RegExp(`^${digits}`, "i") } },
-            ],
-          },
-        },
-        {
-          $project: {
-            Order_No: 1,
-            numericMatch: {
-              $substr: [
-                { $ifNull: ["$matchParts.match", ""] },
-                { $subtract: [{ $strLenCP: "$matchParts.match" }, 3] },
-                3,
-              ],
-            },
-          },
-        },
-        {
-          $match: {
-            numericMatch: digits,
-          },
-        },
-        {
-          $group: {
-            _id: "$Order_No",
-            count: { $sum: 1 },
-          },
-        },
-        {
-          $limit: 100,
-        },
-      ])
+      .find({
+        Order_No: { $regex: regexPattern }
+      })
+      .project({ Order_No: 1, _id: 0 }) // Only return Order_No field
+      .limit(100) // Limit results to prevent overwhelming the UI
       .toArray();
 
-      // console.log("Search results:", results);
+    // Extract unique Order_No values
+    const uniqueMONos = [...new Set(results.map((r) => r.Order_No))];
 
-    res.json(results.map((r) => r._id));
+    res.json(uniqueMONos);
   } catch (error) {
     console.error("Error searching MONo:", error);
     res.status(500).json({ error: "Failed to search MONo" });
   }
 });
+
 
 // Update /api/order-details endpoint
 app.get("/api/order-details/:mono", async (req, res) => {
@@ -457,9 +620,6 @@ const generateRandomId = async () => {
   return randomId;
 };
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
-});
 
 // Save bundle data to MongoDB
 app.post("/api/save-bundle-data", async (req, res) => {
@@ -567,20 +727,6 @@ app.get("/api/user-batches", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch user batches" });
   }
 });
-
-// //For Data tab display records in a table
-// app.get("/api/user-batches", async (req, res) => {
-//   try {
-//     const { emp_id } = req.query;
-//     if (!emp_id) {
-//       return res.status(400).json({ message: "emp_id is required" });
-//     }
-//     const batches = await QC2OrderData.find({ emp_id });
-//     res.json(batches);
-//   } catch (error) {
-//     res.status(500).json({ message: "Failed to fetch user batches" });
-//   }
-// });
 
 /* ------------------------------
    End Points - Reprint - qc2_orderdata
@@ -816,48 +962,6 @@ app.post("/api/save-ironing", async (req, res) => {
   }
 });
 
-// Update qc2_orderdata with ironing details
-app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
-  try {
-    const { bundleId } = req.params;
-    const {
-      passQtyIron,
-      ironing_updated_date,
-      ironing_update_time,
-      emp_id_ironing,
-      eng_name_ironing,
-      kh_name_ironing,
-      job_title_ironing,
-      dept_name_ironing,
-      sect_name_ironing,
-    } = req.body;
-
-    const updatedRecord = await QC2OrderData.findOneAndUpdate(
-      { bundle_id: bundleId },
-      {
-        passQtyIron,
-        ironing_updated_date,
-        ironing_update_time,
-        emp_id_ironing,
-        eng_name_ironing,
-        kh_name_ironing,
-        job_title_ironing,
-        dept_name_ironing,
-        sect_name_ironing,
-      },
-      { new: true }
-    );
-
-    if (!updatedRecord) {
-      return res.status(404).json({ error: "Bundle not found" });
-    }
-
-    res.json({ message: "Record updated successfully", data: updatedRecord });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update record" });
-  }
-});
-
 // For Data tab display records in a table
 app.get("/api/ironing-records", async (req, res) => {
   try {
@@ -982,47 +1086,6 @@ app.post("/api/save-washing", async (req, res) => {
   }
 });
 
-app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
-  try {
-    const { bundleId } = req.params;
-    const {
-      passQtyWash,
-      washing_updated_date,
-      washing_update_time,
-      emp_id_washing,
-      eng_name_washing,
-      kh_name_washing,
-      job_title_washing,
-      dept_name_washing,
-      sect_name_washing,
-    } = req.body;
-
-    const updatedRecord = await QC2OrderData.findOneAndUpdate(
-      { bundle_id: bundleId },
-      {
-        passQtyWash,
-        washing_updated_date,
-        washing_update_time,
-        emp_id_washing,
-        eng_name_washing,
-        kh_name_washing,
-        job_title_washing,
-        dept_name_washing,
-        sect_name_washing,
-      },
-      { new: true }
-    );
-
-    if (!updatedRecord) {
-      return res.status(404).json({ error: "Bundle not found" });
-    }
-
-    res.json({ message: "Record updated successfully", data: updatedRecord });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update record" });
-  }
-});
-
 app.get("/api/washing-records", async (req, res) => {
   try {
     const records = await Washing.find();
@@ -1143,47 +1206,6 @@ app.post("/api/save-opa", async (req, res) => {
     } else {
       res.status(500).json({ error: "Failed to save record" });
     }
-  }
-});
-
-app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
-  try {
-    const { bundleId } = req.params;
-    const {
-      passQtyOPA,
-      opa_updated_date,
-      opa_update_time,
-      emp_id_opa,
-      eng_name_opa,
-      kh_name_opa,
-      job_title_opa,
-      dept_name_opa,
-      sect_name_opa,
-    } = req.body;
-
-    const updatedRecord = await QC2OrderData.findOneAndUpdate(
-      { bundle_id: bundleId },
-      {
-        passQtyOPA,
-        opa_updated_date,
-        opa_update_time,
-        emp_id_opa,
-        eng_name_opa,
-        kh_name_opa,
-        job_title_opa,
-        dept_name_opa,
-        sect_name_opa,
-      },
-      { new: true }
-    );
-
-    if (!updatedRecord) {
-      return res.status(404).json({ error: "Bundle not found" });
-    }
-
-    res.json({ message: "Record updated successfully", data: updatedRecord });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update record" });
   }
 });
 
@@ -1365,36 +1387,51 @@ app.post("/api/save-packing", async (req, res) => {
   }
 });
 
-// Update qc2_orderdata with Packing details (no change needed)
+//For Data tab display records in a table (no change needed)
+app.get("/api/packing-records", async (req, res) => {
+  try {
+    const records = await Packing.find();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch Packing records" });
+  }
+});
+
+/* ------------------------------
+  PUT Endpoints - Update QC2 Order Data
+------------------------------ */
+
 app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
   try {
     const { bundleId } = req.params;
-    const {
-      passQtyPack,
-      packing_updated_date,
-      packing_update_time,
-      emp_id_packing,
-      eng_name_packing,
-      kh_name_packing,
-      job_title_packing,
-      dept_name_packing,
-      sect_name_packing,
-    } = req.body;
+    const { inspectionType, process, data } = req.body;
+
+    if (!["first", "defect"].includes(inspectionType)) {
+      return res.status(400).json({ error: "Invalid inspection type" });
+    }
+
+    const updateField =
+      inspectionType === "first" ? "inspectionFirst" : "inspectionDefect";
+    const updateOperation = {
+      $push: {
+        [updateField]: {
+          process,
+          ...data
+        }
+      }
+    };
+
+    // For defect scans, ensure defect_print_id is provided
+    if (inspectionType === "defect" && !data.defect_print_id) {
+      return res
+        .status(400)
+        .json({ error: "defect_print_id is required for defect scans" });
+    }
 
     const updatedRecord = await QC2OrderData.findOneAndUpdate(
       { bundle_id: bundleId },
-      {
-        passQtyPack,
-        packing_updated_date,
-        packing_update_time,
-        emp_id_packing,
-        eng_name_packing,
-        kh_name_packing,
-        job_title_packing,
-        dept_name_packing,
-        sect_name_packing,
-      },
-      { new: true }
+      updateOperation,
+      { new: true, upsert: true }
     );
 
     if (!updatedRecord) {
@@ -1403,17 +1440,10 @@ app.put("/api/update-qc2-orderdata/:bundleId", async (req, res) => {
 
     res.json({ message: "Record updated successfully", data: updatedRecord });
   } catch (error) {
-    res.status(500).json({ error: "Failed to update record" });
-  }
-});
-
-// For Data tab display records in a table (no change needed)
-app.get("/api/packing-records", async (req, res) => {
-  try {
-    const records = await Packing.find();
-    res.json(records);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch Packing records" });
+    console.error("Error updating qc2_orderdata:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to update record", details: error.message });
   }
 });
 
@@ -2186,7 +2216,7 @@ app.put(
             ...printEntry,
             totalRejectGarment_Var:
               printEntry.totalRejectGarment_Var ||
-              printEntry.totalRejectGarmentCount, // Preserve or initialize
+              printEntry.totalRejectGarmentCount
           }));
       }
 
@@ -2208,6 +2238,123 @@ app.put(
         return res.status(404).json({ error: "Record not found" });
       }
 
+      // Update qc2_orderdata for qc2InspectionFirst and qc2InspectionDefect
+      const qc2OrderDataRecord = await QC2OrderData.findOne({
+        bundle_random_id
+      });
+
+      // Case 1: Initial inspection completed (inspection_time is set)
+      if (
+        updateOperationsFinal.$set &&
+        updateOperationsFinal.$set.inspection_time
+      ) {
+        if (qc2OrderDataRecord) {
+          // Check if an entry with the same inspection_time, emp_id, and bundle_random_id already exists
+          const existingEntry = qc2OrderDataRecord.qc2InspectionFirst.find(
+            (entry) =>
+              entry.inspectionRecordId === updatedRecord._id.toString() ||
+              (entry.updated_date === updatedRecord.inspection_date &&
+                entry.update_time === updatedRecord.inspection_time &&
+                entry.emp_id === updatedRecord.emp_id_inspection)
+          );
+
+          if (!existingEntry) {
+            const inspectionFirstEntry = {
+              process: "qc2",
+              task_no: 100,
+              checkedQty: updatedRecord.checkedQty,
+              totalPass: updatedRecord.totalPass,
+              totalRejects: updatedRecord.totalRejects,
+              defectQty: updatedRecord.defectQty,
+              defectArray: updatedRecord.defectArray,
+              rejectGarments: updatedRecord.rejectGarments.map((rg) => ({
+                totalCount: rg.totalCount,
+                defects: rg.defects.map((d) => ({
+                  name: d.name,
+                  count: d.count,
+                  repair: d.repair,
+                  status: "Fail"
+                })),
+                garment_defect_id: rg.garment_defect_id,
+                rejectTime: rg.rejectTime
+              })),
+              updated_date: updatedRecord.inspection_date,
+              update_time: updatedRecord.inspection_time,
+              emp_id: updatedRecord.emp_id_inspection,
+              eng_name: updatedRecord.eng_name_inspection,
+              kh_name: updatedRecord.kh_name_inspection,
+              job_title: updatedRecord.job_title_inspection,
+              dept_name: updatedRecord.dept_name_inspection,
+              sect_name: updatedRecord.sect_name_inspection,
+              inspectionRecordId: updatedRecord._id.toString() // Add unique identifier
+            };
+            qc2OrderDataRecord.qc2InspectionFirst.push(inspectionFirstEntry);
+            await qc2OrderDataRecord.save();
+          } else {
+            console.log(
+              "Duplicate entry detected, skipping push to qc2InspectionFirst"
+            );
+          }
+        }
+      }
+
+      // Case 2: Return inspection completed (repairGarmentsDefects is pushed)
+      if (
+        updateOperationsFinal.$push &&
+        updateOperationsFinal.$push[
+          "printArray.$[elem].repairGarmentsDefects"
+        ] &&
+        updateData.sessionData
+      ) {
+        const sessionData = updateData.sessionData;
+        const {
+          sessionTotalPass,
+          sessionTotalRejects,
+          sessionDefectsQty,
+          sessionRejectedGarments,
+          inspectionNo,
+          defect_print_id
+        } = sessionData;
+
+        if (qc2OrderDataRecord) {
+          const now = new Date();
+          const inspectionDefectEntry = {
+            process: "qc2",
+            task_no: 101,
+            defect_print_id,
+            inspectionNo,
+            checkedQty: sessionTotalPass + sessionTotalRejects,
+            totalPass: sessionTotalPass,
+            totalRejects: sessionTotalRejects,
+            defectQty: sessionDefectsQty,
+            // Omit defectArray
+            rejectGarments: sessionRejectedGarments.map((rg) => ({
+              totalCount: rg.totalDefectCount,
+              defects: rg.repairDefectArray.map((d) => ({
+                name: d.name,
+                count: d.count,
+                repair:
+                  allDefects.find((def) => def.english === d.name)?.repair ||
+                  "Unknown",
+                status: "Fail"
+              })),
+              garment_defect_id: generateGarmentDefectId(),
+              rejectTime: now.toLocaleTimeString("en-US", { hour12: false })
+            })),
+            updated_date: now.toLocaleDateString("en-US"),
+            update_time: now.toLocaleTimeString("en-US", { hour12: false }),
+            emp_id: updatedRecord.emp_id_inspection,
+            eng_name: updatedRecord.eng_name_inspection,
+            kh_name: updatedRecord.kh_name_inspection,
+            job_title: updatedRecord.job_title_inspection,
+            dept_name: updatedRecord.dept_name_inspection,
+            sect_name: updatedRecord.sect_name_inspection
+          };
+          qc2OrderDataRecord.qc2InspectionDefect.push(inspectionDefectEntry);
+          await qc2OrderDataRecord.save();
+        }
+      }
+
       io.emit("qc2_data_updated");
       res.json({
         message: "Inspection pass bundle updated successfully",
@@ -2222,6 +2369,82 @@ app.put(
     }
   }
 );
+
+// // Helper function to generate garment_defect_id
+// const generateGarmentDefectId = () => {
+//   return Math.floor(1000000000 + Math.random() * 9000000000).toString();
+// };
+
+// old endpoint ---
+// app.put(
+//   "/api/qc2-inspection-pass-bundle/:bundle_random_id",
+//   async (req, res) => {
+//     try {
+//       const { bundle_random_id } = req.params;
+//       const { updateOperations, arrayFilters } = req.body || {};
+
+//       let updateData = req.body;
+//       if (updateOperations) {
+//         updateData = updateOperations;
+//       }
+
+//       const updateOperationsFinal = {};
+//       if (updateData.$set) {
+//         updateOperationsFinal.$set = updateData.$set;
+//       }
+//       if (updateData.$push) {
+//         updateOperationsFinal.$push = updateData.$push;
+//       }
+//       if (updateData.$inc) {
+//         updateOperationsFinal.$inc = updateData.$inc;
+//       }
+//       if (!updateData.$set && !updateData.$push && !updateData.$inc) {
+//         updateOperationsFinal.$set = updateData;
+//       }
+
+//       // Ensure totalRejectGarment_Var remains unchanged when updating printArray
+//       if (updateOperationsFinal.$set?.printArray) {
+//         updateOperationsFinal.$set.printArray =
+//           updateOperationsFinal.$set.printArray.map((printEntry) => ({
+//             ...printEntry,
+//             totalRejectGarment_Var:
+//               printEntry.totalRejectGarment_Var ||
+//               printEntry.totalRejectGarmentCount // Preserve or initialize
+//           }));
+//       }
+
+//       const options = {
+//         new: true,
+//         runValidators: true
+//       };
+//       if (arrayFilters) {
+//         options.arrayFilters = arrayFilters;
+//       }
+
+//       const updatedRecord = await QC2InspectionPassBundle.findOneAndUpdate(
+//         { bundle_random_id },
+//         updateOperationsFinal,
+//         options
+//       );
+
+//       if (!updatedRecord) {
+//         return res.status(404).json({ error: "Record not found" });
+//       }
+
+//       io.emit("qc2_data_updated");
+//       res.json({
+//         message: "Inspection pass bundle updated successfully",
+//         data: updatedRecord
+//       });
+//     } catch (error) {
+//       console.error("Error updating inspection pass bundle:", error);
+//       res.status(500).json({
+//         message: "Failed to update inspection pass bundle",
+//         error: error.message
+//       });
+//     }
+//   }
+// );
 
 // Filter Pane for Live Dashboard - EndPoints
 app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {
@@ -2367,12 +2590,35 @@ app.get(
   }
 );
 
-// Helper function to normalize date strings (remove leading zeros for consistency)
+// Helper function to normalize date strings with leading zeros
 const normalizeDateString = (dateStr) => {
   if (!dateStr) return null;
-  const [month, day, year] = dateStr.split("/");
-  return `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
+  try {
+    const [month, day, year] = dateStr.split("/").map((part) => part.trim());
+    if (!month || !day || !year || isNaN(month) || isNaN(day) || isNaN(year)) {
+      throw new Error("Invalid date format");
+    }
+    // Add leading zeros to month and day
+    const normalizedMonth = ("0" + parseInt(month, 10)).slice(-2);
+    const normalizedDay = ("0" + parseInt(day, 10)).slice(-2);
+    return `${normalizedMonth}/${normalizedDay}/${year}`;
+  } catch (error) {
+    console.error(`Invalid date string: ${dateStr}`, error);
+    return null;
+  }
 };
+
+// Helper function to escape special characters in regex
+const escapeRegExp = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // Escapes . * + ? ^ $ { } ( ) | [ ] \
+};
+
+// Helper function to normalize date strings (remove leading zeros for consistency)
+// const normalizeDateString = (dateStr) => {
+//   if (!dateStr) return null;
+//   const [month, day, year] = dateStr.split("/");
+//   return `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
+// };
 
 // GET endpoint to fetch all inspection records
 app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
@@ -2505,11 +2751,6 @@ app.put("/api/qc2-inspection-pass-bundle/:id", async (req, res) => {
   }
 });
 
-// Helper function to escape special characters in regex
-const escapeRegExp = (string) => {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // Escapes . * + ? ^ $ { } ( ) | [ ] \
-};
-
 // Endpoint to get summary data
 app.get("/api/qc2-inspection-summary", async (req, res) => {
   try {
@@ -2536,15 +2777,59 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     if (department) match.department = department;
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
-    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
+    if (lineNo) match.lineNo = lineNo.trim();
+    //if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
 
-    // Normalize dates and apply string comparison
+    // Normalize and convert dates to Date objects for proper comparison
     if (startDate || endDate) {
-      match.inspection_date = {};
-      if (startDate)
-        match.inspection_date.$gte = normalizeDateString(startDate);
-      if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
+      match.$expr = match.$expr || {}; // Initialize $expr if not present
+      match.$expr.$and = match.$expr.$and || [];
+
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
     }
+    // if (startDate || endDate) {
+    //   match.inspection_date = {};
+    //   if (startDate)
+    //     match.inspection_date.$gte = normalizeDateString(startDate);
+    //   if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
+    // }
 
     const data = await QC2InspectionPassBundle.aggregate([
       { $match: match },
@@ -2603,83 +2888,8 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
   }
 });
 
-// Endpoint to get defect rates by defect names
-app.get("/api/qc2-defect-rates", async (req, res) => {
-  try {
-    const {
-      moNo,
-      emp_id_inspection,
-      startDate,
-      endDate,
-      color,
-      size,
-      department,
-      buyer,
-      lineNo // Add Line No
-    } = req.query;
+// Endpoint to get summaries per MO No with dynamic grouping
 
-    let match = {};
-    if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
-    if (emp_id_inspection)
-      match.emp_id_inspection = {
-        $regex: new RegExp(emp_id_inspection.trim(), "i"),
-      };
-    if (color) match.color = color;
-    if (size) match.size = size;
-    if (department) match.department = department;
-    if (buyer)
-      match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
-    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
-
-    if (startDate || endDate) {
-      match.inspection_date = {};
-      if (startDate)
-        match.inspection_date.$gte = normalizeDateString(startDate);
-      if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
-    }
-
-    const data = await QC2InspectionPassBundle.aggregate([
-      { $match: match },
-      { $unwind: "$defectArray" },
-      {
-        $group: {
-          _id: "$defectArray.defectName",
-          totalCount: { $sum: "$defectArray.totalCount" },
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          defectName: "$_id",
-          totalCount: 1,
-        },
-      },
-    ]);
-
-    const totalCheckedQtyAgg = await QC2InspectionPassBundle.aggregate([
-      { $match: match },
-      {
-        $group: {
-          _id: null,
-          totalCheckedQty: { $sum: "$checkedQty" },
-        },
-      },
-    ]);
-    const totalChecked =
-      totalCheckedQtyAgg.length > 0 ? totalCheckedQtyAgg[0].totalCheckedQty : 1;
-    const defectRates = data.map((item) => ({
-      ...item,
-      defectRate: item.totalCount / totalChecked,
-    }));
-
-    res.json(defectRates);
-  } catch (error) {
-    console.error("Error fetching defect rates:", error);
-    res.status(500).json({ error: "Failed to fetch defect rates" });
-  }
-});
-
-// Endpoint to get summaries per MO No
 app.get("/api/qc2-mo-summaries", async (req, res) => {
   try {
     const {
@@ -2691,36 +2901,231 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
       size,
       department,
       buyer,
-      lineNo
+      lineNo,
+      groupByDate, // "true" to group by date
+      groupByLine, // "true" to group by lineNo
+      groupByMO, // "true" to group by moNo
+      groupByBuyer, // "true" to group by buyer
+      groupByColor, // "true" to group by color
+      groupBySize, // "true" to group by size
+      groupByWeek // New parameter for weekly grouping
     } = req.query;
 
     let match = {};
-    if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
-    if (emp_id_inspection)
+
+    if (moNo && moNo.trim()) {
+      match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    }
+    if (emp_id_inspection) {
       match.emp_id_inspection = {
         $regex: new RegExp(emp_id_inspection.trim(), "i"),
       };
+    }
     if (color) match.color = color;
     if (size) match.size = size;
     if (department) match.department = department;
-    if (buyer)
+    if (buyer) {
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
-    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add lineNo filter
+    }
+    if (lineNo) match.lineNo = lineNo.trim();
 
+    // Normalize and convert dates to Date objects for proper comparison
     if (startDate || endDate) {
-      match.inspection_date = {};
-      if (startDate)
-        match.inspection_date.$gte = normalizeDateString(startDate);
-      if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
+      match.$expr = match.$expr || {};
+      match.$expr.$and = match.$expr.$and || [];
+
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y",
+                onError: null // Handle invalid dates gracefully
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y",
+                onError: null // Handle invalid dates gracefully
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+    }
+
+    // Dynamically build the _id object for grouping based on query params
+    const groupBy = {};
+    const projectFields = {};
+
+    // Order matters: Week, Date, Line No, MO No, Buyer, Color, Size
+    if (groupByWeek === "true") {
+      groupBy.weekInfo = {
+        $let: {
+          vars: {
+            parsedDate: {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y",
+                onError: null // Return null if date parsing fails
+              }
+            },
+            monday: {
+              $cond: {
+                if: {
+                  $ne: [
+                    {
+                      $dateFromString: {
+                        dateString: "$inspection_date",
+                        format: "%m/%d/%Y",
+                        onError: null
+                      }
+                    },
+                    null
+                  ]
+                },
+                then: {
+                  $dateSubtract: {
+                    startDate: {
+                      $dateFromString: {
+                        dateString: "$inspection_date",
+                        format: "%m/%d/%Y",
+                        onError: null
+                      }
+                    },
+                    unit: "day",
+                    amount: {
+                      $subtract: [
+                        {
+                          $dayOfWeek: {
+                            $dateFromString: {
+                              dateString: "$inspection_date",
+                              format: "%m/%d/%Y",
+                              onError: null
+                            }
+                          }
+                        },
+                        1 // Adjust for Monday (1 = Sunday, 2 = Monday, etc.)
+                      ]
+                    }
+                  }
+                },
+                else: null // If date is invalid, set monday to null
+              }
+            }
+          },
+          in: {
+            weekNumber: {
+              $cond: {
+                if: { $ne: ["$$monday", null] },
+                then: { $week: "$$monday" },
+                else: -1 // Use -1 for invalid weeks
+              }
+            },
+            startDate: {
+              $cond: {
+                if: { $ne: ["$$monday", null] },
+                then: {
+                  $dateToString: {
+                    format: "%Y-%m-%d",
+                    date: "$$monday"
+                  }
+                },
+                else: "Invalid Date"
+              }
+            },
+            endDate: {
+              $cond: {
+                if: { $ne: ["$$monday", null] },
+                then: {
+                  $dateToString: {
+                    format: "%Y-%m-%d",
+                    date: {
+                      $dateAdd: {
+                        startDate: "$$monday",
+                        unit: "day",
+                        amount: 6
+                      }
+                    }
+                  }
+                },
+                else: "Invalid Date"
+              }
+            }
+          }
+        }
+      };
+      projectFields.weekInfo = "$_id.weekInfo";
+    } else if (groupByDate === "true") {
+      groupBy.inspection_date = {
+        $dateToString: {
+          format: "%Y-%m-%d",
+          date: {
+            $dateFromString: {
+              dateString: "$inspection_date",
+              format: "%m/%d/%Y",
+              onError: null // Handle invalid dates
+            }
+          }
+        }
+      };
+      projectFields.inspection_date = "$_id.inspection_date";
+    }
+    if (groupByLine === "true") {
+      groupBy.lineNo = "$lineNo";
+      projectFields.lineNo = "$_id.lineNo";
+    }
+    if (groupByMO === "true") {
+      groupBy.moNo = "$moNo";
+      projectFields.moNo = "$_id.moNo";
+    }
+    if (groupByBuyer === "true") {
+      groupBy.buyer = "$buyer";
+      projectFields.buyer = "$_id.buyer";
+    }
+    if (groupByColor === "true") {
+      groupBy.color = "$color";
+      projectFields.color = "$_id.color";
+    }
+    if (groupBySize === "true") {
+      groupBy.size = "$size";
+      projectFields.size = "$_id.size";
     }
 
     const data = await QC2InspectionPassBundle.aggregate([
-      { $match: match },
+      // Step 1: Filter out documents with invalid inspection_date
+      {
+        $match: {
+          inspection_date: { $exists: true, $ne: null, $ne: "" },
+          ...match
+        }
+      },
+      // Step 2: Group the data
       {
         $group: {
-          //_id: "$moNo",
-          _id: { moNo: "$moNo", lineNo: "$lineNo" }, // Group by both moNo and lineNo
-          lineNo: { $first: "$lineNo" }, // Include lineNo using $first
+          _id: groupBy,
           checkedQty: { $sum: "$checkedQty" },
           totalPass: { $sum: "$totalPass" },
           totalRejects: { $sum: "$totalRejects" },
@@ -2730,14 +3135,35 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
             $sum: { $cond: [{ $gt: ["$totalRepair", 0] }, 1, 0] },
           },
           defectArray: { $push: "$defectArray" },
-        },
+          firstInspectionDate: { $first: "$inspection_date" },
+          firstLineNo: { $first: "$lineNo" },
+          firstMoNo: { $first: "$moNo" },
+          firstBuyer: { $first: "$buyer" },
+          firstColor: { $first: "$color" },
+          firstSize: { $first: "$size" }
+        }
       },
+      // Step 3: Project the required fields
       {
         $project: {
-          // moNo: "$_id",
-          // lineNo: 1, // Include lineNo in the output
-          moNo: "$_id.moNo", // Include moNo in the output
-          lineNo: "$_id.lineNo", // Include lineNo in the output
+          ...projectFields,
+          inspection_date:
+            groupByDate !== "true"
+              ? "$firstInspectionDate"
+              : "$_id.inspection_date",
+          weekInfo:
+            groupByWeek !== "true"
+              ? null
+              : {
+                  weekNumber: "$_id.weekInfo.weekNumber",
+                  startDate: "$_id.weekInfo.startDate",
+                  endDate: "$_id.weekInfo.endDate"
+                },
+          lineNo: groupByLine !== "true" ? "$firstLineNo" : "$_id.lineNo",
+          moNo: groupByMO !== "true" ? "$firstMoNo" : "$_id.moNo",
+          buyer: groupByBuyer !== "true" ? "$firstBuyer" : "$_id.buyer",
+          color: groupByColor !== "true" ? "$firstColor" : "$_id.color",
+          size: groupBySize !== "true" ? "$firstSize" : "$_id.size",
           checkedQty: 1,
           totalPass: 1,
           totalRejects: 1,
@@ -2768,14 +3194,150 @@ app.get("/api/qc2-mo-summaries", async (req, res) => {
           _id: 0,
         },
       },
-      { $sort: { moNo: 1, lineNo: 1 } } // Sort by moNo and then lineNo
-      // { $sort: { moNo: 1 } }
+      // Step 4: Sort the results
+      {
+        $sort: {
+          ...(groupByWeek === "true" && { "weekInfo.startDate": 1 }),
+          ...(groupByDate === "true" && { inspection_date: 1 }),
+          lineNo: 1,
+          moNo: 1
+        }
+      }
     ]);
 
     res.json(data);
   } catch (error) {
     console.error("Error fetching MO summaries:", error);
     res.status(500).json({ error: "Failed to fetch MO summaries" });
+  }
+});
+
+app.get("/api/qc2-defect-rates", async (req, res) => {
+  try {
+    const {
+      moNo,
+      emp_id_inspection,
+      startDate,
+      endDate,
+      color,
+      size,
+      department,
+      buyer,
+      lineNo
+    } = req.query;
+
+    // Build the match stage with filters
+    let match = {};
+    if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    if (emp_id_inspection)
+      match.emp_id_inspection = {
+        $regex: new RegExp(emp_id_inspection.trim(), "i")
+      };
+    if (color) match.color = color;
+    if (size) match.size = size;
+    if (department) match.department = department;
+    if (buyer)
+      match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+    if (lineNo) match.lineNo = lineNo.trim();
+
+    // Date filtering using $expr for string dates
+    if (startDate || endDate) {
+      match.$expr = match.$expr || {};
+      match.$expr.$and = match.$expr.$and || [];
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+    }
+
+    // Aggregation pipeline
+    const pipeline = [
+      { $match: match },
+      {
+        $facet: {
+          totalChecked: [
+            {
+              $group: {
+                _id: null,
+                totalCheckedQty: { $sum: "$checkedQty" }
+              }
+            }
+          ],
+          defects: [
+            { $unwind: "$defectArray" },
+            {
+              $group: {
+                _id: "$defectArray.defectName",
+                totalCount: { $sum: "$defectArray.totalCount" }
+              }
+            }
+          ]
+        }
+      },
+      {
+        $project: {
+          totalCheckedQty: {
+            $arrayElemAt: ["$totalChecked.totalCheckedQty", 0]
+          },
+          defects: "$defects"
+        }
+      },
+      { $unwind: "$defects" },
+      {
+        $project: {
+          defectName: "$defects._id",
+          totalCount: "$defects.totalCount",
+          defectRate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              { $divide: ["$defects.totalCount", "$totalCheckedQty"] }
+            ]
+          }
+        }
+      },
+      { $sort: { defectRate: -1 } }
+    ];
+
+    const data = await QC2InspectionPassBundle.aggregate(pipeline);
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching defect rates:", error);
+    res.status(500).json({ error: "Failed to fetch defect rates" });
   }
 });
 
@@ -2805,11 +3367,49 @@ app.get("/api/qc2-defect-rates-by-hour", async (req, res) => {
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
 
+    // Update date filtering using $expr and $dateFromString
     if (startDate || endDate) {
-      match.inspection_date = {};
-      if (startDate)
-        match.inspection_date.$gte = normalizeDateString(startDate);
-      if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
+      match.$expr = match.$expr || {}; // Initialize $expr if not present
+      match.$expr.$and = match.$expr.$and || [];
+
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
     }
 
     match.inspection_time = { $regex: /^\d{2}:\d{2}:\d{2}$/ };
@@ -3101,13 +3701,52 @@ app.get("/api/qc2-defect-rates-by-line", async (req, res) => {
     if (department) match.department = department;
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
-    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") };
+    if (lineNo) match.lineNo = lineNo.trim();
+    //if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") };
 
+    // Normalize and convert dates to Date objects for proper comparison using $expr
     if (startDate || endDate) {
-      match.inspection_date = {};
-      if (startDate)
-        match.inspection_date.$gte = normalizeDateString(startDate);
-      if (endDate) match.inspection_date.$lte = normalizeDateString(endDate);
+      match.$expr = match.$expr || {}; // Initialize $expr if not present
+      match.$expr.$and = match.$expr.$and || [];
+
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
     }
 
     match.inspection_time = { $regex: /^\d{2}:\d{2}:\d{2}$/ };
@@ -3194,7 +3833,19 @@ app.get("/api/qc2-defect-rates-by-line", async (req, res) => {
               moNo: "$_id.moNo",
               hours: "$hours",
               totalCheckedQty: "$totalCheckedQty",
-              totalDefectQty: "$totalDefectQty"
+              totalDefectQty: "$totalDefectQty",
+              totalRate: {
+                $cond: [
+                  { $eq: ["$totalCheckedQty", 0] },
+                  0,
+                  {
+                    $multiply: [
+                      { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                      100
+                    ]
+                  }
+                ]
+              }
             }
           },
           totalCheckedQty: { $sum: "$totalCheckedQty" },
@@ -3245,40 +3896,24 @@ app.get("/api/qc2-defect-rates-by-line", async (req, res) => {
                         }
                       }
                     },
-                    totalRate: {
-                      $cond: [
-                        { $eq: ["$$mo.totalCheckedQty", 0] },
-                        0,
-                        {
-                          $multiply: [
-                            {
-                              $divide: [
-                                "$$mo.totalDefectQty",
-                                "$$mo.totalCheckedQty"
-                              ]
-                            },
-                            100
-                          ]
-                        }
-                      ]
-                    }
+                    totalRate: "$$mo.totalRate"
                   }
                 }
               }
             }
           },
-          // totalRate: {
-          //   $cond: [
-          //     { $eq: ["$totalCheckedQty", 0] },
-          //     0,
-          //     {
-          //       $multiply: [
-          //         { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
-          //         100
-          //       ]
-          //     }
-          //   ]
-          // },
+          totalRate: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                  100
+                ]
+              }
+            ]
+          },
           _id: 0
         }
       },
@@ -3434,6 +4069,31 @@ app.get("/api/qc2-defect-rates-by-line", async (req, res) => {
 });
 
 /* ------------------------------
+   Emp id for Inspector Data
+------------------------------ */
+
+// Endpoint to fetch a specific user by emp_id
+app.get("/api/users/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const user = await UserMain.findOne(
+      { emp_id },
+      "emp_id eng_name face_photo"
+    ).lean();
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.json(user);
+  } catch (error) {
+    console.error(
+      `Error fetching user with emp_id ${req.params.emp_id}:`,
+      error
+    );
+    res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+
+/* ------------------------------
    QC2 - Repair Tracking
 ------------------------------ */
 // 1. Fetch Defect Data by defect_print_id
@@ -3486,7 +4146,7 @@ app.get("/api/defect-track/:defect_print_id", async (req, res) => {
             name: defect.name,
             count: defect.count,
             repair: defect.repair,
-            status: repairItem ? repairItem.status : "Not Repaired",
+            status: repairItem ? repairItem.status : "Fail",
             repair_date: repairItem ? repairItem.repair_date : "",
             repair_time: repairItem ? repairItem.repair_time : "",
             pass_bundle: repairItem ? repairItem.pass_bundle : "Not Checked",
@@ -3534,7 +4194,7 @@ app.post("/api/repair-tracking", async (req, res) => {
           // Determine if pass_bundle needs to be updated
           let newPassBundle = item.pass_bundle;
           if (updatedItem.status !== item.status) {
-            newPassBundle = updatedItem.status === "Not Repaired" ? "Not Checked" : updatedItem.status === "OK" ? "Fail" : "OK";
+            newPassBundle = updatedItem.status === "Fail" ? "Not Checked" : updatedItem.status === "OK" ? "Fail" : "OK";
           }
           return {
             ...item,
@@ -3581,10 +4241,10 @@ app.post("/api/repair-tracking", async (req, res) => {
           defectCount: item.defectCount,
           repairGroup: item.repairGroup,
           garmentNumber: item.garmentNumber,
-          status: item.status || "Not Repaired",
+          status: item.status || "Fail",
           repair_date: item.repair_date || "",
           repair_time: item.repair_time || "",
-          pass_bundle: item.status === "Not Repaired" ? "Not Checked" : item.status === "OK" ? "Fail" : "OK",
+          pass_bundle: item.status === "Fail" ? "Not Checked" : item.status === "OK" ? "Fail" : "OK",
         }))
       });
       await newRecord.save();
@@ -3930,6 +4590,646 @@ app.get("/api/qc2-defect-print/:defect_id", async (req, res) => {
 });
 
 /* ------------------------------
+   QC2 OrderData Live Dashboard
+------------------------------ */
+
+app.get("/api/qc2-orderdata/filter-options", async (req, res) => {
+  try {
+    const filterOptions = await QC2OrderData.aggregate([
+      {
+        $group: {
+          _id: null,
+          moNo: { $addToSet: "$selectedMono" },
+          color: { $addToSet: "$color" },
+          size: { $addToSet: "$size" },
+          department: { $addToSet: "$department" },
+          empId: { $addToSet: "$emp_id" },
+          buyer: { $addToSet: "$buyer" },
+          lineNo: { $addToSet: "$lineNo" }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          moNo: 1,
+          color: 1,
+          size: 1,
+          department: 1,
+          empId: 1,
+          buyer: 1,
+          lineNo: 1
+        }
+      }
+    ]);
+
+    const result =
+      filterOptions.length > 0
+        ? filterOptions[0]
+        : {
+            moNo: [],
+            color: [],
+            size: [],
+            department: [],
+            empId: [],
+            buyer: [],
+            lineNo: []
+          };
+
+    Object.keys(result).forEach((key) => {
+      result[key] = result[key]
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b));
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching filter options:", error);
+    res.status(500).json({ error: "Failed to fetch filter options" });
+  }
+});
+
+app.get("/api/qc2-orderdata-summary", async (req, res) => {
+  try {
+    const {
+      moNo,
+      startDate,
+      endDate,
+      color,
+      size,
+      department,
+      empId,
+      buyer,
+      lineNo,
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    let match = {};
+    if (moNo) match.selectedMono = { $regex: new RegExp(moNo.trim(), "i") };
+    if (color) match.color = color;
+    if (size) match.size = size;
+    if (department) match.department = department;
+    if (empId) match.emp_id = { $regex: new RegExp(empId.trim(), "i") };
+    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") };
+    if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") };
+    if (startDate || endDate) {
+      match.updated_date_seperator = {};
+      if (startDate) match.updated_date_seperator.$gte = startDate;
+      if (endDate) match.updated_date_seperator.$lte = endDate;
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const pipeline = [
+      { $match: match },
+      {
+        $facet: {
+          summary: [
+            {
+              $group: {
+                _id: null,
+                totalRegisteredBundleQty: { $sum: "$totalBundleQty" },
+                totalGarmentsQty: { $sum: "$count" },
+                uniqueMONos: { $addToSet: "$selectedMono" },
+                uniqueColors: { $addToSet: "$color" }, // Add unique colors
+                uniqueSizes: { $addToSet: "$size" }, // Add unique sizes
+                uniqueOrderQty: {
+                  $addToSet: { moNo: "$selectedMono", orderQty: "$orderQty" }
+                }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                totalRegisteredBundleQty: 1,
+                totalGarmentsQty: 1,
+                totalMO: { $size: "$uniqueMONos" },
+                totalColors: { $size: "$uniqueColors" }, // Count unique colors
+                totalSizes: { $size: "$uniqueSizes" }, // Count unique sizes
+                totalOrderQty: {
+                  $sum: {
+                    $map: {
+                      input: "$uniqueOrderQty",
+                      in: "$$this.orderQty"
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          tableData: [
+            {
+              $group: {
+                _id: {
+                  lineNo: "$lineNo",
+                  moNo: "$selectedMono",
+                  custStyle: "$custStyle",
+                  country: "$country",
+                  buyer: "$buyer",
+                  color: "$color",
+                  size: "$size",
+                  empId: "$emp_id" // Add emp_id to group
+                },
+                totalRegisteredBundleQty: { $sum: "$totalBundleQty" },
+                totalGarments: { $sum: "$count" },
+                orderQty: { $first: "$orderQty" } // Use $first to get orderQty for each unique MO
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                lineNo: "$_id.lineNo",
+                moNo: "$_id.moNo",
+                custStyle: "$_id.custStyle",
+                country: "$_id.country",
+                buyer: "$_id.buyer",
+                color: "$_id.color",
+                size: "$_id.size",
+                empId: "$_id.empId", // Include empId in output
+                totalRegisteredBundleQty: 1,
+                totalGarments: 1,
+                orderQty: 1 // Include orderQty in output
+              }
+            },
+            { $sort: { lineNo: 1, moNo: 1 } },
+            { $skip: skip },
+            { $limit: limitNum }
+          ],
+          total: [{ $count: "count" }]
+        }
+      }
+    ];
+
+    const result = await QC2OrderData.aggregate(pipeline);
+    const summary = result[0].summary[0] || {
+      totalRegisteredBundleQty: 0,
+      totalGarmentsQty: 0,
+      totalMO: 0,
+      totalColors: 0, // Default for new fields
+      totalSizes: 0,
+      totalOrderQty: 0
+    };
+    const tableData = result[0].tableData || [];
+    const total = result[0].total.length > 0 ? result[0].total[0].count : 0;
+
+    res.json({ summary, tableData, total });
+  } catch (error) {
+    console.error("Error fetching order data summary:", error);
+    res.status(500).json({ error: "Failed to fetch order data summary" });
+  }
+});
+
+/* ------------------------------
+   QC2 Washing Live Dashboard
+------------------------------ */
+app.get("/api/washing-autocomplete", async (req, res) => {
+  try {
+    const { field, query } = req.query;
+
+    // Validate field
+    const validFields = [
+      "selectedMono",
+      "custStyle",
+      "buyer",
+      "color",
+      "size",
+      "emp_id_washing"
+    ];
+    if (!validFields.includes(field)) {
+      return res.status(400).json({ error: "Invalid field" });
+    }
+
+    // Build match stage for partial search (optional)
+    const match = {};
+    if (query) {
+      match[field] = { $regex: new RegExp(query.trim(), "i") };
+    }
+
+    const pipeline = [
+      { $match: match },
+      {
+        $group: {
+          _id: `$${field}`
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          value: "$_id"
+        }
+      },
+      { $sort: { value: 1 } },
+      ...(query ? [{ $limit: 10 }] : []) // Limit only when searching
+    ];
+
+    const results = await Washing.aggregate(pipeline);
+    const suggestions = results.map((item) => item.value).filter(Boolean);
+
+    res.json(suggestions);
+  } catch (error) {
+    console.error("Error fetching autocomplete suggestions:", error);
+    res.status(500).json({ error: "Failed to fetch suggestions" });
+  }
+});
+
+app.get("/api/washing-summary", async (req, res) => {
+  try {
+    const {
+      moNo,
+      custStyle, // Added for filtering
+      color,
+      size,
+      empId,
+      buyer,
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    let match = {};
+    if (moNo) match.selectedMono = { $regex: new RegExp(moNo.trim(), "i") };
+    if (custStyle)
+      match.custStyle = { $regex: new RegExp(custStyle.trim(), "i") };
+    if (color) match.color = { $regex: new RegExp(color.trim(), "i") };
+    if (size) match.size = { $regex: new RegExp(size.trim(), "i") };
+    if (empId) match.emp_id_washing = { $regex: new RegExp(empId.trim(), "i") };
+    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") };
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const pipeline = [
+      { $match: match },
+      {
+        $group: {
+          _id: {
+            moNo: "$selectedMono",
+            custStyle: "$custStyle",
+            buyer: "$buyer",
+            color: "$color",
+            size: "$size"
+          },
+          goodBundleQty: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_washing", 55] }, "$totalBundleQty", 0]
+            }
+          },
+          defectiveBundleQty: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_washing", 86] }, "$totalBundleQty", 0]
+            }
+          },
+          goodGarments: {
+            $sum: {
+              $cond: [
+                { $eq: ["$task_no_washing", 55] },
+                { $toInt: "$passQtyWash" },
+                0
+              ]
+            }
+          },
+          defectiveGarments: {
+            $sum: {
+              $cond: [
+                { $eq: ["$task_no_washing", 86] },
+                { $toInt: "$passQtyWash" },
+                0
+              ]
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          moNo: "$_id.moNo",
+          custStyle: "$_id.custStyle",
+          buyer: "$_id.buyer",
+          color: "$_id.color",
+          size: "$_id.size",
+          goodBundleQty: 1,
+          defectiveBundleQty: 1,
+          goodGarments: 1,
+          defectiveGarments: 1
+        }
+      },
+      { $sort: { moNo: 1 } },
+      {
+        $facet: {
+          tableData: [{ $skip: skip }, { $limit: limitNum }],
+          total: [{ $count: "count" }]
+        }
+      }
+    ];
+
+    const result = await Washing.aggregate(pipeline);
+    const tableData = result[0].tableData || [];
+    const total = result[0].total.length > 0 ? result[0].total[0].count : 0;
+
+    res.json({ tableData, total });
+  } catch (error) {
+    console.error("Error fetching washing summary:", error);
+    res.status(500).json({ error: "Failed to fetch washing summary" });
+  }
+});
+
+/* ------------------------------
+   Ironing Live Dashboard Endpoints
+------------------------------ */
+
+// Summary endpoint for IroningLive table
+app.get("/api/ironing-summary", async (req, res) => {
+  try {
+    const {
+      moNo,
+      custStyle,
+      color,
+      size,
+      empId,
+      buyer,
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    let match = {};
+    if (moNo) match.selectedMono = { $regex: new RegExp(moNo.trim(), "i") };
+    if (custStyle)
+      match.custStyle = { $regex: new RegExp(custStyle.trim(), "i") };
+    if (color) match.color = { $regex: new RegExp(color.trim(), "i") };
+    if (size) match.size = { $regex: new RegExp(size.trim(), "i") };
+    if (empId) match.emp_id_ironing = { $regex: new RegExp(empId.trim(), "i") };
+    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") };
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const pipeline = [
+      { $match: match },
+      {
+        $group: {
+          _id: {
+            moNo: "$selectedMono",
+            custStyle: "$custStyle",
+            buyer: "$buyer",
+            color: "$color",
+            size: "$size"
+          },
+          goodBundleQty: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_ironing", 53] }, "$totalBundleQty", 0]
+            }
+          },
+          defectiveBundleQty: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_ironing", 84] }, "$totalBundleQty", 0]
+            }
+          },
+          goodGarments: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_ironing", 53] }, "$passQtyIron", 0]
+            }
+          },
+          defectiveGarments: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_ironing", 84] }, "$passQtyIron", 0]
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          moNo: "$_id.moNo",
+          custStyle: "$_id.custStyle",
+          buyer: "$_id.buyer",
+          color: "$_id.color",
+          size: "$_id.size",
+          goodBundleQty: 1,
+          defectiveBundleQty: 1,
+          goodGarments: 1,
+          defectiveGarments: 1
+        }
+      },
+      { $sort: { moNo: 1 } },
+      {
+        $facet: {
+          tableData: [{ $skip: skip }, { $limit: limitNum }],
+          total: [{ $count: "count" }]
+        }
+      }
+    ];
+
+    const result = await Ironing.aggregate(pipeline);
+    const tableData = result[0].tableData || [];
+    const total = result[0].total.length > 0 ? result[0].total[0].count : 0;
+
+    res.json({ tableData, total });
+  } catch (error) {
+    console.error("Error fetching ironing summary:", error);
+    res.status(500).json({ error: "Failed to fetch ironing summary" });
+  }
+});
+
+// Autocomplete endpoint for IroningLive filters
+app.get("/api/ironing-autocomplete", async (req, res) => {
+  try {
+    const { field, query } = req.query;
+
+    const validFields = [
+      "selectedMono",
+      "custStyle",
+      "buyer",
+      "color",
+      "size",
+      "emp_id_ironing"
+    ];
+    if (!validFields.includes(field)) {
+      return res.status(400).json({ error: "Invalid field" });
+    }
+
+    const match = {};
+    if (query) {
+      match[field] = { $regex: new RegExp(query.trim(), "i") };
+    }
+
+    const pipeline = [
+      { $match: match },
+      {
+        $group: {
+          _id: `$${field}`
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          value: "$_id"
+        }
+      },
+      { $sort: { value: 1 } },
+      ...(query ? [{ $limit: 10 }] : [])
+    ];
+
+    const results = await Ironing.aggregate(pipeline);
+    const suggestions = results.map((item) => item.value).filter(Boolean);
+
+    res.json(suggestions);
+  } catch (error) {
+    console.error("Error fetching ironing autocomplete suggestions:", error);
+    res.status(500).json({ error: "Failed to fetch suggestions" });
+  }
+});
+
+/* ------------------------------
+   OPA Live Dashboard Endpoints
+------------------------------ */
+
+// Summary endpoint for OPALive table
+app.get("/api/opa-summary", async (req, res) => {
+  try {
+    const {
+      moNo,
+      custStyle,
+      color,
+      size,
+      empId,
+      buyer,
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    let match = {};
+    if (moNo) match.selectedMono = { $regex: new RegExp(moNo.trim(), "i") };
+    if (custStyle)
+      match.custStyle = { $regex: new RegExp(custStyle.trim(), "i") };
+    if (color) match.color = { $regex: new RegExp(color.trim(), "i") };
+    if (size) match.size = { $regex: new RegExp(size.trim(), "i") };
+    if (empId) match.emp_id_opa = { $regex: new RegExp(empId.trim(), "i") };
+    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") };
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const pipeline = [
+      { $match: match },
+      {
+        $group: {
+          _id: {
+            moNo: "$selectedMono",
+            custStyle: "$custStyle",
+            buyer: "$buyer",
+            color: "$color",
+            size: "$size"
+          },
+          goodBundleQty: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_opa", 60] }, "$totalBundleQty", 0]
+            }
+          },
+          defectiveBundleQty: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_opa", 85] }, "$totalBundleQty", 0]
+            }
+          },
+          goodGarments: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_opa", 60] }, "$passQtyOPA", 0]
+            }
+          },
+          defectiveGarments: {
+            $sum: {
+              $cond: [{ $eq: ["$task_no_opa", 85] }, "$passQtyOPA", 0]
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          moNo: "$_id.moNo",
+          custStyle: "$_id.custStyle",
+          buyer: "$_id.buyer",
+          color: "$_id.color",
+          size: "$_id.size",
+          goodBundleQty: 1,
+          defectiveBundleQty: 1,
+          goodGarments: 1,
+          defectiveGarments: 1
+        }
+      },
+      { $sort: { moNo: 1 } },
+      {
+        $facet: {
+          tableData: [{ $skip: skip }, { $limit: limitNum }],
+          total: [{ $count: "count" }]
+        }
+      }
+    ];
+
+    const result = await OPA.aggregate(pipeline);
+    const tableData = result[0].tableData || [];
+    const total = result[0].total.length > 0 ? result[0].total[0].count : 0;
+
+    res.json({ tableData, total });
+  } catch (error) {
+    console.error("Error fetching OPA summary:", error);
+    res.status(500).json({ error: "Failed to fetch OPA summary" });
+  }
+});
+
+// Autocomplete endpoint for OPALive filters
+app.get("/api/opa-autocomplete", async (req, res) => {
+  try {
+    const { field, query } = req.query;
+
+    const validFields = [
+      "selectedMono",
+      "custStyle",
+      "buyer",
+      "color",
+      "size",
+      "emp_id_opa"
+    ];
+    if (!validFields.includes(field)) {
+      return res.status(400).json({ error: "Invalid field" });
+    }
+
+    const match = {};
+    if (query) {
+      match[field] = { $regex: new RegExp(query.trim(), "i") };
+    }
+
+    const pipeline = [
+      { $match: match },
+      {
+        $group: {
+          _id: `$${field}`
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          value: "$_id"
+        }
+      },
+      { $sort: { value: 1 } },
+      ...(query ? [{ $limit: 10 }] : [])
+    ];
+
+    const results = await OPA.aggregate(pipeline);
+    const suggestions = results.map((item) => item.value).filter(Boolean);
+
+    res.json(suggestions);
+  } catch (error) {
+    console.error("Error fetching OPA autocomplete suggestions:", error);
+    res.status(500).json({ error: "Failed to fetch suggestions" });
+  }
+});
+
+/* ------------------------------
    QC Inline Roving ENDPOINTS
 ------------------------------ */
 app.post("/api/save-qc-inline-roving", async (req, res) => {
@@ -3956,14 +5256,27 @@ app.post("/api/save-qc-inline-roving", async (req, res) => {
 });
 
 // Endpoint to fetch QC Inline Roving reports
-app.get('/api/qc-inline-roving-reports', async (req, res) => {
+app.get("/api/qc-inline-roving-reports", async (req, res) => {
   try {
     const reports = await QCInlineRoving.find();
     res.json(reports);
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching reports', error });
+    res.status(500).json({ message: "Error fetching reports", error });
   }
 });
+
+/* ------------------------------
+   User Auth ENDPOINTS
+------------------------------ */
+
+// const authenticateUser = (req, res, next) => {
+//   try {
+//     const reports = await QCInlineRoving.find();
+//     res.json(reports);
+//   } catch (error) {
+//     res.status(500).json({ message: 'Error fetching reports', error });
+//   }
+// });
 
 /* ------------------------------
    User Management old ENDPOINTS
