@@ -58,12 +58,31 @@ const SunriseSummaryTable = ({
   if (groupOptions.color) groupByColumns.push("ColorName");
   if (groupOptions.size) groupByColumns.push("SizeName");
 
+  // Calculate the total CheckedQty from all rows in filteredData
+  const totalCheckedQtyAllRows = filteredData.reduce(
+    (sum, row) => sum + row.CheckedQty,
+    0
+  );
+
   // Aggregate data based on selected group columns
   const aggregatedData = () => {
     const groupedData = {};
 
     filteredData.forEach((row) => {
+      // Filter DefectDetails based on the selected reworkName
+      const filteredDefectDetails = filters.reworkName
+        ? row.DefectDetails.filter(
+            (defect) => defect.ReworkName === filters.reworkName
+          )
+        : row.DefectDetails;
+
+      // Skip this row entirely if no matching defects remain after filtering
+      if (filters.reworkName && filteredDefectDetails.length === 0) {
+        return;
+      }
+
       const key = groupByColumns.map((col) => row[col] || "-").join("|");
+
       if (!groupedData[key]) {
         groupedData[key] = {
           InspectionDate: row.InspectionDate,
@@ -84,10 +103,16 @@ const SunriseSummaryTable = ({
       group.TotalQtyT38 += row.TotalQtyT38;
       group.TotalQtyT39 += row.TotalQtyT39;
       group.CheckedQty += row.CheckedQty;
-      group.DefectsQty += row.DefectsQty;
 
-      // Aggregate DefectDetails by ReworkName
-      row.DefectDetails.forEach((defect) => {
+      // Use the filtered DefectDetails for aggregation
+      const defectsQty = filteredDefectDetails.reduce(
+        (sum, defect) => sum + defect.DefectsQty,
+        0
+      );
+      group.DefectsQty += defectsQty;
+
+      // Aggregate filtered DefectDetails by ReworkName
+      filteredDefectDetails.forEach((defect) => {
         if (group.DefectDetailsMap.has(defect.ReworkName)) {
           const existing = group.DefectDetailsMap.get(defect.ReworkName);
           existing.DefectsQty += defect.DefectsQty;
@@ -147,14 +172,29 @@ const SunriseSummaryTable = ({
     CheckedQty: aggregatedRows.reduce((sum, row) => sum + row.CheckedQty, 0),
     DefectsQty: aggregatedRows.reduce((sum, row) => sum + row.DefectsQty, 0),
     DefectRate:
-      aggregatedRows.reduce((sum, row) => sum + row.CheckedQty, 0) === 0
+      totalCheckedQtyAllRows === 0
         ? 0
         : (
             (aggregatedRows.reduce((sum, row) => sum + row.DefectsQty, 0) /
-              aggregatedRows.reduce((sum, row) => sum + row.CheckedQty, 0)) *
+              totalCheckedQtyAllRows) *
             100
           ).toFixed(2)
   };
+
+  // const aggregatedTotals = {
+  //   TotalQtyT38: aggregatedRows.reduce((sum, row) => sum + row.TotalQtyT38, 0),
+  //   TotalQtyT39: aggregatedRows.reduce((sum, row) => sum + row.TotalQtyT39, 0),
+  //   CheckedQty: aggregatedRows.reduce((sum, row) => sum + row.CheckedQty, 0),
+  //   DefectsQty: aggregatedRows.reduce((sum, row) => sum + row.DefectsQty, 0),
+  //   DefectRate:
+  //     aggregatedRows.reduce((sum, row) => sum + row.CheckedQty, 0) === 0
+  //       ? 0
+  //       : (
+  //           (aggregatedRows.reduce((sum, row) => sum + row.DefectsQty, 0) /
+  //             aggregatedRows.reduce((sum, row) => sum + row.CheckedQty, 0)) *
+  //           100
+  //         ).toFixed(2)
+  // };
 
   return (
     <div className="mb-6">

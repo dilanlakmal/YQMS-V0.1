@@ -8,6 +8,7 @@ import SunriseLineBarChart from "../components/inspection/sunrise/SunriseLineBar
 import SunriseTopN from "../components/inspection/sunrise/SunriseTopN";
 import SunriseFilterPane from "../components/inspection/sunrise/SunriseFilterPane";
 import SunriseSummaryCard from "../components/inspection/sunrise/SunriseSummaryCard"; // New import
+import SunriseDailyDefectTrend from "../components/inspection/sunrise/SunriseDailyDefectTrend"; // New import
 import FindBuyer from "../components/inspection/sunrise/FindBuyer";
 
 const SunriseAnalyze = ({ rs18Data, outputData }) => {
@@ -22,7 +23,8 @@ const SunriseAnalyze = ({ rs18Data, outputData }) => {
     moNo: "",
     colorName: "",
     sizeName: "",
-    buyer: ""
+    buyer: "",
+    reworkName: "" // Added new filter for ReworkName
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [topN, setTopN] = useState(5);
@@ -143,6 +145,13 @@ const SunriseAnalyze = ({ rs18Data, outputData }) => {
       const startDate = filters.startDate ? parseDate(filters.startDate) : null;
       const endDate = filters.endDate ? parseDate(filters.endDate) : null;
 
+      // Check if the row has any DefectDetails matching the selected reworkName
+      const matchesReworkName =
+        !filters.reworkName ||
+        row.DefectDetails.some(
+          (defect) => defect.ReworkName === filters.reworkName
+        );
+
       return (
         (!startDate || rowDate >= startDate) &&
         (!endDate || rowDate <= endDate) &&
@@ -150,7 +159,8 @@ const SunriseAnalyze = ({ rs18Data, outputData }) => {
         (!filters.moNo || row.MONo === filters.moNo) &&
         (!filters.colorName || row.ColorName === filters.colorName) &&
         (!filters.sizeName || row.SizeName === filters.sizeName) &&
-        (!filters.buyer || row.Buyer === filters.buyer)
+        (!filters.buyer || row.Buyer === filters.buyer) &&
+        matchesReworkName // Added filter for ReworkName
       );
     });
   };
@@ -204,7 +214,8 @@ const SunriseAnalyze = ({ rs18Data, outputData }) => {
       moNo: "",
       colorName: "",
       sizeName: "",
-      buyer: ""
+      buyer: "",
+      reworkName: "" // Added to clear the new filter
     });
     setCurrentPage(1);
   };
@@ -268,6 +279,27 @@ const SunriseAnalyze = ({ rs18Data, outputData }) => {
                 uniqueMoNos={getUniqueValuesInDateRange("MONo")}
                 uniqueColorNames={getUniqueValuesInDateRange("ColorName")}
                 uniqueSizeNames={getUniqueValuesInDateRange("SizeName")}
+                uniqueReworkNames={(() => {
+                  if (!rs18Data) return [];
+                  const startDate = filters.startDate
+                    ? parseDate(filters.startDate)
+                    : null;
+                  const endDate = filters.endDate
+                    ? parseDate(filters.endDate)
+                    : null;
+
+                  const filtered = rs18Data.filter((row) => {
+                    const rowDate = parseDate(row.InspectionDate);
+                    return (
+                      (!startDate || rowDate >= startDate) &&
+                      (!endDate || rowDate <= endDate)
+                    );
+                  });
+
+                  return [
+                    ...new Set(filtered.map((row) => row.ReworkName))
+                  ].sort();
+                })()} // Added unique ReworkNames
                 formatToInputDate={formatToInputDate}
               />
 
@@ -277,16 +309,22 @@ const SunriseAnalyze = ({ rs18Data, outputData }) => {
                     title="Checked Qty"
                     value={totals.CheckedQty}
                     iconType="chart"
+                    filteredData={filteredData} // Added
+                    filters={filters} // Added
                   />
                   <SunriseSummaryCard
                     title="Defects Qty"
                     value={totals.DefectsQty}
                     iconType="list"
+                    filteredData={filteredData} // Added
+                    filters={filters} // Added
                   />
                   <SunriseSummaryCard
                     title="Defect Rate"
                     value={totals.DefectRate}
                     getDefectRateStyles={getDefectRateStyles}
+                    filteredData={filteredData} // Added
+                    filters={filters} // Added
                   />
                 </div>
               )}
@@ -304,13 +342,25 @@ const SunriseAnalyze = ({ rs18Data, outputData }) => {
                     filters={filters}
                   />
                   <div className="grid grid-cols-2 gap-6">
-                    <SunriseLineBarChart filteredData={filteredData} />
+                    <SunriseLineBarChart
+                      filteredData={filteredData}
+                      filters={filters}
+                    />
                     <SunriseTopN
                       filteredData={filteredData}
                       topN={topN}
                       setTopN={setTopN}
                     />
                   </div>
+                </>
+              )}
+
+              {selectedMenu === "Daily Trend" && (
+                <>
+                  <SunriseDailyDefectTrend
+                    filteredData={filteredData}
+                    filters={filters}
+                  />
                 </>
               )}
 
