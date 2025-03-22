@@ -688,8 +688,8 @@ const QC2InspectionPage = () => {
       setTotalRejects((prev) => prev + 1);
       setTempDefects({});
       setSelectedGarment(null);
-      console.log("reReturnGarment created:", reReturnGarment);
-      console.log("Updated sessionRejectedGarments:", newSessionData.sessionRejectedGarments);
+      // console.log("reReturnGarment created:", reReturnGarment);
+      // console.log("Updated sessionRejectedGarments:", newSessionData.sessionRejectedGarments);
       // Add re-return garment to qc2_inspection_pass_bundle
       const updatePayload = {
         $push: {
@@ -698,7 +698,7 @@ const QC2InspectionPage = () => {
       };
       const arrayFilters = [{ "elem.defect_print_id": sessionData.printEntry.defect_print_id }];
       try {
-        console.log("Updating qc2_inspection_pass_bundle with payload:", updatePayload, "and filters:", arrayFilters);
+        // console.log("Updating qc2_inspection_pass_bundle with payload:", updatePayload, "and filters:", arrayFilters);
         const response = await fetch(
           `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
           {
@@ -714,7 +714,7 @@ const QC2InspectionPage = () => {
           const errorText = await response.text();
           throw new Error(`Failed to update re-return garment record: ${errorText}`);
         }
-        console.log("qc2_inspection_pass_bundle updated successfully");
+        // console.log("qc2_inspection_pass_bundle updated successfully");
         setLockedGarments((prev) => new Set(prev).add(actualGarmentNumber));
         reReturnGarment.defects.forEach(defect => {
           setLockedDefects(prev => new Set(prev).add(`${actualGarmentNumber}-${defect.name}`));
@@ -725,7 +725,7 @@ const QC2InspectionPage = () => {
         console.error("Error updating qc2_inspection_pass_bundle:", err.message);
         return;
       }
-      console.log("Calling handleReReturnGarment with:", { actualGarmentNumber, garmentDefects });
+      // console.log("Calling handleReReturnGarment with:", { actualGarmentNumber, garmentDefects });
       // Update repair tracking for re-return garment
       await handleReReturnGarment(actualGarmentNumber, garmentDefects);
 
@@ -740,7 +740,7 @@ const QC2InspectionPage = () => {
         );
       }
     } else {
-      console.log("Handling non-return inspection rejection");
+      // console.log("Handling non-return inspection rejection");
       const newConfirmed = { ...confirmedDefects };
       const currentTempDefects = { ...tempDefects };
       Object.keys(currentTempDefects).forEach((key) => {
@@ -885,7 +885,7 @@ const QC2InspectionPage = () => {
           const errorText = await response.text();
           throw new Error(`Failed to update pass_bundle status for defect ${defect.name}: ${errorText}`);
         }
-        console.log(`pass_bundle status updated successfully for defect ${defect.name}`);
+        // console.log(`pass_bundle status updated successfully for defect ${defect.name}`);
       });
 
       // Wait for all updates to complete
@@ -905,7 +905,7 @@ const QC2InspectionPage = () => {
         pass_bundle: "Fail",
       }));
 
-      console.log("handleReReturnGarment started", { garmentNumber, failedDefects });
+      // console.log("handleReReturnGarment started", { garmentNumber, failedDefects });
 
       const payload = {
         defect_print_id: sessionData.printEntry.defect_print_id,
@@ -914,7 +914,7 @@ const QC2InspectionPage = () => {
         isRejecting: true,
       };
 
-      console.log("Sending payload to qc2_repair_tracking:", payload);
+      // console.log("Sending payload to qc2_repair_tracking:", payload);
 
       const repairUpdateResponse = await fetch(
         `${API_BASE_URL}/api/qc2-repair-tracking/update-defect-status`,
@@ -930,7 +930,7 @@ const QC2InspectionPage = () => {
         throw new Error(`Failed to update repair tracking: ${errorText}`);
       }
 
-      console.log("qc2_repair_tracking updated successfully for garment", garmentNumber);
+      // console.log("qc2_repair_tracking updated successfully for garment", garmentNumber);
     } catch (err) {
       setError(`Failed to update repair tracking: ${err.message}`);
       console.error("Error in handleReReturnGarment:", err.message);
