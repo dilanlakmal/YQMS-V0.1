@@ -346,8 +346,6 @@ const QC2InspectionPage = () => {
         );
       }
 
-  
-
       const maxInspectionNo =
         (printEntry.repairGarmentsDefects?.length > 0
           ? Math.max(
@@ -376,6 +374,50 @@ const QC2InspectionPage = () => {
       setScanning(false);
       setError(null);
 
+      // Fetch repair tracking details (defect card details)
+      const trackingResponse = await fetch(
+        `${API_BASE_URL}/api/defect-track/${defect_print_id}`
+      );
+      if (trackingResponse.ok) {
+        const trackingData = await trackingResponse.json();
+        setDefectTrackingDetails(trackingData); // Set defect card details for display
+        setIsReturnInspection(true); // Mark this as a return inspection
+
+        // Initialize repair statuses for each defect
+        const initialStatuses = {};
+        const initialLockedDefects = new Set(); // Initialize a set for locked defects
+        const initialLockedGarments = new Set(); // Initialize a set for locked garments
+        const initialRejectedGarmentDefects = new Set(); // Initialize a set for rejected garment defects
+
+        trackingData.garments.forEach((garment) => {
+          garment.defects.forEach((defect) => {
+            initialStatuses[`${garment.garmentNumber}-${defect.name}`] =
+              defect.status || "Fail";
+            // Lock defects that are already "Fail"
+            if (defect.status === "Fail") {
+              initialLockedDefects.add(
+                `${garment.garmentNumber}-${defect.name}`
+              );
+            }
+          });
+          // Check if any defect in the garment is "Fail"
+          const hasFailDefect = garment.defects.some(
+            (defect) => defect.status === "Fail"
+          );
+          if (hasFailDefect) {
+            initialLockedGarments.add(garment.garmentNumber);
+            initialRejectedGarmentDefects.add(garment.garmentNumber);
+          }
+        });
+
+        setRepairStatuses(initialStatuses); // Track repair status changes
+        setLockedDefects(initialLockedDefects); // Set the initial locked defects
+        setLockedGarments(initialLockedGarments); // Set the initial locked garments
+        setRejectedGarmentDefects(initialRejectedGarmentDefects); // Set the initial rejected garment defects
+      } else {
+        console.error("Failed to fetch defect tracking details");
+      }
+
     } catch (err) {
       setError(err.message);
       setInDefectWindow(false);
@@ -388,7 +430,15 @@ const QC2InspectionPage = () => {
     if (rejectedGarmentDefects.has(garmentNumber)) {
       return; // Prevent any changes if the garment is rejected
     }
-
+    // Check if the defect is locked
+    if (lockedDefects.has(`${garmentNumber}-${defectName}`)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Defect Locked',
+        text: 'This defect is locked and cannot be changed.',
+      });
+      return; // Prevent any changes if the defect is locked
+    }
 
     //Check if a garment is already selected
     if (selectedGarment && selectedGarment !== garmentNumber) {
@@ -422,10 +472,16 @@ const QC2InspectionPage = () => {
               let newPassBundleStatus = defect.pass_bundle;
               if (newStatus === "Fail") {
                 newPassBundleStatus = "Fail";
+                setLockedDefects((prevLocked) => new Set(prevLocked).add(`${garmentNumber}-${defectName}`));
               } else if (newStatus === "OK") {
                 // Only change to "Pending" if it was previously "Fail"
                 if (defect.status === "Fail") {
-                  newPassBundleStatus = "Pending";
+                  newPassBundleStatus = "Not Checked" || "Fail";
+                  setLockedDefects((prevLocked) => {
+                    const newLocked = new Set(prevLocked);
+                    newLocked.delete(`${garmentNumber}-${defectName}`);
+                    return newLocked;
+                  });
                 }
               }
   

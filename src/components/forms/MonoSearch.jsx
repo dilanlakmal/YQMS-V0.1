@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-// Import the API_BASE_URL from our config file
-import { API_BASE_URL } from "../../../config"; 
+import { API_BASE_URL } from "../../../config";
 
 function MonoSearch({
   value,
@@ -17,11 +16,12 @@ function MonoSearch({
 
   useEffect(() => {
     const handler = setTimeout(async () => {
-      if (searchTerm.length >= 3) {
+      if (searchTerm.length > 0) {
+        // Changed from >= 3 to > 0
         setIsLoading(true);
         try {
           const response = await fetch(
-            `${API_BASE_URL}/api/search-mono?digits=${searchTerm}`
+            `${API_BASE_URL}/api/search-mono?term=${searchTerm}` // Changed 'digits' to 'term' for clarity
           );
           const data = await response.json();
           setSuggestions(data);
@@ -36,7 +36,7 @@ function MonoSearch({
         setSuggestions([]);
         setIsDropdownOpen(false);
       }
-    }, 300);
+    }, 300); // Debounce delay of 300ms
 
     return () => clearTimeout(handler);
   }, [searchTerm]);
