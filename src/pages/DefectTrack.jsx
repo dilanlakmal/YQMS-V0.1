@@ -67,7 +67,7 @@ const DefectTrack = () => {
 
   const updateDefectStatusInRepairTracking = async (defect_print_id, garmentNumber, defectName, status) => {
     try {
-      console.log("Updating defect status with:", { defect_print_id, garmentNumber, defectName, status }); // Log the values
+      // console.log("Updating defect status with:", { defect_print_id, garmentNumber, defectName, status }); // Log the values
       const payload = {
         defect_print_id,
         garmentNumber,
@@ -332,7 +332,7 @@ const DefectTrack = () => {
                       .filter(
                         (defect) =>
                           defect.status !== "OK" ||
-                          isDefectTemporarilyOk(
+                          isDefectTemporarilyOk( 
                             garment.garmentNumber,
                             defect.name
                           )
