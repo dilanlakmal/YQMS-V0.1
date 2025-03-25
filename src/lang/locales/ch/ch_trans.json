@@ -304,10 +304,20 @@
 
   "defectPrint": {
     "search_package": "搜索包裹编号",
-    "repair_group": "维修组",
-    "select_repair": "选择修复组",
+    "repair_group": "搜索维修组",
+    "search_repair": "搜索维修组",
     "no_defect_card": "未发现缺陷卡",
-    "defect_count": "缺陷数量"
+    "defect_count": "缺陷数量",
+    "mode": "模式",
+    "status": "地位",
+    "in_progress": "进行中",
+    "completed": "完全的",
+    "both": "两个都",
+    "checked": "已检查 #",
+    "defectsN": "缺点 #",
+    "rejectN": "拒绝 #",
+    "reworking": "重做 #",
+    "print_details": "打印详细信息"
   },
 
   "imageUpload": {
@@ -381,5 +391,54 @@
   "styleDig": {
     "style_digit": "风格数字",
     "enter_style_digit": "输入款式数字"
+  },
+  "rePrint": {
+    "reprint_records": "重印记录",
+    "clear": "清除",
+    "search_mono": "搜索 MONo...",
+    "search_package_no": "搜索包裹编号...",
+    "search_emp_id": "搜索员工 ID..."
+  },
+  "qc2In": {
+    "language": "语言",
+    "all_languages": "所有语言",
+    "sort": "种类",
+    "printer": "连接打印机",
+    "printing_method": "印刷方法",
+    "repair": "通过修复",
+    "garment": "通过服装",
+    "bundle": "按捆绑",
+    "inspection": "检查",
+    "edit_inspection": "编辑检查",
+    "defect_card": "缺陷卡",
+    "fabric": "织物",
+    "workmanship": "做工",
+    "cleanliness": "清洁",
+    "embellishment": "点缀",
+    "measurement": "测量",
+    "washing": "洗涤",
+    "finishing": "精加工",
+    "miscellaneous": "各种各样的",
+    "loading_data": "正在加载数据...",
+    "reject_garment": "拒绝服装",
+    "defect_qty": "缺陷数量",
+    "pass_bundle": "通行证套餐",
+    "all": "全部",
+    "common": "常见的",
+    "type1": "类型 1",
+    "type2": "类型 2"
+  },
+
+  "editGar": {
+    "edit_garment": "编辑服装",
+    "select_garment": "精选服装",
+    "select_defect": "选择缺陷",
+    "add_defect": "添加缺陷"
+  },
+
+  "defName": {
+    "defect_code": "缺陷代码",
+    "chinese_name": "中文名",
+    "printing_name": "打印姓名"
   }
 }

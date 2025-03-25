@@ -11,7 +11,9 @@ import {
   Printer,
   QrCode,
   Tag,
-  XCircle
+  XCircle,
+  Languages,
+  Paperclip
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "../../config";
@@ -26,9 +28,28 @@ import DefectPrint from "../components/inspection/DefectPrint";
 import EditInspection from "../components/inspection/EditInspection";
 import QC2Data from "../components/inspection/QC2Data";
 import { allDefects, defectsList } from "../constants/defects";
-import DefectTrack from "./DefectTrack"; // Import DefectTrack
+import { useTranslation } from "react-i18next";
+import i18next from "i18next";
+import Swal from "sweetalert2";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  TableContainer,
+  Paper,
+  Button
+} from "@mui/material";
+//import DefectTrack from "./DefectTrack"; // Import DefectTrack
 
 const QC2InspectionPage = () => {
+  const { t } = useTranslation();
+  const currentLanguage = i18next.language;
   const { user, loading } = useAuth();
   const { bluetoothState } = useBluetooth();
   const [error, setError] = useState(null);
@@ -65,6 +86,19 @@ const QC2InspectionPage = () => {
   const [passBundleCountdown, setPassBundleCountdown] = useState(null);
   const [isReturnInspection, setIsReturnInspection] = useState(false);
   const [sessionData, setSessionData] = useState(null);
+
+  const [defectTrackingDetails, setDefectTrackingDetails] = useState(null); // New state for defect tracking details
+  const [repairStatuses, setRepairStatuses] = useState({});
+  const [showDefectBoxes, setShowDefectBoxes] = useState(!isReturnInspection); // New state for toggling defect boxes visibility
+  const [lockedGarments, setLockedGarments] = useState(new Set());
+  const [rejectedGarmentNumbers, setRejectedGarmentNumbers] = useState(
+    new Set()
+  );
+  const [lockedDefects, setLockedDefects] = useState(new Set());
+  const [rejectedGarmentDefects, setRejectedGarmentDefects] = useState(
+    new Set()
+  ); // New state to track rejected garment defects
+  const [selectedGarment, setSelectedGarment] = useState(null);
 
   const [isPassingBundle, setIsPassingBundle] = useState(false); // New state for Pass Bundle
 
@@ -370,6 +404,49 @@ const QC2InspectionPage = () => {
       setInDefectWindow(true);
       setScanning(false);
       setError(null);
+      // Fetch repair tracking details (defect card details)
+      const trackingResponse = await fetch(
+        `${API_BASE_URL}/api/defect-track/${defect_print_id}`
+      );
+      if (trackingResponse.ok) {
+        const trackingData = await trackingResponse.json();
+        setDefectTrackingDetails(trackingData); // Set defect card details for display
+        setIsReturnInspection(true); // Mark this as a return inspection
+
+        // Initialize repair statuses for each defect
+        const initialStatuses = {};
+        const initialLockedDefects = new Set(); // Initialize a set for locked defects
+        const initialLockedGarments = new Set(); // Initialize a set for locked garments
+        const initialRejectedGarmentDefects = new Set(); // Initialize a set for rejected garment defects
+
+        trackingData.garments.forEach((garment) => {
+          garment.defects.forEach((defect) => {
+            initialStatuses[`${garment.garmentNumber}-${defect.name}`] =
+              defect.status || "Fail";
+            // Lock defects that are already "Fail"
+            if (defect.status === "Fail") {
+              initialLockedDefects.add(
+                `${garment.garmentNumber}-${defect.name}`
+              );
+            }
+          });
+          // Check if any defect in the garment is "Fail"
+          const hasFailDefect = garment.defects.some(
+            (defect) => defect.status === "Fail"
+          );
+          if (hasFailDefect) {
+            initialLockedGarments.add(garment.garmentNumber);
+            initialRejectedGarmentDefects.add(garment.garmentNumber);
+          }
+        });
+
+        setRepairStatuses(initialStatuses); // Track repair status changes
+        setLockedDefects(initialLockedDefects); // Set the initial locked defects
+        setLockedGarments(initialLockedGarments); // Set the initial locked garments
+        setRejectedGarmentDefects(initialRejectedGarmentDefects); // Set the initial rejected garment defects
+      } else {
+        console.error("Failed to fetch defect tracking details");
+      }
     } catch (err) {
       setError(err.message);
       setInDefectWindow(false);
@@ -377,19 +454,334 @@ const QC2InspectionPage = () => {
     }
   };
 
+  // const handleDefectStatusToggle = (garmentNumber, defectName) => {
+  //   const defectKey = `${garmentNumber}-${defectName}`;
+  //   if (lockedDefects.has(defectKey)) return; // Only lock specific defect
+
+  //   if (selectedGarment && selectedGarment !== garmentNumber) {
+  //     Swal.fire({
+  //       icon: "error",
+  //       title: "Cannot Fail the defect.",
+  //       text: "Please reject the selected garment defect first before selecting another."
+  //     });
+  //     return;
+  //   }
+
+  //   setSelectedGarment(garmentNumber);
+  //   setRepairStatuses((prev) => {
+  //     const currentStatus = prev[defectKey];
+  //     const newStatus = currentStatus === "OK" ? "Fail" : "OK";
+  //     return { ...prev, [defectKey]: newStatus };
+  //   });
+
+  //   // Update defectTrackingDetails and tempDefects as before
+  //   setDefectTrackingDetails((prev) => {
+  //     if (!prev) return prev;
+  //     const updatedGarments = prev.garments.map((garment) => {
+  //       if (garment.garmentNumber === garmentNumber) {
+  //         const updatedDefects = garment.defects.map((defect) => {
+  //           if (defect.name === defectName) {
+  //             const now = new Date();
+  //             const newStatus = defect.status === "OK" ? "Fail" : "OK";
+  //             const newPassBundleStatus =
+  //               newStatus === "Fail" ? "Fail" : "Pending";
+  //             setTempDefects((prevTempDefects) => {
+  //               const defectIndex = allDefects.findIndex(
+  //                 (d) => d.english === defectName
+  //               );
+  //               const newTempDefects = { ...prevTempDefects };
+  //               if (newStatus === "Fail") {
+  //                 newTempDefects[defectIndex] = defect.count;
+  //                 setRejectedOnce(true);
+  //               } else {
+  //                 delete newTempDefects[defectIndex];
+  //               }
+  //               return newTempDefects;
+  //             });
+  //             return {
+  //               ...defect,
+  //               status: newStatus,
+  //               repair_date:
+  //                 newStatus === "OK" ? now.toLocaleDateString("en-US") : "",
+  //               repair_time:
+  //                 newStatus === "OK"
+  //                   ? now.toLocaleTimeString("en-US", { hour12: false })
+  //                   : "",
+  //               pass_bundle: newPassBundleStatus
+  //             };
+  //           }
+  //           return defect;
+  //         });
+  //         return { ...garment, defects: updatedDefects };
+  //       }
+  //       return garment;
+  //     });
+  //     return { ...prev, garments: updatedGarments };
+  //   });
+
+  //   updateDefectStatusInRepairTrackingAndPassBundle(
+  //     sessionData.printEntry.defect_print_id,
+  //     garmentNumber,
+  //     defectName,
+  //     newStatus === "OK" ? "OK" : "Fail"
+  //   );
+  // };
+
+  const handleDefectStatusToggle = (garmentNumber, defectName) => {
+    // Check if the defect is already locked OR if the garment is rejected
+    if (rejectedGarmentDefects.has(garmentNumber)) {
+      return; // Prevent any changes if the garment is rejected
+    }
+
+    //Check if a garment is already selected
+    if (selectedGarment && selectedGarment !== garmentNumber) {
+      // Display an error message or take other appropriate action
+      Swal.fire({
+        icon: "error",
+        title: "Cannot Fail the defect.",
+        text: "Please reject the selected garment defect first before selecting another."
+      });
+      // alert("Please resolve the defects for the currently selected garment before selecting another.");
+      return;
+    }
+
+    setSelectedGarment(garmentNumber); // Update the selected garment
+    setRepairStatuses((prev) => {
+      const key = `${garmentNumber}-${defectName}`;
+      const currentStatus = prev[key];
+      const newStatus = currentStatus === "OK" ? "Fail" : "OK";
+      return { ...prev, [key]: newStatus };
+    });
+
+    setDefectTrackingDetails((prev) => {
+      if (!prev) return prev;
+
+      const updatedGarments = prev.garments.map((garment) => {
+        if (garment.garmentNumber === garmentNumber) {
+          const updatedDefects = garment.defects.map((defect) => {
+            if (defect.name === defectName) {
+              const now = new Date();
+              const newStatus = defect.status === "OK" ? "Fail" : "OK";
+              let newPassBundleStatus = defect.pass_bundle;
+              if (newStatus === "Fail") {
+                newPassBundleStatus = "Fail";
+              } else if (newStatus === "OK") {
+                // Only change to "Pending" if it was previously "Fail"
+                if (defect.status === "Fail") {
+                  newPassBundleStatus = "Pending";
+                }
+              }
+
+              // Update tempDefects state based on the actual defect count
+              setTempDefects((prevTempDefects) => {
+                const defectIndex = allDefects.findIndex(
+                  (d) => d.english === defectName
+                );
+                if (defectIndex === -1) return prevTempDefects;
+
+                const newTempDefects = { ...prevTempDefects };
+
+                if (newStatus === "Fail") {
+                  // When marking as fail, add the original defect count
+                  newTempDefects[defectIndex] = defect.count;
+                  setRejectedOnce(true); // Set rejectedOnce to true when a defect is marked as Fail
+                  // setLockedGarments((prevLocked) => new Set(prevLocked).add(garmentNumber));
+                  //Call the function to update the defect status on qc2_repair_tracking
+                  updateDefectStatusInRepairTrackingAndPassBundle(
+                    sessionData.printEntry.defect_print_id,
+                    garmentNumber,
+                    defect.name,
+                    "Fail"
+                  );
+                } else {
+                  // When marking as OK, remove the defect count
+                  delete newTempDefects[defectIndex];
+                  //Call the function to update the defect status on qc2_repair_tracking
+                  updateDefectStatusInRepairTrackingAndPassBundle(
+                    sessionData.printEntry.defect_print_id,
+                    garmentNumber,
+                    defect.name,
+                    "OK"
+                  );
+                }
+
+                return newTempDefects;
+              });
+
+              return {
+                ...defect,
+                status: newStatus,
+                repair_date:
+                  newStatus === "OK" ? now.toLocaleDateString("en-US") : "",
+                repair_time:
+                  newStatus === "OK"
+                    ? now.toLocaleTimeString("en-US", { hour12: false })
+                    : "",
+                newPassBundleStatus
+              };
+            }
+            return defect;
+          });
+
+          return { ...garment, defects: updatedDefects };
+        }
+        return garment;
+      });
+
+      // Update total counts
+      let totalRejected = 0;
+      let totalPassed = 0;
+      let totalDefects = 0;
+
+      updatedGarments.forEach((garment) => {
+        const hasFail = garment.defects.some(
+          (defect) => defect.status === "Fail"
+        );
+        if (hasFail) {
+          totalRejected++;
+          // Sum up defect counts for failed items
+          garment.defects.forEach((defect) => {
+            if (defect.status === "Fail") {
+              totalDefects += defect.count;
+            }
+          });
+        } else {
+          totalPassed++;
+        }
+      });
+
+      // setTotalRejects(totalRejected); // Update totalRejects state
+      // setTotalPass(totalPassed); // Update totalPass state
+      // setDefectQty(totalDefects); // Update defectQty state
+
+      return { ...prev, garments: updatedGarments };
+    });
+  };
+
+  const updateDefectStatusInRepairTracking = async (
+    defect_print_id,
+    garmentNumber,
+    defectName,
+    status
+  ) => {
+    try {
+      const payload = {
+        defect_print_id,
+        garmentNumber,
+        defectName,
+        status
+      };
+      // // Only add pass_bundle if status is "OK"
+      // if (status === "OK" || status === "Fail") {
+      //   payload.pass_bundle = passBundleStatus;
+      // }
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc2-repair-tracking/update-defect-status-by-name`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }
+      );
+      // if (!response.ok) {
+      //   const errorText = await response.text();
+      //   throw new Error(`Failed to update defect status in repair tracking: ${errorText}`);
+      // }
+      console.log("Defect status updated in repair tracking successfully");
+    } catch (err) {
+      setError(
+        `Failed to update defect status in repair tracking: ${err.message}`
+      );
+      console.error(
+        "Error updating defect status in repair tracking:",
+        err.message
+      );
+    }
+  };
+
+  const updateDefectStatusInRepairTrackingAndPassBundle = async (
+    defect_print_id,
+    garmentNumber,
+    defectName,
+    status,
+    passBundleStatus
+  ) => {
+    try {
+      let finalPassBundleStatus = passBundleStatus;
+      // Only update to "Pass" if the status is "OK" and passBundleStatus is not already set
+      if (status === "OK" && !passBundleStatus === "Pass") {
+        finalPassBundleStatus = "Pass";
+      }
+      const payload = {
+        defect_print_id,
+        garmentNumber,
+        defectName,
+        status,
+        pass_bundle: finalPassBundleStatus // Add pass_bundle here
+      };
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc2-repair-tracking/update-defect-status-by-name`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }
+      );
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to update defect status in repair tracking: ${errorText}`
+        );
+      }
+      console.log("Defect status updated in repair tracking successfully");
+    } catch (err) {
+      setError(
+        `Failed to update defect status in repair tracking: ${err.message}`
+      );
+      console.error(
+        "Error updating defect status in repair tracking:",
+        err.message
+      );
+    }
+  };
+
   const handleScanSuccess = async (scannedData) => {
     try {
       setLoadingData(true);
 
+      // Step 1: Check if the scanned data is a defect_print_id (repair QR code)
       const defectResponse = await fetch(
         `${API_BASE_URL}/api/qc2-inspection-pass-bundle-by-defect-print-id/${scannedData}`
       );
       if (defectResponse.ok) {
         const bundleData = await defectResponse.json();
         await handleDefectCardScan(bundleData, scannedData);
+
+        // Fetch repair tracking details (defect card details)
+        const trackingResponse = await fetch(
+          `${API_BASE_URL}/api/defect-track/${scannedData}`
+        );
+        if (trackingResponse.ok) {
+          const trackingData = await trackingResponse.json();
+          setDefectTrackingDetails(trackingData); // Set defect card details for display
+          setIsReturnInspection(true); // Mark this as a return inspection
+
+          // Initialize repair statuses for each defect
+          const initialStatuses = {};
+          trackingData.garments.forEach((garment) => {
+            garment.defects.forEach((defect) => {
+              initialStatuses[`${garment.garmentNumber}-${defect.name}`] =
+                defect.status || "Fail";
+            });
+          });
+          setRepairStatuses(initialStatuses); // Track repair status changes
+        } else {
+          console.error("Failed to fetch defect tracking details");
+        }
         return;
       }
 
+      // Step 2: Check if the scanned data is a bundle_random_id
       const inspectionResponse = await fetch(
         `${API_BASE_URL}/api/qc2-inspection-pass-bundle-by-random-id/${scannedData}`
       );
@@ -402,6 +794,7 @@ const QC2InspectionPage = () => {
         }
         setScanning(false);
       } else {
+        // Step 3: Fallback to fetching bundle data if neither defect nor inspection ID matches
         await fetchBundleData(scannedData);
       }
     } catch (err) {
@@ -430,15 +823,132 @@ const QC2InspectionPage = () => {
         0
       );
       newSessionData.sessionDefectsQty += totalDefectCount;
+
+      // } else {
+      //   const newConfirmed = { ...confirmedDefects };
+      //   const currentTempDefects = { ...tempDefects };
+      //   Object.keys(currentTempDefects).forEach((key) => {
+      //     if (currentTempDefects[key] > 0) {
+      //       newConfirmed[key] =
+      //         (newConfirmed[key] || 0) + currentTempDefects[key];
+      //     }
+      //   });
+      //   setConfirmedDefects(newConfirmed);
+      //   setTempDefects({});
+      //   setTotalPass((prev) => prev - 1);
+      //   setTotalRejects((prev) => prev + 1);
+      //   setTotalRepair((prev) => prev + 1);
+      //   setRejectedOnce(true);
+
+      // Find the actual garment number from defectTrackingDetails
+      const currentGarment = defectTrackingDetails.garments.find((garment) => {
+        // Check if the garment has any of the defects in tempDefects
+        return garment.defects.some((defect) =>
+          garmentDefects.some((gd) => gd.name === defect.name)
+        );
+      });
+
+      if (!currentGarment) {
+        console.error(
+          "Could not find the garment to reject in defectTrackingDetails."
+        );
+        return;
+      }
+
+      const actualGarmentNumber = currentGarment.garmentNumber;
+
+      // Record the current time
+      const now = new Date();
+      const currentTime = now.toLocaleTimeString("en-US", { hour12: false });
+
+      // Create re-return garment object
+      const reReturnGarment = {
+        garment: { garmentNumber: actualGarmentNumber, time: currentTime },
+        defects: garmentDefects.map((defect) => {
+          const defectIndex = allDefects.findIndex(
+            (d) => d.english === defect.name
+          );
+          const repair =
+            defectIndex !== -1 ? allDefects[defectIndex].repair : "Unknown";
+          return {
+            name: defect.name,
+            count: defect.count,
+            repair: repair
+            // _id: defect._id || null
+          };
+        })
+      };
       newSessionData.sessionRejectedGarments.push({
         totalDefectCount,
-        repairDefectArray: garmentDefects
+        repairDefectArray: garmentDefects,
+        garmentNumber: actualGarmentNumber
       });
       setSessionData(newSessionData);
       setTotalPass((prev) => prev - 1);
       setTotalRejects((prev) => prev + 1);
       setTempDefects({});
+      setSelectedGarment(null);
+
+      const updatePayload = {
+        $push: {
+          "printArray.$[elem].re_return_garment": reReturnGarment
+        }
+      };
+      const arrayFilters = [
+        { "elem.defect_print_id": sessionData.printEntry.defect_print_id }
+      ];
+      try {
+        // console.log("Updating qc2_inspection_pass_bundle with payload:", updatePayload, "and filters:", arrayFilters);
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              updateOperations: updatePayload,
+              arrayFilters
+            })
+          }
+        );
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            `Failed to update re-return garment record: ${errorText}`
+          );
+        }
+        // console.log("qc2_inspection_pass_bundle updated successfully");
+        setLockedGarments((prev) => new Set(prev).add(actualGarmentNumber));
+        reReturnGarment.defects.forEach((defect) => {
+          setLockedDefects((prev) =>
+            new Set(prev).add(`${actualGarmentNumber}-${defect.name}`)
+          );
+        });
+        setRejectedGarmentDefects((prev) =>
+          new Set(prev).add(actualGarmentNumber)
+        );
+      } catch (err) {
+        setError(`Failed to update re-return garment record: ${err.message}`);
+        console.error(
+          "Error updating qc2_inspection_pass_bundle:",
+          err.message
+        );
+        return;
+      }
+      // Update repair tracking for re-return garment
+      await handleReReturnGarment(actualGarmentNumber, garmentDefects);
+
+      // Update defect status in repair tracking for each defect in the rejected garment
+      for (const defect of reReturnGarment.defects) {
+        await updateDefectStatusInRepairTracking(
+          sessionData.printEntry.defect_print_id,
+          actualGarmentNumber,
+          defect.name,
+          "Fail",
+          "Fail"
+        );
+      }
     } else {
+      // console.log("Handling non-return inspection rejection");
       const newConfirmed = { ...confirmedDefects };
       const currentTempDefects = { ...tempDefects };
       Object.keys(currentTempDefects).forEach((key) => {
@@ -449,6 +959,7 @@ const QC2InspectionPage = () => {
       });
       setConfirmedDefects(newConfirmed);
       setTempDefects({});
+      setSelectedGarment(null);
       setTotalPass((prev) => prev - 1);
       setTotalRejects((prev) => prev + 1);
       setTotalRepair((prev) => prev + 1);
@@ -498,6 +1009,12 @@ const QC2InspectionPage = () => {
           }
         );
         if (!response.ok) throw new Error("Failed to update inspection record");
+        // Update pass_bundle to "Fail" for all defects in the rejected garment
+        await updatePassBundleStatusForRejectedGarment(
+          garmentDefectId,
+          "Fail",
+          defects
+        );
       } catch (err) {
         setError(`Failed to update inspection record: ${err.message}`);
       }
@@ -535,6 +1052,125 @@ const QC2InspectionPage = () => {
       } catch (err) {
         setError(`Failed to save reworks data: ${err.message}`);
       }
+      // Lock the garment and its defects after rejection
+      setLockedGarments((prev) => new Set(prev).add(garmentDefectId));
+      defects.forEach((defect) => {
+        setLockedDefects((prev) =>
+          new Set(prev).add(`${garmentDefectId}-${defect.name}`)
+        );
+      });
+      setRejectedGarmentDefects((prev) => new Set(prev).add(garmentDefectId));
+      await handleReReturnGarment(garmentDefectId, defects);
+    }
+  };
+
+  const updatePassBundleStatusForRejectedGarment = async (garmentNumber) => {
+    try {
+      // Find the rejected garment in rejectedGarments
+      const rejectedGarment = rejectedGarments.find(
+        (garment) => garment.garment_defect_id === garmentNumber
+      );
+      if (!rejectedGarment) {
+        console.error(
+          `Rejected garment with number ${garmentNumber} not found.`
+        );
+        return;
+      }
+
+      // Prepare the payload for updating each defect in the rejected garment
+      const updatePromises = rejectedGarment.defects.map(async (defect) => {
+        let defect_print_id;
+        if (isReturnInspection) {
+          defect_print_id = sessionData.printEntry.defect_print_id;
+        } else {
+          defect_print_id = bundleData.printArray.find(
+            (item) => item.defect_print_id
+          ).defect_print_id;
+        }
+        const payload = {
+          defect_print_id: defect_print_id, // You might need to adjust this if defect_print_id is available
+          garmentNumber: garmentNumber,
+          defectName: defect.name,
+          status: "Fail"
+          // pass_bundle: passBundleStatus, // "Fail"
+        };
+        await updateDefectStatusInRepairTracking(
+          defect_print_id,
+          garmentNumber,
+          defect.name,
+          "Fail",
+          true
+        );
+
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc2-repair-tracking/update-defect-status-by-name`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            `Failed to update pass_bundle status for defect ${defect.name}: ${errorText}`
+          );
+        }
+        // console.log(`pass_bundle status updated successfully for defect ${defect.name}`);
+      });
+
+      // Wait for all updates to complete
+      await Promise.all(updatePromises);
+    } catch (err) {
+      setError(
+        `Failed to update pass_bundle status for rejected garment ${garmentNumber}: ${err.message}`
+      );
+      console.error(
+        "Error updating pass_bundle status for rejected garment:",
+        err.message
+      );
+    }
+  };
+
+  const handleReReturnGarment = async (garmentNumber, garmentDefects) => {
+    try {
+      const failedDefects = garmentDefects.map((defect) => ({
+        name: defect.name,
+        count: defect.count,
+        status: "Fail", // Set status to Fail for re-returned garments
+        pass_bundle: "Fail"
+      }));
+
+      // console.log("handleReReturnGarment started", { garmentNumber, failedDefects });
+
+      const payload = {
+        defect_print_id: sessionData.printEntry.defect_print_id,
+        garmentNumber,
+        failedDefects, // Include the array of failed defects with IDs
+        isRejecting: true
+      };
+
+      // console.log("Sending payload to qc2_repair_tracking:", payload);
+
+      const repairUpdateResponse = await fetch(
+        `${API_BASE_URL}/api/qc2-repair-tracking/update-defect-status`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      if (!repairUpdateResponse.ok) {
+        const errorText = await repairUpdateResponse.text();
+        throw new Error(`Failed to update repair tracking: ${errorText}`);
+      }
+
+      // console.log("qc2_repair_tracking updated successfully for garment", garmentNumber);
+    } catch (err) {
+      setError(`Failed to update repair tracking: ${err.message}`);
+      console.error("Error in handleReReturnGarment:", err.message);
     }
   };
 
@@ -771,6 +1407,159 @@ const QC2InspectionPage = () => {
     }
   };
 
+  // const handlePassBundle = async () => {
+  //   if (isPassingBundle) return;
+  //   setIsPassingBundle(true);
+
+  //   const hasDefects = Object.values(tempDefects).some((count) => count > 0);
+  //   if (!isReturnInspection && hasDefects && !rejectedOnce) {
+  //     setIsPassingBundle(false);
+  //     return;
+  //   }
+
+  //   try {
+  //     if (isReturnInspection) {
+  //       if (!sessionData || !bundleData || !sessionData.printEntry) {
+  //         throw new Error("Missing required session or bundle data");
+  //       }
+
+  //       // Check for unresolved defects
+  //       const hasFailDefects = defectTrackingDetails.garments.some((garment) =>
+  //         garment.defects.some(
+  //           (defect) =>
+  //             defect.status === "Fail" &&
+  //             !lockedDefects.has(`${garment.garmentNumber}-${defect.name}`)
+  //         )
+  //       );
+
+  //       if (hasFailDefects) {
+  //         Swal.fire({
+  //           icon: "warning",
+  //           title: "Unresolved Defects",
+  //           text: "Some defects are still marked as Fail. Do you want to proceed?",
+  //           showCancelButton: true,
+  //           confirmButtonText: "Yes, Pass Anyway",
+  //           cancelButtonText: "No, Resolve Defects"
+  //         }).then(async (result) => {
+  //           if (!result.isConfirmed) {
+  //             setIsPassingBundle(false);
+  //             return;
+  //           }
+  //           await proceedWithPassBundle();
+  //         });
+  //       } else {
+  //         await proceedWithPassBundle();
+  //       }
+  //     } else {
+  //       const now = new Date();
+  //       const inspectionTime = `${String(now.getHours()).padStart(
+  //         2,
+  //         "0"
+  //       )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+  //         now.getSeconds()
+  //       ).padStart(2, "0")}`;
+  //       const updatePayload = { $set: { inspection_time: inspectionTime } };
+  //       await fetch(
+  //         `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
+  //         {
+  //           method: "PUT",
+  //           headers: { "Content-Type": "application/json" },
+  //           body: JSON.stringify(updatePayload)
+  //         }
+  //       );
+  //       resetState();
+  //     }
+  //   } catch (err) {
+  //     setError(err.message || "Failed to update inspection record");
+  //     console.error("Error in handlePassBundle:", err);
+  //     resetState(); // Reset even on error
+  //   } finally {
+  //     setIsPassingBundle(false);
+  //   }
+  // };
+
+  // const proceedWithPassBundle = async () => {
+  //   const {
+  //     sessionTotalPass,
+  //     sessionTotalRejects,
+  //     sessionRejectedGarments,
+  //     inspectionNo,
+  //     printEntry,
+  //     initialTotalPass
+  //   } = sessionData;
+  //   const initialTotalRepair = bundleData.totalRepair;
+  //   const initialTotalPassGlobal = bundleData.totalPass;
+  //   const newTotalRejectGarmentCount = initialTotalPass - sessionTotalPass;
+
+  //   const updatePayload = {
+  //     $set: {
+  //       totalRepair:
+  //         sessionTotalRejects > 0 ? initialTotalRepair - sessionTotalPass : 0,
+  //       totalPass: initialTotalPassGlobal + sessionTotalPass,
+  //       "printArray.$[elem].totalRejectGarmentCount":
+  //         newTotalRejectGarmentCount,
+  //       "printArray.$[elem].isCompleted": newTotalRejectGarmentCount === 0
+  //     }
+  //   };
+
+  //   if (sessionTotalRejects > 0) {
+  //     updatePayload.$push = {
+  //       "printArray.$[elem].repairGarmentsDefects": {
+  //         inspectionNo,
+  //         repairGarments: sessionRejectedGarments
+  //       }
+  //     };
+  //   }
+
+  //   const arrayFilters = [
+  //     { "elem.defect_print_id": printEntry.defect_print_id }
+  //   ];
+
+  //   const response = await fetch(
+  //     `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
+  //     {
+  //       method: "PUT",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ updateOperations: updatePayload, arrayFilters })
+  //     }
+  //   );
+
+  //   if (!response.ok) throw new Error("Failed to update record");
+
+  //   if (sessionData.printEntry.defect_print_id) {
+  //     await updatePassBundleStatusForOKDefects(
+  //       sessionData.printEntry.defect_print_id
+  //     );
+  //   }
+
+  //   resetState();
+  // };
+
+  // const resetState = () => {
+  //   setTotalPass(0);
+  //   setTotalRejects(0);
+  //   setTotalRepair(0);
+  //   setConfirmedDefects({});
+  //   setTempDefects({});
+  //   setBundlePassed(true);
+  //   setRejectedOnce(false);
+  //   setBundleData(null);
+  //   setInDefectWindow(false);
+  //   setScanning(true);
+  //   setRejectedGarments([]);
+  //   setQrCodesData({ repair: [], garment: [], bundle: [] });
+  //   setGenerateQRDisabled(false);
+  //   setPassBundleCountdown(null);
+  //   setIsReturnInspection(false);
+  //   setSessionData(null);
+  //   setDefectTrackingDetails(null);
+  //   setRepairStatuses({});
+  //   setLockedGarments(new Set());
+  //   setLockedDefects(new Set());
+  //   setRejectedGarmentDefects(new Set());
+  //   setSelectedGarment(null);
+  // };
+
   const handlePassBundle = async () => {
     if (isPassingBundle) return; // Prevent multiple calls
     setIsPassingBundle(true);
@@ -789,6 +1578,45 @@ const QC2InspectionPage = () => {
         // Validate required data
         if (!sessionData || !bundleData || !sessionData.printEntry) {
           throw new Error("Missing required session or bundle data");
+        }
+        // Check if there are any "Fail" defects before proceeding
+        const hasFailDefects = defectTrackingDetails.garments.some((garment) =>
+          // garment.defects.some(defect => (defect.status === "Fail" || defect.status === "Not Repaired") && !lockedDefects.has(`${garment.garmentNumber}-${defect.name}`))
+          garment.defects.some(
+            (defect) =>
+              defect.status === "Fail" &&
+              !lockedDefects.has(`${garment.garmentNumber}-${defect.name}`)
+          )
+        );
+
+        if (hasFailDefects) {
+          Swal.fire({
+            icon: "error",
+            title: "Cannot Pass Bundle",
+            text: "There are still failed defects. Please resolve them before passing the bundle."
+          });
+          setIsPassingBundle(false);
+          return;
+        }
+
+        // **New check: Check if all defects for each garment are OK**
+        const allGarmentsPassed = defectTrackingDetails.garments.every(
+          (garment) =>
+            garment.defects.every(
+              (defect) =>
+                defect.status === "OK" ||
+                lockedDefects.has(`${garment.garmentNumber}-${defect.name}`)
+            )
+        );
+
+        if (!allGarmentsPassed) {
+          Swal.fire({
+            icon: "error",
+            title: "Cannot Pass Bundle",
+            text: "Not all defects for each garment are marked as OK. Please review and correct the defect status before passing the bundle."
+          });
+          setIsPassingBundle(false);
+          return;
         }
         const {
           sessionTotalPass,
@@ -856,6 +1684,13 @@ const QC2InspectionPage = () => {
           throw new Error(errorData.message || "Failed to update record");
         }
 
+        // Update pass_bundle status to "Pass" for all OK defects
+        if (sessionData.printEntry.defect_print_id) {
+          await updatePassBundleStatusForOKDefects(
+            sessionData.printEntry.defect_print_id
+          );
+        }
+
         // Reset return inspection state
         setIsReturnInspection(false);
         setSessionData(null);
@@ -910,6 +1745,40 @@ const QC2InspectionPage = () => {
       console.error("Error in handlePassBundle:", err);
     } finally {
       setIsPassingBundle(false);
+    }
+  };
+
+  const updatePassBundleStatusForOKDefects = async (defect_print_id) => {
+    try {
+      const payload = {
+        defect_print_id: defect_print_id,
+        pass_bundle: "Pass"
+      };
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc2-repair-tracking/update-pass-bundle-status`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }
+      );
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to update pass_bundle status for defect ${defect_print_id}: ${errorText}`
+        );
+      }
+      console.log(
+        `pass_bundle status updated successfully for defect ${defect_print_id}`
+      );
+    } catch (err) {
+      setError(
+        `Failed to update pass_bundle status for OK defects: ${err.message}`
+      );
+      console.error(
+        "Error updating pass_bundle status for OK defects:",
+        err.message
+      );
     }
   };
 
@@ -1034,6 +1903,56 @@ const QC2InspectionPage = () => {
     setMenuClicked(true);
   };
 
+  const handleLanguageChange = (event) => {
+    const newLanguage = event.target.value;
+    setLanguage(newLanguage);
+    if (defectTrackingDetails) {
+      setDefectTrackingDetails((prev) => ({
+        ...prev,
+        garments: prev.garments.map((garment) => ({
+          ...garment,
+          defects: garment.defects.map((defect) => {
+            const defectEntry = allDefects.find(
+              (d) => d.english === defect.name
+            );
+            return {
+              ...defect,
+              displayName: defectEntry
+                ? defectEntry[newLanguage] || defect.name
+                : defect.name
+            };
+          })
+        }))
+      }));
+    }
+  };
+
+  useEffect(() => {
+    setShowDefectBoxes(!isReturnInspection);
+  }, [isReturnInspection]);
+
+  useEffect(() => {
+    if (defectTrackingDetails) {
+      setDefectTrackingDetails((prev) => ({
+        ...prev,
+        garments: prev.garments.map((garment) => ({
+          ...garment,
+          defects: garment.defects.map((defect) => {
+            const defectEntry = allDefects.find(
+              (d) => d.english === defect.name
+            );
+            return {
+              ...defect,
+              displayName: defectEntry
+                ? defectEntry[language] || defect.name
+                : defect.name
+            };
+          })
+        }))
+      }));
+    }
+  }, [defectTrackingDetails, language]);
+
   return (
     <div className="flex h-screen">
       <div
@@ -1051,23 +1970,25 @@ const QC2InspectionPage = () => {
             {menuClicked ? (
               <>
                 <div className="flex items-center mb-1">
-                  <Globe className="w-5 h-5 mr-1" />
-                  <span className="font-medium">Language</span>
+                  <Languages className="w-5 h-5 mr-1" />
+                  <span className="font-medium">{t("qc2In.language")}</span>
                 </div>
                 <select
                   value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
+                  onChange={handleLanguageChange} //{(e) => setLanguage(e.target.value)}
                   className="w-full p-1 text-black rounded"
                 >
-                  <option value="english">English</option>
-                  <option value="khmer">Khmer</option>
-                  <option value="chinese">Chinese</option>
-                  <option value="all">All Languages</option>
+                  <option value="english">{t("languages.en")}</option>
+                  <option value="khmer">{t("languages.kh")}</option>
+                  <option value="chinese">{t("languages.ch")}</option>
+                  <option value="all">{t("qc2In.all_languages")}</option>
                 </select>
 
                 <div className="flex items-center mb-1">
                   <Filter className="w-5 h-5 mr-1" />
-                  <span className="font-medium">Defect Type</span>
+                  <span className="font-medium">
+                    {t("preview.defect_type")}
+                  </span>
                 </div>
                 <div className="grid grid-cols- md:grid-cols-2 gap-1">
                   {["all", "common", "type1", "type2"].map((type) => (
@@ -1083,14 +2004,16 @@ const QC2InspectionPage = () => {
                           : "bg-gray-700"
                       }`}
                     >
-                      {type.toUpperCase()}
+                      {currentLanguage === "en"
+                        ? t(`qc2In.${type}`).toUpperCase()
+                        : t(`qc2In.${type}`)}
                     </button>
                   ))}
                 </div>
 
                 <div className="flex items-center mb-1">
                   <Tag className="w-5 h-5 mr-1" />
-                  <span className="font-medium">Category</span>
+                  <span className="font-medium">{t("ana.category")}</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
                   {categoryOptions.map((cat) => (
@@ -1104,14 +2027,16 @@ const QC2InspectionPage = () => {
                         categoryFilter === cat ? "bg-blue-600" : "bg-gray-700"
                       }`}
                     >
-                      {cat.toUpperCase()}
+                      {currentLanguage === "en"
+                        ? t(`qc2In.${cat}`).toUpperCase()
+                        : t(`qc2In.${cat}`)}
                     </button>
                   ))}
                 </div>
 
                 <div className="flex items-center mb-1">
                   <ArrowUpDown className="w-5 h-5 mr-1" />
-                  <span className="font-medium">Sort</span>
+                  <span className="font-medium">{t("qc2In.sort")}</span>
                 </div>
                 <div className="relative">
                   <button
@@ -1168,6 +2093,12 @@ const QC2InspectionPage = () => {
                   // bluetoothState={bluetoothState}
                   // setBluetoothState={setBluetoothState}
                 />
+                <div className="flex items-center mb-1">
+                  <Paperclip className="w-5 h-5 mr-1" />
+                  <span className="font-medium">
+                    {t("qc2In.printing_method")}
+                  </span>
+                </div>
 
                 <div className="flex items-center mb-1">
                   <span className="font-medium">Printing Method</span>
@@ -1179,7 +2110,7 @@ const QC2InspectionPage = () => {
                       printMethod === "repair" ? "bg-blue-600" : "bg-gray-700"
                     }`}
                   >
-                    By Repair
+                    {t("qc2In.repair")}
                   </button>
                   <button
                     onClick={() => setPrintMethod("garment")}
@@ -1187,7 +2118,7 @@ const QC2InspectionPage = () => {
                       printMethod === "garment" ? "bg-blue-600" : "bg-gray-700"
                     }`}
                   >
-                    By Garments
+                    {t("qc2In.garment")}
                   </button>
                   <button
                     onClick={() => setPrintMethod("bundle")}
@@ -1195,7 +2126,7 @@ const QC2InspectionPage = () => {
                       printMethod === "bundle" ? "bg-blue-600" : "bg-gray-700"
                     }`}
                   >
-                    By Bundle
+                    {t("qc2In.bundle")}
                   </button>
                 </div>
               </>
@@ -1204,18 +2135,18 @@ const QC2InspectionPage = () => {
                 {selectedFeature === "language" && (
                   <div>
                     <div className="flex items-center mb-1">
-                      <Globe className="w-5 h-5 mr-1" />
-                      <span className="font-medium">Language</span>
+                      <Languages className="w-5 h-5 mr-1" />
+                      <span className="font-medium">{t("qc2In.language")}</span>
                     </div>
                     <select
                       value={language}
-                      onChange={(e) => setLanguage(e.target.value)}
+                      onChange={handleLanguageChange}
                       className="w-full p-1 text-black rounded"
                     >
-                      <option value="english">English</option>
-                      <option value="khmer">Khmer</option>
-                      <option value="chinese">Chinese</option>
-                      <option value="all">All Languages</option>
+                      <option value="english">{t("languages.en")}</option>
+                      <option value="khmer">{t("languages.kh")}</option>
+                      <option value="chinese">{t("languages.ch")}</option>
+                      <option value="all">{t("qc2In.all_languages")}</option>
                     </select>
                   </div>
                 )}
@@ -1224,7 +2155,9 @@ const QC2InspectionPage = () => {
                   <div>
                     <div className="flex items-center mb-1">
                       <Filter className="w-5 h-5 mr-1" />
-                      <span className="font-medium">Defect Type</span>
+                      <span className="font-medium">
+                        {t("preview.defect_type")}
+                      </span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
                       {["all", "common", "type1", "type2"].map((type) => (
@@ -1240,7 +2173,9 @@ const QC2InspectionPage = () => {
                               : "bg-gray-700"
                           }`}
                         >
-                          {type.toUpperCase()}
+                          {currentLanguage === "en"
+                            ? t(`qc2In.${type}`).toUpperCase()
+                            : t(`qc2In.${type}`)}
                         </button>
                       ))}
                     </div>
@@ -1251,7 +2186,7 @@ const QC2InspectionPage = () => {
                   <div>
                     <div className="flex items-center mb-1">
                       <Tag className="w-5 h-5 mr-1" />
-                      <span className="font-medium">Category</span>
+                      <span className="font-medium">{t("ana.category")}</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
                       {categoryOptions.map((cat) => (
@@ -1269,7 +2204,9 @@ const QC2InspectionPage = () => {
                               : "bg-gray-700"
                           }`}
                         >
-                          {cat.toUpperCase()}
+                          {currentLanguage === "en"
+                            ? t(`qc2In.${cat}`).toUpperCase()
+                            : t(`qc2In.${cat}`)}
                         </button>
                       ))}
                     </div>
@@ -1280,7 +2217,7 @@ const QC2InspectionPage = () => {
                   <div>
                     <div className="flex items-center mb-1">
                       <ArrowUpDown className="w-5 h-5 mr-1" />
-                      <span className="font-medium">Sort</span>
+                      <span className="font-medium">{t("qc2In.sort")}</span>
                     </div>
                     <div className="relative">
                       <button
@@ -1347,7 +2284,10 @@ const QC2InspectionPage = () => {
                 {selectedFeature === "printingMethod" && (
                   <div>
                     <div className="flex items-center mb-1">
-                      <span className="font-medium">Printing Method</span>
+                      <Paperclip className="w-5 h-5 mr-1" />
+                      <span className="font-medium">
+                        {t("qc2In.printing_method")}
+                      </span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:flex space-x-1 md:space-x-2">
                       <button
@@ -1358,7 +2298,7 @@ const QC2InspectionPage = () => {
                             : "bg-gray-700"
                         }`}
                       >
-                        By Repair
+                        {t("qc2In.repair")}
                       </button>
                       <button
                         onClick={() => setPrintMethod("garment")}
@@ -1368,7 +2308,7 @@ const QC2InspectionPage = () => {
                             : "bg-gray-700"
                         }`}
                       >
-                        By Garments
+                        {t("qc2In.garment")}
                       </button>
                       <button
                         onClick={() => setPrintMethod("bundle")}
@@ -1378,7 +2318,7 @@ const QC2InspectionPage = () => {
                             : "bg-gray-700"
                         }`}
                       >
-                        By Bundle
+                        {t("qc2In.bundle")}
                       </button>
                     </div>
                   </div>
@@ -1390,7 +2330,7 @@ const QC2InspectionPage = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-center">
               <button onClick={() => handleIconClick("language")}>
-                <Globe className="w-5 h-5" />
+                <Languages className="w-5 h-5" />
               </button>
             </div>
             <div className="flex items-center justify-center">
@@ -1417,6 +2357,11 @@ const QC2InspectionPage = () => {
                 />
               </button>
             </div>
+            <div className="flex items-center justify-center">
+              <button onClick={() => handleIconClick("printingMethod")}>
+                <Paperclip className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1439,16 +2384,16 @@ const QC2InspectionPage = () => {
                     }`}
                   >
                     {tab === "first"
-                      ? "Inspection"
+                      ? t("qc2In.inspection")
                       : tab === "edit"
-                      ? "Edit Inspection"
+                      ? t("qc2In.edit_inspection")
                       : tab === "return"
-                      ? "Defect Names"
+                      ? t("defIm.defect_name")
                       : tab === "data"
-                      ? "Data"
+                      ? t("bundle.data")
                       : // : tab === "dashboard"
                         // ? "Dashboard"
-                        "Defect Cards"}
+                        t("qc2In.defect_card")}
                   </button>
                 )
               )}
@@ -1484,7 +2429,7 @@ const QC2InspectionPage = () => {
                       {loadingData && (
                         <div className="flex items-center justify-center gap-2 text-blue-600 mt-4">
                           <Loader2 className="w-5 h-5 animate-spin" />
-                          <p>Loading data...</p>
+                          <p>{t("qc2In.loading_data")}</p>
                         </div>
                       )}
                       {error && (
@@ -1511,7 +2456,7 @@ const QC2InspectionPage = () => {
                               : "bg-red-600 hover:bg-red-700 text-white"
                           }`}
                         >
-                          Reject Garment
+                          {t("qc2In.reject_garment")}
                         </button>
                         {!isReturnInspection && (
                           <div className="flex space-x-1">
@@ -1534,43 +2479,57 @@ const QC2InspectionPage = () => {
                         <div className="overflow-x-auto whitespace-nowrap h-12 border-b mb-2">
                           <div className="flex space-x-4 items-center">
                             <div>
-                              <span className="text-xs">Department: </span>
+                              <span className="text-xs">
+                                {t("bundle.department")}:{" "}
+                              </span>
                               <span className="text-xs font-bold">
                                 {bundleData.department}
                               </span>
                             </div>
                             <div>
-                              <span className="text-xs">MO No: </span>
+                              <span className="text-xs">
+                                {t("bundle.mono")}:{" "}
+                              </span>
                               <span className="text-xs font-bold">
                                 {bundleData.selectedMono}
                               </span>
                             </div>
                             <div>
-                              <span className="text-xs">Cust. Style: </span>
+                              <span className="text-xs">
+                                {t("bundle.customer_style")}:{" "}
+                              </span>
                               <span className="text-xs font-bold">
                                 {bundleData.custStyle}
                               </span>
                             </div>
                             <div>
-                              <span className="text-xs">Color: </span>
+                              <span className="text-xs">
+                                {t("bundle.color")}:{" "}
+                              </span>
                               <span className="text-xs font-bold">
                                 {bundleData.color}
                               </span>
                             </div>
                             <div>
-                              <span className="text-xs">Size: </span>
+                              <span className="text-xs">
+                                {t("bundle.size")}:
+                              </span>
                               <span className="text-xs font-bold">
                                 {bundleData.size}
                               </span>
                             </div>
                             <div>
-                              <span className="text-xs">Line No: </span>
+                              <span className="text-xs">
+                                {t("bundle.line_no")}:{" "}
+                              </span>
                               <span className="text-xs font-bold">
                                 {bundleData.lineNo}
                               </span>
                             </div>
                             <div>
-                              <span className="text-xs">Package No: </span>
+                              <span className="text-xs">
+                                {t("bundle.package_no")}:{" "}
+                              </span>
                               <span className="text-xs font-bold">
                                 {bundleData.package_no}
                               </span>
@@ -1617,7 +2576,9 @@ const QC2InspectionPage = () => {
                           <div className="flex md:flex-1 mx-1 bg-gray-100 rounded p-1 md:p-2 flex items-center">
                             <XCircle className="w-5 h-5 mr-2 text-red-600" />
                             <div className="hidden md:block">
-                              <div className="text-xs">Total Rejects</div>
+                              <div className="text-xs">
+                                {t("dash.total_rejects")}
+                              </div>
                               <div className="text-xl font-bold text-red-600">
                                 {totalRejects}
                               </div>
@@ -1631,7 +2592,9 @@ const QC2InspectionPage = () => {
                           <div className="flex md:flex-1 mx-1 bg-gray-100 rounded p-1 md:p-2 flex items-center">
                             <AlertCircle className="w-5 h-5 mr-2 text-orange-600" />
                             <div className="hidden md:block">
-                              <div className="text-xs">Defects Qty</div>
+                              <div className="text-xs">
+                                {t("qc2In.defect_qty")}
+                              </div>
                               <div className="text-xl font-bold text-orange-600">
                                 {defectQty}
                               </div>
@@ -1670,7 +2633,7 @@ const QC2InspectionPage = () => {
                               : "bg-green-600 hover:bg-green-700"
                           } text-white`}
                         >
-                          Pass Bundle{" "}
+                          {t("qc2In.pass_bundle")}{" "}
                           {passBundleCountdown !== null
                             ? `(${passBundleCountdown}s)`
                             : ""}
@@ -1685,7 +2648,7 @@ const QC2InspectionPage = () => {
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-blue-600 hover:bg-blue-700 text-white"
                               }`}
-                              title="Generate QR"
+                              title={t("bundle.generate_qr")}
                             >
                               <QrCode className="w-5 h-5" />
                             </button>
@@ -1703,7 +2666,7 @@ const QC2InspectionPage = () => {
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-blue-600 hover:bg-blue-700 text-white"
                               }`}
-                              title="Print QR"
+                              title={t("bundle.print_qr")}
                             >
                               <Printer className="w-5 h-5" />
                             </button>
@@ -1713,15 +2676,226 @@ const QC2InspectionPage = () => {
                     </div>
                   </div>
 
-                  <div className="h-[calc(100vh-200px)] overflow-y-auto p-4">
-                    <DefectBox
-                      language={language}
-                      tempDefects={tempDefects}
-                      onDefectUpdate={setTempDefects}
-                      activeFilter={activeFilter}
-                      confirmedDefects={confirmedDefects}
-                      sortOption={sortOption}
-                    />
+                  <div className="h-[calc(100vh-200px)] overflow-y-auto p-2">
+                    <div className="mt-4 max-w-5xl mx-auto mb-4">
+                      {defectTrackingDetails && (
+                        <div className="mt-4">
+                          <div className="bg-gray-50 rounded-lg p-4 mb-1">
+                            <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                              Defect Card Details
+                            </h3>
+                            <div className="flex justify-between mb-6 bg-gray-100 p-2 rounded">
+                              <p className="text-gray-700">
+                                <strong>MO No:</strong>{" "}
+                                {defectTrackingDetails.moNo}
+                              </p>
+                              <p className="text-gray-700">
+                                <strong>Line No:</strong>{" "}
+                                {defectTrackingDetails.lineNo}
+                              </p>
+                              <p className="text-gray-700">
+                                <strong>Color:</strong>{" "}
+                                {defectTrackingDetails.color}
+                              </p>
+                              <p className="text-gray-700">
+                                <strong>Size:</strong>{" "}
+                                {defectTrackingDetails.size}
+                              </p>
+                            </div>
+                            <div className="flex justify-end mb-1">
+                              <FormControl
+                                variant="outlined"
+                                sx={{ minWidth: 200 }}
+                              >
+                                <InputLabel id="language-select-label">
+                                  Select Language
+                                </InputLabel>
+                                <Select
+                                  labelId="language-select-label"
+                                  id="language-select"
+                                  value={language}
+                                  onChange={handleLanguageChange}
+                                  label="Select Language"
+                                >
+                                  <MenuItem value="english">English</MenuItem>
+                                  <MenuItem value="khmer">Khmer</MenuItem>
+                                  <MenuItem value="chinese">Chinese</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </div>
+                          </div>
+                          <TableContainer
+                            component={Paper}
+                            className="shadow-lg"
+                          >
+                            <Table className="min-w-full">
+                              <TableHead>
+                                <TableRow className="bg-gray-100 text-white">
+                                  <TableCell
+                                    scope="col"
+                                    className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-200"
+                                  >
+                                    Garment Number
+                                  </TableCell>
+                                  <TableCell
+                                    scope="col"
+                                    className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-200"
+                                  >
+                                    Repair Group
+                                  </TableCell>
+                                  <TableCell
+                                    scope="col"
+                                    className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-200"
+                                  >
+                                    Defect Name ({language})
+                                  </TableCell>
+                                  <TableCell
+                                    scope="col"
+                                    className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-200"
+                                  >
+                                    Defect Count
+                                  </TableCell>
+                                  <TableCell
+                                    scope="col"
+                                    className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-200"
+                                  >
+                                    Status
+                                  </TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {defectTrackingDetails.garments &&
+                                defectTrackingDetails.garments.length > 0 ? (
+                                  defectTrackingDetails.garments.map(
+                                    (garment) =>
+                                      garment.defects
+                                        .filter(
+                                          (defect) =>
+                                            defect.pass_bundle !== "Pass"
+                                        )
+                                        .map((defect, index) => (
+                                          <TableRow
+                                            key={`${garment.garmentNumber}-${defect.name}-${index}`}
+                                            className={
+                                              lockedGarments.has(
+                                                garment.garmentNumber
+                                              ) ||
+                                              rejectedGarmentNumbers.has(
+                                                garment.garmentNumber
+                                              )
+                                                ? "bg-gray-300"
+                                                : defect.status === "OK"
+                                                ? "bg-green-100"
+                                                : "bg-red-100"
+                                            }
+                                          >
+                                            <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
+                                              {garment.garmentNumber}
+                                            </TableCell>
+                                            <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
+                                              {defect.repair}
+                                            </TableCell>
+                                            <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
+                                              {defect.displayName ||
+                                                defect.name}
+                                            </TableCell>
+                                            <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
+                                              {defect.count}
+                                            </TableCell>
+                                            <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
+                                              <Button
+                                                variant="contained"
+                                                color={
+                                                  repairStatuses[
+                                                    `${garment.garmentNumber}-${defect.name}`
+                                                  ] === "OK"
+                                                    ? "success"
+                                                    : "error"
+                                                }
+                                                onClick={() =>
+                                                  handleDefectStatusToggle(
+                                                    garment.garmentNumber,
+                                                    defect.name
+                                                  )
+                                                }
+                                                disabled={lockedDefects.has(
+                                                  `${garment.garmentNumber}-${defect.name}`
+                                                )}
+                                              >
+                                                {repairStatuses[
+                                                  `${garment.garmentNumber}-${defect.name}`
+                                                ] === "OK"
+                                                  ? "PASS"
+                                                  : "Fail"}
+                                              </Button>
+                                              {/* <Button
+                                                variant="contained"
+                                                color={
+                                                  repairStatuses[
+                                                    `${garment.garmentNumber}-${defect.name}`
+                                                  ] === "OK"
+                                                    ? "success"
+                                                    : "error"
+                                                }
+                                                onClick={() =>
+                                                  handleDefectStatusToggle(
+                                                    garment.garmentNumber,
+                                                    defect.name
+                                                  )
+                                                }
+                                                disabled={rejectedGarmentDefects.has(
+                                                  garment.garmentNumber
+                                                )} // Check if the garment is rejected
+                                              >
+                                                {repairStatuses[
+                                                  `${garment.garmentNumber}-${defect.name}`
+                                                ] === "OK"
+                                                  ? "PASS"
+                                                  : "Fail"}
+                                              </Button> */}
+                                            </TableCell>
+                                          </TableRow>
+                                        ))
+                                  )
+                                ) : (
+                                  <TableRow>
+                                    <TableCell
+                                      colSpan={5}
+                                      className="text-center text-gray-700"
+                                    >
+                                      No garments found.
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        </div>
+                      )}
+                    </div>
+                    {/* Conditionally render the hide/show button and defect boxes only for return inspections */}
+                    {isReturnInspection && (
+                      <div className="flex justify-between bg-gray-200 items-center mb-4">
+                        {/* <h3 className="text-xl font-semibold text-gray-800">Defect</h3>
+                     <button
+                       onClick={() => setShowDefectBoxes(!showDefectBoxes)}
+                       className="p-2 bg-blue-600 text-white rounded"
+                     >
+                       {showDefectBoxes ? "Hide" : "Show"}
+                     </button> */}
+                      </div>
+                    )}
+                    {isReturnInspection ||
+                      (showDefectBoxes && (
+                        <DefectBox
+                          language={language}
+                          tempDefects={tempDefects}
+                          onDefectUpdate={setTempDefects}
+                          activeFilter={activeFilter}
+                          confirmedDefects={confirmedDefects}
+                          sortOption={sortOption}
+                        />
+                      ))}
                   </div>
                 </>
               )}

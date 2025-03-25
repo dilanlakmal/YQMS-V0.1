@@ -55,6 +55,7 @@
     "morgan": "^1.10.0",
     "mssql": "^11.0.1",
     "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
     "postcss": "^8.4.35",
     "prop-types": "^15.8.1",
     "qr-scanner": "^1.4.2",

@@ -57,7 +57,12 @@ const qc2RepairTrackingSchema = new mongoose.Schema(
         garmentNumber: { type: Number, required: true },
         status: { type: String, default: "Fail" }, // "Fail" or "OK"
         repair_date: { type: String }, // "MM/DD/YYYY"
-        repair_time: { type: String } // "HH:MM:SS"
+        repair_time: { type: String }, // "HH:MM:SS"
+        pass_bundle: {
+          type: String,
+          enum: ["Pass", "Fail", "Not Checked"], // Possible values
+          default: "Not Checked"
+        }
       }
     ]
   },

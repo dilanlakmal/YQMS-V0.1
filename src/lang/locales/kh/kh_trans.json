@@ -305,9 +305,19 @@
   "defectPrint": {
     "search_package": "ស្វែងរកកញ្ចប់",
     "repair_group": "ក្រុមជួសជុល",
-    "select_repair": "ជ្រើសរើសក្រុមជួសជុល",
+    "search_repair": "ស្វែងរកក្រុមជួសជុល",
     "no_defect_card": "រកមិនឃើញកាតដែលមានបញ្ហា",
-    "defect_count": "ចំនួនពិការភាព"
+    "defect_count": "ចំនួនពិការភាព",
+    "mode": "របៀប",
+    "status": "ស្ថានភាព",
+    "in_progress": "កំពុងដំណើរការ",
+    "completed": "បានបញ្ចប់",
+    "both": "ទាំងពីរ",
+    "checked": "បានពិនិត្យ #",
+    "defectsN": "ពិការភាព #",
+    "rejectN": "បដិសេធ #",
+    "reworking": "ដំណើរការឡើងវិញ #",
+    "print_details": "ព័ត៌មានលម្អិតបោះពុម្ព"
   },
 
   "imageUpload": {
@@ -381,5 +391,53 @@
   "styleDig": {
     "style_digit": "ខ្ទង់រចនាប័ទ្ម",
     "enter_style_digit": "បញ្ចូលលេខរចនាប័ទ្ម"
+  },
+  "rePrint": {
+    "reprint_records": "កត់ត្រាឡើងវិញ",
+    "clear": "ច្បាស់",
+    "search_mono": "ស្វែងរក MONo...",
+    "search_package_no": "ស្វែងរកកញ្ចប់ ..",
+    "search_emp_id": "ស្វែងរកលេខសម្គាល់បុគ្គលិក..."
+  },
+  "qc2In": {
+    "language": "ភាសា",
+    "all_languages": "ភាសាទាំងអស់",
+    "sort": "តម្រៀប",
+    "printer": "ភ្ជាប់ម៉ាស៊ីនបោះពុម្ព",
+    "printing_method": "វិធីសាស្រ្តបោះពុម្ព",
+    "repair": "ដោយការជួសជុល",
+    "garment": "ដោយសម្លៀកបំពាក់",
+    "bundle": "ដោយបាច់",
+    "inspection": "អធិការកិច្ច",
+    "edit_inspection": "កែសម្រួលការត្រួតពិនិត្យ",
+    "defect_card": "ប័ណ្ណពិការ",
+    "fabric": "ក្រណាត់",
+    "workmanship": "ស្នាដៃ",
+    "cleanliness": "អនាម័យ",
+    "embellishment": "ការតុបតែង",
+    "measurement": "ការវាស់វែង",
+    "washing": "បោកគក់",
+    "finishing": "ការបញ្ចប់",
+    "miscellaneous": "ផ្សេងៗ",
+    "loading_data": "កំពុងផ្ទុកទិន្នន័យ...",
+    "reject_garment": "បដិសេធសម្លៀកបំពាក់",
+    "defect_qty": "បរិមាណខូច",
+    "pass_bundle": "កញ្ចប់លិខិតឆ្លងដែន",
+    "all": "ទាំងអស់",
+    "common": "ទូទៅ",
+    "type1": "ប្រភេទ 1",
+    "type2": "ប្រភេទទី 2"
+  },
+  "editGar": {
+    "edit_garment": "កែសម្រួលសម្លៀកបំពាក់",
+    "select_garment": "សម្លៀកបំពាក់ដែលបានជ្រើសរើស",
+    "select_defect": "ជ្រើសរើសពិការភាព",
+    "add_defect": "បន្ថែមពិការភាព"
+  },
+
+  "defName": {
+    "defect_code": "លេខកូដខូច",
+    "chinese_name": "ឈ្មោះចិន",
+    "printing_name": "ឈ្មោះបោះពុម្ព"
   }
 }
