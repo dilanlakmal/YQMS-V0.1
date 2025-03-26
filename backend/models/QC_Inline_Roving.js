@@ -7,10 +7,26 @@ const qcInlineRovingSchema = new mongoose.Schema(
     emp_id: { type: String, required: true },
     eng_name: { type: String, required: true },
     inspection_date: { type: String, required: true },
+    mo_no: { type: String, required: true },
+    line_no: { type: String, required: true },
     inlineData: [
       {
+        operator_emp_id: { type: String, required: true },
+        operator_eng_name: { type: String, required: true },
+        operator_kh_name: { type: String, required: true },
+        operator_job_title: { type: String, required: true },
+        operator_dept_name: { type: String, required: true },
+        operator_sect_name: { type: String, required: true },
+        tg_no: { type: String, required: true },
+        tg_code: { type: String, required: true },
+        ma_code: { type: String, required: true },
+        operation_ch_name: { type: String, required: true },
+        operation_kh_name: { type: String, required: true },
         type: { type: String, required: true },
         spi: { type: String, required: true },
+        spi_image: { type: String }, // Path to the SPI image
+        measurement: { type: String, required: true },
+        measurement_image: { type: String }, // Path to the Measurement image
         checked_quantity: { type: Number, required: true },
         inspection_time: { type: String, required: true }, // Store as string in HH:MM:SS
         qualityStatus: { type: String, required: true },
@@ -19,7 +35,6 @@ const qcInlineRovingSchema = new mongoose.Schema(
             totalCount: { type: Number, required: true },
             garments: [
               {
-                // garment_defect_id: { type: String, required: true },
                 defects: [
                   {
                     name: { type: String, required: true },

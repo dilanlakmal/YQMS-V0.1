@@ -122,7 +122,7 @@ const EditInspection = () => {
       const defectArray = Object.entries(defectCounts).map(
         ([defectName, totalCount]) => ({
           defectName,
-          totalCount,
+          totalCount
         })
       );
 
@@ -130,7 +130,7 @@ const EditInspection = () => {
         ...updatedData,
         defectQty: totalDefectCount,
         defectArray,
-        totalRejects: updatedData.rejectGarments.length,
+        totalRejects: updatedData.rejectGarments.length
       };
 
       const response = await fetch(
@@ -138,7 +138,7 @@ const EditInspection = () => {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(dataToUpdate),
+          body: JSON.stringify(dataToUpdate)
         }
       );
 

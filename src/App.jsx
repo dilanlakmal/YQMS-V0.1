@@ -29,6 +29,7 @@ import Setting from "./pages/Setting";
 import WashingPage from "./pages/Washing";
 import DefectTrack from "./pages/DefectTrack.jsx";
 import RovingPage from "./pages/Roving";
+import EmpData from "./pages/EmpData.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -338,6 +339,7 @@ function AppContent() {
               <Route path="/ironing" element={<IroningPage />} />
               <Route path="/washing" element={<WashingPage />} />
               <Route path="/roving" element={<RovingPage />} />
+              <Route path="/inline-emp" element={<EmpData />} />
               <Route path="/opa" element={<OPAPage />} />
               <Route path="/packing" element={<PackingPage />} />
               <Route path="/qc2-inspection" element={<QC2InspectionPage />} />

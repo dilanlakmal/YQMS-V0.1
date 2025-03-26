@@ -561,6 +561,89 @@ syncInlineOrders().then(() => {
   );
 });
 
+// Updated Endpoint to Search MO Numbers (St_No) from inline_orders in MongoDB with partial matching
+app.get("/api/inline-orders-mo-numbers", async (req, res) => {
+  try {
+    const searchTerm = req.query.search; // Get the search term from query params
+    if (!searchTerm) {
+      return res.status(400).json({ error: "Search term is required" });
+    }
+
+    // Use a case-insensitive regex to match the term anywhere in St_No
+    const regexPattern = new RegExp(searchTerm, "i");
+
+    // Query the inline_orders collection
+    const results = await InlineOrders.find({
+      St_No: { $regex: regexPattern }
+    })
+      .select("St_No") // Only return the St_No field (equivalent to .project({ St_No: 1, _id: 0 }))
+      .limit(100) // Limit results to prevent overwhelming the UI
+      .sort({ St_No: 1 }) // Sort alphabetically
+      .exec();
+
+    // Extract unique St_No values
+    const uniqueMONos = [...new Set(results.map((r) => r.St_No))];
+
+    res.json(uniqueMONos);
+  } catch (err) {
+    console.error("Error fetching MO numbers from inline_orders:", err);
+    res.status(500).json({
+      message: "Failed to fetch MO numbers from inline_orders",
+      error: err.message
+    });
+  }
+});
+
+// New Endpoint to Fetch Inline Order Details for a given MO No (St_No)
+app.get("/api/inline-orders-details", async (req, res) => {
+  try {
+    const stNo = req.query.stNo;
+    if (!stNo) {
+      return res.status(400).json({ error: "St_No is required" });
+    }
+
+    // Find the document where St_No matches
+    const document = await InlineOrders.findOne({ St_No: stNo }).exec();
+
+    if (!document) {
+      return res.status(404).json({ error: "MO No not found" });
+    }
+
+    res.json(document);
+  } catch (err) {
+    console.error("Error fetching Inline Order details:", err);
+    res.status(500).json({
+      message: "Failed to fetch Inline Order details",
+      error: err.message
+    });
+  }
+});
+
+// New Endpoint to Fetch Inline Order Details for a given MO No (St_No)
+app.get("/api/inline-orders-details", async (req, res) => {
+  try {
+    const stNo = req.query.stNo;
+    if (!stNo) {
+      return res.status(400).json({ error: "St_No is required" });
+    }
+
+    // Find the document where St_No matches
+    const document = await InlineOrders.findOne({ St_No: stNo }).exec();
+
+    if (!document) {
+      return res.status(404).json({ error: "MO No not found" });
+    }
+
+    res.json(document);
+  } catch (err) {
+    console.error("Error fetching Inline Order details:", err);
+    res.status(500).json({
+      message: "Failed to fetch Inline Order details",
+      error: err.message
+    });
+  }
+});
+
 // New Endpoint for YMCE_SYSTEM Data
 app.get("/api/ymce-system-data", async (req, res) => {
   let pool;
@@ -600,36 +683,6 @@ app.get("/api/ymce-system-data", async (req, res) => {
     console.error("Error fetching YMCE_SYSTEM data:", err);
     res.status(500).json({
       message: "Failed to fetch YMCE_SYSTEM data",
-      error: err.message
-    });
-  } finally {
-    if (pool) {
-      await pool.close();
-    }
-  }
-});
-
-// New Endpoint to Search MO Numbers (St_No) from YMCE_SYSTEM
-app.get("/api/ymce-system-mo-numbers", async (req, res) => {
-  let pool;
-  try {
-    const searchTerm = req.query.search || "";
-    pool = await connectToSqlServerYMCE();
-    const query = `
-      SELECT DISTINCT St_No
-      FROM dbo.ViewTg
-      WHERE St_No LIKE @searchTerm + '%'
-      ORDER BY St_No;
-    `;
-    const result = await pool
-      .request()
-      .input("searchTerm", sql.NVarChar, searchTerm)
-      .query(query);
-    res.json(result.recordset.map((row) => row.St_No));
-  } catch (err) {
-    console.error("Error fetching MO numbers from YMCE_SYSTEM:", err);
-    res.status(500).json({
-      message: "Failed to fetch MO numbers",
       error: err.message
     });
   } finally {
@@ -5350,20 +5403,98 @@ app.get("/api/opa-autocomplete", async (req, res) => {
 /* ------------------------------
    QC Inline Roving ENDPOINTS
 ------------------------------ */
+
+// ------------------------
+// Multer Storage Setup for QC Inline Roving
+// ------------------------
+const qcStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, "../public/storage/qcinline");
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const { date, type, emp_id } = req.body;
+    // Validate the inputs to prevent 'undefined' in the filename
+    const currentDate = date || new Date().toISOString().split("T")[0]; // Fallback to current date if not provided
+    const imageType = type || "spi-measurement"; // Fallback to 'unknown' if type is not provided
+    const userEmpId = emp_id || "emp"; // Fallback to 'guest' if emp_id is not provided
+    const randomId = Math.random().toString(36).substring(2, 15);
+    const fileName = `${currentDate}-${imageType}-${userEmpId}-${randomId}.jpg`;
+    cb(null, fileName);
+  }
+});
+
+const qcUpload = multer({
+  storage: qcStorage,
+  limits: { fileSize: 5000000 }, // Limit file size to 5MB
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|gif/;
+    const extname = filetypes.test(
+      path.extname(file.originalname).toLowerCase()
+    );
+    const mimetype = filetypes.test(file.mimetype);
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb("Error: Images Only (jpeg, jpg, png, gif)!");
+    }
+  }
+}).single("image");
+
+// Serve static files (for accessing uploaded images)
+app.use("/storage", express.static(path.join(__dirname, "../public/storage")));
+
+// Endpoint to upload images for QC Inline Roving
+app.post("/api/upload-qc-image", qcUpload, (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No image uploaded" });
+    }
+    const imagePath = `/storage/qcinline/${req.file.filename}`;
+    res.status(200).json({ imagePath });
+  } catch (error) {
+    console.error("Error uploading image:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to upload image", error: error.message });
+  }
+});
+
+// Updated endpoint to save or update QC Inline Roving data
 app.post("/api/save-qc-inline-roving", async (req, res) => {
   try {
     const qcInlineRovingData = req.body;
 
-    // Create a new instance of the QCInlineRoving model with the data from the request body
-    const newQCInlineRoving = new QCInlineRoving(qcInlineRovingData);
+    const { inspection_date, line_no, mo_no } = qcInlineRovingData;
 
-    // Save the new QCInlineRoving document to the database
-    await newQCInlineRoving.save();
-
-    res.status(201).json({
-      message: "QC Inline Roving data saved successfully",
-      data: newQCInlineRoving
+    // Check if a record exists with the same emp_id and inspection_date
+    let existingRecord = await QCInlineRoving.findOne({
+      inspection_date,
+      line_no,
+      mo_no
     });
+
+    if (existingRecord) {
+      // If a matching record exists, append the new inlineData to the existing record
+      existingRecord.inlineData.push(qcInlineRovingData.inlineData[0]);
+      await existingRecord.save();
+      res.status(200).json({
+        message: "QC Inline Roving data updated successfully",
+        data: existingRecord
+      });
+    } else {
+      // If no matching record exists, create a new one
+      const newQCInlineRoving = new QCInlineRoving(qcInlineRovingData);
+      await newQCInlineRoving.save();
+      res.status(201).json({
+        message: "QC Inline Roving data saved successfully",
+        data: newQCInlineRoving
+      });
+    }
   } catch (error) {
     console.error("Error saving QC Inline Roving data:", error);
     res.status(500).json({
@@ -5380,6 +5511,68 @@ app.get("/api/qc-inline-roving-reports", async (req, res) => {
     res.json(reports);
   } catch (error) {
     res.status(500).json({ message: "Error fetching reports", error });
+  }
+});
+
+// Endpoint to fetch user data by emp_id
+app.get("/api/user-by-emp-id", async (req, res) => {
+  try {
+    const empId = req.query.emp_id;
+    if (!empId) {
+      return res.status(400).json({ error: "emp_id is required" });
+    }
+
+    const user = await UserMain.findOne({ emp_id: empId }).exec(); // Use UserMain
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      emp_id: user.emp_id,
+      eng_name: user.eng_name,
+      kh_name: user.kh_name,
+      job_title: user.job_title,
+      dept_name: user.dept_name,
+      sect_name: user.sect_name
+    });
+  } catch (err) {
+    console.error("Error fetching user by emp_id:", err);
+    res.status(500).json({
+      message: "Failed to fetch user data",
+      error: err.message
+    });
+  }
+});
+
+// Endpoint to fetch paginated users
+app.get("/api/users-paginated", async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Fetch users with pagination
+    const users = await UserMain.find() // Use UserMain instead of User
+      .skip(skip)
+      .limit(limit)
+      .select("emp_id eng_name kh_name dept_name sect_name")
+      .exec();
+
+    // Get total count for pagination
+    const total = await UserMain.countDocuments();
+
+    res.json({
+      users,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (err) {
+    console.error("Error fetching paginated users:", err);
+    res.status(500).json({
+      message: "Failed to fetch users",
+      error: err.message
+    });
   }
 });
 
