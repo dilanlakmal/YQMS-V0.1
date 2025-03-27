@@ -2301,37 +2301,65 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
                                 </TableRow>
                               </TableHead>
                               <TableBody>
-                              {defectTrackingDetails.garments.map((garment) =>
-                                  garment.defects
-                                    .filter((defect) => defect.pass_bundle !== "Pass")
-                                    .map((defect, index) => (
-                                      <TableRow
-                                      key={`${garment.garmentNumber}-${defect.name}-${index}`}
-                                      className={lockedGarments.has(garment.garmentNumber) || 
-                                      rejectedGarmentNumbers.has(garment.garmentNumber) ? "bg-gray-300" : (defect.status === "OK" ? "bg-green-100" : "bg-red-100")}
-                                   >
-                                        <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{garment.garmentNumber}</TableCell>
-                                        <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{defect.repair}</TableCell>
-                                        <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{defect.displayName || defect.name}</TableCell>
-                                        <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{defect.count}</TableCell>
-                                        <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-                                        <Button
-                                          variant="contained"
-                                          color={repairStatuses[`${garment.garmentNumber}-${defect.name}`] === "OK" ? "success" : "error"}
-                                          onClick={() => handleDefectStatusToggle(garment.garmentNumber, defect.name)}
-                                          disabled={rejectedGarmentDefects.has(garment.garmentNumber) && rejectedGarmentNumbers.has(garment.garmentNumber)} // Check if the garment is rejected
+                                {defectTrackingDetails.garments.some(garment =>
+                                  garment.defects.some(defect => defect.pass_bundle !== "Pass")
+                                ) ? (
+                                  defectTrackingDetails.garments.map((garment) =>
+                                    garment.defects
+                                      .filter((defect) => defect.pass_bundle !== "Pass")
+                                      .map((defect, index) => (
+                                        <TableRow
+                                          key={`${garment.garmentNumber}-${defect.name}-${index}`}
+                                          className={
+                                            lockedGarments.has(garment.garmentNumber) ||
+                                            rejectedGarmentNumbers.has(garment.garmentNumber)
+                                              ? "bg-gray-300"
+                                              : defect.status === "OK"
+                                              ? "bg-green-100"
+                                              : "bg-red-100"
+                                          }
                                         >
-                                          {repairStatuses[`${garment.garmentNumber}-${defect.name}`] === "OK" ? "PASS" : "Fail"}
-                                        </Button>
+                                          <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
+                                            {garment.garmentNumber}
                                           </TableCell>
-                                      </TableRow>
-                                    ))
-                                  )}
-                                 : (
+                                          <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
+                                            {defect.repair}
+                                          </TableCell>
+                                          <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
+                                            {defect.displayName || defect.name}
+                                          </TableCell>
+                                          <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
+                                            {defect.count}
+                                          </TableCell>
+                                          <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
+                                            <Button
+                                              variant="contained"
+                                              color={
+                                                repairStatuses[`${garment.garmentNumber}-${defect.name}`] === "OK"
+                                                  ? "success"
+                                                  : "error"
+                                              }
+                                              onClick={() => handleDefectStatusToggle(garment.garmentNumber, defect.name)}
+                                              disabled={
+                                                rejectedGarmentDefects.has(garment.garmentNumber) &&
+                                                rejectedGarmentNumbers.has(garment.garmentNumber)
+                                              }
+                                            >
+                                              {repairStatuses[`${garment.garmentNumber}-${defect.name}`] === "OK"
+                                                ? "PASS"
+                                                : "Fail"}
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))
+                                  )
+                                ) : (
                                   <TableRow>
-                                    <TableCell colSpan={5} className="text-center text-gray-700">No garments found.</TableCell>
+                                    <TableCell colSpan={5} className="text-center text-gray-700">
+                                      No garments found.
+                                    </TableCell>
                                   </TableRow>
-                                )
+                                )}
                               </TableBody>
                             </Table>
                           </TableContainer>

@@ -41,14 +41,14 @@ const DefectTrack = () => {
         ...data,
         garments: data.garments.map((garment) => ({
           ...garment,
-          defects: garment.defects.map((defect) => ({
-            // const defectEntry = allDefects.find((d) => d.english === defect.name);
-            // return {
+          defects: garment.defects.map((defect) => {
+            const defectEntry = allDefects.find((d) => d.english === defect.name);
+            return {
               ...defect,
-              // displayName: defectEntry ? defectEntry[language] || defect.name : defect.name,
+              displayName: defectEntry ? defectEntry[language] || defect.name : defect.name,
               status: defect.status || "Fail",
-            // };
-          })),
+            };
+          }),
         })),
       };
       setScannedData(mappedData);
@@ -67,17 +67,13 @@ const DefectTrack = () => {
 
   const updateDefectStatusInRepairTracking = async (defect_print_id, garmentNumber, defectName, status) => {
     try {
-      console.log("Updating defect status with:", { defect_print_id, garmentNumber, defectName, status }); // Log the values
+      console.log("Updating defect status with:", { defect_print_id, garmentNumber, defectName, status });
       const payload = {
         defect_print_id,
         garmentNumber,
         defectName,
         status,
       };
-      // // Only add pass_bundle if updatePassBundle is true
-      // if (updatePassBundle && (status === "OK" || status === "Fail")) {
-      //   payload.pass_bundle = passBundleStatus;
-      // }
       const response = await fetch(
         `${API_BASE_URL}/api/qc2-repair-tracking/update-defect-status-by-name`,
         {
@@ -100,7 +96,6 @@ const DefectTrack = () => {
   const handleOkClick = async (garmentNumber, defectName) => {
     try {
       setLoading(true);
-      // await updateDefectStatusInRepairTracking(scannedData.defect_print_id, garmentNumber, defectName, "OK");
       setTempOkDefects((prev) => [...prev, { garmentNumber, defectName }]);
       setScannedData((prev) => {
         const updatedGarments = prev.garments.map((garment) => {
@@ -122,7 +117,7 @@ const DefectTrack = () => {
                     minute: "2-digit",
                     second: "2-digit",
                   }),
-                  garmentNumber : garment.garmentNumber
+                  garmentNumber: garment.garmentNumber,
                 };
               }
               return defect;
@@ -157,7 +152,7 @@ const DefectTrack = () => {
           status: defect.status || "Fail",
           repair_date: defect.repair_date || "",
           repair_time: defect.repair_time || "",
-          garmentNumber:garment.garmentNumber,
+          garmentNumber: garment.garmentNumber,
         });
       });
     });
@@ -184,7 +179,6 @@ const DefectTrack = () => {
       if (!response.ok) {
         throw new Error("Failed to save repair tracking");
       }
-      // Update defect status in qc2_repair_tracking after saving
       for (const garment of scannedData.garments) {
         for (const defect of garment.defects) {
           if (defect.status === "OK") {
@@ -197,7 +191,6 @@ const DefectTrack = () => {
           }
         }
       }
-
       Swal.fire({
         icon: "success",
         title: "Success",
@@ -272,7 +265,6 @@ const DefectTrack = () => {
         <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">
           Defect Tracking
         </h1>
-        
         {showScanner && (
           <div className="text-center mb-4">
             <QrCodeScannerRepair onScanSuccess={onScanSuccess} onScanError={onScanError} />
@@ -327,18 +319,18 @@ const DefectTrack = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                {scannedData.garments.map((garment) =>
+                  {scannedData.garments.map((garment) =>
                     garment.defects
                       .filter((defect) => defect.status !== "OK" || isDefectTemporarilyOk(garment.garmentNumber, defect.name))
                       .map((defect, index) => (
-                      <TableRow key={`${garment.garmentNumber}-${defect.name}-${index}`} className={defect.status === "OK" ? "bg-green-100" : "hover:bg-gray-100"}>
-                        <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{garment.garmentNumber}</TableCell>
-                        <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{defect.repair}</TableCell>
-                        <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{defect.displayName}</TableCell>
-                        <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{defect.count}</TableCell>
-                        <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-                          <div className="flex justify-center">
-                            <button
+                        <TableRow key={`${garment.garmentNumber}-${defect.name}-${index}`} className={defect.status === "OK" ? "bg-green-100" : "hover:bg-gray-100"}>
+                          <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{garment.garmentNumber}</TableCell>
+                          <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{defect.repair}</TableCell>
+                          <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{defect.displayName}</TableCell>
+                          <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{defect.count}</TableCell>
+                          <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
+                            <div className="flex justify-center">
+                              <button
                                 onClick={() =>
                                   handleOkClick(
                                     garment.garmentNumber,
@@ -354,19 +346,18 @@ const DefectTrack = () => {
                                 }
                                 className={`px-4 py-2 rounded ${
                                   isDefectTemporarilyOk(garment.garmentNumber, defect.name)
-                                    ? "bg-green-600" // Green if temporarily OK
+                                    ? "bg-green-600"
                                     : defect.status === "OK"
-                                    ? "bg-green-600" // Green if already OK
-                                    : "bg-gray-400" // Gray if not OK
+                                    ? "bg-green-600"
+                                    : "bg-gray-400"
                                 } text-white`}
                               >
                                 OK
                               </button>
-                              
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
                   )}
                 </TableBody>
               </Table>
@@ -375,7 +366,7 @@ const DefectTrack = () => {
               <Button onClick={handleSave} variant="contained" color="primary">
                 Save
               </Button>
-              <Button onClick={handleCancel} variant="contained"  color="secondary">
+              <Button onClick={handleCancel} variant="contained" color="secondary">
                 Cancel
               </Button>
             </div>
