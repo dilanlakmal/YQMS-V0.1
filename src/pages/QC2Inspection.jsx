@@ -670,7 +670,20 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
         );
         if (trackingResponse.ok) {
           const trackingData = await trackingResponse.json();
-          setDefectTrackingDetails(trackingData); // Set defect card details for display
+          const updatedTrackingData = {
+            ...trackingData,
+            garments: trackingData.garments.map((garment) => ({
+              ...garment,
+              defects: garment.defects.map((defect) => {
+                const defectEntry = allDefects.find(d => d.english === defect.name);
+                return {
+                  ...defect,
+                  displayName: defectEntry ? defectEntry[language] || defect.name : defect.name
+                };
+              })
+            }))
+          };
+          setDefectTrackingDetails(updatedTrackingData); // Set defect card details for display
           setIsReturnInspection(true); // Mark this as a return inspection
   
           // Initialize repair statuses for each defect
