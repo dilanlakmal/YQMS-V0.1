@@ -452,11 +452,16 @@ const handleDefectCardScan = useCallback(
 const handleDefectStatusToggle = (garmentNumber, defectName) => {
   const key = `${garmentNumber}-${defectName}`;
   // Check if the defect is already locked OR if the garment is rejected
-  if (rejectedGarmentDefects.has(garmentNumber) || lockedDefects.has(key)) {
+  // Check if the defect is already locked OR if the garment is rejected
+  if (rejectedGarmentDefects.has(garmentNumber)) {
+    return; 
+  }
+  // Check if the defect is locked
+  if (lockedDefects.has(key)) {
     Swal.fire({
       icon: "error",
-      title: "Action Denied",
-      text: "This defect or garment is locked and cannot be modified.",
+      title: "Defect Locked",
+      text: "This defect is locked and cannot be changed.",
     });
     return;
   }
@@ -472,6 +477,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
   }
 
   setSelectedGarment(garmentNumber); // Update the selected garment
+  
 
   // Determine the new status
   const currentStatus = repairStatuses[key];
@@ -2065,14 +2071,16 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
                           onClick={handleRejectGarment}
                           disabled={
                             !hasDefects ||
-                            (isReturnInspection && totalPass <= 0) || rejectedGarmentNumbers.has(rejectedGarments.length + 1)
+                            (isReturnInspection && totalPass <= 0) ||
+                            (isReturnInspection && selectedGarment && rejectedGarmentNumbers.has(selectedGarment))
                           }
                           className={`px-2 md:px-4 py-2 rounded ${
                             !hasDefects ||
-                            (isReturnInspection && totalPass <= 0 ) || rejectedGarmentNumbers.has(rejectedGarments.length + 1)
-                              ? "bg-gray-300 cursor-not-allowed"
-                              : "bg-red-600 hover:bg-red-700 text-white"
-                          }`}
+                              (isReturnInspection && totalPass <= 0) ||
+                              (isReturnInspection && selectedGarment && rejectedGarmentNumbers.has(selectedGarment))
+                                ? "bg-gray-300 cursor-not-allowed"
+                                : "bg-red-600 hover:bg-red-700 text-white"
+                            }`}
                         >
                           {t("qc2In.reject_garment")}
                         </button>
