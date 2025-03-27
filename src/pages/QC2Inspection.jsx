@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback} from "react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -97,6 +97,7 @@ const QC2InspectionPage = () => {
   const [rejectedGarmentDefects, setRejectedGarmentDefects] = useState(new Set()); // New state to track rejected garment defects
   const [selectedGarment, setSelectedGarment] = useState(null);
   const [isPassingBundle, setIsPassingBundle] = useState(false); 
+  const [locallyRejectedDefects, setLocallyRejectedDefects] = useState(new Set());
 
   const categoryOptions = [
     "fabric",
@@ -333,277 +334,245 @@ const QC2InspectionPage = () => {
       setLoadingData(false);
     }
   }, 
-  );
+  
+);
 
-  const handleDefectCardScan = useCallback(
-    async (bundleData, defect_print_id) => {
-      try {
-        const printEntry = bundleData.printArray.find(
-          (entry) =>
-            entry.defect_print_id === defect_print_id && !entry.isCompleted
+const handleDefectCardScan = useCallback(
+  async (bundleData, defect_print_id) => {
+    try {
+      const printEntry = bundleData.printArray.find(
+        (entry) =>
+          entry.defect_print_id === defect_print_id && !entry.isCompleted
+      );
+      if (!printEntry) {
+        throw new Error(
+          "This defect card is already completed or does not exist"
         );
-        if (!printEntry) {
-          throw new Error(
-            "This defect card is already completed or does not exist"
-          );
-        }
-
-        const maxInspectionNo =
-          (printEntry.repairGarmentsDefects?.length > 0
-            ? Math.max(
-                ...printEntry.repairGarmentsDefects.map((r) => r.inspectionNo)
-              )
-            : 1) || 1;
-        const inspectionNo = maxInspectionNo + 1;
-        const newSessionData = {
-          bundleData,
-          printEntry,
-          totalRejectGarmentCount: printEntry.totalRejectGarmentCount,
-          initialTotalPass: printEntry.totalRejectGarmentCount,
-          sessionTotalPass: printEntry.totalRejectGarmentCount,
-          sessionTotalRejects: 0,
-          sessionDefectsQty: 0,
-          sessionRejectedGarments: [],
-          inspectionNo
-        };
-        setSessionData(newSessionData);
-        setBundleData(bundleData);
-        setTotalPass(printEntry.totalRejectGarmentCount);
-        setTotalRejects(0);
-        setTotalRepair(bundleData.totalRepair);
-        setIsReturnInspection(true);
-        setInDefectWindow(true);
-        setScanning(false);
-        setError(null);
-
-        // Fetch repair tracking details (defect card details)
-        const trackingResponse = await fetch(
-          `${API_BASE_URL}/api/defect-track/${defect_print_id}`
-        );
-        if (trackingResponse.ok) {
-          const trackingData = await trackingResponse.json();
-          setDefectTrackingDetails(trackingData); // Set defect card details for display
-          setIsReturnInspection(true); // Mark this as a return inspection
-
-          // Initialize repair statuses for each defect
-          const initialStatuses = {};
-          const initialLockedDefects = new Set(); // Initialize a set for locked defects
-          const initialLockedGarments = new Set(); // Initialize a set for locked garments
-          const initialRejectedGarmentDefects = new Set(); // Initialize a set for rejected garment defects
-
-          trackingData.garments.forEach((garment) => {
-            garment.defects.forEach((defect, defectIndex) => {
-              const key = `${garment.garmentNumber}-${defect.name}-${defectIndex}`;
-                initialStatuses[key] = defect.status || "Fail";
-                if (defect.status === "Fail") {
-                  initialLockedDefects.add(key);
-                }
-              // Lock defects that are already "Fail"
-              // if (defect.status === "Fail") {
-              //   initialLockedDefects.add(
-              //     `${garment.garmentNumber}-${defect.name}`
-              //   );
-              // }
-            });
-            // Check if any defect in the garment is "Fail"
-            const hasFailDefect = garment.defects.some(
-              (defect) => defect.status === "Fail"
-            );
-            if (hasFailDefect) {
-              initialLockedGarments.add(garment.garmentNumber);
-              initialRejectedGarmentDefects.add(garment.garmentNumber);
-            }
-          });
-
-          setRepairStatuses(initialStatuses); // Track repair status changes
-          setLockedDefects(initialLockedDefects); // Set the initial locked defects
-          setLockedGarments(initialLockedGarments); // Set the initial locked garments
-          setRejectedGarmentDefects(initialRejectedGarmentDefects); // Set the initial rejected garment defects
-        } else {
-          console.error("Failed to fetch defect tracking details");
-        }
-      } catch (err) {
-        setError(err.message);
-        setInDefectWindow(false);
-        setScanning(false);
       }
-    },
-    // [
-    //   setSessionData,
-    //   setBundleData,
-    //   setTotalPass,
-    //   setTotalRejects,
-    //   setTotalRepair,
-    //   setIsReturnInspection,
-    //   setInDefectWindow,
-    //   setScanning,
-    //   setError,
-    //   setDefectTrackingDetails,
-    //   setRepairStatuses,
-    //   setLockedDefects,
-    //   setLockedGarments,
-    //   setRejectedGarmentDefects,
-    // ]
-  );
 
-  const handleDefectStatusToggle = (garmentNumber, defectName , defectIndex) => {
-    const key = `${garmentNumber}-${defectName}-${defectIndex}`;
-    // Check if the defect is already locked OR if the garment is rejected
-    if (rejectedGarmentDefects.has(garmentNumber)) {
-      return; 
-    }
-    // Check if the defect is locked
-    if (lockedDefects.has(key)) {
-      Swal.fire({
-        icon: "error",
-        title: "Defect Locked",
-        text: "This defect is locked and cannot be changed.",
-      });
-      return;
-    }
+      const maxInspectionNo =
+        (printEntry.repairGarmentsDefects?.length > 0
+          ? Math.max(
+              ...printEntry.repairGarmentsDefects.map((r) => r.inspectionNo)
+            )
+          : 1) || 1;
+      const inspectionNo = maxInspectionNo + 1;
+      const newSessionData = {
+        bundleData,
+        printEntry,
+        totalRejectGarmentCount: printEntry.totalRejectGarmentCount,
+        initialTotalPass: printEntry.totalRejectGarmentCount,
+        sessionTotalPass: printEntry.totalRejectGarmentCount,
+        sessionTotalRejects: 0,
+        sessionDefectsQty: 0,
+        sessionRejectedGarments: [],
+        inspectionNo
+      };
+      setSessionData(newSessionData);
+      setBundleData(bundleData);
+      setTotalPass(printEntry.totalRejectGarmentCount);
+      setTotalRejects(0);
+      setTotalRepair(bundleData.totalRepair);
+      setIsReturnInspection(true);
+      setInDefectWindow(true);
+      setScanning(false);
+      setError(null);
 
-    //Check if a garment is already selected
-    if (selectedGarment && selectedGarment !== garmentNumber) {
-        // Display an error message or take other appropriate action
-        Swal.fire({
-          icon: 'error',
-          title: 'Cannot Fail the defect.',
-          text: 'Please reject the selected garment defect first before selecting another.',
-        });
-        // alert("Please resolve the defects for the currently selected garment before selecting another.");
-        return;
-    }
+      // Fetch repair tracking details (defect card details)
+      const trackingResponse = await fetch(
+        `${API_BASE_URL}/api/defect-track/${defect_print_id}`
+      );
+      if (!trackingResponse.ok) {
+        throw new Error("Failed to fetch defect tracking details");
+      }
+      const trackingData = await trackingResponse.json();
+      setDefectTrackingDetails(trackingData);
+        setIsReturnInspection(true); // Mark this as a return inspection
 
-    // setSelectedGarment(garmentNumber); // Update the selected garment
-    // Check if a garment is already selected and if the current toggle will result in "Fail"
-    const currentStatus = repairStatuses[key];
-    const willBeFail = currentStatus !== "Fail"; // If current status is not fail then it will be fail
+        // Initialize repair statuses for each defect
+        const initialStatuses = {};
+        const initialLockedDefects = new Set(); // Initialize a set for locked defects
+        // const initialLockedGarments = new Set(); // Initialize a set for locked garments
+        const initialRejectedGarmentDefects = new Set(); // Initialize a set for rejected garment defects
 
-    if (selectedGarment && selectedGarment !== garmentNumber && willBeFail) {
-      // Display an error message or take other appropriate action
-      Swal.fire({
-        icon: "error",
-        title: "Cannot Fail the defect.",
-        text: "Please reject the selected garment defect first before selecting another.",
-      });
-      return;
-    }
-
-    // Update selectedGarment only if the defect is being set to "Fail"
-    if (willBeFail) {
-      setSelectedGarment(garmentNumber);
-    } else {
-      setSelectedGarment(null); // Clear selectedGarment when toggling to "Pass"
-    }
-    setRepairStatuses((prev) => {
-      const key = `${garmentNumber}-${defectName}`;
-      const currentStatus = prev[key];
-      const newStatus = currentStatus === "OK" ? "Fail" : "OK";
-      return { ...prev, [key]: newStatus };
-    });
-  
-    setDefectTrackingDetails((prev) => {
-      if (!prev) return prev;
-  
-      const updatedGarments = prev.garments.map((garment) => {
-        if (garment.garmentNumber === garmentNumber) {
-          const updatedDefects = garment.defects.map((defect, garmentNumber) => {
-            if (defect.name === defectName && garmentNumber === garmentNumber) {
-              const now = new Date();
-              const newStatus = defect.status === "OK" ? "Fail" : "OK";
-              let newPassBundleStatus = defect.pass_bundle;
-              if (newStatus === "Fail") {
-                newPassBundleStatus = "Fail";
-                setLockedDefects((prevLocked) => new Set(prevLocked).add(`${garmentNumber}-${defectName}`));
-              } else if (newStatus === "OK") {
-                // Only change to "Pending" if it was previously "Fail"
-                if (defect.status === "Fail") {
-                  newPassBundleStatus = "Not Checked" || "Fail";
-                  setLockedDefects((prevLocked) => {
-                    const newLocked = new Set(prevLocked);
-                    newLocked.delete(`${garmentNumber}-${defectName}`);
-                    return newLocked;
-                  });
-                }
-              }
-  
-              // Update tempDefects state based on the actual defect count
-              setTempDefects((prevTempDefects) => {
-                const defectIndex = allDefects.findIndex(d => d.english === defectName);
-                if (defectIndex === -1) return prevTempDefects;
-  
-                const newTempDefects = { ...prevTempDefects };
-
-                if (newStatus === "Fail") {
-                  // When marking as fail, add the original defect count
-                  newTempDefects[defectIndex] = defect.count;
-                  setRejectedOnce(true); // Set rejectedOnce to true when a defect is marked as Fail
-                  // if (!newTempDefects[garmentNumber]) {
-                  //   newTempDefects[garmentNumber] = {};
-                  // }
-                  // newTempDefects[garmentNumber][defectIndex] = defect.count;
-                  // setLockedGarments((prevLocked) => new Set(prevLocked).add(garmentNumber));
-                  //Call the function to update the defect status on qc2_repair_tracking
-                  updateDefectStatusInRepairTrackingAndPassBundle(sessionData.printEntry.defect_print_id, garmentNumber, defect.name, "Fail");
-                } else {
-                  // When marking as OK, remove the defect count
-                  delete newTempDefects[defectIndex];
-                  // if (newTempDefects[garmentNumber]) {
-                  //   delete newTempDefects[garmentNumber][defectIndex];
-                  //   if (Object.keys(newTempDefects[garmentNumber]).length === 0) {
-                  //     delete newTempDefects[garmentNumber];
-                  //   }
-                  // }
-                   //Call the function to update the defect status on qc2_repair_tracking
-                   updateDefectStatusInRepairTrackingAndPassBundle(sessionData.printEntry.defect_print_id, garmentNumber, defect.name, "OK");
-                }
-
-                return newTempDefects;
-              });
-
-              return {
-                ...defect,
-                status: newStatus,
-                repair_date: newStatus === "OK" ? now.toLocaleDateString("en-US") : "",
-                repair_time: newStatus === "OK" ? now.toLocaleTimeString("en-US", { hour12: false }) : "",
-                newPassBundleStatus
-              };
-            }
-            return defect;
-          });
-  
-          return { ...garment, defects: updatedDefects };
-        }
-        return garment;
-      });
-  
-      // Update total counts
-      let totalRejected = 0;
-      let totalPassed = 0;
-      let totalDefects = 0;
-  
-      updatedGarments.forEach((garment) => {
-        const hasFail = garment.defects.some((defect) => defect.status === "Fail");
-        if (hasFail) {
-          totalRejected++;
-          // Sum up defect counts for failed items
+        trackingData.garments.forEach((garment) => {
           garment.defects.forEach((defect) => {
+            const key = `${garment.garmentNumber}-${defect.name}`;
+            initialStatuses[key] = defect.status || "Fail";
+            // Lock defects that are already "Fail"
             if (defect.status === "Fail") {
-              totalDefects += defect.count;
+              initialLockedDefects.add(key);
+              initialRejectedGarmentDefects.add(garment.garmentNumber);
+            // initialLockedGarments.add(garment.garmentNumber);
+              
             }
           });
-        } else {
-          totalPassed++;
-        }
-      });
-  
-      // setTotalRejects(totalRejected); // Update totalRejects state
-      // setTotalPass(totalPassed); // Update totalPass state
-      // setDefectQty(totalDefects); // Update defectQty state
-  
-      return { ...prev, garments: updatedGarments };
+          // Check if any defect in the garment is "Fail"
+          // const hasFailDefect = garment.defects.some(
+          //   (defect) => defect.status === "Fail"
+          // );
+          // if (hasFailDefect) {
+          //   initialLockedGarments.add(garment.garmentNumber);
+          //   initialRejectedGarmentDefects.add(garment.garmentNumber);
+          // }
+        });
+
+        setRepairStatuses(initialStatuses); // Track repair status changes
+        setLockedDefects(initialLockedDefects); // Set the initial locked defects
+        // setLockedGarments(initialLockedGarments); // Set the initial locked garments
+        setRejectedGarmentDefects(initialRejectedGarmentDefects); // Set the initial rejected garment defects
+      // } else {
+      //   console.error("Failed to fetch defect tracking details");
+      // }
+
+    } catch (err) {
+      setError(err.message);
+      setInDefectWindow(false);
+      setScanning(false);
+    }
+  },
+  [
+    // setSessionData,
+    // setBundleData,
+    // setTotalPass,
+    // setTotalRejects,
+    // setTotalRepair,
+    // setIsReturnInspection,
+    // setInDefectWindow,
+    // setScanning,
+    // setError,
+    // setDefectTrackingDetails,
+    // setRepairStatuses,
+    // setLockedDefects,
+    // setLockedGarments,
+    // setRejectedGarmentDefects,
+  ]
+);
+
+const handleDefectStatusToggle = (garmentNumber, defectName) => {
+  const key = `${garmentNumber}-${defectName}`;
+  // Check if the defect is already locked OR if the garment is rejected
+  if (rejectedGarmentDefects.has(garmentNumber) || lockedDefects.has(key)) {
+    Swal.fire({
+      icon: "error",
+      title: "Action Denied",
+      text: "This defect or garment is locked and cannot be modified.",
     });
-  };
+    return;
+  }
+
+  // Check if a garment is already selected
+  if (selectedGarment && selectedGarment !== garmentNumber && Object.keys(tempDefects).length > 0) {
+    Swal.fire({
+      icon: "error",
+      title: "Pending Defects",
+      text: "Please reject or clear defects for the selected garment first.",
+    });
+    return;
+  }
+
+  setSelectedGarment(garmentNumber); // Update the selected garment
+
+  // Determine the new status
+  const currentStatus = repairStatuses[key];
+  const newStatus = currentStatus === "OK" ? "Fail" : "OK";
+
+  // Update repairStatuses
+  setRepairStatuses((prev) => ({
+    ...prev,
+    [key]: newStatus,
+  }));
+
+  // Update defectTrackingDetails
+  setDefectTrackingDetails((prev) => {
+    if (!prev) return prev;
+
+    const updatedGarments = prev.garments.map((garment) => {
+      if (garment.garmentNumber === garmentNumber) {
+        const updatedDefects = garment.defects.map((defect) => {
+          if (defect.name === defectName) {
+            const now = new Date();
+            let newPassBundleStatus = defect.pass_bundle;
+            // Update tempDefects state based on the actual defect count
+            setTempDefects((prevTempDefects) => {
+              const defectIndex = allDefects.findIndex(d => d.english === defectName);
+              if (defectIndex === -1) return prevTempDefects;
+
+              const newTempDefects = { ...prevTempDefects };
+              if (newStatus === "Fail") {
+                // When marking as fail, add the original defect count
+                newTempDefects[defectIndex] = defect.count;
+                setRejectedOnce(true);
+                setRejectedGarmentDefects((prev) => new Set(prev).add(garmentNumber));
+              } else {
+                // When marking as OK, remove the defect count
+                delete newTempDefects[defectIndex];
+                setRejectedGarmentDefects((prev) => {
+                  const newRejected = new Set(prev);
+                  newRejected.delete(garmentNumber);
+                  return newRejected;
+                });
+              }
+              return newTempDefects;
+            });
+            if (newStatus === "Fail") {
+              newPassBundleStatus = "Fail";
+              setLockedDefects((prevLocked) => new Set(prevLocked).add(key));
+            } else if (newStatus === "OK") {
+              // Only change to "Not Checked" if it was previously "Fail"
+              if (defect.status === "Fail") {
+                newPassBundleStatus = "Not Checked";
+                setLockedDefects((prevLocked) => {
+                  const newLocked = new Set(prevLocked);
+                  newLocked.delete(key);
+                  return newLocked;
+                });
+              }
+            }
+            // Call the function to update the defect status on qc2_repair_tracking
+            updateDefectStatusInRepairTrackingAndPassBundle(sessionData.printEntry.defect_print_id, garmentNumber, defect.name, newStatus, newPassBundleStatus);
+            return {
+              ...defect,
+              status: newStatus,
+              repair_date: newStatus === "OK" ? now.toLocaleDateString("en-US") : "",
+              repair_time: newStatus === "OK" ? now.toLocaleTimeString("en-US", { hour12: false }) : "",
+              pass_bundle: newPassBundleStatus,
+            };
+          }
+          return defect;
+        });
+        return { ...garment, defects: updatedDefects };
+      }
+      return garment;
+    });
+
+    // Update total counts
+    let totalRejected = 0;
+    let totalPassed = 0;
+    let totalDefects = 0;
+
+    updatedGarments.forEach((garment) => {
+      const hasFail = garment.defects.some((defect) => defect.status === "Fail");
+      if (hasFail) {
+        totalRejected++;
+        // Sum up defect counts for failed items
+        garment.defects.forEach((defect) => {
+          if (defect.status === "Fail") {
+            totalDefects += defect.count;
+          }
+        });
+      } else {
+        totalPassed++;
+      }
+    });
+
+    // setTotalRejects(totalRejected); // Update totalRejects state
+    // setTotalPass(totalPassed); // Update totalPass state
+    // setDefectQty(totalDefects); // Update defectQty state
+
+    return { ...prev, garments: updatedGarments };
+  });
+};
   
   const updateDefectStatusInRepairTracking = async (defect_print_id, garmentNumber, defectName, status) => {
     try {
@@ -613,10 +582,6 @@ const QC2InspectionPage = () => {
         defectName,
         status,
       };
-      // // Only add pass_bundle if status is "OK"
-      // if (status === "OK" || status === "Fail") {
-      //   payload.pass_bundle = passBundleStatus;
-      // }
       const response = await fetch(
         `${API_BASE_URL}/api/qc2-repair-tracking/update-defect-status-by-name`,
         {
@@ -627,12 +592,13 @@ const QC2InspectionPage = () => {
       );
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to update defect status in repair tracking: ${errorText}`);
+        throw new Error(`Failed to update defect status: ${errorText}`);
       }
-      // console.log("Defect status updated in repair tracking successfully");
+      console.log(`Defect status updated to "${status}" for ${garmentNumber}-${defectName}`);
     } catch (err) {
-      setError(`Failed to update defect status in repair tracking: ${err.message}`);
-      console.error("Error updating defect status in repair tracking:", err.message);
+      setError(`Failed to update defect status: ${err.message}`);
+      console.error("Error updating defect status:", err.message);
+      throw err; // Re-throw to allow caller to handle the error
     }
   };
 
@@ -671,7 +637,7 @@ const QC2InspectionPage = () => {
           `Failed to update defect status in repair tracking: ${errorText}`
         );
       }
-      // console.log("Defect status updated in repair tracking successfully");
+      console.log("Defect status updated in repair tracking successfully");
     } catch (err) {
       setError(
         `Failed to update defect status in repair tracking: ${err.message}`
@@ -711,10 +677,11 @@ const QC2InspectionPage = () => {
           const initialStatuses = {};
           trackingData.garments.forEach((garment) => {
             garment.defects.forEach((defect) => {
-              initialStatuses[`${garment.garmentNumber}-${defect.name}`] = defect.status || "Fail";
+              const key = `${garment.garmentNumber}-${defect.name}`;
+              initialStatuses[key] = defect.status || "Fail";
             });
           });
-          setRepairStatuses(initialStatuses); // Track repair status changes
+          setRepairStatuses(initialStatuses);
         } else {
           console.error("Failed to fetch defect tracking details");
         }
@@ -745,7 +712,7 @@ const QC2InspectionPage = () => {
       setLoadingData(false);
     }
   }, 
-  // [fetchBundleData, handleDefectCardScan, setDefectTrackingDetails, setError, setIsReturnInspection, setLoadingData, setRepairStatuses, setScanning]
+  [fetchBundleData, handleDefectCardScan, setDefectTrackingDetails, setError, setIsReturnInspection, setLoadingData, setRepairStatuses, setScanning]
 );
   
   const handleScanError = useCallback((err) => {
@@ -754,13 +721,19 @@ const QC2InspectionPage = () => {
 
   const handleRejectGarment = async () => {
     if (!hasDefects || totalPass <= 0) {
-      // console.log("handleRejectGarment aborted: No defects or totalPass <= 0", { hasDefects, totalPass });
+      console.log("handleRejectGarment aborted: No defects or totalPass <= 0", { hasDefects, totalPass });
       return;
     }
-
+  
     if (isReturnInspection) {
-      // console.log("Starting handleRejectGarment for return inspection", { sessionData, tempDefects });
-
+      const actualGarmentNumber = selectedGarment;
+      if (!actualGarmentNumber) {
+        setError("No garment selected for rejection.");
+        return;
+      }
+        // Update the rejected garment numbers state
+    setRejectedGarmentNumbers((prev) => new Set(prev).add(actualGarmentNumber));
+  
       const newSessionData = { ...sessionData };
       newSessionData.sessionTotalPass -= 1;
       newSessionData.sessionTotalRejects += 1;
@@ -768,40 +741,14 @@ const QC2InspectionPage = () => {
         .filter((key) => tempDefects[key] > 0)
         .map((key) => ({
           name: defectsList["english"][key].name,
-          count: tempDefects[key]
+          count: tempDefects[key],
+          garmentNumber: selectedGarment,
         }));
-      // const garmentDefects = [];
-      // if (tempDefects[actualGarmentNumber]) {
-      //   Object.keys(tempDefects[actualGarmentNumber]).forEach((key) => {
-      //     garmentDefects.push({
-      //       name: defectsList["english"][key].name,
-      //       count: tempDefects[actualGarmentNumber][key],
-      //     });
-      //   });
-      // }
-      const totalDefectCount = garmentDefects.reduce(
-        (sum, d) => sum + d.count,
-        0
-      );
+      const totalDefectCount = garmentDefects.reduce((sum, d) => sum + d.count, 0);
       newSessionData.sessionDefectsQty += totalDefectCount;
-
-      // Find the actual garment number from defectTrackingDetails
-      const currentGarment = defectTrackingDetails.garments.find(garment => {
-        // Check if the garment has any of the defects in tempDefects
-        return garment.defects.some(defect => garmentDefects.some(gd => gd.name === defect.name));
-      });
-
-      if (!currentGarment) {
-        // console.error("Could not find the garment to reject in defectTrackingDetails.");
-        return;
-      }
-
-      const actualGarmentNumber = currentGarment.garmentNumber;
-
-      // Record the current time
+  
       const now = new Date();
       const currentTime = now.toLocaleTimeString("en-US", { hour12: false });
-      // Create re-return garment object
       const reReturnGarment = {
         garment: { garmentNumber: actualGarmentNumber, time: currentTime },
         defects: garmentDefects.map((defect) => {
@@ -811,7 +758,6 @@ const QC2InspectionPage = () => {
             name: defect.name,
             count: defect.count,
             repair: repair,
-            // _id: defect._id || null
           };
         }),
       };
@@ -820,20 +766,21 @@ const QC2InspectionPage = () => {
         repairDefectArray: garmentDefects,
         garmentNumber: actualGarmentNumber,
       });
+  
       setSessionData(newSessionData);
       setTotalPass((prev) => prev - 1);
       setTotalRejects((prev) => prev + 1);
       setTempDefects({});
       setSelectedGarment(null);
-      // Add re-return garment to qc2_inspection_pass_bundle
+  
       const updatePayload = {
         $push: {
           "printArray.$[elem].re_return_garment": reReturnGarment,
         },
       };
       const arrayFilters = [{ "elem.defect_print_id": sessionData.printEntry.defect_print_id }];
+  
       try {
-        // console.log("Updating qc2_inspection_pass_bundle with payload:", updatePayload, "and filters:", arrayFilters);
         const response = await fetch(
           `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
           {
@@ -849,51 +796,41 @@ const QC2InspectionPage = () => {
           const errorText = await response.text();
           throw new Error(`Failed to update re-return garment record: ${errorText}`);
         }
-        // console.log("qc2_inspection_pass_bundle updated successfully");
+  
+        // Lock the garment and its defects
         setLockedGarments((prev) => new Set(prev).add(actualGarmentNumber));
-        reReturnGarment.defects.forEach(defect => {
-          setLockedDefects(prev => new Set(prev).add(`${actualGarmentNumber}-${defect.name}`));
+        reReturnGarment.defects.forEach((defect) => {
+          const defectKey = `${actualGarmentNumber}-${defect.name}`;
+          setLockedDefects((prev) => new Set(prev).add(defectKey));
+          // Update repairStatuses to reflect "Fail"
+          setRepairStatuses((prev) => ({ ...prev, [defectKey]: "Fail" }));
         });
-        setRejectedGarmentDefects(prev => new Set(prev).add(actualGarmentNumber));
+        setRejectedGarmentDefects((prev) => new Set(prev).add(actualGarmentNumber));
+  
+        // Update repair tracking and defect statuses
+        await handleReReturnGarment(actualGarmentNumber, garmentDefects);
+        for (const defect of reReturnGarment.defects) {
+          await updateDefectStatusInRepairTracking(
+            sessionData.printEntry.defect_print_id,
+            actualGarmentNumber,
+            defect.name,
+            "Fail"
+          );
+        }
       } catch (err) {
-        setError(`Failed to update re-return garment record: ${err.message}`);
-        console.error("Error updating qc2_inspection_pass_bundle:", err.message);
+        setError(`Failed to process garment rejection: ${err.message}`);
+        console.error("Error in handleRejectGarment:", err.message);
         return;
       }
-      // console.log("Calling handleReReturnGarment with:", { actualGarmentNumber, garmentDefects });
-      // Update repair tracking for re-return garment
-      await handleReReturnGarment(actualGarmentNumber, garmentDefects);
-
-      // Update defect status in repair tracking for each defect in the rejected garment
-      for (const defect of reReturnGarment.defects) {
-        await updateDefectStatusInRepairTracking(
-          sessionData.printEntry.defect_print_id,
-          actualGarmentNumber,
-          defect.name,
-          "Fail",
-          "Fail"
-        );
-      }
     } else {
-      // console.log("Handling non-return inspection rejection");
+      // Non-return inspection logic remains unchanged
       const newConfirmed = { ...confirmedDefects };
       const currentTempDefects = { ...tempDefects };
       Object.keys(currentTempDefects).forEach((key) => {
         if (currentTempDefects[key] > 0) {
-          newConfirmed[key] =
-            (newConfirmed[key] || 0) + currentTempDefects[key];
+          newConfirmed[key] = (newConfirmed[key] || 0) + currentTempDefects[key];
         }
       });
-
-      // const garmentDefects = [];
-      // if (currentTempDefects[garmentDefectId]) {
-      //   Object.keys(currentTempDefects[garmentDefectId]).forEach((key) => {
-      //     garmentDefects.push({
-      //       name: defectsList["english"][key].name,
-      //       count: currentTempDefects[garmentDefectId][key],
-      //     });
-      //   });
-      // }
       setConfirmedDefects(newConfirmed);
       setTempDefects({});
       setSelectedGarment(null);
@@ -912,7 +849,7 @@ const QC2InspectionPage = () => {
           return {
             name: defect?.english || "Unknown",
             count: currentTempDefects[key],
-            repair: defect?.repair || "Unknown"
+            repair: defect?.repair || "Unknown",
           };
         });
       const totalCount = defects.reduce((sum, d) => sum + d.count, 0);
@@ -920,17 +857,19 @@ const QC2InspectionPage = () => {
         totalCount,
         defects,
         garment_defect_id: garmentDefectId,
-        rejectTime: currentTime
+        rejectTime: currentTime,
       };
-
+  
       const newRejectedGarments = [...rejectedGarments, newRejectGarment];
       setRejectedGarments(newRejectedGarments);
+      // Update the rejected garment numbers state
+      setRejectedGarmentNumbers((prev) => new Set(prev).add(garmentDefectId));
       const updatePayload = {
         totalPass: totalPass - 1,
         totalRejects: totalRejects + 1,
         totalRepair: totalRepair + 1,
         defectQty: defectQty + totalCount,
-        rejectGarments: newRejectedGarments
+        rejectGarments: newRejectedGarments,
       };
       try {
         const response = await fetch(
@@ -938,11 +877,10 @@ const QC2InspectionPage = () => {
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(updatePayload)
+            body: JSON.stringify(updatePayload),
           }
         );
         if (!response.ok) throw new Error("Failed to update inspection record");
-        // Update pass_bundle to "Fail" for all defects in the rejected garment
         await updatePassBundleStatusForRejectedGarment(garmentDefectId, "Fail", defects);
       } catch (err) {
         setError(`Failed to update inspection record: ${err.message}`);
@@ -950,7 +888,7 @@ const QC2InspectionPage = () => {
       const reworkGarments = defects.map((defect) => ({
         defectName: defect.name,
         count: defect.count,
-        time: currentTime
+        time: currentTime,
       }));
       const payload = {
         package_no: bundleData.package_no,
@@ -968,24 +906,32 @@ const QC2InspectionPage = () => {
         dept_name_inspection: user.dept_name,
         sect_name_inspection: user.sect_name,
         bundle_id: bundleData.bundle_id,
-        bundle_random_id: bundleData.bundle_random_id
+        bundle_random_id: bundleData.bundle_random_id,
       };
       try {
         const response = await fetch(`${API_BASE_URL}/api/reworks`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
         });
         if (!response.ok) throw new Error("Failed to save reworks data");
       } catch (err) {
         setError(`Failed to save reworks data: ${err.message}`);
       }
-      // Lock the garment and its defects after rejection
       setLockedGarments((prev) => new Set(prev).add(garmentDefectId));
-      defects.forEach(defect => {
-        setLockedDefects(prev => new Set(prev).add(`${garmentDefectId}-${defect.name}`));
+      defects.forEach((defect) => {
+        setLockedDefects((prev) => new Set(prev).add(`${garmentDefectId}-${defect.name}`));
       });
-      setRejectedGarmentDefects(prev => new Set(prev).add(garmentDefectId));
+      // Add the code here:
+      defects.forEach((defect) => {
+        const key = `${garmentDefectId}-${defect.name}`;
+        setLocallyRejectedDefects((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(key);
+          return newSet;
+        });
+      });
+      setRejectedGarmentDefects((prev) => new Set(prev).add(garmentDefectId));
       await handleReReturnGarment(garmentDefectId, defects);
     }
   };
@@ -996,7 +942,7 @@ const QC2InspectionPage = () => {
       // Find the rejected garment in rejectedGarments
       const rejectedGarment = rejectedGarments.find(garment => garment.garment_defect_id === garmentNumber);
       if (!rejectedGarment) {
-        // console.error(`Rejected garment with number ${garmentNumber} not found.`);
+        console.error(`Rejected garment with number ${garmentNumber} not found.`);
         return;
       }
 
@@ -1314,7 +1260,7 @@ const QC2InspectionPage = () => {
     }
 
     // Add console logs for debugging
-    // console.log("handlePassBundle called", { isReturnInspection, sessionData });
+    console.log("handlePassBundle called", { isReturnInspection, sessionData });
 
     try {
       if (isReturnInspection) {
@@ -1325,8 +1271,10 @@ const QC2InspectionPage = () => {
 
         // Check if there are any "Fail" defects before proceeding
         const hasFailDefects = defectTrackingDetails.garments.some(garment =>
-          // garment.defects.some(defect => (defect.status === "Fail" || defect.status === "Not Repaired") && !lockedDefects.has(`${garment.garmentNumber}-${defect.name}`))
-          garment.defects.some(defect => defect.status === "Fail"  && !lockedDefects.has(`${garment.garmentNumber}-${defect.name}`))
+          garment.defects.some(defect =>
+            defect.status === "Fail" &&
+            !lockedDefects.has(`${garment.garmentNumber}-${defect.name}`)
+          )
         );
 
         if (hasFailDefects) {
@@ -1341,7 +1289,10 @@ const QC2InspectionPage = () => {
 
         // **New check: Check if all defects for each garment are OK**
         const allGarmentsPassed = defectTrackingDetails.garments.every(garment =>
-          garment.defects.every(defect => defect.status === "OK" || lockedDefects.has(`${garment.garmentNumber}-${defect.name}`))
+          garment.defects.every(defect =>
+            defect.status === "OK" ||
+            lockedDefects.has(`${garment.garmentNumber}-${defect.name}`)
+          )
         );
 
         if (!allGarmentsPassed) {
@@ -1401,7 +1352,7 @@ const QC2InspectionPage = () => {
           { "elem.defect_print_id": printEntry.defect_print_id }
         ];
 
-        // console.log("Updating for return inspection", updatePayload);
+        console.log("Updating for return inspection", updatePayload);
 
         const response = await fetch(
           `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
@@ -1476,7 +1427,7 @@ const QC2InspectionPage = () => {
       setError(null); // Clear any previous errors
     } catch (err) {
       setError(err.message || "Failed to update inspection record");
-      // console.error("Error in handlePassBundle:", err);
+      console.error("Error in handlePassBundle:", err);
     } finally {
       setIsPassingBundle(false);
     }
@@ -1502,7 +1453,7 @@ const QC2InspectionPage = () => {
           `Failed to update pass_bundle status for defect ${defect_print_id}: ${errorText}`
         );
       }
-      // console.log(`pass_bundle status updated successfully for defect ${defect_print_id}`);
+      console.log(`pass_bundle status updated successfully for defect ${defect_print_id}`);
     } catch (err) {
       setError(
         `Failed to update pass_bundle status for OK defects: ${err.message}`
@@ -1635,31 +1586,6 @@ const QC2InspectionPage = () => {
     setMenuClicked(true);
   };
 
-  // const handleLanguageChange = (event) => {
-  //   const newLanguage = event.target.value;
-  //   setLanguage(newLanguage);
-  //   if (defectTrackingDetails) {
-  //     setDefectTrackingDetails((prev) => ({
-  //       ...prev,
-  //       garments: prev.garments.map((garment) => ({
-  //         ...garment,
-  //         defects: garment.defects.map((defect) => {
-  //           const defectEntry = allDefects.find((d) => d.english === defect.name);
-  //           return {
-  //             ...defect,
-  //             displayName: defectEntry ? defectEntry[newLanguage] || defect.name : defect.name,
-  //           };
-  //         }),
-  //       })),
-  //     }));
-  //   }
-  // };
-
-  // const handleLanguageChange = (event) => {
-  //   const newLanguage = event.target.value;
-  //   setLanguage(newLanguage);
-  // };
-
   const handleLanguageChange = (event) => {
     const newLanguage = event.target.value;
     setLanguage(newLanguage);
@@ -1669,7 +1595,7 @@ const QC2InspectionPage = () => {
         garments: prev.garments.map((garment) => ({
           ...garment,
           defects: garment.defects.map((defect) => {
-            const defectEntry = allDefects.find((d) => d.english === defect.name);
+            const defectEntry = allDefects.find((d) => d.english === defect.name );
             return {
               ...defect,
               displayName: defectEntry ? defectEntry[newLanguage] || defect.name : defect.name,
@@ -1684,7 +1610,7 @@ const QC2InspectionPage = () => {
     setShowDefectBoxes(!isReturnInspection);
   }, [isReturnInspection]);
 
-   useEffect(() => {
+  useEffect(() => {
     if (defectTrackingDetails) {
       setDefectTrackingDetails((prev) => ({
         ...prev,
@@ -1702,12 +1628,11 @@ const QC2InspectionPage = () => {
     }
   }, [language]);
 
-  useEffect(() => {
-    if (defectTrackingDetails) {
-      // console.log("Updated defectTrackingDetails:", defectTrackingDetails);
-    }
-  }, [defectTrackingDetails]);
-
+  // useEffect(() => {
+  //   if (defectTrackingDetails) {
+  //     // console.log("Updated defectTrackingDetails:", defectTrackingDetails);
+  //   }
+  // }, [defectTrackingDetails]);
 
   return (
     <div className="flex h-screen">
@@ -2376,11 +2301,10 @@ const QC2InspectionPage = () => {
                                 </TableRow>
                               </TableHead>
                               <TableBody>
-                                {defectTrackingDetails.garments && defectTrackingDetails.garments.length > 0 ? (
-                                  defectTrackingDetails.garments.map((garment) =>
-                                    garment.defects
-                                  .filter((defect) => defect.pass_bundle !== "Pass")
-                                  .map((defect, index) => (
+                              {defectTrackingDetails.garments.map((garment) =>
+                                  garment.defects
+                                    .filter((defect) => defect.pass_bundle !== "Pass")
+                                    .map((defect, index) => (
                                       <TableRow
                                       key={`${garment.garmentNumber}-${defect.name}-${index}`}
                                       className={lockedGarments.has(garment.garmentNumber) || 
@@ -2395,19 +2319,19 @@ const QC2InspectionPage = () => {
                                           variant="contained"
                                           color={repairStatuses[`${garment.garmentNumber}-${defect.name}`] === "OK" ? "success" : "error"}
                                           onClick={() => handleDefectStatusToggle(garment.garmentNumber, defect.name)}
-                                          disabled={rejectedGarmentDefects.has(garment.garmentNumber)} // Check if the garment is rejected
+                                          disabled={rejectedGarmentDefects.has(garment.garmentNumber) && rejectedGarmentNumbers.has(garment.garmentNumber)} // Check if the garment is rejected
                                         >
                                           {repairStatuses[`${garment.garmentNumber}-${defect.name}`] === "OK" ? "PASS" : "Fail"}
                                         </Button>
                                           </TableCell>
                                       </TableRow>
                                     ))
-                                  )
-                                ) : (
+                                  )}
+                                 : (
                                   <TableRow>
                                     <TableCell colSpan={5} className="text-center text-gray-700">No garments found.</TableCell>
                                   </TableRow>
-                                )}
+                                )
                               </TableBody>
                             </Table>
                           </TableContainer>
@@ -2464,3 +2388,9 @@ const QC2InspectionPage = () => {
 };
 
 export default QC2InspectionPage;
+
+
+
+ 
+
+

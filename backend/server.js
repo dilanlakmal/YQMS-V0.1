@@ -4140,7 +4140,7 @@ app.get("/api/defect-track/:defect_print_id", async (req, res) => {
         garmentNumber: garment.garmentNumber,
         defects: garment.defects.map((defect) => {
           const repairItem = repairRecord
-            ? repairRecord.repairArray.find((r) => r.defectName === defect.name)
+            ? repairRecord.repairArray.find((r) => r.defectName === defect.name &&  r.garmentNumber === garment.garmentNumber)
             : null;
           return {
             name: defect.name,
@@ -4150,6 +4150,7 @@ app.get("/api/defect-track/:defect_print_id", async (req, res) => {
             repair_date: repairItem ? repairItem.repair_date : "",
             repair_time: repairItem ? repairItem.repair_time : "",
             pass_bundle: repairItem ? repairItem.pass_bundle : "Not Checked",
+            garmentNumber: garment.garmentNumber,
           };
         })
       }))
@@ -4357,8 +4358,7 @@ app.post("/api/qc2-repair-tracking/update-defect-status-by-name", async (req, re
     // Find the specific defect and update it
     const updatedRepairArray = repairTracking.repairArray.map(item => {
       if (item.garmentNumber === garmentNumber && item.defectName === defectName) {
-        const shouldUpdate = item.status !== status; 
-        if (shouldUpdate) {
+        if (item.status !== status) {
             const now = new Date();
             return {
                 ...item,
@@ -4376,10 +4376,19 @@ app.post("/api/qc2-repair-tracking/update-defect-status-by-name", async (req, re
       }
       return item;
     });
-    console.log("Updated Repair Array:", updatedRepairArray);
-    repairTracking.repairArray = updatedRepairArray;
-    await repairTracking.save();
-    res.status(200).json({ message: "Defect status updated successfully" });
+    // Check if any changes were made
+    const hasChanges = repairTracking.repairArray.some((item, index) => {
+      return JSON.stringify(item) !== JSON.stringify(updatedRepairArray[index]);
+    });
+
+    if (hasChanges) {
+      repairTracking.repairArray = updatedRepairArray;
+      await repairTracking.save();
+      console.log("Updated Repair Array:", updatedRepairArray);
+      res.status(200).json({ message: "Defect status updated successfully" });
+    } else {
+      res.status(200).json({ message: "No changes were made" });
+    }
 
   } catch (error) {
     console.error("Error updating defect status:", error);

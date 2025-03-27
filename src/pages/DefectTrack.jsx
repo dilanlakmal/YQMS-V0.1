@@ -41,14 +41,14 @@ const DefectTrack = () => {
         ...data,
         garments: data.garments.map((garment) => ({
           ...garment,
-          defects: garment.defects.map((defect) => {
-            const defectEntry = allDefects.find((d) => d.english === defect.name);
-            return {
+          defects: garment.defects.map((defect) => ({
+            // const defectEntry = allDefects.find((d) => d.english === defect.name);
+            // return {
               ...defect,
-              displayName: defectEntry ? defectEntry[language] || defect.name : defect.name,
+              // displayName: defectEntry ? defectEntry[language] || defect.name : defect.name,
               status: defect.status || "Fail",
-            };
-          }),
+            // };
+          })),
         })),
       };
       setScannedData(mappedData);
@@ -67,7 +67,7 @@ const DefectTrack = () => {
 
   const updateDefectStatusInRepairTracking = async (defect_print_id, garmentNumber, defectName, status) => {
     try {
-      // console.log("Updating defect status with:", { defect_print_id, garmentNumber, defectName, status }); // Log the values
+      console.log("Updating defect status with:", { defect_print_id, garmentNumber, defectName, status }); // Log the values
       const payload = {
         defect_print_id,
         garmentNumber,
@@ -329,14 +329,7 @@ const DefectTrack = () => {
                 <TableBody>
                 {scannedData.garments.map((garment) =>
                     garment.defects
-                      .filter(
-                        (defect) =>
-                          defect.status !== "OK" ||
-                          isDefectTemporarilyOk( 
-                            garment.garmentNumber,
-                            defect.name
-                          )
-                      )
+                      .filter((defect) => defect.status !== "OK" || isDefectTemporarilyOk(garment.garmentNumber, defect.name))
                       .map((defect, index) => (
                       <TableRow key={`${garment.garmentNumber}-${defect.name}-${index}`} className={defect.status === "OK" ? "bg-green-100" : "hover:bg-gray-100"}>
                         <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{garment.garmentNumber}</TableCell>
