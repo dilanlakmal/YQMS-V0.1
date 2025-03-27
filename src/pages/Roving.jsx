@@ -110,20 +110,30 @@ const RovingPage = () => {
 
       try {
         const response = await axios.get(
-          `${API_BASE_URL}/api/inline-orders-operation-data`,
+          `${API_BASE_URL}/api/inline-orders-details`,
           {
             params: { stNo: moNo }
           }
         );
-        setOperationData(response.data);
+        setOperationData(response.data.orderData || []); // Set to orderData array
       } catch (error) {
         console.error("Error fetching operation data:", error);
         setOperationData([]);
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: "Failed to fetch operation data."
-        });
+        // Only show error if the MO Number was explicitly selected
+        if (error.response?.status === 404) {
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: `MO Number "${moNo}" not found.`
+          });
+        } else {
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text:
+              error.response?.data?.message || "Failed to fetch operation data."
+          });
+        }
       }
     };
 
@@ -504,7 +514,6 @@ const RovingPage = () => {
                       value={moNoSearch}
                       onChange={(e) => {
                         setMoNoSearch(e.target.value);
-                        setMoNo(e.target.value);
                       }}
                       placeholder="Search MO No..."
                       className="mt-1 w-full p-2 border border-gray-300 rounded-lg"

@@ -619,31 +619,6 @@ app.get("/api/inline-orders-details", async (req, res) => {
   }
 });
 
-// New Endpoint to Fetch Inline Order Details for a given MO No (St_No)
-app.get("/api/inline-orders-details", async (req, res) => {
-  try {
-    const stNo = req.query.stNo;
-    if (!stNo) {
-      return res.status(400).json({ error: "St_No is required" });
-    }
-
-    // Find the document where St_No matches
-    const document = await InlineOrders.findOne({ St_No: stNo }).exec();
-
-    if (!document) {
-      return res.status(404).json({ error: "MO No not found" });
-    }
-
-    res.json(document);
-  } catch (err) {
-    console.error("Error fetching Inline Order details:", err);
-    res.status(500).json({
-      message: "Failed to fetch Inline Order details",
-      error: err.message
-    });
-  }
-});
-
 // New Endpoint for YMCE_SYSTEM Data
 app.get("/api/ymce-system-data", async (req, res) => {
   let pool;
@@ -5544,22 +5519,37 @@ app.get("/api/user-by-emp-id", async (req, res) => {
   }
 });
 
-// Endpoint to fetch paginated users
 app.get("/api/users-paginated", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
+    const jobTitle = req.query.jobTitle || ""; // Optional jobTitle filter
+    const empId = req.query.empId || ""; // Optional empId filter
+    const section = req.query.section || ""; // Optional section filter
 
-    // Fetch users with pagination
-    const users = await UserMain.find() // Use UserMain instead of User
+    // Build the query object
+    const query = {};
+    if (jobTitle) {
+      query.job_title = jobTitle;
+    }
+    if (empId) {
+      query.emp_id = empId;
+    }
+    if (section) {
+      query.sect_name = section;
+    }
+    query.working_status = "Working"; // Ensure only working users are fetched
+
+    // Fetch users with pagination and filters
+    const users = await UserMain.find(query)
       .skip(skip)
       .limit(limit)
-      .select("emp_id eng_name kh_name dept_name sect_name")
+      .select("emp_id eng_name kh_name dept_name sect_name job_title")
       .exec();
 
-    // Get total count for pagination
-    const total = await UserMain.countDocuments();
+    // Get total count for pagination (with filters applied)
+    const total = await UserMain.countDocuments(query);
 
     res.json({
       users,
@@ -5573,6 +5563,18 @@ app.get("/api/users-paginated", async (req, res) => {
       message: "Failed to fetch users",
       error: err.message
     });
+  }
+});
+
+app.get("/api/sections", async (req, res) => {
+  try {
+    const sections = await UserMain.distinct("sect_name", {
+      working_status: "Working"
+    });
+    res.json(sections.filter((section) => section)); // Filter out null/empty values
+  } catch (error) {
+    console.error("Error fetching sections:", error);
+    res.status(500).json({ message: "Failed to fetch sections" });
   }
 });
 
