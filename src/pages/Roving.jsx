@@ -784,7 +784,7 @@ const RovingPage = () => {
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-medium text-gray-800">
-                      Garment {currentGarmentIndex + 1}
+                      Part {currentGarmentIndex + 1}
                     </h3>
                     <span
                       className={`px-3 py-1 rounded-full text-lg ${
@@ -801,7 +801,7 @@ const RovingPage = () => {
                       currentGarmentDefects.map((defect, defectIndex) => (
                         <div
                           key={`${currentGarmentIndex}-${defectIndex}`}
-                          className="flex items-center space-x-1 bg-white p-3 rounded-lg shadow-sm"
+                          className="flex items-center space-x-2 bg-white p-3 rounded-lg shadow-sm flex-wrap gap-y-2"
                         >
                           <select
                             value={defect.name}
@@ -812,7 +812,7 @@ const RovingPage = () => {
                               ].name = e.target.value;
                               setGarments(newGarments);
                             }}
-                            className="flex-1 p-2 border border-gray-300 rounded-lg"
+                            className="max-w-[220px] md:max-w-[400px] p-2 border border-gray-300 rounded-lg"
                           >
                             <option value="">Select Defect</option>
                             {allDefects.map((defectName) => (
@@ -851,7 +851,7 @@ const RovingPage = () => {
                       ))
                     ) : (
                       <p className="text-gray-600">
-                        No defects recorded for this garment.
+                        No defects recorded for this Part.
                       </p>
                     )}
                     <div className="flex items-center space-x-2 mt-4">
@@ -986,6 +986,7 @@ const RovingPage = () => {
                     selectedOperation?.kh_name ||
                     selectedOperation?.ch_name ||
                     "N/A",
+                  machineCode: selectedOperation?.Ma_Code || "N/A",
                   spiStatus,
                   measurementStatus,
                   garments,
