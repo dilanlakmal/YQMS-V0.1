@@ -28,7 +28,9 @@ import createQC2InspectionPassBundle from "./models/qc2_inspection_pass_bundle.j
 import createQC2DefectPrintModel from "./models/QC2DefectPrint.js";
 import createQC2ReworksModel from "./models/qc2_reworks.js";
 import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
-import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
+import sql from "mssql"; // Import mssql for SQL Server connection
+
+// Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "./config.js";
 import sql from "mssql"; 
 
@@ -112,6 +114,7 @@ const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
 const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const QCInlineRoving =createQCInlineRovingModel(ymProdConnection);
 const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
+const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -119,7 +122,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// SQL Server Configuration
+/* ------------------------------
+   YM DataSore SQL
+------------------------------ */
+
+// SQL Server Configuration for YMDataStore
 const sqlConfig = {
   user: "ymdata",
   password: "Kzw15947",
@@ -138,23 +145,33 @@ const sqlConfig = {
   }
 };
 
-// Connect to SQL Server
-async function connectToSqlServer() {
+// Connect to SQL Server (YMDataStore)
+async function connectToSqlServerYMDataStore() {
   try {
-    await sql.connect(sqlConfig);
+    const pool = await sql.connect(sqlConfig);
     console.log("Connected to SQL Server (YMDataStore) at 192.167.1.13:1433");
+    return pool;
   } catch (err) {
-    console.error("SQL Server connection error:", err);
+    console.error("SQL Server (YMDataStore) connection error:", err);
+    throw err;
   }
 }
 
-connectToSqlServer();
+// Test connections at startup
+connectToSqlServerYMDataStore().catch((err) => {
+  console.error(
+    "Initial connection to YMDataStore failed. The server will still start, but YMDataStore endpoints may not work:",
+    err
+  );
+});
 
-// New Endpoint for RS18 Data
+// New Endpoint for RS18 Data (YMDataStore)
 app.get("/api/sunrise/rs18", async (req, res) => {
+  let pool;
   try {
+    pool = await connectToSqlServerYMDataStore();
     const query = `
-      SELECT 
+      SELECT
         FORMAT(CAST(dDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
         WorkLine,
         MONo,
@@ -210,15 +227,15 @@ app.get("/api/sunrise/rs18", async (req, res) => {
           ELSE NULL
         END AS ReworkName,
         SUM(QtyRework) AS DefectsQty
-      FROM 
-        YMDataStore.SUNRISE.RS18 r 
-      WHERE 
+      FROM
+        YMDataStore.SUNRISE.RS18 r
+      WHERE
         TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
         AND SeqNo <> 700
         AND TRY_CAST(ReworkCode AS INT) BETWEEN 1 AND 44
         AND CAST(dDate AS DATE) > '2022-12-31'
         AND CAST(dDate AS DATE) < DATEADD(DAY, 1, GETDATE())
-      GROUP BY 
+      GROUP BY
         CAST(dDate AS DATE),
         WorkLine,
         MONo,
@@ -226,7 +243,7 @@ app.get("/api/sunrise/rs18", async (req, res) => {
         ColorNo,
         ColorName,
         ReworkCode
-      HAVING 
+      HAVING
         CASE ReworkCode
           WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
           WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
@@ -276,21 +293,28 @@ app.get("/api/sunrise/rs18", async (req, res) => {
         END IS NOT NULL;
     `;
 
-    const result = await sql.query(query);
+    const result = await pool.request().query(query);
     res.json(result.recordset);
   } catch (err) {
     console.error("Error fetching RS18 data:", err);
     res
       .status(500)
       .json({ message: "Failed to fetch RS18 data", error: err.message });
+  } finally {
+    if (pool) {
+      await pool.close();
+      console.log("SQL Server (YMDataStore) connection closed.");
+    }
   }
 });
 
-// New Endpoint for Sunrise Output Data
+// New Endpoint for Sunrise Output Data (YMDataStore)
 app.get("/api/sunrise/output", async (req, res) => {
+  let pool;
   try {
+    pool = await connectToSqlServerYMDataStore();
     const query = `
-      SELECT 
+      SELECT
         FORMAT(CAST(BillDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
         WorkLine,
         MONo,
@@ -299,7 +323,7 @@ app.get("/api/sunrise/output", async (req, res) => {
         ColorName,
         SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END) AS TotalQtyT38,
         SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END) AS TotalQtyT39
-      FROM 
+      FROM
       (
         SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2023
         UNION ALL
@@ -307,10 +331,10 @@ app.get("/api/sunrise/output", async (req, res) => {
         UNION ALL
         SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2025
       ) AS CombinedData
-      WHERE 
+      WHERE
         SeqNo IN (38, 39)
         AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
-      GROUP BY 
+      GROUP BY
         CAST(BillDate AS DATE),
         WorkLine,
         MONo,
@@ -319,7 +343,7 @@ app.get("/api/sunrise/output", async (req, res) => {
         ColorName;
     `;
 
-    const result = await sql.query(query);
+    const result = await pool.request().query(query);
     res.json(result.recordset);
   } catch (err) {
     console.error("Error fetching Sunrise Output data:", err);
@@ -327,15 +351,128 @@ app.get("/api/sunrise/output", async (req, res) => {
       message: "Failed to fetch Sunrise Output data",
       error: err.message
     });
+  } finally {
+    if (pool) {
+      await pool.close();
+      console.log("SQL Server (YMDataStore) connection closed.");
+    }
   }
 });
 
+// app.get("/api/sunrise/output", async (req, res) => {
+//   try {
+//     const query = `
+//       SELECT
+//         FORMAT(CAST(BillDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName,
+//         SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END) AS TotalQtyT38,
+//         SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END) AS TotalQtyT39
+//       FROM
+//         YMDataStore.SunRise_G.tWork2024
+//       WHERE
+//         SeqNo IN (38, 39)
+//         AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+//       GROUP BY
+//         CAST(BillDate AS DATE),
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName;
+//     `;
+
+//     const result = await sql.query(query);
+//     res.json(result.recordset);
+//   } catch (err) {
+//     console.error("Error fetching Sunrise Output data:", err);
+//     res.status(500).json({
+//       message: "Failed to fetch Sunrise Output data",
+//       error: err.message
+//     });
+//   }
+// });
+
+//Old Endpoint for RS18 Data
+
+// app.get("/api/sunrise/rs18", async (req, res) => {
+//   try {
+//     const query = `
+//       SELECT
+//         FORMAT(CAST(dDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+//         DATEPART(HOUR, CAST(QcTime AS DATETIME)) AS StartHR,
+//         DATEPART(HOUR, CAST(QcTime AS DATETIME)) + 1 AS EndHR,
+//         WorkLine,
+//         MONo,
+//         EmpID,
+//         EmpName,
+//         EmpID_QC,
+//         EmpName_QC,
+//         SizeName,
+//         ColorNo,
+//         ColorName,
+//         SeqNo,
+//         SeqName,
+//         ReworkCode,
+//         ReworkName,
+//         SUM(QtyRework) AS DefectsQty
+//       FROM
+//         YMDataStore.SUNRISE.RS18 r
+//       WHERE
+//         TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+//         AND SeqNo <> 700
+//         AND TRY_CAST(ReworkCode AS INT) BETWEEN 1 AND 40
+//         AND CAST(dDate AS DATE) > '2021-12-31'
+//         AND CAST(dDate AS DATE) < DATEADD(DAY, 1, GETDATE())
+//       GROUP BY
+//         CAST(dDate AS DATE),
+//         DATEPART(HOUR, CAST(QcTime AS DATETIME)),
+//         DATEPART(HOUR, CAST(QcTime AS DATETIME)) + 1,
+//         WorkLine,
+//         MONo,
+//         EmpID,
+//         EmpName,
+//         EmpID_QC,
+//         EmpName_QC,
+//         SizeName,
+//         ColorNo,
+//         ColorName,
+//         SeqNo,
+//         SeqName,
+//         ReworkCode,
+//         ReworkName;
+//     `;
+
+//     const result = await sql.query(query);
+//     res.json(result.recordset);
+//   } catch (err) {
+//     console.error("Error fetching RS18 data:", err);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to fetch RS18 data", error: err.message });
+//   }
+// });
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// Update the MONo search endpoint to handle complex pattern matching
+/* ------------------------------
+   End Points - dt_orders
+------------------------------ */
+
+// const checkDbConnection = (req, res, next) => {
+//   if (ymProdConnection.readyState !== 1) {
+//     // 1 means connected
+//     return res.status(500).json({ error: "Mongoose connection is not ready" });
+//   }
+//   next();
+// };
+
+// Update the MONo search endpoint to handle partial matching
 app.get("/api/search-mono", async (req, res) => {
   try {
     const term = req.query.term; // Changed from 'digits' to 'term'
@@ -366,6 +503,72 @@ app.get("/api/search-mono", async (req, res) => {
   }
 });
 
+// app.get("/api/search-mono", async (req, res) => {
+//   try {
+//     const digits = req.query.digits;
+//     const collection = ymEcoConnection.db.collection("dt_orders");
+
+//     // More robust regex pattern to match last 3 digits before any non-digit characters
+//     const regexPattern = new RegExp(
+//       `(\\d{3})(?=\\D*$)|(\\d{3}$)|(?<=\\D)(\\d{3})(?=\\D)`,
+//       "i"
+//     );
+
+//     const results = await collection
+//       .aggregate([
+//         {
+//           $addFields: {
+//             matchParts: {
+//               $regexFind: {
+//                 input: "$Order_No",
+//                 regex: regexPattern,
+//               },
+//             },
+//           },
+//         },
+//         {
+//           $match: {
+//             $or: [
+//               { "matchParts.match": { $regex: new RegExp(`${digits}$`, "i") } },
+//               { "matchParts.match": { $regex: new RegExp(`^${digits}`, "i") } },
+//             ],
+//           },
+//         },
+//         {
+//           $project: {
+//             Order_No: 1,
+//             numericMatch: {
+//               $substr: [
+//                 { $ifNull: ["$matchParts.match", ""] },
+//                 { $subtract: [{ $strLenCP: "$matchParts.match" }, 3] },
+//                 3,
+//               ],
+//             },
+//           },
+//         },
+//         {
+//           $match: {
+//             numericMatch: digits,
+//           },
+//         },
+//         {
+//           $group: {
+//             _id: "$Order_No",
+//             count: { $sum: 1 },
+//           },
+//         },
+//         {
+//           $limit: 100,
+//         },
+//       ])
+//       .toArray();
+
+//     res.json(results.map((r) => r._id));
+//   } catch (error) {
+//     console.error("Error searching MONo:", error);
+//     res.status(500).json({ error: "Failed to search MONo" });
+//   }
+// });
 
 // Update /api/order-details endpoint
 app.get("/api/order-details/:mono", async (req, res) => {
@@ -4263,140 +4466,6 @@ app.post("/api/repair-tracking", async (req, res) => {
   }
 });
 
-
-// Endpoint to update defect status for a rejected garment
-app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
-  const { defect_print_id, garmentNumber, failedDefects, isRejecting } = req.body;
-  try {
-    const repairTracking = await QC2RepairTracking.find({ defect_print_id });
-    if (!repairTracking || repairTracking.length == 0) {
-      return res.status(404).json({ message: "Repair tracking not found" });
-    }
-
-    const rt = repairTracking[0];
-    console.log("Before update:", rt.repairArray);
-
-    rt.repairArray = rt.repairArray.map(item => {
-      if (item.garmentNumber === garmentNumber) {
-        if (isRejecting && failedDefects.some(fd => fd.name === item.defectName)) {
-          item.status = "Fail";
-          item.repair_date = null;
-          item.repair_time = null;
-          item.pass_bundle = "Fail"; 
-        } else if (isRejecting) {
-          // If rejecting but not in failedDefectIds, don't change status or pass_bundle
-        } else {
-          item.status = "OK";
-          const now = new Date();
-          item.repair_date = now.toLocaleDateString("en-US");
-          item.repair_time = now.toLocaleTimeString("en-US", { hour12: false });
-          // Only set pass_bundle to "Pass" if not rejecting
-          item.pass_bundle = "Pass"; 
-        }
-      }
-      return item;
-    });
-
-    console.log("After update:", rt.repairArray);
-
-    await rt.save();
-    res.status(200).json({ message: "Updated successfully" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Endpoint to update pass_bundle status for all garments
-app.post("/api/qc2-repair-tracking/update-pass-bundle-status", async (req, res) => {
-  try {
-    const { defect_print_id, pass_bundle } =
-      req.body;
-
-    const repairTracking = await QC2RepairTracking.findOne({
-      defect_print_id,
-    });
-
-    if (!repairTracking) {
-      return res.status(404).json({ message: "Repair tracking not found" });
-    }
-
-    const updatedRepairArray = repairTracking.repairArray.map((item) => {
-        return {
-          ...item.toObject(),
-          pass_bundle: item.status === "OK" ? "Pass" : item.pass_bundle,
-        };
-    });
-
-    repairTracking.repairArray = updatedRepairArray;
-    await repairTracking.save();
-
-    res
-      .status(200)
-      .json({ message: "pass_bundle status updated successfully" });
-  } catch (error) {
-    console.error("Error updating pass_bundle status:", error);
-    res.status(500).json({
-      message: "Failed to update pass_bundle status",
-      error: error.message,
-    });
-  }
-}
-);
-
-
-
-// Endpoint to update defect status by defect name and garment number
-app.post("/api/qc2-repair-tracking/update-defect-status-by-name", async (req, res) => {
-  const { defect_print_id, garmentNumber, defectName, status} = req.body;
-  try {
-    const repairTracking = await QC2RepairTracking.findOne({ defect_print_id });
-    if (!repairTracking) {
-      console.error(`No repair tracking found for defect_print_id: ${defect_print_id}`); // Add this line
-      return res.status(404).json({ message: "Repair tracking not found" });
-    }
-    
-    // Find the specific defect and update it
-    const updatedRepairArray = repairTracking.repairArray.map(item => {
-      if (item.garmentNumber === garmentNumber && item.defectName === defectName) {
-        if (item.status !== status) {
-            const now = new Date();
-            return {
-                ...item,
-                status: status,
-                repair_date: status === "OK" ? now.toLocaleDateString("en-US") : null,
-                repair_time: status === "OK" ? now.toLocaleTimeString("en-US", { hour12: false }) : null,
-                // pass_bundle: status === "OK" ? "Pass" : status === "Fail" ? "Fail" : item.pass_bundle
-                pass_bundle: status === "OK" ? "Pass" : item.pass_bundle,
-            };
-            
-        } 
-        // else {
-        //     return item; // Don't update if no change is needed
-        // }
-      }
-      return item;
-    });
-    // Check if any changes were made
-    const hasChanges = repairTracking.repairArray.some((item, index) => {
-      return JSON.stringify(item) !== JSON.stringify(updatedRepairArray[index]);
-    });
-
-    if (hasChanges) {
-      repairTracking.repairArray = updatedRepairArray;
-      await repairTracking.save();
-      console.log("Updated Repair Array:", updatedRepairArray);
-      res.status(200).json({ message: "Defect status updated successfully" });
-    } else {
-      res.status(200).json({ message: "No changes were made" });
-    }
-
-  } catch (error) {
-    console.error("Error updating defect status:", error);
-    res.status(500).json({ message: "Failed to update defect status", error: error.message });
-  }
-});
-
-
 /* ------------------------------
    QC2 - Reworks
 ------------------------------ */
@@ -5241,6 +5310,68 @@ app.get("/api/opa-autocomplete", async (req, res) => {
 /* ------------------------------
    QC Inline Roving ENDPOINTS
 ------------------------------ */
+
+// ------------------------
+// Multer Storage Setup for QC Inline Roving
+// ------------------------
+const qcStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, "../public/storage/qcinline");
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const { date, type, emp_id } = req.body;
+    // Validate the inputs to prevent 'undefined' in the filename
+    const currentDate = date || new Date().toISOString().split("T")[0]; // Fallback to current date if not provided
+    const imageType = type || "spi-measurement"; // Fallback to 'unknown' if type is not provided
+    const userEmpId = emp_id || "emp"; // Fallback to 'guest' if emp_id is not provided
+    const randomId = Math.random().toString(36).substring(2, 15);
+    const fileName = `${currentDate}-${imageType}-${userEmpId}-${randomId}.jpg`;
+    cb(null, fileName);
+  }
+});
+
+const qcUpload = multer({
+  storage: qcStorage,
+  limits: { fileSize: 5000000 }, // Limit file size to 5MB
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|gif/;
+    const extname = filetypes.test(
+      path.extname(file.originalname).toLowerCase()
+    );
+    const mimetype = filetypes.test(file.mimetype);
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb("Error: Images Only (jpeg, jpg, png, gif)!");
+    }
+  }
+}).single("image");
+
+// Serve static files (for accessing uploaded images)
+app.use("/storage", express.static(path.join(__dirname, "../public/storage")));
+
+// Endpoint to upload images for QC Inline Roving
+app.post("/api/upload-qc-image", qcUpload, (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No image uploaded" });
+    }
+    const imagePath = `/storage/qcinline/${req.file.filename}`;
+    res.status(200).json({ imagePath });
+  } catch (error) {
+    console.error("Error uploading image:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to upload image", error: error.message });
+  }
+});
+
+// Updated endpoint to save or update QC Inline Roving data
 app.post("/api/save-qc-inline-roving", async (req, res) => {
   try {
     const qcInlineRovingData = req.body;
@@ -5253,7 +5384,7 @@ app.post("/api/save-qc-inline-roving", async (req, res) => {
 
     res.status(201).json({
       message: "QC Inline Roving data saved successfully",
-      data: newQCInlineRoving,
+      data: newQCInlineRoving
     });
   } catch (error) {
     console.error("Error saving QC Inline Roving data:", error);
@@ -5271,6 +5402,95 @@ app.get("/api/qc-inline-roving-reports", async (req, res) => {
     res.json(reports);
   } catch (error) {
     res.status(500).json({ message: "Error fetching reports", error });
+  }
+});
+
+// Endpoint to fetch user data by emp_id
+app.get("/api/user-by-emp-id", async (req, res) => {
+  try {
+    const empId = req.query.emp_id;
+    if (!empId) {
+      return res.status(400).json({ error: "emp_id is required" });
+    }
+
+    const user = await UserMain.findOne({ emp_id: empId }).exec(); // Use UserMain
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      emp_id: user.emp_id,
+      eng_name: user.eng_name,
+      kh_name: user.kh_name,
+      job_title: user.job_title,
+      dept_name: user.dept_name,
+      sect_name: user.sect_name
+    });
+  } catch (err) {
+    console.error("Error fetching user by emp_id:", err);
+    res.status(500).json({
+      message: "Failed to fetch user data",
+      error: err.message
+    });
+  }
+});
+
+app.get("/api/users-paginated", async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const jobTitle = req.query.jobTitle || ""; // Optional jobTitle filter
+    const empId = req.query.empId || ""; // Optional empId filter
+    const section = req.query.section || ""; // Optional section filter
+
+    // Build the query object
+    const query = {};
+    if (jobTitle) {
+      query.job_title = jobTitle;
+    }
+    if (empId) {
+      query.emp_id = empId;
+    }
+    if (section) {
+      query.sect_name = section;
+    }
+    query.working_status = "Working"; // Ensure only working users are fetched
+
+    // Fetch users with pagination and filters
+    const users = await UserMain.find(query)
+      .skip(skip)
+      .limit(limit)
+      .select("emp_id eng_name kh_name dept_name sect_name job_title")
+      .exec();
+
+    // Get total count for pagination (with filters applied)
+    const total = await UserMain.countDocuments(query);
+
+    res.json({
+      users,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (err) {
+    console.error("Error fetching paginated users:", err);
+    res.status(500).json({
+      message: "Failed to fetch users",
+      error: err.message
+    });
+  }
+});
+
+app.get("/api/sections", async (req, res) => {
+  try {
+    const sections = await UserMain.distinct("sect_name", {
+      working_status: "Working"
+    });
+    res.json(sections.filter((section) => section)); // Filter out null/empty values
+  } catch (error) {
+    console.error("Error fetching sections:", error);
+    res.status(500).json({ message: "Failed to fetch sections" });
   }
 });
 

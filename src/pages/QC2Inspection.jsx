@@ -340,13 +340,28 @@ const QC2InspectionPage = () => {
 const handleDefectCardScan = useCallback(
   async (bundleData, defect_print_id) => {
     try {
-      const printEntry = bundleData.printArray.find(
-        (entry) =>
-          entry.defect_print_id === defect_print_id && !entry.isCompleted
+      const payload = {
+        defect_print_id,
+        garmentNumber,
+        defectName,
+        status
+      };
+      // // Only add pass_bundle if status is "OK"
+      // if (status === "OK" || status === "Fail") {
+      //   payload.pass_bundle = passBundleStatus;
+      // }
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc2-repair-tracking/update-defect-status-by-name`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }
       );
-      if (!printEntry) {
+      if (!response.ok) {
+        const errorText = await response.text();
         throw new Error(
-          "This defect card is already completed or does not exist"
+          `Failed to update defect status in repair tracking: ${errorText}`
         );
       }
 
@@ -426,9 +441,13 @@ const handleDefectCardScan = useCallback(
       // }
 
     } catch (err) {
-      setError(err.message);
-      setInDefectWindow(false);
-      setScanning(false);
+      setError(
+        `Failed to update defect status in repair tracking: ${err.message}`
+      );
+      console.error(
+        "Error updating defect status in repair tracking:",
+        err.message
+      );
     }
   },
   [
@@ -608,7 +627,6 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
     }
   };
 
-
   const updateDefectStatusInRepairTrackingAndPassBundle = async (
     defect_print_id,
     garmentNumber,
@@ -724,11 +742,15 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
         // Step 3: Fallback to fetching bundle data if neither defect nor inspection ID matches
         await fetchBundleData(scannedData);
       }
+      // console.log("Defect status updated in repair tracking successfully");
     } catch (err) {
-      setError(err.message || "Failed to process scanned data");
-      setScanning(false);
-    } finally {
-      setLoadingData(false);
+      setError(
+        `Failed to update defect status in repair tracking: ${err.message}`
+      );
+      console.error(
+        "Error updating defect status in repair tracking:",
+        err.message
+      );
     }
   }, 
   [fetchBundleData, handleDefectCardScan, setDefectTrackingDetails, setError, setIsReturnInspection, setLoadingData, setRepairStatuses, setScanning]
@@ -737,6 +759,78 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
   const handleScanError = useCallback((err) => {
     setError(err.message || "Failed to process scanned data");
   }, [setError]);
+
+  const handleScanSuccess = useCallback(
+    async (scannedData) => {
+      try {
+        setLoadingData(true);
+
+        // Step 1: Check if the scanned data is a defect_print_id (repair QR code)
+        const defectResponse = await fetch(
+          `${API_BASE_URL}/api/qc2-inspection-pass-bundle-by-defect-print-id/${scannedData}`
+        );
+
+        if (defectResponse.ok) {
+          const bundleData = await defectResponse.json();
+          await handleDefectCardScan(bundleData, scannedData);
+
+          // Fetch repair tracking details (defect card details)
+          const trackingResponse = await fetch(
+            `${API_BASE_URL}/api/defect-track/${scannedData}`
+          );
+          if (trackingResponse.ok) {
+            const trackingData = await trackingResponse.json();
+            setDefectTrackingDetails(trackingData); // Set defect card details for display
+            setIsReturnInspection(true); // Mark this as a return inspection
+
+            // Initialize repair statuses for each defect
+            const initialStatuses = {};
+            trackingData.garments.forEach((garment) => {
+              garment.defects.forEach((defect) => {
+                initialStatuses[`${garment.garmentNumber}-${defect.name}`] =
+                  defect.status || "Fail";
+              });
+            });
+            setRepairStatuses(initialStatuses); // Track repair status changes
+          } else {
+            console.error("Failed to fetch defect tracking details");
+          }
+          return;
+        }
+
+        // Step 2: Check if the scanned data is a bundle_random_id
+        const inspectionResponse = await fetch(
+          `${API_BASE_URL}/api/qc2-inspection-pass-bundle-by-random-id/${scannedData}`
+        );
+
+        if (inspectionResponse.ok) {
+          const inspectionData = await inspectionResponse.json();
+          if (inspectionData.totalPass === 0) {
+            setError("This bundle already finished inspection");
+          } else {
+            setError("Please scan defect card for Return Garments");
+          }
+          setScanning(false);
+        } else {
+          // Step 3: Fallback to fetching bundle data if neither defect nor inspection ID matches
+          await fetchBundleData(scannedData);
+        }
+      } catch (err) {
+        setError(err.message || "Failed to process scanned data");
+        setScanning(false);
+      } finally {
+        setLoadingData(false);
+      }
+    }
+    // [fetchBundleData, handleDefectCardScan, setDefectTrackingDetails, setError, setIsReturnInspection, setLoadingData, setRepairStatuses, setScanning]
+  );
+
+  const handleScanError = useCallback(
+    (err) => {
+      setError(err.message || "Failed to process scanned data");
+    },
+    [setError]
+  );
 
   const handleRejectGarment = async () => {
     if (!hasDefects || totalPass <= 0) {
@@ -850,6 +944,16 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
           newConfirmed[key] = (newConfirmed[key] || 0) + currentTempDefects[key];
         }
       });
+
+      // const garmentDefects = [];
+      // if (currentTempDefects[garmentDefectId]) {
+      //   Object.keys(currentTempDefects[garmentDefectId]).forEach((key) => {
+      //     garmentDefects.push({
+      //       name: defectsList["english"][key].name,
+      //       count: currentTempDefects[garmentDefectId][key],
+      //     });
+      //   });
+      // }
       setConfirmedDefects(newConfirmed);
       setTempDefects({});
       setSelectedGarment(null);
@@ -1279,7 +1383,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
     }
 
     // Add console logs for debugging
-    console.log("handlePassBundle called", { isReturnInspection, sessionData });
+    // console.log("handlePassBundle called", { isReturnInspection, sessionData });
 
     try {
       if (isReturnInspection) {
@@ -1371,7 +1475,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
           { "elem.defect_print_id": printEntry.defect_print_id }
         ];
 
-        console.log("Updating for return inspection", updatePayload);
+        // console.log("Updating for return inspection", updatePayload);
 
         const response = await fetch(
           `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
@@ -1446,7 +1550,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
       setError(null); // Clear any previous errors
     } catch (err) {
       setError(err.message || "Failed to update inspection record");
-      console.error("Error in handlePassBundle:", err);
+      // console.error("Error in handlePassBundle:", err);
     } finally {
       setIsPassingBundle(false);
     }
@@ -1989,6 +2093,11 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
             </div>
             <div className="flex items-center justify-center">
               <button onClick={() => handleIconClick('printingMethod')}>
+                <Paperclip className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex items-center justify-center">
+              <button onClick={() => handleIconClick("printingMethod")}>
                 <Paperclip className="w-5 h-5" />
               </button>
             </div>

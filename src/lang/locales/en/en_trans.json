@@ -303,22 +303,22 @@
     "return":"Return"
   },
 
-  "defectPrint":{
-    "search_package":"Search Package No",
-    "repair_group":"Repair Group",
-    "search_repair":"Search Repair Group",
-    "no_defect_card":"No defect cards found",
-    "defect_count":"Defect Count",
-    "mode":"Mode",
-    "status":"Status",
-    "in_progress":"In Progress",
-    "completed":"Completed",
-    "both":"Both",
-    "checked":"Checked #",
-    "defectsN":"Defect #",
-    "rejectN":"Reject #",
-    "reworking":"Reworking #",
-    "print_details":"Print Details"
+  "defectPrint": {
+    "search_package": "Search Package No",
+    "repair_group": "Repair Group",
+    "search_repair": "Search Repair Group",
+    "no_defect_card": "No defect cards found",
+    "defect_count": "Defect Count",
+    "mode": "Mode",
+    "status": "Status",
+    "in_progress": "In Progress",
+    "completed": "Completed",
+    "both": "Both",
+    "checked": "Checked #",
+    "defectsN": "Defect #",
+    "rejectN": "Reject #",
+    "reworking": "Reworking #",
+    "print_details": "Print Details"
   },
 
   "imageUpload":{
@@ -389,60 +389,58 @@
     "select_style_code":"Select Style Code"
   },
 
-  "styleDig":{
-    "style_digit":"Style Digit",
-    "enter_style_digit":"Enter Style Digit"
+  "styleDig": {
+    "style_digit": "Style Digit",
+    "enter_style_digit": "Enter Style Digit"
   },
-  "rePrint":{
-    "reprint_records":"Reprint Records",
-    "clear":"Clear",
-    "search_mono":"Search MONo...",
-    "search_package_no":"Search Package No...",
-    "search_emp_id":"Search Emp ID..."
+  "rePrint": {
+    "reprint_records": "Reprint Records",
+    "clear": "Clear",
+    "search_mono": "Search MONo...",
+    "search_package_no": "Search Package No...",
+    "search_emp_id": "Search Emp ID..."
   },
-
-  "qc2In":{
-    "language":"Language",
-    "all_languages":"All Languages",
-    "sort":"Sort",
-    "printer":"Connect Printer",
-    "printing_method":"Printing Method",
-    "repair":"By Repair",
-    "garment":"By garments",
-    "bundle":"By Bundle",
-    "inspection":"Inspection",
-    "edit_inspection":"Edit Inspection",
-    "defect_card":"Defect Card",
-    "fabric":"Fabric",
-    "workmanship":"Workmanship",
-    "cleanliness":"Cleanliness",
-    "embellishment":"Embellishment",
-    "measurement":"Measurement",
-    "washing":"Washing",
-    "finishing":"Finishing",
-    "miscellaneous":"miscellaneous",
-    "loading_data":"Loading Data...",
-    "reject_garment":"Reject Garment",
-    "defect_qty":"Defect Qty",
-    "pass_bundle":"Pass Bundle",
-    "all":"All",
-    "common":"Common",
-    "type1":"Type 1",
-    "type2":"Type 2"
+  "qc2In": {
+    "language": "Language",
+    "all_languages": "All Languages",
+    "sort": "Sort",
+    "printer": "Connect Printer",
+    "printing_method": "Printing Method",
+    "repair": "By Repair",
+    "garment": "By garments",
+    "bundle": "By Bundle",
+    "inspection": "Inspection",
+    "edit_inspection": "Edit Inspection",
+    "defect_card": "Defect Card",
+    "fabric": "Fabric",
+    "workmanship": "Workmanship",
+    "cleanliness": "Cleanliness",
+    "embellishment": "Embellishment",
+    "measurement": "Measurement",
+    "washing": "Washing",
+    "finishing": "Finishing",
+    "miscellaneous": "miscellaneous",
+    "loading_data": "Loading Data...",
+    "reject_garment": "Reject Garment",
+    "defect_qty": "Defect Qty",
+    "pass_bundle": "Pass Bundle",
+    "all": "All",
+    "common": "Common",
+    "type1": "Type 1",
+    "type2": "Type 2"
   },
-
-  "editGar":{
-    "edit_garment":"Edit Garment",
-    "select_garment":"Selected Garment",
-    "select_defect":"Select a defect",
-    "add_defect":"Add Defect",
-    "garment_no":"Garment No"
+  "editGar": {
+    "edit_garment": "Edit Garment",
+    "select_garment": "Selected Garment",
+    "select_defect": "Select a defect",
+    "add_defect": "Add Defect",
+    "garment_no": "Garment No"
   },
 
-  "defName":{
-    "defect_code":"Defect Code",
-    "chinese_name":"Chinese Name",
-    "printing_name":"Printing Name"
+  "defName": {
+    "defect_code": "Defect Code",
+    "chinese_name": "Chinese Name",
+    "printing_name": "Printing Name"
   }
 
   }

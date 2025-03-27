@@ -11,6 +11,7 @@ const SunriseFilterPane = ({
   uniqueColorNames,
   //uniqueColorNos,
   uniqueSizeNames,
+  uniqueReworkNames, // Added new prop for ReworkNames
   formatToInputDate
 }) => {
   // Get all possible buyers from uniqueMoNos
@@ -29,7 +30,7 @@ const SunriseFilterPane = ({
 
   return (
     isFilterOpen && (
-      <div className="mb-6 grid grid-cols-7 gap-4 p-4 bg-gray-100 rounded-lg shadow-md">
+      <div className="mb-6 grid grid-cols-8 gap-4 p-4 bg-gray-100 rounded-lg shadow-md">
         <div>
           <label className="block text-sm font-medium text-gray-700">
             Start Date:
@@ -140,6 +141,24 @@ const SunriseFilterPane = ({
             {filteredBuyers.map((buyer) => (
               <option key={buyer} value={buyer}>
                 {buyer}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Defect Name:
+          </label>
+          <select
+            name="reworkName"
+            value={filters.reworkName}
+            onChange={handleFilterChange}
+            className="mt-1 p-2 border rounded-md w-full focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">All</option>
+            {uniqueReworkNames.map((rework) => (
+              <option key={rework} value={rework}>
+                {rework}
               </option>
             ))}
           </select>

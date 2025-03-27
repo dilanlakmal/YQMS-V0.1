@@ -165,6 +165,13 @@ function Home() {
           description: "QC Inline Roving Check Point."
         },
         {
+          path: "/inline-emp",
+          roles: ["Admin", "QC2"],
+          image: "assets/Home/qc2.png",
+          title: "Print QR",
+          description: "Sewing Worker QR."
+        },
+        {
           path: "/details",
           roles: ["Admin", "QC1"],
           image: "/IMG/qcc.png",

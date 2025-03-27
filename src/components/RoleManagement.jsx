@@ -131,7 +131,7 @@ export default function RoleManagement() {
     try {
       await axios.post(`${API_BASE_URL}/api/role-management`, {
         role: selectedRole,
-        jobTitles: selectedJobTitles,
+        jobTitles: selectedJobTitles
       });
 
       setSuccessMessage(
@@ -162,7 +162,7 @@ export default function RoleManagement() {
     "QC2",
     "QA",
     "Download Data",
-    "Live Dashboard",
+    "Live Dashboard"
   ];
 
   return (
