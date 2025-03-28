@@ -574,7 +574,7 @@ function BundleRegistration() {
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Mobile Layout (below md: 768px) */}
       <div className="md:hidden">
-        <div className="bg-white shadow-sm p-3 sticky top-0 z-10">
+        <div className="p-3 top-0 z-10">
           <div className="flex justify-between items-center">
             <h1 className="text-xl font-bold text-gray-900">
               {t("bundle.bundle_registration")}

@@ -340,25 +340,13 @@ const QC2InspectionPage = () => {
 const handleDefectCardScan = useCallback(
   async (bundleData, defect_print_id) => {
     try {
-      const payload = {
-        defect_print_id,
-        garmentNumber,
-        defectName,
-        status
-      };
-     
-      const response = await fetch(
-        `${API_BASE_URL}/api/qc2-repair-tracking/update-defect-status-by-name`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        }
+      const printEntry = bundleData.printArray.find(
+        (entry) =>
+          entry.defect_print_id === defect_print_id && !entry.isCompleted
       );
-      if (!response.ok) {
-        const errorText = await response.text();
+      if (!printEntry) {
         throw new Error(
-          `Failed to update defect status in repair tracking: ${errorText}`
+          "This defect card is already completed or does not exist"
         );
       }
 
@@ -399,13 +387,13 @@ const handleDefectCardScan = useCallback(
       }
       const trackingData = await trackingResponse.json();
       setDefectTrackingDetails(trackingData);
-        setIsReturnInspection(true); 
+        setIsReturnInspection(true); // Mark this as a return inspection
 
         // Initialize repair statuses for each defect
         const initialStatuses = {};
-        const initialLockedDefects = new Set(); 
-        // const initialLockedGarments = new Set(); 
-        const initialRejectedGarmentDefects = new Set();
+        const initialLockedDefects = new Set(); // Initialize a set for locked defects
+        // const initialLockedGarments = new Set(); // Initialize a set for locked garments
+        const initialRejectedGarmentDefects = new Set(); // Initialize a set for rejected garment defects
 
         trackingData.garments.forEach((garment) => {
           garment.defects.forEach((defect) => {
@@ -419,24 +407,24 @@ const handleDefectCardScan = useCallback(
               
             }
           });
+          
         });
 
-        setRepairStatuses(initialStatuses); 
-        setLockedDefects(initialLockedDefects); 
-        // setLockedGarments(initialLockedGarments); 
-        setRejectedGarmentDefects(initialRejectedGarmentDefects); 
-  
+        setRepairStatuses(initialStatuses); // Track repair status changes
+        setLockedDefects(initialLockedDefects); // Set the initial locked defects
+        // setLockedGarments(initialLockedGarments); // Set the initial locked garments
+        setRejectedGarmentDefects(initialRejectedGarmentDefects); // Set the initial rejected garment defects
+     
+
     } catch (err) {
-      setError(
-        `Failed to update defect status in repair tracking: ${err.message}`
-      );
-      console.error(
-        "Error updating defect status in repair tracking:",
-        err.message
-      );
+      setError(err.message);
+      setInDefectWindow(false);
+      setScanning(false);
     }
   },
-  []
+  [
+    
+  ]
 );
 
 const handleDefectStatusToggle = (garmentNumber, defectName) => {

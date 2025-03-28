@@ -82,10 +82,10 @@ const DefectTrack = () => {
           body: JSON.stringify(payload),
         }
       );
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to update defect status in repair tracking: ${errorText}`);
-      }
+      // if (!response.ok) {
+      //   const errorText = await response.text();
+      //   throw new Error(`Failed to update defect status in repair tracking: ${errorText}`);
+      // }
       console.log("Defect status updated in repair tracking successfully");
     } catch (err) {
       setError(`Failed to update defect status in repair tracking: ${err.message}`);
