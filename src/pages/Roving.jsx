@@ -3,6 +3,7 @@ import axios from "axios";
 import { allDefects } from "../constants/defects";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
+import { useTranslation } from "react-i18next";
 import {
   XCircle,
   Database,
@@ -22,6 +23,7 @@ import RovingCamera from "../components/inspection/qc_roving/RovingCamera";
 import RovingData from "../components/inspection/qc_roving/RovingData"; // Import the new component
 
 const RovingPage = () => {
+  const { t } = useTranslation();
   const { user, loading: authLoading } = useAuth();
   const [inspectionType, setInspectionType] = useState("Normal");
   const [spiStatus, setSpiStatus] = useState("");
@@ -434,7 +436,7 @@ const RovingPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 p-6">
       <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6">
         <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">
-          QC Inline Roving Inspection
+          {t("qcRoving.qc_inline_roving_inspection")}
         </h1>
         {/* Tab Navigation */}
         <div className="flex justify-center mb-4">
@@ -446,7 +448,7 @@ const RovingPage = () => {
                 : "bg-gray-200 text-gray-700"
             } rounded-l-lg`}
           >
-            QC Inline Roving
+            {t("qcRoving.qcInlineRoving")}
           </button>
           <button
             onClick={() => setActiveTab("data")}
@@ -456,7 +458,7 @@ const RovingPage = () => {
                 : "bg-gray-200 text-gray-700"
             }`}
           >
-            Data
+            {t("qcRoving.data")}
           </button>
           <button
             onClick={() => setActiveTab("db")}
@@ -479,7 +481,7 @@ const RovingPage = () => {
               <div className="flex flex-wrap gap-4 items-end">
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
-                    Date
+                    {t("qcRoving.date")}
                   </label>
                   <DatePicker
                     selected={currentDate}
@@ -489,14 +491,14 @@ const RovingPage = () => {
                 </div>
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
-                    Line No
+                    {t("qcRoving.lineNo")}
                   </label>
                   <select
                     value={lineNo}
                     onChange={(e) => setLineNo(e.target.value)}
                     className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
                   >
-                    <option value="">Select Line No</option>
+                    <option value="">{t("qcRoving.select_line_no")}</option>
                     {lineNoOptions.map((num) => (
                       <option key={num} value={num}>
                         {num}
@@ -506,7 +508,7 @@ const RovingPage = () => {
                 </div>
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
-                    MO No
+                    {t("qcRoving.moNo")}
                   </label>
                   <div className="relative" ref={moNoDropdownRef}>
                     <input
@@ -515,7 +517,7 @@ const RovingPage = () => {
                       onChange={(e) => {
                         setMoNoSearch(e.target.value);
                       }}
-                      placeholder="Search MO No..."
+                      placeholder={t("qcRoving.search_mono")}
                       className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
                     />
                     {showMoNoDropdown && (
@@ -543,7 +545,7 @@ const RovingPage = () => {
               <div className="flex flex-wrap items-center gap-4 mt-4">
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
-                    Operation No
+                    {t("qcRoving.operationNo")}
                   </label>
                   <div className="flex items-center gap-2">
                     <select
@@ -552,7 +554,9 @@ const RovingPage = () => {
                       className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
                       disabled={!moNo || operationIds.length === 0}
                     >
-                      <option value="">Select Operation No</option>
+                      <option value="">
+                        {t("qcRoving.select_operation_no")}
+                      </option>
                       {operationIds.map((id) => (
                         <option key={id} value={id}>
                           {id}
@@ -602,14 +606,14 @@ const RovingPage = () => {
                 </div>
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
-                    Scan QR
+                    {t("qcRoving.scanQR")}
                   </label>
                   <button
                     onClick={() => setShowScanner(true)}
                     className="mt-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 w-full justify-center"
                   >
                     <QrCode className="w-5 h-5" />
-                    Scan QR
+                    {t("qcRoving.scanQR")}
                   </button>
                   {scannedUserData && (
                     <div className="mt-2 flex items-center gap-2">
@@ -663,7 +667,7 @@ const RovingPage = () => {
                 </div>
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
-                    Inspection Type
+                    {t("qcRoving.inspectionType")}
                   </label>
                   <div className="mt-1 w-full p-2 border border-gray-300 rounded-lg">
                     <label className="inline-flex items-center">
@@ -674,7 +678,9 @@ const RovingPage = () => {
                         onChange={(e) => setInspectionType(e.target.value)}
                         className="form-radio"
                       />
-                      <span className="ml-2">Normal</span>
+                      <span className="ml-2">
+                        {t("qcRoving.inspectionType")}
+                      </span>
                     </label>
                     <label className="inline-flex items-center ml-6">
                       <input
@@ -684,11 +690,11 @@ const RovingPage = () => {
                         onChange={(e) => setInspectionType(e.target.value)}
                         className="form-radio"
                       />
-                      <span className="ml-2">Critical</span>
+                      <span className="ml-2">{t("qcRoving.critical")}</span>
                     </label>
                   </div>
                   <div className="mt-2 text-sm text-gray-600">
-                    Quantity: {garmentQuantity}
+                    {t("qcRoving.quantity")}: {garmentQuantity}
                   </div>
                 </div>
               </div>
@@ -700,7 +706,7 @@ const RovingPage = () => {
               <div className="flex flex-wrap items-start gap-4">
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
-                    SPI
+                    {t("qcRoving.spi")}
                   </label>
                   <div className="flex items-center gap-2">
                     <select
@@ -708,9 +714,11 @@ const RovingPage = () => {
                       onChange={(e) => setSpiStatus(e.target.value)}
                       className="mt-1 w-3/4 p-2 border border-gray-300 rounded-lg"
                     >
-                      <option value="">Select SPI Status</option>
-                      <option value="Pass">Pass</option>
-                      <option value="Reject">Reject</option>
+                      <option value="">
+                        {t("qcRoving.select_spi_status")}
+                      </option>
+                      <option value="Pass">{t("qcRoving.pass")}</option>
+                      <option value="Reject">{t("qcRoving.reject")}</option>
                     </select>
                     <button
                       onClick={() => setShowSpiCamera(true)}
@@ -737,7 +745,7 @@ const RovingPage = () => {
                 </div>
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
-                    Measurement
+                    {t("qcRoving.measurement")}
                   </label>
                   <div className="flex items-center gap-2">
                     <select
@@ -745,9 +753,11 @@ const RovingPage = () => {
                       onChange={(e) => setMeasurementStatus(e.target.value)}
                       className="mt-1 w-3/4 p-2 border border-gray-300 rounded-lg"
                     >
-                      <option value="">Select Measurement Status</option>
-                      <option value="Pass">Pass</option>
-                      <option value="Reject">Reject</option>
+                      <option value="">
+                        {t("qcRoving.select_measurement_status")}
+                      </option>
+                      <option value="Pass">{t("qcRoving.pass")}</option>
+                      <option value="Reject">{t("qcRoving.reject")}</option>
                     </select>
                     <button
                       onClick={() => setShowMeasurementCamera(true)}
@@ -779,12 +789,12 @@ const RovingPage = () => {
               {/* Quality Inspection Section */}
               <div className="md:col-span-2 mb-2">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                  Quality
+                  {t("qcRoving.quality")}
                 </h2>
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-medium text-gray-800">
-                      Part {currentGarmentIndex + 1}
+                      {t("qcRoving.part")} {currentGarmentIndex + 1}
                     </h3>
                     <span
                       className={`px-3 py-1 rounded-full text-lg ${
@@ -793,7 +803,7 @@ const RovingPage = () => {
                           : "bg-red-100 text-red-800"
                       }`}
                     >
-                      Status: {commonResultStatus}
+                      {t("qcRoving.status")}: {commonResultStatus}
                     </span>
                   </div>
                   <div className="space-y-1">
@@ -851,7 +861,7 @@ const RovingPage = () => {
                       ))
                     ) : (
                       <p className="text-gray-600">
-                        No defects recorded for this Part.
+                        {t("qcRoving.no_defect_record")}
                       </p>
                     )}
                     <div className="flex items-center space-x-2 mt-4">
@@ -870,7 +880,7 @@ const RovingPage = () => {
                         className="border p-2 rounded w-full"
                         disabled={!moNo}
                       >
-                        <option value="">Select Defect</option>
+                        <option value="">{t("qcRoving.select_defect")}</option>
                         {allDefects.map((defect) => (
                           <option key={defect.code} value={defect.english}>
                             {getDefectName(defect)}
@@ -882,7 +892,7 @@ const RovingPage = () => {
                         className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                         disabled={!selectedDefect || !selectedOperationId}
                       >
-                        Add
+                        {t("qcRoving.add")}
                       </button>
                     </div>
                   </div>
@@ -891,16 +901,16 @@ const RovingPage = () => {
               {/* Defect Rate and Ratio Section */}
               <div className="md:col-span-1 mb-2">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                  Defect Metrics
+                  {t("qcRoving.defect_metrics")}
                 </h2>
                 <table className="w-full border-collapse border border-gray-300">
                   <thead>
                     <tr>
                       <th className="border border-gray-300 p-2">
-                        Defect Rate
+                        {t("qcRoving.defect_rate")}
                       </th>
                       <th className="border border-gray-300 p-2">
-                        Defect Ratio
+                        {t("qcRoving.defect_ratio")}
                       </th>
                     </tr>
                   </thead>
@@ -926,7 +936,7 @@ const RovingPage = () => {
                   disabled={currentGarmentIndex === 0}
                   className="px-4 py-2 bg-gray-300 text-gray-900 rounded-lg disabled:opacity-50"
                 >
-                  Previous
+                  {t("qcRoving.previous")}
                 </button>
                 <button
                   onClick={() =>
@@ -937,7 +947,7 @@ const RovingPage = () => {
                   disabled={currentGarmentIndex === garments.length - 1}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
-                  Next
+                  {t("qcRoving.next")}
                 </button>
               </div>
             </div>
@@ -951,7 +961,7 @@ const RovingPage = () => {
                     : "bg-gray-400 text-gray-200 cursor-not-allowed"
                 }`}
               >
-                Preview
+                {t("qcRoving.preview")}
               </button>
               <button
                 onClick={handleSubmit}
@@ -962,7 +972,7 @@ const RovingPage = () => {
                     : "bg-gray-400 text-gray-200 cursor-not-allowed"
                 }`}
               >
-                Finish Inspection
+                {t("qcRoving.finish_inspection")}
               </button>
             </div>
             {showScanner && (
