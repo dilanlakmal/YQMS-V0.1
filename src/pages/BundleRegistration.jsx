@@ -137,7 +137,6 @@ function BundleRegistration() {
       }));
     }
   }, [formData.department]);
-
   useEffect(() => {
     const fetchOrderDetails = async () => {
       if (!formData.selectedMono) return;
@@ -963,7 +962,6 @@ function BundleRegistration() {
                     setSubConName={setSubConName}
                   />
                 )}
-
                 {formData.department === "Sub-con" && (
                   <div className="mb-3">
                     <label className="block text-xs font-medium text-gray-700 mb-1">

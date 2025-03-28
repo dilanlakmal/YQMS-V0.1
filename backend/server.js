@@ -28,11 +28,11 @@ import createQC2InspectionPassBundle from "./models/qc2_inspection_pass_bundle.j
 import createQC2DefectPrintModel from "./models/QC2DefectPrint.js";
 import createQC2ReworksModel from "./models/qc2_reworks.js";
 import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
+import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
 import sql from "mssql"; // Import mssql for SQL Server connection
 
 // Import the API_BASE_URL from our config file
-import { API_BASE_URL } from "./config.js";
-import sql from "mssql"; 
+import { API_BASE_URL } from "./config.js"; 
 
 /* ------------------------------
    Connection String
@@ -114,7 +114,6 @@ const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
 const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const QCInlineRoving =createQCInlineRovingModel(ymProdConnection);
 const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
-const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
