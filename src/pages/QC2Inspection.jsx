@@ -1850,11 +1850,6 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
                 <Paperclip className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex items-center justify-center">
-              <button onClick={() => handleIconClick("printingMethod")}>
-                <Paperclip className="w-5 h-5" />
-              </button>
-            </div>
           </div>
         )}
       </div>
