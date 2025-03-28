@@ -1242,23 +1242,20 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
   const handlePassBundle = async () => {
     if (isPassingBundle) return; // Prevent multiple calls
     setIsPassingBundle(true);
-
+  
     const hasDefects = Object.values(tempDefects).some((count) => count > 0);
     if (!isReturnInspection && hasDefects && !rejectedOnce) {
       setIsPassingBundle(false);
       return;
     }
-
-    // Add console logs for debugging
-    // console.log("handlePassBundle called", { isReturnInspection, sessionData });
-
+  
     try {
       if (isReturnInspection) {
         // Validate required data
         if (!sessionData || !bundleData || !sessionData.printEntry) {
           throw new Error("Missing required session or bundle data");
         }
-
+  
         // Check if there are any "Fail" defects before proceeding
         const hasFailDefects = defectTrackingDetails.garments.some(garment =>
           garment.defects.some(defect =>
@@ -1266,7 +1263,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
             !lockedDefects.has(`${garment.garmentNumber}-${defect.name}`)
           )
         );
-
+  
         if (hasFailDefects) {
           Swal.fire({
             icon: 'error',
@@ -1276,7 +1273,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
           setIsPassingBundle(false);
           return;
         }
-
+  
         // **New check: Check if all defects for each garment are OK**
         const allGarmentsPassed = defectTrackingDetails.garments.every(garment =>
           garment.defects.every(defect =>
@@ -1284,7 +1281,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
             lockedDefects.has(`${garment.garmentNumber}-${defect.name}`)
           )
         );
-
+  
         if (!allGarmentsPassed) {
           Swal.fire({
             icon: 'error',
@@ -1294,7 +1291,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
           setIsPassingBundle(false);
           return;
         }
-
+  
         const {
           sessionTotalPass,
           sessionTotalRejects,
@@ -1303,11 +1300,11 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
           printEntry,
           initialTotalPass
         } = sessionData;
-
+  
         const initialTotalRepair = bundleData.totalRepair;
         const initialTotalPassGlobal = bundleData.totalPass;
         const newTotalRejectGarmentCount = initialTotalPass - sessionTotalPass;
-
+  
         const updatePayload = {
           $set: {
             totalRepair:
@@ -1319,9 +1316,8 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
               newTotalRejectGarmentCount,
             "printArray.$[elem].isCompleted": newTotalRejectGarmentCount === 0
           }
-         
         };
-
+  
         if (sessionTotalRejects > 0) {
           updatePayload.$push = {
             "printArray.$[elem].repairGarmentsDefects": {
@@ -1330,11 +1326,11 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
             }
           };
         }
-
+  
         const arrayFilters = [
           { "elem.defect_print_id": printEntry.defect_print_id }
         ];
-
+  
         const response = await fetch(
           `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
           {
@@ -1343,20 +1339,20 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
             body: JSON.stringify({
               updateOperations: updatePayload,
               arrayFilters
-            })
+            }),
           }
         );
-
+  
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.message || "Failed to update record");
         }
-
+  
         // Update pass_bundle status to "Pass" for all OK defects
         if (sessionData.printEntry.defect_print_id) {
           await updatePassBundleStatusForOKDefects(sessionData.printEntry.defect_print_id);
         }
-
+  
         // Reset return inspection state
         setIsReturnInspection(false);
         setSessionData(null);
@@ -1366,13 +1362,13 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
         const minutes = String(now.getMinutes()).padStart(2, "0");
         const seconds = String(now.getSeconds()).padStart(2, "0");
         const inspectionTime = `${hours}:${minutes}:${seconds}`;
-
+  
         const updatePayload = {
           $set: {
             inspection_time: inspectionTime
           }
         };
-
+  
         const response = await fetch(
           `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${bundleData.bundle_random_id}`,
           {
@@ -1381,7 +1377,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
             body: JSON.stringify(updatePayload)
           }
         );
-
+  
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(
@@ -1389,7 +1385,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
           );
         }
       }
-
+  
       // Reset state after successful update
       setTotalPass(0);
       setTotalRejects(0);
@@ -1408,9 +1404,9 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
       setError(null); // Clear any previous errors
     } catch (err) {
       setError(err.message || "Failed to update inspection record");
-      // console.error("Error in handlePassBundle:", err);
     } finally {
       setIsPassingBundle(false);
+      setLoadingData(false); // Ensure loading state is reset
     }
   };
 
