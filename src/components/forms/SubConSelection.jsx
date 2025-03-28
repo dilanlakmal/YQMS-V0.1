@@ -18,7 +18,7 @@ const SubConSelection = ({
       <div className="space-y-4">
         <div className="flex items-center space-x-4">
           <label className="inline-flex items-center">
-            <input
+          <input
               type="radio"
               name="subCon"
               value="No"
@@ -32,7 +32,7 @@ const SubConSelection = ({
             <span className="ml-2">{t("subCon.no")}</span>
           </label>
           <label className="inline-flex items-center">
-            <input
+          <input
               type="radio"
               name="subCon"
               value="Yes"
