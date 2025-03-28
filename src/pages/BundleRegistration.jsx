@@ -10,7 +10,7 @@ import {
   FaPlus,
   FaPrint,
   FaQrcode,
-  FaTimes,
+  FaTimes
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../config";
@@ -31,7 +31,7 @@ function BundleRegistration() {
   const {
     formData: persistedFormData,
     updateFormData,
-    clearFormData,
+    clearFormData
   } = useFormData();
 
   const [userBatches, setUserBatches] = useState([]);
@@ -49,10 +49,15 @@ function BundleRegistration() {
   const [sizes, setSizes] = useState([]);
   const [hasColors, setHasColors] = useState(false);
   const [hasSizes, setHasSizes] = useState(false);
-  const [isSubCon, setIsSubCon] = useState(
-    () =>
-      persistedFormData.bundleRegistration?.department === "Sub-con" || false
-  );
+  const [isSubCon, setIsSubCon] = useState(() => {
+    const savedDepartment = persistedFormData.bundleRegistration?.department;
+    if (savedDepartment === "Sub-con") return true; // Default to "Yes" for Sub-con
+    return false; // Default to "No" for all other cases
+  });
+  // const [isSubCon, setIsSubCon] = useState(
+  //   () =>
+  //     persistedFormData.bundleRegistration?.department === "Sub-con" || false
+  // );
   const [subConName, setSubConName] = useState(
     () => persistedFormData.bundleRegistration?.subConName || ""
   );
@@ -77,7 +82,7 @@ function BundleRegistration() {
     return savedData && user
       ? {
           ...savedData,
-          date: savedData.date ? new Date(savedData.date) : today,
+          date: savedData.date ? new Date(savedData.date) : today
         }
       : {
           date: today,
@@ -97,7 +102,7 @@ function BundleRegistration() {
           chnColor: "",
           colorKey: "",
           sizeOrderQty: "",
-          planCutQty: "",
+          planCutQty: ""
         };
   });
 
@@ -112,28 +117,37 @@ function BundleRegistration() {
     updateFormData("bundleRegistration", {
       ...formData,
       isSubCon,
-      subConName,
+      subConName
     });
   }, [formData, isSubCon, subConName]);
 
   useEffect(() => {
     if (formData.department === "Sub-con") {
-      setIsSubCon(true);
+      setIsSubCon(true); // Default to "Yes" for Sub-con
       setFormData((prev) => ({
         ...prev,
-        lineNo: "SUB",
+        lineNo: "SUB"
       }));
     } else if (formData.department === "Washing") {
+      setIsSubCon(false); // Default to "No" for Washing
+      setSubConName(""); // Reset subConName when not Sub-con
       setFormData((prev) => ({
         ...prev,
-        lineNo: "WA",
+        lineNo: "WA"
+      }));
+    } else if (formData.department === "QC1 Endline") {
+      setIsSubCon(false); // Default to "No" for QC1 Endline
+      setSubConName(""); // Reset subConName when not Sub-con
+      setFormData((prev) => ({
+        ...prev,
+        lineNo: ""
       }));
     } else {
-      setIsSubCon(false);
-      setSubConName("");
+      setIsSubCon(false); // Default to "No" for any other case (e.g., empty department)
+      setSubConName(""); // Reset subConName
       setFormData((prev) => ({
         ...prev,
-        lineNo: "",
+        lineNo: ""
       }));
     }
   }, [formData.department]);
@@ -160,7 +174,7 @@ function BundleRegistration() {
           colorKey: "",
           size: "",
           sizeOrderQty: "",
-          planCutQty: "",
+          planCutQty: ""
         }));
 
         const totalResponse = await fetch(
@@ -212,7 +226,7 @@ function BundleRegistration() {
 
           setFormData((prev) => ({
             ...prev,
-            totalGarmentsCount,
+            totalGarmentsCount
           }));
         } else {
           setSizes([]);
@@ -238,7 +252,7 @@ function BundleRegistration() {
           const data = await response.json();
           setFormData((prev) => ({
             ...prev,
-            totalGarmentsCount: data.totalCount,
+            totalGarmentsCount: data.totalCount
           }));
         } catch (error) {
           console.error("Error fetching updated total:", error);
@@ -307,17 +321,17 @@ function BundleRegistration() {
     if (numberPadTarget === "bundleQty") {
       setFormData((prev) => ({
         ...prev,
-        bundleQty: value,
+        bundleQty: value
       }));
     } else if (numberPadTarget === "lineNo") {
       setFormData((prev) => ({
         ...prev,
-        lineNo: value,
+        lineNo: value
       }));
     } else if (numberPadTarget === "count") {
       setFormData((prev) => ({
         ...prev,
-        count: value,
+        count: value
       }));
     }
   };
@@ -357,8 +371,8 @@ function BundleRegistration() {
           lineNo,
           selectedMono,
           color,
-          size,
-        }),
+          size
+        })
       });
 
       const { largestNumber } = await response.json();
@@ -399,7 +413,7 @@ function BundleRegistration() {
           kh_name: user.kh_name,
           job_title: user.job_title,
           dept_name: user.dept_name,
-          sect_name: user.sect_name,
+          sect_name: user.sect_name
         };
 
         bundleData.push(bundleRecord);
@@ -408,7 +422,7 @@ function BundleRegistration() {
       const saveResponse = await fetch(`${API_BASE_URL}/api/save-bundle-data`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bundleData }),
+        body: JSON.stringify({ bundleData })
       });
 
       if (saveResponse.ok) {
@@ -417,7 +431,7 @@ function BundleRegistration() {
         setIsGenerateDisabled(true);
         setFormData((prev) => ({
           ...prev,
-          bundleQty: "",
+          bundleQty: ""
         }));
 
         setDataRecords((prevRecords) => [...prevRecords, ...savedData.data]);
@@ -461,7 +475,7 @@ function BundleRegistration() {
       for (const data of qrData) {
         await bluetoothComponentRef.current.printData({
           ...data,
-          bundle_id: data.bundle_random_id,
+          bundle_id: data.bundle_random_id
         });
       }
 
@@ -469,7 +483,7 @@ function BundleRegistration() {
         ...prev,
         bundleQty: 1,
         size: "",
-        count: 10,
+        count: 10
       }));
       setIsGenerateDisabled(false);
 
@@ -493,7 +507,7 @@ function BundleRegistration() {
   const incrementValue = (field) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: parseInt(prev[field]) + 1,
+      [field]: parseInt(prev[field]) + 1
     }));
   };
 
@@ -501,7 +515,7 @@ function BundleRegistration() {
     if (formData[field] > 1) {
       setFormData((prev) => ({
         ...prev,
-        [field]: parseInt(prev[field]) - 1,
+        [field]: parseInt(prev[field]) - 1
       }));
     }
   };
@@ -528,7 +542,7 @@ function BundleRegistration() {
         chnColor: record.chnColor,
         colorKey: record.colorKey,
         sizeOrderQty: record.sizeOrderQty,
-        planCutQty: record.planCutQty,
+        planCutQty: record.planCutQty
       });
       setEditRecordId(recordId);
       setEditModalOpen(true);
@@ -647,7 +661,7 @@ function BundleRegistration() {
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
-                          department: e.target.value,
+                          department: e.target.value
                         }))
                       }
                       className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
@@ -790,7 +804,7 @@ function BundleRegistration() {
                             colorKey: selectedColor?.key || "",
                             size: "",
                             sizeOrderQty: "",
-                            planCutQty: "",
+                            planCutQty: ""
                           };
                           setFormData(newFormData);
                           updateFormData("bundleRegistration", newFormData);
@@ -826,7 +840,7 @@ function BundleRegistration() {
                               ...formData,
                               size: e.target.value,
                               sizeOrderQty: selectedSize?.orderQty || 0,
-                              planCutQty: selectedSize?.planCutQty || 0,
+                              planCutQty: selectedSize?.planCutQty || 0
                             };
                             setFormData(newFormData);
                             updateFormData("bundleRegistration", newFormData);
@@ -1385,7 +1399,7 @@ function BundleRegistration() {
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        department: e.target.value,
+                        department: e.target.value
                       }))
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -1523,7 +1537,7 @@ function BundleRegistration() {
                           colorKey: selectedColor?.key || "",
                           size: "",
                           sizeOrderQty: "",
-                          planCutQty: "",
+                          planCutQty: ""
                         };
                         setFormData(newFormData);
                         updateFormData("bundleRegistration", newFormData);
@@ -1559,7 +1573,7 @@ function BundleRegistration() {
                             ...formData,
                             size: e.target.value,
                             sizeOrderQty: selectedSize?.orderQty || 0,
-                            planCutQty: selectedSize?.planCutQty || 0,
+                            planCutQty: selectedSize?.planCutQty || 0
                           };
                           setFormData(newFormData);
                           updateFormData("bundleRegistration", newFormData);

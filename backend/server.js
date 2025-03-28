@@ -4288,7 +4288,11 @@ app.get("/api/defect-track/:defect_print_id", async (req, res) => {
         garmentNumber: garment.garmentNumber,
         defects: garment.defects.map((defect) => {
           const repairItem = repairRecord
-            ? repairRecord.repairArray.find((r) => r.defectName === defect.name)
+            ? repairRecord.repairArray.find(
+                (r) =>
+                  r.defectName === defect.name &&
+                  r.garmentNumber === garment.garmentNumber
+              )
             : null;
           return {
             name: defect.name,
@@ -4296,7 +4300,9 @@ app.get("/api/defect-track/:defect_print_id", async (req, res) => {
             repair: defect.repair,
             status: repairItem ? repairItem.status : "Fail",
             repair_date: repairItem ? repairItem.repair_date : "",
-            repair_time: repairItem ? repairItem.repair_time : ""
+            repair_time: repairItem ? repairItem.repair_time : "",
+            pass_bundle: repairItem ? repairItem.pass_bundle : "Not Checked",
+            garmentNumber: garment.garmentNumber
           };
         })
       }))
@@ -4335,18 +4341,46 @@ app.post("/api/repair-tracking", async (req, res) => {
       // Update existing record
       existingRecord.repairArray = existingRecord.repairArray.map((item) => {
         const updatedItem = repairArray.find(
-          (newItem) => newItem.defectName === item.defectName
+          (newItem) =>
+            newItem.defectName === item.defectName &&
+            newItem.garmentNumber === item.garmentNumber
         );
         if (updatedItem) {
+          // Determine if pass_bundle needs to be updated
+          let newPassBundle = item.pass_bundle;
+          if (updatedItem.status !== item.status) {
+            newPassBundle =
+              updatedItem.status === "Fail"
+                ? "Not Checked"
+                : updatedItem.status === "OK"
+                ? "Fail"
+                : "OK";
+          }
           return {
             ...item,
             status: updatedItem.status,
             repair_date: updatedItem.repair_date,
-            repair_time: updatedItem.repair_time
+            repair_time: updatedItem.repair_time,
+            pass_bundle: newPassBundle
           };
         }
         return item;
       });
+
+      //Add new items
+      const newItems = repairArray.filter(
+        (newItem) =>
+          !existingRecord.repairArray.some(
+            (existingItem) =>
+              existingItem.defectName === newItem.defectName &&
+              existingItem.garmentNumber === newItem.garmentNumber
+          )
+      );
+
+      if (newItems.length > 0) {
+        existingRecord.repairArray.push(...newItems);
+      }
+
       await existingRecord.save();
       res.status(200).json({
         message: "Repair tracking updated successfully",
@@ -4374,7 +4408,13 @@ app.post("/api/repair-tracking", async (req, res) => {
           garmentNumber: item.garmentNumber,
           status: item.status || "Fail",
           repair_date: item.repair_date || "",
-          repair_time: item.repair_time || ""
+          repair_time: item.repair_time || "",
+          pass_bundle:
+            item.status === "Fail"
+              ? "Not Checked"
+              : item.status === "OK"
+              ? "Fail"
+              : "OK"
         }))
       });
       await newRecord.save();
@@ -4403,7 +4443,6 @@ app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
     }
 
     const rt = repairTracking[0];
-    console.log("Before update:", rt.repairArray);
 
     rt.repairArray = rt.repairArray.map((item) => {
       if (item.garmentNumber === garmentNumber) {
@@ -4428,8 +4467,6 @@ app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
       }
       return item;
     });
-
-    console.log("After update:", rt.repairArray);
 
     await rt.save();
     res.status(200).json({ message: "Updated successfully" });
@@ -4514,16 +4551,23 @@ app.post(
               pass_bundle: status === "OK" ? "Pass" : item.pass_bundle
             };
           }
-          // else {
-          //     return item; // Don't update if no change is needed
-          // }
         }
         return item;
       });
-      console.log("Updated Repair Array:", updatedRepairArray);
-      repairTracking.repairArray = updatedRepairArray;
-      await repairTracking.save();
-      res.status(200).json({ message: "Defect status updated successfully" });
+      // Check if any changes were made
+      const hasChanges = repairTracking.repairArray.some((item, index) => {
+        return (
+          JSON.stringify(item) !== JSON.stringify(updatedRepairArray[index])
+        );
+      });
+      if (hasChanges) {
+        repairTracking.repairArray = updatedRepairArray;
+        await repairTracking.save();
+        console.log("Updated Repair Array:", updatedRepairArray);
+        res.status(200).json({ message: "Defect status updated successfully" });
+      } else {
+        res.status(200).json({ message: "No changes were made" });
+      }
     } catch (error) {
       console.error("Error updating defect status:", error);
       res.status(500).json({

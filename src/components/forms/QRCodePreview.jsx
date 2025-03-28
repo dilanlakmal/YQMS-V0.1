@@ -8,7 +8,7 @@ export default function QRCodePreview({
   onClose,
   qrData,
   onPrint,
-  mode = "inspection",
+  mode = "inspection"
 }) {
   const data = Array.isArray(qrData) ? qrData : [];
 
@@ -38,7 +38,7 @@ export default function QRCodePreview({
                 ? item.defect_id
                 : mode === "garment"
                 ? item.rejectGarments?.[0]?.garment_defect_id
-                : item.defect_print_id,
+                : item.defect_print_id
           });
         }
       }
@@ -156,6 +156,9 @@ export default function QRCodePreview({
                               {item.totalDefectCount ||
                                 item.totalPrintDefectCount ||
                                 "N/A"}
+                            </p>
+                            <p>
+                              <strong>Line No:</strong> {item.lineNo || "N/A"}
                             </p>
                           </>
                         ) : (

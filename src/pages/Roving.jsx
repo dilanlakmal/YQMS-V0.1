@@ -678,9 +678,7 @@ const RovingPage = () => {
                         onChange={(e) => setInspectionType(e.target.value)}
                         className="form-radio"
                       />
-                      <span className="ml-2">
-                        {t("qcRoving.inspectionType")}
-                      </span>
+                      <span className="ml-2">{t("qcRoving.normal")}</span>
                     </label>
                     <label className="inline-flex items-center ml-6">
                       <input

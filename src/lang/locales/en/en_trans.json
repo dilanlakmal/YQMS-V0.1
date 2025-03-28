@@ -23,6 +23,8 @@
     "qc1_inspection": "QC1 Inspection",
     "qc2_repair": "QC2 Repair Tracking",
     "qc2_inspection": "QC2 Inspection",
+    "qc2_repair_tracking": "QC2 Repair Tracking",
+    "printing_QR": "Printing QR",
     "qa_audit_report": "QA Audit Report",
     "download_data": "Download Data",
     "live_dashboard": "Live Dashboard"

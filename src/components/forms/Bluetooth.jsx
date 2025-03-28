@@ -3,7 +3,7 @@ import React, {
   forwardRef,
   useEffect,
   useImperativeHandle,
-  useState,
+  useState
 } from "react";
 import { allDefects } from "../../constants/defects"; // Import allDefects from defects.js
 import { useBluetooth } from "../context/BluetoothContext";
@@ -14,8 +14,8 @@ const PRINTER_CONFIG = {
     writeUUID: "00002af1-0000-1000-8000-00805f9b34fb",
     chunkSize: 20,
     delay: 50,
-    encoding: "gbk",
-  },
+    encoding: "gbk"
+  }
 };
 
 const BluetoothComponent = forwardRef((props, ref) => {
@@ -33,7 +33,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
       await handleGarmentDefectPrint(data),
     printBundleDefectData: async (data) => await handleBundleDefectPrint(data),
     onConnect: null, // Will be set by parent component
-    onDisconnect: null, // Will be set by parent component
+    onDisconnect: null // Will be set by parent component
   }));
 
   // Show connection status when it changes
@@ -65,18 +65,18 @@ const BluetoothComponent = forwardRef((props, ref) => {
     try {
       updateBluetoothState({
         isScanning: true,
-        connectionStatus: "Scanning for devices...",
+        connectionStatus: "Scanning for devices..."
       });
       setShowStatus(true);
       const device = await navigator.bluetooth.requestDevice({
         filters: [{ namePrefix: "GP-" }],
-        optionalServices: [PRINTER_CONFIG.gainscha.serviceUUID],
+        optionalServices: [PRINTER_CONFIG.gainscha.serviceUUID]
       });
       const printerType = detectPrinterType(device.name);
       if (!printerType) throw new Error("Unsupported printer");
       updateBluetoothState({
         connectionStatus: `Connecting to ${printerType} printer...`,
-        printerType,
+        printerType
       });
       const server = await device.gatt.connect();
       const { serviceUUID, writeUUID } = PRINTER_CONFIG[printerType];
@@ -93,7 +93,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
         isScanning: false,
         selectedDevice: device,
         characteristic,
-        connectionStatus: `Connected to ${device.name}`,
+        connectionStatus: `Connected to ${device.name}`
       });
       // console.log("Device Connected");
       setShowStatus(true);
@@ -116,7 +116,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
       isScanning: false,
       selectedDevice: null,
       characteristic: null,
-      connectionStatus: errorMessage,
+      connectionStatus: errorMessage
     });
     setShowStatus(true);
   };
@@ -169,7 +169,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
         `TEXT 20,190,"2",0,1,1,"Package No: ${printData.package_no}"`,
         `QRCODE 30,230,L,6,M,0,"${printData.bundle_random_id}"`,
         "PRINT 1",
-        "",
+        ""
       ].join("\n");
       const encoder = new TextEncoder("gbk");
       const data = encoder.encode(tsplCommands);
@@ -216,7 +216,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
           printData.defect_id
         }"`,
         "PRINT 1",
-        "",
+        ""
       ].join("\n");
       const encoder = new TextEncoder("gbk");
       const data = encoder.encode(tsplCommands);
@@ -263,7 +263,7 @@ const BluetoothComponent = forwardRef((props, ref) => {
           printData.rejectGarments?.[0]?.totalCount || printData.count || "N/A"
         }"`,
         `TEXT 20,130,"2",0,1,1,"Package No: ${printData.package_no || "N/A"}"`,
-        `TEXT 20,150,"2",0,1,1,"Defects:"`,
+        `TEXT 20,150,"2",0,1,1,"Defects:"`
       ];
       let yPosition = 170;
       Object.entries(defectsByRepair).forEach(([repair, defects]) => {
@@ -314,20 +314,21 @@ const BluetoothComponent = forwardRef((props, ref) => {
         "DENSITY 8",
         "SET TEAR ON",
         `SET COUNTER @1 ${counter}`,
-        `TEXT 20,10,"2",0,1,1,"MO: ${printData.moNo || "N/A"}"`,
-        `TEXT 20,30,"2",0,1,1,"Color: ${printData.color || "N/A"}"`,
-        `TEXT 20,50,"2",0,1,1,"Size: ${printData.size || "N/A"}"`,
-        `TEXT 20,70,"2",0,1,1,"Bundle Qty: ${printData.bundleQty || "N/A"}"`,
-        `TEXT 20,90,"2",0,1,1,"Reject Garments: ${
+        `TEXT 20,10,"2",0,1,1,"Line No: ${printData.lineNo || "N/A"}"`,
+        `TEXT 20,30,"2",0,1,1,"MO: ${printData.moNo || "N/A"}"`,
+        `TEXT 20,50,"2",0,1,1,"Color: ${printData.color || "N/A"}"`,
+        `TEXT 20,70,"2",0,1,1,"Size: ${printData.size || "N/A"}"`,
+        `TEXT 20,90,"2",0,1,1,"Bundle Qty: ${printData.bundleQty || "N/A"}"`,
+        `TEXT 20,110,"2",0,1,1,"Reject Garments: ${
           printData.totalRejectGarments || "N/A"
         }"`,
-        `TEXT 20,110,"2",0,1,1,"Defect Count: ${
+        `TEXT 20,130,"2",0,1,1,"Defect Count: ${
           printData.totalDefectCount || "N/A"
         }"`,
-        `TEXT 20,130,"2",0,1,1,"Package No: ${printData.package_no || "N/A"}"`,
-        `TEXT 20,150,"2",0,1,1,"Defects:"`,
+        `TEXT 20,150,"2",0,1,1,"Package No: ${printData.package_no || "N/A"}"`,
+        `TEXT 20,170,"2",0,1,1,"Defects:"`
       ];
-      let yPosition = 170;
+      let yPosition = 190;
       defects.forEach((garment) => {
         garment.defects.forEach((defect) => {
           tsplCommands.push(
