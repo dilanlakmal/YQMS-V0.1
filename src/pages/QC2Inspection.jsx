@@ -573,7 +573,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
         const errorText = await response.text();
         throw new Error(`Failed to update defect status: ${errorText}`);
       }
-      console.log(`Defect status updated to "${status}" for ${garmentNumber}-${defectName}`);
+      // console.log(`Defect status updated to "${status}" for ${garmentNumber}-${defectName}`);
     } catch (err) {
       setError(`Failed to update defect status: ${err.message}`);
       console.error("Error updating defect status:", err.message);
@@ -615,7 +615,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
           `Failed to update defect status in repair tracking: ${errorText}`
         );
       }
-      console.log("Defect status updated in repair tracking successfully");
+      // console.log("Defect status updated in repair tracking successfully");
     } catch (err) {
       setError(
         `Failed to update defect status in repair tracking: ${err.message}`
@@ -716,7 +716,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
 
   const handleRejectGarment = async () => {
     if (!hasDefects || totalPass <= 0) {
-      console.log("handleRejectGarment aborted: No defects or totalPass <= 0", { hasDefects, totalPass });
+      // console.log("handleRejectGarment aborted: No defects or totalPass <= 0", { hasDefects, totalPass });
       return;
     }
   
@@ -814,7 +814,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
         }
       } catch (err) {
         setError(`Failed to process garment rejection: ${err.message}`);
-        console.error("Error in handleRejectGarment:", err.message);
+        // console.error("Error in handleRejectGarment:", err.message);
         return;
       }
     } else {
@@ -938,7 +938,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
       // Find the rejected garment in rejectedGarments
       const rejectedGarment = rejectedGarments.find(garment => garment.garment_defect_id === garmentNumber);
       if (!rejectedGarment) {
-        console.error(`Rejected garment with number ${garmentNumber} not found.`);
+        // console.error(`Rejected garment with number ${garmentNumber} not found.`);
         return;
       }
 
@@ -978,7 +978,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
       await Promise.all(updatePromises);
     } catch (err) {
       setError(`Failed to update pass_bundle status for rejected garment ${garmentNumber}: ${err.message}`);
-      console.error("Error updating pass_bundle status for rejected garment:", err.message);
+      // console.error("Error updating pass_bundle status for rejected garment:", err.message);
     }
   };
 
@@ -1014,7 +1014,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
 
     } catch (err) {
       setError(`Failed to update repair tracking: ${err.message}`);
-      console.error("Error in handleReReturnGarment:", err.message);
+      // console.error("Error in handleReReturnGarment:", err.message);
     }
   };
 
@@ -1232,7 +1232,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
         setPassBundleCountdown(3); // Initiate countdown from 3 seconds
       }
     } catch (error) {
-      console.error("Print error:", error);
+      // console.error("Print error:", error);
       alert(`Failed to print QR codes: ${error.message || "Unknown error"}`);
     } finally {
       setPrinting(false);
@@ -1430,15 +1430,15 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
           `Failed to update pass_bundle status for defect ${defect_print_id}: ${errorText}`
         );
       }
-      console.log(`pass_bundle status updated successfully for defect ${defect_print_id}`);
+      // console.log(`pass_bundle status updated successfully for defect ${defect_print_id}`);
     } catch (err) {
       setError(
         `Failed to update pass_bundle status for OK defects: ${err.message}`
       );
-      console.error(
-        "Error updating pass_bundle status for OK defects:",
-        err.message
-      );
+      // console.error(
+      //   "Error updating pass_bundle status for OK defects:",
+      //   err.message
+      // );
     }
   };
 

@@ -5,7 +5,7 @@ import QRCodePreview from "../forms/QRCodePreview";
 import { useTranslation } from "react-i18next";
 
 const DefectPrint = ({ bluetoothRef, printMethod }) => {
-  const {t} = useTranslation();
+  const { t } = useTranslation();
   const [mode, setMode] = useState("repair"); // "repair", "garment", or "bundle"
   const [defectCards, setDefectCards] = useState([]);
   const [searchMoNo, setSearchMoNo] = useState("");
@@ -22,6 +22,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage, setRecordsPerPage] = useState(50);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [repairTrackingDetails, setRepairTrackingDetails] = useState({});
 
   useEffect(() => {
     fetchFilterOptions();
@@ -62,7 +63,6 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
       if (!response.ok) throw new Error(`Failed to fetch ${mode} cards`);
       const responseData = await response.json();
 
-      // Safeguard: Ensure data and total are defined
       const data = Array.isArray(responseData.data) ? responseData.data : [];
       const total = Number.isInteger(responseData.total)
         ? responseData.total
@@ -103,11 +103,16 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
               ) || []
         );
         setDefectCards(bundleQrCards);
-        setTotalRecords(bundleQrCards.length); // Total reflects filtered bundle cards
+        setTotalRecords(bundleQrCards.length);
+        // Fetch repair tracking details for each bundle card
+      
+        bundleQrCards.forEach((card) => {
+          fetchRepairTracking(card.defect_print_id);
+        });
       }
     } catch (error) {
       console.error(`Error fetching ${mode} cards:`, error);
-      setDefectCards([]); // Ensure reset to empty array on error
+      setDefectCards([]);
       setTotalRecords(0);
     } finally {
       setLoading(false);
@@ -139,6 +144,27 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
     }
   };
 
+  async function fetchRepairTracking(defect_print_id) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/defect-track/${defect_print_id}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      const data = await response.json();
+      // console.log(data);
+      setRepairTrackingDetails((prev) => ({
+        ...prev,
+        [defect_print_id]: data,
+      }));
+    } catch (error) {
+      console.error("Error fetching repair tracking:", error);
+      setRepairTrackingDetails((prev) => ({
+        ...prev,
+        [defect_print_id]: null,
+      }));
+    }
+  }
+
   const handleSearch = () => {
     setCurrentPage(1);
     fetchDefectCards(1, recordsPerPage, {
@@ -156,6 +182,15 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
     setSearchStatus("both");
     setCurrentPage(1);
     fetchDefectCards(1, recordsPerPage, {});
+  };
+  const formatTime12Hour = (timeString) => {
+    if (!timeString) return "N/A"; // Handle empty cases
+  
+    const [hours, minutes] = timeString.split(":").map(Number); // Convert to numbers
+    const ampm = hours >= 12 ? "PM" : "AM"; // Determine AM/PM
+    const formattedHours = hours % 12 || 12; // Convert 0 to 12 for AM/PM format
+  
+    return `${formattedHours}:${String(minutes).padStart(2, "0")} ${ampm}`; // Format properly
   };
 
   const handlePreviewQR = (card) => {
@@ -204,7 +239,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="col-span-1">
             <label className="block mb-1 text-sm font-semibold text-gray-700">
-            {t("defectPrint.mode")}
+              {t("defectPrint.mode")}
             </label>
             <div className="flex space-x-2">
               <button
@@ -235,7 +270,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
           </div>
           <div className="col-span-1">
             <label className="block mb-1 text-sm font-semibold text-gray-700">
-            {t("bundle.mono")}
+              {t("bundle.mono")}
             </label>
             <input
               type="text"
@@ -253,7 +288,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
           </div>
           <div>
             <label className="block mb-1 text-sm font-semibold text-gray-700">
-            {t("bundle.package_no")}
+              {t("bundle.package_no")}
             </label>
             <input
               type="text"
@@ -313,7 +348,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                       : "bg-gray-200"
                   }`}
                 >
-                 {t("defectPrint.completed")}
+                  {t("defectPrint.completed")}
                 </button>
                 <button
                   onClick={() => setSearchStatus("both")}
@@ -380,7 +415,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
             disabled={currentPage === 1 || loading}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition duration-200"
           >
-            {loading ? t("downDa.searching") : t("dash.apply")}
+            {t("userL.previous")}
           </button>
           <div className="flex items-center gap-2">
             <select
@@ -422,7 +457,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
             disabled={currentPage === totalPages || loading}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition duration-200"
           >
-            {t("dash.reset")} {t("dash.filters")}
+            {t("userL.next")}
           </button>
         </div>
       </div>
@@ -454,97 +489,121 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                         {t("bundle.factory")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.package_no")}
+                        {t("bundle.package_no")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.mono")}
+                        {t("bundle.mono")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.customer_style")}
+                        {t("bundle.customer_style")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.color")}
+                        {t("bundle.color")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.size")}
+                        {t("bundle.size")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("defectPrint.repair_group")}
+                        {t("defectPrint.repair_group")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("defectPrint.defect_count")}
+                        {t("defectPrint.defect_count")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("preview.defect_details")}
+                        {t("preview.defect_details")}
+                        <div className="flex justify-between text-xs mt-1 border-t border-gray-300 pt-1">
+                          <span className="w-1/5">Station</span>
+                          <span className="w-1/5">Defect name</span>
+                          <span className="w-1/5">Count</span>
+                          <span className="w-1/5">Status</span>
+                          <span className="w-1/5">Repair Date</span>
+                          <span className="w-1/5">Repair Time</span>
+                        </div>
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.action")}
+                        {t("bundle.action")}
                       </th>
                     </>
                   ) : mode === "garment" ? (
                     <>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.package_no")}
+                        {t("bundle.package_no")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.mono")}
+                        {t("bundle.mono")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.customer_style")}
+                        {t("bundle.customer_style")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.color")}
+                        {t("bundle.color")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.size")}
+                        {t("bundle.size")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("defectPrint.defect_count")}
+                        {t("defectPrint.defect_count")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("preview.defect_details")}
+                        {t("preview.defect_details")}
+                        <div className="flex justify-between text-xs mt-1 border-t border-gray-300 pt-1">
+                          <span className="w-1/5">Station</span>
+                          <span className="w-1/5">Defect name</span>
+                          <span className="w-1/5">Count</span>
+                          <span className="w-1/5">Status</span>
+                          <span className="w-1/5">Repair Date</span>
+                          <span className="w-1/5">Repair Time</span>
+                        </div>
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.action")}
+                        {t("bundle.action")}
                       </th>
                     </>
                   ) : mode === "bundle" ? (
                     <>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.package_no")}
+                        {t("bundle.package_no")}
+                      </th>
+                      {/* <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
+                        {t("defectPrint.status")}
+                      </th> */}
+                      <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
+                        {t("bundle.action")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("defectPrint.status")}
+                        {t("bundle.mono")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.action")}
+                        {t("bundle.customer_style")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.mono")}
+                        {t("bundle.color")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.customer_style")}
+                        {t("bundle.size")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.color")}
+                        {t("defectPrint.checked")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("bundle.size")}
-                      </th>
-                      <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("defectPrint.checked")}
-                      </th>
-                      <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("defectPrint.defectN")}
+                        {t("defectPrint.defectsN")}
                       </th>
                       <th className="py-3 px-2 border-b border-gray-300 font-semibold text-sm text-gray-700 break-words">
-                      {t("defectPrint.rejectN")}
+                        {t("defectPrint.rejectN")}
                       </th>
-                      <th className="py-3 px-2 border-b border-gray-300 font-semibold text-sm text-gray-700 break-words">
-                      {t("defectPrint.reworking")}
-                      </th>
+                      {/* <th className="py-3 px-2 border-b border-gray-300 font-semibold text-sm text-gray-700 break-words">
+                        {t("defectPrint.reworking")}
+                      </th> */}
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                      {t("defectPrint.print_details")}
+                        {t("preview.defect_details")}
+                        <div className="flex justify-between text-xs mt-1 border-t border-gray-300 pt-1">
+                          <span className="w-1/6 border-r border-l border-gray-300 font-semibold text-sm text-gray-700">Station</span>
+                          <span className="w-1/6 border-r border-gray-300 font-semibold text-sm text-gray-700">Defect name</span>
+                          <span className="w-1/6 border-r border-gray-300 font-semibold text-sm text-gray-700">Count</span>
+                          <span className="w-1/6 border-r border-gray-300 font-semibold text-sm text-gray-700">Status</span>
+                          <span className="w-1/6 border-r border-gray-300 font-semibold text-sm text-gray-700">Repair Date</span>
+                          <span className="w-1/6 border-r border-gray-300 font-semibold text-sm text-gray-700">Repair Time</span>
+                        </div>
                       </th>
                     </>
                   ) : null}
@@ -579,17 +638,26 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                           {card.count_print || "N/A"}
                         </td>
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {card.defects && Array.isArray(card.defects)
-                            ? card.defects.map((defect) => (
-                                <div
-                                  key={defect.defectName}
-                                  className="flex justify-between text-sm"
-                                >
-                                  <span>{defect.defectName}:</span>
-                                  <span>{defect.count}</span>
+                          {repairTrackingDetails[card.defect_print_id] === undefined ? (
+                            <div>Loading...</div>
+                          ) : repairTrackingDetails[card.defect_print_id] === null ? (
+                            <div>Error loading details</div>
+                          ) : repairTrackingDetails[card.defect_print_id].garments && repairTrackingDetails[card.defect_print_id].garments.length > 0 ? (
+                            repairTrackingDetails[card.defect_print_id].garments.map((garment, garmentIndex) => (
+                              garment.defects.map((defect, defectIndex) => (
+                                <div key={`${garmentIndex}-${defectIndex}`} className="flex justify-between text-xs mb-1">
+                                   <span className="w-1/4">{defect.repairGroup || "N/A"}</span>
+                                  <span className="w-1/4">{defect.name || "N/A"}</span>
+                                  <span className="w-1/4">{defect.count || "N/A"}</span>
+                                  <span className="w-1/4">{defect.status || "N/A"}</span>
+                                  <span className="w-1/4">{defect.repair_date || "N/A"}</span>
+                                  <span className="w-1/4">{defect.repair_time || "N/A"}</span>
                                 </div>
                               ))
-                            : "No defects"}
+                            ))
+                          ) : (
+                            <div>No details</div>
+                          )}
                         </td>
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           <button
@@ -643,18 +711,26 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                             {garment.totalCount || "N/A"}
                           </td>
                           <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                            {garment.defects && Array.isArray(garment.defects)
-                              ? garment.defects.map((defect) => (
-                                  <div
-                                    key={defect.name}
-                                    className="flex justify-between text-sm"
-                                  >
-                                    <span>{defect.name}:</span>
-                                    <span>{defect.count}</span>
-                                  </div>
-                                ))
-                              : "No defects"}
-                          </td>
+                          {repairTrackingDetails[card.defect_print_id] === undefined ? (
+                            <div>Loading...</div>
+                          ) : repairTrackingDetails[card.defect_print_id] === null ? (
+                            <div>Error loading details</div>
+                          ) : repairTrackingDetails[card.defect_print_id].garments && repairTrackingDetails[card.defect_print_id].garments.length > 0 ? (
+                            repairTrackingDetails[card.defect_print_id].garments.map((garment, garmentIndex) => (
+                              garment.defects.map((defect, defectIndex) => (
+                                <div key={`${garmentIndex}-${defectIndex}`} className="flex justify-between text-xs mb-1">
+                                   {/* <span className="w-1/4">{defect.repairGroup || "N/A"}</span> */}
+                                  <span className="w-1/4">{defect.name || "N/A"}</span>
+                                  <span className="w-1/4">{defect.count || "N/A"}</span>
+                                  <span className="w-1/4">{defect.status || "N/A"}</span>
+                                  <span className="w-1/4">{defect.repair_date || "N/A"}</span>
+                                </div>
+                              ))
+                            ))
+                          ) : (
+                            <div>No details</div>
+                          )}
+                        </td>
                           <td className="py-2 px-4 border-b border-gray-200 text-sm">
                             <button
                               onClick={() =>
@@ -696,7 +772,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           {card.package_no || "N/A"}
                         </td>
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {/* <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           <span
                             className={`inline-block px-2 py-1 rounded-full text-white text-sm ${
                               card.totalRejectGarments > 0
@@ -708,7 +784,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                               ? "In Progress"
                               : "Completed"}
                           </span>
-                        </td>
+                        </td> */}
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           <button
                             onClick={() => handlePreviewQR(card)}
@@ -749,35 +825,52 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           {card.rejectGarmentsLength || "N/A"}
                         </td>
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {/* <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           {card.totalRejectGarments === 0
                             ? "0"
                             : card.totalRejectGarments || "N/A"}
-                        </td>
+                        </td> */}
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {card.printData && Array.isArray(card.printData)
-                            ? card.printData.flatMap((garment) =>
-                                garment.defects &&
-                                Array.isArray(garment.defects) ? (
-                                  garment.defects.map((defect) => (
-                                    <div
-                                      key={`${garment.garmentNumber}-${defect.name}`}
-                                      className="text-sm"
-                                    >
-                                      ({garment.garmentNumber}) {defect.name}:{" "}
-                                      {defect.count}
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div
-                                    key={garment.garmentNumber}
-                                    className="text-sm"
+                          {repairTrackingDetails[card.defect_print_id] === undefined ? (
+                            <div>Loading...</div>
+                          ) : repairTrackingDetails[card.defect_print_id] === null ? (
+                            <div>Error loading details</div>
+                          ) : repairTrackingDetails[card.defect_print_id].garments && repairTrackingDetails[card.defect_print_id].garments.length > 0 ? (
+                            repairTrackingDetails[card.defect_print_id].garments.map((garment, garmentIndex) => (
+                              garment.defects.map((defect, defectIndex) => (
+                                <div
+                                    key={`${garmentIndex}-${defectIndex}`}
+                                    className={`flex justify-between text-xs mb-1 py-2 px-4 rounded-md 
+                                      ${
+                                        defect.status === "OK"
+                                          ? "bg-green-100" // Light Green background
+                                          : defect.status === "Not Repaired"
+                                          ? "bg-yellow-100" // Light Yellow background
+                                          : "bg-red-100" // Light Red background
+                                      }`}
                                   >
-                                    ({garment.garmentNumber}) No defects
-                                  </div>
-                                )
-                              )
-                            : "No print data"}
+                                   <span className="w-1/6 py-2 px-4 border-r border-l border-gray-200 text-sm">{defect.repair || "N/A"}</span>
+                                  <span className="w-1/6 py-2 px-4 border-r border-gray-200 text-sm">{defect.name || "N/A"}</span>
+                                  <span className="w-1/6 py-2 px-4 border-r border-gray-200 text-sm text-center">{defect.count || "N/A"}</span>
+                                  <span
+                                        className={`w-1/6 py-2 px-4 inline-block items-center text-xs font-medium text-center rounded-md ${
+                                          defect.status === "OK"
+                                            ? "bg-green-400"
+                                            : defect.status === "Not Repaired"
+                                            ? "bg-yellow-400"
+                                            : "bg-red-400"
+                                        }`}
+                                      >
+                                        {defect.status || "N/A"}
+                                      </span>
+                                  <span className="w-1/6 py-2 px-4 border-r border-gray-200 text-sm">{defect.repair_date || "N/A"}</span>
+                                  <span className="w-1/6 py-2 px-4 border-r border-gray-200 text-sm">{formatTime12Hour(defect.repair_time) || "N/A"}</span>
+                                </div>
+                              ))
+                            ))
+                          ) : (
+                            <div>No details</div>
+                          )}
                         </td>
                       </tr>
                     ))
