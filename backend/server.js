@@ -184,31 +184,96 @@ const sqlConfig = {
   }
 };
 
-// Connect to SQL Server (YMDataStore)
-async function connectToSqlServerYMDataStore() {
-  try {
-    const pool = await sql.connect(sqlConfig);
-    console.log("Connected to SQL Server (YMDataStore) at 192.167.1.13:1433");
-    return pool;
-  } catch (err) {
-    console.error("SQL Server (YMDataStore) connection error:", err);
-    throw err;
+/* ------------------------------
+   YMCE_SYSTEM SQL
+------------------------------ */
+
+// SQL Server Configuration for YMCE_SYSTEM
+const sqlConfigYMCE = {
+  user: "visitor",
+  password: "visitor",
+  server: "ymws-150",
+  //port: 1433,
+  database: "YMCE_SYSTEM",
+  options: {
+    encrypt: false,
+    trustServerCertificate: true
+  },
+  requestTimeout: 300000,
+  connectionTimeout: 300000, // Increase connection timeout to 300 seconds
+  pool: {
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000
+  }
+};
+
+// Create connection pools
+const poolYMDataStore = new sql.ConnectionPool(sqlConfig);
+const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
+
+// Function to connect to a pool with reconnection logic
+async function connectPool(pool, poolName) {
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      await pool.connect();
+      console.log(`Connected to ${poolName} pool at ${pool.config.server}`);
+      return pool;
+    } catch (err) {
+      console.error(`Error connecting to ${poolName} pool:`, err);
+      retries -= 1;
+      if (retries === 0) {
+        throw new Error(`Failed to connect to ${poolName} after 3 attempts`);
+      }
+      console.log(
+        `Retrying ${poolName} connection (${retries} attempts left)...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds before retrying
+    }
   }
 }
 
-// Test connections at startup
-connectToSqlServerYMDataStore().catch((err) => {
-  console.error(
-    "Initial connection to YMDataStore failed. The server will still start, but YMDataStore endpoints may not work:",
-    err
-  );
-});
+// Function to ensure pool is connected before querying
+async function ensurePoolConnected(pool, poolName) {
+  if (!pool.connected) {
+    console.log(
+      `${poolName} pool is not connected. Attempting to reconnect...`
+    );
+    await connectPool(pool, poolName);
+  }
+  return pool;
+}
+
+// Initialize pools and wait for connections
+async function initializePools() {
+  try {
+    await Promise.all([
+      connectPool(poolYMDataStore, "YMDataStore"),
+      connectPool(poolYMCE, "YMCE_SYSTEM")
+    ]);
+  } catch (err) {
+    console.error("Failed to initialize SQL connection pools:", err);
+    process.exit(1); // Exit if pools cannot be initialized
+  }
+}
+
+// Call initializePools before starting the server
+initializePools()
+  .then(() => {
+    console.log("All SQL connection pools initialized successfully.");
+  })
+  .catch((err) => {
+    console.error("Failed to initialize SQL connection pools:", err);
+    process.exit(1);
+  });
 
 // New Endpoint for RS18 Data (YMDataStore)
 app.get("/api/sunrise/rs18", async (req, res) => {
-  let pool;
   try {
-    pool = await connectToSqlServerYMDataStore();
+    await ensurePoolConnected(poolYMDataStore, "YMDataStore");
+    const request = poolYMDataStore.request();
+    //pool = await connectToSqlServerYMDataStore();
     const query = `
       SELECT
         FORMAT(CAST(dDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
@@ -332,26 +397,22 @@ app.get("/api/sunrise/rs18", async (req, res) => {
         END IS NOT NULL;
     `;
 
-    const result = await pool.request().query(query);
+    const result = await request.query(query);
     res.json(result.recordset);
   } catch (err) {
     console.error("Error fetching RS18 data:", err);
     res
       .status(500)
       .json({ message: "Failed to fetch RS18 data", error: err.message });
-  } finally {
-    if (pool) {
-      await pool.close();
-      console.log("SQL Server (YMDataStore) connection closed.");
-    }
   }
 });
 
 // New Endpoint for Sunrise Output Data (YMDataStore)
 app.get("/api/sunrise/output", async (req, res) => {
-  let pool;
   try {
-    pool = await connectToSqlServerYMDataStore();
+    await ensurePoolConnected(poolYMDataStore, "YMDataStore");
+    const request = poolYMDataStore.request();
+    //pool = await connectToSqlServerYMDataStore();
     const query = `
       SELECT
         FORMAT(CAST(BillDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
@@ -382,7 +443,7 @@ app.get("/api/sunrise/output", async (req, res) => {
         ColorName;
     `;
 
-    const result = await pool.request().query(query);
+    const result = await request.query(query);
     res.json(result.recordset);
   } catch (err) {
     console.error("Error fetching Sunrise Output data:", err);
@@ -390,56 +451,7 @@ app.get("/api/sunrise/output", async (req, res) => {
       message: "Failed to fetch Sunrise Output data",
       error: err.message
     });
-  } finally {
-    if (pool) {
-      await pool.close();
-      console.log("SQL Server (YMDataStore) connection closed.");
-    }
   }
-});
-
-/* ------------------------------
-   YMCE_SYSTEM SQL
------------------------------- */
-
-// SQL Server Configuration for YMCE_SYSTEM
-const sqlConfigYMCE = {
-  user: "visitor",
-  password: "visitor",
-  server: "ymws-150",
-  //port: 1433,
-  database: "YMCE_SYSTEM",
-  options: {
-    encrypt: false,
-    trustServerCertificate: true
-  },
-  requestTimeout: 300000,
-  connectionTimeout: 300000, // Increase connection timeout to 300 seconds
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
-  }
-};
-
-// Connect to SQL Server (YMCE_SYSTEM)
-async function connectToSqlServerYMCE() {
-  try {
-    const pool = await sql.connect(sqlConfigYMCE);
-    console.log("Connected to SQL Server (YMCE_SYSTEM) at ymws-150");
-    return pool;
-  } catch (err) {
-    console.error("SQL Server (YMCE_SYSTEM) connection error:", err);
-    throw err;
-  }
-}
-
-// Test connection at startup
-connectToSqlServerYMCE().catch((err) => {
-  console.error(
-    "Initial connection to YMCE_SYSTEM failed. The server will still start, but YMCE_SYSTEM endpoints may not work:",
-    err
-  );
 });
 
 /* ------------------------------
@@ -448,18 +460,17 @@ connectToSqlServerYMCE().catch((err) => {
 
 // Function to fetch data from YMCE_SYSTEM and sync to inline_orders
 async function syncInlineOrders() {
-  let pool;
+  //let pool;
   try {
     console.log("Starting inline_orders sync at", new Date().toISOString());
 
-    // Connect to SQL Server (YMCE_SYSTEM)
-    pool = await connectToSqlServerYMCE();
+    const request = poolYMCE.request();
 
     console.log(
       "Using connection to:",
-      pool.config.server,
+      poolYMCE.config.server,
       "database:",
-      pool.config.database
+      poolYMCE.config.database
     );
 
     // Fetch data from YMCE_SYSTEM
@@ -479,7 +490,9 @@ async function syncInlineOrders() {
         Dept_Type = 'Sewing';
     `;
 
-    const result = await pool.request().query(query);
+    // Ensure the pool is connected before proceeding
+    await ensurePoolConnected(poolYMCE, "YMCE_SYSTEM");
+    const result = await request.query(query);
     const data = result.recordset;
 
     if (data.length === 0) {
@@ -518,17 +531,13 @@ async function syncInlineOrders() {
     console.log("Cleared existing data in inline_orders collection.");
 
     // Insert the transformed data into MongoDB
+
     await InlineOrders.insertMany(documents);
     console.log(
       `Successfully synced ${documents.length} documents to inline_orders.`
     );
   } catch (err) {
     console.error("Error during inline_orders sync:", err);
-  } finally {
-    if (pool) {
-      await pool.close();
-      console.log("SQL Server (YMCE_SYSTEM) connection closed.");
-    }
   }
 }
 
@@ -621,9 +630,10 @@ app.get("/api/inline-orders-details", async (req, res) => {
 
 // New Endpoint for YMCE_SYSTEM Data
 app.get("/api/ymce-system-data", async (req, res) => {
-  let pool;
+  //let pool;
   try {
-    pool = await connectToSqlServerYMCE();
+    await ensurePoolConnected(poolYMCE, "YMCE_SYSTEM");
+    const request = poolYMCE.request();
     const query = `
       SELECT
         St_No,
@@ -652,7 +662,7 @@ app.get("/api/ymce-system-data", async (req, res) => {
         Dept_Type;
     `;
 
-    const result = await pool.request().query(query);
+    const result = await request.query(query);
     res.json(result.recordset);
   } catch (err) {
     console.error("Error fetching YMCE_SYSTEM data:", err);
@@ -660,11 +670,15 @@ app.get("/api/ymce-system-data", async (req, res) => {
       message: "Failed to fetch YMCE_SYSTEM data",
       error: err.message
     });
-  } finally {
-    if (pool) {
-      await pool.close();
-    }
   }
+});
+
+// Graceful shutdown
+process.on("SIGINT", async () => {
+  await poolYMDataStore.close();
+  await poolYMCE.close();
+  console.log("SQL connection pools closed.");
+  process.exit(0);
 });
 
 app.get("/api/health", (req, res) => {
