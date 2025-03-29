@@ -259,7 +259,7 @@ const RovingPage = () => {
     //setMoNoSearch("");
     //setMoNoOptions([]);
     //setShowMoNoDropdown(false);
-    setOperationData([]);
+    //setOperationData([]);
     setScannedUserData(null);
     setShowOperatorDetails(false);
     setShowOperationDetails(false);
@@ -311,7 +311,7 @@ const RovingPage = () => {
       0
     );
     const qualityStatus = updatedGarments.some((g) => g.status === "Fail")
-      ? "Fail"
+      ? "Reject"
       : "Pass";
 
     const selectedOperation = operationData.find(
@@ -397,7 +397,7 @@ const RovingPage = () => {
   };
 
   const commonResultStatus = garments.some((g) => g.defects.length > 0)
-    ? "Fail"
+    ? "Reject"
     : "Pass";
   const garment = garments[currentGarmentIndex] || {
     defects: [],

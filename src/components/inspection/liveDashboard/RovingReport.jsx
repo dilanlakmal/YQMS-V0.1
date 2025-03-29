@@ -10,7 +10,7 @@ import { FileText } from "lucide-react";
 
 const RovingReport = () => {
   // Filter states
-  const [startDate, setStartDate] = useState(null);
+  const [startDate, setStartDate] = useState(new Date()); // Default to today
   const [endDate, setEndDate] = useState(null);
   const [lineNo, setLineNo] = useState("");
   const [moNo, setMoNo] = useState("");
@@ -24,6 +24,7 @@ const RovingReport = () => {
   const [lineNos] = useState(
     Array.from({ length: 30 }, (_, i) => (i + 1).toString())
   );
+  const [lastUpdated, setLastUpdated] = useState(null); // State for last updated timestamp
 
   // Format date to "MM/DD/YYYY"
   const formatDate = (date) => {
@@ -32,6 +33,18 @@ const RovingReport = () => {
     const day = ("0" + date.getDate()).slice(-2);
     const year = date.getFullYear();
     return `${month}/${day}/${year}`;
+  };
+
+  // Format timestamp to "MM/DD/YYYY HH:MM:SS"
+  const formatTimestamp = (date) => {
+    if (!date) return "Never";
+    const month = ("0" + (date.getMonth() + 1)).slice(-2);
+    const day = ("0" + date.getDate()).slice(-2);
+    const year = date.getFullYear();
+    const hours = ("0" + date.getHours()).slice(-2);
+    const minutes = ("0" + date.getMinutes()).slice(-2);
+    const seconds = ("0" + date.getSeconds()).slice(-2);
+    return `${month}/${day}/${year} ${hours}:${minutes}:${seconds}`;
   };
 
   // Fetch dropdown data
@@ -65,17 +78,27 @@ const RovingReport = () => {
         }
       );
       setReportData(response.data);
+      setLastUpdated(new Date()); // Update the last updated timestamp
     } catch (error) {
       console.error("Error fetching roving report data:", error);
       setReportData([]);
+      setLastUpdated(new Date()); // Update timestamp even on error
     }
   };
 
-  // Initial data fetch
+  // Initial data fetch and set up polling
   useEffect(() => {
     fetchDropdownData();
-    fetchReportData();
-  }, []);
+    fetchReportData(); // Initial fetch
+
+    // Set up polling every 10 seconds
+    const intervalId = setInterval(() => {
+      fetchReportData();
+    }, 10000); // 10 seconds interval
+
+    // Clean up the interval on component unmount
+    return () => clearInterval(intervalId);
+  }, [startDate, endDate, lineNo, moNo, qcId]); // Dependencies to refetch when filters change
 
   // Apply filters and group data
   useEffect(() => {
@@ -102,24 +125,29 @@ const RovingReport = () => {
     };
 
     applyFilters();
-  }, [reportData]);
+  }, [reportData, currentPage]); // Recalculate when reportData changes
 
-  // Refetch data when filters change
-  useEffect(() => {
-    fetchReportData();
-  }, [startDate, endDate, lineNo, moNo, qcId]);
-
-  // Calculate metrics for each inlineData entry
   const calculateMetrics = (inlineEntry) => {
-    const checkedQty = inlineEntry.checked_quantity || 0;
-    const rejectGarments = inlineEntry.rejectGarments || [];
+    const checkedQty = inlineEntry?.checked_quantity || 0;
+    const rejectGarments = Array.isArray(inlineEntry?.rejectGarments)
+      ? inlineEntry.rejectGarments
+      : [];
+
+    // Calculate totalDefectsQty (sum of defect counts)
     const totalDefectsQty = rejectGarments.reduce(
-      (sum, garment) => sum + (garment.totalCount || 0),
+      (sum, garment) => sum + (garment?.totalCount || 0),
       0
     );
-    const rejectGarmentCount = rejectGarments.length; // Number of reject garments (Reject Part)
-    const goodOutput = checkedQty - rejectGarmentCount;
 
+    // Calculate rejectGarmentCount based on garments array
+    let rejectGarmentCount = 0;
+    rejectGarments.forEach((garment) => {
+      if (Array.isArray(garment?.garments) && garment.garments.length > 0) {
+        rejectGarmentCount += garment.garments.length; // Count objects in garments array
+      }
+    });
+
+    const goodOutput = checkedQty - rejectGarmentCount;
     const defectRate =
       checkedQty > 0 ? (totalDefectsQty / checkedQty) * 100 : 0;
     const defectRatio =
@@ -128,14 +156,19 @@ const RovingReport = () => {
 
     const defectDetails = rejectGarments
       .flatMap((garment) =>
-        garment.garments.flatMap((g) =>
-          g.defects.map((defect) => ({
-            name: defect.name,
-            count: defect.count
-          }))
-        )
+        Array.isArray(garment?.garments)
+          ? garment.garments.flatMap((g) =>
+              Array.isArray(g?.defects)
+                ? g.defects.map((defect) => ({
+                    name: defect?.name || "Unknown",
+                    count: defect?.count || 0
+                  }))
+                : []
+            )
+          : []
       )
       .reduce((acc, defect) => {
+        if (!defect || !defect.name) return acc; // Skip invalid defects
         const existing = acc.find((d) => d.name === defect.name);
         if (existing) {
           existing.count += defect.count;
@@ -155,7 +188,6 @@ const RovingReport = () => {
     };
   };
 
-  // Calculate aggregated metrics for a group (for the Summary Table)
   const calculateGroupMetrics = (group) => {
     let totalCheckedQty = 0;
     let totalDefectsQty = 0;
@@ -209,7 +241,7 @@ const RovingReport = () => {
 
   // Clear filters
   const handleClearFilters = () => {
-    setStartDate(null);
+    setStartDate(new Date()); // Reset to today
     setEndDate(null);
     setLineNo("");
     setMoNo("");
@@ -236,7 +268,10 @@ const RovingReport = () => {
     <div className="p-4 bg-gray-100 min-h-screen">
       {/* Filter Panel */}
       <div className="bg-white p-4 rounded-lg shadow-md mb-6">
-        <h2 className="text-lg font-semibold mb-4">Filter Report</h2>
+        <h2 className="text-sm font-semibold mb-4">
+          Filter Roving Reports -- Last Updated at{" "}
+          {lastUpdated && `(${formatTimestamp(lastUpdated)})`}
+        </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

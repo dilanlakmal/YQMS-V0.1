@@ -130,13 +130,22 @@ const RovingReportPDFA4 = ({ data }) => {
   const calculateMetrics = (inlineEntry) => {
     const checkedQty = inlineEntry.checked_quantity || 0;
     const rejectGarments = inlineEntry.rejectGarments || [];
+
+    // Calculate totalDefectsQty (sum of defect counts)
     const totalDefectsQty = rejectGarments.reduce(
       (sum, garment) => sum + (garment.totalCount || 0),
       0
     );
-    const rejectGarmentCount = rejectGarments.length; // Number of reject garments (Reject Part)
-    const goodOutput = checkedQty - rejectGarmentCount;
 
+    // Calculate rejectGarmentCount based on garments array
+    let rejectGarmentCount = 0;
+    rejectGarments.forEach((garment) => {
+      if (garment.garments && garment.garments.length > 0) {
+        rejectGarmentCount += garment.garments.length; // Count objects in garments array
+      }
+    });
+
+    const goodOutput = checkedQty - rejectGarmentCount;
     const defectRate =
       checkedQty > 0 ? (totalDefectsQty / checkedQty) * 100 : 0;
     const defectRatio =
