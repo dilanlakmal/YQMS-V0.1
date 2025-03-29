@@ -4,8 +4,8 @@ import "react-datepicker/dist/react-datepicker.css";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../config";
 import { PDFDownloadLink } from "@react-pdf/renderer";
-import RovingReportPDFA3 from "./RovingReportPDFA3"; // Import A3 PDF component
-import RovingReportPDFA4 from "./RovingReportPDFA4"; // Import A4 PDF component
+import RovingReportPDFA3 from "./RovingReportPDFA3";
+import RovingReportPDFA4 from "./RovingReportPDFA4";
 import { FileText } from "lucide-react";
 
 const RovingReport = () => {
@@ -84,8 +84,9 @@ const RovingReport = () => {
       const grouped = reportData.reduce((acc, record) => {
         const key = `${record.inspection_date}-${record.line_no}-${record.mo_no}-${record.emp_id}`;
         if (!acc[key]) {
-          acc[key] = { ...record };
+          acc[key] = { ...record, inlineData: [] };
         }
+        acc[key].inlineData.push(...record.inlineData);
         return acc;
       }, {});
 
@@ -116,7 +117,7 @@ const RovingReport = () => {
       (sum, garment) => sum + (garment.totalCount || 0),
       0
     );
-    const rejectGarmentCount = rejectGarments.length;
+    const rejectGarmentCount = rejectGarments.length; // Number of reject garments (Reject Part)
     const goodOutput = checkedQty - rejectGarmentCount;
 
     const defectRate =
@@ -154,9 +155,45 @@ const RovingReport = () => {
     };
   };
 
+  // Calculate aggregated metrics for a group (for the Summary Table)
+  const calculateGroupMetrics = (group) => {
+    let totalCheckedQty = 0;
+    let totalDefectsQty = 0;
+    let totalRejectGarmentCount = 0;
+
+    group.inlineData.forEach((entry) => {
+      const metrics = calculateMetrics(entry);
+      totalCheckedQty += entry.checked_quantity || 0;
+      totalDefectsQty += metrics.totalDefectsQty;
+      totalRejectGarmentCount += metrics.rejectGarmentCount;
+    });
+
+    const goodOutput = totalCheckedQty - totalRejectGarmentCount;
+    const defectRate =
+      totalCheckedQty > 0 ? (totalDefectsQty / totalCheckedQty) * 100 : 0;
+    const defectRatio =
+      totalCheckedQty > 0
+        ? (totalRejectGarmentCount / totalCheckedQty) * 100
+        : 0;
+    const passRate =
+      totalCheckedQty > 0 ? (goodOutput / totalCheckedQty) * 100 : 0;
+
+    return {
+      totalCheckedQty,
+      totalDefectsQty,
+      totalRejectGarmentCount,
+      defectRate: defectRate.toFixed(2),
+      defectRatio: defectRatio.toFixed(2),
+      passRate: passRate.toFixed(2)
+    };
+  };
+
   // Pagination
   const totalPages = filteredData.length;
   const currentRecord = filteredData[currentPage];
+  const currentGroupMetrics = currentRecord
+    ? calculateGroupMetrics(currentRecord)
+    : {};
 
   const handleNextPage = () => {
     if (currentPage < totalPages - 1) {
@@ -178,6 +215,21 @@ const RovingReport = () => {
     setMoNo("");
     setQcId("");
     setPaperSize("A3"); // Reset to default A3
+  };
+
+  // Helper function to get background color based on value and type
+  const getBackgroundColor = (value, type) => {
+    const numValue = parseFloat(value);
+    if (type === "passRate") {
+      if (numValue > 80) return "bg-green-100";
+      if (numValue >= 50 && numValue <= 80) return "bg-orange-100";
+      return "bg-red-100";
+    } else {
+      // For defectRate and defectRatio
+      if (numValue > 10) return "bg-red-100";
+      if (numValue >= 5 && numValue <= 10) return "bg-orange-100";
+      return "bg-green-100";
+    }
   };
 
   return (
@@ -321,46 +373,99 @@ const RovingReport = () => {
           </h1>
 
           {/* Summary Table */}
-          <table className="w-full mb-6 border border-gray-200 rounded-lg">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
-                  Inspection Date
-                </th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
-                  QC ID
-                </th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
-                  QC Name
-                </th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
-                  Line No
-                </th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
-                  MO No
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
-                  {currentRecord?.inspection_date}
-                </td>
-                <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
-                  {currentRecord?.emp_id}
-                </td>
-                <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
-                  {currentRecord?.eng_name}
-                </td>
-                <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
-                  {currentRecord?.line_no}
-                </td>
-                <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
-                  {currentRecord?.mo_no}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full mb-6 border border-gray-200 rounded-lg">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
+                    Inspection Date
+                  </th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
+                    QC ID
+                  </th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
+                    QC Name
+                  </th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
+                    Line No
+                  </th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
+                    MO No
+                  </th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
+                    Checked Qty
+                  </th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
+                    Reject Part
+                  </th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
+                    Defect Qty
+                  </th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
+                    Defect Rate (%)
+                  </th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
+                    Defect Ratio (%)
+                  </th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
+                    Pass Rate (%)
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                    {currentRecord?.inspection_date}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                    {currentRecord?.emp_id}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                    {currentRecord?.eng_name}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                    {currentRecord?.line_no}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                    {currentRecord?.mo_no}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                    {currentGroupMetrics.totalCheckedQty || 0}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                    {currentGroupMetrics.totalRejectGarmentCount || 0}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                    {currentGroupMetrics.totalDefectsQty || 0}
+                  </td>
+                  <td
+                    className={`px-4 py-2 text-sm text-gray-700 border-r border-gray-200 ${getBackgroundColor(
+                      currentGroupMetrics.defectRate,
+                      "defectRate"
+                    )}`}
+                  >
+                    {currentGroupMetrics.defectRate || 0}
+                  </td>
+                  <td
+                    className={`px-4 py-2 text-sm text-gray-700 border-r border-gray-200 ${getBackgroundColor(
+                      currentGroupMetrics.defectRatio,
+                      "defectRatio"
+                    )}`}
+                  >
+                    {currentGroupMetrics.defectRatio || 0}
+                  </td>
+                  <td
+                    className={`px-4 py-2 text-sm text-gray-700 border-r border-gray-200 ${getBackgroundColor(
+                      currentGroupMetrics.passRate,
+                      "passRate"
+                    )}`}
+                  >
+                    {currentGroupMetrics.passRate || 0}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           {/* Inspection Data Subtitle */}
           <h2 className="text-xl font-semibold text-gray-800 mb-4">
