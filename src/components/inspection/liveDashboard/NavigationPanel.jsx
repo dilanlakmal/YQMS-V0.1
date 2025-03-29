@@ -12,7 +12,8 @@ import {
   TrendingUp,
   Calendar,
   FileText,
-  Box
+  Box,
+  Search // Added Search icon for QC Inline Roving
 } from "lucide-react";
 
 const NavigationPanel = ({
@@ -24,6 +25,7 @@ const NavigationPanel = ({
   const [expandedMenus, setExpandedMenus] = useState({});
 
   const menuItems = [
+    { name: "QC Inline Roving", icon: <Search size={16} />, subMenus: [] },
     { name: "Order Data", icon: <Package size={18} />, subMenus: [] },
     { name: "Washing", icon: <Shirt size={18} />, subMenus: [] },
     { name: "Ironing", icon: <Shirt size={18} />, subMenus: [] }, // Replaced 'Iron' with 'Shirt'

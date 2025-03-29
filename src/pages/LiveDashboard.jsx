@@ -21,6 +21,7 @@ import OPALive from "../components/inspection/liveDashboard/OPALive";
 import DailySummary from "../components/inspection/liveDashboard/DailySummary";
 import WeeklySummary from "../components/inspection/liveDashboard/WeeklySummary";
 import InspectorCard from "../components/inspection/liveDashboard/InspectorCard";
+import RovingReport from "../components/inspection/liveDashboard/RovingReport"; // Added import
 
 const LiveDashboard = () => {
   const [activeSection, setActiveSection] = useState("Live Dashboard");
@@ -431,6 +432,7 @@ const LiveDashboard = () => {
         )}
 
         {/* Section Content */}
+        {activeSection === "QC Inline Roving" && <RovingReport />}
         {activeSection === "Order Data" && <OrderData />}
         {activeSection === "Washing" && <WashingLive />}
         {activeSection === "Ironing" && <IroningLive />}

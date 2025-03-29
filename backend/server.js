@@ -5533,6 +5533,98 @@ app.get("/api/qc-inline-roving-reports", async (req, res) => {
   }
 });
 
+// New endpoint to fetch filtered QC Inline Roving reports with date handling
+app.get("/api/qc-inline-roving-reports-filtered", async (req, res) => {
+  try {
+    const { startDate, endDate, line_no, mo_no, emp_id } = req.query;
+
+    let match = {};
+
+    // Date filtering using $expr for string dates
+    if (startDate || endDate) {
+      match.$expr = match.$expr || {};
+      match.$expr.$and = match.$expr.$and || [];
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+    }
+
+    // Other filters
+    if (line_no) {
+      match.line_no = line_no;
+    }
+    if (mo_no) {
+      match.mo_no = mo_no;
+    }
+    if (emp_id) {
+      match.emp_id = emp_id;
+    }
+
+    const reports = await QCInlineRoving.find(match);
+    res.json(reports);
+  } catch (error) {
+    console.error("Error fetching filtered roving reports:", error);
+    res.status(500).json({ message: "Error fetching filtered reports", error });
+  }
+});
+
+// Endpoint to fetch distinct MO Nos
+app.get("/api/qc-inline-roving-mo-nos", async (req, res) => {
+  try {
+    const moNos = await QCInlineRoving.distinct("mo_no");
+    res.json(moNos.filter((mo) => mo)); // Filter out null/empty values
+  } catch (error) {
+    console.error("Error fetching MO Nos:", error);
+    res.status(500).json({ message: "Failed to fetch MO Nos" });
+  }
+});
+
+// Endpoint to fetch distinct QC IDs (emp_id)
+app.get("/api/qc-inline-roving-qc-ids", async (req, res) => {
+  try {
+    const qcIds = await QCInlineRoving.distinct("emp_id");
+    res.json(qcIds.filter((id) => id)); // Filter out null/empty values
+  } catch (error) {
+    console.error("Error fetching QC IDs:", error);
+    res.status(500).json({ message: "Failed to fetch QC IDs" });
+  }
+});
+
 // Endpoint to fetch user data by emp_id
 app.get("/api/user-by-emp-id", async (req, res) => {
   try {
