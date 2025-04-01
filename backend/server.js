@@ -76,31 +76,12 @@ const server = https.createServer(credentials, app);
 // Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: "https://192.167.12.14:3001", //"https://192.165.2.175:3001", // Update with your frontend URL  //"https://localhost:3001"
+    origin: "https://192.167.12.14:3001", //"https://192.165.2.175:3001", //"https://localhost:3001"
     methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
   }
-  //path: "/socket.io",
-  //transports: ["websocket"],
 });
-
-/* ------------------------------
-   for HTTP
------------------------------- */
-
-//const server = http.createServer(app); // Create HTTP server for Socket.io
-
-// const io = new Server(server, {
-//   cors: {
-//     origin: "*", // Allow all origins (update with your frontend URL in production)
-//     methods: ["GET", "POST"],
-//     allowedHeaders: ["Content-Type", "Authorization"],
-//     credentials: true,
-//   },
-//   path: "/socket.io",
-//   transports: ["websocket"],
-// }); // Initialize Socket.io
 
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
@@ -110,11 +91,14 @@ app.use("/public", express.static(path.join(__dirname, "../public")));
 app.use(bodyParser.json());
 app.use(
   cors({
-    origin: "*", //["http://localhost:3001", "https://localhost:3001"], // Allow both HTTP and HTTPS, // Update with your frontend URL
+    origin: "https://192.167.12.14:3001", //["http://localhost:3001", "https://localhost:3001"],
     methods: ["GET", "POST", "PUT"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
   })
 );
+
+app.options("*", cors());
 
 const ymProdConnection = mongoose.createConnection(
   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
@@ -992,6 +976,9 @@ async function syncCuttingOrders() {
         return {
           tableNo: marker.TableNo,
           markerNo: marker.MackerNo,
+          planLayerQty: marker.PlanLayer || 0, // Map PlanLayer to planLayerQty
+          totalPlanPcs: marker.PlanPcs || 0, // Map PlanPcs to totalPlanPcs
+          actualLayers: marker.ActualLayer || 0, // Map ActualLayer to actualLayers
           markerData
         };
       });
@@ -1057,6 +1044,69 @@ cron.schedule("0 7 * * *", async () => {
     await syncCuttingOrders();
   } catch (err) {
     console.error("Scheduled cuttingOrders sync failed:", err);
+  }
+});
+
+/* ------------------------------
+   Updated Endpoints for Cutting.jsx
+------------------------------ */
+
+// Endpoint to Search MO Numbers (StyleNo) from cuttingOrders with partial matching
+app.get("/api/cutting-orders-mo-numbers", async (req, res) => {
+  try {
+    const searchTerm = req.query.search;
+    if (!searchTerm) {
+      return res.status(400).json({ error: "Search term is required" });
+    }
+
+    // Use a case-insensitive regex to match the term anywhere in StyleNo
+    const regexPattern = new RegExp(searchTerm, "i");
+
+    // Query the cuttingOrders collection
+    const results = await CuttingOrders.find({
+      StyleNo: { $regex: regexPattern }
+    })
+      .select("StyleNo") // Only return the StyleNo field
+      .limit(100) // Limit results to prevent overwhelming the UI
+      .sort({ StyleNo: 1 }) // Sort alphabetically
+      .exec();
+
+    // Extract unique StyleNo values
+    const uniqueMONos = [...new Set(results.map((r) => r.StyleNo))];
+
+    res.json(uniqueMONos);
+  } catch (err) {
+    console.error("Error fetching MO numbers from cuttingOrders:", err);
+    res.status(500).json({
+      message: "Failed to fetch MO numbers from cuttingOrders",
+      error: err.message
+    });
+  }
+});
+
+// Endpoint to Fetch Cutting Order Details for a given MO No (StyleNo)
+app.get("/api/cutting-orders-details", async (req, res) => {
+  try {
+    const styleNo = req.query.styleNo;
+    if (!styleNo) {
+      return res.status(400).json({ error: "StyleNo is required" });
+    }
+
+    // Find all documents where StyleNo matches
+    const documents = await CuttingOrders.find({ StyleNo: styleNo }).exec();
+
+    if (documents.length === 0) {
+      console.log(`No documents found for StyleNo: ${styleNo}`);
+      return res.status(404).json({ error: "MO No not found" });
+    }
+
+    res.json(documents);
+  } catch (err) {
+    console.error("Error fetching Cutting Orders details:", err);
+    res.status(500).json({
+      message: "Failed to fetch Cutting Orders details",
+      error: err.message
+    });
   }
 });
 
