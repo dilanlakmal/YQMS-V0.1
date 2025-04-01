@@ -931,6 +931,9 @@ async function syncCuttingOrders() {
       markersMap[key].push({
         TableNo: row.TableNo,
         MackerNo: row.MackerNo,
+        PlanLayer: row.PlanLayer, // Include PlanLayer
+        PlanPcs: row.PlanPcs, // Include PlanPcs
+        ActualLayer: row.ActualLayer, // Include ActualLayer
         Ratio1: row.Ratio1,
         Ratio2: row.Ratio2,
         Ratio3: row.Ratio3,
@@ -1105,6 +1108,59 @@ app.get("/api/cutting-orders-details", async (req, res) => {
     console.error("Error fetching Cutting Orders details:", err);
     res.status(500).json({
       message: "Failed to fetch Cutting Orders details",
+      error: err.message
+    });
+  }
+});
+
+app.get("/api/cutting-orders-sizes", async (req, res) => {
+  try {
+    const { styleNo, color, tableNo } = req.query;
+
+    if (!styleNo || !color || !tableNo) {
+      return res
+        .status(400)
+        .json({ error: "styleNo, color, and tableNo are required" });
+    }
+
+    // Find the document matching the styleNo and color
+    const document = await CuttingOrders.findOne({
+      StyleNo: styleNo,
+      EngColor: color
+    }).exec();
+
+    if (!document) {
+      return res
+        .status(404)
+        .json({ error: "Document not found for the given styleNo and color" });
+    }
+
+    // Find the cuttingData entry matching the tableNo
+    const cuttingDataEntry = document.cuttingData.find(
+      (cd) => cd.tableNo === tableNo
+    );
+
+    if (!cuttingDataEntry) {
+      return res
+        .status(404)
+        .json({ error: "Table number not found in cuttingData" });
+    }
+
+    // Extract sizes from markerData, filter out null/empty sizes, and sort by no
+    const sizes = cuttingDataEntry.markerData
+      .filter((md) => md.size && md.size.trim() !== "" && md.size !== "0") // Exclude null or empty sizes
+      .map((md) => ({ no: md.no, size: md.size })) // Map to { no, size }
+      .sort((a, b) => a.no - b.no) // Sort by no
+      .map((md) => md.size); // Extract only the size values
+
+    // Remove duplicates
+    const uniqueSizes = [...new Set(sizes)];
+
+    res.json(uniqueSizes);
+  } catch (err) {
+    console.error("Error fetching sizes from cuttingOrders:", err);
+    res.status(500).json({
+      message: "Failed to fetch sizes from cuttingOrders",
       error: err.message
     });
   }
