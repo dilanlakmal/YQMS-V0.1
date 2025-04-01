@@ -12,7 +12,7 @@ const OrderDataSchema = new mongoose.Schema({
 });
 
 const InlineOrdersSchema = new mongoose.Schema({
-  St_No: { type: String, unique: true },
+  St_No: { type: String },
   By_Style: { type: String },
   Dept_Type: { type: String },
   orderData: [OrderDataSchema],

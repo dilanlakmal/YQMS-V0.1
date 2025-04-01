@@ -30,6 +30,7 @@ import createQC2InspectionPassBundleModel from "./models/qc2_inspection.js";
 import createQC2ReworksModel from "./models/qc2_rework.js";
 import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
 import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
+import createCuttingOrdersModel from "./models/CuttingOrders.js"; // New model import
 
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
 import sql from "mssql"; // Import mssql for SQL Server connection
@@ -154,6 +155,7 @@ const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
 const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
 const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
+const CuttingOrders = createCuttingOrdersModel(ymProdConnection); // New model
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -208,9 +210,28 @@ const sqlConfigYMCE = {
   }
 };
 
+/* ------------------------------
+   YMWHSYS2 SQL Configuration
+------------------------------ */
+
+const sqlConfigYMWHSYS2 = {
+  user: "user01",
+  password: "user01",
+  server: "YM-WHSYS",
+  database: "YMWHSYS2",
+  options: {
+    encrypt: false,
+    trustServerCertificate: true
+  },
+  requestTimeout: 300000,
+  connectionTimeout: 300000,
+  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
+};
+
 // Create connection pools
 const poolYMDataStore = new sql.ConnectionPool(sqlConfig);
 const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
+const poolYMWHSYS2 = new sql.ConnectionPool(sqlConfigYMWHSYS2);
 
 // Function to connect to a pool with reconnection logic
 async function connectPool(pool, poolName) {
@@ -245,12 +266,28 @@ async function ensurePoolConnected(pool, poolName) {
   return pool;
 }
 
+// Drop the conflicting St_No_1 index if it exists
+async function dropConflictingIndex() {
+  try {
+    const indexes = await InlineOrders.collection.getIndexes();
+    if (indexes["St_No_1"]) {
+      await InlineOrders.collection.dropIndex("St_No_1");
+      console.log("Dropped conflicting St_No_1 index.");
+    } else {
+      console.log("St_No_1 index not found, no need to drop.");
+    }
+  } catch (err) {
+    console.error("Error dropping St_No_1 index:", err);
+  }
+}
+
 // Initialize pools and wait for connections
 async function initializePools() {
   try {
     await Promise.all([
       connectPool(poolYMDataStore, "YMDataStore"),
-      connectPool(poolYMCE, "YMCE_SYSTEM")
+      connectPool(poolYMCE, "YMCE_SYSTEM"),
+      connectPool(poolYMWHSYS2, "YMWHSYS2")
     ]);
   } catch (err) {
     console.error("Failed to initialize SQL connection pools:", err);
@@ -258,15 +295,27 @@ async function initializePools() {
   }
 }
 
-// Call initializePools before starting the server
-initializePools()
-  .then(() => {
-    console.log("All SQL connection pools initialized successfully.");
-  })
-  .catch((err) => {
-    console.error("Failed to initialize SQL connection pools:", err);
-    process.exit(1);
-  });
+/* ------------------------------
+   Initialize Pools and Run Initial Syncs
+------------------------------ */
+
+// Call this before initializePools
+dropConflictingIndex().then(() => {
+  initializePools()
+    .then(() => {
+      console.log("All SQL connection pools initialized successfully.");
+      syncInlineOrders().then(() =>
+        console.log("Initial inline_orders sync completed.")
+      );
+      syncCuttingOrders().then(() =>
+        console.log("Initial cuttingOrders sync completed.")
+      );
+    })
+    .catch((err) => {
+      console.error("Failed to initialize SQL connection pools:", err);
+      process.exit(1);
+    });
+});
 
 // New Endpoint for RS18 Data (YMDataStore)
 app.get("/api/sunrise/rs18", async (req, res) => {
@@ -458,11 +507,10 @@ app.get("/api/sunrise/output", async (req, res) => {
    API to fetch inline data from SQL to ym_prod
 ------------------------------ */
 
-// Function to fetch data from YMCE_SYSTEM and sync to inline_orders
 async function syncInlineOrders() {
-  //let pool;
   try {
     console.log("Starting inline_orders sync at", new Date().toISOString());
+    await ensurePoolConnected(poolYMCE, "YMCE_SYSTEM");
 
     const request = poolYMCE.request();
 
@@ -473,7 +521,6 @@ async function syncInlineOrders() {
       poolYMCE.config.database
     );
 
-    // Fetch data from YMCE_SYSTEM
     const query = `
       SELECT 
         St_No,
@@ -490,8 +537,6 @@ async function syncInlineOrders() {
         Dept_Type = 'Sewing';
     `;
 
-    // Ensure the pool is connected before proceeding
-    await ensurePoolConnected(poolYMCE, "YMCE_SYSTEM");
     const result = await request.query(query);
     const data = result.recordset;
 
@@ -523,21 +568,62 @@ async function syncInlineOrders() {
       return acc;
     }, {});
 
-    // Convert grouped data to an array
     const documents = Object.values(groupedData);
 
-    // Clear existing data in inline_orders (optional, depending on your requirements)
-    await InlineOrders.deleteMany({});
-    console.log("Cleared existing data in inline_orders collection.");
+    // Use bulkWrite with upsert to update or insert documents
+    const bulkOps = documents.map((doc) => ({
+      updateOne: {
+        filter: {
+          St_No: doc.St_No,
+          By_Style: doc.By_Style,
+          Dept_Type: doc.Dept_Type
+        },
+        update: {
+          $set: {
+            St_No: doc.St_No,
+            By_Style: doc.By_Style,
+            Dept_Type: doc.Dept_Type,
+            orderData: doc.orderData,
+            updatedAt: new Date()
+          },
+          $setOnInsert: {
+            createdAt: new Date()
+          }
+        },
+        upsert: true
+      }
+    }));
 
-    // Insert the transformed data into MongoDB
-
-    await InlineOrders.insertMany(documents);
+    await InlineOrders.bulkWrite(bulkOps);
     console.log(
       `Successfully synced ${documents.length} documents to inline_orders.`
     );
+
+    // Optional: Remove documents that no longer exist in the source data
+    const existingKeys = documents.map(
+      (doc) => `${doc.St_No}_${doc.By_Style}_${doc.Dept_Type}`
+    );
+    await InlineOrders.deleteMany({
+      $and: [
+        { St_No: { $exists: true } },
+        { By_Style: { $exists: true } },
+        { Dept_Type: { $exists: true } },
+        {
+          $expr: {
+            $not: {
+              $in: [
+                { $concat: ["$St_No", "_", "$By_Style", "_", "$Dept_Type"] },
+                existingKeys
+              ]
+            }
+          }
+        }
+      ]
+    });
+    console.log("Removed outdated documents from inline_orders.");
   } catch (err) {
     console.error("Error during inline_orders sync:", err);
+    throw err;
   }
 }
 
@@ -673,12 +759,322 @@ app.get("/api/ymce-system-data", async (req, res) => {
   }
 });
 
-// Graceful shutdown
+/* ------------------------------
+   Sync Cutting Orders Function
+------------------------------ */
+
+async function syncCuttingOrders() {
+  try {
+    console.log("Starting cuttingOrders sync at", new Date().toISOString());
+    await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
+
+    // Define SQL queries
+    const query1 = `
+      SELECT 
+        StyleNo, 
+        Batch AS LotNo
+      FROM [YMWHSYS2].[dbo].[tbSpreading]
+      GROUP BY StyleNo, Batch
+      ORDER BY StyleNo, Batch;
+    `;
+
+    const query2 = `
+      SELECT DISTINCT 
+        StyleNo, 
+        Buyer, 
+        BuyerStyle, 
+        EngColor, 
+        ChColor, 
+        ColorCode, 
+        Size1, 
+        Size2, 
+        Size3, 
+        Size4, 
+        Size5, 
+        Size6, 
+        Size7, 
+        Size8, 
+        Size9, 
+        Size10
+      FROM [YMWHSYS2].[dbo].[ViewCuttingOrderReport]
+      WHERE FabricType = 'A'
+      ORDER BY StyleNo, Buyer, BuyerStyle, EngColor, ChColor, ColorCode;
+    `;
+
+    const query3 = `
+      SELECT 
+        StyleNo, 
+        Buyer, 
+        BuyerStyle, 
+        EngColor, 
+        ChColor, 
+        ColorCode, 
+        SUM(Qty1) AS Sum_Qty1,
+        SUM(Qty2) AS Sum_Qty2,
+        SUM(Qty3) AS Sum_Qty3,
+        SUM(Qty4) AS Sum_Qty4,
+        SUM(Qty5) AS Sum_Qty5,
+        SUM(Qty6) AS Sum_Qty6,
+        SUM(Qty7) AS Sum_Qty7,
+        SUM(Qty8) AS Sum_Qty8,
+        SUM(Qty9) AS Sum_Qty9,
+        SUM(Qty10) AS Sum_Qty10
+      FROM [YMWHSYS2].[dbo].[ViewCuttingOrderReport]
+      WHERE FabricType = 'A'
+      GROUP BY 
+        StyleNo, 
+        Buyer, 
+        BuyerStyle, 
+        EngColor, 
+        ChColor, 
+        ColorCode
+      ORDER BY 
+        StyleNo, 
+        Buyer, 
+        BuyerStyle, 
+        EngColor, 
+        ChColor, 
+        ColorCode;
+    `;
+
+    const query4 = `
+      SELECT 
+        StyleNo, 
+        Buyer, 
+        BuyerStyle, 
+        EngColor, 
+        ChColor, 
+        ColorCode, 
+        TableNo, 
+        MackerNo, 
+        MAX(PlanLayer) AS PlanLayer,
+        MAX(PlanPcs) AS PlanPcs,
+        MAX(ActualLayer) AS ActualLayer,
+        MAX(RollQty) AS RollQty,
+        MAX(Ratio1) AS Ratio1,
+        MAX(Ratio2) AS Ratio2,
+        MAX(Ratio3) AS Ratio3,
+        MAX(Ratio4) AS Ratio4,
+        MAX(Ratio5) AS Ratio5,
+        MAX(Ratio6) AS Ratio6,
+        MAX(Ratio7) AS Ratio7,
+        MAX(Ratio8) AS Ratio8,
+        MAX(Ratio9) AS Ratio9,
+        MAX(Ratio10) AS Ratio10
+      FROM [YMWHSYS2].[dbo].[ViewCuttingDetailReport]
+      WHERE FabricType = 'A' 
+      GROUP BY 
+        StyleNo, 
+        Buyer, 
+        BuyerStyle, 
+        EngColor, 
+        ChColor, 
+        ColorCode, 
+        TableNo, 
+        MackerNo
+      ORDER BY 
+        StyleNo, 
+        Buyer, 
+        BuyerStyle, 
+        EngColor, 
+        ChColor, 
+        ColorCode, 
+        TableNo, 
+        MackerNo;
+    `;
+
+    // Fetch data concurrently
+    const [lotNumbersResult, sizesResult, orderQtyResult, markersResult] =
+      await Promise.all([
+        poolYMWHSYS2.request().query(query1),
+        poolYMWHSYS2.request().query(query2),
+        poolYMWHSYS2.request().query(query3),
+        poolYMWHSYS2.request().query(query4)
+      ]);
+
+    // Process lot numbers into a map
+    const lotNumbersMap = {};
+    lotNumbersResult.recordset.forEach((row) => {
+      if (!lotNumbersMap[row.StyleNo]) {
+        lotNumbersMap[row.StyleNo] = new Set();
+      }
+      lotNumbersMap[row.StyleNo].add(row.LotNo);
+    });
+
+    // Process sizes into a map
+    const sizesMap = {};
+    sizesResult.recordset.forEach((row) => {
+      const key = `${row.StyleNo}|${row.Buyer}|${row.BuyerStyle}|${row.EngColor}|${row.ChColor}|${row.ColorCode}`;
+      sizesMap[key] = {
+        Size1: row.Size1,
+        Size2: row.Size2,
+        Size3: row.Size3,
+        Size4: row.Size4,
+        Size5: row.Size5,
+        Size6: row.Size6,
+        Size7: row.Size7,
+        Size8: row.Size8,
+        Size9: row.Size9,
+        Size10: row.Size10
+      };
+    });
+
+    // Process order quantities into a map
+    const orderQtyMap = {};
+    orderQtyResult.recordset.forEach((row) => {
+      const key = `${row.StyleNo}|${row.Buyer}|${row.BuyerStyle}|${row.EngColor}|${row.ChColor}|${row.ColorCode}`;
+      orderQtyMap[key] = {
+        Sum_Qty1: row.Sum_Qty1,
+        Sum_Qty2: row.Sum_Qty2,
+        Sum_Qty3: row.Sum_Qty3,
+        Sum_Qty4: row.Sum_Qty4,
+        Sum_Qty5: row.Sum_Qty5,
+        Sum_Qty6: row.Sum_Qty6,
+        Sum_Qty7: row.Sum_Qty7,
+        Sum_Qty8: row.Sum_Qty8,
+        Sum_Qty9: row.Sum_Qty9,
+        Sum_Qty10: row.Sum_Qty10
+      };
+    });
+
+    // Process markers into a map
+    const markersMap = {};
+    markersResult.recordset.forEach((row) => {
+      const key = `${row.StyleNo}|${row.Buyer}|${row.BuyerStyle}|${row.EngColor}|${row.ChColor}|${row.ColorCode}`;
+      if (!markersMap[key]) {
+        markersMap[key] = [];
+      }
+      markersMap[key].push({
+        TableNo: row.TableNo,
+        MackerNo: row.MackerNo,
+        Ratio1: row.Ratio1,
+        Ratio2: row.Ratio2,
+        Ratio3: row.Ratio3,
+        Ratio4: row.Ratio4,
+        Ratio5: row.Ratio5,
+        Ratio6: row.Ratio6,
+        Ratio7: row.Ratio7,
+        Ratio8: row.Ratio8,
+        Ratio9: row.Ratio9,
+        Ratio10: row.Ratio10
+      });
+    });
+
+    // Build MongoDB documents
+    const documents = [];
+    for (const key in sizesMap) {
+      const [StyleNo, Buyer, BuyerStyle, EngColor, ChColor, ColorCode] =
+        key.split("|");
+      const sizes = sizesMap[key];
+      const orderQtys = orderQtyMap[key] || {};
+      const markers = markersMap[key] || [];
+      const lotNumbers = lotNumbersMap[StyleNo]
+        ? Array.from(lotNumbersMap[StyleNo])
+        : [];
+
+      // Build lotNo array
+      const lotNoArray = lotNumbers.map((lotName, index) => ({
+        No: index + 1,
+        LotName: lotName
+      }));
+
+      // Build cuttingData array
+      const cuttingData = markers.map((marker) => {
+        const markerData = [];
+        for (let i = 1; i <= 10; i++) {
+          markerData.push({
+            No: i,
+            size: sizes[`Size${i}`] || null,
+            orderQty: orderQtys[`Sum_Qty${i}`] || null,
+            markerRatio: marker[`Ratio${i}`] || null
+          });
+        }
+        return {
+          tableNo: marker.TableNo,
+          markerNo: marker.MackerNo,
+          markerData
+        };
+      });
+
+      // Calculate totalOrderQty
+      let totalOrderQty = 0;
+      for (let i = 1; i <= 10; i++) {
+        totalOrderQty += orderQtys[`Sum_Qty${i}`] || 0;
+      }
+
+      // Create document
+      documents.push({
+        StyleNo,
+        Buyer,
+        BuyerStyle,
+        EngColor,
+        ChColor,
+        ColorCode,
+        lotNo: lotNoArray,
+        cuttingData,
+        totalOrderQty
+      });
+    }
+
+    // Sync to MongoDB
+    await CuttingOrders.deleteMany({});
+    await CuttingOrders.insertMany(documents);
+    console.log(
+      `Successfully synced ${documents.length} documents to cuttingOrders.`
+    );
+  } catch (err) {
+    console.error("Error during cuttingOrders sync:", err);
+    throw err;
+  }
+}
+
+/* ------------------------------
+   Manual Sync Endpoint
+------------------------------ */
+
+app.post("/api/sync-cutting-orders", async (req, res) => {
+  try {
+    await syncCuttingOrders();
+    res
+      .status(200)
+      .json({ message: "Cutting orders sync completed successfully." });
+  } catch (err) {
+    console.error("Error in /api/sync-cutting-orders endpoint:", err);
+    res.status(500).json({
+      message: "Failed to sync cutting orders",
+      error: err.message
+    });
+  }
+});
+
+/* ------------------------------
+   Schedule Daily Sync
+------------------------------ */
+
+cron.schedule("0 7 * * *", async () => {
+  console.log("Running scheduled cuttingOrders sync at 7 AM...");
+  try {
+    await syncCuttingOrders();
+  } catch (err) {
+    console.error("Scheduled cuttingOrders sync failed:", err);
+  }
+});
+
+/* ------------------------------
+   Graceful Shutdown
+------------------------------ */
+
 process.on("SIGINT", async () => {
-  await poolYMDataStore.close();
-  await poolYMCE.close();
-  console.log("SQL connection pools closed.");
-  process.exit(0);
+  try {
+    await poolYMDataStore.close();
+    await poolYMCE.close();
+    await poolYMWHSYS2.close();
+    console.log("SQL connection pools closed.");
+  } catch (err) {
+    console.error("Error closing SQL connection pools:", err);
+  } finally {
+    process.exit(0);
+  }
 });
 
 app.get("/api/health", (req, res) => {
