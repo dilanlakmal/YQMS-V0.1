@@ -564,9 +564,9 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                         {t("bundle.package_no")}
                       </th>
-                      {/* <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
+                      <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                         {t("defectPrint.status")}
-                      </th> */}
+                      </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                         {t("bundle.action")}
                       </th>
@@ -772,7 +772,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           {card.package_no || "N/A"}
                         </td>
-                        {/* <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           <span
                             className={`inline-block px-2 py-1 rounded-full text-white text-sm ${
                               card.totalRejectGarments > 0
@@ -784,7 +784,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                               ? "In Progress"
                               : "Completed"}
                           </span>
-                        </td> */}
+                        </td>
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           <button
                             onClick={() => handlePreviewQR(card)}

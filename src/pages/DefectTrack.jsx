@@ -43,10 +43,11 @@ const DefectTrack = () => {
           ...garment,
           defects: garment.defects.map((defect) => {
             const defectEntry = allDefects.find((d) => d.english === defect.name);
+            const isUnrepairable = defect.name === "Fabric defect(unrepairable)";
             return {
               ...defect,
               displayName: defectEntry ? defectEntry[language] || defect.name : defect.name,
-              status: defect.status || "Fail",
+              status: isUnrepairable ? "Unrepairable" : (defect.status || "Fail"),
             };
           }),
         })),
@@ -82,10 +83,6 @@ const DefectTrack = () => {
           body: JSON.stringify(payload),
         }
       );
-      // if (!response.ok) {
-      //   const errorText = await response.text();
-      //   throw new Error(`Failed to update defect status in repair tracking: ${errorText}`);
-      // }
       console.log("Defect status updated in repair tracking successfully");
     } catch (err) {
       setError(`Failed to update defect status in repair tracking: ${err.message}`);
@@ -321,7 +318,7 @@ const DefectTrack = () => {
                 <TableBody>
                   {scannedData.garments.map((garment) =>
                     garment.defects
-                      .filter((defect) => defect.status !== "OK" || isDefectTemporarilyOk(garment.garmentNumber, defect.name))
+                      .filter((defect) => defect.status !== "Unrepairable" && (defect.status !== "OK" || isDefectTemporarilyOk(garment.garmentNumber, defect.name)))
                       .map((defect, index) => (
                         <TableRow key={`${garment.garmentNumber}-${defect.name}-${index}`} className={defect.status === "OK" ? "bg-green-100" : "hover:bg-gray-100"}>
                           <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{garment.garmentNumber}</TableCell>
