@@ -4397,7 +4397,7 @@ app.post("/api/repair-tracking", async (req, res) => {
           // Determine if pass_bundle needs to be updated
           let newPassBundle = item.pass_bundle;
           if (updatedItem.status !== item.status) {
-            newPassBundle = updatedItem.status === "Fail" ? "Not Checked" : updatedItem.status === "OK" ? "Fail" : "OK";
+            newPassBundle = updatedItem.status === "Fail" ? "Not Checked" : updatedItem.status === "OK" ? "Fail" : updatedItem.status === "Unrepairable" ? "Fail" : "Not Checked";
           }
           return {
             ...item,
@@ -4447,7 +4447,7 @@ app.post("/api/repair-tracking", async (req, res) => {
           status: item.status || "Fail",
           repair_date: item.repair_date || "",
           repair_time: item.repair_time || "",
-          pass_bundle: item.status === "Fail" ? "Not Checked" : item.status === "OK" ? "Fail" : "OK",
+          pass_bundle: item.status === "Fail" ? "Not Checked" : item.status === "OK" ? "Fail" : item.status === "Unrepairable" ? "Fail": "Not Checked",
         }))
       });
       await newRecord.save();

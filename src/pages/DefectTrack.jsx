@@ -83,6 +83,10 @@ const DefectTrack = () => {
           body: JSON.stringify(payload),
         }
       );
+      // if (!response.ok) {
+      //   const errorText = await response.text();
+      //   throw new Error(`Failed to update defect status in repair tracking: ${errorText}`);
+      // }
       console.log("Defect status updated in repair tracking successfully");
     } catch (err) {
       setError(`Failed to update defect status in repair tracking: ${err.message}`);
@@ -318,7 +322,7 @@ const DefectTrack = () => {
                 <TableBody>
                   {scannedData.garments.map((garment) =>
                     garment.defects
-                      .filter((defect) => defect.status !== "Unrepairable" && (defect.status !== "OK" || isDefectTemporarilyOk(garment.garmentNumber, defect.name)))
+                    .filter((defect) => defect.status !== "Unrepairable" && (defect.status !== "OK" || isDefectTemporarilyOk(garment.garmentNumber, defect.name)))
                       .map((defect, index) => (
                         <TableRow key={`${garment.garmentNumber}-${defect.name}-${index}`} className={defect.status === "OK" ? "bg-green-100" : "hover:bg-gray-100"}>
                           <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{garment.garmentNumber}</TableCell>

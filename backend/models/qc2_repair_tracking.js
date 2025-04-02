@@ -60,7 +60,7 @@ const qc2RepairTrackingSchema = new mongoose.Schema(
         repair_time: { type: String },// "HH:MM:SS"
         pass_bundle: {
                 type: String,
-                enum: ["Pass", "Fail", "Not Checked"], // Possible values
+                enum: ["Pass", "Fail", "Not Checked","Unrepairable"], // Possible values
                 default: "Not Checked",
             },
       }
