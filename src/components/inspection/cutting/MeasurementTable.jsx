@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { X, Check } from "lucide-react";
+import { X, Check, AlertCircle, Plus } from "lucide-react";
 import MeasurementNumPad from "./MeasurementNumPad";
+import { cuttingDefects } from "../../../constants/cuttingdefect";
 
 // Helper function to convert decimal to fraction for display
 const decimalToFraction = (value) => {
@@ -58,15 +59,23 @@ const MeasurementTable = ({
     rowIndex: null,
     colIndex: null
   });
+  // State to manage defect selection for each row
+  const [selectedDefect, setSelectedDefect] = useState(
+    Array(measurementPoints.length).fill("")
+  );
+  const [showDefectDropdown, setShowDefectDropdown] = useState(
+    Array(measurementPoints.length).fill(false)
+  );
 
-  // Initialize table data with both decimal and fraction values
+  // Initialize table data with both decimal, fraction values, and defects
   useEffect(() => {
     if (tableData.length === 0 && measurementPoints.length > 0) {
       const initialData = measurementPoints.map((point, index) => ({
         no: index + 1,
         measurementPoint: point.pointName,
         values: Array(numColumns).fill({ decimal: 0, fraction: "0" }), // Store both decimal and fraction
-        isUsed: true // Default to "used" (✔ icon)
+        isUsed: true, // Default to "used" (✔ icon)
+        defects: [] // Initialize defects array for each row
       }));
       setTableData(initialData);
       calculateSummary(initialData);
@@ -157,7 +166,8 @@ const MeasurementTable = ({
     for (let i = 1; i <= numColumns; i++) {
       headers.push(`${prefix}${i}`);
     }
-    headers.push("Use"); // Column for toggling usage
+    headers.push("Use");
+    headers.push("Defects"); // Add Defects column
     return headers;
   };
 
@@ -166,6 +176,58 @@ const MeasurementTable = ({
     if (!tableData[rowIndex].isUsed) return; // Don't show numpad if row is not used
     setCurrentCell({ rowIndex, colIndex });
     setShowNumPad(true);
+  };
+
+  // Handle defect selection
+  const handleDefectSelect = (rowIndex, value) => {
+    const newSelectedDefect = [...selectedDefect];
+    newSelectedDefect[rowIndex] = value;
+    setSelectedDefect(newSelectedDefect);
+  };
+
+  // Toggle defect dropdown visibility
+  const toggleDefectDropdown = (rowIndex) => {
+    const newShowDefectDropdown = [...showDefectDropdown];
+    newShowDefectDropdown[rowIndex] = !newShowDefectDropdown[rowIndex];
+    setShowDefectDropdown(newShowDefectDropdown);
+  };
+
+  // Add a defect to the row
+  const addDefect = (rowIndex) => {
+    if (!selectedDefect[rowIndex]) return; // Don't add if no defect is selected
+    const updatedData = [...tableData];
+    const defect = cuttingDefects.find(
+      (d) => d.defectName === selectedDefect[rowIndex]
+    );
+    updatedData[rowIndex].defects.push({
+      defectName: defect.defectName,
+      defectNameEng: defect.defectNameEng,
+      defectNameKhmer: defect.defectNameKhmer,
+      defectCode: defect.defectCode,
+      quantity: 1 // Default quantity
+    });
+    setTableData(updatedData);
+    // Reset dropdown
+    const newSelectedDefect = [...selectedDefect];
+    newSelectedDefect[rowIndex] = "";
+    setSelectedDefect(newSelectedDefect);
+    toggleDefectDropdown(rowIndex);
+  };
+
+  // Update defect quantity
+  const updateDefectQuantity = (rowIndex, defectIndex, change) => {
+    const updatedData = [...tableData];
+    const currentQty = updatedData[rowIndex].defects[defectIndex].quantity;
+    const newQty = Math.max(1, currentQty + change); // Minimum quantity is 1
+    updatedData[rowIndex].defects[defectIndex].quantity = newQty;
+    setTableData(updatedData);
+  };
+
+  // Remove a defect
+  const removeDefect = (rowIndex, defectIndex) => {
+    const updatedData = [...tableData];
+    updatedData[rowIndex].defects.splice(defectIndex, 1);
+    setTableData(updatedData);
   };
 
   return (
@@ -305,6 +367,82 @@ const MeasurementTable = ({
                       <X className="w-5 h-5" />
                     )}
                   </button>
+                </td>
+                {/* Defects Column */}
+                <td className="border border-gray-300 p-2 text-center">
+                  <div className="flex flex-col items-center space-y-2">
+                    {/* Display existing defects */}
+                    {row.defects.map((defect, defectIndex) => (
+                      <div
+                        key={defectIndex}
+                        className="flex items-center space-x-2"
+                      >
+                        <span className="text-sm">
+                          {defect.defectNameEng} ({defect.defectNameKhmer})
+                        </span>
+                        <button
+                          onClick={() =>
+                            updateDefectQuantity(rowIndex, defectIndex, -1)
+                          }
+                          className="p-1 bg-gray-200 rounded-full hover:bg-gray-300"
+                        >
+                          <span className="text-lg">-</span>
+                        </button>
+                        <input
+                          type="text"
+                          value={defect.quantity}
+                          readOnly
+                          className="w-12 text-center border border-gray-300 rounded"
+                        />
+                        <button
+                          onClick={() =>
+                            updateDefectQuantity(rowIndex, defectIndex, 1)
+                          }
+                          className="p-1 bg-gray-200 rounded-full hover:bg-gray-300"
+                        >
+                          <span className="text-lg">+</span>
+                        </button>
+                        <button
+                          onClick={() => removeDefect(rowIndex, defectIndex)}
+                          className="p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    {/* Add new defect */}
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => toggleDefectDropdown(rowIndex)}
+                        className="p-1 bg-blue-500 text-white rounded-full hover:bg-blue-600"
+                      >
+                        <AlertCircle className="w-5 h-5" />
+                      </button>
+                      {showDefectDropdown[rowIndex] && (
+                        <select
+                          value={selectedDefect[rowIndex]}
+                          onChange={(e) =>
+                            handleDefectSelect(rowIndex, e.target.value)
+                          }
+                          className="p-1 border border-gray-300 rounded"
+                        >
+                          <option value="">Select Defect</option>
+                          {cuttingDefects.map((defect, index) => (
+                            <option key={index} value={defect.defectName}>
+                              {defect.defectNameEng} ({defect.defectNameKhmer})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <button
+                        onClick={() => addDefect(rowIndex)}
+                        className="p-1 bg-green-500 text-white rounded-full hover:bg-green-600"
+                        disabled={!selectedDefect[rowIndex]}
+                      >
+                        <Plus className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
                 </td>
               </tr>
             ))}
