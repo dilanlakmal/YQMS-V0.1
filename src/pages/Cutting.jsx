@@ -9,6 +9,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import NumberPad from "../components/forms/NumberPad";
 import { measurementPoints } from "../constants/cuttingmeasurement";
+import MeasurementTable from "../components/inspection/cutting/MeasurementTable";
 
 const CuttingPage = () => {
   const { t } = useTranslation();
@@ -38,10 +39,24 @@ const CuttingPage = () => {
     useState(false);
   const [isTablet, setIsTablet] = useState(false);
   const [selectedPanel, setSelectedPanel] = useState("");
-  const [selectedSize, setSelectedSize] = useState(""); // New state for Size
-  const [selectedSerialLetter, setSelectedSerialLetter] = useState(""); // New state for Serial Letter
-  const [selectedMeasurementPoint, setSelectedMeasurementPoint] = useState("");
-  const [availableSizes, setAvailableSizes] = useState([]); // New state for available sizes
+  const [selectedSize, setSelectedSize] = useState("");
+  const [selectedSerialLetter, setSelectedSerialLetter] = useState("");
+  const [availableSizes, setAvailableSizes] = useState([]);
+  const [tolerance, setTolerance] = useState({ min: -0.125, max: 0.125 }); // Default to -1/8, 1/8
+  const [activeMeasurementTab, setActiveMeasurementTab] = useState("Top"); // For Top, Middle, Bottom tabs
+  const [colCounts, setColCounts] = useState({ Top: 5, Middle: 5, Bottom: 5 }); // Column counts for each tab
+  const [summary, setSummary] = useState({
+    Top: { totalPoints: 0, totalPass: 0, totalFail: 0, passRate: 0 },
+    Middle: { totalPoints: 0, totalPass: 0, totalFail: 0, passRate: 0 },
+    Bottom: { totalPoints: 0, totalPass: 0, totalFail: 0, passRate: 0 }
+  });
+
+  // State for table data for each tab
+  const [tableData, setTableData] = useState({
+    Top: [],
+    Middle: [],
+    Bottom: []
+  });
 
   // State for data fetched from server
   const [moData, setMoData] = useState(null);
@@ -103,7 +118,7 @@ const CuttingPage = () => {
         setColors([]);
         setTableNos([]);
         setMarkerData([]);
-        setAvailableSizes([]); // Reset sizes
+        setAvailableSizes([]);
         setLotNo("");
         setColor("");
         setTableNo("");
@@ -117,10 +132,10 @@ const CuttingPage = () => {
         setBundleQtyCheck("");
         setTotalInspectionQty(0);
         setSelectedPanel("");
-        setSelectedSize(""); // Reset Size
-        setSelectedSerialLetter(""); // Reset Serial Letter
-        setSelectedMeasurementPoint("");
+        setSelectedSize("");
+        setSelectedSerialLetter("");
         setShowOrderDetails(false);
+        setTableData({ Top: [], Middle: [], Bottom: [] }); // Reset table data
         return;
       }
 
@@ -156,7 +171,7 @@ const CuttingPage = () => {
         setColors([]);
         setTableNos([]);
         setMarkerData([]);
-        setAvailableSizes([]); // Reset sizes
+        setAvailableSizes([]);
         setLotNo("");
         setColor("");
         setTableNo("");
@@ -170,10 +185,10 @@ const CuttingPage = () => {
         setBundleQtyCheck("");
         setTotalInspectionQty(0);
         setSelectedPanel("");
-        setSelectedSize(""); // Reset Size
-        setSelectedSerialLetter(""); // Reset Serial Letter
-        setSelectedMeasurementPoint("");
+        setSelectedSize("");
+        setSelectedSerialLetter("");
         setShowOrderDetails(false);
+        setTableData({ Top: [], Middle: [], Bottom: [] }); // Reset table data
         if (error.response?.status === 404) {
           Swal.fire({
             icon: "error",
@@ -223,11 +238,11 @@ const CuttingPage = () => {
     setBundleQtyCheck("");
     setTotalInspectionQty(0);
     setSelectedPanel("");
-    setSelectedSize(""); // Reset Size
-    setSelectedSerialLetter(""); // Reset Serial Letter
-    setSelectedMeasurementPoint("");
+    setSelectedSize("");
+    setSelectedSerialLetter("");
     setMarkerData([]);
-    setAvailableSizes([]); // Reset sizes
+    setAvailableSizes([]);
+    setTableData({ Top: [], Middle: [], Bottom: [] }); // Reset table data
   }, [color, moData]);
 
   // Update Cutting Table No, Marker, PlanLayerQty, TotalPlanPcs, ActualLayers, Marker Data, and Fetch Sizes when Table No is selected
@@ -285,11 +300,11 @@ const CuttingPage = () => {
           setBundleQtyCheck("");
           setTotalInspectionQty(0);
           setSelectedPanel("");
-          setSelectedSize(""); // Reset Size
-          setSelectedSerialLetter(""); // Reset Serial Letter
-          setSelectedMeasurementPoint("");
+          setSelectedSize("");
+          setSelectedSerialLetter("");
           setMarkerData([]);
-          setAvailableSizes([]); // Reset sizes
+          setAvailableSizes([]);
+          setTableData({ Top: [], Middle: [], Bottom: [] }); // Reset table data
         }
       }
     } else {
@@ -302,11 +317,11 @@ const CuttingPage = () => {
       setBundleQtyCheck("");
       setTotalInspectionQty(0);
       setSelectedPanel("");
-      setSelectedSize(""); // Reset Size
-      setSelectedSerialLetter(""); // Reset Serial Letter
-      setSelectedMeasurementPoint("");
+      setSelectedSize("");
+      setSelectedSerialLetter("");
       setMarkerData([]);
-      setAvailableSizes([]); // Reset sizes
+      setAvailableSizes([]);
+      setTableData({ Top: [], Middle: [], Bottom: [] }); // Reset table data
     }
     // Reset dependent fields
     setCuttingTableL("");
@@ -350,11 +365,6 @@ const CuttingPage = () => {
     }
   }, [bundleQtyCheck]);
 
-  // Reset Measurement Point when Panel changes
-  useEffect(() => {
-    setSelectedMeasurementPoint("");
-  }, [selectedPanel]);
-
   // Handle clicks outside the MO No dropdown to close it
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -392,15 +402,23 @@ const CuttingPage = () => {
     setBundleQtyCheck("");
     setTotalInspectionQty(0);
     setSelectedPanel("");
-    setSelectedSize(""); // Reset Size
-    setSelectedSerialLetter(""); // Reset Serial Letter
-    setSelectedMeasurementPoint("");
+    setSelectedSize("");
+    setSelectedSerialLetter("");
     setLotNos([]);
     setColors([]);
     setTableNos([]);
     setMarkerData([]);
-    setAvailableSizes([]); // Reset sizes
+    setAvailableSizes([]);
     setShowOrderDetails(false);
+    setTolerance({ min: -0.125, max: 0.125 }); // Reset tolerance
+    setActiveMeasurementTab("Top");
+    setColCounts({ Top: 5, Middle: 5, Bottom: 5 });
+    setSummary({
+      Top: { totalPoints: 0, totalPass: 0, totalFail: 0, passRate: 0 },
+      Middle: { totalPoints: 0, totalPass: 0, totalFail: 0, passRate: 0 },
+      Bottom: { totalPoints: 0, totalPass: 0, totalFail: 0, passRate: 0 }
+    });
+    setTableData({ Top: [], Middle: [], Bottom: [] }); // Reset table data
   };
 
   // Get order details for selected color
@@ -419,9 +437,8 @@ const CuttingPage = () => {
       !totalBundleQty ||
       !bundleQtyCheck ||
       !selectedPanel ||
-      !selectedSize || // Validate Size
-      !selectedSerialLetter || // Validate Serial Letter
-      !selectedMeasurementPoint
+      !selectedSize ||
+      !selectedSerialLetter
     ) {
       Swal.fire({
         icon: "warning",
@@ -451,10 +468,12 @@ const CuttingPage = () => {
       bundle_qty_check: parseInt(bundleQtyCheck),
       total_inspection_qty: totalInspectionQty,
       panel: selectedPanel,
-      size: selectedSize, // Include Size
-      serial_letter: selectedSerialLetter, // Include Serial Letter
-      measurement_point: selectedMeasurementPoint,
+      size: selectedSize,
+      serial_letter: selectedSerialLetter,
+      tolerance: tolerance,
+      measurement_data: summary,
       marker_data: markerData,
+      table_data: tableData, // Include table data in the report
       order_details: orderDetails
         ? {
             customer_style: orderDetails.BuyerStyle,
@@ -492,6 +511,46 @@ const CuttingPage = () => {
   const serialLetters = Array.from({ length: 26 }, (_, i) =>
     String.fromCharCode(65 + i)
   );
+
+  // Tolerance options
+  const toleranceOptions = [
+    { label: "-1/4, 1/4", value: { min: -0.25, max: 0.25 } },
+    { label: "-1/8, 1/8", value: { min: -0.125, max: 0.125 } }
+  ];
+
+  // Handle tolerance change
+  const handleToleranceChange = (e) => {
+    const selectedOption = toleranceOptions.find(
+      (option) => option.label === e.target.value
+    );
+    if (selectedOption) {
+      setTolerance(selectedOption.value);
+    }
+  };
+
+  // Handle column count change for a specific tab
+  const handleColChange = (tab, value) => {
+    setColCounts((prev) => ({
+      ...prev,
+      [tab]: parseInt(value)
+    }));
+  };
+
+  // Update summary data for a specific tab
+  const updateSummary = (tab, data) => {
+    setSummary((prev) => ({
+      ...prev,
+      [tab]: data
+    }));
+  };
+
+  // Update table data for a specific tab
+  const updateTableData = (tab, data) => {
+    setTableData((prev) => ({
+      ...prev,
+      [tab]: data
+    }));
+  };
 
   if (authLoading) {
     return <div>{t("cutting.loading")}</div>;
@@ -549,7 +608,7 @@ const CuttingPage = () => {
                     {t("cutting.date")}
                   </label>
                   <DatePicker
-                    selected={inspectionDate} // Use inspectionDate, which is a Date object
+                    selected={inspectionDate}
                     onChange={(date) => setInspectionDate(date)}
                     className="mt-1 w-full p-2 border border-gray-300 rounded-lg bg-gray-100"
                   />
@@ -882,7 +941,7 @@ const CuttingPage = () => {
                 </div>
                 <hr className="my-4 border-gray-300" />
 
-                {/* Panel, Size, Serial Letter, and Measurement Point Dropdowns */}
+                {/* Panel, Size, Serial Letter, and Tolerance Dropdowns */}
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-medium text-gray-700">
@@ -938,27 +997,121 @@ const CuttingPage = () => {
                   </div>
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-medium text-gray-700">
-                      Measurement Point
+                      Tolerance
                     </label>
                     <select
-                      value={selectedMeasurementPoint}
-                      onChange={(e) =>
-                        setSelectedMeasurementPoint(e.target.value)
+                      value={
+                        toleranceOptions.find(
+                          (opt) =>
+                            opt.value.min === tolerance.min &&
+                            opt.value.max === tolerance.max
+                        )?.label
                       }
+                      onChange={handleToleranceChange}
                       className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                      disabled={!selectedPanel}
                     >
-                      <option value="">
-                        {t("cutting.select_measurement_point")}
-                      </option>
-                      {filteredMeasurementPoints.map((point, index) => (
-                        <option key={index} value={point.pointName}>
-                          {point.pointName}
+                      {toleranceOptions.map((option, index) => (
+                        <option key={index} value={option.label}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
                   </div>
                 </div>
+
+                {/* Measurement Tabs and Tables */}
+                {selectedPanel && filteredMeasurementPoints.length > 0 && (
+                  <div className="mt-6">
+                    {/* Tabs for Top, Middle, Bottom */}
+                    <div className="flex justify-center mb-4">
+                      <button
+                        onClick={() => setActiveMeasurementTab("Top")}
+                        className={`px-4 py-2 ${
+                          activeMeasurementTab === "Top"
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-200 text-gray-700"
+                        } rounded-l-lg`}
+                      >
+                        Top
+                      </button>
+                      <button
+                        onClick={() => setActiveMeasurementTab("Middle")}
+                        className={`px-4 py-2 ${
+                          activeMeasurementTab === "Middle"
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-200 text-gray-700"
+                        }`}
+                      >
+                        Middle
+                      </button>
+                      <button
+                        onClick={() => setActiveMeasurementTab("Bottom")}
+                        className={`px-4 py-2 ${
+                          activeMeasurementTab === "Bottom"
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-200 text-gray-700"
+                        } rounded-r-lg`}
+                      >
+                        Bottom
+                      </button>
+                    </div>
+
+                    {/* Col Dropdown */}
+                    <div className="flex items-center gap-4 mb-4">
+                      <label className="text-sm font-medium text-gray-700">
+                        Col:
+                      </label>
+                      <select
+                        value={colCounts[activeMeasurementTab]}
+                        onChange={(e) =>
+                          handleColChange(activeMeasurementTab, e.target.value)
+                        }
+                        className="p-2 border border-gray-300 rounded-lg"
+                      >
+                        {[...Array(15)].map((_, i) => (
+                          <option key={i + 1} value={i + 1}>
+                            {i + 1}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Measurement Table for the Active Tab */}
+                    {activeMeasurementTab === "Top" && (
+                      <MeasurementTable
+                        tab="Top"
+                        measurementPoints={filteredMeasurementPoints}
+                        numColumns={colCounts.Top}
+                        tolerance={tolerance}
+                        onUpdate={(data) => updateSummary("Top", data)}
+                        tableData={tableData.Top}
+                        setTableData={(data) => updateTableData("Top", data)}
+                      />
+                    )}
+                    {activeMeasurementTab === "Middle" && (
+                      <MeasurementTable
+                        tab="Middle"
+                        measurementPoints={filteredMeasurementPoints}
+                        numColumns={colCounts.Middle}
+                        tolerance={tolerance}
+                        onUpdate={(data) => updateSummary("Middle", data)}
+                        tableData={tableData.Middle}
+                        setTableData={(data) => updateTableData("Middle", data)}
+                      />
+                    )}
+                    {activeMeasurementTab === "Bottom" && (
+                      <MeasurementTable
+                        tab="Bottom"
+                        measurementPoints={filteredMeasurementPoints}
+                        numColumns={colCounts.Bottom}
+                        tolerance={tolerance}
+                        onUpdate={(data) => updateSummary("Bottom", data)}
+                        tableData={tableData.Bottom}
+                        setTableData={(data) => updateTableData("Bottom", data)}
+                      />
+                    )}
+                  </div>
+                )}
 
                 <div className="mt-2 text-sm text-gray-600">
                   Additional Information
@@ -989,5 +1142,4 @@ const CuttingPage = () => {
     </div>
   );
 };
-
 export default CuttingPage;
