@@ -30,6 +30,7 @@ import { useBluetooth } from "../components/context/BluetoothContext";
 import { useTranslation } from "react-i18next";
 import i18next from 'i18next'; 
 import Swal from "sweetalert2";
+import moment from 'moment';
 import {
   Table,
   TableBody,
@@ -99,6 +100,8 @@ const QC2InspectionPage = () => {
   const [selectedGarment, setSelectedGarment] = useState(null);
   const [isPassingBundle, setIsPassingBundle] = useState(false); 
   const [locallyRejectedDefects, setLocallyRejectedDefects] = useState(new Set());
+  const [scanCount, setScanCount] = useState(0);
+  const scanCountRef = useRef(0);
 
   const categoryOptions = [
     "fabric",
@@ -322,7 +325,7 @@ const QC2InspectionPage = () => {
         if (!createResponse.ok)
           throw new Error("Failed to create inspection record");
 
-        setBundleData({ ...data, passQtyIron }); // Add passQtyIron to bundleData for consistency
+        setBundleData({ ...data, passQtyIron , bundle_random_id: data.bundle_random_id }); // Add passQtyIron to bundleData for consistency
         setTotalRepair(0);
         setInDefectWindow(true);
         setScanning(false);
@@ -336,7 +339,7 @@ const QC2InspectionPage = () => {
     }
   }, 
   
-);
+[]);
 
 const handleDefectCardScan = useCallback(
   async (bundleData, defect_print_id) => {
@@ -660,7 +663,80 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
     }
   };
 
-
+  const saveScanData = async (isRejectGarment = false, isPassBundle = false) => {
+    console.log("saveScanData() called");
+    console.log("bundle_random_id:", bundleData.bundle_random_id);
+    console.log("isRejectGarment:", isRejectGarment);
+    console.log("isPassBundle:", isPassBundle);
+  
+    try {
+      const now = new Date();
+      const scanDate = moment(now).format('YYYY-MM-DD');
+      const scanTime = moment(now).format('HH:mm:ss');
+  
+      // Fetch the current scan count from the database
+      const response = await fetch(`${API_BASE_URL}/api/get-current-scan-count/${bundleData.bundle_random_id}?defect_print_id=${sessionData?.printEntry?.defect_print_id}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch current scan count: ${errorText}`);
+      }
+      const { currentScanCount } = await response.json();
+  
+      // Increment the scan count
+      const newScanNo = String(currentScanCount + 1).padStart(2, '0'); // Format as two-digit number
+  
+      const payload = {
+        bundle_random_id: bundleData.bundle_random_id,
+        defect_print_id: sessionData?.printEntry?.defect_print_id || null,
+        scanNo: newScanNo,
+        scanDate,
+        scanTime,
+        rejectGarmentCount: isReturnInspection ? sessionData.sessionTotalRejects : totalRejects, // Changed to rejectGarmentCount
+        totalPass,
+        totalRejects,
+        defectQty,
+        isRejectGarment,
+        isPassBundle,
+        sessionData: sessionData ? { ...sessionData } : null,
+        confirmedDefects: { ...confirmedDefects },
+        tempDefects: { ...tempDefects },
+        rejectedGarments: [...rejectedGarments],
+        repairStatuses: { ...repairStatuses },
+        lockedDefects: [...lockedDefects],
+        rejectedGarmentDefects: [...rejectedGarmentDefects],
+        defectTrackingDetails: defectTrackingDetails ? { ...defectTrackingDetails } : null,
+      };
+  
+      // Log the size of the payload
+      const encoder = new TextEncoder();
+      const payloadSize = encoder.encode(JSON.stringify(payload)).length;
+      console.log("Payload size:", payloadSize, "bytes");
+  
+      // Log the payload to inspect its structure and size
+      console.log("saveScanData payload:", JSON.stringify(payload, null, 2)); // Pretty print the payload
+  
+      const saveResponse = await fetch(`${API_BASE_URL}/api/save-qc2-scan-data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+  
+      console.log("saveScanData response:", saveResponse); // Log the response
+  
+      if (!saveResponse.ok) {
+        const errorText = await saveResponse.text();
+        throw new Error(`Failed to save scan data: ${errorText}`);
+      }
+  
+      const responseData = await saveResponse.json(); // Parse the response body
+      console.log("saveScanData responseData:", responseData); // Log the response data
+  
+    } catch (err) {
+      console.error("saveScanData error:", err); // Log the error
+      setError(`Failed to save scan data: ${err.message}`);
+    }
+  };
+  
 
   const handleScanSuccess = useCallback(async (scannedData) => {
     try {
@@ -729,6 +805,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
         // Step 3: Fallback to fetching bundle data if neither defect nor inspection ID matches
         await fetchBundleData(scannedData);
       }
+      await saveScanData();
       // console.log("Defect status updated in repair tracking successfully");
     } catch (err) {
       setError(
@@ -740,7 +817,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
       );
     }
   }, 
-  [fetchBundleData, handleDefectCardScan, setDefectTrackingDetails, setError, setIsReturnInspection, setLoadingData, setRepairStatuses, setScanning]
+  [fetchBundleData, handleDefectCardScan, setDefectTrackingDetails, setError, setIsReturnInspection, setLoadingData, setRepairStatuses, setScanning, , saveScanData]
 );
   
   const handleScanError = useCallback((err) => {
@@ -962,6 +1039,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
       });
       setRejectedGarmentDefects((prev) => new Set(prev).add(garmentDefectId));
       await handleReReturnGarment(garmentDefectId, defects);
+      await saveScanData(true);
     }
   };
 
@@ -1435,6 +1513,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
       setGenerateQRDisabled(false);
       setPassBundleCountdown(null);
       setError(null); // Clear any previous errors
+      await saveScanData(false, true);
     } catch (err) {
       setError(err.message || "Failed to update inspection record");
     } finally {

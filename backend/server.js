@@ -4476,7 +4476,6 @@ app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
     }
 
     const rt = repairTracking[0];
-    console.log("Before update:", rt.repairArray);
 
     rt.repairArray = rt.repairArray.map(item => {
       if (item.garmentNumber === garmentNumber) {
@@ -4499,7 +4498,6 @@ app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
       return item;
     });
 
-    console.log("After update:", rt.repairArray);
 
     await rt.save();
     res.status(200).json({ message: "Updated successfully" });
@@ -4553,7 +4551,7 @@ app.post("/api/qc2-repair-tracking/update-defect-status-by-name", async (req, re
   try {
     const repairTracking = await QC2RepairTracking.findOne({ defect_print_id });
     if (!repairTracking) {
-      console.error(`No repair tracking found for defect_print_id: ${defect_print_id}`); // Add this line
+      // console.error(`No repair tracking found for defect_print_id: ${defect_print_id}`); // Add this line
       return res.status(404).json({ message: "Repair tracking not found" });
     }
     
@@ -4586,7 +4584,6 @@ app.post("/api/qc2-repair-tracking/update-defect-status-by-name", async (req, re
     if (hasChanges) {
       repairTracking.repairArray = updatedRepairArray;
       await repairTracking.save();
-      console.log("Updated Repair Array:", updatedRepairArray);
       res.status(200).json({ message: "Defect status updated successfully" });
     } else {
       res.status(200).json({ message: "No changes were made" });
@@ -4598,6 +4595,132 @@ app.post("/api/qc2-repair-tracking/update-defect-status-by-name", async (req, re
   }
 });
 
+
+// New endpoint to save scan data
+app.post('/api/save-qc2-scan-data', async (req, res) => {
+  try {
+    const {
+      bundle_random_id,
+      defect_print_id,
+      scanNo,
+      scanDate,
+      scanTime,
+      rejectGarmentCount,
+      totalPass,
+      totalRejects,
+      defectQty,
+      isRejectGarment,
+      isPassBundle,
+      sessionData,
+      confirmedDefects,
+      // tempDefects,
+      // rejectedGarments,
+      repairStatuses,
+      // lockedDefects,
+      // rejectedGarmentDefects,
+      // defectTrackingDetails,
+    } = req.body;
+
+    // 1. Save to qc2_orderdata
+    let orderData = await QC2OrderData.findOne({ bundle_random_id });
+    if (!orderData) {
+      orderData = new QC2OrderData({
+        bundle_random_id,
+        QC2InspectionDefect: [], // Initialize as empty array
+      });
+    }
+
+    // Ensure QC2InspectionDefect is an array before pushing
+    if (!Array.isArray(orderData.QC2InspectionDefect)) {
+      orderData.QC2InspectionDefect = [];
+    }
+
+    orderData.QC2InspectionDefect.push({
+      scanNo,
+      scanDate,
+      scanTime,
+      rejectGarmentCount,
+      totalPass,
+      totalRejects,
+      defectQty,
+      bundle_random_id,
+      defect_print_id,
+      isRejectGarment,
+      isPassBundle,
+      sessionData,
+      confirmedDefects,
+      // tempDefects,
+      // rejectedGarments,
+      repairStatuses,
+      // lockedDefects,
+      // rejectedGarmentDefects,
+      // defectTrackingDetails,
+    });
+
+    await orderData.save();
+
+    // 2. Save to qc2_inspection_pass_bundle
+    const inspectionData = await QC2InspectionPassBundle.findOne({ bundle_random_id });
+    if (inspectionData) {
+      const printEntry = inspectionData.printArray.find(
+        (entry) => entry.defect_print_id === defect_print_id
+      );
+      if (printEntry) {
+        printEntry.inspectionHistory.push({
+          scanNo,
+          scanDate,
+          scanTime,
+          rejectGarmentCount,
+          totalPass,
+          totalRejects,
+          defectQty,
+          isRejectGarment,
+          isPassBundle,
+          sessionData,
+          confirmedDefects,
+          // tempDefects,
+          // rejectedGarments,
+          repairStatuses,
+          // lockedDefects,
+          // rejectedGarmentDefects,
+          // defectTrackingDetails,
+        });
+        await inspectionData.save();
+      }
+    }
+
+    res.status(200).json({ message: 'Scan data saved successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to save scan data', error: err.message });
+  }
+});
+
+app.get('/api/get-current-scan-count/:bundle_random_id', async (req, res) => {
+  const { bundle_random_id } = req.params;
+
+  try {
+    const inspectionData = await QC2InspectionPassBundle.findOne({ bundle_random_id });
+
+    if (!inspectionData) {
+      return res.status(404).json({ message: 'Bundle not found' });
+    }
+
+    const printEntry = inspectionData.printArray.find(
+      (entry) => entry.defect_print_id === req.query.defect_print_id
+    );
+
+    if (!printEntry) {
+      return res.status(404).json({ message: 'Defect print entry not found' });
+    }
+
+    const currentScanCount = printEntry.inspectionHistory.length;
+
+    res.json({ currentScanCount });
+  } catch (err) {
+    console.error('Error fetching current scan count:', err);
+    res.status(500).json({ message: 'Failed to fetch current scan count', error: err.message });
+  }
+});
 /* ------------------------------
    QC2 - Reworks
 ------------------------------ */

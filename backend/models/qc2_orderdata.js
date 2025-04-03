@@ -118,37 +118,23 @@ const qc2OrderDataSchema = new mongoose.Schema(
     ],
     qc2InspectionDefect: [
       {
-        process: { type: String, default: "qc2" },
-        task_no: { type: Number, default: 101 },
-        defect_print_id: { type: String },
-        inspectionNo: { type: Number },
-        checkedQty: { type: Number },
-        totalPass: { type: Number },
-        totalRejects: { type: Number },
-        defectQty: { type: Number },
-        rejectGarments: [
-          {
-            totalCount: { type: Number, required: true },
-            defects: [
-              {
-                name: { type: String, required: true },
-                count: { type: Number, required: true },
-                repair: { type: String, required: true },
-                status: { type: String, default: "Fail" }
-              }
-            ],
-            garment_defect_id: { type: String, required: true },
-            rejectTime: { type: String, required: true }
-          }
-        ],
-        updated_date: { type: String },
-        update_time: { type: String },
-        emp_id: { type: String },
-        eng_name: { type: String },
-        kh_name: { type: String },
-        job_title: { type: String },
-        dept_name: { type: String },
-        sect_name: { type: String }
+        scanNo: { type: Number, required: true },
+        scanDate: { type: Date, required: true },
+        scanTime: { type: String, required: true },
+        rejectGarmentCount: { type: Number, required: true },
+        totalPass: { type: Number, required: true },
+        totalRejects: { type: Number, required: true },
+        defectQty: { type: Number, required: true },
+        isRejectGarment: { type: Boolean, default: false },
+        isPassBundle: { type: Boolean, default: false },
+        sessionData: Object,
+        confirmedDefects: Object,
+        // tempDefects: Object,
+        // rejectedGarments: Array,
+        repairStatuses: Object,
+        // lockedDefects: Array,
+        // rejectedGarmentDefects: Array,
+        // defectTrackingDetails: Object,
       }
     ]
   },
