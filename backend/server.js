@@ -4613,29 +4613,30 @@ app.post('/api/save-qc2-scan-data', async (req, res) => {
       isPassBundle,
       sessionData,
       confirmedDefects,
-      // tempDefects,
-      // rejectedGarments,
       repairStatuses,
-      // lockedDefects,
-      // rejectedGarmentDefects,
-      // defectTrackingDetails,
     } = req.body;
+
+    console.log('Received data:', req.body);
 
     // 1. Save to qc2_orderdata
     let orderData = await QC2OrderData.findOne({ bundle_random_id });
     if (!orderData) {
+      console.log('No existing order data found, creating new document.');
       orderData = new QC2OrderData({
         bundle_random_id,
-        QC2InspectionDefect: [], // Initialize as empty array
+        qc2InspectionDefect: [], // Initialize as empty array
       });
+    } else {
+      console.log('Existing order data found:', orderData);
     }
 
-    // Ensure QC2InspectionDefect is an array before pushing
-    if (!Array.isArray(orderData.QC2InspectionDefect)) {
-      orderData.QC2InspectionDefect = [];
+    // Ensure qc2InspectionDefect is an array before pushing
+    if (!Array.isArray(orderData.qc2InspectionDefect)) {
+      console.log('qc2InspectionDefect is not an array, initializing as empty array.');
+      orderData.qc2InspectionDefect = [];
     }
 
-    orderData.QC2InspectionDefect.push({
+    orderData.qc2InspectionDefect.push({
       scanNo,
       scanDate,
       scanTime,
@@ -4649,15 +4650,12 @@ app.post('/api/save-qc2-scan-data', async (req, res) => {
       isPassBundle,
       sessionData,
       confirmedDefects,
-      // tempDefects,
-      // rejectedGarments,
       repairStatuses,
-      // lockedDefects,
-      // rejectedGarmentDefects,
-      // defectTrackingDetails,
     });
 
+    console.log('Saving order data:', orderData);
     await orderData.save();
+    console.log('Order data saved successfully.');
 
     // 2. Save to qc2_inspection_pass_bundle
     const inspectionData = await QC2InspectionPassBundle.findOne({ bundle_random_id });
@@ -4666,6 +4664,9 @@ app.post('/api/save-qc2-scan-data', async (req, res) => {
         (entry) => entry.defect_print_id === defect_print_id
       );
       if (printEntry) {
+        if (!Array.isArray(printEntry.inspectionHistory)) {
+          printEntry.inspectionHistory = [];
+        }
         printEntry.inspectionHistory.push({
           scanNo,
           scanDate,
@@ -4678,19 +4679,18 @@ app.post('/api/save-qc2-scan-data', async (req, res) => {
           isPassBundle,
           sessionData,
           confirmedDefects,
-          // tempDefects,
-          // rejectedGarments,
           repairStatuses,
-          // lockedDefects,
-          // rejectedGarmentDefects,
-          // defectTrackingDetails,
         });
+
+        console.log('Saving inspection data:', inspectionData);
         await inspectionData.save();
+        console.log('Inspection data saved successfully.');
       }
     }
 
     res.status(200).json({ message: 'Scan data saved successfully' });
   } catch (err) {
+    console.error('Error saving scan data:', err);
     res.status(500).json({ message: 'Failed to save scan data', error: err.message });
   }
 });

@@ -730,6 +730,28 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
   
       const responseData = await saveResponse.json(); // Parse the response body
       console.log("saveScanData responseData:", responseData); // Log the response data
+
+      // Save to qc2-orderdata collection
+      const orderDataPayload = {
+        ...payload,
+        scanNo: parseInt(newScanNo, 10), // Ensure scanNo is a number
+      };
+
+      const orderDataResponse = await fetch(`${API_BASE_URL}/api/save-qc2-scan-data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderDataPayload),
+      });
+
+      console.log("saveOrderData response:", orderDataResponse); // Log the response
+
+      if (!orderDataResponse.ok) {
+        const errorText = await orderDataResponse.text();
+        throw new Error(`Failed to save order data: ${errorText}`);
+      }
+
+      const orderDataResponseData = await orderDataResponse.json(); // Parse the response body
+      console.log("saveOrderData responseData:", orderDataResponseData); // Log the response data
   
     } catch (err) {
       console.error("saveScanData error:", err); // Log the error
