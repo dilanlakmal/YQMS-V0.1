@@ -31,6 +31,7 @@ import createQC2ReworksModel from "./models/qc2_rework.js";
 import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
 import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
 import createCuttingOrdersModel from "./models/CuttingOrders.js"; // New model import
+import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
 
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
 import sql from "mssql"; // Import mssql for SQL Server connection
@@ -140,6 +141,7 @@ const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
 const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
 const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
 const CuttingOrders = createCuttingOrdersModel(ymProdConnection); // New model
+const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -293,6 +295,9 @@ dropConflictingIndex().then(() => {
       );
       syncCuttingOrders().then(() =>
         console.log("Initial cuttingOrders sync completed.")
+      );
+      syncQC1SunriseData().then(() =>
+        console.log("Initial QC1 Sunrise sync completed.")
       );
     })
     .catch((err) => {
@@ -484,6 +489,746 @@ app.get("/api/sunrise/output", async (req, res) => {
       message: "Failed to fetch Sunrise Output data",
       error: err.message
     });
+  }
+});
+
+// /* ------------------------------
+//    QC1 Sunrise MongoDB
+// ------------------------------ */
+// // Function to fetch RS18 data (defects)
+// const fetchRS18Data = async () => {
+//   try {
+//     await ensurePoolConnected(poolYMDataStore, "YMDataStore");
+//     const request = poolYMDataStore.request();
+//     const query = `
+//       SELECT
+//         FORMAT(CAST(dDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName,
+//         ReworkCode,
+//         CASE ReworkCode
+//           WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
+//           WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
+//           WHEN '3' THEN N'ដេររមួល / 扭 / Twisted'
+//           WHEN '4' THEN N'ជ្រួញនិងទឹករលក និងប៉ោងសាច់ / 起皺/波浪/起包 / Puckering/ Wavy/ Fullness'
+//           WHEN '5' THEN N'ដាច់អំបោះ / 斷線 / Broken stitches'
+//           WHEN '6' THEN N'លោតអំបោះ / 跳線 / Skipped stitches'
+//           WHEN '7' THEN N'ប្រឡាក់ប្រេង / 油漬 / Oil stain'
+//           WHEN '8' THEN N'ធ្លុះរន្ធ / 破洞 (包括針洞) / Hole/ Needle hole'
+//           WHEN '9' THEN N'ខុសពណ៏ / 色差 / Color shading'
+//           WHEN '10' THEN N'ផ្លាកដេរខុសសេរីនិងដេរខុសផ្លាក / 嘜頭錯碼/車錯嘜頭 / Label sewn wrong size/style/po'
+//           WHEN '11' THEN N'ប្រឡាក់ / 髒污 / Dirty stain'
+//           WHEN '12' THEN N'រហែកថ្នេរ / 爆縫 / Open seam'
+//           WHEN '13' THEN N'អត់បានដេរ / 漏車縫/漏空 / Missed sewing'
+//           WHEN '14' THEN N'ព្រុយ / 線頭 / Untrimmed thread ends'
+//           WHEN '15' THEN N'ខូចសាច់ក្រណាត់(មិនអាចកែ) / 布疵（改不了） / Fabric defect (unrepairable)'
+//           WHEN '16' THEN N'គៀបសាច់ / 打折 / Pleated'
+//           WHEN '17' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់ / 燙畫/印花/繡花 / Heat transfer/ Printing/ EMB defect'
+//           WHEN '18' THEN N'អាវកែផ្សេងៗ / 其它返工 / Others'
+//           WHEN '19' THEN N'អ៊ុតអត់ជាប់ / 熨燙不良 / Insecure of Heat transfer'
+//           WHEN '20' THEN N'ទំហំទទឺងតូចធំមិនស្មើគ្នា / 左右大小不均匀 / Uneven width'
+//           WHEN '21' THEN N'គំលាតម្ជុល តឹង និង ធូរអំបោះពេក / 針距: 線緊/線鬆 / Stitch density tight/loose'
+//           WHEN '22' THEN N'សល់ជាយ និង ព្រុយខាងៗ / 毛邊 止口 / Fray edge / Raw edge'
+//           WHEN '23' THEN N'ជ្រលក់ពណ៏ខុស រឺក៏ ខូច / 染色不正確 - 次品/廢品 / Incorrect dying'
+//           WHEN '24' THEN N'ប្រឡាក់ប្រេង2 / 油漬2 / Oil stain 2'
+//           WHEN '25' THEN N'ខុសពណ៏2 / 色差2 / Color variation 2'
+//           WHEN '26' THEN N'ប្រឡាក់2 / 髒污2 / Dirty stain 2'
+//           WHEN '27' THEN N'ឆ្នូតក្រណាត់2 / 布疵2 / Fabric defect 2'
+//           WHEN '28' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់2 / 燙畫 / 印花 /繡花 2 / Heat transfer/ Printing/ EMB defect 2'
+//           WHEN '29' THEN N'ដេរអត់ជាប់ / 不牢固 / Insecure'
+//           WHEN '30' THEN N'ដេរធ្លាក់ទឹក / 落坑 / Run off stitching'
+//           WHEN '31' THEN N'ខូចទ្រង់ទ្រាយ / 形状不良 / Poor shape'
+//           WHEN '32' THEN N'បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន) / 布有飞纱，勾纱(可修) / Fabric fly yarn / snagging (repairable)'
+//           WHEN '33' THEN N'មិនចំគ្នា / 不对称（骨位，间条） / Mismatched'
+//           WHEN '34' THEN N'បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំ វៀច / 车标问题:错位置,反,高低,歪斜 / Label: misplace,invert,uneven,slant'
+//           WHEN '35' THEN N'ស្មាមម្ជុល / 针孔 / Needle Mark'
+//           WHEN '36' THEN N'បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-) / 衣服錯碼(某部位/裁片) / Wrong size of garment(cut panel/part)'
+//           WHEN '37' THEN N'ផ្សេងៗ / 其它-做工不良 / Others - Poor Workmanship (Spare) 2'
+//           WHEN '38' THEN N'បញ្ហាបោកទឹក / ជ្រលក់ពណ៌ / 洗水 / 染色不正确 / Improper Washing Dyeing'
+//           WHEN '39' THEN N'បញ្ហាអ៊ុត- ឡើងស / ស្នាម / ខ្លោច -ល- / 烫工不良:起镜 / 压痕 / 烫焦 / Improper Ironing: Glazing / Mark / Scorch, etc…'
+//           WHEN '40' THEN N'បញ្ហាអ៊ុត: ខូចទ្រង់ទ្រាយ / ខូចរាង / 烫工不良:变形 / 外观不良 / Improper Ironing: Off Shape / Poor Appearance'
+//           WHEN '41' THEN N'ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា / 左右高低 / Asymmetry / Hi-Low'
+//           WHEN '42' THEN N'ថ្នេរដេរមិនត្រួតគ្នា តូចធំមិនស្មើគ្នា / 车线不重叠 大小不均匀 / Uneven / Misalign stitches'
+//           WHEN '43' THEN N'បញ្ហាលើសខ្នាត(+) / 尺寸问题 (+大) / Measurement issue positive'
+//           WHEN '44' THEN N'បញ្ហាខ្វះខ្នាត(-) / 尺寸问题 (-小) / Measurement issue negative'
+//           ELSE NULL
+//         END AS ReworkName,
+//         SUM(QtyRework) AS DefectsQty
+//       FROM
+//         YMDataStore.SUNRISE.RS18 r
+//       WHERE
+//         TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+//         AND SeqNo <> 700
+//         AND TRY_CAST(ReworkCode AS INT) BETWEEN 1 AND 44
+//         AND CAST(dDate AS DATE) > '2022-12-31'
+//         AND CAST(dDate AS DATE) < DATEADD(DAY, 1, GETDATE())
+//       GROUP BY
+//         CAST(dDate AS DATE),
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName,
+//         ReworkCode
+//       HAVING
+//         CASE ReworkCode
+//           WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
+//           WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
+//           WHEN '3' THEN N'ដេររមួល / 扭 / Twisted'
+//           WHEN '4' THEN N'ជ្រួញនិងទឹករលក និងប៉ោងសាច់ / 起皺/波浪/起包 / Puckering/ Wavy/ Fullness'
+//           WHEN '5' THEN N'ដាច់អំបោះ / 斷線 / Broken stitches'
+//           WHEN '6' THEN N'លោតអំបោះ / 跳線 / Skipped stitches'
+//           WHEN '7' THEN N'ប្រឡាក់ប្រេង / 油漬 / Oil stain'
+//           WHEN '8' THEN N'ធ្លុះរន្ធ / 破洞 (包括針洞) / Hole/ Needle hole'
+//           WHEN '9' THEN N'ខុសពណ៏ / 色差 / Color shading'
+//           WHEN '10' THEN N'ផ្លាកដេរខុសសេរីនិងដេរខុសផ្លាក / 嘜頭錯碼/車錯嘜頭 / Label sewn wrong size/style/po'
+//           WHEN '11' THEN N'ប្រឡាក់ / 髒污 / Dirty stain'
+//           WHEN '12' THEN N'រហែកថ្នេរ / 爆縫 / Open seam'
+//           WHEN '13' THEN N'អត់បានដេរ / 漏車縫/漏空 / Missed sewing'
+//           WHEN '14' THEN N'ព្រុយ / 線頭 / Untrimmed thread ends'
+//           WHEN '15' THEN N'ខូចសាច់ក្រណាត់(មិនអាចកែ) / 布疵（改不了） / Fabric defect (unrepairable)'
+//           WHEN '16' THEN N'គៀបសាច់ / 打折 / Pleated'
+//           WHEN '17' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់ / 燙畫/印花/繡花 / Heat transfer/ Printing/ EMB defect'
+//           WHEN '18' THEN N'អាវកែផ្សេងៗ / 其它返工 / Others'
+//           WHEN '19' THEN N'អ៊ុតអត់ជាប់ / 熨燙不良 / Insecure of Heat transfer'
+//           WHEN '20' THEN N'ទំហំទទឺងតូចធំមិនស្មើគ្នា / 左右大小不均匀 / Uneven width'
+//           WHEN '21' THEN N'គំលាតម្ជុល តឹង និង ធូរអំបោះពេក / 針距: 線緊/線鬆 / Stitch density tight/loose'
+//           WHEN '22' THEN N'សល់ជាយ និង ព្រុយខាងៗ / 毛邊 止口 / Fray edge / Raw edge'
+//           WHEN '23' THEN N'ជ្រលក់ពណ៏ខុស រឺក៏ ខូច / 染色不正確 - 次品/廢品 / Incorrect dying'
+//           WHEN '24' THEN N'ប្រឡាក់ប្រេង2 / 油漬2 / Oil stain 2'
+//           WHEN '25' THEN N'ខុសពណ៏2 / 色差2 / Color variation 2'
+//           WHEN '26' THEN N'ប្រឡាក់2 / 髒污2 / Dirty stain 2'
+//           WHEN '27' THEN N'ឆ្នូតក្រណាត់2 / 布疵2 / Fabric defect 2'
+//           WHEN '28' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់2 / 燙畫 / 印花 /繡花 2 / Heat transfer/ Printing/ EMB defect 2'
+//           WHEN '29' THEN N'ដេរអត់ជាប់ / 不牢固 / Insecure'
+//           WHEN '30' THEN N'ដេរធ្លាក់ទឹក / 落坑 / Run off stitching'
+//           WHEN '31' THEN N'ខូចទ្រង់ទ្រាយ / 形状不良 / Poor shape'
+//           WHEN '32' THEN N'បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន) / 布有飞纱，勾纱(可修) / Fabric fly yarn / snagging (repairable)'
+//           WHEN '33' THEN N'មិនចំគ្នា / 不对称（骨位，间条） / Mismatched'
+//           WHEN '34' THEN N'បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំ វៀច / 车标问题:错位置,反,高低,歪斜 / Label: misplace,invert,uneven,slant'
+//           WHEN '35' THEN N'ស្មាមម្ជុល / 针孔 / Needle Mark'
+//           WHEN '36' THEN N'បញ្ហាអាវដេរខ្ខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-) / 衣服錯碼(某部位/裁片) / Wrong size of garment(cut panel/part)'
+//           WHEN '37' THEN N'ផ្សេងៗ / 其它-做工不良 / Others - Poor Workmanship (Spare) 2'
+//           WHEN '38' THEN N'បញ្ហាបោកទឹក / ជ្រលក់ពណ៌ / 洗水 / 染色不正确 / Improper Washing Dyeing'
+//           WHEN '39' THEN N'បញ្ហាអ៊ុត- ឡើងស / ស្នាម / ខ្លោច -ល- / 烫工不良:起镜 / 压痕 / 烫焦 / Improper Ironing: Glazing / Mark / Scorch, etc…'
+//           WHEN '40' THEN N'បញ្ហាអ៊ុត: ខូចទ្រង់ទ្រាយ / ខូចរាង / 烫工不良:变形 / 外观不良 / Improper Ironing: Off Shape / Poor Appearance'
+//           WHEN '41' THEN N'ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា / 左右高低 / Asymmetry / Hi-Low'
+//           WHEN '42' THEN N'ថ្នេរដេរមិនត្រួតគ្នា តូចធំមិនស្មើគ្នា / 车线不重叠 大小不均匀 / Uneven / Misalign stitches'
+//           WHEN '43' THEN N'បញ្ហាលើសខ្នាត(+) / 尺寸问题 (+大) / Measurement issue positive'
+//           WHEN '44' THEN N'បញ្ហាខ្វះខ្នាត(-) / 尺寸问题 (-小) / Measurement issue negative'
+//           ELSE NULL
+//         END IS NOT NULL;
+//     `;
+//     const result = await request.query(query);
+//     return result.recordset;
+//   } catch (err) {
+//     console.error("Error fetching RS18 data:", err);
+//     throw err;
+//   }
+// };
+
+// // Function to fetch Output data
+// const fetchOutputData = async () => {
+//   try {
+//     await ensurePoolConnected(poolYMDataStore, "YMDataStore");
+//     const request = poolYMDataStore.request();
+//     const query = `
+//       SELECT
+//         FORMAT(CAST(BillDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName,
+//         SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END) AS TotalQtyT38,
+//         SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END) AS TotalQtyT39
+//       FROM
+//       (
+//         SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2023
+//         UNION ALL
+//         SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2024
+//         UNION ALL
+//         SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2025
+//       ) AS CombinedData
+//       WHERE
+//         SeqNo IN (38, 39)
+//         AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+//       GROUP BY
+//         CAST(BillDate AS DATE),
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName;
+//     `;
+//     const result = await request.query(query);
+//     return result.recordset;
+//   } catch (err) {
+//     console.error("Error fetching Output data:", err);
+//     throw err;
+//   }
+// };
+
+// // Helper function to determine Buyer based on MONo
+// const determineBuyer = (MONo) => {
+//   if (!MONo) return "Other";
+//   if (MONo.includes("CO")) return "Costco";
+//   if (MONo.includes("AR")) return "Aritzia";
+//   if (MONo.includes("RT")) return "Reitmans";
+//   if (MONo.includes("AF")) return "ANF";
+//   if (MONo.includes("NT")) return "STORI";
+//   return "Other";
+// };
+
+// // Function to sync data to MongoDB
+// const syncQC1SunriseData = async () => {
+//   try {
+//     console.log("Starting QC1 Sunrise data sync at", new Date().toISOString());
+
+//     // Fetch data from both sources
+//     const [rs18Data, outputData] = await Promise.all([
+//       fetchRS18Data(),
+//       fetchOutputData()
+//     ]);
+
+//     if (rs18Data.length === 0 && outputData.length === 0) {
+//       console.log("No data fetched from SQL Server. Sync aborted.");
+//       return;
+//     }
+
+//     // Create a map for output data for quick lookup
+//     const outputMap = new Map();
+//     outputData.forEach((output) => {
+//       const key = `${output.InspectionDate}-${output.WorkLine}-${output.MONo}-${output.SizeName}-${output.ColorNo}-${output.ColorName}`;
+//       outputMap.set(key, output);
+//     });
+//     console.log(`Output Map contains ${outputMap.size} entries`);
+
+//     // Group RS18 data by key to aggregate defects
+//     const groupedData = new Map();
+//     rs18Data.forEach((defect) => {
+//       const key = `${defect.InspectionDate}-${defect.WorkLine}-${defect.MONo}-${defect.SizeName}-${defect.ColorNo}-${defect.ColorName}`;
+//       if (!groupedData.has(key)) {
+//         groupedData.set(key, {
+//           inspectionDate: defect.InspectionDate,
+//           lineNo: defect.WorkLine,
+//           MONo: defect.MONo,
+//           Size: defect.SizeName,
+//           Color: defect.ColorName,
+//           ColorNo: defect.ColorNo,
+//           DefectArray: []
+//         });
+//       }
+//       const entry = groupedData.get(key);
+//       entry.DefectArray.push({
+//         defectCode: defect.ReworkCode,
+//         defectName: defect.ReworkName,
+//         defectQty: defect.DefectsQty
+//       });
+//     });
+
+//     // Merge with output data and prepare MongoDB documents
+//     const documents = [];
+//     for (const [key, entry] of groupedData) {
+//       const outputEntry = outputMap.get(key) || {
+//         TotalQtyT38: 0,
+//         TotalQtyT39: 0
+//       };
+
+//       const totalDefectsQty = entry.DefectArray.reduce(
+//         (sum, defect) => sum + defect.defectQty,
+//         0
+//       );
+//       const checkedQty = Math.max(
+//         outputEntry.TotalQtyT38 || 0,
+//         outputEntry.TotalQtyT39 || 0
+//       );
+
+//       const doc = {
+//         inspectionDate: entry.inspectionDate,
+//         lineNo: entry.lineNo,
+//         MONo: entry.MONo,
+//         Size: entry.Size,
+//         Color: entry.Color,
+//         ColorNo: entry.ColorNo,
+//         Buyer: determineBuyer(entry.MONo),
+//         CheckedQtyT38: outputEntry.TotalQtyT38 || 0,
+//         CheckedQtyT39: outputEntry.TotalQtyT39 || 0,
+//         CheckedQty: checkedQty,
+//         DefectArray: entry.DefectArray,
+//         totalDefectsQty: totalDefectsQty
+//       };
+//       documents.push(doc);
+//     }
+
+//     // Log a sample document
+//     if (documents.length > 0) {
+//       console.log("Sample Document:", documents[0]);
+//     }
+
+//     // Bulk upsert into MongoDB
+//     const bulkOps = documents.map((doc) => ({
+//       updateOne: {
+//         filter: {
+//           inspectionDate: doc.inspectionDate,
+//           lineNo: doc.lineNo,
+//           MONo: doc.MONo,
+//           Size: doc.Size,
+//           ColorNo: doc.ColorNo
+//         },
+//         update: { $set: doc },
+//         upsert: true
+//       }
+//     }));
+
+//     if (bulkOps.length > 0) {
+//       const result = await QC1Sunrise.bulkWrite(bulkOps);
+//       console.log(
+//         `Bulk write result: Matched: ${result.matchedCount}, Modified: ${result.modifiedCount}, Upserted: ${result.upsertedCount}`
+//       );
+//     } else {
+//       console.log("No documents to upsert");
+//     }
+
+//     // Verify collection contents
+//     const collectionCount = await QC1Sunrise.countDocuments();
+//     console.log(
+//       `Total documents in qc1_sunrise collection: ${collectionCount}`
+//     );
+
+//     console.log(
+//       `Successfully completed QC1 Sunrise sync with ${documents.length} records`
+//     );
+//   } catch (err) {
+//     console.error("Error syncing QC1 Sunrise data:", err);
+//     throw err;
+//   }
+// };
+
+// // Endpoint to manually trigger QC1 Sunrise sync
+// app.get("/api/sunrise/sync-qc1", async (req, res) => {
+//   try {
+//     await syncQC1SunriseData();
+//     res.json({ message: "QC1 Sunrise data synced successfully" });
+//   } catch (err) {
+//     console.error("Error in /api/sunrise/sync-qc1 endpoint:", err);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to sync QC1 Sunrise data", error: err.message });
+//   }
+// });
+
+// // Schedule daily sync at midnight
+// cron.schedule("0 0 * * *", async () => {
+//   console.log("Running daily QC1 Sunrise data sync...");
+//   try {
+//     await syncQC1SunriseData();
+//   } catch (err) {
+//     console.error("Error in daily QC1 Sunrise sync:", err);
+//   }
+// });
+
+/* ------------------------------
+   QC1 Sunrise MongoDB
+------------------------------ */
+
+// Function to fetch RS18 data (defects) - Last 7 days only
+const fetchRS18Data = async () => {
+  try {
+    await ensurePoolConnected(poolYMDataStore, "YMDataStore");
+    const request = poolYMDataStore.request();
+    const query = `
+      SELECT
+        FORMAT(CAST(dDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+        WorkLine,
+        MONo,
+        SizeName,
+        ColorNo,
+        ColorName,
+        ReworkCode,
+        CASE ReworkCode
+          WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
+          WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
+          WHEN '3' THEN N'ដេររមួល / 扭 / Twisted'
+          WHEN '4' THEN N'ជ្រួញនិងទឹករលក និងប៉ោងសាច់ / 起皺/波浪/起包 / Puckering/ Wavy/ Fullness'
+          WHEN '5' THEN N'ដាច់អំបោះ / 斷線 / Broken stitches'
+          WHEN '6' THEN N'លោតអំបោះ / 跳線 / Skipped stitches'
+          WHEN '7' THEN N'ប្រឡាក់ប្រេង / 油漬 / Oil stain'
+          WHEN '8' THEN N'ធ្លុះរន្ធ / 破洞 (包括針洞) / Hole/ Needle hole'
+          WHEN '9' THEN N'ខុសពណ៏ / 色差 / Color shading'
+          WHEN '10' THEN N'ផ្លាកដេរខុសសេរីនិងដេរខុសផ្លាក / 嘜頭錯碼/車錯嘜頭 / Label sewn wrong size/style/po'
+          WHEN '11' THEN N'ប្រឡាក់ / 髒污 / Dirty stain'
+          WHEN '12' THEN N'រហែកថ្នេរ / 爆縫 / Open seam'
+          WHEN '13' THEN N'អត់បានដេរ / 漏車縫/漏空 / Missed sewing'
+          WHEN '14' THEN N'ព្រុយ / 線頭 / Untrimmed thread ends'
+          WHEN '15' THEN N'ខូចសាច់ក្រណាត់(មិនអាចកែ) / 布疵（改不了） / Fabric defect (unrepairable)'
+          WHEN '16' THEN N'គៀបសាច់ / 打折 / Pleated'
+          WHEN '17' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់ / 燙畫/印花/繡花 / Heat transfer/ Printing/ EMB defect'
+          WHEN '18' THEN N'អាវកែផ្សេងៗ / 其它返工 / Others'
+          WHEN '19' THEN N'អ៊ុតអត់ជាប់ / 熨燙不良 / Insecure of Heat transfer'
+          WHEN '20' THEN N'ទំហំទទឺងតូចធំមិនស្មើគ្នា / 左右大小不均匀 / Uneven width'
+          WHEN '21' THEN N'គំលាតម្ជុល តឹង និង ធូរអំបោះពេក / 針距: 線緊/線鬆 / Stitch density tight/loose'
+          WHEN '22' THEN N'សល់ជាយ និង ព្រុយខាងៗ / 毛邊 止口 / Fray edge / Raw edge'
+          WHEN '23' THEN N'ជ្រលក់ពណ៏ខុស រឺក៏ ខូច / 染色不正確 - 次品/廢品 / Incorrect dying'
+          WHEN '24' THEN N'ប្រឡាក់ប្រេង2 / 油漬2 / Oil stain 2'
+          WHEN '25' THEN N'ខុសពណ៏2 / 色差2 / Color variation 2'
+          WHEN '26' THEN N'ប្រឡាក់2 / 髒污2 / Dirty stain 2'
+          WHEN '27' THEN N'ឆ្នូតក្រណាត់2 / 布疵2 / Fabric defect 2'
+          WHEN '28' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់2 / 燙畫 / 印花 /繡花 2 / Heat transfer/ Printing/ EMB defect 2'
+          WHEN '29' THEN N'ដេរអត់ជាប់ / 不牢固 / Insecure'
+          WHEN '30' THEN N'ដេរធ្លាក់ទឹក / 落坑 / Run off stitching'
+          WHEN '31' THEN N'ខូចទ្រង់ទ្រាយ / 形状不良 / Poor shape'
+          WHEN '32' THEN N'បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន) / 布有飞纱，勾纱(可修) / Fabric fly yarn / snagging (repairable)'
+          WHEN '33' THEN N'មិនចំគ្នា / 不对称（骨位，间条） / Mismatched'
+          WHEN '34' THEN N'បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំ វៀច / 车标问题:错位置,反,高低,歪斜 / Label: misplace,invert,uneven,slant'
+          WHEN '35' THEN N'ស្មាមម្ជុល / 针孔 / Needle Mark'
+          WHEN '36' THEN N'បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-) / 衣服錯碼(某部位/裁片) / Wrong size of garment(cut panel/part)'
+          WHEN '37' THEN N'ផ្សេងៗ / 其它-做工不良 / Others - Poor Workmanship (Spare) 2'
+          WHEN '38' THEN N'បញ្ហាបោកទឹក / ជ្រលក់ពណ៌ / 洗水 / 染色不正确 / Improper Washing Dyeing'
+          WHEN '39' THEN N'បញ្ហាអ៊ុត- ឡើងស / ស្នាម / ខ្លោច -ល- / 烫工不良:起镜 / 压痕 / 烫焦 / Improper Ironing: Glazing / Mark / Scorch, etc…'
+          WHEN '40' THEN N'បញ្ហាអ៊ុត: ខូចទ្រង់ទ្រាយ / ខូចរាង / 烫工不良:变形 / 外观不良 / Improper Ironing: Off Shape / Poor Appearance'
+          WHEN '41' THEN N'ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា / 左右高低 / Asymmetry / Hi-Low'
+          WHEN '42' THEN N'ថ្នេរដេរមិនត្រួតគ្នា តូចធំមិនស្មើគ្នា / 车线不重叠 大小不均匀 / Uneven / Misalign stitches'
+          WHEN '43' THEN N'បញ្ហាលើសខ្នាត(+) / 尺寸问题 (+大) / Measurement issue positive'
+          WHEN '44' THEN N'បញ្ហាខ្វះខ្នាត(-) / 尺寸问题 (-小) / Measurement issue negative'
+          ELSE NULL
+        END AS ReworkName,
+        SUM(QtyRework) AS DefectsQty
+      FROM
+        YMDataStore.SUNRISE.RS18 r
+      WHERE
+        TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+        AND SeqNo <> 700
+        AND TRY_CAST(ReworkCode AS INT) BETWEEN 1 AND 44
+        AND CAST(dDate AS DATE) >= DATEADD(DAY, -7, GETDATE())
+        AND CAST(dDate AS DATE) < DATEADD(DAY, 1, GETDATE())
+      GROUP BY
+        CAST(dDate AS DATE),
+        WorkLine,
+        MONo,
+        SizeName,
+        ColorNo,
+        ColorName,
+        ReworkCode
+      HAVING
+        CASE ReworkCode
+          WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
+          WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
+          WHEN '3' THEN N'ដេររមួល / 扭 / Twisted'
+          WHEN '4' THEN N'ជ្រួញនិងទឹករលក និងប៉ោងសាច់ / 起皺/波浪/起包 / Puckering/ Wavy/ Fullness'
+          WHEN '5' THEN N'ដាច់អំបោះ / 斷線 / Broken stitches'
+          WHEN '6' THEN N'លោតអំបោះ / 跳線 / Skipped stitches'
+          WHEN '7' THEN N'ប្រឡាក់ប្រេង / 油漬 / Oil stain'
+          WHEN '8' THEN N'ធ្លុះរន្ធ / 破洞 (包括針洞) / Hole/ Needle hole'
+          WHEN '9' THEN N'ខុសពណ៏ / 色差 / Color shading'
+          WHEN '10' THEN N'ផ្លាកដេរខុសសេរីនិងដេរខុសផ្លាក / 嘜頭錯碼/車錯嘜頭 / Label sewn wrong size/style/po'
+          WHEN '11' THEN N'ប្រឡាក់ / 髒污 / Dirty stain'
+          WHEN '12' THEN N'រហែកថ្នេរ / 爆縫 / Open seam'
+          WHEN '13' THEN N'អត់បានដេរ / 漏車縫/漏空 / Missed sewing'
+          WHEN '14' THEN N'ព្រុយ / 線頭 / Untrimmed thread ends'
+          WHEN '15' THEN N'ខូចសាច់ក្រណាត់(មិនអាចកែ) / 布疵（改不了） / Fabric defect (unrepairable)'
+          WHEN '16' THEN N'គៀបសាច់ / 打折 / Pleated'
+          WHEN '17' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់ / 燙畫/印花/繡花 / Heat transfer/ Printing/ EMB defect'
+          WHEN '18' THEN N'អាវកែផ្សេងៗ / 其它返工 / Others'
+          WHEN '19' THEN N'អ៊ុតអត់ជាប់ / 熨燙不良 / Insecure of Heat transfer'
+          WHEN '20' THEN N'ទំហំទទឺងតូចធំមិនស្មើគ្នា / 左右大小不均匀 / Uneven width'
+          WHEN '21' THEN N'គំលាតម្ជុល តឹង និង ធូរអំបោះពេក / 針距: 線緊/線鬆 / Stitch density tight/loose'
+          WHEN '22' THEN N'សល់ជាយ និង ព្រុយខាងៗ / 毛邊 止口 / Fray edge / Raw edge'
+          WHEN '23' THEN N'ជ្រលក់ពណ៏ខុស រឺក៏ ខូច / 染色不正確 - 次品/廢品 / Incorrect dying'
+          WHEN '24' THEN N'ប្រឡាក់ប្រេង2 / 油漬2 / Oil stain 2'
+          WHEN '25' THEN N'ខុសពណ៏2 / 色差2 / Color variation 2'
+          WHEN '26' THEN N'ប្រឡាក់2 / 髒污2 / Dirty stain 2'
+          WHEN '27' THEN N'ឆ្នូតក្រណាត់2 / 布疵2 / Fabric defect 2'
+          WHEN '28' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់2 / 燙畫 / 印花 /繡花 2 / Heat transfer/ Printing/ EMB defect 2'
+          WHEN '29' THEN N'ដេរអត់ជាប់ / 不牢固 / Insecure'
+          WHEN '30' THEN N'ដេរធ្លាក់ទឹក / 落坑 / Run off stitching'
+          WHEN '31' THEN N'ខូចទ្រង់ទ្រាយ / 形状不良 / Poor shape'
+          WHEN '32' THEN N'បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន) / 布有飞纱，勾纱(可修) / Fabric fly yarn / snagging (repairable)'
+          WHEN '33' THEN N'មិនចំគ្នា / 不对称（骨位，间条） / Mismatched'
+          WHEN '34' THEN N'បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំ វៀច / 车标问题:错位置,反,高低,歪斜 / Label: misplace,invert,uneven,slant'
+          WHEN '35' THEN N'ស្មាមម្ជុល / 针孔 / Needle Mark'
+          WHEN '36' THEN N'បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-) / 衣服錯碼(某部位/裁片) / Wrong size of garment(cut panel/part)'
+          WHEN '37' THEN N'ផ្សេងៗ / 其它-做工不良 / Others - Poor Workmanship (Spare) 2'
+          WHEN '38' THEN N'បញ្ហាបោកទឹក / ជ្រលក់ពណ៌ / 洗水 / 染色不正确 / Improper Washing Dyeing'
+          WHEN '39' THEN N'បញ្ហាអ៊ុត- ឡើងស / ស្នាម / ខ្លោច -ល- / 烫工不良:起镜 / 压痕 / 烫焦 / Improper Ironing: Glazing / Mark / Scorch, etc…'
+          WHEN '40' THEN N'បញ្ហាអ៊ុត: ខូចទ្រង់ទ្រាយ / ខូចរាង / 烫工不良:变形 / 外观不良 / Improper Ironing: Off Shape / Poor Appearance'
+          WHEN '41' THEN N'ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា / 左右高低 / Asymmetry / Hi-Low'
+          WHEN '42' THEN N'ថ្នេរដេរមិនត្រួតគ្នា តូចធំមិនស្មើគ្នា / 车线不重叠 大小不均匀 / Uneven / Misalign stitches'
+          WHEN '43' THEN N'បញ្ហាលើសខ្នាត(+) / 尺寸问题 (+大) / Measurement issue positive'
+          WHEN '44' THEN N'បញ្ហាខ្វះខ្នាត(-) / 尺寸问题 (-小) / Measurement issue negative'
+          ELSE NULL
+        END IS NOT NULL;
+    `;
+    const result = await request.query(query);
+    console.log(
+      `Fetched ${result.recordset.length} RS18 records from the last 7 days`
+    );
+    return result.recordset;
+  } catch (err) {
+    console.error("Error fetching RS18 data:", err);
+    throw err;
+  }
+};
+
+// Function to fetch Output data - Last 7 days only
+const fetchOutputData = async () => {
+  try {
+    await ensurePoolConnected(poolYMDataStore, "YMDataStore");
+    const request = poolYMDataStore.request();
+    const query = `
+      SELECT
+        FORMAT(CAST(BillDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+        WorkLine,
+        MONo,
+        SizeName,
+        ColorNo,
+        ColorName,
+        SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END) AS TotalQtyT38,
+        SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END) AS TotalQtyT39
+      FROM
+      (
+        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2023
+        UNION ALL
+        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2024
+        UNION ALL
+        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2025
+      ) AS CombinedData
+      WHERE
+        SeqNo IN (38, 39)
+        AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+        AND CAST(BillDate AS DATE) >= DATEADD(DAY, -7, GETDATE())
+        AND CAST(BillDate AS DATE) < DATEADD(DAY, 1, GETDATE())
+      GROUP BY
+        CAST(BillDate AS DATE),
+        WorkLine,
+        MONo,
+        SizeName,
+        ColorNo,
+        ColorName;
+    `;
+    const result = await request.query(query);
+    console.log(
+      `Fetched ${result.recordset.length} Output records from the last 7 days`
+    );
+    return result.recordset;
+  } catch (err) {
+    console.error("Error fetching Output data:", err);
+    throw err;
+  }
+};
+
+// Helper function to determine Buyer based on MONo
+const determineBuyer = (MONo) => {
+  if (!MONo) return "Other";
+  if (MONo.includes("CO")) return "Costco";
+  if (MONo.includes("AR")) return "Aritzia";
+  if (MONo.includes("RT")) return "Reitmans";
+  if (MONo.includes("AF")) return "ANF";
+  if (MONo.includes("NT")) return "STORI";
+  return "Other";
+};
+
+// Function to sync data to MongoDB - Only process last 7 days and update if modified
+const syncQC1SunriseData = async () => {
+  try {
+    console.log("Starting QC1 Sunrise data sync at", new Date().toISOString());
+
+    // Fetch data from both sources (last 7 days only)
+    const [rs18Data, outputData] = await Promise.all([
+      fetchRS18Data(),
+      fetchOutputData()
+    ]);
+
+    if (rs18Data.length === 0 && outputData.length === 0) {
+      console.log(
+        "No new or modified data fetched from SQL Server for the last 7 days. Sync aborted."
+      );
+      return;
+    }
+
+    // Create a map for output data for quick lookup
+    const outputMap = new Map();
+    outputData.forEach((output) => {
+      const key = `${output.InspectionDate}-${output.WorkLine}-${output.MONo}-${output.SizeName}-${output.ColorNo}-${output.ColorName}`;
+      outputMap.set(key, output);
+    });
+    console.log(`Output Map contains ${outputMap.size} entries`);
+
+    // Group RS18 data by key to aggregate defects
+    const groupedData = new Map();
+    rs18Data.forEach((defect) => {
+      const key = `${defect.InspectionDate}-${defect.WorkLine}-${defect.MONo}-${defect.SizeName}-${defect.ColorNo}-${defect.ColorName}`;
+      if (!groupedData.has(key)) {
+        groupedData.set(key, {
+          inspectionDate: defect.InspectionDate,
+          lineNo: defect.WorkLine,
+          MONo: defect.MONo,
+          Size: defect.SizeName,
+          Color: defect.ColorName,
+          ColorNo: defect.ColorNo,
+          DefectArray: []
+        });
+      }
+      const entry = groupedData.get(key);
+      entry.DefectArray.push({
+        defectCode: defect.ReworkCode,
+        defectName: defect.ReworkName,
+        defectQty: defect.DefectsQty
+      });
+    });
+    console.log(`Grouped ${groupedData.size} unique entries from RS18 data`);
+
+    // Prepare MongoDB documents
+    const documents = [];
+    for (const [key, entry] of groupedData) {
+      const outputEntry = outputMap.get(key) || {
+        TotalQtyT38: 0,
+        TotalQtyT39: 0
+      };
+
+      const totalDefectsQty = entry.DefectArray.reduce(
+        (sum, defect) => sum + defect.defectQty,
+        0
+      );
+      const checkedQty = Math.max(
+        outputEntry.TotalQtyT38 || 0,
+        outputEntry.TotalQtyT39 || 0
+      );
+
+      const doc = {
+        inspectionDate: entry.inspectionDate,
+        lineNo: entry.lineNo,
+        MONo: entry.MONo,
+        Size: entry.Size,
+        Color: entry.Color,
+        ColorNo: entry.ColorNo,
+        Buyer: determineBuyer(entry.MONo),
+        CheckedQtyT38: outputEntry.TotalQtyT38 || 0,
+        CheckedQtyT39: outputEntry.TotalQtyT39 || 0,
+        CheckedQty: checkedQty,
+        DefectArray: entry.DefectArray,
+        totalDefectsQty: totalDefectsQty
+      };
+      documents.push(doc);
+    }
+    console.log(`Prepared ${documents.length} documents for MongoDB`);
+
+    // Log a sample document
+    if (documents.length > 0) {
+      console.log("Sample Document:", documents[0]);
+    }
+
+    // Fetch existing documents from MongoDB for comparison (only for the last 7 days)
+    const existingDocs = await QC1Sunrise.find({
+      inspectionDate: {
+        $gte: new Date(new Date().setDate(new Date().getDate() - 7))
+          .toISOString()
+          .split("T")[0]
+      }
+    }).lean();
+    const existingDocsMap = new Map();
+    existingDocs.forEach((doc) => {
+      const key = `${doc.inspectionDate}-${doc.lineNo}-${doc.MONo}-${doc.Size}-${doc.ColorNo}`;
+      existingDocsMap.set(key, doc);
+    });
+    console.log(
+      `Fetched ${existingDocsMap.size} existing documents from qc1_sunrise for comparison`
+    );
+
+    // Filter documents to only include those that are new or have changed
+    const documentsToUpdate = [];
+    for (const doc of documents) {
+      const key = `${doc.inspectionDate}-${doc.lineNo}-${doc.MONo}-${doc.Size}-${doc.ColorNo}`;
+      const existingDoc = existingDocsMap.get(key);
+
+      if (!existingDoc) {
+        // New document, include it
+        documentsToUpdate.push(doc);
+      } else {
+        // Compare fields to check for changes
+        const hasChanged =
+          existingDoc.CheckedQtyT38 !== doc.CheckedQtyT38 ||
+          existingDoc.CheckedQtyT39 !== doc.CheckedQtyT39 ||
+          existingDoc.CheckedQty !== doc.CheckedQty ||
+          existingDoc.totalDefectsQty !== doc.totalDefectsQty ||
+          JSON.stringify(existingDoc.DefectArray) !==
+            JSON.stringify(doc.DefectArray);
+
+        if (hasChanged) {
+          documentsToUpdate.push(doc);
+        }
+      }
+    }
+    console.log(
+      `Filtered down to ${documentsToUpdate.length} documents that are new or modified`
+    );
+
+    // Bulk upsert into MongoDB
+    const bulkOps = documentsToUpdate.map((doc) => ({
+      updateOne: {
+        filter: {
+          inspectionDate: doc.inspectionDate,
+          lineNo: doc.lineNo,
+          MONo: doc.MONo,
+          Size: doc.Size,
+          ColorNo: doc.ColorNo
+        },
+        update: { $set: doc },
+        upsert: true
+      }
+    }));
+
+    if (bulkOps.length > 0) {
+      const result = await QC1Sunrise.bulkWrite(bulkOps);
+      console.log(
+        `Bulk write result: Matched: ${result.matchedCount}, Modified: ${result.modifiedCount}, Upserted: ${result.upsertedCount}`
+      );
+      console.log(
+        `Successfully synced ${bulkOps.length} documents to qc1_sunrise.`
+      );
+    } else {
+      console.log("No new or modified documents to upsert");
+      console.log("Successfully synced 0 documents to qc1_sunrise.");
+    }
+
+    // Verify collection contents
+    const collectionCount = await QC1Sunrise.countDocuments();
+    console.log(
+      `Total documents in qc1_sunrise collection: ${collectionCount}`
+    );
+
+    console.log(
+      `Successfully completed QC1 Sunrise sync with ${documentsToUpdate.length} new or modified records`
+    );
+  } catch (err) {
+    console.error("Error syncing QC1 Sunrise data:", err);
+    throw err;
+  }
+};
+
+// Endpoint to manually trigger QC1 Sunrise sync
+app.get("/api/sunrise/sync-qc1", async (req, res) => {
+  try {
+    await syncQC1SunriseData();
+    res.json({ message: "QC1 Sunrise data synced successfully" });
+  } catch (err) {
+    console.error("Error in /api/sunrise/sync-qc1 endpoint:", err);
+    res
+      .status(500)
+      .json({ message: "Failed to sync QC1 Sunrise data", error: err.message });
+  }
+});
+
+// Schedule daily sync at midnight
+cron.schedule("0 0 * * *", async () => {
+  console.log("Running daily QC1 Sunrise data sync...");
+  try {
+    await syncQC1SunriseData();
+  } catch (err) {
+    console.error("Error in daily QC1 Sunrise sync:", err);
   }
 });
 
@@ -6227,6 +6972,226 @@ app.get("/api/sections", async (req, res) => {
   } catch (error) {
     console.error("Error fetching sections:", error);
     res.status(500).json({ message: "Failed to fetch sections" });
+  }
+});
+
+/* ------------------------------
+  QC1 Sunrise Dashboard ENDPOINTS
+------------------------------ */
+
+// Endpoint to fetch filtered QC1 Sunrise data for the dashboard
+app.get("/api/sunrise/qc1-data", async (req, res) => {
+  try {
+    const { startDate, endDate, lineNo, MONo, Color, Size, Buyer, defectName } =
+      req.query;
+
+    // Build the match stage for the aggregation pipeline
+    const matchStage = {};
+
+    // Other filters
+    if (lineNo) matchStage.lineNo = lineNo;
+    if (MONo) matchStage.MONo = MONo;
+    if (Color) matchStage.Color = Color;
+    if (Size) matchStage.Size = Size;
+    if (Buyer) matchStage.Buyer = Buyer;
+    if (defectName) {
+      matchStage["DefectArray.defectName"] = defectName;
+    }
+
+    // Aggregation pipeline
+    const pipeline = [];
+
+    // Stage 1: Add a new field with the converted date
+    pipeline.push({
+      $addFields: {
+        inspectionDateAsDate: {
+          $dateFromString: {
+            dateString: {
+              $concat: [
+                { $substr: ["$inspectionDate", 6, 4] }, // Extract year (YYYY)
+                "-",
+                { $substr: ["$inspectionDate", 0, 2] }, // Extract month (MM)
+                "-",
+                { $substr: ["$inspectionDate", 3, 2] } // Extract day (DD)
+              ]
+            },
+            format: "%Y-%m-%d"
+          }
+        }
+      }
+    });
+
+    // Stage 2: Apply date range filter if provided
+    if (startDate && endDate) {
+      const start = new Date(startDate); // startDate is in YYYY-MM-DD
+      const end = new Date(endDate); // endDate is in YYYY-MM-DD
+
+      // Ensure end date includes the full day
+      end.setHours(23, 59, 59, 999);
+
+      pipeline.push({
+        $match: {
+          inspectionDateAsDate: {
+            $gte: start,
+            $lte: end
+          },
+          ...matchStage // Include other filters
+        }
+      });
+    } else {
+      // If no date range, just apply other filters
+      pipeline.push({
+        $match: matchStage
+      });
+    }
+
+    // Stage 3: Sort by lineNo
+    pipeline.push({
+      $sort: { lineNo: 1 } // Sort by Line No (1 to 30)
+    });
+
+    // Fetch data from MongoDB using aggregation
+    const data = await QC1Sunrise.aggregate(pipeline).exec();
+
+    // Transform the inspectionDate to DD/MM/YYYY format for display
+    const transformedData = data.map((item) => {
+      const [month, day, year] = item.inspectionDate.split("-");
+      return {
+        ...item,
+        inspectionDate: `${day}/${month}/${year}` // Convert to DD/MM/YYYY
+      };
+    });
+
+    res.json(transformedData);
+  } catch (err) {
+    console.error("Error fetching QC1 Sunrise data:", err);
+    res.status(500).json({
+      message: "Failed to fetch QC1 Sunrise data",
+      error: err.message
+    });
+  }
+});
+
+// Endpoint to fetch unique filter values with cross-filtering
+app.get("/api/sunrise/qc1-filters", async (req, res) => {
+  try {
+    const { startDate, endDate, lineNo, MONo, Color, Size, Buyer, defectName } =
+      req.query;
+
+    // Build the match stage for the aggregation pipeline
+    const matchStage = {};
+
+    // Apply other filters
+    if (lineNo) matchStage.lineNo = lineNo;
+    if (MONo) matchStage.MONo = MONo;
+    if (Color) matchStage.Color = Color;
+    if (Size) matchStage.Size = Size;
+    if (Buyer) matchStage.Buyer = Buyer;
+    if (defectName) matchStage["DefectArray.defectName"] = defectName;
+
+    // Aggregation pipeline
+    const pipeline = [];
+
+    // Stage 1: Add a new field with the converted date
+    pipeline.push({
+      $addFields: {
+        inspectionDateAsDate: {
+          $dateFromString: {
+            dateString: {
+              $concat: [
+                { $substr: ["$inspectionDate", 6, 4] }, // Extract year (YYYY)
+                "-",
+                { $substr: ["$inspectionDate", 0, 2] }, // Extract month (MM)
+                "-",
+                { $substr: ["$inspectionDate", 3, 2] } // Extract day (DD)
+              ]
+            },
+            format: "%Y-%m-%d"
+          }
+        }
+      }
+    });
+
+    // Stage 2: Apply date range filter if provided
+    if (startDate && endDate) {
+      const start = new Date(startDate); // startDate is in YYYY-MM-DD
+      const end = new Date(endDate); // endDate is in YYYY-MM-DD
+
+      // Ensure end date includes the full day
+      end.setHours(23, 59, 59, 999);
+
+      pipeline.push({
+        $match: {
+          inspectionDateAsDate: {
+            $gte: start,
+            $lte: end
+          },
+          ...matchStage // Include other filters
+        }
+      });
+    } else {
+      // If no date range, just apply other filters
+      pipeline.push({
+        $match: matchStage
+      });
+    }
+
+    // Fetch unique values for each filter using aggregation
+    const [
+      uniqueLineNos,
+      uniqueMONos,
+      uniqueColors,
+      uniqueSizes,
+      uniqueBuyers,
+      uniqueDefectNames
+    ] = await Promise.all([
+      QC1Sunrise.aggregate([
+        ...pipeline,
+        { $group: { _id: "$lineNo" } }
+      ]).exec(),
+      QC1Sunrise.aggregate([...pipeline, { $group: { _id: "$MONo" } }]).exec(),
+      QC1Sunrise.aggregate([...pipeline, { $group: { _id: "$Color" } }]).exec(),
+      QC1Sunrise.aggregate([...pipeline, { $group: { _id: "$Size" } }]).exec(),
+      QC1Sunrise.aggregate([...pipeline, { $group: { _id: "$Buyer" } }]).exec(),
+      QC1Sunrise.aggregate([
+        ...pipeline,
+        { $unwind: "$DefectArray" },
+        { $group: { _id: "$DefectArray.defectName" } }
+      ]).exec()
+    ]);
+
+    res.json({
+      lineNos: uniqueLineNos
+        .map((item) => item._id)
+        .filter(Boolean)
+        .sort((a, b) => parseInt(a) - parseInt(b)), // Sort numerically
+      MONos: uniqueMONos
+        .map((item) => item._id)
+        .filter(Boolean)
+        .sort(),
+      Colors: uniqueColors
+        .map((item) => item._id)
+        .filter(Boolean)
+        .sort(),
+      Sizes: uniqueSizes
+        .map((item) => item._id)
+        .filter(Boolean)
+        .sort(),
+      Buyers: uniqueBuyers
+        .map((item) => item._id)
+        .filter(Boolean)
+        .sort(),
+      defectNames: uniqueDefectNames
+        .map((item) => item._id)
+        .filter(Boolean)
+        .sort()
+    });
+  } catch (err) {
+    console.error("Error fetching QC1 Sunrise filter values:", err);
+    res.status(500).json({
+      message: "Failed to fetch filter values",
+      error: err.message
+    });
   }
 });
 

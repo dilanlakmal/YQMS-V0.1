@@ -309,7 +309,7 @@ const MeasurementTable = ({
               {getColumnHeaders().map((header, index) => (
                 <th
                   key={index}
-                  className="border border-gray-300 p-2 text-center"
+                  className="border border-gray-300 p-2 text-center text-sm"
                 >
                   {header}
                 </th>
@@ -324,16 +324,16 @@ const MeasurementTable = ({
                   row.isUsed ? "bg-green-50" : "bg-red-50 opacity-50"
                 }`}
               >
-                <td className="border border-gray-300 p-2 text-center bg-white">
+                <td className="border border-gray-300 p-2 text-center bg-white text-sm">
                   {row.no}
                 </td>
-                <td className="border border-gray-300 p-2 bg-white">
+                <td className="border border-gray-300 p-2 bg-white text-sm">
                   {row.measurementPoint}
                 </td>
                 {row.values.map((value, colIndex) => (
                   <td
                     key={colIndex}
-                    className="border border-gray-300 p-0 text-center"
+                    className="border border-gray-300 p-0 text-center text-sm min-w-[48px] sm:min-w-[80px]"
                     onClick={() => handleCellClick(rowIndex, colIndex)}
                   >
                     <input

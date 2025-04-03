@@ -22,9 +22,11 @@ import DailySummary from "../components/inspection/liveDashboard/DailySummary";
 import WeeklySummary from "../components/inspection/liveDashboard/WeeklySummary";
 import InspectorCard from "../components/inspection/liveDashboard/InspectorCard";
 import RovingReport from "../components/inspection/liveDashboard/RovingReport"; // Added import
+import HomeMenu from "../components/inspection/liveDashboard/HomeMenu";
+import QCSunriseDashboard from "../components/inspection/liveDashboard/QCSunriseDashboard";
 
 const LiveDashboard = () => {
-  const [activeSection, setActiveSection] = useState("Live Dashboard");
+  const [activeSection, setActiveSection] = useState("Home");
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [activeMoTab, setActiveMoTab] = useState("MO Summary"); // For MO Hr Trend tabs
   const [activeLineTab, setActiveLineTab] = useState("Line Summary");
@@ -432,8 +434,14 @@ const LiveDashboard = () => {
         )}
 
         {/* Section Content */}
+        {activeSection === "Home" && (
+          <HomeMenu setActiveSection={setActiveSection} />
+        )}
+
         {activeSection === "QC Inline Roving" && <RovingReport />}
+        {activeSection === "QC 1 Dashboard" && <QCSunriseDashboard />}
         {activeSection === "Order Data" && <OrderData />}
+
         {activeSection === "Washing" && <WashingLive />}
         {activeSection === "Ironing" && <IroningLive />}
         {activeSection === "OPA" && <OPALive />}
