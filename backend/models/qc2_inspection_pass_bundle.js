@@ -115,7 +115,7 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
         inspectionHistory: [
           {
             scanNo: { type: Number, required: true },
-            scanDate: { type: Date, required: true },
+            scanDate: { type: String, required: true },
             scanTime: { type: String, required: true },
             rejectGarmentCount: { type: Number, required: true },
             totalPass: { type: Number, required: true },
@@ -123,7 +123,7 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
             defectQty: { type: Number, required: true },
             isRejectGarment: { type: Boolean, default: false },
             isPassBundle: { type: Boolean, default: false },
-            sessionData: Object,
+            // sessionData: Object,
             confirmedDefects: Object,
             // tempDefects: Object,
             // rejectedGarments: Array,
@@ -131,6 +131,16 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
             // lockedDefects: Array,
             // rejectedGarmentDefects: Array,
             // defectTrackingDetails: Object,
+            inspection_operator:[
+              {
+              emp_id: { type: String, required: true },
+              eng_name: { type: String, required: true },
+              kh_name: { type: String, required: true },
+              job_title: { type: String, required: true },
+              dept_name: { type: String, required: true },
+              sect_name: { type: String, required: true },
+              },
+            ],
           },
         ],
       },

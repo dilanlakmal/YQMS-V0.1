@@ -102,6 +102,7 @@ const QC2InspectionPage = () => {
   const [locallyRejectedDefects, setLocallyRejectedDefects] = useState(new Set());
   const [scanCount, setScanCount] = useState(0);
   const scanCountRef = useRef(0);
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   const categoryOptions = [
     "fabric",
@@ -467,8 +468,13 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
   const key = `${garmentNumber}-${defectName}`;
   
   if (rejectedGarmentDefects.has(garmentNumber)) {
-    return; 
-  }
+      Swal.fire({
+        icon: "error",
+        title: "Garment Rejected",
+        text: "This garment has been rejected and its defects cannot be changed.",
+      });
+      return;
+    }
   // Check if the defect is locked
   if (lockedDefects.has(key)) {
     Swal.fire({
@@ -671,7 +677,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
   
     try {
       const now = new Date();
-      const scanDate = moment(now).format('YYYY-MM-DD');
+      const scanDate = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`;
       const scanTime = moment(now).format('HH:mm:ss');
   
       // Fetch the current scan count from the database
@@ -684,27 +690,29 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
   
       // Increment the scan count
       const newScanNo = String(currentScanCount + 1).padStart(2, '0'); // Format as two-digit number
-  
+      const inspectionOperator = [{
+        emp_id: user.emp_id,
+        eng_name: user.eng_name,
+        kh_name: user.kh_name,
+        job_title: user.job_title,
+        dept_name: user.dept_name,
+        sect_name: user.sect_name,
+      }];
       const payload = {
         bundle_random_id: bundleData.bundle_random_id,
         defect_print_id: sessionData?.printEntry?.defect_print_id || null,
         scanNo: newScanNo,
         scanDate,
         scanTime,
-        rejectGarmentCount: isReturnInspection ? sessionData.sessionTotalRejects : totalRejects, // Changed to rejectGarmentCount
+        rejectGarmentCount: isReturnInspection ? sessionData.sessionTotalRejects : totalRejects,
         totalPass,
         totalRejects,
         defectQty,
         isRejectGarment,
         isPassBundle,
-        sessionData: sessionData ? { ...sessionData } : null,
         confirmedDefects: { ...confirmedDefects },
-        tempDefects: { ...tempDefects },
-        rejectedGarments: [...rejectedGarments],
         repairStatuses: { ...repairStatuses },
-        lockedDefects: [...lockedDefects],
-        rejectedGarmentDefects: [...rejectedGarmentDefects],
-        defectTrackingDetails: defectTrackingDetails ? { ...defectTrackingDetails } : null,
+        inspection_operator: inspectionOperator,
       };
   
       // Log the size of the payload
@@ -713,48 +721,27 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
       console.log("Payload size:", payloadSize, "bytes");
   
       // Log the payload to inspect its structure and size
-      console.log("saveScanData payload:", JSON.stringify(payload, null, 2)); // Pretty print the payload
+      console.log("saveScanData payload:", JSON.stringify(payload, null, 2));
   
+      // Single POST request to save data
       const saveResponse = await fetch(`${API_BASE_URL}/api/save-qc2-scan-data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
   
-      console.log("saveScanData response:", saveResponse); // Log the response
+      console.log("saveScanData response:", saveResponse);
   
       if (!saveResponse.ok) {
         const errorText = await saveResponse.text();
         throw new Error(`Failed to save scan data: ${errorText}`);
       }
   
-      const responseData = await saveResponse.json(); // Parse the response body
-      console.log("saveScanData responseData:", responseData); // Log the response data
-
-      // Save to qc2-orderdata collection
-      const orderDataPayload = {
-        ...payload,
-        scanNo: parseInt(newScanNo, 10), // Ensure scanNo is a number
-      };
-
-      const orderDataResponse = await fetch(`${API_BASE_URL}/api/save-qc2-scan-data`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderDataPayload),
-      });
-
-      console.log("saveOrderData response:", orderDataResponse); // Log the response
-
-      if (!orderDataResponse.ok) {
-        const errorText = await orderDataResponse.text();
-        throw new Error(`Failed to save order data: ${errorText}`);
-      }
-
-      const orderDataResponseData = await orderDataResponse.json(); // Parse the response body
-      console.log("saveOrderData responseData:", orderDataResponseData); // Log the response data
+      const responseData = await saveResponse.json();
+      console.log("saveScanData responseData:", responseData);
   
     } catch (err) {
-      console.error("saveScanData error:", err); // Log the error
+      console.error("saveScanData error:", err);
       setError(`Failed to save scan data: ${err.message}`);
     }
   };

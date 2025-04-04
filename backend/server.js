@@ -4611,12 +4611,22 @@ app.post('/api/save-qc2-scan-data', async (req, res) => {
       defectQty,
       isRejectGarment,
       isPassBundle,
-      sessionData,
+      // sessionData,
       confirmedDefects,
       repairStatuses,
+      inspection_operator,
     } = req.body;
 
     console.log('Received data:', req.body);
+
+    // Optional: Ensure scanDate is in MM/DD/YYYY format
+    let formattedScanDate = scanDate;
+    if (!/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(scanDate)) {
+      const now = new Date();
+      formattedScanDate = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`;
+      console.log(`Invalid scanDate format received (${scanDate}), using current date: ${formattedScanDate}`);
+    }
+
 
     // 1. Save to qc2_orderdata
     let orderData = await QC2OrderData.findOne({ bundle_random_id });
@@ -4638,7 +4648,7 @@ app.post('/api/save-qc2-scan-data', async (req, res) => {
 
     orderData.qc2InspectionDefect.push({
       scanNo,
-      scanDate,
+      scanDate: formattedScanDate,
       scanTime,
       rejectGarmentCount,
       totalPass,
@@ -4648,9 +4658,10 @@ app.post('/api/save-qc2-scan-data', async (req, res) => {
       defect_print_id,
       isRejectGarment,
       isPassBundle,
-      sessionData,
+      // sessionData,
       confirmedDefects,
       repairStatuses,
+      inspection_operator,
     });
 
     console.log('Saving order data:', orderData);
@@ -4669,7 +4680,7 @@ app.post('/api/save-qc2-scan-data', async (req, res) => {
         }
         printEntry.inspectionHistory.push({
           scanNo,
-          scanDate,
+          scanDate: formattedScanDate,
           scanTime,
           rejectGarmentCount,
           totalPass,
@@ -4677,9 +4688,10 @@ app.post('/api/save-qc2-scan-data', async (req, res) => {
           defectQty,
           isRejectGarment,
           isPassBundle,
-          sessionData,
+          // sessionData,
           confirmedDefects,
           repairStatuses,
+          inspection_operator,
         });
 
         console.log('Saving inspection data:', inspectionData);
