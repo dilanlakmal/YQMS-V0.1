@@ -320,11 +320,18 @@ const DefectTrack = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {scannedData.garments.map((garment) =>
-                    garment.defects
-                    .filter((defect) => defect.status !== "Unrepairable" && (defect.status !== "OK" || isDefectTemporarilyOk(garment.garmentNumber, defect.name)))
-                      .map((defect, index) => (
-                        <TableRow key={`${garment.garmentNumber}-${defect.name}-${index}`} className={defect.status === "OK" ? "bg-green-100" : "hover:bg-gray-100"}>
+                {scannedData.garments
+                    .filter((garment) => 
+                      !garment.defects.some((defect) => defect.name === "Fabric defect(unrepairable)")
+                    )
+                    .map((garment) =>
+                      garment.defects
+                        .filter((defect) => defect.status !== "OK" || isDefectTemporarilyOk(garment.garmentNumber, defect.name))
+                        .map((defect, index) => (
+                          <TableRow 
+                            key={`${garment.garmentNumber}-${defect.name}-${index}`} 
+                            className={defect.status === "OK" ? "bg-green-100" : "hover:bg-gray-100"}
+                          >
                           <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{garment.garmentNumber}</TableCell>
                           <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{defect.repair}</TableCell>
                           <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">{defect.displayName}</TableCell>

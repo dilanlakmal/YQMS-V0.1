@@ -2301,24 +2301,29 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
                                 </TableRow>
                               </TableHead>
                               <TableBody>
-                                {defectTrackingDetails.garments.some(garment =>
-                                  garment.defects.some(defect => defect.pass_bundle !== "Pass")
-                                ) ? (
-                                  defectTrackingDetails.garments.map((garment) =>
-                                    garment.defects
-                                  .filter((defect) => defect.pass_bundle !== "Pass" && defect.name !== "Fabric defect(unrepairable)")
-                                      .map((defect, index) => (
-                                        <TableRow
-                                          key={`${garment.garmentNumber}-${defect.name}-${index}`}
-                                          className={
-                                            lockedGarments.has(garment.garmentNumber) ||
-                                            rejectedGarmentNumbers.has(garment.garmentNumber)
-                                              ? "bg-gray-300"
-                                              : defect.status === "OK"
-                                              ? "bg-green-100"
-                                              : "bg-red-100"
-                                          }
-                                        >
+                              {defectTrackingDetails.garments.some(garment =>
+                                    !garment.defects.some(defect => defect.name === "Fabric defect(unrepairable)") &&
+                                    garment.defects.some(defect => defect.pass_bundle !== "Pass")
+                                  ) ? (
+                                    defectTrackingDetails.garments
+                                      .filter(garment => 
+                                        !garment.defects.some(defect => defect.name === "Fabric defect(unrepairable)")
+                                      )
+                                      .flatMap(garment =>
+                                        garment.defects
+                                          .filter(defect => defect.pass_bundle !== "Pass")
+                                          .map((defect, index) => (
+                                            <TableRow
+                                              key={`${garment.garmentNumber}-${defect.name}-${index}`}
+                                              className={
+                                                lockedGarments.has(garment.garmentNumber) ||
+                                                rejectedGarmentNumbers.has(garment.garmentNumber)
+                                                  ? "bg-gray-300"
+                                                  : defect.status === "OK"
+                                                  ? "bg-green-100"
+                                                  : "bg-red-100"
+                                              }
+                                            >
                                           <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
                                             {garment.garmentNumber}
                                           </TableCell>
