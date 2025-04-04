@@ -6057,9 +6057,9 @@ app.post('/api/save-qc2-scan-data', async (req, res) => {
       scanNo,
       scanDate,
       scanTime,
-      rejectGarmentCount,
-      totalPass,
       totalRejects,
+      totalPass,
+      rejectGarmentCount,
       defectQty,
       isRejectGarment,
       isPassBundle,
@@ -6085,9 +6085,10 @@ app.post('/api/save-qc2-scan-data', async (req, res) => {
         bundle_random_id,
         qc2InspectionDefect: [], // Initialize as empty array
       });
-    } else {
-      console.log('Existing order data found:', orderData);
-    }
+    } 
+    // else {
+    //   console.log('Existing order data found:', orderData);
+    // }
 
     // Ensure qc2InspectionDefect is an array before pushing
     if (!Array.isArray(orderData.qc2InspectionDefect)) {

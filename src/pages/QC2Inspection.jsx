@@ -688,15 +688,23 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
         dept_name: user.dept_name,
         sect_name: user.sect_name,
       }];
+
+      let rejectGarmentCountToSave = totalRejects;
+      if (isReturnInspection && sessionData) {
+        rejectGarmentCountToSave = sessionData.totalRejectGarmentCount;
+      } else {
+        rejectGarmentCountToSave = totalRejects;
+      }
+
       const payload = {
         bundle_random_id: bundleData.bundle_random_id,
         defect_print_id: sessionData?.printEntry?.defect_print_id || null,
         scanNo: newScanNo,
         scanDate,
         scanTime,
-        rejectGarmentCount: isReturnInspection ? sessionData.sessionTotalRejects : totalRejects,
+        totalRejects: rejectGarmentCountToSave,
         totalPass,
-        totalRejects,
+        rejectGarmentCount: totalRejects,
         defectQty,
         isRejectGarment,
         isPassBundle,
@@ -724,15 +732,26 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
   
       if (!saveResponse.ok) {
         const errorText = await saveResponse.text();
-        throw new Error(`Failed to save scan data: ${errorText}`);
+        // Check if the scanned QR code is a defect card by verifying if defect_print_id exists and is not null
+        const isDefectCard = payload.defect_print_id !== null && payload.defect_print_id !== undefined;
+        if (isDefectCard) {
+          throw new Error(`Failed to save scan data: ${errorText}`);
+        }
+        // For non-defect card scans (no defect_print_id), log the error silently
+        console.error(`Failed to save scan data (non-defect card): ${errorText}`);
+        return; // Exit without setting the error state
       }
   
       const responseData = await saveResponse.json();
-      // console.log("saveScanData responseData:", responseData);
   
     } catch (err) {
-      // console.error("saveScanData error:", err);
-      setError(`Failed to save scan data: ${err.message}`);
+      // Only set the error state if the error pertains to a defect card scan
+      const isDefectCard = sessionData?.printEntry?.defect_print_id !== null && sessionData?.printEntry?.defect_print_id !== undefined;
+      if (isDefectCard) {
+        setError(`Failed to save scan data: ${err.message}`);
+      } else {
+        console.error(`Error during saveScanData (non-defect card): ${err.message}`);
+      }
     }
   };
   
