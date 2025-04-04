@@ -46,6 +46,7 @@ import { BluetoothProvider } from './components/context/BluetoothContext.jsx';
 // Context
 import { AuthProvider } from "./components/authentication/AuthContext.jsx";
 import { FormDataProvider } from "./components/context/FormDataContext";
+import CuttingPage from "./pages/Cutting.jsx";
 
 export const BluetoothContext = createContext(null);
 
@@ -340,6 +341,7 @@ function AppContent() {
               <Route path="/ironing" element={<IroningPage />} />
               <Route path="/washing" element={<WashingPage />} />
               <Route path="/roving" element={<RovingPage />} />
+              <Route path="/cutting" element={<CuttingPage />} />
               <Route path="/inline-emp" element={<EmpData />} />
               <Route path="/opa" element={<OPAPage />} />
               <Route path="/packing" element={<PackingPage />} />

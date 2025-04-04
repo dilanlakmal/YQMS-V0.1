@@ -68,7 +68,7 @@ const DefectTrack = () => {
 
   const updateDefectStatusInRepairTracking = async (defect_print_id, garmentNumber, defectName, status) => {
     try {
-      console.log("Updating defect status with:", { defect_print_id, garmentNumber, defectName, status });
+      
       const payload = {
         defect_print_id,
         garmentNumber,
@@ -83,14 +83,9 @@ const DefectTrack = () => {
           body: JSON.stringify(payload),
         }
       );
-      // if (!response.ok) {
-      //   const errorText = await response.text();
-      //   throw new Error(`Failed to update defect status in repair tracking: ${errorText}`);
-      // }
-      console.log("Defect status updated in repair tracking successfully");
+     
     } catch (err) {
       setError(`Failed to update defect status in repair tracking: ${err.message}`);
-      console.error("Error updating defect status in repair tracking:", err.message);
     }
   };
 

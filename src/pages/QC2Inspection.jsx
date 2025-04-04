@@ -618,7 +618,6 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
       // console.log(`Defect status updated to "${status}" for ${garmentNumber}-${defectName}`);
     } catch (err) {
       setError(`Failed to update defect status: ${err.message}`);
-      console.error("Error updating defect status:", err.message);
       throw err; // Re-throw to allow caller to handle the error
     }
   };
@@ -657,23 +656,14 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
           `Failed to update defect status in repair tracking: ${errorText}`
         );
       }
-      // console.log("Defect status updated in repair tracking successfully");
     } catch (err) {
       setError(
         `Failed to update defect status in repair tracking: ${err.message}`
-      );
-      console.error(
-        "Error updating defect status in repair tracking:",
-        err.message
       );
     }
   };
 
   const saveScanData = async (isRejectGarment = false, isPassBundle = false) => {
-    console.log("saveScanData() called");
-    console.log("bundle_random_id:", bundleData.bundle_random_id);
-    console.log("isRejectGarment:", isRejectGarment);
-    console.log("isPassBundle:", isPassBundle);
   
     try {
       const now = new Date();
@@ -715,13 +705,13 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
         inspection_operator: inspectionOperator,
       };
   
-      // Log the size of the payload
-      const encoder = new TextEncoder();
-      const payloadSize = encoder.encode(JSON.stringify(payload)).length;
-      console.log("Payload size:", payloadSize, "bytes");
+      // // Log the size of the payload
+      // const encoder = new TextEncoder();
+      // const payloadSize = encoder.encode(JSON.stringify(payload)).length;
+      // console.log("Payload size:", payloadSize, "bytes");
   
-      // Log the payload to inspect its structure and size
-      console.log("saveScanData payload:", JSON.stringify(payload, null, 2));
+      // // Log the payload to inspect its structure and size
+      // console.log("saveScanData payload:", JSON.stringify(payload, null, 2));
   
       // Single POST request to save data
       const saveResponse = await fetch(`${API_BASE_URL}/api/save-qc2-scan-data`, {
@@ -730,7 +720,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
         body: JSON.stringify(payload),
       });
   
-      console.log("saveScanData response:", saveResponse);
+      // console.log("saveScanData response:", saveResponse);
   
       if (!saveResponse.ok) {
         const errorText = await saveResponse.text();
@@ -738,10 +728,10 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
       }
   
       const responseData = await saveResponse.json();
-      console.log("saveScanData responseData:", responseData);
+      // console.log("saveScanData responseData:", responseData);
   
     } catch (err) {
-      console.error("saveScanData error:", err);
+      // console.error("saveScanData error:", err);
       setError(`Failed to save scan data: ${err.message}`);
     }
   };
@@ -820,10 +810,6 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
       setError(
         `Failed to update defect status in repair tracking: ${err.message}`
       );
-      console.error(
-        "Error updating defect status in repair tracking:",
-        err.message
-      );
     }
   }, 
   [fetchBundleData, handleDefectCardScan, setDefectTrackingDetails, setError, setIsReturnInspection, setLoadingData, setRepairStatuses, setScanning, , saveScanData]
@@ -835,7 +821,10 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
 
   const handleRejectGarment = async () => {
     if (!hasDefects || totalPass <= 0) {
-      // console.log("handleRejectGarment aborted: No defects or totalPass <= 0", { hasDefects, totalPass });
+      // console.log("handleRejectGarment aborted: No defects or totalPass <= 0", {
+      //   hasDefects,
+      //   totalPass
+      // });
       return;
     }
   
@@ -1046,6 +1035,15 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
           return newSet;
         });
       });
+      // Add the code here:
+      defects.forEach((defect) => {
+        const key = `${garmentDefectId}-${defect.name}`;
+        setLocallyRejectedDefects((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(key);
+          return newSet;
+        });
+      });
       setRejectedGarmentDefects((prev) => new Set(prev).add(garmentDefectId));
       await handleReReturnGarment(garmentDefectId, defects);
       await saveScanData(true);
@@ -1058,7 +1056,9 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
       // Find the rejected garment in rejectedGarments
       const rejectedGarment = rejectedGarments.find(garment => garment.garment_defect_id === garmentNumber);
       if (!rejectedGarment) {
-        // console.error(`Rejected garment with number ${garmentNumber} not found.`);
+        // console.error(
+        //   `Rejected garment with number ${garmentNumber} not found.`
+        // );
         return;
       }
 
@@ -1131,7 +1131,6 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
         const errorText = await repairUpdateResponse.text();
         throw new Error(`Failed to update repair tracking: ${errorText}`);
       }
-
     } catch (err) {
       setError(`Failed to update repair tracking: ${err.message}`);
       // console.error("Error in handleReReturnGarment:", err.message);
@@ -1278,6 +1277,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
           moNo: bundleData.selectedMono,
           color: bundleData.color,
           size: bundleData.size,
+          lineNo: bundleData.lineNo, // Add this line to include lineNo
           bundleQty: bundleData.passQtyIron,
           totalRejectGarments: totalRejectGarmentCount,
           totalRejectGarment_Var, // New field, remains constant
@@ -1551,7 +1551,9 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
           `Failed to update pass_bundle status for defect ${defect_print_id}: ${errorText}`
         );
       }
-      // console.log(`pass_bundle status updated successfully for defect ${defect_print_id}`);
+      // console.log(
+      //   `pass_bundle status updated successfully for defect ${defect_print_id}`
+      // );
     } catch (err) {
       setError(
         `Failed to update pass_bundle status for OK defects: ${err.message}`
@@ -2198,13 +2200,18 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
                         <button
                           onClick={handlePassBundle}
                           disabled={
-                            isPassingBundle || // Add this condition
-                            (!isReturnInspection &&
-                              ((hasDefects && !rejectedOnce) ||
-                                ((printMethod === "garment" ||
-                                  printMethod === "bundle") &&
+                            isPassingBundle || // Prevent multiple clicks
+                            (isReturnInspection
+                              ? // For return inspection: Disable if there are pending defects (hasDefects) or if a garment has been rejected (rejectedOnce)
+                                hasDefects || rejectedOnce
+                              : // For non-return inspection: Disable if there are pending defects and no rejection has occurred,
+                                // or if a garment has been rejected but QR codes haven't been generated, or if printing is in progress
+                                (hasDefects && !rejectedOnce) ||
+                                (rejectedOnce && // Only check QR codes if a garment has been rejected
+                                  (printMethod === "garment" ||
+                                    printMethod === "bundle") &&
                                   qrCodesData.garment.length === 0) ||
-                                printing))
+                                printing)
                           }
                           className={`px-2 md:px-4 py-1 md:py-2 rounded ${
                             !isReturnInspection &&

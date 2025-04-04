@@ -12,6 +12,7 @@ const PreviewRoving = ({ isOpen, onClose, data }) => {
     operatorId,
     inspectionType,
     operationName,
+    machineCode,
     spiStatus,
     measurementStatus,
     garments,
@@ -48,27 +49,47 @@ const PreviewRoving = ({ isOpen, onClose, data }) => {
 
         {/* Summary Section */}
         <div className="mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <h3 className="text-xl font-semibold text-gray-800 mb-4">Summary</h3>
+          <table className="w-full border-collapse border border-gray-300 mb-4">
+            <thead>
+              <tr className="bg-gray-200">
+                <th className="border border-gray-300 p-2">Date</th>
+                <th className="border border-gray-300 p-2">QC ID</th>
+                <th className="border border-gray-300 p-2">Line No</th>
+                <th className="border border-gray-300 p-2">MO No</th>
+                <th className="border border-gray-300 p-2">Operator ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border border-gray-300 p-2 text-center">
+                  {date}
+                </td>
+                <td className="border border-gray-300 p-2 text-center">
+                  {qcId}
+                </td>
+                <td className="border border-gray-300 p-2 text-center">
+                  {lineNo}
+                </td>
+                <td className="border border-gray-300 p-2 text-center">
+                  {moNo}
+                </td>
+                <td className="border border-gray-300 p-2 text-center">
+                  {operatorId}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          {/* Remaining Summary Items in Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
             <p>
-              <strong>Date:</strong> {date}
+              <strong>Inspection Type:</strong> {inspectionType} ---{" "}
+              <strong>Checked Qty:</strong>{" "}
+              {inspectionType === "Normal" ? 5 : 15}
             </p>
             <p>
-              <strong>QC ID:</strong> {qcId}
-            </p>
-            <p>
-              <strong>Line No:</strong> {lineNo}
-            </p>
-            <p>
-              <strong>MO No:</strong> {moNo}
-            </p>
-            <p>
-              <strong>Operator ID:</strong> {operatorId}
-            </p>
-            <p>
-              <strong>Inspection Type:</strong> {inspectionType}
-            </p>
-            <p>
-              <strong>Operation Name:</strong> {operationName}
+              <strong>Operation Name:</strong> {operationName} ---{" "}
+              <strong>Machine Code :</strong> {machineCode}
             </p>
           </div>
         </div>
@@ -116,7 +137,7 @@ const PreviewRoving = ({ isOpen, onClose, data }) => {
           <table className="w-full border-collapse border border-gray-300 mb-4">
             <thead>
               <tr className="bg-gray-200">
-                <th className="border border-gray-300 p-2">Garment No</th>
+                <th className="border border-gray-300 p-2">Part No</th>
                 <th className="border border-gray-300 p-2">Defect Name</th>
                 <th className="border border-gray-300 p-2">Defect Qty</th>
               </tr>

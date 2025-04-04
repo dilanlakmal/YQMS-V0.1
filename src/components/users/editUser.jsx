@@ -18,7 +18,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
     eng_name: false,
     kh_name: false,
     job_title: false,
-    email: false,
+    email: false
   };
 
   const availableRoles = [
@@ -29,11 +29,17 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
     "OPA",
     "Ironing",
     "Packing",
-    "QC1",
-    "QC2",
-    "QA",
+    "QC Roving",
+    "Printing",
+    "QC2 Tracking",
+    "QC1 Inspection",
+    "QC2 Inspection",
+    "QA Audit",
+    "Final Inspection",
     "Download Data",
     "Live Dashboard",
+    "Power BI",
+    "QC1 Sunrise"
   ];
 
   // Array of allowed working statuses that can modify roles.
@@ -83,7 +89,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
       eng_name: formData.get("eng_name"),
       kh_name: formData.get("kh_name"),
       job_title: formData.get("job_title"),
-      email: formData.get("email"),
+      email: formData.get("email")
     };
 
     try {
@@ -107,15 +113,15 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
             sect_name: user.sect_name,
             phone_number: updatedUser.phone_number,
             working_status: user.working_status,
-            face_photo: user.face_photo,
-          },
+            face_photo: user.face_photo
+          }
         }
       );
 
       if (response.data.success) {
         setMessage({
           type: "success",
-          text: "Successfully updated user roles",
+          text: "Successfully updated user roles"
         });
         setTimeout(() => {
           setMessage({ type: "", text: "" });
@@ -126,7 +132,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
       console.error("Error updating user:", error);
       setMessage({
         type: "error",
-        text: error.response?.data?.message || "Failed to update user roles",
+        text: error.response?.data?.message || "Failed to update user roles"
       });
     }
   };
@@ -391,9 +397,9 @@ EditUserModal.propTypes = {
     dept_name: PropTypes.string,
     sect_name: PropTypes.string,
     working_status: PropTypes.string,
-    face_photo: PropTypes.string,
+    face_photo: PropTypes.string
   }),
-  onSubmit: PropTypes.func.isRequired,
+  onSubmit: PropTypes.func.isRequired
 };
 
 export default EditUserModal;

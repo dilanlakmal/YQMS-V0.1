@@ -12,7 +12,7 @@ import {
   Package,
   Settings,
   User,
-  X,
+  X
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -97,16 +97,21 @@ export default function Navbar({ onLogout }) {
       icon: <ClipboardList className="h-4 w-4 mr-2" />,
       items: [
         {
+          path: "/fabric",
+          title: t("home.fabric"), //"Fabric",
+          requiredRoles: ["Super Admin", "Admin", "Fabric"]
+        },
+        {
           path: "/cutting",
           title: t("home.cutting"), //"Cutting",
-          requiredRoles: ["Super Admin", "Admin", "Cutting"],
+          requiredRoles: ["Super Admin", "Admin", "Cutting"]
         },
         {
           path: "/scc",
           title: t("home.scc"), //"SCC",
-          requiredRoles: ["Super Admin", "Admin", "SCC"],
-        },
-      ],
+          requiredRoles: ["Super Admin", "Admin", "SCC"]
+        }
+      ]
     },
 
     {
@@ -116,45 +121,65 @@ export default function Navbar({ onLogout }) {
         {
           path: "/bundle-registration",
           title: t("home.bundle_registration"),
-          requiredRoles: ["Super Admin", "Admin", "Bundle Registration"],
+          requiredRoles: ["Super Admin", "Admin", "Bundle Registration"]
         },
         {
           path: "/washing",
           title: t("home.washing"),
-          requiredRoles: ["Super Admin", "Admin", "Washing"],
+          requiredRoles: ["Super Admin", "Admin", "Washing"]
         },
         {
           path: "/opa",
           title: t("home.opa"),
-          requiredRoles: ["Super Admin", "Admin", "OPA"],
+          requiredRoles: ["Super Admin", "Admin", "OPA"]
         },
         {
           path: "/ironing",
           title: t("home.ironing"),
-          requiredRoles: ["Super Admin", "Admin", "Ironing"],
+          requiredRoles: ["Super Admin", "Admin", "Ironing"]
         },
         {
           path: "/packing",
           title: t("home.packing"),
-          requiredRoles: ["Super Admin", "Admin", "Packing"],
-        },
-      ],
+          requiredRoles: ["Super Admin", "Admin", "Packing"]
+        }
+      ]
     },
     {
       title: t("nav.qc"),
       icon: <Activity className="h-4 w-4 mr-2" />,
       items: [
         {
+          path: "/roving",
+          title: t("qcRoving.qcInlineRoving"),
+          requiredRoles: ["Super Admin", "Admin", "QC Roving"]
+        },
+        {
+          path: "/inline-emp",
+          title: t("home.printing_QR"),
+          requiredRoles: ["Super Admin", "Admin", "Printing"]
+        },
+        {
           path: "/details",
           title: t("home.qc1_inspection"),
-          requiredRoles: ["Super Admin", "Admin", "QC1"],
+          requiredRoles: ["Super Admin", "Admin", "QC1 Inspection"]
+        },
+        {
+          path: "/qc2-repair-tracking",
+          title: t("home.qc2_repair_tracking"),
+          requiredRoles: [
+            "Super Admin",
+            "Admin",
+            "QC2 Tracking",
+            "QC2 Inspection"
+          ]
         },
         {
           path: "/qc2-inspection",
           title: t("home.qc2_inspection"),
-          requiredRoles: ["Super Admin", "Admin", "QC2"],
-        },
-      ],
+          requiredRoles: ["Super Admin", "Admin", "QC2 Inspection"]
+        }
+      ]
     },
     {
       title: t("nav.qa"),
@@ -163,9 +188,14 @@ export default function Navbar({ onLogout }) {
         {
           path: "/audit",
           title: t("home.qa_audit"),
-          requiredRoles: ["Super Admin", "Admin", "QA"],
+          requiredRoles: ["Super Admin", "Admin", "QA Audit"]
         },
-      ],
+        {
+          path: "/final-inspection",
+          title: t("home.final_inspection"),
+          requiredRoles: ["Super Admin", "Admin", "QA Audit"]
+        }
+      ]
     },
     {
       title: t("nav.report"),
@@ -174,15 +204,25 @@ export default function Navbar({ onLogout }) {
         {
           path: "/download-data",
           title: t("home.download_data"),
-          requiredRoles: ["Super Admin", "Admin", "Download Data"],
+          requiredRoles: ["Super Admin", "Admin", "Download Data"]
         },
         {
-          path: "/dashboard",
+          path: "/live-dashboard",
           title: t("home.live_dashboard"),
-          requiredRoles: ["Super Admin", "Admin", "Live Dashboard"],
+          requiredRoles: ["Super Admin", "Admin", "Live Dashboard"]
         },
-      ],
-    },
+        {
+          path: "/powerbi",
+          title: "Power BI",
+          requiredRoles: ["Super Admin", "Admin", "Power BI"]
+        },
+        {
+          path: "/qc1-sunrise",
+          title: "QC1 Sunrise",
+          requiredRoles: ["Super Admin", "Admin", "QC1 Sunrise"]
+        }
+      ]
+    }
   ];
 
   const showRoleManagement = isSuperAdmin || isAdmin;
