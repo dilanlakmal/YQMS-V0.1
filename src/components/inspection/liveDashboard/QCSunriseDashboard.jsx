@@ -5,6 +5,7 @@ import QCSunriseFilterPane from "../qc1_sunrise_mongodb/QCSunriseFilterPane";
 import QCSunriseSummaryCard from "../qc1_sunrise_mongodb/QCSunriseSummaryCard";
 import QCSunriseSummaryTable from "../qc1_sunrise_mongodb/QCSunriseSummaryTable";
 import SunriseLineBarChart from "./QCSunriseBarChart";
+import SunriseTopNDefect from "./SunriseTopNDefect";
 
 const QC1SunriseDashboard = () => {
   const [data, setData] = useState([]);
@@ -16,6 +17,7 @@ const QC1SunriseDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({});
+  const [topN, setTopN] = useState(5);
 
   const fetchDashboardData = async () => {
     try {
@@ -52,7 +54,10 @@ const QC1SunriseDashboard = () => {
 
         return {
           ...item,
-          DefectArray: sortedDefectArray,
+          DefectArray: sortedDefectArray.map((defect) => ({
+            defectName: defect.defectName,
+            defectQty: defect.defectQty,
+          })),
           WorkLine: item.LineNo || "No Line",
           MONo: item.MONo,
           ColorName: item.Color,
@@ -139,8 +144,13 @@ const QC1SunriseDashboard = () => {
         error={error}
         filters={filters}
       />
-      <div className="mt-8">
-        <SunriseLineBarChart filteredData={filteredData} filters={filters} />
+      <div className="mt-8 grid grid-cols-2 gap-6">
+      <SunriseLineBarChart filteredData={filteredData} filters={filters} />     
+        <SunriseTopNDefect
+            filteredData={filteredData}
+            topN={topN}
+            setTopN={setTopN}
+          />
       </div>
     </div>
   );
