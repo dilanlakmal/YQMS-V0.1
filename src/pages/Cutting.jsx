@@ -1182,6 +1182,8 @@ const CuttingPage = () => {
   const [totalBundleQty, setTotalBundleQty] = useState("");
   const [bundleQtyCheck, setBundleQtyCheck] = useState("");
   const [totalInspectionQty, setTotalInspectionQty] = useState(0);
+  const [cuttingByAuto, setCuttingByAuto] = useState(true); // Default to Auto
+  const [cuttingByManual, setCuttingByManual] = useState(false);
   const [showNumberPad, setShowNumberPad] = useState(false);
   const [showBundleQtyCheckNumberPad, setShowBundleQtyCheckNumberPad] =
     useState(false);
@@ -1477,6 +1479,8 @@ const CuttingPage = () => {
     setTotalBundleQty("");
     setBundleQtyCheck("");
     setTotalInspectionQty(0);
+    setCuttingByAuto(true); // Reset to default
+    setCuttingByManual(false);
     setSelectedPanel("");
     setSelectedSize("");
     setSelectedSerialLetter("");
@@ -1530,6 +1534,48 @@ const CuttingPage = () => {
     setFilters({ panelName: "", side: "", direction: "", lw: "" });
   };
 
+  const resetMeasurementData = () => {
+    setSummary({
+      Top: {
+        totalParts: 0,
+        totalPass: 0,
+        totalReject: 0,
+        rejectMeasurement: 0,
+        rejectDefects: 0,
+        passRate: 0
+      },
+      Middle: {
+        totalParts: 0,
+        totalPass: 0,
+        totalReject: 0,
+        rejectMeasurement: 0,
+        rejectDefects: 0,
+        passRate: 0
+      },
+      Bottom: {
+        totalParts: 0,
+        totalPass: 0,
+        totalReject: 0,
+        rejectMeasurement: 0,
+        rejectDefects: 0,
+        passRate: 0
+      }
+    });
+    setTableData({ Top: [], Middle: [], Bottom: [] });
+    setColumnDefects({
+      Top: Array(colCounts.Top)
+        .fill([])
+        .map(() => Array(5).fill([])),
+      Middle: Array(colCounts.Middle)
+        .fill([])
+        .map(() => Array(5).fill([])),
+      Bottom: Array(colCounts.Bottom)
+        .fill([])
+        .map(() => Array(5).fill([]))
+    });
+    setFilters({ panelName: "", side: "", direction: "", lw: "" });
+  };
+
   const resetTableData = () => {
     setCuttingTableNo("");
     setMarker("");
@@ -1539,6 +1585,8 @@ const CuttingPage = () => {
     setTotalBundleQty("");
     setBundleQtyCheck("");
     setTotalInspectionQty(0);
+    setCuttingByAuto(true); // Reset to default
+    setCuttingByManual(false);
     setSelectedPanel("");
     setSelectedSize("");
     setSelectedSerialLetter("");
@@ -1546,8 +1594,67 @@ const CuttingPage = () => {
     setAvailableSizes([]);
   };
 
-  const orderDetails =
-    color && moData ? moData.find((d) => d.EngColor === color) : null;
+  const collectMeasurementData = (
+    tab,
+    tableDataTab,
+    defectsTab,
+    tolerance,
+    numColumns
+  ) => {
+    const usedPanelIndices = [
+      ...new Set(
+        tableDataTab.filter((row) => row.isUsed).map((row) => row.panelIndex)
+      )
+    ];
+    return usedPanelIndices.map((panelIndex) => {
+      let totalMeasurementDefects = 0;
+      let totalDefectPcs = 0;
+      for (let colIndex = 0; colIndex < numColumns; colIndex++) {
+        const hasMeasurementDefect = tableDataTab
+          .filter((row) => row.panelIndex === panelIndex && row.isUsed)
+          .some((row) => {
+            const value = row.values[colIndex].decimal;
+            return (
+              value !== null && (value < tolerance.min || value > tolerance.max)
+            );
+          });
+        if (hasMeasurementDefect) totalMeasurementDefects++;
+        const hasDefects = defectsTab[colIndex][panelIndex - 1].length > 0;
+        if (hasDefects) totalDefectPcs++;
+      }
+      return {
+        panelIndex,
+        totalMeasurementDefects,
+        totalDefectPcs,
+        measurementPointData: tableDataTab
+          .filter((row) => row.panelIndex === panelIndex && row.isUsed)
+          .map((row) => ({
+            no: row.no,
+            measurementPointName: row.measurementPoint,
+            panelName: row.panelName,
+            side: row.panelSide,
+            direction: row.panelDirection,
+            property: row.measurementSide,
+            measurementValues: row.values.map((value, colIndex) => ({
+              partName: `${tab[0]}${colIndex + 1}`,
+              measurement: value.decimal,
+              status:
+                value.decimal !== null &&
+                (value.decimal < tolerance.min || value.decimal > tolerance.max)
+                  ? "Fail"
+                  : "Pass"
+            }))
+          })),
+        defectData: Array.from({ length: numColumns }, (_, colIndex) => ({
+          column: `${tab[0]}${colIndex + 1}`,
+          defects: defectsTab[colIndex][panelIndex - 1].map((d) => ({
+            defectName: d.defectName,
+            defectQty: d.count
+          }))
+        }))
+      };
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1569,51 +1676,166 @@ const CuttingPage = () => {
       });
       return;
     }
-    const report = {
-      cutting_report_id: Date.now(),
-      report_name: "Cutting Report",
-      emp_id: user?.emp_id || "Guest",
-      eng_name: user?.eng_name || "Guest",
-      inspection_date: inspectionDate.toLocaleDateString("en-US"),
-      mo_no: moNo,
-      lot_no: lotNo,
-      color: color,
-      table_no: tableNo,
-      cutting_table_l: cuttingTableL,
-      cutting_table_no: cuttingTableNo,
-      marker: marker,
-      plan_layer_qty: planLayerQty,
-      total_plan_pcs: totalPlanPcs,
-      actual_layers: actualLayers,
-      total_bundle_qty: parseInt(totalBundleQty),
-      bundle_qty_check: parseInt(bundleQtyCheck),
-      total_inspection_qty: totalInspectionQty,
-      panel: selectedPanel,
+
+    let cuttingtype = "";
+    if (cuttingByAuto && cuttingByManual) {
+      cuttingtype = "Auto & Manual";
+    } else if (cuttingByAuto) {
+      cuttingtype = "Auto";
+    } else if (cuttingByManual) {
+      cuttingtype = "Manual";
+    } else {
+      cuttingtype = "None"; // Optional: handle case where neither is selected
+    }
+
+    const inspectionData = {
       size: selectedSize,
-      serial_letter: selectedSerialLetter,
-      tolerance: tolerance,
-      measurement_data: summary,
-      marker_data: markerData,
-      table_data: tableData,
-      filters: filters,
-      column_defects: columnDefects,
-      order_details: orderDetails
-        ? {
-            customer_style: orderDetails.BuyerStyle,
-            buyer: orderDetails.Buyer,
-            order_qty: orderDetails.totalOrderQty
-          }
-        : null
+      serialLetter: selectedSerialLetter,
+      tolerance,
+      totalPcs: totalParts,
+      totalPass: totalPass,
+      totalReject: totalReject,
+      totalRejectMeasurement:
+        summary.Top.rejectMeasurement +
+        summary.Middle.rejectMeasurement +
+        summary.Bottom.rejectMeasurement,
+      totalRejectDefects:
+        summary.Top.rejectDefects +
+        summary.Middle.rejectDefects +
+        summary.Bottom.rejectDefects,
+      passRate:
+        totalParts > 0
+          ? parseFloat(((totalPass / totalParts) * 100).toFixed(2))
+          : 0,
+      pcsLocation: [
+        {
+          location: "Top",
+          pcs: summary.Top.totalParts,
+          pass: summary.Top.totalPass,
+          reject: summary.Top.totalReject,
+          rejectGarment: summary.Top.totalReject, // Assuming rejectGarment is same as totalReject
+          rejectMeasurement: summary.Top.rejectMeasurement,
+          passrate: summary.Top.passRate,
+          measurementData: collectMeasurementData(
+            "Top",
+            tableData.Top,
+            columnDefects.Top,
+            tolerance,
+            colCounts.Top
+          )
+        },
+        {
+          location: "Middle",
+          pcs: summary.Middle.totalParts,
+          pass: summary.Middle.totalPass,
+          reject: summary.Middle.totalReject,
+          rejectGarment: summary.Middle.totalReject,
+          rejectMeasurement: summary.Middle.rejectMeasurement,
+          passrate: summary.Middle.passRate,
+          measurementData: collectMeasurementData(
+            "Middle",
+            tableData.Middle,
+            columnDefects.Middle,
+            tolerance,
+            colCounts.Middle
+          )
+        },
+        {
+          location: "Bottom",
+          pcs: summary.Bottom.totalParts,
+          pass: summary.Bottom.totalPass,
+          reject: summary.Bottom.totalReject,
+          rejectGarment: summary.Bottom.totalReject,
+          rejectMeasurement: summary.Bottom.rejectMeasurement,
+          passrate: summary.Bottom.passRate,
+          measurementData: collectMeasurementData(
+            "Bottom",
+            tableData.Bottom,
+            columnDefects.Bottom,
+            tolerance,
+            colCounts.Bottom
+          )
+        }
+      ],
+      inspectionTime: new Date().toLocaleTimeString("en-US", { hour12: false })
     };
+
+    const report = {
+      inspectionDate: inspectionDate.toLocaleDateString("en-US"),
+      cutting_emp_id: user.emp_id,
+      cutting_emp_engName: user.eng_name,
+      cutting_emp_khName: user.kh_name,
+      cutting_emp_dept: user.dept_name,
+      cutting_emp_section: user.sect_name,
+      moNo,
+      lotNo,
+      color,
+      tableNo,
+      planLayerQty,
+      actualLayerQty: actualLayers,
+      totalPcs: totalPlanPcs,
+      cuttingtableLetter: cuttingTableL,
+      cuttingtableNo: cuttingTableNo,
+      marker,
+      markerRatio: markerData.map((data, index) => ({
+        index: index + 1,
+        markerSize: data.size,
+        ratio: data.markerRatio
+      })),
+      totalBundleQty: parseInt(totalBundleQty),
+      bundleQtyCheck: parseInt(bundleQtyCheck),
+      totalInspectionQty,
+      cuttingtype,
+      garmentType: selectedPanel,
+      inspectionData
+    };
+
+    // const report = {
+    //   cutting_report_id: Date.now(),
+    //   report_name: "Cutting Report",
+    //   emp_id: user?.emp_id || "Guest",
+    //   eng_name: user?.eng_name || "Guest",
+    //   inspection_date: inspectionDate.toLocaleDateString("en-US"),
+    //   mo_no: moNo,
+    //   lot_no: lotNo,
+    //   color: color,
+    //   table_no: tableNo,
+    //   cutting_table_l: cuttingTableL,
+    //   cutting_table_no: cuttingTableNo,
+    //   marker: marker,
+    //   plan_layer_qty: planLayerQty,
+    //   total_plan_pcs: totalPlanPcs,
+    //   actual_layers: actualLayers,
+    //   total_bundle_qty: parseInt(totalBundleQty),
+    //   bundle_qty_check: parseInt(bundleQtyCheck),
+    //   total_inspection_qty: totalInspectionQty,
+    //   panel: selectedPanel,
+    //   size: selectedSize,
+    //   serial_letter: selectedSerialLetter,
+    //   tolerance: tolerance,
+    //   measurement_data: summary,
+    //   marker_data: markerData,
+    //   table_data: tableData,
+    //   filters: filters,
+    //   column_defects: columnDefects,
+    //   order_details: orderDetails
+    //     ? {
+    //         customer_style: orderDetails.BuyerStyle,
+    //         buyer: orderDetails.Buyer,
+    //         order_qty: orderDetails.totalOrderQty
+    //       }
+    //     : null
+    // };
     try {
-      // Placeholder for API call
-      // await axios.post(`${API_BASE_URL}/api/save-cutting-report`, report);
+      //  API call
+      await axios.post(`${API_BASE_URL}/api/save-cutting-inspection`, report);
       Swal.fire({
         icon: "success",
         title: t("cutting.success"),
         text: t("cutting.dataSaved")
       });
-      resetForm();
+      resetMeasurementData(); // Reset only summary details and below
+      //resetForm();
     } catch (error) {
       console.error("Error saving Cutting data:", error);
       Swal.fire({
@@ -1623,6 +1845,9 @@ const CuttingPage = () => {
       });
     }
   };
+
+  const orderDetails =
+    color && moData ? moData.find((d) => d.EngColor === color) : null;
 
   const filteredMeasurementPoints = measurementPoints.filter(
     (point) => point.panel === selectedPanel
@@ -2048,6 +2273,35 @@ const CuttingPage = () => {
                       readOnly
                       className="mt-1 w-full p-2 border border-gray-300 rounded-lg bg-gray-100"
                     />
+                  </div>
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Cutting by
+                    </label>
+                    <div className="flex items-center space-x-4 mt-1">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={cuttingByAuto}
+                          onChange={(e) => setCuttingByAuto(e.target.checked)}
+                          className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                        />
+                        <label className="ml-2 text-sm text-gray-700">
+                          Auto
+                        </label>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={cuttingByManual}
+                          onChange={(e) => setCuttingByManual(e.target.checked)}
+                          className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                        />
+                        <label className="ml-2 text-sm text-gray-700">
+                          Manual
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className="mt-2 text-sm text-gray-600">

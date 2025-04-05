@@ -882,7 +882,7 @@ const MeasurementTable = ({
       {/* Defect Details */}
       <hr className="my-4 border-gray-300" />
       <h3 className="text-sm font-medium text-gray-600 mb-2">
-        Defect Details Across Panel Index
+        Defect Details Across Panel
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {paginatedPanelIndices.map((panelIndex) =>
@@ -891,18 +891,30 @@ const MeasurementTable = ({
               tab === "Top" ? "T" : tab === "Middle" ? "M" : "B"
             }${colIndex + 1}`;
             const defectsForPanel = defects[colIndex][panelIndex - 1] || [];
+            const isPanelUsed = tableData.some(
+              (row) => row.panelIndex === panelIndex && row.isUsed
+            );
             return (
               <div
                 key={`${colIndex}-${panelIndex}`}
-                className="p-2 bg-gray-100 rounded-lg"
+                className={`p-2 rounded-lg ${
+                  isPanelUsed ? "bg-gray-100" : "bg-gray-300 opacity-50"
+                }`}
+                //className="p-2 bg-gray-100 rounded-lg"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold">
-                    {colName} - Panel Index {panelIndex}
+                    {colName} - Panel {panelIndex}
                   </span>
                   <button
                     onClick={() => toggleDefectDropdown(colIndex, panelIndex)}
-                    className="p-1 bg-blue-500 text-white rounded-full hover:bg-blue-600"
+                    className={`p-1 rounded-full ${
+                      isPanelUsed
+                        ? "bg-blue-500 text-white hover:bg-blue-600"
+                        : "bg-gray-400 text-gray-600 cursor-not-allowed"
+                    }`}
+                    disabled={!isPanelUsed}
+                    //className="p-1 bg-blue-500 text-white rounded-full hover:bg-blue-600"
                   >
                     <AlertCircle className="w-4 h-4" />
                   </button>
@@ -921,7 +933,13 @@ const MeasurementTable = ({
                           defect.count - 1
                         )
                       }
-                      className="p-1 bg-gray-500 text-white rounded-full hover:bg-gray-600"
+                      className={`p-1 rounded-full ${
+                        isPanelUsed
+                          ? "bg-gray-500 text-white hover:bg-gray-600"
+                          : "bg-gray-400 text-gray-600 cursor-not-allowed"
+                      }`}
+                      disabled={!isPanelUsed}
+                      //className="p-1 bg-gray-500 text-white rounded-full hover:bg-gray-600"
                     >
                       <Minus className="w-4 h-4" />
                     </button>
@@ -940,7 +958,13 @@ const MeasurementTable = ({
                           defect.count + 1
                         )
                       }
-                      className="p-1 bg-gray-500 text-white rounded-full hover:bg-gray-600"
+                      className={`p-1 rounded-full ${
+                        isPanelUsed
+                          ? "bg-gray-500 text-white hover:bg-gray-600"
+                          : "bg-gray-400 text-gray-600 cursor-not-allowed"
+                      }`}
+                      disabled={!isPanelUsed}
+                      //className="p-1 bg-gray-500 text-white rounded-full hover:bg-gray-600"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -958,7 +982,11 @@ const MeasurementTable = ({
                         setDefects(updatedDefects);
                         calculateSummary(tableData, updatedDefects);
                       }}
-                      className="p-1 border border-gray-300 rounded text-sm flex-1"
+                      className={`p-1 border border-gray-300 rounded text-sm flex-1 ${
+                        !isPanelUsed ? "cursor-not-allowed bg-gray-200" : ""
+                      }`}
+                      disabled={!isPanelUsed}
+                      //className="p-1 border border-gray-300 rounded text-sm flex-1"
                     >
                       {cuttingDefects.map((d, i) => (
                         <option key={i} value={d.defectName}>
@@ -970,7 +998,13 @@ const MeasurementTable = ({
                       onClick={() =>
                         removeDefect(colIndex, panelIndex, defectIndex)
                       }
-                      className="p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                      className={`p-1 rounded-full ${
+                        isPanelUsed
+                          ? "bg-red-500 text-white hover:bg-red-600"
+                          : "bg-gray-400 text-gray-600 cursor-not-allowed"
+                      }`}
+                      disabled={!isPanelUsed}
+                      //className="p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -981,7 +1015,11 @@ const MeasurementTable = ({
                     onChange={(e) =>
                       handleDefectSelect(colIndex, panelIndex, e.target.value)
                     }
-                    className="mt-1 p-1 border border-gray-300 rounded w-full text-sm"
+                    className={`mt-1 p-1 border border-gray-300 rounded w-full text-sm ${
+                      !isPanelUsed ? "cursor-not-allowed bg-gray-200" : ""
+                    }`}
+                    disabled={!isPanelUsed}
+                    //className="mt-1 p-1 border border-gray-300 rounded w-full text-sm"
                   >
                     <option value="">Select Defect</option>
                     {cuttingDefects.map((defect, index) => (

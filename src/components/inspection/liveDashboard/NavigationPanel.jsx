@@ -28,6 +28,7 @@ const NavigationPanel = ({
   const menuItems = [
     { name: "Home", icon: <Home size={18} />, subMenus: [] }, // Add Home menu
     { name: "QC Inline Roving", icon: <Search size={16} />, subMenus: [] },
+    { name: "Cutting", icon: <Search size={16} />, subMenus: [] },
     { name: "QC 1 Dashboard", icon: <BarChart size={16} />, subMenus: [] },
     { name: "Order Data", icon: <Package size={18} />, subMenus: [] },
     { name: "Washing", icon: <Shirt size={18} />, subMenus: [] },
