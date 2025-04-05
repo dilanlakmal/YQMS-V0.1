@@ -540,10 +540,13 @@ const MeasurementTable = ({
     colIndex: null
   });
   const [showDefectDropdown, setShowDefectDropdown] = useState(
-    Array(numColumns).fill(false)
+    Array(numColumns)
+      .fill()
+      .map(() => Array(5).fill(false))
   );
+  const [currentPage, setCurrentPage] = useState(1);
+  const defectsPerPage = 1; // Changed to 1 for one panel index per page
 
-  // Filter measurement points based on filters and initialize table data
   useEffect(() => {
     const filteredPoints = measurementPoints.filter((point) => {
       return (
@@ -555,28 +558,21 @@ const MeasurementTable = ({
       );
     });
 
-    // Only reinitialize if the table data is empty, length differs, or numColumns changes
-    if (
-      tableData.length === 0 ||
-      tableData.length !== filteredPoints.length ||
-      (tableData.length > 0 && tableData[0].values.length !== numColumns)
-    ) {
-      const initialData = filteredPoints.map((point, index) => ({
+    if (tableData.length === 0) {
+      const initialData = measurementPoints.map((point, index) => ({
         no: index + 1,
         measurementPoint: point.pointName,
         panelName: point.panelName,
         panelSide: point.panelSide,
         panelDirection: point.panelDirection,
         measurementSide: point.measurementSide,
-        values: Array(numColumns).fill({ decimal: null, fraction: "" }),
+        panelIndex: point.panelIndex,
+        values: Array(numColumns).fill({ decimal: 0, fraction: "0" }),
         isUsed: true
       }));
       setTableData(initialData);
       calculateSummary(initialData, defects);
-    } else if (
-      tableData.length > 0 &&
-      tableData[0].values.length !== numColumns
-    ) {
+    } else if (tableData[0].values.length !== numColumns) {
       const updatedData = tableData.map((row) => {
         const currentValues = row.values;
         const newValues =
@@ -584,8 +580,8 @@ const MeasurementTable = ({
             ? [
                 ...currentValues,
                 ...Array(numColumns - currentValues.length).fill({
-                  decimal: null,
-                  fraction: ""
+                  decimal: 0,
+                  fraction: "0"
                 })
               ]
             : currentValues.slice(0, numColumns);
@@ -593,17 +589,11 @@ const MeasurementTable = ({
       });
       setTableData(updatedData);
       calculateSummary(updatedData, defects);
+    } else {
+      calculateSummary(tableData, defects);
     }
-  }, [
-    measurementPoints,
-    numColumns,
-    filters,
-    tableData,
-    setTableData,
-    defects
-  ]);
+  }, [measurementPoints, numColumns, filters, defects]);
 
-  // Handle cell value change
   const handleCellChange = (
     rowIndex,
     colIndex,
@@ -619,7 +609,6 @@ const MeasurementTable = ({
     calculateSummary(updatedData, defects);
   };
 
-  // Toggle row usage
   const toggleRowUsage = (rowIndex) => {
     const updatedData = [...tableData];
     updatedData[rowIndex].isUsed = !updatedData[rowIndex].isUsed;
@@ -627,41 +616,54 @@ const MeasurementTable = ({
     calculateSummary(updatedData, defects);
   };
 
-  // Calculate summary
-  const calculateSummary = (data, currentDefects) => {
-    const usedRows = data.filter((row) => row.isUsed);
-    const totalParts = numColumns; // Each column represents a part
-    const rejectMeasurementSet = new Set();
-    usedRows.forEach((row) => {
-      row.values.forEach((value, colIndex) => {
-        if (value.decimal !== null) {
-          const numValue = parseFloat(value.decimal);
-          if (
-            !isNaN(numValue) &&
-            (numValue < tolerance.min || numValue > tolerance.max)
-          ) {
-            rejectMeasurementSet.add(colIndex);
-          }
-        }
-      });
+  const togglePanelIndexUsage = (panelIndex) => {
+    const currentIsUsed = tableData.find(
+      (row) => row.panelIndex === panelIndex
+    )?.isUsed;
+    const newIsUsed = !currentIsUsed;
+    const updatedData = tableData.map((row) => {
+      if (row.panelIndex === panelIndex) {
+        return { ...row, isUsed: newIsUsed };
+      }
+      return row;
     });
+    setTableData(updatedData);
+    calculateSummary(updatedData, defects);
+  };
 
-    const rejectDefectsSet = new Set();
-    currentDefects.forEach((defectList, colIndex) => {
-      if (defectList.length > 0) {
-        rejectDefectsSet.add(colIndex);
+  const calculateSummary = (data, currentDefects) => {
+    const usedPanelIndices = [
+      ...new Set(data.filter((row) => row.isUsed).map((row) => row.panelIndex))
+    ];
+    const totalParts = numColumns * usedPanelIndices.length;
+
+    let rejectMeasurement = 0;
+    let rejectDefects = 0;
+    const rejectSet = new Set();
+
+    usedPanelIndices.forEach((panelIndex) => {
+      for (let colIndex = 0; colIndex < numColumns; colIndex++) {
+        const hasDefects = currentDefects[colIndex][panelIndex - 1]?.length > 0;
+        const measurements = data
+          .filter((row) => row.isUsed && row.panelIndex === panelIndex)
+          .map((row) => row.values[colIndex].decimal);
+
+        const anyMeasurementOutOfTolerance = measurements.some(
+          (value) =>
+            value !== null && (value < tolerance.min || value > tolerance.max)
+        );
+
+        if (hasDefects || anyMeasurementOutOfTolerance) {
+          const partKey = `${colIndex}-${panelIndex}`;
+          rejectSet.add(partKey);
+          if (hasDefects) rejectDefects++;
+          if (anyMeasurementOutOfTolerance) rejectMeasurement++;
+        }
       }
     });
 
-    const rejectSet = new Set([...rejectMeasurementSet, ...rejectDefectsSet]);
     const totalReject = rejectSet.size;
-    // Initially, totalPass = totalParts if no measurements or defects; otherwise, Parts - Reject
-    const hasMeasurementsOrDefects =
-      usedRows.some((row) => row.values.some((v) => v.decimal !== null)) ||
-      currentDefects.some((d) => d.length > 0);
-    const totalPass = hasMeasurementsOrDefects
-      ? totalParts - totalReject
-      : totalParts;
+    const totalPass = totalParts - totalReject;
     const passRate =
       totalParts > 0 ? ((totalPass / totalParts) * 100).toFixed(2) : 0;
 
@@ -669,8 +671,8 @@ const MeasurementTable = ({
       totalParts,
       totalPass,
       totalReject,
-      rejectMeasurement: rejectMeasurementSet.size,
-      rejectDefects: rejectDefectsSet.size,
+      rejectMeasurement,
+      rejectDefects,
       passRate
     });
   };
@@ -679,6 +681,7 @@ const MeasurementTable = ({
     const prefix = tab === "Top" ? "T" : tab === "Middle" ? "M" : "B";
     const headers = [
       "No",
+      "Panel Index",
       "Measurement Point",
       "Panel Name",
       "Side",
@@ -692,23 +695,39 @@ const MeasurementTable = ({
     return headers;
   };
 
-  const handleCellClick = (rowIndex, colIndex) => {
-    if (!tableData[rowIndex].isUsed) return;
-    setCurrentCell({ rowIndex, colIndex });
-    setShowNumPad(true);
+  const handleCellClick = (filteredRowIndex, colIndex) => {
+    const row = filteredTableData[filteredRowIndex];
+    if (!row.isUsed) return;
+
+    // Find the original index in tableData
+    const originalRowIndex = tableData.findIndex(
+      (r) =>
+        r.no === row.no &&
+        r.measurementPoint === row.measurementPoint &&
+        r.panelIndex === row.panelIndex
+    );
+
+    if (originalRowIndex !== -1) {
+      setCurrentCell({ rowIndex: originalRowIndex, colIndex });
+      setShowNumPad(true);
+    }
   };
 
-  const toggleDefectDropdown = (colIndex) => {
-    const newShowDefectDropdown = [...showDefectDropdown];
-    newShowDefectDropdown[colIndex] = !newShowDefectDropdown[colIndex];
-    setShowDefectDropdown(newShowDefectDropdown);
+  const toggleDefectDropdown = (colIndex, panelIndex) => {
+    setShowDefectDropdown((prev) => {
+      const newShowDefectDropdown = prev.map((col) => [...col]);
+      newShowDefectDropdown[colIndex][panelIndex - 1] =
+        !newShowDefectDropdown[colIndex][panelIndex - 1];
+      return newShowDefectDropdown;
+    });
   };
 
-  const handleDefectSelect = (colIndex, value) => {
-    const updatedDefects = [...defects];
+  const handleDefectSelect = (colIndex, panelIndex, value) => {
+    const updatedDefects = defects.map((col) => col.map((panel) => [...panel]));
     const defect = cuttingDefects.find((d) => d.defectName === value);
-    updatedDefects[colIndex] = updatedDefects[colIndex] || [];
-    updatedDefects[colIndex].push({
+    updatedDefects[colIndex][panelIndex - 1] =
+      updatedDefects[colIndex][panelIndex - 1] || [];
+    updatedDefects[colIndex][panelIndex - 1].push({
       defectName: defect.defectName,
       defectNameEng: defect.defectNameEng,
       defectNameKhmer: defect.defectNameKhmer,
@@ -716,23 +735,52 @@ const MeasurementTable = ({
       count: 1
     });
     setDefects(updatedDefects);
-    toggleDefectDropdown(colIndex);
+    toggleDefectDropdown(colIndex, panelIndex);
     calculateSummary(tableData, updatedDefects);
   };
 
-  const removeDefect = (colIndex, defectIndex) => {
-    const updatedDefects = [...defects];
-    updatedDefects[colIndex].splice(defectIndex, 1);
+  const removeDefect = (colIndex, panelIndex, defectIndex) => {
+    const updatedDefects = defects.map((col) => col.map((panel) => [...panel]));
+    updatedDefects[colIndex][panelIndex - 1].splice(defectIndex, 1);
     setDefects(updatedDefects);
     calculateSummary(tableData, updatedDefects);
   };
 
-  const updateDefectCount = (colIndex, defectIndex, newCount) => {
-    const updatedDefects = [...defects];
-    updatedDefects[colIndex][defectIndex].count = Math.max(1, newCount);
+  const updateDefectCount = (colIndex, panelIndex, defectIndex, newCount) => {
+    const updatedDefects = defects.map((col) => col.map((panel) => [...panel]));
+    updatedDefects[colIndex][panelIndex - 1][defectIndex].count = Math.max(
+      1,
+      newCount
+    );
     setDefects(updatedDefects);
     calculateSummary(tableData, updatedDefects);
   };
+
+  const filteredTableData = tableData.filter((row) => {
+    return (
+      (filters.panelName === "" || row.panelName === filters.panelName) &&
+      (filters.side === "" || row.panelSide === filters.side) &&
+      (filters.direction === "" || row.panelDirection === filters.direction) &&
+      (filters.lw === "" || row.measurementSide === filters.lw)
+    );
+  });
+
+  const visiblePanelIndices = [
+    ...new Set(
+      filteredTableData.filter((row) => row.isUsed).map((row) => row.panelIndex)
+    )
+  ].sort((a, b) => a - b);
+
+  const allPanelIndices = Array.from({ length: 5 }, (_, i) => i + 1);
+  const defectPanelIndices =
+    filters.panelName === "" &&
+    filters.side === "" &&
+    filters.direction === "" &&
+    filters.lw === ""
+      ? allPanelIndices
+      : visiblePanelIndices;
+  const totalDefectPages = defectPanelIndices.length; // One page per panel index
+  const paginatedPanelIndices = [defectPanelIndices[currentPage - 1]]; // Show only one panel index per page
 
   return (
     <div className="mt-4">
@@ -752,15 +800,24 @@ const MeasurementTable = ({
             </tr>
           </thead>
           <tbody>
-            {tableData.map((row, rowIndex) => (
+            {filteredTableData.map((row, filteredRowIndex) => (
               <tr
-                key={rowIndex}
+                key={filteredRowIndex}
                 className={`${
                   row.isUsed ? "bg-green-50" : "bg-red-50 opacity-50"
                 }`}
               >
                 <td className="border border-gray-300 p-2 text-center bg-white text-sm">
                   {row.no}
+                </td>
+                <td className="border border-gray-300 p-2 text-center bg-white text-sm">
+                  {row.panelIndex}
+                  <button
+                    onClick={() => togglePanelIndexUsage(row.panelIndex)}
+                    className="ml-2 text-red-600 hover:text-red-800"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </td>
                 <td className="border border-gray-300 p-2 bg-white text-sm">
                   {row.measurementPoint}
@@ -781,7 +838,7 @@ const MeasurementTable = ({
                   <td
                     key={colIndex}
                     className="border border-gray-300 p-0 text-center text-sm min-w-[48px] sm:min-w-[80px]"
-                    onClick={() => handleCellClick(rowIndex, colIndex)}
+                    onClick={() => handleCellClick(filteredRowIndex, colIndex)}
                   >
                     <input
                       type="text"
@@ -802,7 +859,7 @@ const MeasurementTable = ({
                 ))}
                 <td className="border border-gray-300 p-2 text-center">
                   <button
-                    onClick={() => toggleRowUsage(rowIndex)}
+                    onClick={() => toggleRowUsage(filteredRowIndex)}
                     className={`${
                       row.isUsed
                         ? "text-green-600 hover:text-green-800"
@@ -824,98 +881,146 @@ const MeasurementTable = ({
 
       {/* Defect Details */}
       <hr className="my-4 border-gray-300" />
-      <h3 className="text-sm font-medium text-gray-600 mb-2">Defect Details</h3>
+      <h3 className="text-sm font-medium text-gray-600 mb-2">
+        Defect Details Across Panel Index
+      </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {Array.from({ length: numColumns }, (_, colIndex) => {
-          const colName = `${
-            tab === "Top" ? "T" : tab === "Middle" ? "M" : "B"
-          }${colIndex + 1}`;
-          const columnDefects = defects[colIndex] || [];
-          return (
-            <div key={colIndex} className="p-2 bg-gray-100 rounded-lg">
-              <div className="flex items-center space-x-2 mb-2">
-                <span className="font-semibold">{colName}:</span>
-                <button
-                  onClick={() => toggleDefectDropdown(colIndex)}
-                  className="p-1 bg-blue-500 text-white rounded-full hover:bg-blue-600"
-                >
-                  <AlertCircle className="w-5 h-5" />
-                </button>
-              </div>
-              {columnDefects.map((defect, defectIndex) => (
-                <div
-                  key={defectIndex}
-                  className="flex items-center space-x-2 mb-1"
-                >
+        {paginatedPanelIndices.map((panelIndex) =>
+          Array.from({ length: numColumns }, (_, colIndex) => {
+            const colName = `${
+              tab === "Top" ? "T" : tab === "Middle" ? "M" : "B"
+            }${colIndex + 1}`;
+            const defectsForPanel = defects[colIndex][panelIndex - 1] || [];
+            return (
+              <div
+                key={`${colIndex}-${panelIndex}`}
+                className="p-2 bg-gray-100 rounded-lg"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold">
+                    {colName} - Panel Index {panelIndex}
+                  </span>
                   <button
-                    onClick={() =>
-                      updateDefectCount(colIndex, defectIndex, defect.count - 1)
-                    }
-                    className="p-1 bg-gray-500 text-white rounded-full hover:bg-gray-600"
+                    onClick={() => toggleDefectDropdown(colIndex, panelIndex)}
+                    className="p-1 bg-blue-500 text-white rounded-full hover:bg-blue-600"
                   >
-                    <Minus className="w-4 h-4" />
+                    <AlertCircle className="w-4 h-4" />
                   </button>
-                  <input
-                    type="number"
-                    value={defect.count}
-                    readOnly
-                    className="w-12 p-1 text-center border border-gray-300 rounded text-sm"
-                  />
-                  <button
-                    onClick={() =>
-                      updateDefectCount(colIndex, defectIndex, defect.count + 1)
-                    }
-                    className="p-1 bg-gray-500 text-white rounded-full hover:bg-gray-600"
+                </div>
+                {defectsForPanel.map((defect, defectIndex) => (
+                  <div
+                    key={defectIndex}
+                    className="flex items-center space-x-2 mb-1"
                   >
-                    <Plus className="w-4 h-4" />
-                  </button>
+                    <button
+                      onClick={() =>
+                        updateDefectCount(
+                          colIndex,
+                          panelIndex,
+                          defectIndex,
+                          defect.count - 1
+                        )
+                      }
+                      className="p-1 bg-gray-500 text-white rounded-full hover:bg-gray-600"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <input
+                      type="number"
+                      value={defect.count}
+                      readOnly
+                      className="w-12 p-1 text-center border border-gray-300 rounded text-sm"
+                    />
+                    <button
+                      onClick={() =>
+                        updateDefectCount(
+                          colIndex,
+                          panelIndex,
+                          defectIndex,
+                          defect.count + 1
+                        )
+                      }
+                      className="p-1 bg-gray-500 text-white rounded-full hover:bg-gray-600"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                    <select
+                      value={defect.defectName}
+                      onChange={(e) => {
+                        const updatedDefects = defects.map((col) =>
+                          col.map((panel) => [...panel])
+                        );
+                        const newDefect = cuttingDefects.find(
+                          (d) => d.defectName === e.target.value
+                        );
+                        updatedDefects[colIndex][panelIndex - 1][defectIndex] =
+                          { ...newDefect, count: defect.count };
+                        setDefects(updatedDefects);
+                        calculateSummary(tableData, updatedDefects);
+                      }}
+                      className="p-1 border border-gray-300 rounded text-sm flex-1"
+                    >
+                      {cuttingDefects.map((d, i) => (
+                        <option key={i} value={d.defectName}>
+                          {d.defectNameEng} ({d.defectNameKhmer})
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() =>
+                        removeDefect(colIndex, panelIndex, defectIndex)
+                      }
+                      className="p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {showDefectDropdown[colIndex][panelIndex - 1] && (
                   <select
-                    value={defect.defectName}
-                    onChange={(e) => {
-                      const updatedDefects = [...defects];
-                      const newDefect = cuttingDefects.find(
-                        (d) => d.defectName === e.target.value
-                      );
-                      updatedDefects[colIndex][defectIndex] = {
-                        ...newDefect,
-                        count: defect.count
-                      };
-                      setDefects(updatedDefects);
-                      calculateSummary(tableData, updatedDefects);
-                    }}
-                    className="p-1 border border-gray-300 rounded text-sm flex-1"
+                    onChange={(e) =>
+                      handleDefectSelect(colIndex, panelIndex, e.target.value)
+                    }
+                    className="mt-1 p-1 border border-gray-300 rounded w-full text-sm"
                   >
-                    {cuttingDefects.map((d, i) => (
-                      <option key={i} value={d.defectName}>
-                        {d.defectNameEng} ({d.defectNameKhmer})
+                    <option value="">Select Defect</option>
+                    {cuttingDefects.map((defect, index) => (
+                      <option key={index} value={defect.defectName}>
+                        {defect.defectNameEng} ({defect.defectNameKhmer})
                       </option>
                     ))}
                   </select>
-                  <button
-                    onClick={() => removeDefect(colIndex, defectIndex)}
-                    className="p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-              {showDefectDropdown[colIndex] && (
-                <select
-                  onChange={(e) => handleDefectSelect(colIndex, e.target.value)}
-                  className="mt-1 p-1 border border-gray-300 rounded w-full text-sm"
-                >
-                  <option value="">Select Defect</option>
-                  {cuttingDefects.map((defect, index) => (
-                    <option key={index} value={defect.defectName}>
-                      {defect.defectNameEng} ({defect.defectNameKhmer})
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          );
-        })}
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
+
+      {/* Pagination Controls */}
+      {totalDefectPages > 1 && (
+        <div className="flex justify-center mt-4 space-x-2">
+          <button
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span className="px-3 py-1">
+            Page {currentPage} of {totalDefectPages}
+          </span>
+          <button
+            onClick={() =>
+              setCurrentPage((prev) => Math.min(prev + 1, totalDefectPages))
+            }
+            disabled={currentPage === totalDefectPages}
+            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       {/* Measurement NumPad */}
       {showNumPad && currentCell.rowIndex !== null && (

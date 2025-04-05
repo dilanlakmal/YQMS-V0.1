@@ -1196,28 +1196,28 @@ const CuttingPage = () => {
 
   const [summary, setSummary] = useState({
     Top: {
-      totalParts: 5,
-      totalPass: 5,
+      totalParts: 0,
+      totalPass: 0,
       totalReject: 0,
       rejectMeasurement: 0,
       rejectDefects: 0,
-      passRate: 100
+      passRate: 0
     },
     Middle: {
-      totalParts: 5,
-      totalPass: 5,
+      totalParts: 0,
+      totalPass: 0,
       totalReject: 0,
       rejectMeasurement: 0,
       rejectDefects: 0,
-      passRate: 100
+      passRate: 0
     },
     Bottom: {
-      totalParts: 5,
-      totalPass: 5,
+      totalParts: 0,
+      totalPass: 0,
       totalReject: 0,
       rejectMeasurement: 0,
       rejectDefects: 0,
-      passRate: 100
+      passRate: 0
     }
   });
 
@@ -1230,13 +1230,13 @@ const CuttingPage = () => {
   const [columnDefects, setColumnDefects] = useState({
     Top: Array(5)
       .fill([])
-      .map(() => []),
+      .map(() => Array(5).fill([])), // 5 columns, each with 5 panel indices
     Middle: Array(5)
       .fill([])
-      .map(() => []),
+      .map(() => Array(5).fill([])),
     Bottom: Array(5)
       .fill([])
-      .map(() => [])
+      .map(() => Array(5).fill([]))
   });
 
   const [moData, setMoData] = useState(null);
@@ -1491,41 +1491,41 @@ const CuttingPage = () => {
     setColCounts({ Top: 5, Middle: 5, Bottom: 5 });
     setSummary({
       Top: {
-        totalParts: 5,
-        totalPass: 5,
+        totalParts: 0,
+        totalPass: 0,
         totalReject: 0,
         rejectMeasurement: 0,
         rejectDefects: 0,
-        passRate: 100
+        passRate: 0
       },
       Middle: {
-        totalParts: 5,
-        totalPass: 5,
+        totalParts: 0,
+        totalPass: 0,
         totalReject: 0,
         rejectMeasurement: 0,
         rejectDefects: 0,
-        passRate: 100
+        passRate: 0
       },
       Bottom: {
-        totalParts: 5,
-        totalPass: 5,
+        totalParts: 0,
+        totalPass: 0,
         totalReject: 0,
         rejectMeasurement: 0,
         rejectDefects: 0,
-        passRate: 100
+        passRate: 0
       }
     });
     setTableData({ Top: [], Middle: [], Bottom: [] });
     setColumnDefects({
       Top: Array(5)
         .fill([])
-        .map(() => []),
+        .map(() => Array(5).fill([])),
       Middle: Array(5)
         .fill([])
-        .map(() => []),
+        .map(() => Array(5).fill([])),
       Bottom: Array(5)
         .fill([])
-        .map(() => [])
+        .map(() => Array(5).fill([]))
     });
     setFilters({ panelName: "", side: "", direction: "", lw: "" });
   };
@@ -1648,30 +1648,29 @@ const CuttingPage = () => {
     setColCounts((prev) => ({ ...prev, [tab]: newCount }));
     setColumnDefects((prev) => {
       const currentDefects = prev[tab];
-      const newDefects = Array(newCount).fill([]);
+      const newDefects = Array(newCount)
+        .fill([])
+        .map(() => Array(5).fill([]));
       for (let i = 0; i < Math.min(currentDefects.length, newCount); i++) {
         newDefects[i] = currentDefects[i];
       }
       return { ...prev, [tab]: newDefects };
     });
-    setSummary((prev) => ({
-      ...prev,
-      [tab]: { ...prev[tab], totalParts: newCount, totalPass: newCount }
-    }));
+    // Summary will be recalculated by MeasurementTable
   };
 
   const updateSummary = (tab, data) => {
-    setSummary((prev) => ({
-      ...prev,
-      [tab]: data
-    }));
+    setSummary((prev) => ({ ...prev, [tab]: data }));
   };
 
   const updateTableData = (tab, data) => {
     setTableData((prev) => ({ ...prev, [tab]: data }));
   };
 
-  const totalParts = colCounts.Top + colCounts.Middle + colCounts.Bottom;
+  const totalParts =
+    summary.Top.totalParts +
+    summary.Middle.totalParts +
+    summary.Bottom.totalParts;
   const totalPass =
     summary.Top.totalPass + summary.Middle.totalPass + summary.Bottom.totalPass;
   const totalReject =
@@ -2064,44 +2063,7 @@ const CuttingPage = () => {
                       value={selectedPanel}
                       onChange={(e) => {
                         setSelectedPanel(e.target.value);
-                        setTableData({ Top: [], Middle: [], Bottom: [] }); // Reset table data on panel change
-                        setColumnDefects({
-                          Top: Array(colCounts.Top)
-                            .fill([])
-                            .map(() => []),
-                          Middle: Array(colCounts.Middle)
-                            .fill([])
-                            .map(() => []),
-                          Bottom: Array(colCounts.Bottom)
-                            .fill([])
-                            .map(() => [])
-                        });
-                        setSummary({
-                          Top: {
-                            totalParts: colCounts.Top,
-                            totalPass: colCounts.Top,
-                            totalReject: 0,
-                            rejectMeasurement: 0,
-                            rejectDefects: 0,
-                            passRate: 100
-                          },
-                          Middle: {
-                            totalParts: colCounts.Middle,
-                            totalPass: colCounts.Middle,
-                            totalReject: 0,
-                            rejectMeasurement: 0,
-                            rejectDefects: 0,
-                            passRate: 100
-                          },
-                          Bottom: {
-                            totalParts: colCounts.Bottom,
-                            totalPass: colCounts.Bottom,
-                            totalReject: 0,
-                            rejectMeasurement: 0,
-                            rejectDefects: 0,
-                            passRate: 100
-                          }
-                        });
+                        // Do not reset tableData or columnDefects here to persist data
                       }}
                       className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
                     >
