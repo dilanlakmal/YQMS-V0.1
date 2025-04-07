@@ -1,76 +1,35 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../config";
 import { useTranslation } from "react-i18next";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+import ReactPaginate from "react-paginate";
+import CuttingReportFilterPane from "../cutting/CuttingReportFilterPane";
+import CuttingReportOrderDetails from "../cutting/CuttingReportOrderDetails";
+import CuttingReportSummaryCard from "../cutting/CuttingReportSummaryCard";
+import CuttingReportMeasurementTable from "../cutting/CuttingReportMeasurementTable";
+import CuttingReportDefects from "../cutting/CuttingReportDefects";
+import { measurementPoints } from "../../../constants/cuttingmeasurement";
 
 const CuttingReport = () => {
   const { t } = useTranslation();
   const [filters, setFilters] = useState({
-    startDate: null,
+    startDate: new Date(), // Default to today
     endDate: null,
     moNo: "",
     lotNo: "",
+    buyer: "",
     color: "",
     tableNo: ""
   });
-  const [reportData, setReportData] = useState({
-    totalPcs: 0,
-    totalPass: 0,
-    totalReject: 0,
-    totalRejectMeasurement: 0,
-    totalRejectDefects: 0,
-    totalInspectionQty: 0
-  });
-  const [moNoOptions, setMoNoOptions] = useState([]);
-  const [filterOptions, setFilterOptions] = useState({
-    lotNos: [],
-    colors: [],
-    tableNos: []
-  });
-  const [showMoNoDropdown, setShowMoNoDropdown] = useState(false);
-  const moNoRef = useRef(null);
+  const [reportData, setReportData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Fetch initial MO Nos
-  useEffect(() => {
-    fetchMoNos();
-  }, []);
-
-  // Fetch report data and filter options when filters change
+  // Fetch report data when filters or page changes
   useEffect(() => {
     fetchReportData();
-    if (filters.moNo) fetchFilterOptions();
-  }, [filters]);
-
-  const fetchMoNos = async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/cutting-inspection-mo-nos`
-      );
-      setMoNoOptions(response.data);
-    } catch (error) {
-      console.error("Error fetching MO Nos:", error);
-    }
-  };
-
-  const fetchFilterOptions = async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/cutting-inspection-filter-options`,
-        {
-          params: { moNo: filters.moNo }
-        }
-      );
-      setFilterOptions({
-        lotNos: response.data.lotNos,
-        colors: response.data.colors,
-        tableNos: response.data.tableNos
-      });
-    } catch (error) {
-      console.error("Error fetching filter options:", error);
-    }
-  };
+  }, [filters, currentPage]);
 
   const fetchReportData = async () => {
     try {
@@ -79,288 +38,225 @@ const CuttingReport = () => {
         endDate: filters.endDate ? formatDate(filters.endDate) : "",
         moNo: filters.moNo,
         lotNo: filters.lotNo,
+        buyer: filters.buyer,
         color: filters.color,
-        tableNo: filters.tableNo
+        tableNo: filters.tableNo,
+        page: currentPage,
+        limit: 1 // One combination per page
       };
       const response = await axios.get(
-        `${API_BASE_URL}/api/cutting-inspection-report`,
+        `${API_BASE_URL}/api/cutting-inspection-detailed-report`,
         { params }
       );
-      setReportData(response.data);
+      setReportData(response.data.data);
+      setTotalPages(response.data.totalPages);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error("Error fetching cutting report data:", error);
-      setReportData({
-        totalPcs: 0,
-        totalPass: 0,
-        totalReject: 0,
-        totalRejectMeasurement: 0,
-        totalRejectDefects: 0,
-        totalInspectionQty: 0
-      });
+      setReportData([]);
+      setTotalPages(0);
     }
   };
 
-  // Format Date object to MM/DD/YYYY without leading zeros
   const formatDate = (date) => {
     if (!date) return "";
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
+    const month = ("0" + (date.getMonth() + 1)).slice(-2);
+    const day = ("0" + date.getDate()).slice(-2);
     const year = date.getFullYear();
-    return `${month}/${day}/${year}`; // e.g., "4/5/2025"
+    return `${month}/${day}/${year}`; // e.g., "04/05/2025"
   };
 
-  // Handle filter changes
-  const handleFilterChange = (key, value) => {
-    setFilters((prev) => {
-      const newFilters = { ...prev, [key]: value };
-      // Reset dependent filters when MO No changes
-      if (key === "moNo") {
-        newFilters.lotNo = "";
-        newFilters.color = "";
-        newFilters.tableNo = "";
-      }
-      return newFilters;
-    });
-    if (key === "moNo") {
-      setShowMoNoDropdown(false);
-    }
+  const handlePageClick = (data) => {
+    setCurrentPage(data.selected);
   };
 
-  // Handle MO No input for dropdown
-  const handleMoNoInput = (e) => {
-    const value = e.target.value;
-    setFilters((prev) => ({ ...prev, moNo: value }));
-    setShowMoNoDropdown(true);
-  };
+  // Function to get panelIndexName based on garmentType and panelIndex
+  const getPanelIndexName = (garmentType, panelIndex) => {
+    if (!garmentType || !panelIndex) return `Panel Index: ${panelIndex}`;
 
-  // Handle click outside to close dropdown
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (moNoRef.current && !moNoRef.current.contains(event.target)) {
-        setShowMoNoDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    // Find matching measurement points for the garmentType (case-insensitive)
+    const matchingPoints = measurementPoints.find(
+      (point) => point.panel.toLowerCase() === garmentType.toLowerCase()
+    );
 
-  // Calculate Pass Rate
-  const passRate =
-    reportData.totalPcs > 0
-      ? ((reportData.totalPass / reportData.totalPcs) * 100).toFixed(2)
-      : "0.00";
+    if (!matchingPoints) return `Panel Index: ${panelIndex}`;
 
-  // Determine Result based on AQL standards
-  const getResult = () => {
-    const { totalReject, totalInspectionQty } = reportData;
-    if (totalInspectionQty === 0) return "N/A";
+    // Find the first matching panelIndex and get its panelIndexName
+    const matchingPoint = measurementPoints.find(
+      (point) =>
+        point.panel.toLowerCase() === garmentType.toLowerCase() &&
+        point.panelIndex === panelIndex
+    );
 
-    if (totalInspectionQty <= 75) {
-      return totalReject <= 1 ? "Pass" : "Fail";
-    } else if (totalInspectionQty <= 135) {
-      return totalReject <= 3 ? "Pass" : "Fail";
-    } else if (totalInspectionQty <= 210) {
-      return totalReject <= 5 ? "Pass" : "Fail";
-    } else if (totalInspectionQty <= 300) {
-      return totalReject <= 7 ? "Pass" : "Fail";
-    }
-    return totalReject <= 7 ? "Pass" : "Fail"; // Default, extend as needed
+    return matchingPoint
+      ? matchingPoint.panelIndexName
+      : `Panel Index: ${panelIndex}`;
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">
+    <div className="p-4 bg-gray-100 min-h-screen">
+      <div className="max-w-8xl mx-auto">
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-6 bg-gradient-to-r from-blue-500 to-blue-700 text-white py-4 rounded-t-lg">
           {t("cuttingReport.title")}
         </h1>
 
         {/* Filter Pane */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-700 mb-4">
-            {t("cuttingReport.filters")}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {/* Start Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                {t("cuttingReport.startDate")}
-              </label>
-              <DatePicker
-                selected={filters.startDate}
-                onChange={(date) => handleFilterChange("startDate", date)}
-                dateFormat="MM/dd/yyyy"
-                className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                placeholderText="Select Start Date"
-              />
-            </div>
-            {/* End Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                {t("cuttingReport.endDate")}
-              </label>
-              <DatePicker
-                selected={filters.endDate}
-                onChange={(date) => handleFilterChange("endDate", date)}
-                dateFormat="MM/dd/yyyy"
-                className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                placeholderText="Select End Date"
-              />
-            </div>
-            {/* MO No with Dropdown */}
-            <div ref={moNoRef} className="relative">
-              <label className="block text-sm font-medium text-gray-700">
-                {t("cuttingReport.moNo")}
-              </label>
-              <input
-                type="text"
-                value={filters.moNo}
-                onChange={handleMoNoInput}
-                className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                placeholder="Enter MO No"
-              />
-              {showMoNoDropdown && (
-                <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-40 overflow-y-auto">
-                  {moNoOptions
-                    .filter((mo) =>
-                      mo.toLowerCase().includes(filters.moNo.toLowerCase())
-                    )
-                    .map((mo) => (
-                      <li
-                        key={mo}
-                        onClick={() => handleFilterChange("moNo", mo)}
-                        className="p-2 hover:bg-gray-100 cursor-pointer"
-                      >
-                        {mo}
-                      </li>
-                    ))}
-                </ul>
-              )}
-            </div>
-            {/* Lot No Dropdown */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                {t("cuttingReport.lotNo")}
-              </label>
-              <select
-                value={filters.lotNo}
-                onChange={(e) => handleFilterChange("lotNo", e.target.value)}
-                className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                disabled={!filters.moNo}
-              >
-                <option value="">{t("cuttingReport.selectLotNo")}</option>
-                {filterOptions.lotNos.map((lot) => (
-                  <option key={lot} value={lot}>
-                    {lot}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {/* Color Dropdown */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                {t("cuttingReport.color")}
-              </label>
-              <select
-                value={filters.color}
-                onChange={(e) => handleFilterChange("color", e.target.value)}
-                className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                disabled={!filters.moNo}
-              >
-                <option value="">{t("cuttingReport.selectColor")}</option>
-                {filterOptions.colors.map((color) => (
-                  <option key={color} value={color}>
-                    {color}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {/* Table No Dropdown */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                {t("cuttingReport.tableNo")}
-              </label>
-              <select
-                value={filters.tableNo}
-                onChange={(e) => handleFilterChange("tableNo", e.target.value)}
-                className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                disabled={!filters.moNo}
-              >
-                <option value="">{t("cuttingReport.selectTableNo")}</option>
-                {filterOptions.tableNos.map((table) => (
-                  <option key={table} value={table}>
-                    {table}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
+        <CuttingReportFilterPane
+          filters={filters}
+          setFilters={setFilters}
+          setCurrentPage={setCurrentPage}
+          lastUpdated={lastUpdated}
+        />
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-6">
-          <div className="bg-white rounded-lg shadow-md p-4 text-center">
-            <h3 className="text-lg font-semibold text-gray-700">
-              {t("cuttingReport.totalPcs")}
-            </h3>
-            <p className="text-2xl font-bold text-blue-600">
-              {reportData.totalPcs}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-4 text-center">
-            <h3 className="text-lg font-semibold text-gray-700">
-              {t("cuttingReport.passPcs")}
-            </h3>
-            <p className="text-2xl font-bold text-green-600">
-              {reportData.totalPass}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-4 text-center">
-            <h3 className="text-lg font-semibold text-gray-700">
-              {t("cuttingReport.rejectPcs")}
-            </h3>
-            <p className="text-2xl font-bold text-red-600">
-              {reportData.totalReject}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-4 text-center">
-            <h3 className="text-lg font-semibold text-gray-700">
-              {t("cuttingReport.measurementDefects")}
-            </h3>
-            <p className="text-2xl font-bold text-orange-600">
-              {reportData.totalRejectMeasurement}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-4 text-center">
-            <h3 className="text-lg font-semibold text-gray-700">
-              {t("cuttingReport.physicalDefects")}
-            </h3>
-            <p className="text-2xl font-bold text-purple-600">
-              {reportData.totalRejectDefects}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-4 text-center">
-            <h3 className="text-lg font-semibold text-gray-700">
-              {t("cuttingReport.passRate")}
-            </h3>
-            <p className="text-2xl font-bold text-teal-600">{passRate}%</p>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-4 text-center">
-            <h3 className="text-lg font-semibold text-gray-700">
-              {t("cuttingReport.result")}
-            </h3>
-            <p
-              className={`text-2xl font-bold ${
-                getResult() === "Pass"
-                  ? "text-green-600"
-                  : getResult() === "Fail"
-                  ? "text-red-600"
-                  : "text-gray-600"
-              }`}
-            >
-              {getResult()}
-            </p>
-          </div>
-        </div>
+        {/* Paginated Report */}
+        {reportData.length > 0 ? (
+          reportData.map((data, index) => (
+            <div key={index} className="mb-8">
+              {/* Order Details, Inspection Details, Marker Data */}
+              <div className="mb-4">
+                <CuttingReportOrderDetails data={data} />
+              </div>
+
+              {/* Combined Section: Summary, Inspected Sample Details, Measurement Tables, Defects */}
+              <div className="bg-white p-4 rounded-lg shadow-md">
+                {/* Summary Data */}
+                <CuttingReportSummaryCard summary={data.summary} />
+
+                {/* Inspected Sample Details */}
+                {data.inspectionData.map((sizeData, idx) => (
+                  <div key={idx} className="mt-6">
+                    <div className="mb-4">
+                      <h3 className="text-sm font-semibold mb-2">
+                        Inspected Sample Details - Size: {sizeData.size}
+                      </h3>
+                      {/* 6-Column Table for Inspected Sample Details */}
+                      <table className="w-full border border-gray-900 rounded-lg shadow-md">
+                        <thead className="bg-gray-200">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-900 border border-gray-900">
+                              Serial Letter
+                            </th>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-900 border border-gray-900">
+                              Total Pcs
+                            </th>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-900 border border-gray-900">
+                              Total Pass
+                            </th>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-900 border border-gray-900">
+                              Total Reject
+                            </th>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-900 border border-gray-900">
+                              Measurement Issues
+                            </th>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-900 border border-gray-900">
+                              Physical Defects
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td className="px-4 py-2 text-sm text-gray-900 border border-gray-900">
+                              {sizeData.serialLetter}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-900 border border-gray-900">
+                              {sizeData.totalPcs}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-900 border border-gray-900">
+                              {sizeData.totalPass}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-900 border border-gray-900">
+                              {sizeData.totalReject}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-900 border border-gray-900">
+                              {sizeData.totalRejectMeasurement}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-900 border border-gray-900">
+                              {sizeData.totalRejectDefects}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Panel Index Tables */}
+                    {sizeData.pcsLocation
+                      .reduce((acc, loc) => {
+                        loc.measurementData.forEach((panel) => {
+                          const existing = acc.find(
+                            (p) => p.panelIndex === panel.panelIndex
+                          );
+                          if (!existing) {
+                            acc.push({
+                              panelIndex: panel.panelIndex,
+                              measurementData: [],
+                              defectData: []
+                            });
+                          }
+                          const panelEntry = acc.find(
+                            (p) => p.panelIndex === panel.panelIndex
+                          );
+                          panelEntry.measurementData.push({
+                            location: loc.location,
+                            ...panel
+                          });
+                          if (panel.defectData.length > 0) {
+                            panelEntry.defectData.push(...panel.defectData);
+                          }
+                        });
+                        return acc;
+                      }, [])
+                      .map((panel, panelIdx) => (
+                        <div key={panelIdx} className="mb-4">
+                          <h4 className="text-md font-medium mb-2">
+                            {getPanelIndexName(
+                              data.garmentType,
+                              panel.panelIndex
+                            )}
+                          </h4>
+                          {/* Measurement Table */}
+                          <CuttingReportMeasurementTable panel={panel} />
+                          {/* Defects */}
+                          <CuttingReportDefects defectData={panel.defectData} />
+                        </div>
+                      ))}
+                    {idx < data.inspectionData.length - 1 && (
+                      <hr className="my-4" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-center text-gray-600">
+            No data available for the selected filters.
+          </p>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <ReactPaginate
+            previousLabel={"Previous"}
+            nextLabel={"Next"}
+            breakLabel={"..."}
+            pageCount={totalPages}
+            marginPagesDisplayed={2}
+            pageRangeDisplayed={5}
+            onPageChange={handlePageClick}
+            containerClassName={"flex justify-center space-x-2 mt-4"}
+            pageClassName={
+              "px-3 py-1 bg-white border border-gray-300 rounded-md cursor-pointer"
+            }
+            activeClassName={"bg-blue-900 text-white"}
+            previousClassName={
+              "px-3 py-1 bg-white border border-gray-300 rounded-md cursor-pointer"
+            }
+            nextClassName={
+              "px-3 py-1 bg-white border border-gray-300 rounded-md cursor-pointer"
+            }
+            breakClassName={"px-3 py-1"}
+          />
+        )}
       </div>
     </div>
   );

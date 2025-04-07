@@ -6879,6 +6879,8 @@ app.post("/api/save-cutting-inspection", async (req, res) => {
       cutting_emp_section,
       moNo,
       lotNo,
+      buyer,
+      orderQty,
       color,
       tableNo,
       planLayerQty,
@@ -6920,6 +6922,8 @@ app.post("/api/save-cutting-inspection", async (req, res) => {
         cutting_emp_section,
         moNo,
         lotNo,
+        buyer,
+        orderQty,
         color,
         tableNo,
         planLayerQty,
@@ -6947,14 +6951,23 @@ app.post("/api/save-cutting-inspection", async (req, res) => {
   }
 });
 
-// New GET endpoint to fetch filtered cutting inspection reports
-app.get("/api/cutting-inspection-report", async (req, res) => {
+app.get("/api/cutting-inspection-detailed-report", async (req, res) => {
   try {
-    const { startDate, endDate, moNo, lotNo, color, tableNo } = req.query;
+    const {
+      startDate,
+      endDate,
+      moNo,
+      lotNo,
+      buyer,
+      color,
+      tableNo,
+      page = 0,
+      limit = 1
+    } = req.query;
 
     let match = {};
 
-    // Date filtering using $expr for string dates
+    // Date filtering
     if (startDate || endDate) {
       match.$expr = match.$expr || {};
       match.$expr.$and = match.$expr.$and || [];
@@ -7001,56 +7014,178 @@ app.get("/api/cutting-inspection-report", async (req, res) => {
     // Other filters with case-insensitive regex
     if (moNo) match.moNo = new RegExp(moNo, "i");
     if (lotNo) match.lotNo = new RegExp(lotNo, "i");
+    if (buyer) match.buyer = new RegExp(buyer, "i");
     if (color) match.color = new RegExp(color, "i");
     if (tableNo) match.tableNo = new RegExp(tableNo, "i");
 
-    const inspections = await CuttingInspection.find(match);
+    const totalDocs = await CuttingInspection.countDocuments(match);
+    const totalPages = Math.ceil(totalDocs / limit);
 
-    if (!inspections.length) {
-      return res.status(200).json({
-        totalPcs: 0,
-        totalPass: 0,
-        totalReject: 0,
-        totalRejectMeasurement: 0,
-        totalRejectDefects: 0,
-        totalInspectionQty: 0
-      });
-    }
+    const inspections = await CuttingInspection.find(match)
+      .skip(page * limit)
+      .limit(parseInt(limit))
+      .lean();
 
-    // Aggregate totals
-    let totalPcs = 0;
-    let totalPass = 0;
-    let totalReject = 0;
-    let totalRejectMeasurement = 0;
-    let totalRejectDefects = 0;
-    let totalInspectionQty = 0;
+    // Calculate summary data for each inspection
+    inspections.forEach((inspection) => {
+      let totalPcs = 0;
+      let totalPass = 0;
+      let totalReject = 0;
+      let totalRejectMeasurement = 0;
+      let totalRejectDefects = 0;
 
-    inspections.forEach((doc) => {
-      totalInspectionQty += doc.totalInspectionQty;
-      doc.inspectionData.forEach((data) => {
+      inspection.inspectionData.forEach((data) => {
         totalPcs += data.totalPcs;
         totalPass += data.totalPass;
         totalReject += data.totalReject;
         totalRejectMeasurement += data.totalRejectMeasurement;
         totalRejectDefects += data.totalRejectDefects;
       });
+
+      const passRate =
+        totalPcs > 0 ? ((totalPass / totalPcs) * 100).toFixed(2) : "0.00";
+      const result = getResult(inspection.bundleQtyCheck, totalReject);
+
+      inspection.summary = {
+        totalPcs,
+        totalPass,
+        totalReject,
+        totalRejectMeasurement,
+        totalRejectDefects,
+        passRate,
+        result
+      };
     });
 
-    res.status(200).json({
-      totalPcs,
-      totalPass,
-      totalReject,
-      totalRejectMeasurement,
-      totalRejectDefects,
-      totalInspectionQty
-    });
+    res.status(200).json({ data: inspections, totalPages });
   } catch (error) {
-    console.error("Error fetching cutting inspection report:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to fetch report", error: error.message });
+    console.error("Error fetching detailed cutting inspection report:", error);
+    res.status(500).json({
+      message: "Failed to fetch detailed report",
+      error: error.message
+    });
   }
 });
+
+// Helper function to determine AQL result
+function getResult(bundleQtyCheck, totalReject) {
+  if (bundleQtyCheck === 5) return totalReject > 1 ? "Fail" : "Pass";
+  if (bundleQtyCheck === 9) return totalReject > 3 ? "Fail" : "Pass";
+  if (bundleQtyCheck === 14) return totalReject > 5 ? "Fail" : "Pass";
+  if (bundleQtyCheck === 20) return totalReject > 7 ? "Fail" : "Pass";
+  return "N/A";
+}
+
+// New GET endpoint to fetch filtered cutting inspection reports
+// app.get("/api/cutting-inspection-report", async (req, res) => {
+//   try {
+//     const { startDate, endDate, moNo, lotNo, buyer, color, tableNo } =
+//       req.query;
+
+//     let match = {};
+
+//     // Date filtering using $expr for string dates
+//     if (startDate || endDate) {
+//       match.$expr = match.$expr || {};
+//       match.$expr.$and = match.$expr.$and || [];
+//       if (startDate) {
+//         const normalizedStartDate = normalizeDateString(startDate);
+//         match.$expr.$and.push({
+//           $gte: [
+//             {
+//               $dateFromString: {
+//                 dateString: "$inspectionDate",
+//                 format: "%m/%d/%Y"
+//               }
+//             },
+//             {
+//               $dateFromString: {
+//                 dateString: normalizedStartDate,
+//                 format: "%m/%d/%Y"
+//               }
+//             }
+//           ]
+//         });
+//       }
+//       if (endDate) {
+//         const normalizedEndDate = normalizeDateString(endDate);
+//         match.$expr.$and.push({
+//           $lte: [
+//             {
+//               $dateFromString: {
+//                 dateString: "$inspectionDate",
+//                 format: "%m/%d/%Y"
+//               }
+//             },
+//             {
+//               $dateFromString: {
+//                 dateString: normalizedEndDate,
+//                 format: "%m/%d/%Y"
+//               }
+//             }
+//           ]
+//         });
+//       }
+//     }
+
+//     // Other filters with case-insensitive regex
+//     if (moNo) match.moNo = new RegExp(moNo, "i");
+//     if (lotNo) match.lotNo = new RegExp(lotNo, "i");
+//     if (buyer) match.buyer = new RegExp(buyer, "i"); // New filter
+//     if (color) match.color = new RegExp(color, "i");
+//     if (tableNo) match.tableNo = new RegExp(tableNo, "i");
+
+//     const inspections = await CuttingInspection.find(match);
+
+//     if (!inspections.length) {
+//       return res.status(200).json({
+//         totalPcs: 0,
+//         totalPass: 0,
+//         totalReject: 0,
+//         totalRejectMeasurement: 0,
+//         totalRejectDefects: 0,
+//         totalInspectionQty: 0,
+//         orderQty: 0
+//       });
+//     }
+
+//     // Aggregate totals
+//     let totalPcs = 0;
+//     let totalPass = 0;
+//     let totalReject = 0;
+//     let totalRejectMeasurement = 0;
+//     let totalRejectDefects = 0;
+//     let totalInspectionQty = 0;
+//     let orderQtySum = 0;
+
+//     inspections.forEach((doc) => {
+//       totalInspectionQty += doc.totalInspectionQty;
+//       doc.inspectionData.forEach((data) => {
+//         totalPcs += data.totalPcs;
+//         totalPass += data.totalPass;
+//         totalReject += data.totalReject;
+//         totalRejectMeasurement += data.totalRejectMeasurement;
+//         totalRejectDefects += data.totalRejectDefects;
+//       });
+//       if (doc.orderQty) orderQtySum += doc.orderQty;
+//     });
+
+//     res.status(200).json({
+//       totalPcs,
+//       totalPass,
+//       totalReject,
+//       totalRejectMeasurement,
+//       totalRejectDefects,
+//       totalInspectionQty,
+//       orderQty: orderQtySum
+//     });
+//   } catch (error) {
+//     console.error("Error fetching cutting inspection report:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to fetch report", error: error.message });
+//   }
+// });
 
 // Endpoint to fetch distinct MO Nos
 app.get("/api/cutting-inspection-mo-nos", async (req, res) => {
@@ -7071,11 +7206,13 @@ app.get("/api/cutting-inspection-filter-options", async (req, res) => {
     if (moNo) match.moNo = new RegExp(moNo, "i");
 
     const lotNos = await CuttingInspection.distinct("lotNo", match);
+    const buyers = await CuttingInspection.distinct("buyer", match); // Add buyer filter options
     const colors = await CuttingInspection.distinct("color", match);
     const tableNos = await CuttingInspection.distinct("tableNo", match);
 
     res.json({
       lotNos: lotNos.filter((lot) => lot),
+      buyers: buyers.filter((buyer) => buyer), // Return distinct buyers
       colors: colors.filter((color) => color),
       tableNos: tableNos.filter((table) => table)
     });

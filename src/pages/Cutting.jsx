@@ -1769,6 +1769,7 @@ const CuttingPage = () => {
       cutting_emp_section: user.sect_name,
       moNo,
       lotNo,
+      buyer: orderDetails?.Buyer || "N/A", // New field from orderDetails
       color,
       tableNo,
       planLayerQty,
@@ -1787,45 +1788,10 @@ const CuttingPage = () => {
       totalInspectionQty,
       cuttingtype,
       garmentType: selectedPanel,
+      orderQty: orderDetails?.totalOrderQty || 0, // New field from orderDetails
       inspectionData
     };
 
-    // const report = {
-    //   cutting_report_id: Date.now(),
-    //   report_name: "Cutting Report",
-    //   emp_id: user?.emp_id || "Guest",
-    //   eng_name: user?.eng_name || "Guest",
-    //   inspection_date: inspectionDate.toLocaleDateString("en-US"),
-    //   mo_no: moNo,
-    //   lot_no: lotNo,
-    //   color: color,
-    //   table_no: tableNo,
-    //   cutting_table_l: cuttingTableL,
-    //   cutting_table_no: cuttingTableNo,
-    //   marker: marker,
-    //   plan_layer_qty: planLayerQty,
-    //   total_plan_pcs: totalPlanPcs,
-    //   actual_layers: actualLayers,
-    //   total_bundle_qty: parseInt(totalBundleQty),
-    //   bundle_qty_check: parseInt(bundleQtyCheck),
-    //   total_inspection_qty: totalInspectionQty,
-    //   panel: selectedPanel,
-    //   size: selectedSize,
-    //   serial_letter: selectedSerialLetter,
-    //   tolerance: tolerance,
-    //   measurement_data: summary,
-    //   marker_data: markerData,
-    //   table_data: tableData,
-    //   filters: filters,
-    //   column_defects: columnDefects,
-    //   order_details: orderDetails
-    //     ? {
-    //         customer_style: orderDetails.BuyerStyle,
-    //         buyer: orderDetails.Buyer,
-    //         order_qty: orderDetails.totalOrderQty
-    //       }
-    //     : null
-    // };
     try {
       //  API call
       await axios.post(`${API_BASE_URL}/api/save-cutting-inspection`, report);

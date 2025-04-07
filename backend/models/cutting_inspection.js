@@ -9,6 +9,8 @@ const cuttingInspectionSchema = new mongoose.Schema({
   cutting_emp_section: { type: String, required: true },
   moNo: { type: String, required: true },
   lotNo: { type: String, required: true },
+  buyer: { type: String, required: false },
+  orderQty: { type: Number, required: false },
   color: { type: String, required: true },
   tableNo: { type: String, required: true },
   planLayerQty: { type: Number, required: true },
