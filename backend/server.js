@@ -12,7 +12,7 @@ import jwt from "jsonwebtoken";
 import multer from "multer";
 import fs from 'fs';
 import https from 'https';
-import { Server } from "socket.io"; // Import Socket.i
+import { Server } from "socket.io"; // Import Socket.io
 import createUserModel from "./models/User.js";
 import createQCDataModel from "./models/qc1_data.js";
 import createRoleModel from "./models/Role.js";
@@ -7181,6 +7181,107 @@ app.get("/api/sunrise/qc1-filters", async (req, res) => {
     });
   }
 });
+
+app.get("/api/sunrise/qc1-daily-trend", async (req, res) => {
+  try {
+    const { startDate, endDate, lineNo, MONo, Color, Size, Buyer, defectName } = req.query;
+
+    // Input validation: Check for required parameters and data types
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "Start and end dates are required." });
+    }
+    if (isNaN(Date.parse(startDate)) || isNaN(Date.parse(endDate))) {
+      return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD." });
+    }
+
+
+    // Build the match stage for the aggregation pipeline
+    const matchStage = {};
+
+    // Date filtering using $expr for string dates
+    if (startDate || endDate) {
+      matchStage.$expr = matchStage.$expr || {};
+      matchStage.$expr.$and = matchStage.$expr.$and || [];
+
+      // Normalize dates before comparison
+      const normalizedStartDate = normalizeDateString(startDate);
+      const normalizedEndDate = normalizeDateString(endDate);
+
+      if (normalizedStartDate) {
+        matchStage.$expr.$and.push({
+          $gte: [
+            { $dateFromString: { dateString: "$inspectionDate", format: "%m/%d/%Y" } },
+            { $dateFromString: { dateString: normalizedStartDate, format: "%m/%d/%Y" } }
+          ]
+        });
+      }
+      if (normalizedEndDate) {
+        matchStage.$expr.$and.push({
+          $lte: [
+            { $dateFromString: { dateString: "$inspectionDate", format: "%m/%d/%Y" } },
+            { $dateFromString: { dateString: normalizedEndDate, format: "%m/%d/%Y" } }
+          ]
+        });
+      }
+    }
+
+    // Other filters
+    if (lineNo) matchStage.lineNo = lineNo;
+    if (MONo) matchStage.MONo = MONo;
+    if (Color) matchStage.Color = Color;
+    if (Size) matchStage.Size = Size;
+    if (Buyer) matchStage.Buyer = Buyer;
+    if (defectName) {
+      matchStage["DefectArray.defectName"] = defectName;
+    }
+
+    // Aggregation pipeline
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $group: {
+          _id: "$inspectionDate",
+          checkedQty: { $sum: "$CheckedQty" },
+          defectQty: { $sum: "$totalDefectsQty" },
+        },
+      },
+      {
+        $project: {
+          date: "$_id",
+          checkedQty: 1,
+          defectQty: 1,
+          defectRate: {
+            $cond: [
+              { $eq: ["$checkedQty", 0] },
+              0,
+              { $multiply: [{ $divide: ["$defectQty", "$checkedQty"] }, 100] },
+            ],
+          },
+          _id: 0,
+        },
+      },
+      { $sort: { date: 1 } }, // Sort by date ascending
+    ];
+
+    // Execute aggregation
+    const data = await QC1Sunrise.aggregate(pipeline).exec();
+
+    // Transform date to MM/DD/YYYY for consistency with UI
+    const transformedData = data.map((item) => ({
+      ...item,
+      date: item.date, // Already in MM/DD/YYYY from the group
+    }));
+
+    res.json(transformedData);
+  } catch (err) {
+    console.error("Error fetching QC1 Sunrise daily trend:", err);
+    res.status(500).json({
+      message: "Failed to fetch QC1 Sunrise daily trend",
+      error: err.message,
+    });
+  }
+});
+
 
 /* ------------------------------
    User Auth ENDPOINTS

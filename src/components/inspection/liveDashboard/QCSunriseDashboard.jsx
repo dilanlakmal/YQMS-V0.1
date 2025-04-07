@@ -4,8 +4,9 @@ import { API_BASE_URL } from "../../../../config";
 import QCSunriseFilterPane from "../qc1_sunrise_mongodb/QCSunriseFilterPane";
 import QCSunriseSummaryCard from "../qc1_sunrise_mongodb/QCSunriseSummaryCard";
 import QCSunriseSummaryTable from "../qc1_sunrise_mongodb/QCSunriseSummaryTable";
-import SunriseLineBarChart from "./QCSunriseBarChart";
-import SunriseTopNDefect from "./SunriseTopNDefect";
+import SunriseLineBarChart from "../qc1_sunrise_mongodb/QCSunriseBarChart";
+import SunriseTopNDefect from "../qc1_sunrise_mongodb/SunriseTopNDefect";
+
 
 const QC1SunriseDashboard = () => {
   const [data, setData] = useState([]);

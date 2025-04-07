@@ -24,6 +24,7 @@ import InspectorCard from "../components/inspection/liveDashboard/InspectorCard"
 import RovingReport from "../components/inspection/liveDashboard/RovingReport"; // Added import
 import HomeMenu from "../components/inspection/liveDashboard/HomeMenu";
 import QCSunriseDashboard from "../components/inspection/liveDashboard/QCSunriseDashboard";
+import QCSunriseDailyTrend from "../components/inspection/qc1_sunrise_mongodb/SunriseDailyTrend";
 import { useTranslation } from "react-i18next";
 
 const LiveDashboard = () => {
@@ -33,6 +34,10 @@ const LiveDashboard = () => {
   const [activeMoTab, setActiveMoTab] = useState("MO Summary"); // For MO Hr Trend tabs
   const [activeLineTab, setActiveLineTab] = useState("Line Summary");
   const [activeDashboardTab, setActiveDashboardTab] = useState("Bar Chart"); // For Live Dashboard tabs
+  const [qc1Data, setQc1Data] = useState([]);
+  const [qc1Filters, setQc1Filters] = useState({});
+  const [qc1Loading, setQc1Loading] = useState(false);
+  const [qc1Error, setQc1Error] = useState(null);
 
   // Filter states
   const [startDate, setStartDate] = useState(null);
@@ -236,6 +241,78 @@ const LiveDashboard = () => {
     ]);
   };
 
+  // Fetch QC1 data
+  const fetchQc1Data = async (filters = {}) => {
+    try {
+      setQc1Loading(true);
+      setQc1Error(null);
+      const response = await axios.get(`${API_BASE_URL}/api/sunrise/qc1-data`, {
+        params: filters,
+      });
+      const fetchedData = response.data;
+      const sortedData = fetchedData.map((item) => {
+        const sortedDefectArray = [...item.DefectArray].sort((a, b) => {
+          const rateA =
+            item.CheckedQty > 0 ? (a.defectQty / item.CheckedQty) * 100 : 0;
+          const rateB =
+            item.CheckedQty > 0 ? (b.defectQty / item.CheckedQty) * 100 : 0;
+          return rateB - rateA;
+        });
+
+        return {
+          ...item,
+          DefectArray: sortedDefectArray.map((defect) => ({
+            defectName: defect.defectName,
+            defectQty: defect.defectQty,
+          })),
+          WorkLine: item.LineNo || "No Line",
+          MONo: item.MONo,
+          ColorName: item.Color,
+          SizeName: item.Size,
+          Buyer: item.Buyer,
+        };
+      });
+      setQc1Data(sortedData);
+    } catch (error) {
+      console.error(
+        "Error fetching dashboard data:",
+        error.response?.data || error.message
+      );
+      setQc1Error(
+        "Failed to load dashboard data. Please check the filters or try again later."
+      );
+    } finally {
+      setQc1Loading(false);
+    }
+  };
+
+  // Apply QC1 Filters
+  const handleQc1ApplyFilters = async () => {
+    const filters = {};
+    if (moNo && moNo.trim()) filters.moNo = moNo;
+    if (color) filters.color = color;
+    if (size) filters.size = size;
+    if (startDate) filters.startDate = formatDate(startDate);
+    if (endDate) filters.endDate = formatDate(endDate);
+    if (buyer) filters.buyer = buyer;
+    if (lineNo) filters.lineNo = lineNo;
+    await fetchQc1Data(filters);
+    setQc1Filters(filters);
+  };
+
+  // Reset QC1 Filters
+  const handleQc1ResetFilters = async () => {
+    setStartDate(null);
+    setEndDate(null);
+    setMoNo("");
+    setColor("");
+    setSize("");
+    setBuyer("");
+    setLineNo("");
+    await fetchQc1Data();
+    setQc1Filters({});
+  };
+
   // Initial data fetch
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -245,10 +322,12 @@ const LiveDashboard = () => {
         fetchMoSummaries(),
         fetchHourlyDefectRates(),
         fetchLineDefectRates(),
-        fetchInspectors()
+        fetchInspectors(),
+        fetchQc1Data()
       ]);
     };
     fetchInitialData();
+    // fetchData();
 
     const intervalId = setInterval(async () => {
       const currentFilters = filtersRef.current;
@@ -258,7 +337,8 @@ const LiveDashboard = () => {
         fetchMoSummaries(currentFilters),
         fetchHourlyDefectRates(currentFilters),
         fetchLineDefectRates(currentFilters),
-        fetchInspectors(currentFilters)
+        fetchInspectors(),
+        fetchQc1Data(qc1Filters)
       ]);
     }, 5000);
 
@@ -380,6 +460,41 @@ const LiveDashboard = () => {
     );
   };
 
+  const filteredQc1Data = qc1Data.filter((item) => {
+    let passesFilter = true;
+  
+    if (qc1Filters.lineNo && String(item.WorkLine) !== String(qc1Filters.lineNo)) {
+      passesFilter = false;
+    }
+  
+    if (qc1Filters.moNo && item.MONo !== qc1Filters.moNo) {
+      passesFilter = false;
+    }
+  
+    if (qc1Filters.color && item.ColorName !== qc1Filters.color) {
+      passesFilter = false;
+    }
+  
+    if (qc1Filters.size && item.SizeName !== qc1Filters.size) {
+      passesFilter = false;
+    }
+  
+    if (qc1Filters.buyer && item.Buyer !== qc1Filters.buyer) {
+      passesFilter = false;
+    }
+  
+    if (qc1Filters.startDate && new Date(item.Date) < new Date(qc1Filters.startDate)) {
+      passesFilter = false;
+    }
+  
+    if (qc1Filters.endDate && new Date(item.Date) > new Date(qc1Filters.endDate)) {
+      passesFilter = false;
+    }
+  
+    return passesFilter;
+  });
+
+
   return (
     <div className="flex min-h-screen bg-gray-100">
       {/* Navigation Panel */}
@@ -439,6 +554,7 @@ const LiveDashboard = () => {
         {activeSection === "Home" && (
           <HomeMenu setActiveSection={setActiveSection} />
         )}
+        
 
         {activeSection === "QC Inline Roving" && <RovingReport />}
         {activeSection === "QC 1 Dashboard" && <QCSunriseDashboard />}
@@ -533,6 +649,7 @@ const LiveDashboard = () => {
             )}
           </>
         )}
+        
 
         {activeSection === "MO Analysis" && (
           <>
@@ -667,10 +784,52 @@ const LiveDashboard = () => {
         {activeSection === "Daily Summary" && (
           <DailySummary filters={filtersRef.current} />
         )}
-
+      
         {activeSection === "Weekly Analysis" && (
           <WeeklySummary filters={filtersRef.current} />
         )}
+
+{activeSection === "Daily Trend" && (
+      <>
+        {[
+          "Live Dashboard",
+          "MO Analysis",
+          "Line Hr Trend",
+          "Daily Summary",
+          "Weekly Analysis",
+          "Monthly Analysis"
+        ].includes(activeSection) && (
+          <FilterPane
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
+            moNo={moNo}
+            setMoNo={setMoNo}
+            color={color}
+            setColor={setColor}
+            size={size}
+            setSize={setSize}
+            department={department}
+            setDepartment={setDepartment}
+            empId={empId}
+            setEmpId={setEmpId}
+            buyer={buyer}
+            setBuyer={setBuyer}
+            lineNo={lineNo}
+            setLineNo={setLineNo}
+            appliedFilters={appliedFilters}
+            setAppliedFilters={setAppliedFilters}
+            onApplyFilters={handleQc1ApplyFilters}
+            onResetFilters={handleQc1ResetFilters}
+          />
+        )}
+        <QCSunriseDailyTrend
+          filteredData={filteredQc1Data}
+          filters={qc1Filters}
+        />
+      </>
+    )}
 
         {["Packing"].includes(activeSection) && (
           <div className="text-center mt-8 text-gray-700">
