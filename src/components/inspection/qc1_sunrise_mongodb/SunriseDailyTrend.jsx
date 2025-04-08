@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { API_BASE_URL } from "../../../../config"; // Adjust path as needed
+import { API_BASE_URL } from "../../../../config";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable"; // Explicitly import autoTable
-// Add a fallback import for debugging
-if (typeof autoTable === "undefined") {
-  console.error("jspdf-autotable not loaded. Attempting default import.");
-  import("jspdf-autotable").then((module) => {
-    global.autoTable = module.default;
-  });
-}
+import autoTable from "jspdf-autotable";
 import { FaFileExcel, FaFilePdf } from "react-icons/fa";
+
+// Helper to convert YYYY-MM-DD to DD/MM/YYYY
+const formatDateToDDMMYYYY = (dateStr) => {
+  const [year, month, day] = dateStr.split("-");
+  return `${day}/${month}/${year}`;
+};
+
+// Helper to convert DD/MM/YYYY to YYYY-MM-DD
+const formatDateToYYYYMMDD = (dateStr) => {
+  const [day, month, year] = dateStr.split("/");
+  return `${year}-${month}-${day}`;
+};
 
 const QCSunriseDailyTrend = ({ filters }) => {
   const [summaryData, setSummaryData] = useState([]);
@@ -22,18 +27,18 @@ const QCSunriseDailyTrend = ({ filters }) => {
     addMO: false,
     addBuyer: false,
     addColors: false,
-    addSizes: false
+    addSizes: false,
   });
   const [rows, setRows] = useState([]);
   const [uniqueDates, setUniqueDates] = useState([]);
 
-  // Determine if filters are applied (non-empty values) with default fallback
+  // Determine if filters are applied
   const isMoNoFiltered = (filters.moNo ?? "").trim() !== "";
   const isLineNoFiltered = (filters.lineNo ?? "").trim() !== "";
   const isColorFiltered = (filters.color ?? "").trim() !== "";
   const isSizeFiltered = (filters.size ?? "").trim() !== "";
 
-  // Fetch data from /api/qc2-mo-summaries
+  // Fetch data from /api/sunrise/qc1-data
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -43,26 +48,49 @@ const QCSunriseDailyTrend = ({ filters }) => {
         )
       );
 
-      // Always group by date for trend analysis
-      activeFilters.groupByDate = "true";
-      activeFilters.groupByLine =
-        customFilters.addLines || isLineNoFiltered ? "true" : "false";
-      activeFilters.groupByMO =
-        customFilters.addMO || isMoNoFiltered ? "true" : "false";
-      activeFilters.groupByBuyer = customFilters.addBuyer ? "true" : "false";
-      activeFilters.groupByColor =
-        customFilters.addColors || isColorFiltered ? "true" : "false";
-      activeFilters.groupBySize =
-        customFilters.addSizes || isSizeFiltered ? "true" : "false";
+      // Map filters to QC1 endpoint parameters
+      const queryParams = {};
+      if (activeFilters.startDate)
+        queryParams.startDate = activeFilters.startDate; // Expected as YYYY-MM-DD
+      if (activeFilters.endDate)
+        queryParams.endDate = activeFilters.endDate; // Expected as YYYY-MM-DD
+      if (activeFilters.lineNo) queryParams.lineNo = activeFilters.lineNo;
+      if (activeFilters.moNo) queryParams.MONo = activeFilters.moNo;
+      if (activeFilters.color) queryParams.Color = activeFilters.color;
+      if (activeFilters.size) queryParams.Size = activeFilters.size;
+      if (activeFilters.buyer) queryParams.Buyer = activeFilters.buyer;
+      if (activeFilters.defectName)
+        queryParams.defectName = activeFilters.defectName;
 
-      const queryString = new URLSearchParams(activeFilters).toString();
-      const url = `${API_BASE_URL}/api/qc2-mo-summaries?${queryString}`;
+      // Add custom filters if not overridden by activeFilters
+      if (customFilters.addLines && !queryParams.lineNo)
+        queryParams.lineNo = ""; // Empty string to fetch all lines for grouping
+      if (customFilters.addMO && !queryParams.MONo)
+        queryParams.MONo = "";
+      if (customFilters.addBuyer && !queryParams.Buyer)
+        queryParams.Buyer = "";
+      if (customFilters.addColors && !queryParams.Color)
+        queryParams.Color = "";
+      if (customFilters.addSizes && !queryParams.Size)
+        queryParams.Size = "";
+
+      // Ensure startDate and endDate are always provided
+      if (!queryParams.startDate || !queryParams.endDate) {
+        const today = new Date();
+        queryParams.endDate = today.toISOString().split("T")[0]; // YYYY-MM-DD
+        queryParams.startDate = new Date(today.setDate(today.getDate() - 30))
+          .toISOString()
+          .split("T")[0]; // 30 days ago
+      }
+
+      const queryString = new URLSearchParams(queryParams).toString();
+      const url = `${API_BASE_URL}/api/sunrise/qc1-data?${queryString}`;
       const response = await axios.get(url);
       setSummaryData(response.data);
       setError(null);
     } catch (err) {
       console.error("Fetch error:", err);
-      setError(err.message || "Failed to fetch summary data");
+      setError(err.message || "Failed to fetch QC1 Sunrise data");
       setSummaryData([]);
     } finally {
       setLoading(false);
@@ -73,22 +101,28 @@ const QCSunriseDailyTrend = ({ filters }) => {
     fetchData();
   }, [JSON.stringify(filters), customFilters]);
 
-  // Process data when summaryData changes
+  // Process data for table
   useEffect(() => {
     if (summaryData.length === 0) return;
 
-    // Extract unique dates
-    const datesSet = new Set(summaryData.map((d) => d.inspection_date));
-    const sortedDates = [...datesSet].sort((a, b) => new Date(a) - new Date(b));
+    // Extract unique dates (in DD/MM/YYYY format)
+    const datesSet = new Set(summaryData.map((d) => d.inspectionDate));
+    const sortedDates = [...datesSet].sort((a, b) => {
+      const [dayA, monthA, yearA] = a.split("/").map(Number);
+      const [dayB, monthB, yearB] = b.split("/").map(Number);
+      return (
+        new Date(yearA, monthA - 1, dayA) - new Date(yearB, monthB - 1, dayB)
+      );
+    });
     setUniqueDates(sortedDates);
 
     // Define grouping fields
     const groupingFields = [];
     if (customFilters.addLines) groupingFields.push("lineNo");
-    if (customFilters.addMO) groupingFields.push("moNo");
-    if (customFilters.addBuyer) groupingFields.push("buyer");
-    if (customFilters.addColors) groupingFields.push("color");
-    if (customFilters.addSizes) groupingFields.push("size");
+    if (customFilters.addMO) groupingFields.push("MONo");
+    if (customFilters.addBuyer) groupingFields.push("Buyer");
+    if (customFilters.addColors) groupingFields.push("Color");
+    if (customFilters.addSizes) groupingFields.push("Size");
 
     // Build hierarchy and rows
     const hierarchy = buildHierarchy(summaryData, groupingFields);
@@ -101,7 +135,7 @@ const QCSunriseDailyTrend = ({ filters }) => {
     if (groupingFields.length === 0) {
       const dateMap = {};
       data.forEach((doc) => {
-        dateMap[doc.inspection_date] = doc;
+        dateMap[doc.inspectionDate] = doc;
       });
       return dateMap;
     } else {
@@ -141,14 +175,16 @@ const QCSunriseDailyTrend = ({ filters }) => {
           dates.forEach((date) => {
             const sum = getSumForGroup(subHierarchy, date);
             groupData[date] =
-              sum.checkedQty > 0 ? (sum.defectsQty / sum.checkedQty) * 100 : 0;
+              sum.checkedQty > 0
+                ? (sum.defectsQty / sum.checkedQty) * 100
+                : 0;
           });
           rows.push({
             level,
             type: "group",
             key: value,
             path: [...path, value],
-            data: groupData
+            data: groupData,
           });
           const subRows = buildRows(
             subHierarchy,
@@ -165,8 +201,8 @@ const QCSunriseDailyTrend = ({ filters }) => {
       const dateMap = hierarchy;
       const defectNames = new Set();
       Object.values(dateMap).forEach((doc) => {
-        if (doc && doc.defectArray) {
-          doc.defectArray.forEach((defect) => {
+        if (doc && doc.DefectArray) {
+          doc.DefectArray.forEach((defect) => {
             if (defect.defectName) defectNames.add(defect.defectName);
           });
         }
@@ -175,13 +211,13 @@ const QCSunriseDailyTrend = ({ filters }) => {
         const defectData = {};
         dates.forEach((date) => {
           const doc = dateMap[date];
-          if (doc && doc.defectArray) {
-            const defect = doc.defectArray.find(
+          if (doc && doc.DefectArray) {
+            const defect = doc.DefectArray.find(
               (d) => d.defectName === defectName
             );
             defectData[date] =
-              defect && doc.checkedQty > 0
-                ? (defect.totalCount / doc.checkedQty) * 100
+              defect && doc.CheckedQty > 0
+                ? (defect.defectQty / doc.CheckedQty) * 100
                 : 0;
           } else {
             defectData[date] = 0;
@@ -192,14 +228,14 @@ const QCSunriseDailyTrend = ({ filters }) => {
           type: "defect",
           key: defectName,
           path: [...path, defectName],
-          data: defectData
+          data: defectData,
         });
       });
     }
     return rows;
   };
 
-  // Sum checkedQty and defectsQty for a group on a specific date
+  // Sum CheckedQty and totalDefectsQty for a group on a specific date
   const getSumForGroup = (currentHierarchy, date) => {
     if (
       typeof currentHierarchy !== "object" ||
@@ -207,7 +243,7 @@ const QCSunriseDailyTrend = ({ filters }) => {
     ) {
       const doc = currentHierarchy[date];
       return doc
-        ? { checkedQty: doc.checkedQty, defectsQty: doc.defectsQty }
+        ? { checkedQty: doc.CheckedQty, defectsQty: doc.totalDefectsQty }
         : { checkedQty: 0, defectsQty: 0 };
     }
     let sum = { checkedQty: 0, defectsQty: 0 };
@@ -219,7 +255,7 @@ const QCSunriseDailyTrend = ({ filters }) => {
     return sum;
   };
 
-  // Color coding functions from TrendAnalysisLine.jsx
+  // Color coding functions
   const getBackgroundColor = (rate) => {
     if (rate > 3) return "bg-red-100";
     if (rate >= 2) return "bg-yellow-100";
@@ -257,7 +293,7 @@ const QCSunriseDailyTrend = ({ filters }) => {
 
     exportData.push([
       "Daily Defect Trend Analysis",
-      ...Array(uniqueDates.length).fill("")
+      ...Array(uniqueDates.length).fill(""),
     ]);
     ratesMap.set("0-0", 0);
 
@@ -285,10 +321,10 @@ const QCSunriseDailyTrend = ({ filters }) => {
     uniqueDates.forEach((date, colIndex) => {
       const hierarchy = buildHierarchy(summaryData, [
         ...(customFilters.addLines ? ["lineNo"] : []),
-        ...(customFilters.addMO ? ["moNo"] : []),
-        ...(customFilters.addBuyer ? ["buyer"] : []),
-        ...(customFilters.addColors ? ["color"] : []),
-        ...(customFilters.addSizes ? ["size"] : [])
+        ...(customFilters.addMO ? ["MONo"] : []),
+        ...(customFilters.addBuyer ? ["Buyer"] : []),
+        ...(customFilters.addColors ? ["Color"] : []),
+        ...(customFilters.addSizes ? ["Size"] : []),
       ]);
       const sum = getSumForGroup(hierarchy, date);
       const rate =
@@ -321,7 +357,7 @@ const QCSunriseDailyTrend = ({ filters }) => {
             top: { style: "thin" },
             bottom: { style: "thin" },
             left: { style: "thin" },
-            right: { style: "thin" }
+            right: { style: "thin" },
           },
           fill: {
             fgColor: {
@@ -332,13 +368,13 @@ const QCSunriseDailyTrend = ({ filters }) => {
                   ? getBackgroundColorHex(rate)
                   : row < 2
                   ? "FFFFFF"
-                  : "E5E7EB"
-            }
+                  : "E5E7EB",
+            },
           },
           alignment: {
             horizontal: col === 0 ? "left" : "center",
-            vertical: "middle"
-          }
+            vertical: "middle",
+          },
         };
       }
     }
@@ -353,13 +389,10 @@ const QCSunriseDailyTrend = ({ filters }) => {
     const { exportData, ratesMap } = prepareExportData();
     const doc = new jsPDF({ orientation: "landscape" });
 
-    // Use the imported or globally assigned autoTable
     const tablePlugin =
       typeof autoTable === "function" ? autoTable : global.autoTable;
     if (!tablePlugin) {
-      console.error(
-        "autoTable plugin not available. Please check jspdf-autotable installation."
-      );
+      console.error("autoTable plugin not available.");
       return;
     }
 
@@ -371,13 +404,13 @@ const QCSunriseDailyTrend = ({ filters }) => {
       headStyles: {
         fillColor: [173, 216, 230],
         textColor: [55, 65, 81],
-        fontStyle: "bold"
+        fontStyle: "bold",
       },
       styles: {
         cellPadding: 2,
         fontSize: 8,
         halign: "center",
-        valign: "middle"
+        valign: "middle",
       },
       columnStyles: { 0: { halign: "left" } },
       didParseCell: (data) => {
@@ -407,22 +440,19 @@ const QCSunriseDailyTrend = ({ filters }) => {
       },
       didDrawPage: () => {
         doc.text("Daily Defect Trend Analysis", 14, 10);
-      }
+      },
     });
 
     doc.save("DailyDefectTrend.pdf");
   };
 
   if (loading) return <div className="text-center p-4">Loading...</div>;
-  if (error)
-    return <div className="text-center p-4 text-red-500">Error: {error}</div>;
+  if (error) return <div className="text-center p-4 text-red-500">Error: {error}</div>;
 
   return (
     <div className="mt-6 bg-white shadow-md rounded-lg p-6 overflow-x-auto">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-sm font-medium text-gray-900">
-          Daily Defect Trend
-        </h2>
+        <h2 className="text-sm font-medium text-gray-900">Daily Defect Trend</h2>
         <div className="flex space-x-2">
           <button
             onClick={downloadExcel}
@@ -448,15 +478,10 @@ const QCSunriseDailyTrend = ({ filters }) => {
             type="checkbox"
             checked={customFilters.addLines || isLineNoFiltered}
             onChange={(e) =>
-              setCustomFilters((prev) => ({
-                ...prev,
-                addLines: e.target.checked
-              }))
+              setCustomFilters((prev) => ({ ...prev, addLines: e.target.checked }))
             }
             disabled={isLineNoFiltered}
-            className={`mr-1 ${
-              isLineNoFiltered ? "opacity-50 cursor-not-allowed" : ""
-            }`}
+            className={`mr-1 ${isLineNoFiltered ? "opacity-50 cursor-not-allowed" : ""}`}
           />
           Add Lines
         </label>
@@ -468,9 +493,7 @@ const QCSunriseDailyTrend = ({ filters }) => {
               setCustomFilters((prev) => ({ ...prev, addMO: e.target.checked }))
             }
             disabled={isMoNoFiltered}
-            className={`mr-1 ${
-              isMoNoFiltered ? "opacity-50 cursor-not-allowed" : ""
-            }`}
+            className={`mr-1 ${isMoNoFiltered ? "opacity-50 cursor-not-allowed" : ""}`}
           />
           Add MO
         </label>
@@ -479,10 +502,7 @@ const QCSunriseDailyTrend = ({ filters }) => {
             type="checkbox"
             checked={customFilters.addBuyer}
             onChange={(e) =>
-              setCustomFilters((prev) => ({
-                ...prev,
-                addBuyer: e.target.checked
-              }))
+              setCustomFilters((prev) => ({ ...prev, addBuyer: e.target.checked }))
             }
             className="mr-1"
           />
@@ -493,15 +513,10 @@ const QCSunriseDailyTrend = ({ filters }) => {
             type="checkbox"
             checked={customFilters.addColors || isColorFiltered}
             onChange={(e) =>
-              setCustomFilters((prev) => ({
-                ...prev,
-                addColors: e.target.checked
-              }))
+              setCustomFilters((prev) => ({ ...prev, addColors: e.target.checked }))
             }
             disabled={isColorFiltered}
-            className={`mr-1 ${
-              isColorFiltered ? "opacity-50 cursor-not-allowed" : ""
-            }`}
+            className={`mr-1 ${isColorFiltered ? "opacity-50 cursor-not-allowed" : ""}`}
           />
           Add Colors
         </label>
@@ -510,15 +525,10 @@ const QCSunriseDailyTrend = ({ filters }) => {
             type="checkbox"
             checked={customFilters.addSizes || isSizeFiltered}
             onChange={(e) =>
-              setCustomFilters((prev) => ({
-                ...prev,
-                addSizes: e.target.checked
-              }))
+              setCustomFilters((prev) => ({ ...prev, addSizes: e.target.checked }))
             }
             disabled={isSizeFiltered}
-            className={`mr-1 ${
-              isSizeFiltered ? "opacity-50 cursor-not-allowed" : ""
-            }`}
+            className={`mr-1 ${isSizeFiltered ? "opacity-50 cursor-not-allowed" : ""}`}
           />
           Add Sizes
         </label>
@@ -577,14 +587,14 @@ const QCSunriseDailyTrend = ({ filters }) => {
               </td>
               {uniqueDates.map((date) => {
                 const dateData = summaryData.filter(
-                  (d) => d.inspection_date === date
+                  (d) => d.inspectionDate === date
                 );
                 const totalChecked = dateData.reduce(
-                  (sum, d) => sum + (d.checkedQty || 0),
+                  (sum, d) => sum + (d.CheckedQty || 0),
                   0
                 );
                 const totalDefects = dateData.reduce(
-                  (sum, d) => sum + (d.defectsQty || 0),
+                  (sum, d) => sum + (d.totalDefectsQty || 0),
                   0
                 );
                 const rate =

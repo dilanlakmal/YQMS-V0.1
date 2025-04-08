@@ -24,7 +24,7 @@ import InspectorCard from "../components/inspection/liveDashboard/InspectorCard"
 import RovingReport from "../components/inspection/liveDashboard/RovingReport"; // Added import
 import HomeMenu from "../components/inspection/liveDashboard/HomeMenu";
 import QCSunriseDashboard from "../components/inspection/liveDashboard/QCSunriseDashboard";
-import QCSunriseDailyTrend from "../components/inspection/qc1_sunrise_mongodb/SunriseDailyTrend";
+import SunriseDailyTrend from "../components/inspection/qc1_sunrise_mongodb/SunriseDailyTrend";
 import { useTranslation } from "react-i18next";
 
 const LiveDashboard = () => {
@@ -824,7 +824,7 @@ const LiveDashboard = () => {
             onResetFilters={handleQc1ResetFilters}
           />
         )}
-        <QCSunriseDailyTrend
+        <SunriseDailyTrend
           filteredData={filteredQc1Data}
           filters={qc1Filters}
         />
