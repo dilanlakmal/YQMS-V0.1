@@ -2,7 +2,6 @@ import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/authentication/AuthContext";
-// Import the API_BASE_URL from our config file
 import { useTranslation } from "react-i18next";
 import { API_BASE_URL } from "../../config";
 
@@ -94,21 +93,21 @@ function Home() {
       items: [
         {
           path: "/Fabric",
-          roles: ["Admin", "QC2"],
+          roles: ["Admin", "Fabric"], // Matches "Fabric" role
           image: "assets/Home/fabric-logo.png",
           title: t("home.fabric"),
           description: "Fabric Inspection Reports"
         },
         {
           path: "/cutting",
-          roles: ["Admin", "QC1"],
+          roles: ["Admin", "Cutting"], // Matches "Cutting" role
           image: "assets/Home/cutting.webp",
-          title: t("home.cutting"), //"Cutting",
+          title: t("home.cutting"),
           description: "Cutting Inspection Check Point"
         },
         {
           path: "/scc",
-          roles: ["Admin", "QC2"],
+          roles: ["Admin", "SCC"], // Matches "SCC" role
           image: "assets/Home/bundle.avif",
           title: t("SCC"),
           description: "SCC Inspection Check Point"
@@ -120,35 +119,35 @@ function Home() {
       items: [
         {
           path: "/bundle-registration",
-          roles: ["Admin", "Bundle Registration"],
+          roles: ["Admin", "Bundle Registration"], // Matches "Bundle Registration" role
           image: "assets/Home/bundle.avif",
           title: t("home.bundle_registration"),
           description: "Order Registration: QC2."
         },
         {
           path: "/washing",
-          roles: ["Admin", "Washing"],
+          roles: ["Admin", "Washing"], // Matches "Washing" role
           image: "assets/Home/washing.jpg",
           title: t("home.washing"),
           description: "Scan orders for Washing."
         },
         {
           path: "/opa",
-          roles: ["Admin", "OPA"],
+          roles: ["Admin", "OPA"], // Matches "OPA" role
           image: "assets/Home/dyeing.png",
           title: t("home.opa"),
           description: "Scan orders in OPA."
         },
         {
           path: "/ironing",
-          roles: ["Admin", "Ironing"],
+          roles: ["Admin", "Ironing"], // Matches "Ironing" role
           image: "assets/Home/ironing.png",
           title: t("home.ironing"),
           description: "Scan orders for Ironing."
         },
         {
           path: "/packing",
-          roles: ["Admin", "Packing"],
+          roles: ["Admin", "Packing"], // Matches "Packing" role
           image: "assets/Home/packing.webp",
           title: t("home.packing"),
           description: "Scan orders for Packing."
@@ -160,35 +159,35 @@ function Home() {
       items: [
         {
           path: "/roving",
-          roles: ["Admin", "QC1"],
+          roles: ["Admin", "QC Roving"], // Fixed: Changed "QC1" to "QC Roving"
           image: "assets/Home/qcinline.png",
           title: t("home.qc_inline_roving"),
           description: "QC Inline Roving Check Point."
         },
         {
           path: "/inline-emp",
-          roles: ["Admin", "QC2"],
+          roles: ["Admin", "Printing"], // Matches "Printing" role
           image: "assets/Home/qc2.png",
           title: "Print QR",
           description: "Sewing Worker QR."
         },
         {
           path: "/details",
-          roles: ["Admin", "QC1"],
+          roles: ["Admin", "QC1 Inspection"], // Matches "QC1 Inspection" role
           image: "assets/Home/qcc.png",
           title: t("home.qc1_inspection"),
           description: "QC1 Inspection Check Point."
         },
         {
           path: "/qc2-repair-tracking",
-          roles: ["Admin", "QC2"],
+          roles: ["Admin", "QC2 Tracking"], // Matches "QC2 Tracking" role
           image: "assets/Home/repair.png",
           title: t("home.qc2_repair"),
           description: "QC2 Repair Tracking System."
         },
         {
           path: "/qc2-inspection",
-          roles: ["Admin", "QC2"],
+          roles: ["Admin", "QC2 Inspection"], // Matches "QC2 Inspection" role
           image: "assets/Home/qc2.png",
           title: t("home.qc2_inspection"),
           description: "QC2 Inspection Check Point."
@@ -200,14 +199,14 @@ function Home() {
       items: [
         {
           path: "/audit",
-          roles: ["Admin", "QA"],
+          roles: ["Admin", "QA Audit"], // Matches "QA Audit" role
           image: "assets/Home/qaa.png",
           title: t("home.qa_audit"),
           description: "QA Audit Check Point."
         },
         {
           path: "/final-inspection",
-          roles: ["Admin", "QA"],
+          roles: ["Admin", "QA Audit"], // Matches "QA Audit" role (same as audit)
           image: "assets/Home/qafinal.png",
           title: t("home.final_inspection"),
           description: "QA Final Inspection."
@@ -219,28 +218,28 @@ function Home() {
       items: [
         {
           path: "/download-data",
-          roles: ["Admin", "Data Analytics"],
+          roles: ["Admin", "Download Data"], // Matches "Download Data" role
           image: "assets/Home/download.jpg",
           title: t("home.download_data"),
           description: "Download Raw Data."
         },
         {
           path: "/live-dashboard",
-          roles: ["Admin", "Data Analytics"],
+          roles: ["Admin", "Live Dashboard"], // Matches "Live Dashboard" role
           image: "assets/Home/dash.png",
           title: t("home.live_dashboard"),
           description: "YQMS QC2 Live Dashboard."
         },
         {
           path: "/powerbi",
-          roles: ["Admin", "Data Analytics"],
+          roles: ["Admin", "Power BI"], // Matches "Power BI" role
           image: "assets/Home/powerbi.png",
           title: "Power BI",
           description: "Power BI Report"
         },
         {
           path: "/qc1-sunrise",
-          roles: ["Admin", "Data Analytics"],
+          roles: ["Admin", "QC1 Sunrise"], // Matches "QC1 Sunrise" role
           image: "assets/Home/sunrise.png",
           title: "QC1 Sunriser",
           description: "Upload Excel file here..."
@@ -252,13 +251,6 @@ function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-50 to-gray-100 py-20 px-20">
       <div className="max-w-8xl mx-auto">
-        {/* <h3 className="text-3xl font-extrabold text-blue-900 mb-8 text-center drop-shadow-md">
-          Welcome to Quality Data Management System
-        </h3> */}
-        {/* <p className="text-lg text-gray-700 text-center mb-12">
-          Click on the cards below to start inspection Reports or Live
-          monitoring
-        </p> */}
         {errorMessage && (
           <div className="bg-red-500 text-white text-center py-2 mb-4 rounded">
             {errorMessage}
@@ -284,9 +276,6 @@ function Home() {
                     className="flex flex-col items-center justify-center mb-2 w-16 h-16 bg-cover bg-center"
                     style={{ backgroundImage: `url(${item.image})` }}
                   ></div>
-                  {/* <div className="flex items-center justify-center mb-4 bg-blue-100 w-12 h-12 rounded-full group-hover:bg-blue-600">
-                    {item.icon}
-                  </div> */}
                   <h2
                     className={`text-xl font-bold text-gray-800 mb-2 ${
                       hasAccess(item.roles)
