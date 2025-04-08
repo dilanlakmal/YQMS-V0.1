@@ -9,11 +9,13 @@ import CuttingReportSummaryCard from "../cutting/CuttingReportSummaryCard";
 import CuttingReportMeasurementTable from "../cutting/CuttingReportMeasurementTable";
 import CuttingReportDefects from "../cutting/CuttingReportDefects";
 import { measurementPoints } from "../../../constants/cuttingmeasurement";
+import { pdf } from "@react-pdf/renderer";
+import CuttingReportDownloadPDF from "../cutting/CuttingReportDownloadPDF";
 
 const CuttingReport = () => {
   const { t } = useTranslation();
   const [filters, setFilters] = useState({
-    startDate: new Date(), // Default to today
+    startDate: new Date(),
     endDate: null,
     moNo: "",
     lotNo: "",
@@ -25,8 +27,8 @@ const CuttingReport = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
-  // Fetch report data when filters or page changes
   useEffect(() => {
     fetchReportData();
   }, [filters, currentPage]);
@@ -42,7 +44,7 @@ const CuttingReport = () => {
         color: filters.color,
         tableNo: filters.tableNo,
         page: currentPage,
-        limit: 1 // One combination per page
+        limit: 1
       };
       const response = await axios.get(
         `${API_BASE_URL}/api/cutting-inspection-detailed-report`,
@@ -58,39 +60,79 @@ const CuttingReport = () => {
     }
   };
 
+  const fetchAllReportData = async () => {
+    try {
+      const params = {
+        startDate: filters.startDate ? formatDate(filters.startDate) : "",
+        endDate: filters.endDate ? formatDate(filters.endDate) : "",
+        moNo: filters.moNo,
+        lotNo: filters.lotNo,
+        buyer: filters.buyer,
+        color: filters.color,
+        tableNo: filters.tableNo,
+        page: 0,
+        limit: 1000
+      };
+      const response = await axios.get(
+        `${API_BASE_URL}/api/cutting-inspection-detailed-report`,
+        { params }
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching all cutting report data:", error);
+      return [];
+    }
+  };
+
   const formatDate = (date) => {
     if (!date) return "";
     const month = ("0" + (date.getMonth() + 1)).slice(-2);
     const day = ("0" + date.getDate()).slice(-2);
     const year = date.getFullYear();
-    return `${month}/${day}/${year}`; // e.g., "04/05/2025"
+    return `${month}/${day}/${year}`;
   };
 
   const handlePageClick = (data) => {
     setCurrentPage(data.selected);
   };
 
-  // Function to get panelIndexName based on garmentType and panelIndex
   const getPanelIndexName = (garmentType, panelIndex) => {
     if (!garmentType || !panelIndex) return `Panel Index: ${panelIndex}`;
-
-    // Find matching measurement points for the garmentType (case-insensitive)
     const matchingPoints = measurementPoints.find(
       (point) => point.panel.toLowerCase() === garmentType.toLowerCase()
     );
-
     if (!matchingPoints) return `Panel Index: ${panelIndex}`;
-
-    // Find the first matching panelIndex and get its panelIndexName
     const matchingPoint = measurementPoints.find(
       (point) =>
         point.panel.toLowerCase() === garmentType.toLowerCase() &&
         point.panelIndex === panelIndex
     );
-
     return matchingPoint
       ? matchingPoint.panelIndexName
       : `Panel Index: ${panelIndex}`;
+  };
+
+  const handleDownloadPDF = async () => {
+    setIsGeneratingPDF(true);
+    try {
+      const allData = await fetchAllReportData();
+      const blob = await pdf(
+        <CuttingReportDownloadPDF
+          allReportData={allData}
+          measurementPoints={measurementPoints}
+        />
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "cutting_report.pdf";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   return (
@@ -99,37 +141,28 @@ const CuttingReport = () => {
         <h1 className="text-3xl font-bold text-center text-gray-800 mb-6 bg-gradient-to-r from-blue-500 to-blue-700 text-white py-4 rounded-t-lg">
           {t("cuttingReport.title")}
         </h1>
-
-        {/* Filter Pane */}
         <CuttingReportFilterPane
           filters={filters}
           setFilters={setFilters}
           setCurrentPage={setCurrentPage}
           lastUpdated={lastUpdated}
+          onDownloadPDF={handleDownloadPDF}
+          isGeneratingPDF={isGeneratingPDF}
         />
-
-        {/* Paginated Report */}
         {reportData.length > 0 ? (
           reportData.map((data, index) => (
             <div key={index} className="mb-8">
-              {/* Order Details, Inspection Details, Marker Data */}
               <div className="mb-4">
                 <CuttingReportOrderDetails data={data} />
               </div>
-
-              {/* Combined Section: Summary, Inspected Sample Details, Measurement Tables, Defects */}
               <div className="bg-white p-4 rounded-lg shadow-md">
-                {/* Summary Data */}
                 <CuttingReportSummaryCard summary={data.summary} />
-
-                {/* Inspected Sample Details */}
                 {data.inspectionData.map((sizeData, idx) => (
                   <div key={idx} className="mt-6">
                     <div className="mb-4">
                       <h3 className="text-sm font-semibold mb-2">
                         Inspected Sample Details - Size: {sizeData.size}
                       </h3>
-                      {/* 6-Column Table for Inspected Sample Details */}
                       <table className="w-full border border-gray-900 rounded-lg shadow-md">
                         <thead className="bg-gray-200">
                           <tr>
@@ -177,8 +210,6 @@ const CuttingReport = () => {
                         </tbody>
                       </table>
                     </div>
-
-                    {/* Panel Index Tables */}
                     {sizeData.pcsLocation
                       .reduce((acc, loc) => {
                         loc.measurementData.forEach((panel) => {
@@ -213,9 +244,7 @@ const CuttingReport = () => {
                               panel.panelIndex
                             )}
                           </h4>
-                          {/* Measurement Table */}
                           <CuttingReportMeasurementTable panel={panel} />
-                          {/* Defects */}
                           <CuttingReportDefects defectData={panel.defectData} />
                         </div>
                       ))}
@@ -232,8 +261,6 @@ const CuttingReport = () => {
             No data available for the selected filters.
           </p>
         )}
-
-        {/* Pagination */}
         {totalPages > 1 && (
           <ReactPaginate
             previousLabel={"Previous"}

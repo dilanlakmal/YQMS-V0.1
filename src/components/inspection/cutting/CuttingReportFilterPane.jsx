@@ -1,16 +1,18 @@
-// src/components/inspection/cutting/CuttingReportFilterPane.jsx
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../config";
 import { useTranslation } from "react-i18next";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { FaFilePdf, FaSpinner } from "react-icons/fa";
 
 const CuttingReportFilterPane = ({
   filters,
   setFilters,
   setCurrentPage,
-  lastUpdated
+  lastUpdated,
+  onDownloadPDF,
+  isGeneratingPDF
 }) => {
   const { t } = useTranslation();
   const [moNoOptions, setMoNoOptions] = useState([]);
@@ -23,12 +25,10 @@ const CuttingReportFilterPane = ({
   const [showMoNoDropdown, setShowMoNoDropdown] = useState(false);
   const moNoRef = useRef(null);
 
-  // Fetch initial MO Nos
   useEffect(() => {
     fetchMoNos();
   }, []);
 
-  // Fetch filter options when MO No changes
   useEffect(() => {
     if (filters.moNo) fetchFilterOptions();
   }, [filters.moNo]);
@@ -85,7 +85,7 @@ const CuttingReportFilterPane = ({
       }
       return newFilters;
     });
-    setCurrentPage(0); // Reset to first page on filter change
+    setCurrentPage(0);
     if (key === "moNo") setShowMoNoDropdown(false);
   };
 
@@ -254,9 +254,23 @@ const CuttingReportFilterPane = ({
         <div className="flex space-x-2">
           <button
             onClick={handleClearFilters}
-            className="px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+            className="px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 whitespace-nowrap"
           >
             Clear Filters
+          </button>
+          <button
+            onClick={onDownloadPDF}
+            disabled={isGeneratingPDF}
+            className={`px-3 py-2 text-white rounded-md flex items-center ${
+              isGeneratingPDF ? "bg-gray-400" : "bg-red-500 hover:bg-red-600"
+            } whitespace-nowrap`}
+          >
+            {isGeneratingPDF ? (
+              <FaSpinner className="animate-spin mr-2" />
+            ) : (
+              <FaFilePdf className="mr-2" />
+            )}
+            {isGeneratingPDF ? "Generating..." : "Download PDF"}
           </button>
         </div>
       </div>
