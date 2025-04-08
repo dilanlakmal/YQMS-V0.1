@@ -1,5 +1,3 @@
-//Old Code
-
 // import React, { useState, useEffect } from "react";
 // import { X, Check, AlertCircle, Plus } from "lucide-react";
 // import MeasurementNumPad from "./MeasurementNumPad";
@@ -545,19 +543,8 @@ const MeasurementTable = ({
       .map(() => Array(5).fill(false))
   );
   const [currentPage, setCurrentPage] = useState(1);
-  const defectsPerPage = 1; // Changed to 1 for one panel index per page
 
   useEffect(() => {
-    const filteredPoints = measurementPoints.filter((point) => {
-      return (
-        (filters.panelName === "" || point.panelName === filters.panelName) &&
-        (filters.side === "" || point.panelSide === filters.side) &&
-        (filters.direction === "" ||
-          point.panelDirection === filters.direction) &&
-        (filters.lw === "" || point.measurementSide === filters.lw)
-      );
-    });
-
     if (tableData.length === 0) {
       const initialData = measurementPoints.map((point, index) => ({
         no: index + 1,

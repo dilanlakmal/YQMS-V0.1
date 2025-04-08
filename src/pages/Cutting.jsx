@@ -1576,6 +1576,56 @@ const CuttingPage = () => {
     setFilters({ panelName: "", side: "", direction: "", lw: "" });
   };
 
+  // New useEffect
+  useEffect(() => {
+    // Reset tableData and columnDefects when selectedPanel changes
+    setTableData({
+      Top: [],
+      Middle: [],
+      Bottom: []
+    });
+    setColumnDefects({
+      Top: Array(colCounts.Top)
+        .fill([])
+        .map(() => Array(5).fill([])),
+      Middle: Array(colCounts.Middle)
+        .fill([])
+        .map(() => Array(5).fill([])),
+      Bottom: Array(colCounts.Bottom)
+        .fill([])
+        .map(() => Array(5).fill([]))
+    });
+    // Reset summary to reflect the new panel
+    setSummary({
+      Top: {
+        totalParts: 0,
+        totalPass: 0,
+        totalReject: 0,
+        rejectMeasurement: 0,
+        rejectDefects: 0,
+        passRate: 0
+      },
+      Middle: {
+        totalParts: 0,
+        totalPass: 0,
+        totalReject: 0,
+        rejectMeasurement: 0,
+        rejectDefects: 0,
+        passRate: 0
+      },
+      Bottom: {
+        totalParts: 0,
+        totalPass: 0,
+        totalReject: 0,
+        rejectMeasurement: 0,
+        rejectDefects: 0,
+        passRate: 0
+      }
+    });
+    // Reset filters to ensure they don't interfere with the new panel
+    setFilters({ panelName: "", side: "", direction: "", lw: "" });
+  }, [selectedPanel]);
+
   const resetTableData = () => {
     setCuttingTableNo("");
     setMarker("");
@@ -2606,6 +2656,7 @@ const CuttingPage = () => {
                     </div>
                     {activeMeasurementTab === "Top" && (
                       <MeasurementTable
+                        key={`Top-${selectedPanel}`}
                         tab="Top"
                         measurementPoints={filteredMeasurementPoints}
                         numColumns={colCounts.Top}
@@ -2625,6 +2676,7 @@ const CuttingPage = () => {
                     )}
                     {activeMeasurementTab === "Middle" && (
                       <MeasurementTable
+                        key={`Middle-${selectedPanel}`}
                         tab="Middle"
                         measurementPoints={filteredMeasurementPoints}
                         numColumns={colCounts.Middle}
@@ -2644,6 +2696,7 @@ const CuttingPage = () => {
                     )}
                     {activeMeasurementTab === "Bottom" && (
                       <MeasurementTable
+                        key={`Bottom-${selectedPanel}`}
                         tab="Bottom"
                         measurementPoints={filteredMeasurementPoints}
                         numColumns={colCounts.Bottom}
