@@ -6,7 +6,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable"; // Explicitly import autoTable
 // Add a fallback import for debugging
 if (typeof autoTable === "undefined") {
-  console.error("jspdf-autotable not loaded. Attempting default import.");
+  // console.error("jspdf-autotable not loaded. Attempting default import.");
   import("jspdf-autotable").then((module) => {
     global.autoTable = module.default;
   });
@@ -61,7 +61,7 @@ const DailyDefectTrend = ({ filters }) => {
       setSummaryData(response.data);
       setError(null);
     } catch (err) {
-      console.error("Fetch error:", err);
+      // console.error("Fetch error:", err);
       setError(err.message || "Failed to fetch summary data");
       setSummaryData([]);
     } finally {
@@ -357,9 +357,9 @@ const DailyDefectTrend = ({ filters }) => {
     const tablePlugin =
       typeof autoTable === "function" ? autoTable : global.autoTable;
     if (!tablePlugin) {
-      console.error(
-        "autoTable plugin not available. Please check jspdf-autotable installation."
-      );
+      // console.error(
+      //   "autoTable plugin not available. Please check jspdf-autotable installation."
+      // );
       return;
     }
 

@@ -33,6 +33,8 @@ const NavigationPanel = ({
       subMenus: [
         { name: "QC 1 Dashboard", icon: <BarChart size={16} /> },
         { name: "Daily Trend", icon: <TrendingUp size={16} /> },
+        { name: "Monthly Trend", icon: <TrendingUp size={16} /> },
+        { name: "Yearly Trend", icon: <TrendingUp size={16} /> },
       ] },
     { name: "Order Data", icon: <Package size={18} />, subMenus: [] },
     { name: "Washing", icon: <Shirt size={18} />, subMenus: [] },

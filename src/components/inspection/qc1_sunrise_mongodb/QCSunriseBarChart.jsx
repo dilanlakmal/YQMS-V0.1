@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Bar } from "react-chartjs-2";
-import FindBuyer from "../sunrise/FindBuyer";
 import Chart from 'chart.js/auto';
 import 'chartjs-plugin-datalabels';
 import annotationPlugin from 'chartjs-plugin-annotation';
@@ -14,7 +13,7 @@ const SunriseLineBarChart = ({ filteredData, filters }) => {
     const groupData = {};
 
     filteredData.forEach((row) => {
-      console.log("Row Data:", row);
+      // console.log("Row Data:", row);
       let key;
 
       if (groupBy === "WorkLine") {
@@ -22,14 +21,14 @@ const SunriseLineBarChart = ({ filteredData, filters }) => {
       } else if (groupBy === "MONo") {
         key = row.MONo || "Unknown MO";
       } else if (groupBy === "Buyer") {
-        key = FindBuyer({ moNo: row.MONo }) || "Unknown Buyer";
+        key = row.Buyer || "Unknown Buyer";
       } else if (groupBy === "ColorName") {
         key = row.ColorName || "Unknown Color";
       } else if (groupBy === "SizeName") {
         key = row.SizeName || "Unknown Size";
       }
 
-      console.log("Key:", key);
+      // console.log("Key:", key);
       if (!groupData[key]) {
         groupData[key] = {
           checked: 0,
@@ -69,7 +68,7 @@ const SunriseLineBarChart = ({ filteredData, filters }) => {
   };
 
   const defectData = defectRateByGroup();
-  console.log("Defect Data:", defectData); // Log the processed data
+  // console.log("Defect Data:", defectData); // Log the processed data
 
   const numberOfGroups = defectData.length;
   const baseBarWidth = 80;
