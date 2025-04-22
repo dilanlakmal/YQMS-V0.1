@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FaFileExcel, FaFilePdf } from "react-icons/fa";
+import QCSunriseFilterPane from "./QCSunriseFilterPane"; // Adjust the import path as needed
 
 // Helper to convert YYYY-MM-DD to DD/MM/YYYY
 const formatDateToDDMMYYYY = (dateStr) => {
@@ -18,10 +19,20 @@ const formatDateToYYYYMMDD = (dateStr) => {
   return `${year}-${month}-${day}`;
 };
 
-const QCSunriseDailyTrend = ({ filters }) => {
+const QCSunriseDailyTrend = () => {
   const [summaryData, setSummaryData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({
+    startDate: "",
+    endDate: "",
+    lineNo: "",
+    moNo: "",
+    Color: "",
+    Size: "",
+    Buyer: "",
+    defectName: "",
+  });
   const [customFilters, setCustomFilters] = useState({
     addLines: false,
     addMO: false,
@@ -35,46 +46,27 @@ const QCSunriseDailyTrend = ({ filters }) => {
   // Determine if filters are applied
   const isMoNoFiltered = (filters.moNo ?? "").trim() !== "";
   const isLineNoFiltered = (filters.lineNo ?? "").trim() !== "";
-  const isColorFiltered = (filters.color ?? "").trim() !== "";
-  const isSizeFiltered = (filters.size ?? "").trim() !== "";
+  const isColorFiltered = (filters.Color ?? "").trim() !== "";
+  const isSizeFiltered = (filters.Size ?? "").trim() !== "";
 
   // Fetch data from /api/sunrise/qc1-data
   const fetchData = async () => {
     try {
       setLoading(true);
-      const activeFilters = Object.fromEntries(
+      const queryParams = Object.fromEntries(
         Object.entries(filters).filter(
           ([_, value]) => value !== "" && value !== undefined && value !== null
         )
       );
 
-      // Map filters to QC1 endpoint parameters
-      const queryParams = {};
-      if (activeFilters.startDate)
-        queryParams.startDate = activeFilters.startDate; // Expected as YYYY-MM-DD
-      if (activeFilters.endDate)
-        queryParams.endDate = activeFilters.endDate; // Expected as YYYY-MM-DD
-      if (activeFilters.lineNo) queryParams.lineNo = activeFilters.lineNo;
-      if (activeFilters.moNo) queryParams.MONo = activeFilters.moNo;
-      if (activeFilters.color) queryParams.Color = activeFilters.color;
-      if (activeFilters.size) queryParams.Size = activeFilters.size;
-      if (activeFilters.buyer) queryParams.Buyer = activeFilters.buyer;
-      if (activeFilters.defectName)
-        queryParams.defectName = activeFilters.defectName;
+      // Map custom filters to query if not overridden by specific filters
+      if (customFilters.addLines && !queryParams.lineNo) queryParams.lineNo = "";
+      if (customFilters.addMO && !queryParams.moNo) queryParams.moNo = "";
+      if (customFilters.addBuyer && !queryParams.Buyer) queryParams.Buyer = "";
+      if (customFilters.addColors && !queryParams.Color) queryParams.Color = "";
+      if (customFilters.addSizes && !queryParams.Size) queryParams.Size = "";
 
-      // Add custom filters if not overridden by activeFilters
-      if (customFilters.addLines && !queryParams.lineNo)
-        queryParams.lineNo = ""; // Empty string to fetch all lines for grouping
-      if (customFilters.addMO && !queryParams.MONo)
-        queryParams.MONo = "";
-      if (customFilters.addBuyer && !queryParams.Buyer)
-        queryParams.Buyer = "";
-      if (customFilters.addColors && !queryParams.Color)
-        queryParams.Color = "";
-      if (customFilters.addSizes && !queryParams.Size)
-        queryParams.Size = "";
-
-      // Ensure startDate and endDate are always provided
+      // Ensure startDate and endDate are provided
       if (!queryParams.startDate || !queryParams.endDate) {
         const today = new Date();
         queryParams.endDate = today.toISOString().split("T")[0]; // YYYY-MM-DD
@@ -99,14 +91,16 @@ const QCSunriseDailyTrend = ({ filters }) => {
 
   useEffect(() => {
     fetchData();
-  }, [JSON.stringify(filters), customFilters]);
+  }, [filters, customFilters]);
 
   // Process data for table
   useEffect(() => {
     if (summaryData.length === 0) return;
 
     // Extract unique dates (in DD/MM/YYYY format)
-    const datesSet = new Set(summaryData.map((d) => d.inspectionDate));
+    const datesSet = new Set(
+      summaryData.map((d) => formatDateToDDMMYYYY(d.inspectionDate))
+    );
     const sortedDates = [...datesSet].sort((a, b) => {
       const [dayA, monthA, yearA] = a.split("/").map(Number);
       const [dayB, monthB, yearB] = b.split("/").map(Number);
@@ -118,11 +112,13 @@ const QCSunriseDailyTrend = ({ filters }) => {
 
     // Define grouping fields
     const groupingFields = [];
-    if (customFilters.addLines) groupingFields.push("lineNo");
-    if (customFilters.addMO) groupingFields.push("MONo");
+    if (customFilters.addLines && !isLineNoFiltered)
+      groupingFields.push("lineNo");
+    if (customFilters.addMO && !isMoNoFiltered) groupingFields.push("moNo");
     if (customFilters.addBuyer) groupingFields.push("Buyer");
-    if (customFilters.addColors) groupingFields.push("Color");
-    if (customFilters.addSizes) groupingFields.push("Size");
+    if (customFilters.addColors && !isColorFiltered)
+      groupingFields.push("Color");
+    if (customFilters.addSizes && !isSizeFiltered) groupingFields.push("Size");
 
     // Build hierarchy and rows
     const hierarchy = buildHierarchy(summaryData, groupingFields);
@@ -135,7 +131,8 @@ const QCSunriseDailyTrend = ({ filters }) => {
     if (groupingFields.length === 0) {
       const dateMap = {};
       data.forEach((doc) => {
-        dateMap[doc.inspectionDate] = doc;
+        const formattedDate = formatDateToDDMMYYYY(doc.inspectionDate);
+        dateMap[formattedDate] = doc;
       });
       return dateMap;
     } else {
@@ -320,11 +317,11 @@ const QCSunriseDailyTrend = ({ filters }) => {
     const totalRow = ["Total"];
     uniqueDates.forEach((date, colIndex) => {
       const hierarchy = buildHierarchy(summaryData, [
-        ...(customFilters.addLines ? ["lineNo"] : []),
-        ...(customFilters.addMO ? ["MONo"] : []),
+        ...(customFilters.addLines && !isLineNoFiltered ? ["lineNo"] : []),
+        ...(customFilters.addMO && !isMoNoFiltered ? ["moNo"] : []),
         ...(customFilters.addBuyer ? ["Buyer"] : []),
-        ...(customFilters.addColors ? ["Color"] : []),
-        ...(customFilters.addSizes ? ["Size"] : []),
+        ...(customFilters.addColors && !isColorFiltered ? ["Color"] : []),
+        ...(customFilters.addSizes && !isSizeFiltered ? ["Size"] : []),
       ]);
       const sum = getSumForGroup(hierarchy, date);
       const rate =
@@ -446,14 +443,132 @@ const QCSunriseDailyTrend = ({ filters }) => {
     doc.save("DailyDefectTrend.pdf");
   };
 
+  // Handle option toggle
+  const handleOptionToggle = (option) => {
+    setCustomFilters((prev) => ({
+      ...prev,
+      [option]: !prev[option],
+    }));
+  };
+
+  // Handle Add All button
+  const handleAddAll = () => {
+    setCustomFilters({
+      addLines: true,
+      addMO: true,
+      addBuyer: true,
+      addColors: true,
+      addSizes: true,
+    });
+  };
+
+  // Handle Clear All button
+  const handleClearAll = () => {
+    setCustomFilters({
+      addLines: false,
+      addMO: false,
+      addBuyer: false,
+      addColors: false,
+      addSizes: false,
+    });
+  };
+
   if (loading) return <div className="text-center p-4">Loading...</div>;
-  if (error) return <div className="text-center p-4 text-red-500">Error: {error}</div>;
+  if (error)
+    return <div className="text-center p-4 text-red-500">Error: {error}</div>;
 
   return (
     <div className="mt-6 bg-white shadow-md rounded-lg p-6 overflow-x-auto">
+      {/* Filter Pane */}
+      <QCSunriseFilterPane onFilterChange={setFilters} />
+
+      {/* Title, Checkboxes, and Buttons */}
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-sm font-medium text-gray-900">Daily Defect Trend</h2>
-        <div className="flex space-x-2">
+        <h2 className="text-sm font-medium text-gray-900">
+          Daily Defect Trend
+        </h2>
+        <div className="flex space-x-2 items-center">
+          {/* Custom Checkboxes */}
+          <label className="flex items-center space-x-1">
+            <input
+              id="lineNo"
+              type="checkbox"
+              checked={customFilters.addLines || isLineNoFiltered}
+              onChange={() => handleOptionToggle("addLines")}
+              disabled={isLineNoFiltered}
+              className={`h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded ${
+                isLineNoFiltered ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            />
+            <span className="text-sm text-gray-700">Add Lines</span>
+          </label>
+          <label className="flex items-center space-x-1">
+            <input
+              id="moNo"
+              type="checkbox"
+              checked={customFilters.addMO || isMoNoFiltered}
+              onChange={() => handleOptionToggle("addMO")}
+              disabled={isMoNoFiltered}
+              className={`h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded ${
+                isMoNoFiltered ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            />
+            <span className="text-sm text-gray-700">Add MO</span>
+          </label>
+          <label className="flex items-center space-x-1">
+            <input
+              id="buyer"
+              type="checkbox"
+              checked={customFilters.addBuyer}
+              onChange={() => handleOptionToggle("addBuyer")}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <span className="text-sm text-gray-700">Add Buyer</span>
+          </label>
+          <label className="flex items-center space-x-1">
+            <input
+              id="color"
+              type="checkbox"
+              checked={customFilters.addColors || isColorFiltered}
+              onChange={() => handleOptionToggle("addColors")}
+              disabled={isColorFiltered}
+              className={`h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded ${
+                isColorFiltered ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            />
+            <span className="text-sm text-gray-700">Add Colors</span>
+          </label>
+          <label className="flex items-center space-x-1">
+            <input
+              id="sizes"
+              type="checkbox"
+              checked={customFilters.addSizes || isSizeFiltered}
+              onChange={() => handleOptionToggle("addSizes")}
+              disabled={isSizeFiltered}
+              className={`h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded ${
+                isSizeFiltered ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            />
+            <span className="text-sm text-gray-700">Add Sizes</span>
+          </label>
+
+          {/* Add All Button */}
+          <button
+            onClick={handleAddAll}
+            className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-150 ease-in-out"
+          >
+            Add All
+          </button>
+
+          {/* Clear All Button */}
+          <button
+            onClick={handleClearAll}
+            className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition duration-150 ease-in-out"
+          >
+            Clear All
+          </button>
+
+          {/* Export Buttons */}
           <button
             onClick={downloadExcel}
             className="flex items-center px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
@@ -469,69 +584,6 @@ const QCSunriseDailyTrend = ({ filters }) => {
             <FaFilePdf className="mr-2" /> PDF
           </button>
         </div>
-      </div>
-
-      {/* Filter Checkboxes */}
-      <div className="mb-4 p-2 bg-gray-100 rounded-lg flex flex-wrap gap-4">
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={customFilters.addLines || isLineNoFiltered}
-            onChange={(e) =>
-              setCustomFilters((prev) => ({ ...prev, addLines: e.target.checked }))
-            }
-            disabled={isLineNoFiltered}
-            className={`mr-1 ${isLineNoFiltered ? "opacity-50 cursor-not-allowed" : ""}`}
-          />
-          Add Lines
-        </label>
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={customFilters.addMO || isMoNoFiltered}
-            onChange={(e) =>
-              setCustomFilters((prev) => ({ ...prev, addMO: e.target.checked }))
-            }
-            disabled={isMoNoFiltered}
-            className={`mr-1 ${isMoNoFiltered ? "opacity-50 cursor-not-allowed" : ""}`}
-          />
-          Add MO
-        </label>
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={customFilters.addBuyer}
-            onChange={(e) =>
-              setCustomFilters((prev) => ({ ...prev, addBuyer: e.target.checked }))
-            }
-            className="mr-1"
-          />
-          Add Buyer
-        </label>
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={customFilters.addColors || isColorFiltered}
-            onChange={(e) =>
-              setCustomFilters((prev) => ({ ...prev, addColors: e.target.checked }))
-            }
-            disabled={isColorFiltered}
-            className={`mr-1 ${isColorFiltered ? "opacity-50 cursor-not-allowed" : ""}`}
-          />
-          Add Colors
-        </label>
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={customFilters.addSizes || isSizeFiltered}
-            onChange={(e) =>
-              setCustomFilters((prev) => ({ ...prev, addSizes: e.target.checked }))
-            }
-            disabled={isSizeFiltered}
-            className={`mr-1 ${isSizeFiltered ? "opacity-50 cursor-not-allowed" : ""}`}
-          />
-          Add Sizes
-        </label>
       </div>
 
       {/* Table */}
@@ -587,7 +639,7 @@ const QCSunriseDailyTrend = ({ filters }) => {
               </td>
               {uniqueDates.map((date) => {
                 const dateData = summaryData.filter(
-                  (d) => d.inspectionDate === date
+                  (d) => formatDateToDDMMYYYY(d.inspectionDate) === date
                 );
                 const totalChecked = dateData.reduce(
                   (sum, d) => sum + (d.CheckedQty || 0),
