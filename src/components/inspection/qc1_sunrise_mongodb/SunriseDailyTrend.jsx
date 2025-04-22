@@ -46,8 +46,8 @@ const QCSunriseDailyTrend = () => {
   // Determine if filters are applied
   const isMoNoFiltered = (filters.moNo ?? "").trim() !== "";
   const isLineNoFiltered = (filters.lineNo ?? "").trim() !== "";
-  const isColorFiltered = (filters.Color ?? "").trim() !== "";
-  const isSizeFiltered = (filters.Size ?? "").trim() !== "";
+  const isColorFiltered = (filters.color ?? "").trim() !== "";
+  const isSizeFiltered = (filters.size ?? "").trim() !== "";
 
   // Fetch data from /api/sunrise/qc1-data
   const fetchData = async () => {
@@ -61,7 +61,7 @@ const QCSunriseDailyTrend = () => {
 
       // Map custom filters to query if not overridden by specific filters
       if (customFilters.addLines && !queryParams.lineNo) queryParams.lineNo = "";
-      if (customFilters.addMO && !queryParams.moNo) queryParams.moNo = "";
+      if (customFilters.addMO && !queryParams.MONo) queryParams.MONo = "";
       if (customFilters.addBuyer && !queryParams.Buyer) queryParams.Buyer = "";
       if (customFilters.addColors && !queryParams.Color) queryParams.Color = "";
       if (customFilters.addSizes && !queryParams.Size) queryParams.Size = "";
@@ -91,7 +91,7 @@ const QCSunriseDailyTrend = () => {
 
   useEffect(() => {
     fetchData();
-  }, [filters, customFilters]);
+  }, [customFilters]);
 
   // Process data for table
   useEffect(() => {
@@ -114,7 +114,7 @@ const QCSunriseDailyTrend = () => {
     const groupingFields = [];
     if (customFilters.addLines && !isLineNoFiltered)
       groupingFields.push("lineNo");
-    if (customFilters.addMO && !isMoNoFiltered) groupingFields.push("moNo");
+    if (customFilters.addMO && !isMoNoFiltered) groupingFields.push("MONo");
     if (customFilters.addBuyer) groupingFields.push("Buyer");
     if (customFilters.addColors && !isColorFiltered)
       groupingFields.push("Color");
@@ -318,7 +318,7 @@ const QCSunriseDailyTrend = () => {
     uniqueDates.forEach((date, colIndex) => {
       const hierarchy = buildHierarchy(summaryData, [
         ...(customFilters.addLines && !isLineNoFiltered ? ["lineNo"] : []),
-        ...(customFilters.addMO && !isMoNoFiltered ? ["moNo"] : []),
+        ...(customFilters.addMO && !isMoNoFiltered ? ["MONo"] : []),
         ...(customFilters.addBuyer ? ["Buyer"] : []),
         ...(customFilters.addColors && !isColorFiltered ? ["Color"] : []),
         ...(customFilters.addSizes && !isSizeFiltered ? ["Size"] : []),
@@ -489,9 +489,9 @@ const QCSunriseDailyTrend = () => {
         </h2>
         <div className="flex space-x-2 items-center">
           {/* Custom Checkboxes */}
-          <label className="flex items-center space-x-1">
+          <label  htmlFor="addLines" className="flex items-center space-x-1">
             <input
-              id="lineNo"
+              id="addLines"
               type="checkbox"
               checked={customFilters.addLines || isLineNoFiltered}
               onChange={() => handleOptionToggle("addLines")}
@@ -502,9 +502,9 @@ const QCSunriseDailyTrend = () => {
             />
             <span className="text-sm text-gray-700">Add Lines</span>
           </label>
-          <label className="flex items-center space-x-1">
+          <label htmlFor="addMo" className="flex items-center space-x-1">
             <input
-              id="moNo"
+              id="addMo"
               type="checkbox"
               checked={customFilters.addMO || isMoNoFiltered}
               onChange={() => handleOptionToggle("addMO")}
@@ -515,9 +515,9 @@ const QCSunriseDailyTrend = () => {
             />
             <span className="text-sm text-gray-700">Add MO</span>
           </label>
-          <label className="flex items-center space-x-1">
+          <label htmlFor="addBuyer" className="flex items-center space-x-1">
             <input
-              id="buyer"
+              id="addBuyer"
               type="checkbox"
               checked={customFilters.addBuyer}
               onChange={() => handleOptionToggle("addBuyer")}
@@ -525,9 +525,9 @@ const QCSunriseDailyTrend = () => {
             />
             <span className="text-sm text-gray-700">Add Buyer</span>
           </label>
-          <label className="flex items-center space-x-1">
+          <label htmlFor="addColors" className="flex items-center space-x-1">
             <input
-              id="color"
+              id="addColors"
               type="checkbox"
               checked={customFilters.addColors || isColorFiltered}
               onChange={() => handleOptionToggle("addColors")}
@@ -538,9 +538,9 @@ const QCSunriseDailyTrend = () => {
             />
             <span className="text-sm text-gray-700">Add Colors</span>
           </label>
-          <label className="flex items-center space-x-1">
+          <label htmlFor="addSizes" className="flex items-center space-x-1">
             <input
-              id="sizes"
+              id="addSizes"
               type="checkbox"
               checked={customFilters.addSizes || isSizeFiltered}
               onChange={() => handleOptionToggle("addSizes")}
