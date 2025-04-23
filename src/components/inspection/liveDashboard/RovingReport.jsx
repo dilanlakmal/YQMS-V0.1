@@ -543,6 +543,9 @@ const RovingReport = () => {
                     Checked Qty
                   </th>
                   <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
+                    Reject Parts
+                  </th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
                     Defects Qty
                   </th>
                   <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-r border-gray-200">
@@ -609,6 +612,9 @@ const RovingReport = () => {
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
                         {entry.checked_quantity}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                        {metrics.rejectGarmentCount}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
                         {metrics.totalDefectsQty}

@@ -90,6 +90,7 @@ const MeasurementNumPad = ({ onClose, onInput, initialValue }) => {
   const handleClear = () => {
     setFraction(null);
     setWholeNumber(0);
+    onClose();
   };
 
   // Handle zero button (bottom row)
