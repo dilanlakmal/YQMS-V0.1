@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import QCSunriseSummaryExcel from "./QCSunriseSummaryExcel";
+import QCSunriseSummaryPDF from "./QCSunriseSummaryPDF";
 
 const QCSunriseSummaryTable = ({ data, loading, error, filters }) => {
   // State for option buttons (default to all ticked)
@@ -10,6 +12,10 @@ const QCSunriseSummaryTable = ({ data, loading, error, filters }) => {
     addColors: true,
     addSizes: true
   });
+
+  // State for download generating status
+  const [isGeneratingExcel, setIsGeneratingExcel] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   // Determine background color for defect rate
   const getDefectRateColor = (rate) => {
@@ -350,6 +356,20 @@ const QCSunriseSummaryTable = ({ data, loading, error, filters }) => {
           >
             Clear All
           </button>
+          {/* Download Excel Button */}
+          <QCSunriseSummaryExcel
+            groupedData={groupedData}
+            columnsToDisplay={columnsToDisplay}
+            isGenerating={isGeneratingExcel}
+            setIsGenerating={setIsGeneratingExcel}
+          />
+          {/* Download PDF Button */}
+          <QCSunriseSummaryPDF
+            groupedData={groupedData}
+            columnsToDisplay={columnsToDisplay}
+            isGenerating={isGeneratingPDF}
+            setIsGenerating={setIsGeneratingPDF}
+          />
         </div>
       </div>
       {groupedData.length === 0 && !loading && !error ? (
