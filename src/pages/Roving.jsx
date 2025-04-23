@@ -20,7 +20,7 @@ import CEDatabase from "../components/inspection/qc_roving/CEDatabase";
 import EmpQRCodeScanner from "../components/inspection/qc_roving/EmpQRCodeScanner";
 import PreviewRoving from "../components/inspection/qc_roving/PreviewRoving";
 import RovingCamera from "../components/inspection/qc_roving/RovingCamera";
-import RovingData from "../components/inspection/qc_roving/RovingData"; // Import the new component
+import RovingData from "../components/inspection/qc_roving/RovingData";
 
 const RovingPage = () => {
   const { t } = useTranslation();
@@ -117,11 +117,10 @@ const RovingPage = () => {
             params: { stNo: moNo }
           }
         );
-        setOperationData(response.data.orderData || []); // Set to orderData array
+        setOperationData(response.data.orderData || []);
       } catch (error) {
         console.error("Error fetching operation data:", error);
         setOperationData([]);
-        // Only show error if the MO Number was explicitly selected
         if (error.response?.status === 404) {
           Swal.fire({
             icon: "error",
@@ -159,9 +158,9 @@ const RovingPage = () => {
     };
   }, []);
 
-  const addDefect = () => {
-    if (selectedDefect && selectedOperationId) {
-      const defect = allDefects.find((d) => d.english === selectedDefect);
+  const addDefect = (defectName) => {
+    if (defectName && selectedOperationId) {
+      const defect = allDefects.find((d) => d.english === defectName);
       if (defect) {
         setGarments((prevGarments) => {
           const newGarments = [...prevGarments];
@@ -170,7 +169,7 @@ const RovingPage = () => {
             defects: [
               ...newGarments[currentGarmentIndex].defects,
               {
-                name: defect.english,
+                name: defect.english, // Store English name
                 count: 1,
                 operationId: selectedOperationId,
                 repair: defect.repair
@@ -180,7 +179,7 @@ const RovingPage = () => {
           };
           return newGarments;
         });
-        setSelectedDefect("");
+        setSelectedDefect(""); // Reset dropdown
       }
     }
   };
@@ -255,15 +254,9 @@ const RovingPage = () => {
     setSelectedDefect("");
     setSelectedOperationId("");
     setLanguage("khmer");
-    //setMoNo("");
-    //setMoNoSearch("");
-    //setMoNoOptions([]);
-    //setShowMoNoDropdown(false);
-    //setOperationData([]);
     setScannedUserData(null);
     setShowOperatorDetails(false);
     setShowOperationDetails(false);
-    //setLineNo("");
     setSpiStatus("");
     setMeasurementStatus("");
     setSpiImage(null);
@@ -278,12 +271,13 @@ const RovingPage = () => {
       !moNo ||
       !selectedOperationId ||
       !spiStatus ||
-      !measurementStatus
+      !measurementStatus ||
+      !scannedUserData
     ) {
       Swal.fire({
         icon: "warning",
         title: "Missing Information",
-        text: "Please fill all required fields first."
+        text: "Please fill all required fields and scan the operator QR code."
       });
       return;
     }
@@ -302,7 +296,11 @@ const RovingPage = () => {
       return {
         ...garment,
         status: hasDefects ? "Fail" : "Pass",
-        garment_defect_count: garmentDefectCount
+        garment_defect_count: garmentDefectCount,
+        defects: garment.defects.map((defect) => ({
+          ...defect,
+          name: defect.name // Already in English
+        }))
       };
     });
 
@@ -430,7 +428,12 @@ const RovingPage = () => {
   );
 
   const isFormValid =
-    lineNo && moNo && selectedOperationId && spiStatus && measurementStatus;
+    lineNo &&
+    moNo &&
+    selectedOperationId &&
+    spiStatus &&
+    measurementStatus &&
+    scannedUserData;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 p-6">
@@ -541,7 +544,7 @@ const RovingPage = () => {
                 </div>
               </div>
 
-              {/* Second Row: Operation No, Scan QR, Inspection Type */}
+              {/* Second Row: Operation No, Scan QR, Inspection Type, Language */}
               <div className="flex flex-wrap items-center gap-4 mt-4">
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
@@ -664,6 +667,20 @@ const RovingPage = () => {
                       </div>
                     </div>
                   )}
+                </div>
+                <div className="flex-1 min-w-[150px]">
+                  <label className="block text-sm font-medium text-gray-700">
+                    {t("qcRoving.language")}
+                  </label>
+                  <select
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="khmer">Khmer</option>
+                    <option value="english">English</option>
+                    <option value="chinese">Chinese</option>
+                  </select>
                 </div>
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
@@ -806,57 +823,49 @@ const RovingPage = () => {
                   </div>
                   <div className="space-y-1">
                     {currentGarmentDefects.length > 0 ? (
-                      currentGarmentDefects.map((defect, defectIndex) => (
-                        <div
-                          key={`${currentGarmentIndex}-${defectIndex}`}
-                          className="flex items-center space-x-2 bg-white p-3 rounded-lg shadow-sm flex-wrap gap-y-2"
-                        >
-                          <select
-                            value={defect.name}
-                            onChange={(e) => {
-                              const newGarments = [...garments];
-                              newGarments[currentGarmentIndex].defects[
-                                defectIndex
-                              ].name = e.target.value;
-                              setGarments(newGarments);
-                            }}
-                            className="max-w-[220px] md:max-w-[400px] p-2 border border-gray-300 rounded-lg"
+                      currentGarmentDefects.map((defect, defectIndex) => {
+                        const defectInfo = allDefects.find(
+                          (d) => d.english === defect.name
+                        );
+                        return (
+                          <div
+                            key={`${currentGarmentIndex}-${defectIndex}`}
+                            className="flex items-center space-x-2 bg-white p-3 rounded-lg shadow-sm flex-wrap gap-y-2"
                           >
-                            <option value="">Select Defect</option>
-                            {allDefects.map((defectName) => (
-                              <option
-                                key={defectName.code}
-                                value={defectName.english}
-                              >
-                                {getDefectName(defectName)}
-                              </option>
-                            ))}
-                          </select>
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() => decrementDefect(defectIndex)}
-                              className="bg-gray-300 text-gray-700 px-2 py-1 rounded-l hover:bg-gray-400"
-                            >
-                              -
-                            </button>
-                            <span className="w-8 text-center">
-                              {defect.count}
+                            <span className="max-w-[220px] md:max-w-[400px] p-2">
+                              {defectInfo
+                                ? getDefectName(defectInfo)
+                                : defect.name}
                             </span>
-                            <button
-                              onClick={() => incrementDefect(defectIndex)}
-                              className="bg-gray-300 text-gray-700 px-2 py-1 rounded-r hover:bg-gray-400"
-                            >
-                              +
-                            </button>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => decrementDefect(defectIndex)}
+                                className="bg-gray-300 text-gray-700 px-2 py-1 rounded-l hover:bg-gray-400"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="text"
+                                value={defect.count}
+                                readOnly
+                                className="w-8 text-center border border-gray-300 rounded"
+                              />
+                              <button
+                                onClick={() => incrementDefect(defectIndex)}
+                                className="bg-gray-300 text-gray-700 px-2 py-1 rounded-r hover:bg-gray-400"
+                              >
+                                +
+                              </button>
+                              <button
+                                onClick={() => deleteDefect(defectIndex)}
+                                className="p-2 text-red-600 hover:text-red-800"
+                              >
+                                <XCircle className="w-5 h-5" />
+                              </button>
+                            </div>
                           </div>
-                          <button
-                            onClick={() => deleteDefect(defectIndex)}
-                            className="p-2 text-red-600 hover:text-red-800"
-                          >
-                            <XCircle className="w-5 h-5" />
-                          </button>
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <p className="text-gray-600">
                         {t("qcRoving.no_defect_record")}
@@ -864,19 +873,15 @@ const RovingPage = () => {
                     )}
                     <div className="flex items-center space-x-2 mt-4">
                       <select
-                        value={language}
-                        onChange={(e) => setLanguage(e.target.value)}
-                        className="border p-2 rounded"
-                      >
-                        <option value="khmer">Khmer</option>
-                        <option value="english">English</option>
-                        <option value="chinese">Chinese</option>
-                      </select>
-                      <select
                         value={selectedDefect}
-                        onChange={(e) => setSelectedDefect(e.target.value)}
+                        onChange={(e) => {
+                          setSelectedDefect(e.target.value);
+                          if (e.target.value) {
+                            addDefect(e.target.value);
+                          }
+                        }}
                         className="border p-2 rounded w-full"
-                        disabled={!moNo}
+                        disabled={!moNo || !selectedOperationId}
                       >
                         <option value="">{t("qcRoving.select_defect")}</option>
                         {allDefects.map((defect) => (
@@ -885,13 +890,6 @@ const RovingPage = () => {
                           </option>
                         ))}
                       </select>
-                      <button
-                        onClick={addDefect}
-                        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                        disabled={!selectedDefect || !selectedOperationId}
-                      >
-                        {t("qcRoving.add")}
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -1025,7 +1023,7 @@ const RovingPage = () => {
             )}
           </>
         ) : activeTab === "data" ? (
-          <RovingData /> // Use the new RovingData component
+          <RovingData />
         ) : (
           <CEDatabase />
         )}

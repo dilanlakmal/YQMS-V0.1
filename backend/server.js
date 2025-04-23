@@ -57,12 +57,12 @@ const PORT = 5001;
 
 // Load SSL certificates
 const privateKey = fs.readFileSync(
-  "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.12.14-key.pem",
+  "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.14.32-key.pem",
   //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175-key.pem",
   "utf8"
 );
 const certificate = fs.readFileSync(
-  "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.12.14.pem",
+  "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.14.32.pem",
   //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175.pem",
   "utf8"
 );
@@ -78,7 +78,7 @@ const server = https.createServer(credentials, app);
 // Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: "https://192.167.12.14:3001", //"https://192.165.2.175:3001", //"https://localhost:3001"
+    origin: "https://192.167.14.32:3001", //"https://192.165.2.175:3001", //"https://localhost:3001"
     methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
@@ -93,7 +93,7 @@ app.use("/public", express.static(path.join(__dirname, "../public")));
 app.use(bodyParser.json());
 app.use(
   cors({
-    origin: "https://192.167.12.14:3001", //["http://localhost:3001", "https://localhost:3001"],
+    origin: "https://192.167.14.32:3001", //["http://localhost:3001", "https://localhost:3001"],
     methods: ["GET", "POST", "PUT"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true

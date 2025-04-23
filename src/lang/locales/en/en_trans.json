@@ -445,6 +445,7 @@
     "select_operation_no": "Select Operation No",
     "scanQR": "Scan QR",
     "inspectionType": "Inspection Type",
+    "language": "Language",
     "normal": "Normal",
     "critical": "Critical",
     "quantity": "Quantity",

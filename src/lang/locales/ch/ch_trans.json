@@ -444,6 +444,7 @@
     "select_operation_no": "选择操作编号",
     "scanQR": "扫描二维码",
     "inspectionType": "检查类型",
+    "language": "语言",
     "normal": "普通",
     "critical": "关键",
     "quantity": "数量",

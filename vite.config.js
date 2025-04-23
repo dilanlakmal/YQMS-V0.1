@@ -12,12 +12,12 @@ export default defineConfig({
       key: fs.readFileSync(
         //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175-key.pem"
 
-        "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.12.14-key.pem"
+        "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.14.32-key.pem"
       ),
       cert: fs.readFileSync(
         //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175.pem"
-        "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.12.14.pem"
-      ),
-    },
-  },
+        "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.14.32.pem"
+      )
+    }
+  }
 });
