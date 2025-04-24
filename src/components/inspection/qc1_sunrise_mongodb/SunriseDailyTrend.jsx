@@ -35,7 +35,7 @@ const getDefaultStartDate = () => {
 };
 
 const QCSunriseDailyTrend = () => {
-  const [rawData, setRawData] = useState([]); // Store the raw fetched data
+  const [rawData, setRawData] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -48,7 +48,7 @@ const QCSunriseDailyTrend = () => {
     Color: '',
     Size: '',
     Buyer: '',
-    defectName: '', // Note: defectName filter affects data fetching but not grouping columns
+    defectName: '', 
   });
 
   // State for controlling which fields to group by in the table
@@ -82,34 +82,33 @@ const QCSunriseDailyTrend = () => {
     try {
       setLoading(true);
       setError(null);
-      setRawData([]); // Clear previous raw data
+      setRawData([]); 
       setRows([]);
       setUniqueDates([]);
       setTotalChecked(0);
       setTotalDefects(0);
       setOverallDhu(0);
 
-      // Construct query parameters from active filters
+     
       const queryParams = { ...activeFilters };
 
-      // Remove empty filters before sending
+      
       Object.keys(queryParams).forEach(key => {
         if (queryParams[key] === '' || queryParams[key] === null || queryParams[key] === undefined) {
           delete queryParams[key];
         }
       });
 
-      // Ensure default dates if none are provided (shouldn't happen with defaults)
       if (!queryParams.startDate) queryParams.startDate = getDefaultStartDate();
       if (!queryParams.endDate) queryParams.endDate = getDefaultEndDate();
 
       const queryString = new URLSearchParams(queryParams).toString();
       const url = `${API_BASE_URL}/api/sunrise/qc1-data?${queryString}`;
-      console.log("Fetching data from:", url); // Log the URL for debugging
+      console.log("Fetching data from:", url); 
 
       const response = await axios.get(url);
-      console.log("Fetched data:", response.data.length, "records"); // Log fetched data count
-      setRawData(response.data || []); // Ensure it's an array
+      console.log("Fetched data:", response.data.length, "records"); 
+      setRawData(response.data || []); 
       setError(null);
     } catch (err) {
       console.error("Fetch error:", err);
@@ -121,14 +120,13 @@ const QCSunriseDailyTrend = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeFilters]); // Dependency: activeFilters
+  }, [activeFilters]);
 
-  // Trigger data fetch when activeFilters change
+ 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Process raw data for Summary Card whenever rawData changes
   useEffect(() => {
     if (loading || error || !Array.isArray(rawData) || rawData.length === 0) {
       setTotalChecked(0);
@@ -150,9 +148,8 @@ const QCSunriseDailyTrend = () => {
     setTotalDefects(defects);
     setOverallDhu(dhu);
 
-  }, [rawData, loading, error]); // Dependency: rawData, loading, error
+  }, [rawData, loading, error]); 
 
-  // Process raw data for the Trend Table whenever rawData or groupingOptions change
   useEffect(() => {
     if (loading || error || !Array.isArray(rawData) || rawData.length === 0) {
       setRows([]);
@@ -277,7 +274,7 @@ const QCSunriseDailyTrend = () => {
       rows.push({
         type: "group",
         key: groupKey + "-group",
-        groupValues: group.groupValues, // Keep the full group values here
+        groupValues: group.groupValues, 
         data: groupData,
       });
 
@@ -308,7 +305,7 @@ const QCSunriseDailyTrend = () => {
         rows.push({
           type: "defect",
           key: groupKey + "-" + defectName,
-          groupValues: group.groupValues, // Also pass group values to defect rows for comparison logic
+          groupValues: group.groupValues, 
           defectName: defectName,
           data: defectData,
         });
@@ -349,8 +346,6 @@ const QCSunriseDailyTrend = () => {
     return "DCFCE7"; // green-100
   };
 
-  // --- Export Functions ---
-
   // Helper to get current grouping field names for headers
   const getCurrentGroupingFieldNames = () => {
     const names = [];
@@ -382,35 +377,30 @@ const QCSunriseDailyTrend = () => {
     exportData.push(headerRow);
     headerRow.forEach((_, colIndex) => ratesMap.set(`2-${colIndex}`, -1));
 
-    // Data Rows - Logic to handle hierarchy display
+    // Data Rows
     let rowIndex = 3;
-    let lastDisplayedGroupValues = Array(numGroupingCols).fill(null); // Track last displayed values
+    let lastDisplayedGroupValues = Array(numGroupingCols).fill(null); 
 
     rows.forEach((row) => {
       const rowData = [];
       const isGroupRow = row.type === "group";
 
-      // Grouping Columns - Conditionally add values
+      // Grouping Columns 
       for (let colIndex = 0; colIndex < numGroupingCols; colIndex++) {
         const currentValue = row.groupValues[colIndex];
         let displayValue = "";
-        // Display if:
-        // 1. It's a group row AND
-        // 2. The value for this column is different from the last displayed value for this column
+      
         if (isGroupRow && currentValue !== lastDisplayedGroupValues[colIndex]) {
           displayValue = currentValue;
           lastDisplayedGroupValues[colIndex] = currentValue;
-          // Reset tracking for all subsequent columns because a higher level changed
           for (let k = colIndex + 1; k < numGroupingCols; k++) {
             lastDisplayedGroupValues[k] = null;
           }
         } else if (!isGroupRow) {
-            // For defect rows, only display if the parent group row changed in this column
-            // This check is implicitly handled because lastDisplayedGroupValues is updated only on group rows
-            // So, defect rows following a group row where the value *was* displayed will show empty here.
+            
              if (currentValue !== lastDisplayedGroupValues[colIndex]) {
-                 // This case should ideally not happen if logic is correct, but as safety:
-                 lastDisplayedGroupValues[colIndex] = currentValue; // Update tracking if somehow missed
+                 
+                 lastDisplayedGroupValues[colIndex] = currentValue;
                  for (let k = colIndex + 1; k < numGroupingCols; k++) {
                     lastDisplayedGroupValues[k] = null;
                  }
@@ -470,8 +460,8 @@ const QCSunriseDailyTrend = () => {
     for (let R = range.s.r; R <= range.e.r; ++R) {
       for (let C = range.s.c; C <= range.e.c; ++C) {
         const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-        const cell = ws[cellAddress]; // Get cell object
-        if (!cell) continue; // Skip empty cells defined by aoa_to_sheet
+        const cell = ws[cellAddress]; 
+        if (!cell) continue; 
 
         const rate = ratesMap.get(`${R}-${C}`);
         const isHeaderRow = R === 2;
@@ -479,13 +469,13 @@ const QCSunriseDailyTrend = () => {
         const isGroupLabelCol = C === numGroupingCols;
         const isDataRow = R > 2 && R < range.e.r;
         const isActualGroupRow = isDataRow && exportData[R][numGroupingCols] === "GROUP TOTAL DHU%";
-        const cellHasValue = cell.v !== undefined && cell.v !== ""; // Check if cell has a value
+        const cellHasValue = cell.v !== undefined && cell.v !== ""; 
 
         let fgColor = "FFFFFF";
         let fontStyle = {};
         let alignment = {
             horizontal: (C <= numGroupingCols) ? "left" : "center",
-            vertical: "middle",
+            vertical: "middle", 
         };
 
         if (R === 0) { /* Title */ }
@@ -501,26 +491,25 @@ const QCSunriseDailyTrend = () => {
             } else if (rate === 0) {
                  fgColor = "E5E7EB";
             }
-        } else if (C < numGroupingCols) { // Grouping value columns
+        } else if (C < numGroupingCols) { 
             if (isActualGroupRow) {
-                // Style group row grouping cells (whether they have value or are empty due to hierarchy)
+                
                 fgColor = "F3F4F6";
-                fontStyle = { bold: cellHasValue }; // Bold only if value is displayed
+                fontStyle = { bold: cellHasValue }; 
             } else {
-                // Defect row grouping cells (always empty)
+                
                 fgColor = "FFFFFF";
             }
-        } else if (isGroupLabelCol) { // Defect/Group label column
+        } else if (isGroupLabelCol) { 
             fgColor = isActualGroupRow ? "F3F4F6" : "FFFFFF";
             fontStyle = { bold: isActualGroupRow };
             if (!isActualGroupRow) {
                 // Indent defect names (Excel doesn't have direct padding, use alignment indent)
                 // alignment.indent = 1; // Requires Pro version of SheetJS? Alternative: add spaces?
-                // Let's stick to left alignment for simplicity here.
             }
-        } else if (rate !== undefined && rate > 0) { // Data cell with positive rate
+        } else if (rate !== undefined && rate > 0) { 
             fgColor = getBackgroundColorHex(rate);
-        } else if (rate === 0) { // Data cell with zero rate
+        } else if (rate === 0) { 
             fgColor = "E5E7EB";
         }
 
@@ -589,21 +578,22 @@ const QCSunriseDailyTrend = () => {
         textColor: [55, 65, 81],
         fontStyle: "bold",
         halign: 'center',
+        valign: 'middle', 
       },
       styles: {
         cellPadding: 1.5,
         fontSize: 7,
-        valign: "middle",
+        valign: "middle", 
         lineColor: [0, 0, 0],
         lineWidth: 0.1,
       },
       columnStyles: {
         ...Array.from({ length: numGroupingCols + 1 }, (_, i) => i).reduce((acc, i) => {
-            acc[i] = { halign: 'left' };
+            acc[i] = { halign: 'left' }; 
             return acc;
         }, {}),
         ...uniqueDates.reduce((acc, _, index) => {
-          acc[numGroupingCols + 1 + index] = { halign: 'center' };
+          acc[numGroupingCols + 1 + index] = { halign: 'center' }; 
           return acc;
         }, {})
       },
@@ -611,7 +601,7 @@ const QCSunriseDailyTrend = () => {
         const rowIndexInExportData = data.row.index + 3;
         const colIndex = data.column.index;
         const rate = ratesMap.get(`${rowIndexInExportData}-${colIndex}`);
-        const cellHasValue = data.cell.raw !== undefined && data.cell.raw !== ""; // Check raw value from exportData
+        const cellHasValue = data.cell.raw !== undefined && data.cell.raw !== ""; 
 
         const isTotalRow = data.row.index === body.length - 1;
         const isGroupLabelCol = colIndex === numGroupingCols;
@@ -631,24 +621,24 @@ const QCSunriseDailyTrend = () => {
                 } else if (rate === 0) {
                     fillColor = [229, 231, 235];
                 }
-            } else if (colIndex < numGroupingCols) { // Grouping value columns
+            } else if (colIndex < numGroupingCols) { 
                 if (isGroupRow) {
                     fillColor = [243, 244, 246];
-                    fontStyle = cellHasValue ? 'bold' : 'normal'; // Bold only if value is displayed
+                    fontStyle = cellHasValue ? 'bold' : 'normal';  
                 } else {
-                    fillColor = [255, 255, 255]; // White for empty defect row grouping cells
+                    fillColor = [255, 255, 255]; 
                 }
-            } else if (isGroupLabelCol) { // Defect/Group label column
+            } else if (isGroupLabelCol) { 
                  fillColor = isGroupRow ? [243, 244, 246] : [255, 255, 255];
                  fontStyle = isGroupRow ? 'bold' : 'normal';
                  if (!isGroupRow) {
-                    // Indent defect names slightly in PDF
+                    
                     data.cell.styles.cellPadding = { ...data.cell.styles.cellPadding, left: 3 };
                  }
-            } else if (rate !== undefined && rate > 0) { // Data cell with positive rate
+            } else if (rate !== undefined && rate > 0) {
                 fillColor = getBackgroundColorRGB(rate);
                 textColor = getFontColorRGB(rate);
-            } else if (rate === 0) { // Data cell with zero rate
+            } else if (rate === 0) { 
                 fillColor = [229, 231, 235];
             }
 
@@ -671,7 +661,6 @@ const QCSunriseDailyTrend = () => {
   };
 
 
-  // --- UI Event Handlers ---
   const handleOptionToggle = (option) => {
     setGroupingOptions((prev) => ({ ...prev, [option]: !prev[option] }));
   };
@@ -682,24 +671,21 @@ const QCSunriseDailyTrend = () => {
     setGroupingOptions({ addLines: false, addMO: false, addBuyer: false, addColors: false, addSizes: false });
   };
 
-  // Prepare summaryStats prop
   const summaryStats = { totalCheckedQty: totalChecked, totalDefectsQty: totalDefects, defectRate: overallDhu };
 
-  // Dynamically determine table headers
   const tableGroupingHeaders = getCurrentGroupingFieldNames();
 
-  // *** ADDED FOR HIERARCHICAL DISPLAY LOGIC IN RENDER ***
   let lastDisplayedGroupValues = Array(tableGroupingHeaders.length).fill(null);
-  // *** END ADDED ***
+ 
 
   return (
     <div className="p-4 space-y-6">
-      {/* Filter Pane */}
+     
       <QCSunriseFilterPane onFilterChange={handleFilterChange} initialFilters={activeFilters} />
 
-      {/* Summary Card Section */}
+      
       <div className="mb-6">
-        {/* ... (summary card loading/error/data states - unchanged) ... */}
+        
          {loading && <div className="text-center p-4 text-gray-500">Loading summary...</div>}
         {error && <div className="text-center p-4 text-red-500">Error loading summary: {error}</div>}
         {!loading && !error && rawData.length === 0 && !activeFilters.startDate && !activeFilters.endDate && (
@@ -713,18 +699,18 @@ const QCSunriseDailyTrend = () => {
         )}
       </div>
 
-      {/* Trend Table Section */}
+      
       <div className="bg-white shadow-md rounded-lg p-4">
-        {/* Grouping Options and Export Buttons */}
+       
         {!loading && !error && (
           <>
-            {/* ... (grouping options controls - unchanged) ... */}
+            
              <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
               <h2 className="text-lg font-semibold text-gray-900 whitespace-nowrap">Daily Defect Trend</h2>
-              {/* Grouping Options Controls */}
+              
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span className="text-sm font-medium text-gray-600 mr-2">Group by:</span>
-                {/* Dynamically render checkboxes based on filter status */}
+                
                 {[
                   { label: 'Lines', option: 'addLines', filterKey: 'lineNo' },
                   { label: 'MO', option: 'addMO', filterKey: 'MONo' },
@@ -737,16 +723,16 @@ const QCSunriseDailyTrend = () => {
                     <label key={option} className="flex items-center space-x-1 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={groupingOptions[option] || isDisabled} // Checked if option is true OR filter is active
+                        checked={groupingOptions[option] || isDisabled} 
                         onChange={() => handleOptionToggle(option)}
-                        disabled={isDisabled} // Disable if the specific filter is active
+                        disabled={isDisabled} 
                         className={`h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded ${isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                       />
                       <span className={`text-sm ${isDisabled ? 'text-gray-400' : 'text-gray-700'}`}>{label}</span>
                     </label>
                   );
                 })}
-                {/* Add/Clear All Buttons */}
+                
                 <button
                   onClick={handleAddAll}
                   className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1"
@@ -761,7 +747,7 @@ const QCSunriseDailyTrend = () => {
                >
                   Clear All
                 </button>
-                {/* Export Buttons */}
+                
                 <div className="border-l border-gray-300 h-6 mx-2"></div>
                 <button
                   onClick={downloadExcel}
@@ -784,8 +770,6 @@ const QCSunriseDailyTrend = () => {
           </>
         )}
 
-        {/* Loading/Error/No Data States for Table */}
-        {/* ... (loading/error/no data states - unchanged) ... */}
          {loading && <div className="text-center p-4 text-gray-500">Loading trend data...</div>}
         {error && <div className="text-center p-4 text-red-500">Error loading trend data: {error}</div>}
         {!loading && !error && rows.length === 0 && rawData.length > 0 && (
@@ -795,88 +779,79 @@ const QCSunriseDailyTrend = () => {
              <div className="text-center p-4 text-gray-500">No data found for the selected filters.</div>
         )}
 
-        {/* The Actual Trend Table */}
+        
         {!loading && !error && rows.length > 0 && (
           <div className="overflow-x-auto border border-gray-300 rounded-md" style={{ maxHeight: "60vh" }}>
-            <table className="min-w-full border-collapse align-middle text-xs">
-              {/* Table Header */}
+            <table className="min-w-full border-collapse align-middle text-xs"> 
               <thead className="bg-gray-100 sticky top-0 z-10">
-                 {/* ... (table header rendering - unchanged) ... */}
+                 
                  <tr>
-                  {/* Dynamic Grouping Headers */}
+                  
                   {tableGroupingHeaders.map((header, index) => (
                     <th
                       key={header}
-                      className="py-2 px-3 border-b border-r border-gray-300 text-left font-semibold text-gray-700 sticky bg-gray-100 z-20 whitespace-nowrap"
-                      // Calculate left offset for sticky positioning
+                      className="py-2 px-3 border-b border-r border-gray-300 text-left font-semibold text-gray-700 sticky bg-gray-100 z-20 whitespace-nowrap align-middle" 
                       style={{ left: `${index * 100}px`, minWidth: '100px' }}
                     >
                       {header}
                     </th>
                   ))}
-                  {/* Defect/Group Header */}
+                  
                   <th
-                    className="py-2 px-3 border-b border-r border-gray-300 text-left font-semibold text-gray-700 sticky bg-gray-100 z-20 whitespace-nowrap"
-                    style={{ left: `${tableGroupingHeaders.length * 100}px`, minWidth: '150px' }} // Adjust width as needed
+                    className="py-2 px-3 border-b border-r border-gray-300 text-left font-semibold text-gray-700 sticky bg-gray-100 z-20 whitespace-nowrap align-middle" 
+                    style={{ left: `${tableGroupingHeaders.length * 100}px`, minWidth: '150px' }} 
                   >
                     Defect / Group
                   </th>
-                  {/* Date Headers */}
+                  
                   {uniqueDates.map((date) => (
                     <th
                       key={date}
-                      className="py-2 px-3 border-b border-r border-gray-300 text-center font-semibold text-gray-700 whitespace-nowrap"
-                      style={{ minWidth: '80px'}} // Ensure date columns have min width
+                      className="py-2 px-3 border-b border-r border-gray-300 text-center font-semibold text-gray-700 whitespace-nowrap align-middle" 
+                      style={{ minWidth: '80px'}} 
                     >
                       {date}
                     </th>
                   ))}
                 </tr>
               </thead>
-              {/* Table Body - MODIFIED FOR HIERARCHICAL DISPLAY */}
               <tbody className="bg-white">
                 {rows.map((row) => {
                   const isGroupRow = row.type === "group";
-                  const rowCells = []; // Store cells for this row
+                  const rowCells = []; 
 
-                  // --- Grouping Columns (Hierarchical Logic) ---
                   for (let colIndex = 0; colIndex < tableGroupingHeaders.length; colIndex++) {
-                    const currentValue = row.groupValues[colIndex]; // Get value for this column
+                    const currentValue = row.groupValues[colIndex]; 
                     let displayValue = "";
                     let shouldDisplay = false;
                     let isSticky = false;
 
-                    // Determine if the value should be displayed
                     if (currentValue !== lastDisplayedGroupValues[colIndex]) {
-                       // Display only if it's different from the last displayed value *at this level*
-                       // And only display the actual value on the group row itself
+
                        if (isGroupRow) {
                            displayValue = currentValue;
-                           shouldDisplay = true; // Mark that this cell displays a value
-                           isSticky = true; // Make the displayed value sticky
+                           shouldDisplay = true; 
+                           isSticky = true; 
                        }
-                       // Update the tracking for this column level
+                       
                        lastDisplayedGroupValues[colIndex] = currentValue;
-                       // Reset tracking for all subsequent (lower) levels
+                       
                        for (let k = colIndex + 1; k < lastDisplayedGroupValues.length; k++) {
-                           lastDisplayedGroupValues[k] = null; // Use null or another value guaranteed not to match data
+                           lastDisplayedGroupValues[k] = null; 
                        }
                     } else {
-                        // Value is the same as the row above (at this level or higher)
-                        // Display nothing.
-                        // If it's a defect row, it also displays nothing here.
+                        
                         displayValue = "";
                         shouldDisplay = false;
-                        isSticky = false; // Don't make empty cells sticky
+                        isSticky = false; 
                     }
 
-                    // Define cell style based on row type and display status
-                    const cellClasses = `py-1.5 px-3 border-b border-r border-gray-300 whitespace-nowrap ${
-                      isGroupRow ? "bg-gray-50" : "bg-white" // Base background
+                    const cellClasses = `py-1.5 px-3 border-b border-r border-gray-300 whitespace-nowrap align-middle ${ 
+                      isGroupRow ? "bg-gray-50" : "bg-white" 
                     } ${
-                      shouldDisplay ? "font-medium text-gray-800" : "text-gray-600" // Font style if displayed
+                      shouldDisplay ? "font-medium text-gray-800" : "text-gray-600" 
                     } ${
-                      isSticky ? "sticky z-10" : "" // Apply sticky only if value is displayed
+                      isSticky ? "sticky z-10" : "" 
                     }`;
 
                     rowCells.push(
@@ -888,19 +863,18 @@ const QCSunriseDailyTrend = () => {
                         {displayValue}
                       </td>
                     );
-                  } // End loop through grouping columns
+                  } 
 
-                  // --- Defect/Group Label Cell ---
-                   const defectGroupLabelSticky = isGroupRow; // Only sticky for the main group row label
+                   const defectGroupLabelSticky = isGroupRow; 
                    rowCells.push(
                      <td
                        key={`label-${row.key}`}
-                       className={`py-1.5 px-3 border-b border-r border-gray-300 whitespace-nowrap ${
+                       className={`py-1.5 px-3 border-b border-r border-gray-300 whitespace-nowrap align-middle ${ 
                          isGroupRow
                            ? "font-bold text-gray-900 bg-gray-50"
-                           : "text-gray-700 bg-white pl-6" // Indent defect names
+                           : "text-gray-700 bg-white pl-6" 
                        } ${
-                           defectGroupLabelSticky ? "sticky z-10" : "" // Apply sticky conditionally
+                           defectGroupLabelSticky ? "sticky z-10" : "" 
                        }`}
                        style={{ left: `${tableGroupingHeaders.length * 100}px`, minWidth: '150px' }}
                      >
@@ -908,14 +882,17 @@ const QCSunriseDailyTrend = () => {
                      </td>
                    );
 
-                  // --- Date Rate Cells ---
                   uniqueDates.forEach((date) => {
                     const rate = row.data[date] || 0;
                     const displayValue = rate > 0 ? `${rate.toFixed(2)}%` : "";
                     rowCells.push(
                       <td
                         key={`${row.key}-date-${date}`}
-                        className={`py-1.5 px-3 border-b border-r border-gray-300 text-center ${rate > 0 ? getBackgroundColor(rate) : (isGroupRow ? "bg-gray-150" : "bg-white")} ${rate > 0 ? getFontColor(rate) : "text-gray-500"}`}
+                        className={`py-1.5 px-3 border-b border-r border-gray-300 text-center align-middle ${ 
+                            rate > 0 ? getBackgroundColor(rate) : (isGroupRow ? "bg-gray-150" : "bg-white")
+                        } ${
+                            rate > 0 ? getFontColor(rate) : "text-gray-500"
+                        }`}
                         title={displayValue || "0.00%"}
                         style={{ minWidth: '80px'}}
                       >
@@ -924,37 +901,34 @@ const QCSunriseDailyTrend = () => {
                     );
                   });
 
-                  // --- Render the full row ---
                   return (
                     <tr
                       key={row.key}
-                      className={isGroupRow ? "hover:bg-gray-100" : "hover:bg-gray-50"} // Keep hover effect, base bg is set in cells
+                      className={isGroupRow ? "hover:bg-gray-100" : "hover:bg-gray-50"} 
                     >
                       {rowCells}
                     </tr>
                   );
                 })}
-                {/* Overall Total Row */}
-                {/* ... (total row rendering - unchanged) ... */}
                  <tr className="bg-gray-200 font-semibold text-gray-800 sticky bottom-0 z-10">
-                  {/* Empty cells for grouping columns */}
+                 
                   {tableGroupingHeaders.map((_, index) => (
                     <td
                       key={`total-group-${index}`}
-                      className="py-2 px-3 border-b border-r border-t border-gray-400 sticky bg-gray-200 z-20" // Ensure higher z-index for sticky
+                      className="py-2 px-3 border-b border-r border-t border-gray-400 sticky bg-gray-200 z-20 align-middle" 
                       style={{ left: `${index * 100}px`, minWidth: '100px' }}
                     ></td>
                   ))}
-                  {/* Total Label */}
+                 
                   <td
-                    className="py-2 px-3 border-b border-r border-t border-gray-400 sticky bg-gray-200 z-20 font-bold"
+                    className="py-2 px-3 border-b border-r border-t border-gray-400 sticky bg-gray-200 z-20 font-bold align-middle" 
                     style={{ left: `${tableGroupingHeaders.length * 100}px`, minWidth: '150px' }}
                   >
                     OVERALL TOTAL DHU%
                   </td>
-                  {/* Calculated Total DHU% per date */}
+                 
                   {uniqueDates.map((date) => {
-                    // Calculate total DHU for this date from rawData
+                    
                     const dateData = rawData.filter(
                       (d) => formatDateToDDMMYYYY(d.inspectionDate) === date
                     );
@@ -969,7 +943,11 @@ const QCSunriseDailyTrend = () => {
                     return (
                       <td
                         key={`total-date-${date}`}
-                        className={`py-2 px-3 border-b border-r border-t border-gray-400 text-center font-bold ${rate > 0 ? getBackgroundColor(rate) : "bg-gray-200"} ${rate > 0 ? getFontColor(rate) : "text-gray-800"}`}
+                        className={`py-2 px-3 border-b border-r border-t border-gray-400 text-center font-bold align-middle ${ 
+                            rate > 0 ? getBackgroundColor(rate) : "bg-gray-200"
+                        } ${
+                            rate > 0 ? getFontColor(rate) : "text-gray-800"
+                        }`}
                          style={{ minWidth: '80px'}}
                         title={displayValue || "0.00%"}
                       >

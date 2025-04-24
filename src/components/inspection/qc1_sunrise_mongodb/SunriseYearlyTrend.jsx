@@ -1,552 +1,525 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../config";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FaFileExcel, FaFilePdf } from "react-icons/fa";
+import QCSunriseFilterPane from "./QCSunriseFilterPane"; // Re-use Filter Pane
+import QCSunriseSummaryCard from "./QCSunriseSummaryCard"; // Re-use Summary Card
 
-// Helper to convert YYYY-MM-DD to DD/MM/YYYY
-const formatDateToDDMMYYYY = (dateStr) => {
-  const [year, month, day] = dateStr.split("-");
-  return `${day}/${month}/${year}`;
+// --- Helper Functions ---
+// Format date string YYYY-MM-DD to YYYY (for yearly grouping)
+const formatDateToYYYY = (dateStr) => {
+  if (!dateStr || typeof dateStr !== 'string' || !dateStr.includes('-')) return null;
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return null;
+  return parts[0]; // Just the year
 };
 
-// Helper to convert DD/MM/YYYY to YYYY-MM-DD
-const formatDateToYYYYMMDD = (dateStr) => {
-  const [day, month, year] = dateStr.split("/");
-  return `${year}-${month}-${day}`;
+// Parse YYYY back to a Date object for sorting
+const parseYYYY = (yyyy) => {
+  if (!yyyy || yyyy.length !== 4) return null;
+  return new Date(parseInt(yyyy), 0, 1); // Use Jan 1st for sorting consistency
 };
 
-// Helper to get year key from DD/MM/YYYY (e.g., "2025")
-const getYearKey = (dateStr) => {
-  const [_, __, year] = dateStr.split("/");
-  return year;
+// Default date range (adjust if needed, e.g., last 5 years)
+const getDefaultEndDate = () => new Date().toISOString().split("T")[0];
+const getDefaultStartDate = () => {
+    const today = new Date();
+    today.setFullYear(today.getFullYear() - 5); // Default to last 5 years
+    today.setMonth(0); // Start from January
+    today.setDate(1); // Start from the 1st
+    return today.toISOString().split("T")[0];
 };
+// --- End Helper Functions ---
 
-const QCSunriseYearlyTrend = ({ filters }) => {
-  const [summaryData, setSummaryData] = useState([]);
+
+const SunriseYearlyTrend = () => {
+  // --- State Variables (Similar to Daily/Monthly Trend) ---
+  const [rawData, setRawData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [customFilters, setCustomFilters] = useState({
-    addLines: false,
-    addMO: false,
-    addBuyer: false,
-    addColors: false,
-    addSizes: false,
+  const [activeFilters, setActiveFilters] = useState({
+    startDate: getDefaultStartDate(),
+    endDate: getDefaultEndDate(),
+    lineNo: '',
+    MONo: '',
+    Color: '',
+    Size: '',
+    Buyer: '',
+    defectName: '',
+  });
+  const [groupingOptions, setGroupingOptions] = useState({
+    addLines: true,
+    addMO: true,
+    addBuyer: true,
+    addColors: true,
+    addSizes: true,
   });
   const [rows, setRows] = useState([]);
-  const [uniqueYears, setUniqueYears] = useState([]);
+  const [uniqueYears, setUniqueYears] = useState([]); // Changed from uniqueDates/Months
+  const [totalChecked, setTotalChecked] = useState(0);
+  const [totalDefects, setTotalDefects] = useState(0);
+  const [overallDhu, setOverallDhu] = useState(0);
+  // --- End State Variables ---
 
-  // Determine if filters are applied
-  const isMoNoFiltered = (filters.moNo ?? "").trim() !== "";
-  const isLineNoFiltered = (filters.lineNo ?? "").trim() !== "";
-  const isColorFiltered = (filters.color ?? "").trim() !== "";
-  const isSizeFiltered = (filters.size ?? "").trim() !== "";
+  // --- Callbacks and Effects (Mostly similar to Daily/Monthly Trend) ---
+  const handleFilterChange = useCallback((newFilters) => {
+    setActiveFilters(newFilters);
+  }, []);
 
-  // Fetch data from /api/sunrise/qc1-data
-  const fetchData = async () => {
+  const isFilterActive = (filterName) => (activeFilters[filterName] ?? "").trim() !== "";
+
+  const fetchData = useCallback(async () => {
+    // Identical fetch logic
     try {
       setLoading(true);
-      const activeFilters = Object.fromEntries(
-        Object.entries(filters).filter(
-          ([_, value]) => value !== "" && value !== undefined && value !== null
-        )
-      );
+      setError(null);
+      setRawData([]);
+      setRows([]);
+      setUniqueYears([]); // Reset years
+      setTotalChecked(0);
+      setTotalDefects(0);
+      setOverallDhu(0);
 
-      const queryParams = {};
-      if (activeFilters.startDate) queryParams.startDate = activeFilters.startDate;
-      if (activeFilters.endDate) queryParams.endDate = activeFilters.endDate;
-      if (activeFilters.lineNo) queryParams.lineNo = activeFilters.lineNo;
-      if (activeFilters.moNo) queryParams.MONo = activeFilters.moNo;
-      if (activeFilters.color) queryParams.Color = activeFilters.color;
-      if (activeFilters.size) queryParams.Size = activeFilters.size;
-      if (activeFilters.buyer) queryParams.Buyer = activeFilters.buyer;
-      if (activeFilters.defectName) queryParams.defectName = activeFilters.defectName;
-
-      if (customFilters.addLines && !queryParams.lineNo) queryParams.lineNo = "";
-      if (customFilters.addMO && !queryParams.MONo) queryParams.MONo = "";
-      if (customFilters.addBuyer && !queryParams.Buyer) queryParams.Buyer = "";
-      if (customFilters.addColors && !queryParams.Color) queryParams.Color = "";
-      if (customFilters.addSizes && !queryParams.Size) queryParams.Size = "";
-
-      if (!queryParams.startDate || !queryParams.endDate) {
-        const today = new Date();
-        queryParams.endDate = today.toISOString().split("T")[0];
-        queryParams.startDate = new Date(today.setFullYear(today.getFullYear() - 5))
-          .toISOString()
-          .split("T")[0]; // 5 years ago
-      }
+      const queryParams = { ...activeFilters };
+      Object.keys(queryParams).forEach(key => { if (!queryParams[key]) delete queryParams[key]; });
+      if (!queryParams.startDate) queryParams.startDate = getDefaultStartDate();
+      if (!queryParams.endDate) queryParams.endDate = getDefaultEndDate();
 
       const queryString = new URLSearchParams(queryParams).toString();
       const url = `${API_BASE_URL}/api/sunrise/qc1-data?${queryString}`;
+      console.log("Fetching yearly trend data from:", url);
+
       const response = await axios.get(url);
-      setSummaryData(response.data);
+      console.log("Fetched yearly data:", response.data.length, "records");
+      setRawData(response.data || []);
       setError(null);
     } catch (err) {
-      console.error("Fetch error:", err);
+      console.error("Fetch error (yearly):", err);
       setError(err.message || "Failed to fetch QC1 Sunrise data");
-      setSummaryData([]);
+      setRawData([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeFilters]);
 
   useEffect(() => {
     fetchData();
-  }, [JSON.stringify(filters), customFilters]);
+  }, [fetchData]);
 
-  // Process data for table
+  // Calculate Summary Stats (Identical)
   useEffect(() => {
-    if (summaryData.length === 0) return;
+    if (loading || error || !Array.isArray(rawData) || rawData.length === 0) {
+      setTotalChecked(0); setTotalDefects(0); setOverallDhu(0); return;
+    }
+    let checked = 0; let defects = 0;
+    rawData.forEach(item => { checked += item.CheckedQty || 0; defects += item.totalDefectsQty || 0; });
+    const dhu = checked > 0 ? parseFloat(((defects / checked) * 100).toFixed(2)) : 0;
+    setTotalChecked(checked); setTotalDefects(defects); setOverallDhu(dhu);
+  }, [rawData, loading, error]);
 
-    // Extract unique years
-    const yearsSet = new Set(summaryData.map((d) => getYearKey(d.inspectionDate)));
-    const sortedYears = [...yearsSet].sort((a, b) => Number(a) - Number(b));
+  // Process Data for Yearly Table (Adapted)
+  useEffect(() => {
+    if (loading || error || !Array.isArray(rawData) || rawData.length === 0) {
+      setRows([]); setUniqueYears([]); return;
+    }
+    console.log("Processing data for yearly table...");
+
+    // 1. Determine Grouping Fields (Identical logic)
+    const groupingFieldsConfig = [
+      { key: 'lineNo', option: 'addLines', filterActive: isFilterActive('lineNo') },
+      { key: 'MONo', option: 'addMO', filterActive: isFilterActive('MONo') },
+      { key: 'Buyer', option: 'addBuyer', filterActive: isFilterActive('Buyer') },
+      { key: 'Color', option: 'addColors', filterActive: isFilterActive('Color') },
+      { key: 'Size', option: 'addSizes', filterActive: isFilterActive('Size') },
+    ];
+    const activeGroupingFields = groupingFieldsConfig
+      .filter(field => groupingOptions[field.option] && !field.filterActive)
+      .map(field => field.key);
+    console.log("Active Grouping Fields (Yearly):", activeGroupingFields);
+
+    // 2. Extract unique YEARS and sort them
+    const yearsSet = new Set(
+      rawData.map((d) => formatDateToYYYY(d.inspectionDate)).filter(Boolean) // Use YYYY
+    );
+    const sortedYears = [...yearsSet].sort((a, b) => {
+      const dateA = parseYYYY(a);
+      const dateB = parseYYYY(b);
+      if (!dateA || !dateB) return 0;
+      return dateA - dateB; // Sort chronologically
+    });
     setUniqueYears(sortedYears);
+    console.log("Unique Years (YYYY):", sortedYears);
 
-    // Define grouping fields
-    const groupingFields = [];
-    if (customFilters.addLines) groupingFields.push("lineNo");
-    if (customFilters.addMO) groupingFields.push("MONo");
-    if (customFilters.addBuyer) groupingFields.push("Buyer");
-    if (customFilters.addColors) groupingFields.push("Color");
-    if (customFilters.addSizes) groupingFields.push("Size");
+    // 3. Build hierarchical data structure (Adapted for Years)
+    const hierarchy = buildHierarchyYearly(rawData, activeGroupingFields); // Use yearly builder
+    console.log("Built Yearly Hierarchy:", hierarchy);
 
-    const hierarchy = buildHierarchy(summaryData, groupingFields);
-    const tableRows = buildRows(hierarchy, groupingFields, sortedYears);
+    // 4. Build table rows from the hierarchy (Adapted for Years)
+    const tableRows = buildRowsYearly(hierarchy, activeGroupingFields, sortedYears); // Use yearly builder
+    console.log("Built Yearly Rows:", tableRows);
     setRows(tableRows);
-  }, [summaryData, customFilters]);
 
-  // Build hierarchical data structure
-  const buildHierarchy = (data, groupingFields) => {
-    if (groupingFields.length === 0) {
-      const yearMap = {};
-      data.forEach((doc) => {
-        const yearKey = getYearKey(doc.inspectionDate);
-        if (!yearMap[yearKey]) {
-          yearMap[yearKey] = { CheckedQty: 0, totalDefectsQty: 0, DefectArray: [] };
-        }
-        yearMap[yearKey].CheckedQty += doc.CheckedQty || 0;
-        yearMap[yearKey].totalDefectsQty += doc.totalDefectsQty || 0;
-        if (doc.DefectArray) {
-          doc.DefectArray.forEach((defect) => {
-            const existing = yearMap[yearKey].DefectArray.find(
-              (d) => d.defectName === defect.defectName
-            );
-            if (existing) {
-              existing.defectQty += defect.defectQty || 0;
-            } else {
-              yearMap[yearKey].DefectArray.push({ ...defect });
-            }
-          });
-        }
-      });
-      return yearMap;
-    } else {
-      const field = groupingFields[0];
-      const groups = {};
-      data.forEach((doc) => {
-        const value = doc[field] || "N/A";
-        if (!groups[value]) groups[value] = [];
-        groups[value].push(doc);
-      });
-      const result = {};
-      for (const [value, docs] of Object.entries(groups)) {
-        result[value] = buildHierarchy(docs, groupingFields.slice(1));
-      }
-      return result;
-    }
-  };
+  }, [rawData, groupingOptions, loading, error, activeFilters]);
+  // --- End Callbacks and Effects ---
 
-  // Build table rows recursively
-  const buildRows = (
-    hierarchy,
-    groupingFields,
-    years,
-    level = 0,
-    path = [],
-    currentFieldIndex = 0
-  ) => {
-    const rows = [];
-    if (currentFieldIndex < groupingFields.length) {
-      const field = groupingFields[currentFieldIndex];
-      Object.keys(hierarchy)
-        .sort()
-        .forEach((value) => {
-          const subHierarchy = hierarchy[value];
-          const groupData = {};
-          years.forEach((year) => {
-            const sum = getSumForGroup(subHierarchy, year);
-            groupData[year] =
-              sum.checkedQty > 0 ? (sum.defectsQty / sum.checkedQty) * 100 : 0;
-          });
-          rows.push({
-            level,
-            type: "group",
-            key: value,
-            path: [...path, value],
-            data: groupData,
-          });
-          const subRows = buildRows(
-            subHierarchy,
-            groupingFields,
-            years,
-            level + 1,
-            [...path, value],
-            currentFieldIndex + 1
-          );
-          rows.push(...subRows);
-        });
-    } else {
-      const yearMap = hierarchy;
-      const defectNames = new Set();
-      Object.values(yearMap).forEach((doc) => {
-        if (doc && doc.DefectArray) {
-          doc.DefectArray.forEach((defect) => {
-            if (defect.defectName) defectNames.add(defect.defectName);
-          });
-        }
-      });
-      [...defectNames].sort().forEach((defectName) => {
-        const defectData = {};
-        years.forEach((year) => {
-          const doc = yearMap[year];
-          if (doc && doc.DefectArray) {
-            const defect = doc.DefectArray.find((d) => d.defectName === defectName);
-            defectData[year] =
-              defect && doc.CheckedQty > 0
-                ? (defect.defectQty / doc.CheckedQty) * 100
-                : 0;
-          } else {
-            defectData[year] = 0;
-          }
-        });
-        rows.push({
-          level,
-          type: "defect",
-          key: defectName,
-          path: [...path, defectName],
-          data: defectData,
-        });
-      });
-    }
-    return rows;
-  };
 
-  // Sum CheckedQty and totalDefectsQty for a group on a specific year
-  const getSumForGroup = (currentHierarchy, year) => {
-    if (typeof currentHierarchy !== "object" || Array.isArray(currentHierarchy)) {
-      const doc = currentHierarchy[year];
-      return doc
-        ? { checkedQty: doc.CheckedQty, defectsQty: doc.totalDefectsQty }
-        : { checkedQty: 0, defectsQty: 0 };
-    }
-    let sum = { checkedQty: 0, defectsQty: 0 };
-    for (const key in currentHierarchy) {
-      const subSum = getSumForGroup(currentHierarchy[key], year);
-      sum.checkedQty += subSum.checkedQty;
-      sum.defectsQty += subSum.defectsQty;
-    }
-    return sum;
-  };
+  // --- Data Processing Functions (ADAPTED FOR YEARLY) ---
 
-  // Color coding functions
-  const getBackgroundColor = (rate) => {
-    if (rate > 3) return "bg-red-100";
-    if (rate >= 2) return "bg-yellow-100";
-    return "bg-green-100";
-  };
+  // Build hierarchical data structure (Groups by activeGroupingFields + YEAR)
+  const buildHierarchyYearly = (data, groupingFields) => {
+    const hierarchy = {};
+    const normalizeString = (str) => (str ? String(str).trim() : "N/A");
 
-  const getFontColor = (rate) => {
-    if (rate > 3) return "text-red-800";
-    if (rate >= 2) return "text-orange-800";
-    return "text-green-800";
-  };
+    data.forEach((doc) => {
+      const groupKey = groupingFields.map(field => normalizeString(doc[field])).join('|');
 
-  const getBackgroundColorRGB = (rate) => {
-    if (rate > 3) return [255, 204, 204];
-    if (rate >= 2) return [255, 255, 204];
-    return [204, 255, 204];
-  };
-
-  const getFontColorRGB = (rate) => {
-    if (rate > 3) return [153, 0, 0];
-    if (rate >= 2) return [204, 102, 0];
-    return [0, 102, 0];
-  };
-
-  const getBackgroundColorHex = (rate) => {
-    if (rate > 3) return "FFCCCC";
-    if (rate >= 2) return "FFFFCC";
-    return "CCFFCC";
-  };
-
-  // Export data preparation
-  const prepareExportData = () => {
-    const exportData = [];
-    const ratesMap = new Map();
-
-    exportData.push(["Yearly Defect Trend Analysis", ...Array(uniqueYears.length).fill("")]);
-    ratesMap.set("0-0", 0);
-
-    exportData.push(Array(uniqueYears.length + 1).fill(""));
-    ratesMap.set("1-0", 0);
-
-    const headerRow = ["Group / Defect", ...uniqueYears];
-    exportData.push(headerRow);
-    ratesMap.set("2-0", 0);
-
-    let rowIndex = 3;
-    rows.forEach((row) => {
-      const indent = "  ".repeat(row.level);
-      const rowData = [`${indent}${row.key}`];
-      uniqueYears.forEach((year, colIndex) => {
-        const rate = row.data[year] || 0;
-        rowData.push(rate > 0 ? `${rate.toFixed(2)}%` : "");
-        ratesMap.set(`${rowIndex}-${colIndex + 1}`, rate);
-      });
-      exportData.push(rowData);
-      rowIndex++;
-    });
-
-    const totalRow = ["Total"];
-    uniqueYears.forEach((year, colIndex) => {
-      const yearData = summaryData.filter((d) => getYearKey(d.inspectionDate) === year);
-      const totalChecked = yearData.reduce((sum, d) => sum + (d.CheckedQty || 0), 0);
-      const totalDefects = yearData.reduce((sum, d) => sum + (d.totalDefectsQty || 0), 0);
-      const rate = totalChecked > 0 ? (totalDefects / totalChecked) * 100 : 0;
-      totalRow.push(rate > 0 ? `${rate.toFixed(2)}%` : "");
-      ratesMap.set(`${rowIndex}-${colIndex + 1}`, rate);
-    });
-    exportData.push(totalRow);
-
-    return { exportData, ratesMap };
-  };
-
-  // Download Excel
-  const downloadExcel = () => {
-    const { exportData, ratesMap } = prepareExportData();
-    const ws = XLSX.utils.aoa_to_sheet(exportData);
-
-    const range = XLSX.utils.decode_range(ws["!ref"]);
-    for (let row = range.s.r; row <= range.e.r; row++) {
-      for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-        if (!ws[cellAddress]) continue;
-
-        const rate = ratesMap.get(`${row}-${col}`) || 0;
-        const isHeaderRow = row === 2;
-        const isTotalRow = row === range.e.r;
-
-        ws[cellAddress].s = {
-          border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } },
-          fill: {
-            fgColor: {
-              rgb: isHeaderRow || isTotalRow ? "ADD8E6" : rate > 0 ? getBackgroundColorHex(rate) : row < 2 ? "FFFFFF" : "E5E7EB",
-            },
-          },
-          alignment: { horizontal: col === 0 ? "left" : "center", vertical: "middle" },
+      if (!hierarchy[groupKey]) {
+        hierarchy[groupKey] = {
+          groupValues: groupingFields.map(field => normalizeString(doc[field])),
+          yearMap: {}, // Store aggregated data per YEAR (YYYY)
         };
       }
-    }
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Yearly Defect Trend");
-    XLSX.writeFile(wb, "YearlyDefectTrend.xlsx");
+      const formattedYear = formatDateToYYYY(doc.inspectionDate); // Get YYYY
+      if (!formattedYear) return; // Skip if year is invalid
+
+      // Aggregate data for the specific year within the group
+      if (!hierarchy[groupKey].yearMap[formattedYear]) {
+        hierarchy[groupKey].yearMap[formattedYear] = {
+          CheckedQty: doc.CheckedQty || 0,
+          totalDefectsQty: doc.totalDefectsQty || 0,
+          DefectArray: Array.isArray(doc.DefectArray) ? doc.DefectArray.map(def => ({ ...def })) : [],
+        };
+      } else {
+        // Add to existing data for this year
+        const yearEntry = hierarchy[groupKey].yearMap[formattedYear];
+        yearEntry.CheckedQty += (doc.CheckedQty || 0);
+        yearEntry.totalDefectsQty += (doc.totalDefectsQty || 0);
+
+        // Aggregate defects within the DefectArray for this year
+        const existingDefects = yearEntry.DefectArray || [];
+        const newDefects = Array.isArray(doc.DefectArray) ? doc.DefectArray : [];
+        newDefects.forEach(newDefect => {
+          if (!newDefect || !newDefect.defectName) return;
+          const existing = existingDefects.find(d => d.defectName === newDefect.defectName);
+          if (existing) {
+            existing.defectQty = (existing.defectQty || 0) + (newDefect.defectQty || 0);
+          } else {
+            existingDefects.push({ ...newDefect, defectQty: newDefect.defectQty || 0 });
+          }
+        });
+        yearEntry.DefectArray = existingDefects;
+      }
+    });
+    return hierarchy;
   };
 
-  // Download PDF
-  const downloadPDF = () => {
-    const { exportData, ratesMap } = prepareExportData();
-    const doc = new jsPDF({ orientation: "landscape" });
-
-    const tablePlugin = typeof autoTable === "function" ? autoTable : global.autoTable;
-    if (!tablePlugin) {
-      console.error("autoTable plugin not available.");
-      return;
-    }
-
-    tablePlugin(doc, {
-      head: [exportData[2]],
-      body: exportData.slice(3),
-      startY: 20,
-      theme: "grid",
-      headStyles: { fillColor: [173, 216, 230], textColor: [55, 65, 81], fontStyle: "bold" },
-      styles: { cellPadding: 2, fontSize: 8, halign: "center", valign: "middle" },
-      columnStyles: { 0: { halign: "left" } },
-      didParseCell: (data) => {
-        const rowIndex = data.row.index + 3;
-        const colIndex = data.column.index;
-        const rate = ratesMap.get(`${rowIndex}-${colIndex}`) || 0;
-        const isTotalRow = rowIndex === exportData.length - 1;
-
-        if (data.section === "body") {
-          if (colIndex === 0) {
-            data.cell.styles.fillColor = isTotalRow ? [173, 216, 230] : [255, 255, 255];
-            data.cell.styles.textColor = [55, 65, 81];
-          } else {
-            const hasData = data.row.raw[colIndex].includes("%");
-            data.cell.styles.fillColor =
-              hasData && rate > 0 ? getBackgroundColorRGB(rate) : isTotalRow ? [173, 216, 230] : [229, 231, 235];
-            data.cell.styles.textColor = hasData && rate > 0 ? getFontColorRGB(rate) : [55, 65, 81];
-          }
+  // Build table rows from the yearly hierarchical structure
+  const buildRowsYearly = (hierarchy, groupingFields, years) => {
+    const rows = [];
+    const sortedGroupKeys = Object.keys(hierarchy).sort((a, b) => {
+        // Sorting logic identical
+        const aValues = hierarchy[a].groupValues; const bValues = hierarchy[b].groupValues;
+        for (let i = 0; i < Math.min(aValues.length, bValues.length); i++) {
+            const comparison = String(aValues[i]).localeCompare(String(bValues[i]));
+            if (comparison !== 0) return comparison;
         }
-      },
-      didDrawPage: () => {
-        doc.text("Yearly Defect Trend Analysis", 14, 10);
-      },
+        return aValues.length - bValues.length;
     });
 
-    doc.save("YearlyDefectTrend.pdf");
+    sortedGroupKeys.forEach(groupKey => {
+      const group = hierarchy[groupKey];
+      const groupData = {}; // To store overall DHU% for the group per year
+
+      // Calculate overall DHU% for the group for each year
+      years.forEach(year => {
+        const yearEntry = group.yearMap[year]; // Use yearMap
+        const checkedQty = yearEntry?.CheckedQty || 0;
+        const defectsQty = yearEntry?.totalDefectsQty || 0;
+        groupData[year] = checkedQty > 0 ? (defectsQty / checkedQty) * 100 : 0;
+      });
+
+      // Add the main group row
+      rows.push({ type: "group", key: groupKey + "-group", groupValues: group.groupValues, data: groupData });
+
+      // Find all unique defect names within this group across all years
+      const defectNames = new Set();
+      Object.values(group.yearMap).forEach(yearEntry => { // Use yearMap
+        if (yearEntry && Array.isArray(yearEntry.DefectArray)) {
+          yearEntry.DefectArray.forEach(defect => { if (defect && defect.defectName) defectNames.add(defect.defectName); });
+        }
+      });
+
+      // Add rows for each unique defect within the group
+      [...defectNames].sort().forEach(defectName => {
+        const defectData = {}; // To store specific defect's DHU% per year
+        years.forEach(year => {
+          const yearEntry = group.yearMap[year]; // Use yearMap
+          if (yearEntry && Array.isArray(yearEntry.DefectArray)) {
+            const defect = yearEntry.DefectArray.find(d => d.defectName === defectName);
+            const checkedQty = yearEntry.CheckedQty || 0;
+            defectData[year] = defect && checkedQty > 0 ? ((defect.defectQty || 0) / checkedQty) * 100 : 0;
+          } else { defectData[year] = 0; }
+        });
+        rows.push({ type: "defect", key: groupKey + "-" + defectName, groupValues: group.groupValues, defectName: defectName, data: defectData });
+      });
+    });
+    return rows;
+  };
+  // --- End Data Processing Functions ---
+
+
+  // --- Color Coding Functions (Identical) ---
+  const getBackgroundColor = (rate) => { if (rate > 3) return "bg-red-100"; if (rate >= 2) return "bg-yellow-100"; return "bg-green-100"; };
+  const getFontColor = (rate) => { if (rate > 3) return "text-red-800"; if (rate >= 2) return "text-orange-800"; return "text-green-800"; };
+  const getBackgroundColorRGB = (rate) => { if (rate > 3) return [254, 226, 226]; if (rate >= 2) return [254, 243, 199]; return [220, 252, 231]; };
+  const getFontColorRGB = (rate) => { if (rate > 3) return [153, 27, 27]; if (rate >= 2) return [154, 52, 18]; return [6, 95, 70]; };
+  const getBackgroundColorHex = (rate) => { if (rate > 3) return "FEE2E2"; if (rate >= 2) return "FEF3C7"; return "DCFCE7"; };
+  // --- End Color Coding Functions ---
+
+
+  // --- Export Functions (ADAPTED FOR YEARLY) ---
+  const getCurrentGroupingFieldNames = () => {
+    // Identical logic
+    const names = [];
+    if (groupingOptions.addLines && !isFilterActive('lineNo')) names.push("Line");
+    if (groupingOptions.addMO && !isFilterActive('MONo')) names.push("MO");
+    if (groupingOptions.addBuyer && !isFilterActive('Buyer')) names.push("Buyer");
+    if (groupingOptions.addColors && !isFilterActive('Color')) names.push("Color");
+    if (groupingOptions.addSizes && !isFilterActive('Size')) names.push("Size");
+    return names;
   };
 
-  if (loading) return <div className="text-center p-4">Loading...</div>;
-  if (error) return <div className="text-center p-4 text-red-500">Error: {error}</div>;
+  const prepareExportData = () => {
+    // Adapted for years
+    const exportData = []; const ratesMap = new Map();
+    const groupingFieldNames = getCurrentGroupingFieldNames();
+    const numGroupingCols = groupingFieldNames.length;
+    // Years are already in display format (YYYY)
 
+    exportData.push(["Yearly Defect Trend Analysis", ...Array(uniqueYears.length + numGroupingCols).fill("")]);
+    ratesMap.set(`0-0`, -1);
+    exportData.push(Array(uniqueYears.length + numGroupingCols + 1).fill(""));
+    ratesMap.set(`1-0`, -1);
+
+    const headerRow = [...groupingFieldNames, "Defect / Group", ...uniqueYears]; // Use years directly
+    exportData.push(headerRow);
+    headerRow.forEach((_, colIndex) => ratesMap.set(`2-${colIndex}`, -1));
+
+    let rowIndex = 3; let lastDisplayedGroupValues = Array(numGroupingCols).fill(null);
+
+    rows.forEach((row) => {
+      const rowData = []; const isGroupRow = row.type === "group";
+      // Grouping Columns (Hierarchy logic)
+      for (let colIndex = 0; colIndex < numGroupingCols; colIndex++) {
+        const currentValue = row.groupValues[colIndex]; let displayValue = "";
+        if (isGroupRow && currentValue !== lastDisplayedGroupValues[colIndex]) {
+          displayValue = currentValue; lastDisplayedGroupValues[colIndex] = currentValue;
+          for (let k = colIndex + 1; k < numGroupingCols; k++) lastDisplayedGroupValues[k] = null;
+        } else if (!isGroupRow && currentValue !== lastDisplayedGroupValues[colIndex]) {
+             lastDisplayedGroupValues[colIndex] = currentValue;
+             for (let k = colIndex + 1; k < numGroupingCols; k++) lastDisplayedGroupValues[k] = null;
+        }
+        rowData.push(displayValue);
+      }
+      rowData.push(isGroupRow ? "GROUP TOTAL DHU%" : row.defectName);
+      // Year Rate Columns
+      uniqueYears.forEach((year, yearIndex) => { // Iterate using YYYY keys
+        const rate = row.data[year] || 0;
+        rowData.push(rate > 0 ? `${rate.toFixed(2)}%` : "");
+        ratesMap.set(`${rowIndex}-${numGroupingCols + 1 + yearIndex}`, rate);
+      });
+      for (let c = 0; c <= numGroupingCols; c++) ratesMap.set(`${rowIndex}-${c}`, -1);
+      exportData.push(rowData); rowIndex++;
+    });
+
+    // Overall Total Row
+    const totalRow = [...Array(numGroupingCols).fill(""), "OVERALL TOTAL DHU%"];
+    uniqueYears.forEach((year, yearIndex) => { // Iterate using YYYY keys
+        const yearData = rawData.filter(d => formatDateToYYYY(d.inspectionDate) === year);
+        const totalCheckedForYear = yearData.reduce((sum, d) => sum + (d.CheckedQty || 0), 0);
+        const totalDefectsForYear = yearData.reduce((sum, d) => sum + (d.totalDefectsQty || 0), 0);
+        const rate = totalCheckedForYear > 0 ? (totalDefectsForYear / totalCheckedForYear) * 100 : 0;
+        totalRow.push(rate > 0 ? `${rate.toFixed(2)}%` : "");
+        ratesMap.set(`${rowIndex}-${numGroupingCols + 1 + yearIndex}`, rate);
+    });
+    for (let c = 0; c <= numGroupingCols; c++) ratesMap.set(`${rowIndex}-${c}`, -1);
+    exportData.push(totalRow);
+
+    return { exportData, ratesMap, numGroupingCols };
+  };
+
+  const downloadExcel = () => {
+    // Excel export logic (mostly identical)
+    const { exportData, ratesMap, numGroupingCols } = prepareExportData();
+    if (exportData.length <= 3) { alert("No data available to export."); return; }
+    const ws = XLSX.utils.aoa_to_sheet(exportData);
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    // Apply styles (identical logic)
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C }); const cell = ws[cellAddress]; if (!cell) continue;
+        const rate = ratesMap.get(`${R}-${C}`); const isHeaderRow = R === 2; const isTotalRow = R === range.e.r; const isGroupLabelCol = C === numGroupingCols; const isDataRow = R > 2 && R < range.e.r; const isActualGroupRow = isDataRow && exportData[R][numGroupingCols] === "GROUP TOTAL DHU%"; const cellHasValue = cell.v !== undefined && cell.v !== "";
+        let fgColor = "FFFFFF"; let fontStyle = {}; let alignment = { horizontal: (C <= numGroupingCols) ? "left" : "center", vertical: "middle" };
+        if (R === 0) {} else if (R === 1) {} else if (isHeaderRow) { fgColor = "ADD8E6"; fontStyle = { bold: true }; }
+        else if (isTotalRow) { fgColor = "D3D3D3"; fontStyle = { bold: true }; if (rate !== undefined && rate > 0) fgColor = getBackgroundColorHex(rate); else if (rate === 0) fgColor = "E5E7EB"; }
+        else if (C < numGroupingCols) { fgColor = isActualGroupRow ? "F3F4F6" : "FFFFFF"; fontStyle = { bold: isActualGroupRow && cellHasValue }; }
+        else if (isGroupLabelCol) { fgColor = isActualGroupRow ? "F3F4F6" : "FFFFFF"; fontStyle = { bold: isActualGroupRow }; }
+        else if (rate !== undefined && rate > 0) { fgColor = getBackgroundColorHex(rate); } else if (rate === 0) { fgColor = "E5E7EB"; }
+        cell.s = { border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, fill: { fgColor: { rgb: fgColor } }, alignment: alignment, font: { ...fontStyle }, };
+      }
+    }
+    // Column widths and merge (adjust year column width if needed)
+    const colWidths = []; groupingFieldNames.forEach(() => colWidths.push({ wch: 15 })); colWidths.push({ wch: 30 }); uniqueYears.forEach(() => colWidths.push({ wch: 12 })); // YYYY is shorter
+    ws['!cols'] = colWidths;
+    if (range.e.c > 0) { ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: range.e.c } }]; if(ws['A1']) { ws['A1'].s = ws['A1'].s || {}; ws['A1'].s.alignment = { horizontal: "center", vertical: "middle" }; ws['A1'].s.font = { sz: 14, bold: true }; } }
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Yearly Defect Trend"); XLSX.writeFile(wb, "YearlyDefectTrend.xlsx");
+  };
+
+  const downloadPDF = () => {
+    // PDF export logic (mostly identical)
+    const { exportData, ratesMap, numGroupingCols } = prepareExportData();
+    if (exportData.length <= 3) { alert("No data available to export."); return; }
+    const doc = new jsPDF({ orientation: "landscape" }); const tablePlugin = typeof autoTable === "function" ? autoTable : window.autoTable; if (!tablePlugin) { console.error("jsPDF-AutoTable not found."); alert("PDF export unavailable."); return; }
+    const head = [exportData[2]]; const body = exportData.slice(3);
+    tablePlugin(doc, {
+      head: head, body: body, startY: 20, theme: "grid",
+      headStyles: { fillColor: [173, 216, 230], textColor: [55, 65, 81], fontStyle: "bold", halign: 'center' },
+      styles: { cellPadding: 1.5, fontSize: 7, valign: "middle", lineColor: [0, 0, 0], lineWidth: 0.1 },
+      columnStyles: { ...Array.from({ length: numGroupingCols + 1 }, (_, i) => i).reduce((acc, i) => { acc[i] = { halign: 'left' }; return acc; }, {}), ...uniqueYears.reduce((acc, _, index) => { acc[numGroupingCols + 1 + index] = { halign: 'center' }; return acc; }, {}) },
+      didParseCell: (data) => {
+        // Styling logic (identical)
+        const rowIndexInExportData = data.row.index + 3; const colIndex = data.column.index; const rate = ratesMap.get(`${rowIndexInExportData}-${colIndex}`); const cellHasValue = data.cell.raw !== undefined && data.cell.raw !== ""; const isTotalRow = data.row.index === body.length - 1; const isGroupLabelCol = colIndex === numGroupingCols; const isGroupRow = !isTotalRow && data.row.raw[numGroupingCols] === "GROUP TOTAL DHU%";
+        if (data.section === "body") {
+            let fillColor = [255, 255, 255]; let textColor = [55, 65, 81]; let fontStyle = 'normal';
+            if (isTotalRow) { fillColor = [211, 211, 211]; fontStyle = 'bold'; if (rate !== undefined && rate > 0) { fillColor = getBackgroundColorRGB(rate); textColor = getFontColorRGB(rate); } else if (rate === 0) { fillColor = [229, 231, 235]; } }
+            else if (colIndex < numGroupingCols) { fillColor = isGroupRow ? [243, 244, 246] : [255, 255, 255]; fontStyle = (isGroupRow && cellHasValue) ? 'bold' : 'normal'; }
+            else if (isGroupLabelCol) { fillColor = isGroupRow ? [243, 244, 246] : [255, 255, 255]; fontStyle = isGroupRow ? 'bold' : 'normal'; if (!isGroupRow) data.cell.styles.cellPadding = { ...data.cell.styles.cellPadding, left: 3 }; }
+            else if (rate !== undefined && rate > 0) { fillColor = getBackgroundColorRGB(rate); textColor = getFontColorRGB(rate); } else if (rate === 0) { fillColor = [229, 231, 235]; }
+            data.cell.styles.fillColor = fillColor; data.cell.styles.textColor = textColor; data.cell.styles.fontStyle = fontStyle;
+        } else if (data.section === 'head') { data.cell.styles.halign = (colIndex <= numGroupingCols) ? 'left' : 'center'; }
+      },
+      didDrawPage: (data) => { doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("Yearly Defect Trend Analysis", doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' }); },
+    });
+    doc.save("YearlyDefectTrend.pdf");
+  };
+  // --- End Export Functions ---
+
+
+  // --- UI Event Handlers (Identical) ---
+  const handleOptionToggle = (option) => { setGroupingOptions((prev) => ({ ...prev, [option]: !prev[option] })); };
+  const handleAddAll = () => { setGroupingOptions({ addLines: true, addMO: true, addBuyer: true, addColors: true, addSizes: true }); };
+  const handleClearAll = () => { setGroupingOptions({ addLines: false, addMO: false, addBuyer: false, addColors: false, addSizes: false }); };
+  // --- End UI Event Handlers ---
+
+  // --- Props for Child Components ---
+  const summaryStats = { totalCheckedQty: totalChecked, totalDefectsQty: totalDefects, defectRate: overallDhu };
+  const tableGroupingHeaders = getCurrentGroupingFieldNames();
+  let lastDisplayedGroupValues = Array(tableGroupingHeaders.length).fill(null); // For render logic
+  // --- End Props ---
+
+
+  // --- JSX Rendering ---
   return (
-    <div className="mt-6 bg-white shadow-md rounded-lg p-6 overflow-x-auto">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-sm font-medium text-gray-900">Yearly Defect Trend</h2>
-        <div className="flex space-x-2">
-          <button
-            onClick={downloadExcel}
-            className="flex items-center px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-            title="Download as Excel"
-          >
-            <FaFileExcel className="mr-2" /> Excel
-          </button>
-          <button
-            onClick={downloadPDF}
-            className="flex items-center px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-            title="Download as PDF"
-          >
-            <FaFilePdf className="mr-2" /> PDF
-          </button>
-        </div>
+    <div className="p-4 space-y-6">
+      {/* === Filter Pane === */}
+      <QCSunriseFilterPane onFilterChange={handleFilterChange} initialFilters={activeFilters} />
+
+      {/* === Summary Card Section === */}
+      <div className="mb-6">
+        {loading && <div className="text-center p-4 text-gray-500">Loading summary...</div>}
+        {error && <div className="text-center p-4 text-red-500">Error loading summary: {error}</div>}
+        {!loading && !error && rawData.length === 0 && !activeFilters.startDate && !activeFilters.endDate && ( <div className="text-center p-4 text-gray-500 bg-white shadow-md rounded-lg">Please select filters and fetch data.</div> )}
+        {!loading && !error && rawData.length === 0 && (activeFilters.startDate || activeFilters.endDate) && ( <div className="text-center p-4 text-gray-500 bg-white shadow-md rounded-lg">No data available for the selected filters.</div> )}
+        {!loading && !error && rawData.length > 0 && ( <QCSunriseSummaryCard summaryStats={summaryStats} /> )}
       </div>
 
-      {/* Filter Checkboxes */}
-      <div className="mb-4 p-2 bg-gray-100 rounded-lg flex flex-wrap gap-4">
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={customFilters.addLines || isLineNoFiltered}
-            onChange={(e) => setCustomFilters((prev) => ({ ...prev, addLines: e.target.checked }))}
-            disabled={isLineNoFiltered}
-            className={`mr-1 ${isLineNoFiltered ? "opacity-50 cursor-not-allowed" : ""}`}
-          />
-          Add Lines
-        </label>
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={customFilters.addMO || isMoNoFiltered}
-            onChange={(e) => setCustomFilters((prev) => ({ ...prev, addMO: e.target.checked }))}
-            disabled={isMoNoFiltered}
-            className={`mr-1 ${isMoNoFiltered ? "opacity-50 cursor-not-allowed" : ""}`}
-          />
-          Add MO
-        </label>
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={customFilters.addBuyer}
-            onChange={(e) => setCustomFilters((prev) => ({ ...prev, addBuyer: e.target.checked }))}
-            className="mr-1"
-          />
-          Add Buyer
-        </label>
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={customFilters.addColors || isColorFiltered}
-            onChange={(e) => setCustomFilters((prev) => ({ ...prev, addColors: e.target.checked }))}
-            disabled={isColorFiltered}
-            className={`mr-1 ${isColorFiltered ? "opacity-50 cursor-not-allowed" : ""}`}
-          />
-          Add Colors
-        </label>
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={customFilters.addSizes || isSizeFiltered}
-            onChange={(e) => setCustomFilters((prev) => ({ ...prev, addSizes: e.target.checked }))}
-            disabled={isSizeFiltered}
-            className={`mr-1 ${isSizeFiltered ? "opacity-50 cursor-not-allowed" : ""}`}
-          />
-          Add Sizes
-        </label>
-      </div>
+      {/* === Yearly Trend Table Section === */}
+      <div className="bg-white shadow-md rounded-lg p-4">
+        {/* Grouping Options and Export Buttons (Identical structure) */}
+        {!loading && !error && (
+          <>
+            <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
+              <h2 className="text-lg font-semibold text-gray-900 whitespace-nowrap">Yearly Defect Trend</h2>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                 <span className="text-sm font-medium text-gray-600 mr-2">Group by:</span>
+                 {[ { label: 'Lines', option: 'addLines', filterKey: 'lineNo' }, { label: 'MO', option: 'addMO', filterKey: 'MONo' }, { label: 'Buyer', option: 'addBuyer', filterKey: 'Buyer' }, { label: 'Colors', option: 'addColors', filterKey: 'Color' }, { label: 'Sizes', option: 'addSizes', filterKey: 'Size' }, ].map(({ label, option, filterKey }) => { const isDisabled = isFilterActive(filterKey); return ( <label key={option} className="flex items-center space-x-1 cursor-pointer"> <input type="checkbox" checked={groupingOptions[option] || isDisabled} onChange={() => handleOptionToggle(option)} disabled={isDisabled} className={`h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded ${isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`} /> <span className={`text-sm ${isDisabled ? 'text-gray-400' : 'text-gray-700'}`}>{label}</span> </label> ); })}
+                 <button onClick={handleAddAll} className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1" title="Select all available grouping options">Add All</button>
+                 <button onClick={handleClearAll} className="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1" title="Clear all grouping options">Clear All</button>
+                 <div className="border-l border-gray-300 h-6 mx-2"></div>
+                 <button onClick={downloadExcel} className="flex items-center px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed" title="Download as Excel" disabled={rows.length === 0}><FaFileExcel className="mr-1 h-4 w-4" /> Excel</button>
+                 <button onClick={downloadPDF} className="flex items-center px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed" title="Download as PDF" disabled={rows.length === 0}><FaFilePdf className="mr-1 h-4 w-4" /> PDF</button>
+              </div>
+            </div>
+          </>
+        )}
 
-      {/* Table */}
-      <div className="overflow-y-auto" style={{ maxHeight: "500px" }}>
-        <table className="min-w-full border-collapse">
-          <thead>
-            <tr className="bg-blue-100 sticky top-0 z-10">
-              <th className="py-2 px-4 border border-gray-800 text-left text-sm font-bold text-gray-700">
-                Group / Defect
-              </th>
-              {uniqueYears.map((year) => (
-                <th
-                  key={year}
-                  className="py-2 px-4 border border-gray-800 text-center text-sm font-bold text-gray-700"
-                >
-                  {year}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={index} className={row.type === "group" ? "bg-gray-50" : ""}>
-                <td
-                  className={`py-2 px-4 border border-gray-800 text-sm ${row.type === "group" ? "font-bold" : ""}`}
-                  style={{ paddingLeft: `${row.level * 20}px` }}
-                >
-                  {row.key}
-                </td>
-                {uniqueYears.map((year) => {
-                  const rate = row.data[year] || 0;
-                  return (
-                    <td
-                      key={year}
-                      className={`py-2 px-4 border border-gray-800 text-center text-sm ${
-                        rate > 0 ? getBackgroundColor(rate) : "bg-gray-100"
-                      } ${rate > 0 ? getFontColor(rate) : "text-gray-700"}`}
-                    >
-                      {rate > 0 ? `${rate.toFixed(2)}%` : ""}
-                    </td>
-                  );
+        {/* Loading/Error/No Data States (Identical structure) */}
+        {loading && <div className="text-center p-4 text-gray-500">Loading yearly trend data...</div>}
+        {error && <div className="text-center p-4 text-red-500">Error loading yearly trend data: {error}</div>}
+        {!loading && !error && rows.length === 0 && rawData.length > 0 && ( <div className="text-center p-4 text-gray-500">No yearly trend data to display based on current grouping.</div> )}
+        {!loading && !error && rows.length === 0 && rawData.length === 0 && (activeFilters.startDate || activeFilters.endDate) && ( <div className="text-center p-4 text-gray-500">No data found for the selected filters.</div> )}
+
+        {/* The Actual Yearly Trend Table */}
+        {!loading && !error && rows.length > 0 && (
+          <div className="overflow-x-auto border border-gray-300 rounded-md" style={{ maxHeight: "60vh" }}>
+            <table className="min-w-full border-collapse align-middle text-xs">
+              {/* Table Header (Adapted for Years) */}
+              <thead className="bg-gray-100 sticky top-0 z-10">
+                 <tr>
+                   {tableGroupingHeaders.map((header, index) => ( <th key={header} className="py-2 px-3 border-b border-r border-gray-300 text-left font-semibold text-gray-700 sticky bg-gray-100 z-20 whitespace-nowrap" style={{ left: `${index * 100}px`, minWidth: '100px' }}>{header}</th> ))}
+                   <th className="py-2 px-3 border-b border-r border-gray-300 text-left font-semibold text-gray-700 sticky bg-gray-100 z-20 whitespace-nowrap" style={{ left: `${tableGroupingHeaders.length * 100}px`, minWidth: '150px' }}>Defect / Group</th>
+                   {/* Year Headers */}
+                   {uniqueYears.map((year) => ( <th key={year} className="py-2 px-3 border-b border-r border-gray-300 text-center font-semibold text-gray-700 whitespace-nowrap" style={{ minWidth: '80px'}}> {year} {/* Display YYYY */} </th> ))}
+                 </tr>
+              </thead>
+              {/* Table Body (Adapted for Years, uses hierarchy logic) */}
+              <tbody className="bg-white">
+                {rows.map((row) => {
+                  const isGroupRow = row.type === "group"; const rowCells = [];
+                  // Grouping Columns (Hierarchy Logic - Identical)
+                  for (let colIndex = 0; colIndex < tableGroupingHeaders.length; colIndex++) {
+                    const currentValue = row.groupValues[colIndex]; let displayValue = ""; let shouldDisplay = false; let isSticky = false;
+                    if (currentValue !== lastDisplayedGroupValues[colIndex]) { if (isGroupRow) { displayValue = currentValue; shouldDisplay = true; isSticky = true; } lastDisplayedGroupValues[colIndex] = currentValue; for (let k = colIndex + 1; k < lastDisplayedGroupValues.length; k++) lastDisplayedGroupValues[k] = null; }
+                    else { displayValue = ""; shouldDisplay = false; isSticky = false; }
+                    const cellClasses = `py-1.5 px-3 border-b border-r border-gray-300 whitespace-nowrap ${isGroupRow ? "bg-gray-50" : "bg-white"} ${shouldDisplay ? "font-medium text-gray-800" : "text-gray-600"} ${isSticky ? "sticky z-10" : ""}`;
+                    rowCells.push( <td key={`group-${row.key}-${colIndex}`} className={cellClasses} style={{ left: `${colIndex * 100}px`, minWidth: "100px" }}>{displayValue}</td> );
+                  }
+                  // Defect/Group Label Cell (Hierarchy Logic - Identical)
+                  const defectGroupLabelSticky = isGroupRow;
+                  rowCells.push( <td key={`label-${row.key}`} className={`py-1.5 px-3 border-b border-r border-gray-300 whitespace-nowrap ${isGroupRow ? "font-bold text-gray-900 bg-gray-50" : "text-gray-700 bg-white pl-6"} ${defectGroupLabelSticky ? "sticky z-10" : ""}`} style={{ left: `${tableGroupingHeaders.length * 100}px`, minWidth: '150px' }}>{isGroupRow ? "GROUP TOTAL DHU%" : row.defectName}</td> );
+                  // Year Rate Cells
+                  uniqueYears.forEach((year) => { // Iterate using YYYY keys
+                    const rate = row.data[year] || 0; const displayValue = rate > 0 ? `${rate.toFixed(2)}%` : "";
+                    rowCells.push( <td key={`${row.key}-year-${year}`} className={`py-1.5 px-3 border-b border-r border-gray-300 text-center ${rate > 0 ? getBackgroundColor(rate) : (isGroupRow ? "bg-gray-50" : "bg-white")} ${rate > 0 ? getFontColor(rate) : "text-gray-500"}`} title={displayValue || "0.00%"} style={{ minWidth: '80px'}}> {displayValue} </td> );
+                  });
+                  // Render Row
+                  return ( <tr key={row.key} className={isGroupRow ? "hover:bg-gray-100" : "hover:bg-gray-50"}>{rowCells}</tr> );
                 })}
-              </tr>
-            ))}
-            <tr className="bg-blue-100 font-bold">
-              <td className="py-2 px-4 border border-gray-800 text-sm font-bold text-gray-700">
-                Total
-              </td>
-              {uniqueYears.map((year) => {
-                const yearData = summaryData.filter((d) => getYearKey(d.inspectionDate) === year);
-                const totalChecked = yearData.reduce((sum, d) => sum + (d.CheckedQty || 0), 0);
-                const totalDefects = yearData.reduce((sum, d) => sum + (d.totalDefectsQty || 0), 0);
-                const rate = totalChecked > 0 ? (totalDefects / totalChecked) * 100 : 0;
-                return (
-                  <td
-                    key={year}
-                    className={`py-2 px-4 border border-gray-800 text-center text-sm ${
-                      rate > 0 ? getBackgroundColor(rate) : "bg-white"
-                    } ${rate > 0 ? getFontColor(rate) : "text-gray-700"}`}
-                  >
-                    {rate > 0 ? `${rate.toFixed(2)}%` : ""}
-                  </td>
-                );
-              })}
-            </tr>
-          </tbody>
-        </table>
+                {/* Overall Total Row (Adapted for Years) */}
+                <tr className="bg-gray-200 font-semibold text-gray-800 sticky bottom-0 z-10">
+                  {tableGroupingHeaders.map((_, index) => ( <td key={`total-group-${index}`} className="py-2 px-3 border-b border-r border-t border-gray-400 sticky bg-gray-200 z-20" style={{ left: `${index * 100}px`, minWidth: '100px' }}></td> ))}
+                  <td className="py-2 px-3 border-b border-r border-t border-gray-400 sticky bg-gray-200 z-20 font-bold" style={{ left: `${tableGroupingHeaders.length * 100}px`, minWidth: '150px' }}>OVERALL TOTAL DHU%</td>
+                  {uniqueYears.map((year) => { // Iterate using YYYY keys
+                    const yearData = rawData.filter(d => formatDateToYYYY(d.inspectionDate) === year);
+                    const totalCheckedForYear = yearData.reduce((sum, d) => sum + (d.CheckedQty || 0), 0);
+                    const totalDefectsForYear = yearData.reduce((sum, d) => sum + (d.totalDefectsQty || 0), 0);
+                    const rate = totalCheckedForYear > 0 ? (totalDefectsForYear / totalCheckedForYear) * 100 : 0;
+                    const displayValue = rate > 0 ? `${rate.toFixed(2)}%` : "";
+                    return ( <td key={`total-year-${year}`} className={`py-2 px-3 border-b border-r border-t border-gray-400 text-center font-bold ${rate > 0 ? getBackgroundColor(rate) : "bg-gray-200"} ${rate > 0 ? getFontColor(rate) : "text-gray-800"}`} style={{ minWidth: '80px'}} title={displayValue || "0.00%"}> {displayValue} </td> );
+                  })}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
+  // --- End JSX Rendering ---
 };
 
-export default QCSunriseYearlyTrend;
+export default SunriseYearlyTrend;
