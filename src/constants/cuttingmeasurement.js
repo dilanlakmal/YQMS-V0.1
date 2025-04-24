@@ -10,7 +10,8 @@ export const measurementPoints = [
     panelSide: "Front",
     panelDirection: "Left",
     measurementSide: "Length",
-    panelIndex: 1
+    panelIndex: 1,
+    panelIndexName: "Body Front"
   },
   {
     no: 2,
@@ -22,7 +23,8 @@ export const measurementPoints = [
     panelSide: "Front",
     panelDirection: "Left",
     measurementSide: "Width",
-    panelIndex: 1
+    panelIndex: 1,
+    panelIndexName: "Body Front"
   },
   {
     no: 3,
@@ -34,7 +36,8 @@ export const measurementPoints = [
     panelSide: "Front",
     panelDirection: "Right",
     measurementSide: "Length",
-    panelIndex: 1
+    panelIndex: 1,
+    panelIndexName: "Body Front"
   },
   {
     no: 4,
@@ -46,7 +49,8 @@ export const measurementPoints = [
     panelSide: "Front",
     panelDirection: "Right",
     measurementSide: "Width",
-    panelIndex: 1
+    panelIndex: 1,
+    panelIndexName: "Body Front"
   },
   {
     no: 5,
@@ -58,7 +62,8 @@ export const measurementPoints = [
     panelSide: "Back",
     panelDirection: "NA",
     measurementSide: "Length",
-    panelIndex: 2
+    panelIndex: 2,
+    panelIndexName: "Body Back"
   },
   {
     no: 6,
@@ -70,7 +75,8 @@ export const measurementPoints = [
     panelSide: "Back",
     panelDirection: "NA",
     measurementSide: "Width",
-    panelIndex: 2
+    panelIndex: 2,
+    panelIndexName: "Body Back"
   },
   {
     no: 7,
@@ -82,7 +88,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "Left",
     measurementSide: "Length",
-    panelIndex: 3
+    panelIndex: 3,
+    panelIndexName: "Sleeve Left"
   },
   {
     no: 8,
@@ -94,7 +101,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "Left",
     measurementSide: "Width",
-    panelIndex: 3
+    panelIndex: 3,
+    panelIndexName: "Sleeve Left"
   },
   {
     no: 9,
@@ -106,7 +114,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "Right",
     measurementSide: "Length",
-    panelIndex: 4
+    panelIndex: 4,
+    panelIndexName: "Sleeve Right"
   },
   {
     no: 10,
@@ -118,7 +127,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "Right",
     measurementSide: "Width",
-    panelIndex: 4
+    panelIndex: 4,
+    panelIndexName: "Sleeve Right"
   },
   {
     no: 11,
@@ -130,7 +140,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "NA",
     measurementSide: "Length",
-    panelIndex: 5
+    panelIndex: 5,
+    panelIndexName: "Other"
   },
   {
     no: 12,
@@ -142,7 +153,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "NA",
     measurementSide: "Width",
-    panelIndex: 5
+    panelIndex: 5,
+    panelIndexName: "Other"
   },
 
   // Top Hoodies Panel Measurements
@@ -156,7 +168,8 @@ export const measurementPoints = [
     panelSide: "Front",
     panelDirection: "NA",
     measurementSide: "Length",
-    panelIndex: 1
+    panelIndex: 1,
+    panelIndexName: "Body Front"
   },
 
   {
@@ -169,7 +182,8 @@ export const measurementPoints = [
     panelSide: "Front",
     panelDirection: "NA",
     measurementSide: "Width",
-    panelIndex: 1
+    panelIndex: 1,
+    panelIndexName: "Body Front"
   },
 
   {
@@ -182,7 +196,8 @@ export const measurementPoints = [
     panelSide: "Back",
     panelDirection: "NA",
     measurementSide: "Length",
-    panelIndex: 2
+    panelIndex: 2,
+    panelIndexName: "Body Back"
   },
 
   {
@@ -195,7 +210,8 @@ export const measurementPoints = [
     panelSide: "Back",
     panelDirection: "NA",
     measurementSide: "Width",
-    panelIndex: 2
+    panelIndex: 2,
+    panelIndexName: "Body Back"
   },
   {
     no: 17,
@@ -207,7 +223,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "Left",
     measurementSide: "Length",
-    panelIndex: 3
+    panelIndex: 3,
+    panelIndexName: "Sleeve Left"
   },
   {
     no: 18,
@@ -219,7 +236,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "Left",
     measurementSide: "Width",
-    panelIndex: 3
+    panelIndex: 3,
+    panelIndexName: "Sleeve Left"
   },
   {
     no: 19,
@@ -231,7 +249,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "Right",
     measurementSide: "Length",
-    panelIndex: 4
+    panelIndex: 4,
+    panelIndexName: "Sleeve Right"
   },
   {
     no: 20,
@@ -243,7 +262,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "Right",
     measurementSide: "Width",
-    panelIndex: 4
+    panelIndex: 4,
+    panelIndexName: "Sleeve Right"
   },
   {
     no: 21,
@@ -255,7 +275,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "NA",
     measurementSide: "Length",
-    panelIndex: 5
+    panelIndex: 5,
+    panelIndexName: "Pocket"
   },
   {
     no: 22,
@@ -267,7 +288,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "NA",
     measurementSide: "Width",
-    panelIndex: 5
+    panelIndex: 5,
+    panelIndexName: "Pocket"
   },
   {
     no: 23,
@@ -279,7 +301,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "NA",
     measurementSide: "Length",
-    panelIndex: 6
+    panelIndex: 6,
+    panelIndexName: "Other"
   },
   {
     no: 24,
@@ -291,7 +314,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "NA",
     measurementSide: "Width",
-    panelIndex: 6
+    panelIndex: 6,
+    panelIndexName: "Other"
   },
 
   // Bottom Panel Measurements
@@ -305,7 +329,8 @@ export const measurementPoints = [
     panelSide: "Front",
     panelDirection: "Left",
     measurementSide: "Length",
-    panelIndex: 1
+    panelIndex: 1,
+    panelIndexName: "Body Front"
   },
   {
     no: 26,
@@ -317,7 +342,8 @@ export const measurementPoints = [
     panelSide: "Front",
     panelDirection: "Left",
     measurementSide: "Width",
-    panelIndex: 1
+    panelIndex: 1,
+    panelIndexName: "Body Front"
   },
   {
     no: 27,
@@ -329,7 +355,8 @@ export const measurementPoints = [
     panelSide: "Front",
     panelDirection: "Right",
     measurementSide: "Length",
-    panelIndex: 1
+    panelIndex: 1,
+    panelIndexName: "Body Front"
   },
   {
     no: 28,
@@ -341,7 +368,8 @@ export const measurementPoints = [
     panelSide: "Front",
     panelDirection: "Right",
     measurementSide: "Width",
-    panelIndex: 1
+    panelIndex: 1,
+    panelIndexName: "Body Front"
   },
   {
     no: 29,
@@ -353,7 +381,8 @@ export const measurementPoints = [
     panelSide: "Back",
     panelDirection: "Left",
     measurementSide: "Length",
-    panelIndex: 2
+    panelIndex: 2,
+    panelIndexName: "Body Back"
   },
   {
     no: 30,
@@ -365,7 +394,8 @@ export const measurementPoints = [
     panelSide: "Back",
     panelDirection: "Left",
     measurementSide: "Width",
-    panelIndex: 2
+    panelIndex: 2,
+    panelIndexName: "Body Back"
   },
   {
     no: 31,
@@ -377,7 +407,8 @@ export const measurementPoints = [
     panelSide: "Back",
     panelDirection: "Right",
     measurementSide: "Length",
-    panelIndex: 2
+    panelIndex: 2,
+    panelIndexName: "Body Back"
   },
   {
     no: 32,
@@ -389,7 +420,8 @@ export const measurementPoints = [
     panelSide: "Back",
     panelDirection: "Right",
     measurementSide: "Width",
-    panelIndex: 2
+    panelIndex: 2,
+    panelIndexName: "Body Back"
   },
   {
     no: 33,
@@ -401,7 +433,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "NA",
     measurementSide: "Length",
-    panelIndex: 3
+    panelIndex: 3,
+    panelIndexName: "Pocket"
   },
   {
     no: 34,
@@ -413,7 +446,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "NA",
     measurementSide: "Width",
-    panelIndex: 3
+    panelIndex: 3,
+    panelIndexName: "Pocket"
   },
   {
     no: 35,
@@ -425,7 +459,8 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "Right",
     measurementSide: "Length",
-    panelIndex: 4
+    panelIndex: 4,
+    panelIndexName: "Pocket Right"
   },
   {
     no: 36,
@@ -437,6 +472,7 @@ export const measurementPoints = [
     panelSide: "NA",
     panelDirection: "Right",
     measurementSide: "Width",
-    panelIndex: 4
+    panelIndex: 4,
+    panelIndexName: "Pocket Right"
   }
 ];

@@ -32,6 +32,7 @@ import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
 import createCuttingOrdersModel from "./models/CuttingOrders.js"; // New model import
 import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
 
+import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron";
@@ -121,6 +122,7 @@ const QCInlineRoving =createQCInlineRovingModel(ymProdConnection);
 const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
 const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
 const CuttingOrders = createCuttingOrdersModel(ymProdConnection); // New model
+const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New model
 const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
 
 // Set UTF-8 encoding for responses
@@ -7282,6 +7284,254 @@ app.get("/api/sunrise/qc1-daily-trend", async (req, res) => {
   }
 });
 
+
+/* ------------------------------
+   Cutting Inspection ENDPOINTS
+------------------------------ */
+
+// New endpoint to save cutting inspection data
+app.post("/api/save-cutting-inspection", async (req, res) => {
+  try {
+    const {
+      inspectionDate,
+      cutting_emp_id,
+      cutting_emp_engName,
+      cutting_emp_khName,
+      cutting_emp_dept,
+      cutting_emp_section,
+      moNo,
+      lotNo,
+      buyer,
+      orderQty,
+      color,
+      tableNo,
+      planLayerQty,
+      actualLayerQty,
+      totalPcs,
+      cuttingtableLetter,
+      cuttingtableNo,
+      marker,
+      markerRatio,
+      totalBundleQty,
+      bundleQtyCheck,
+      totalInspectionQty,
+      cuttingtype,
+      garmentType,
+      inspectionData
+    } = req.body;
+
+    const existingDoc = await CuttingInspection.findOne({
+      inspectionDate,
+      moNo,
+      lotNo,
+      color,
+      tableNo
+    });
+
+    if (existingDoc) {
+      // Append new inspectionData to existing document
+      existingDoc.inspectionData.push(inspectionData);
+      await existingDoc.save();
+      res.status(200).json({ message: "Data appended successfully" });
+    } else {
+      // Create a new document
+      const newDoc = new CuttingInspection({
+        inspectionDate,
+        cutting_emp_id,
+        cutting_emp_engName,
+        cutting_emp_khName,
+        cutting_emp_dept,
+        cutting_emp_section,
+        moNo,
+        lotNo,
+        buyer,
+        orderQty,
+        color,
+        tableNo,
+        planLayerQty,
+        actualLayerQty,
+        totalPcs,
+        cuttingtableLetter,
+        cuttingtableNo,
+        marker,
+        markerRatio,
+        totalBundleQty,
+        bundleQtyCheck,
+        totalInspectionQty,
+        cuttingtype,
+        garmentType,
+        inspectionData: [inspectionData]
+      });
+      await newDoc.save();
+      res.status(200).json({ message: "Data saved successfully" });
+    }
+  } catch (error) {
+    console.error("Error saving cutting inspection data:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to save data", error: error.message });
+  }
+});
+
+app.get("/api/cutting-inspection-detailed-report", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      moNo,
+      lotNo,
+      buyer,
+      color,
+      tableNo,
+      page = 0,
+      limit = 1
+    } = req.query;
+
+    let match = {};
+
+    // Date filtering
+    if (startDate || endDate) {
+      match.$expr = match.$expr || {};
+      match.$expr.$and = match.$expr.$and || [];
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspectionDate",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspectionDate",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+    }
+
+    // Other filters with case-insensitive regex
+    if (moNo) match.moNo = new RegExp(moNo, "i");
+    if (lotNo) match.lotNo = new RegExp(lotNo, "i");
+    if (buyer) match.buyer = new RegExp(buyer, "i");
+    if (color) match.color = new RegExp(color, "i");
+    if (tableNo) match.tableNo = new RegExp(tableNo, "i");
+
+    const totalDocs = await CuttingInspection.countDocuments(match);
+    const totalPages = Math.ceil(totalDocs / limit);
+
+    const inspections = await CuttingInspection.find(match)
+      .skip(page * limit)
+      .limit(parseInt(limit))
+      .lean();
+
+    // Calculate summary data for each inspection
+    inspections.forEach((inspection) => {
+      let totalPcs = 0;
+      let totalPass = 0;
+      let totalReject = 0;
+      let totalRejectMeasurement = 0;
+      let totalRejectDefects = 0;
+
+      inspection.inspectionData.forEach((data) => {
+        totalPcs += data.totalPcs;
+        totalPass += data.totalPass;
+        totalReject += data.totalReject;
+        totalRejectMeasurement += data.totalRejectMeasurement;
+        totalRejectDefects += data.totalRejectDefects;
+      });
+
+      const passRate =
+        totalPcs > 0 ? ((totalPass / totalPcs) * 100).toFixed(2) : "0.00";
+      const result = getResult(inspection.bundleQtyCheck, totalReject);
+
+      inspection.summary = {
+        totalPcs,
+        totalPass,
+        totalReject,
+        totalRejectMeasurement,
+        totalRejectDefects,
+        passRate,
+        result
+      };
+    });
+
+    res.status(200).json({ data: inspections, totalPages });
+  } catch (error) {
+    console.error("Error fetching detailed cutting inspection report:", error);
+    res.status(500).json({
+      message: "Failed to fetch detailed report",
+      error: error.message
+    });
+  }
+});
+
+// Helper function to determine AQL result
+function getResult(bundleQtyCheck, totalReject) {
+  if (bundleQtyCheck === 5) return totalReject > 1 ? "Fail" : "Pass";
+  if (bundleQtyCheck === 9) return totalReject > 3 ? "Fail" : "Pass";
+  if (bundleQtyCheck === 14) return totalReject > 5 ? "Fail" : "Pass";
+  if (bundleQtyCheck === 20) return totalReject > 7 ? "Fail" : "Pass";
+  return "N/A";
+}
+
+// Endpoint to fetch distinct MO Nos
+app.get("/api/cutting-inspection-mo-nos", async (req, res) => {
+  try {
+    const moNos = await CuttingInspection.distinct("moNo");
+    res.json(moNos.filter((mo) => mo));
+  } catch (error) {
+    console.error("Error fetching MO Nos:", error);
+    res.status(500).json({ message: "Failed to fetch MO Nos" });
+  }
+});
+
+// Endpoint to fetch distinct filter options based on MO No
+app.get("/api/cutting-inspection-filter-options", async (req, res) => {
+  try {
+    const { moNo } = req.query;
+    let match = {};
+    if (moNo) match.moNo = new RegExp(moNo, "i");
+
+    const lotNos = await CuttingInspection.distinct("lotNo", match);
+    const buyers = await CuttingInspection.distinct("buyer", match); // Add buyer filter options
+    const colors = await CuttingInspection.distinct("color", match);
+    const tableNos = await CuttingInspection.distinct("tableNo", match);
+
+    res.json({
+      lotNos: lotNos.filter((lot) => lot),
+      buyers: buyers.filter((buyer) => buyer), // Return distinct buyers
+      colors: colors.filter((color) => color),
+      tableNos: tableNos.filter((table) => table)
+    });
+  } catch (error) {
+    console.error("Error fetching filter options:", error);
+    res.status(500).json({ message: "Failed to fetch filter options" });
+  }
+});
 
 /* ------------------------------
    User Auth ENDPOINTS

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { Filter } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../config";
-import DateSelector from "../../forms/DateSelector";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 const FilterPane = ({
   startDate,
@@ -27,9 +27,8 @@ const FilterPane = ({
   setAppliedFilters,
   onApplyFilters,
   onResetFilters,
-  dataSource = "qc2-inspection-pass-bundle" // Default to original data source
+  dataSource = "qc2-inspection-pass-bundle"
 }) => {
-  const [showFilters, setShowFilters] = useState(true);
   const [moNoOptions, setMoNoOptions] = useState([]);
   const [colorOptions, setColorOptions] = useState([]);
   const [sizeOptions, setSizeOptions] = useState([]);
@@ -37,15 +36,10 @@ const FilterPane = ({
   const [empIdOptions, setEmpIdOptions] = useState([]);
   const [buyerOptions, setBuyerOptions] = useState([]);
   const [lineNoOptions, setLineNoOptions] = useState([]);
-
-  // Format Date to "MM/DD/YYYY"
-  const formatDate = (date) => {
-    if (!date) return "";
-    const month = ("0" + (date.getMonth() + 1)).slice(-2);
-    const day = ("0" + date.getDate()).slice(-2);
-    const year = date.getFullYear();
-    return `${month}/${day}/${year}`;
-  };
+  const [showMoNoDropdown, setShowMoNoDropdown] = useState(false);
+  const [showEmpIdDropdown, setShowEmpIdDropdown] = useState(false);
+  const moNoRef = useRef(null);
+  const empIdRef = useRef(null);
 
   // Fetch filter options based on dataSource
   const fetchFilterOptions = async () => {
@@ -75,197 +69,274 @@ const FilterPane = ({
 
   useEffect(() => {
     fetchFilterOptions();
-  }, [dataSource]); // Re-fetch when dataSource changes
+  }, [dataSource]);
+
+  // Handle click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (moNoRef.current && !moNoRef.current.contains(event.target)) {
+        setShowMoNoDropdown(false);
+      }
+      if (empIdRef.current && !empIdRef.current.contains(event.target)) {
+        setShowEmpIdDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleMoNoInput = (e) => {
+    const value = e.target.value;
+    setMoNo(value);
+    setShowMoNoDropdown(true);
+  };
+
+  const handleEmpIdInput = (e) => {
+    const value = e.target.value;
+    setEmpId(value);
+    setShowEmpIdDropdown(true);
+  };
+
+  const handleFilterChange = (key, value) => {
+    switch (key) {
+      case "moNo":
+        setMoNo(value);
+        setShowMoNoDropdown(false);
+        break;
+      case "empId":
+        setEmpId(value);
+        setShowEmpIdDropdown(false);
+        break;
+      case "startDate":
+        setStartDate(value);
+        break;
+      case "endDate":
+        setEndDate(value);
+        break;
+      case "color":
+        setColor(value);
+        break;
+      case "size":
+        setSize(value);
+        break;
+      case "department":
+        setDepartment(value);
+        break;
+      case "buyer":
+        setBuyer(value);
+        break;
+      case "lineNo":
+        setLineNo(value);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleClearFilters = () => {
+    setStartDate(null);
+    setEndDate(null);
+    setMoNo("");
+    setColor("");
+    setSize("");
+    setDepartment("");
+    setEmpId("");
+    setBuyer("");
+    setLineNo("");
+    setAppliedFilters({});
+    setShowMoNoDropdown(false);
+    setShowEmpIdDropdown(false);
+    onResetFilters();
+  };
 
   return (
-    <>
-      <div className="flex items-center justify-between bg-white p-2 rounded-lg shadow mb-2">
-        <div className="flex items-center space-x-2">
-          <Filter className="text-blue-500" size={20} />
-          <h2 className="text-lg font-medium text-gray-700">Filters</h2>
+    <div className="bg-white p-4 rounded-lg shadow-md mb-6">
+      <h2 className="text-sm font-semibold mb-4">Filters</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-10 gap-2 items-end">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Start Date
+          </label>
+          <DatePicker
+            selected={startDate}
+            onChange={(date) => handleFilterChange("startDate", date)}
+            dateFormat="MM/dd/yyyy"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            placeholderText="Start Date"
+            popperPlacement="bottom-start"
+          />
         </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="text-blue-500 flex items-center hover:text-blue-600"
-        >
-          {showFilters ? "Hide" : "Show"}
-        </button>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            End Date
+          </label>
+          <DatePicker
+            selected={endDate}
+            onChange={(date) => handleFilterChange("endDate", date)}
+            dateFormat="MM/dd/yyyy"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            placeholderText="End Date"
+            popperPlacement="bottom-start"
+          />
+        </div>
+        <div ref={moNoRef} className="relative">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            MO No
+          </label>
+          <input
+            type="text"
+            value={moNo}
+            onChange={handleMoNoInput}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            placeholder="MO No"
+          />
+          {showMoNoDropdown && (
+            <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-40 overflow-y-auto shadow-lg">
+              {moNoOptions
+                .filter((mo) => mo.toLowerCase().includes(moNo.toLowerCase()))
+                .map((mo) => (
+                  <li
+                    key={mo}
+                    onClick={() => handleFilterChange("moNo", mo)}
+                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                  >
+                    {mo}
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Color
+          </label>
+          <select
+            value={color}
+            onChange={(e) => handleFilterChange("color", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          >
+            <option value="">Select Color</option>
+            {colorOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Size
+          </label>
+          <select
+            value={size}
+            onChange={(e) => handleFilterChange("size", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          >
+            <option value="">Select Size</option>
+            {sizeOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Department
+          </label>
+          <select
+            value={department}
+            onChange={(e) => handleFilterChange("department", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          >
+            <option value="">Select Department</option>
+            {departmentOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div ref={empIdRef} className="relative">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Emp ID
+          </label>
+          <input
+            type="text"
+            value={empId}
+            onChange={handleEmpIdInput}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            placeholder="Emp ID"
+          />
+          {showEmpIdDropdown && (
+            <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-40 overflow-y-auto shadow-lg">
+              {empIdOptions
+                .filter((emp) =>
+                  emp.toLowerCase().includes(empId.toLowerCase())
+                )
+                .map((emp) => (
+                  <li
+                    key={emp}
+                    onClick={() => handleFilterChange("empId", emp)}
+                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                  >
+                    {emp}
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Buyer
+          </label>
+          <select
+            value={buyer}
+            onChange={(e) => handleFilterChange("buyer", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          >
+            <option value="">Select Buyer</option>
+            {buyerOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Line No
+          </label>
+          <select
+            value={lineNo}
+            onChange={(e) => handleFilterChange("lineNo", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          >
+            <option value="">Select Line No</option>
+            {lineNoOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex space-x-2">
+          <button
+            onClick={handleClearFilters}
+            className="px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 whitespace-nowrap text-sm"
+          >
+            Clear
+          </button>
+          <button
+            onClick={onApplyFilters}
+            className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 whitespace-nowrap text-sm"
+          >
+            Apply
+          </button>
+        </div>
       </div>
-      {showFilters && (
-        <div className="bg-white p-4 rounded-lg shadow mb-6">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Start Date
-              </label>
-              <DateSelector
-                selectedDate={startDate}
-                hideLabel={true}
-                onChange={(date) => setStartDate(date)}
-              />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                End Date
-              </label>
-              <DateSelector
-                selectedDate={endDate}
-                hideLabel={true}
-                onChange={(date) => setEndDate(date)}
-              />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                MO No
-              </label>
-              <input
-                type="text"
-                value={moNo}
-                onChange={(e) => setMoNo(e.target.value)}
-                list="moNoOptions"
-                placeholder="Search MO No"
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              />
-              <datalist id="moNoOptions">
-                {moNoOptions
-                  .filter(
-                    (opt) =>
-                      opt && opt.toLowerCase().includes(moNo.toLowerCase())
-                  )
-                  .map((opt) => (
-                    <option key={opt} value={opt} />
-                  ))}
-              </datalist>
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Color
-              </label>
-              <select
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">Select Color</option>
-                {colorOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Size
-              </label>
-              <select
-                value={size}
-                onChange={(e) => setSize(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">Select Size</option>
-                {sizeOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mt-4">
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Department
-              </label>
-              <select
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">Select Department</option>
-                {departmentOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Emp ID
-              </label>
-              <input
-                type="text"
-                value={empId}
-                onChange={(e) => setEmpId(e.target.value)}
-                list="empIdOptions"
-                placeholder="Search Emp ID"
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              />
-              <datalist id="empIdOptions">
-                {empIdOptions
-                  .filter(
-                    (opt) =>
-                      opt && opt.toLowerCase().includes(empId.toLowerCase())
-                  )
-                  .map((opt) => (
-                    <option key={opt} value={opt} />
-                  ))}
-              </datalist>
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Buyer
-              </label>
-              <select
-                value={buyer}
-                onChange={(e) => setBuyer(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">Select Buyer</option>
-                {buyerOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-gray-700 mb-1">
-                Line No
-              </label>
-              <select
-                value={lineNo}
-                onChange={(e) => setLineNo(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">Select Line No</option>
-                {lineNoOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="flex justify-end mt-4 space-x-2">
-            <button
-              onClick={onApplyFilters}
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-            >
-              Apply
-            </button>
-            <button
-              onClick={onResetFilters}
-              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-      )}
       {Object.keys(appliedFilters).length > 0 && (
-        <div className="mb-4">
+        <div className="mt-4">
           <h3 className="text-sm font-medium text-gray-700 mb-2">
             Applied Filters:
           </h3>
@@ -281,7 +352,7 @@ const FilterPane = ({
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 

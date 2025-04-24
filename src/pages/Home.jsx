@@ -166,7 +166,7 @@ function Home() {
         },
         {
           path: "/inline-emp",
-          roles: ["Admin", "QC2"],
+          roles: ["Admin", "Printing"], // Matches "Printing" role
           image: "assets/Home/qc2.png",
           title: "Print QR",
           description: "Sewing Worker QR."
@@ -218,28 +218,28 @@ function Home() {
       items: [
         {
           path: "/download-data",
-          roles: ["Admin", "Data Analytics"],
+          roles: ["Admin", "Download Data"],
           image: "/IMG/download.jpg",
           title:  t("home.download_data"),
           description: "Download Raw Data."
         },
         {
           path: "/live-dashboard",
-          roles: ["Admin", "Data Analytics"],
+          roles: ["Admin", "Live Dashboard"],
           image: "/IMG/dash.png",
           title:  t("home.live_dashboard"),
           description: "YQMS QC2 Live Dashboard."
         },
         {
           path: "/powerbi",
-          roles: ["Admin", "Data Analytics"],
+          roles: ["Admin", "Power BI"],
           image: "/IMG/powerbi.png",
           title: "Power BI",
           description: "Power BI Report",
         },
         {
           path: "/qc1-sunrise",
-          roles: ["Admin", "Data Analytics"],
+          roles: ["Admin", "QC1 Sunrise"],
           image: "/IMG/sunrise.png",
           title: "QC1 Sunriser",
           description: "Upload Excel file here...",
@@ -250,13 +250,7 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-50 to-gray-100 py-20 px-20">
-      <div className="max-w-7xl mx-auto">
-        {/* <h3 className="text-3xl font-extrabold text-blue-900 mb-8 text-center drop-shadow-md">
-          {t("home.welcome")}
-        </h3> */}
-        {/* <p className="text-lg text-gray-700 text-left mb-12 text-center">
-        {t("home.click_cards")}
-        </p> */}
+      <div className="max-w-8xl mx-auto">
         {errorMessage && (
           <div className="bg-red-500 text-white text-center py-2 mb-4 rounded">
             {errorMessage}

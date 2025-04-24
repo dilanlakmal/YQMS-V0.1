@@ -63,17 +63,14 @@ export default function Navbar({ onLogout }) {
   const isAdmin = userRoles.includes("Admin");
   const isAllowedSuperAdmin = ["YM6702", "YM7903"].includes(user?.emp_id);
 
-  // New hasAccess function that checks requiredRoles array
+  // Updated hasAccess function to check jobTitles instead of users
   const hasAccess = (requiredRoles) => {
     if (!user || !roleManagement) return false;
-    // Super Admins and Admins have full access
     if (isSuperAdmin || isAdmin) return true;
-    // Check if at least one of the required roles is present in the roleManagement data for this user
     return requiredRoles.some((reqRole) =>
       roleManagement.some(
         (roleObj) =>
-          roleObj.role === reqRole &&
-          roleObj.users.some((u) => u.emp_id === user.emp_id)
+          roleObj.role === reqRole && roleObj.jobTitles.includes(user.job_title)
       )
     );
   };
@@ -85,35 +82,33 @@ export default function Navbar({ onLogout }) {
     sessionStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
     sessionStorage.removeItem("user");
-    clearUser(); // Clear the global user state
-    onLogout(); // Update App.jsx state
+    clearUser();
+    onLogout();
     navigate("/", { replace: true });
   };
 
-  // Navigation items now include requiredRoles for each link.
   const navItems = [
     {
-      title: t("home.cutting"), //"Cutting",
+      title: t("home.cutting"),
       icon: <ClipboardList className="h-4 w-4 mr-2" />,
       items: [
         {
           path: "/fabric",
-          title: t("home.fabric"), //"Fabric",
+          title: t("home.fabric"),
           requiredRoles: ["Super Admin", "Admin", "Fabric"]
         },
         {
           path: "/cutting",
-          title: t("home.cutting"), //"Cutting",
+          title: t("home.cutting"),
           requiredRoles: ["Super Admin", "Admin", "Cutting"]
         },
         {
           path: "/scc",
-          title: t("home.scc"), //"SCC",
+          title: t("home.scc"),
           requiredRoles: ["Super Admin", "Admin", "SCC"]
         }
       ]
     },
-
     {
       title: t("nav.orders"),
       icon: <Package className="h-4 w-4 mr-2" />,
@@ -423,7 +418,6 @@ export default function Navbar({ onLogout }) {
         </div>
       </div>
 
-      {/* Mobile menu */}
       {isMobileMenuOpen && (
         <div className="sm:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1">
