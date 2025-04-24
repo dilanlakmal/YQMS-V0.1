@@ -7984,10 +7984,168 @@ app.post("/api/update-user-roles", async (req, res) => {
   }
 });
 
-// app.listen(PORT, "0.0.0.0", () => {
-//   console.log(`Server is running on http://localhost:${PORT}`);
-// });
+/* ------------------------------
+   End Points - Digital Measurement
+------------------------------ */
 
+// New Endpoints for Digital Measurement
+app.get("/api/digital-measurement-summary", async (req, res) => {
+  try {
+    const measurementDataCollection =
+      ymEcoConnection.db.collection("measurement_data");
+    const { startDate, endDate, factory, mono, custStyle, buyer, empId } =
+      req.query;
+
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+
+    let userIds = [];
+    if (empId) {
+      const users = await UserMain.find({ emp_id: empId }, "_id");
+      userIds = users.map((u) => u._id.toString());
+    }
+
+    const measurementFilter = {};
+    if (start && end) {
+      measurementFilter.updated_at = { $gte: start, $lte: end };
+    } else if (start) {
+      measurementFilter.updated_at = { $gte: start };
+    } else if (end) {
+      measurementFilter.updated_at = { $lte: end };
+    }
+    if (userIds.length > 0) {
+      measurementFilter["user.id"] = { $in: userIds };
+    }
+
+    const distinctStyleIds = await measurementDataCollection.distinct(
+      "style_id",
+      measurementFilter
+    );
+
+    const orderFilter = {
+      _id: {
+        $in: distinctStyleIds.map((id) => new mongoose.Types.ObjectId(id))
+      }
+    };
+    if (factory) orderFilter.Factory = factory;
+    if (mono) orderFilter.Order_No = mono;
+    if (custStyle) orderFilter.CustStyle = custStyle;
+    if (buyer) orderFilter.ShortName = buyer;
+
+    const filteredOrders = await ymEcoConnection.db
+      .collection("dt_orders")
+      .find(orderFilter, { projection: { TotalQty: 1 } })
+      .toArray();
+    const orderQty = filteredOrders.reduce(
+      (sum, order) => sum + order.TotalQty,
+      0
+    );
+
+    const filteredOrderIds = filteredOrders.map((order) =>
+      order._id.toString()
+    );
+
+    const finalMeasurementFilter = {
+      style_id: { $in: filteredOrderIds },
+      ...measurementFilter
+    };
+
+    const measurementAggregation = await measurementDataCollection
+      .aggregate([
+        { $match: finalMeasurementFilter },
+        {
+          $group: {
+            _id: null,
+            totalInspected: { $sum: 1 },
+            totalPass: { $sum: { $cond: [{ $eq: ["$status", 1] }, 1, 0] } }
+          }
+        }
+      ])
+      .toArray();
+
+    const measurementSummary = measurementAggregation[0] || {
+      totalInspected: 0,
+      totalPass: 0
+    };
+    const totalInspected = measurementSummary.totalInspected;
+    const totalPass = measurementSummary.totalPass;
+    const totalReject = totalInspected - totalPass;
+    const passRate =
+      totalInspected > 0
+        ? ((totalPass / totalInspected) * 100).toFixed(2)
+        : "0.00";
+
+    res.json({
+      orderQty,
+      totalInspected,
+      totalPass,
+      totalReject,
+      passRate
+    });
+  } catch (error) {
+    console.error("Error fetching digital measurement summary:", error);
+    res.status(500).json({ error: "Failed to fetch summary" });
+  }
+});
+
+app.get("/api/filter-options", async (req, res) => {
+  try {
+    const { factory, mono, custStyle, buyer } = req.query;
+    const filter = {};
+    if (factory) filter.Factory = factory;
+    if (mono) filter.Order_No = mono;
+    if (custStyle) filter.CustStyle = custStyle;
+    if (buyer) filter.ShortName = buyer;
+
+    const factories = await ymEcoConnection.db
+      .collection("dt_orders")
+      .distinct("Factory", filter);
+    const monos = await ymEcoConnection.db
+      .collection("dt_orders")
+      .distinct("Order_No", filter);
+    const custStyles = await ymEcoConnection.db
+      .collection("dt_orders")
+      .distinct("CustStyle", filter);
+    const buyers = await ymEcoConnection.db
+      .collection("dt_orders")
+      .distinct("ShortName", filter);
+
+    res.json({
+      factories,
+      monos,
+      custStyles,
+      buyers
+    });
+  } catch (error) {
+    console.error("Error fetching filter options:", error);
+    res.status(500).json({ error: "Failed to fetch filter options" });
+  }
+});
+
+app.get("/api/search-emp-id", async (req, res) => {
+  try {
+    const term = req.query.term;
+    if (!term) {
+      return res.status(400).json({ error: "Search term is required" });
+    }
+
+    const regexPattern = new RegExp(term, "i");
+    const empIds = await UserMain.find(
+      { emp_id: { $regex: regexPattern } },
+      "emp_id"
+    )
+      .limit(100)
+      .lean();
+    const uniqueEmpIds = [...new Set(empIds.map((u) => u.emp_id))];
+
+    res.json(uniqueEmpIds);
+  } catch (error) {
+    console.error("Error searching employee IDs:", error);
+    res.status(500).json({ error: "Failed to search employee IDs" });
+  }
+});
+
+// Start the server
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`HTTPS Server is running on https://localhost:${PORT}`);
 });
