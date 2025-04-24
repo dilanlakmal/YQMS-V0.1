@@ -58,8 +58,8 @@ const PORT = 5000;
 // });
 
 const options = {
-  key: fs.readFileSync(path.resolve(__dirname, '192.167.12.7-key.pem')),
-  cert: fs.readFileSync(path.resolve(__dirname, '192.167.12.7.pem'))
+  key: fs.readFileSync(path.resolve(__dirname, '192.167.8.235-key.pem')),
+  cert: fs.readFileSync(path.resolve(__dirname, '192.167.8.235.pem'))
 };
 
 // Create HTTPS server
@@ -68,7 +68,7 @@ const server = https.createServer(options, app);
 // Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: "https://192.167.12.7:3001", // Update with your frontend URL  //"https://localhost:3001"
+    origin: "https://192.167.8.235:3001", // Update with your frontend URL  //"https://localhost:3001"
     methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,

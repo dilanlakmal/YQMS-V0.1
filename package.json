@@ -52,6 +52,7 @@
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.344.0",
+    "mkcert": "^3.2.0",
     "moment": "^2.30.1",
     "mongoose": "^8.10.0",
     "morgan": "^1.10.0",

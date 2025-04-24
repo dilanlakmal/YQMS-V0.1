@@ -15,8 +15,8 @@ export default defineConfig({
     port: 3001,
     open: true,
     https: {
-      key: fs.readFileSync(path.resolve(__dirname, '192.167.12.7-key.pem')),
-      cert: fs.readFileSync(path.resolve(__dirname, '192.167.12.7.pem'))
+      key: fs.readFileSync(path.resolve(__dirname, '192.167.8.235-key.pem')),
+      cert: fs.readFileSync(path.resolve(__dirname, '192.167.8.235.pem'))
     }
   }
 })
