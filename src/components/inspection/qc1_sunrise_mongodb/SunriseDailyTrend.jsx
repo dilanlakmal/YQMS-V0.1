@@ -103,11 +103,9 @@ const QCSunriseDailyTrend = () => {
       if (!queryParams.endDate) queryParams.endDate = getDefaultEndDate();
 
       const queryString = new URLSearchParams(queryParams).toString();
-      const url = `${API_BASE_URL}/api/sunrise/qc1-data?${queryString}`;
-      console.log("Fetching data from:", url); 
+      const url = `${API_BASE_URL}/api/sunrise/qc1-data?${queryString}`; 
 
-      const response = await axios.get(url);
-      console.log("Fetched data:", response.data.length, "records"); 
+      const response = await axios.get(url); 
       setRawData(response.data || []); 
       setError(null);
     } catch (err) {
@@ -156,7 +154,6 @@ const QCSunriseDailyTrend = () => {
       setUniqueDates([]);
       return;
     }
-    console.log("Processing data for table...");
 
     // 1. Determine Grouping Fields based on options and active filters
     const groupingFieldsConfig = [
@@ -171,7 +168,6 @@ const QCSunriseDailyTrend = () => {
       .filter(field => groupingOptions[field.option] && !field.filterActive)
       .map(field => field.key);
 
-    console.log("Active Grouping Fields:", activeGroupingFields);
 
     // 2. Extract unique dates and sort them
     const datesSet = new Set(
@@ -184,15 +180,12 @@ const QCSunriseDailyTrend = () => {
       return dateA - dateB;
     });
     setUniqueDates(sortedDates);
-    console.log("Unique Dates:", sortedDates);
 
     // 3. Build hierarchical data structure
     const hierarchy = buildHierarchy(rawData, activeGroupingFields);
-    console.log("Built Hierarchy:", hierarchy);
 
     // 4. Build table rows from the hierarchy
     const tableRows = buildRows(hierarchy, activeGroupingFields, sortedDates);
-    console.log("Built Rows:", tableRows);
     setRows(tableRows);
 
   }, [rawData, groupingOptions, loading, error, activeFilters]);
@@ -560,7 +553,6 @@ const QCSunriseDailyTrend = () => {
 
     const tablePlugin = typeof autoTable === "function" ? autoTable : window.autoTable;
     if (!tablePlugin) {
-      console.error("jsPDF-AutoTable plugin not found.");
       alert("PDF export functionality is unavailable. Please check console.");
       return;
     }

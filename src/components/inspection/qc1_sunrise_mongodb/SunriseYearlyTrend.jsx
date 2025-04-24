@@ -5,38 +5,37 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FaFileExcel, FaFilePdf } from "react-icons/fa";
-import QCSunriseFilterPane from "./QCSunriseFilterPane"; // Re-use Filter Pane
-import QCSunriseSummaryCard from "./QCSunriseSummaryCard"; // Re-use Summary Card
+import QCSunriseFilterPane from "./QCSunriseFilterPane"; 
+import QCSunriseSummaryCard from "./QCSunriseSummaryCard"; 
 
-// --- Helper Functions ---
-// Format date string YYYY-MM-DD to YYYY (for yearly grouping)
+
 const formatDateToYYYY = (dateStr) => {
   if (!dateStr || typeof dateStr !== 'string' || !dateStr.includes('-')) return null;
   const parts = dateStr.split("-");
   if (parts.length !== 3) return null;
-  return parts[0]; // Just the year
+  return parts[0]; 
 };
 
-// Parse YYYY back to a Date object for sorting
+
 const parseYYYY = (yyyy) => {
   if (!yyyy || yyyy.length !== 4) return null;
-  return new Date(parseInt(yyyy), 0, 1); // Use Jan 1st for sorting consistency
+  return new Date(parseInt(yyyy), 0, 1); 
 };
 
-// Default date range (adjust if needed, e.g., last 5 years)
+// Default date range 
 const getDefaultEndDate = () => new Date().toISOString().split("T")[0];
 const getDefaultStartDate = () => {
     const today = new Date();
-    today.setFullYear(today.getFullYear() - 5); // Default to last 5 years
-    today.setMonth(0); // Start from January
-    today.setDate(1); // Start from the 1st
+    today.setFullYear(today.getFullYear() - 5); 
+    today.setMonth(0);
+    today.setDate(1); 
     return today.toISOString().split("T")[0];
 };
-// --- End Helper Functions ---
+
 
 
 const SunriseYearlyTrend = () => {
-  // --- State Variables (Similar to Daily/Monthly Trend) ---
+  
   const [rawData, setRawData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -58,13 +57,11 @@ const SunriseYearlyTrend = () => {
     addSizes: true,
   });
   const [rows, setRows] = useState([]);
-  const [uniqueYears, setUniqueYears] = useState([]); // Changed from uniqueDates/Months
+  const [uniqueYears, setUniqueYears] = useState([]); 
   const [totalChecked, setTotalChecked] = useState(0);
   const [totalDefects, setTotalDefects] = useState(0);
   const [overallDhu, setOverallDhu] = useState(0);
-  // --- End State Variables ---
 
-  // --- Callbacks and Effects (Mostly similar to Daily/Monthly Trend) ---
   const handleFilterChange = useCallback((newFilters) => {
     setActiveFilters(newFilters);
   }, []);
@@ -72,13 +69,13 @@ const SunriseYearlyTrend = () => {
   const isFilterActive = (filterName) => (activeFilters[filterName] ?? "").trim() !== "";
 
   const fetchData = useCallback(async () => {
-    // Identical fetch logic
+    
     try {
       setLoading(true);
       setError(null);
       setRawData([]);
       setRows([]);
-      setUniqueYears([]); // Reset years
+      setUniqueYears([]);
       setTotalChecked(0);
       setTotalDefects(0);
       setOverallDhu(0);
@@ -90,10 +87,8 @@ const SunriseYearlyTrend = () => {
 
       const queryString = new URLSearchParams(queryParams).toString();
       const url = `${API_BASE_URL}/api/sunrise/qc1-data?${queryString}`;
-      console.log("Fetching yearly trend data from:", url);
 
       const response = await axios.get(url);
-      console.log("Fetched yearly data:", response.data.length, "records");
       setRawData(response.data || []);
       setError(null);
     } catch (err) {
@@ -109,7 +104,7 @@ const SunriseYearlyTrend = () => {
     fetchData();
   }, [fetchData]);
 
-  // Calculate Summary Stats (Identical)
+
   useEffect(() => {
     if (loading || error || !Array.isArray(rawData) || rawData.length === 0) {
       setTotalChecked(0); setTotalDefects(0); setOverallDhu(0); return;
@@ -120,12 +115,11 @@ const SunriseYearlyTrend = () => {
     setTotalChecked(checked); setTotalDefects(defects); setOverallDhu(dhu);
   }, [rawData, loading, error]);
 
-  // Process Data for Yearly Table (Adapted)
+
   useEffect(() => {
     if (loading || error || !Array.isArray(rawData) || rawData.length === 0) {
       setRows([]); setUniqueYears([]); return;
     }
-    console.log("Processing data for yearly table...");
 
     // 1. Determine Grouping Fields (Identical logic)
     const groupingFieldsConfig = [
@@ -138,37 +132,28 @@ const SunriseYearlyTrend = () => {
     const activeGroupingFields = groupingFieldsConfig
       .filter(field => groupingOptions[field.option] && !field.filterActive)
       .map(field => field.key);
-    console.log("Active Grouping Fields (Yearly):", activeGroupingFields);
 
     // 2. Extract unique YEARS and sort them
     const yearsSet = new Set(
-      rawData.map((d) => formatDateToYYYY(d.inspectionDate)).filter(Boolean) // Use YYYY
+      rawData.map((d) => formatDateToYYYY(d.inspectionDate)).filter(Boolean) 
     );
     const sortedYears = [...yearsSet].sort((a, b) => {
       const dateA = parseYYYY(a);
       const dateB = parseYYYY(b);
       if (!dateA || !dateB) return 0;
-      return dateA - dateB; // Sort chronologically
+      return dateA - dateB; 
     });
     setUniqueYears(sortedYears);
-    console.log("Unique Years (YYYY):", sortedYears);
 
     // 3. Build hierarchical data structure (Adapted for Years)
-    const hierarchy = buildHierarchyYearly(rawData, activeGroupingFields); // Use yearly builder
-    console.log("Built Yearly Hierarchy:", hierarchy);
+    const hierarchy = buildHierarchyYearly(rawData, activeGroupingFields); 
 
     // 4. Build table rows from the hierarchy (Adapted for Years)
-    const tableRows = buildRowsYearly(hierarchy, activeGroupingFields, sortedYears); // Use yearly builder
-    console.log("Built Yearly Rows:", tableRows);
+    const tableRows = buildRowsYearly(hierarchy, activeGroupingFields, sortedYears); 
     setRows(tableRows);
 
   }, [rawData, groupingOptions, loading, error, activeFilters]);
-  // --- End Callbacks and Effects ---
 
-
-  // --- Data Processing Functions (ADAPTED FOR YEARLY) ---
-
-  // Build hierarchical data structure (Groups by activeGroupingFields + YEAR)
   const buildHierarchyYearly = (data, groupingFields) => {
     const hierarchy = {};
     const normalizeString = (str) => (str ? String(str).trim() : "N/A");
@@ -179,14 +164,14 @@ const SunriseYearlyTrend = () => {
       if (!hierarchy[groupKey]) {
         hierarchy[groupKey] = {
           groupValues: groupingFields.map(field => normalizeString(doc[field])),
-          yearMap: {}, // Store aggregated data per YEAR (YYYY)
+          yearMap: {}, 
         };
       }
 
-      const formattedYear = formatDateToYYYY(doc.inspectionDate); // Get YYYY
-      if (!formattedYear) return; // Skip if year is invalid
+      const formattedYear = formatDateToYYYY(doc.inspectionDate); 
+      if (!formattedYear) return; 
 
-      // Aggregate data for the specific year within the group
+
       if (!hierarchy[groupKey].yearMap[formattedYear]) {
         hierarchy[groupKey].yearMap[formattedYear] = {
           CheckedQty: doc.CheckedQty || 0,
@@ -194,12 +179,11 @@ const SunriseYearlyTrend = () => {
           DefectArray: Array.isArray(doc.DefectArray) ? doc.DefectArray.map(def => ({ ...def })) : [],
         };
       } else {
-        // Add to existing data for this year
+       
         const yearEntry = hierarchy[groupKey].yearMap[formattedYear];
         yearEntry.CheckedQty += (doc.CheckedQty || 0);
         yearEntry.totalDefectsQty += (doc.totalDefectsQty || 0);
 
-        // Aggregate defects within the DefectArray for this year
         const existingDefects = yearEntry.DefectArray || [];
         const newDefects = Array.isArray(doc.DefectArray) ? doc.DefectArray : [];
         newDefects.forEach(newDefect => {
@@ -217,11 +201,11 @@ const SunriseYearlyTrend = () => {
     return hierarchy;
   };
 
-  // Build table rows from the yearly hierarchical structure
+ 
   const buildRowsYearly = (hierarchy, groupingFields, years) => {
     const rows = [];
     const sortedGroupKeys = Object.keys(hierarchy).sort((a, b) => {
-        // Sorting logic identical
+       
         const aValues = hierarchy[a].groupValues; const bValues = hierarchy[b].groupValues;
         for (let i = 0; i < Math.min(aValues.length, bValues.length); i++) {
             const comparison = String(aValues[i]).localeCompare(String(bValues[i]));
@@ -232,32 +216,30 @@ const SunriseYearlyTrend = () => {
 
     sortedGroupKeys.forEach(groupKey => {
       const group = hierarchy[groupKey];
-      const groupData = {}; // To store overall DHU% for the group per year
+      const groupData = {}; 
 
-      // Calculate overall DHU% for the group for each year
       years.forEach(year => {
-        const yearEntry = group.yearMap[year]; // Use yearMap
+        const yearEntry = group.yearMap[year]; 
         const checkedQty = yearEntry?.CheckedQty || 0;
         const defectsQty = yearEntry?.totalDefectsQty || 0;
         groupData[year] = checkedQty > 0 ? (defectsQty / checkedQty) * 100 : 0;
       });
 
-      // Add the main group row
+ 
       rows.push({ type: "group", key: groupKey + "-group", groupValues: group.groupValues, data: groupData });
 
-      // Find all unique defect names within this group across all years
+    
       const defectNames = new Set();
-      Object.values(group.yearMap).forEach(yearEntry => { // Use yearMap
+      Object.values(group.yearMap).forEach(yearEntry => { 
         if (yearEntry && Array.isArray(yearEntry.DefectArray)) {
           yearEntry.DefectArray.forEach(defect => { if (defect && defect.defectName) defectNames.add(defect.defectName); });
         }
       });
 
-      // Add rows for each unique defect within the group
       [...defectNames].sort().forEach(defectName => {
-        const defectData = {}; // To store specific defect's DHU% per year
+        const defectData = {}; 
         years.forEach(year => {
-          const yearEntry = group.yearMap[year]; // Use yearMap
+          const yearEntry = group.yearMap[year]; 
           if (yearEntry && Array.isArray(yearEntry.DefectArray)) {
             const defect = yearEntry.DefectArray.find(d => d.defectName === defectName);
             const checkedQty = yearEntry.CheckedQty || 0;
@@ -269,8 +251,6 @@ const SunriseYearlyTrend = () => {
     });
     return rows;
   };
-  // --- End Data Processing Functions ---
-
 
   // --- Color Coding Functions (Identical) ---
   const getBackgroundColor = (rate) => { if (rate > 3) return "bg-red-100"; if (rate >= 2) return "bg-yellow-100"; return "bg-green-100"; };
@@ -278,10 +258,8 @@ const SunriseYearlyTrend = () => {
   const getBackgroundColorRGB = (rate) => { if (rate > 3) return [254, 226, 226]; if (rate >= 2) return [254, 243, 199]; return [220, 252, 231]; };
   const getFontColorRGB = (rate) => { if (rate > 3) return [153, 27, 27]; if (rate >= 2) return [154, 52, 18]; return [6, 95, 70]; };
   const getBackgroundColorHex = (rate) => { if (rate > 3) return "FEE2E2"; if (rate >= 2) return "FEF3C7"; return "DCFCE7"; };
-  // --- End Color Coding Functions ---
 
 
-  // --- Export Functions (ADAPTED FOR YEARLY) ---
   const getCurrentGroupingFieldNames = () => {
     // Identical logic
     const names = [];
@@ -294,18 +272,18 @@ const SunriseYearlyTrend = () => {
   };
 
   const prepareExportData = () => {
-    // Adapted for years
+
     const exportData = []; const ratesMap = new Map();
     const groupingFieldNames = getCurrentGroupingFieldNames();
     const numGroupingCols = groupingFieldNames.length;
-    // Years are already in display format (YYYY)
+  
 
     exportData.push(["Yearly Defect Trend Analysis", ...Array(uniqueYears.length + numGroupingCols).fill("")]);
     ratesMap.set(`0-0`, -1);
     exportData.push(Array(uniqueYears.length + numGroupingCols + 1).fill(""));
     ratesMap.set(`1-0`, -1);
 
-    const headerRow = [...groupingFieldNames, "Defect / Group", ...uniqueYears]; // Use years directly
+    const headerRow = [...groupingFieldNames, "Defect / Group", ...uniqueYears]; 
     exportData.push(headerRow);
     headerRow.forEach((_, colIndex) => ratesMap.set(`2-${colIndex}`, -1));
 
@@ -313,7 +291,7 @@ const SunriseYearlyTrend = () => {
 
     rows.forEach((row) => {
       const rowData = []; const isGroupRow = row.type === "group";
-      // Grouping Columns (Hierarchy logic)
+      // Grouping Columns 
       for (let colIndex = 0; colIndex < numGroupingCols; colIndex++) {
         const currentValue = row.groupValues[colIndex]; let displayValue = "";
         if (isGroupRow && currentValue !== lastDisplayedGroupValues[colIndex]) {
@@ -327,7 +305,7 @@ const SunriseYearlyTrend = () => {
       }
       rowData.push(isGroupRow ? "GROUP TOTAL DHU%" : row.defectName);
       // Year Rate Columns
-      uniqueYears.forEach((year, yearIndex) => { // Iterate using YYYY keys
+      uniqueYears.forEach((year, yearIndex) => {
         const rate = row.data[year] || 0;
         rowData.push(rate > 0 ? `${rate.toFixed(2)}%` : "");
         ratesMap.set(`${rowIndex}-${numGroupingCols + 1 + yearIndex}`, rate);
@@ -336,9 +314,9 @@ const SunriseYearlyTrend = () => {
       exportData.push(rowData); rowIndex++;
     });
 
-    // Overall Total Row
+  
     const totalRow = [...Array(numGroupingCols).fill(""), "OVERALL TOTAL DHU%"];
-    uniqueYears.forEach((year, yearIndex) => { // Iterate using YYYY keys
+    uniqueYears.forEach((year, yearIndex) =>{
         const yearData = rawData.filter(d => formatDateToYYYY(d.inspectionDate) === year);
         const totalCheckedForYear = yearData.reduce((sum, d) => sum + (d.CheckedQty || 0), 0);
         const totalDefectsForYear = yearData.reduce((sum, d) => sum + (d.totalDefectsQty || 0), 0);
@@ -353,12 +331,12 @@ const SunriseYearlyTrend = () => {
   };
 
   const downloadExcel = () => {
-    // Excel export logic (mostly identical)
+  
     const { exportData, ratesMap, numGroupingCols } = prepareExportData();
     if (exportData.length <= 3) { alert("No data available to export."); return; }
     const ws = XLSX.utils.aoa_to_sheet(exportData);
     const range = XLSX.utils.decode_range(ws["!ref"]);
-    // Apply styles (identical logic)
+ 
     for (let R = range.s.r; R <= range.e.r; ++R) {
       for (let C = range.s.c; C <= range.e.c; ++C) {
         const cellAddress = XLSX.utils.encode_cell({ r: R, c: C }); const cell = ws[cellAddress]; if (!cell) continue;
@@ -372,18 +350,18 @@ const SunriseYearlyTrend = () => {
         cell.s = { border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, fill: { fgColor: { rgb: fgColor } }, alignment: alignment, font: { ...fontStyle }, };
       }
     }
-    // Column widths and merge (adjust year column width if needed)
-    const colWidths = []; groupingFieldNames.forEach(() => colWidths.push({ wch: 15 })); colWidths.push({ wch: 30 }); uniqueYears.forEach(() => colWidths.push({ wch: 12 })); // YYYY is shorter
+  
+    const colWidths = []; groupingFieldNames.forEach(() => colWidths.push({ wch: 15 })); colWidths.push({ wch: 30 }); uniqueYears.forEach(() => colWidths.push({ wch: 12 })); 
     ws['!cols'] = colWidths;
     if (range.e.c > 0) { ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: range.e.c } }]; if(ws['A1']) { ws['A1'].s = ws['A1'].s || {}; ws['A1'].s.alignment = { horizontal: "center", vertical: "middle" }; ws['A1'].s.font = { sz: 14, bold: true }; } }
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Yearly Defect Trend"); XLSX.writeFile(wb, "YearlyDefectTrend.xlsx");
   };
 
   const downloadPDF = () => {
-    // PDF export logic (mostly identical)
+
     const { exportData, ratesMap, numGroupingCols } = prepareExportData();
     if (exportData.length <= 3) { alert("No data available to export."); return; }
-    const doc = new jsPDF({ orientation: "landscape" }); const tablePlugin = typeof autoTable === "function" ? autoTable : window.autoTable; if (!tablePlugin) { console.error("jsPDF-AutoTable not found."); alert("PDF export unavailable."); return; }
+    const doc = new jsPDF({ orientation: "landscape" }); const tablePlugin = typeof autoTable === "function" ? autoTable : window.autoTable; if (!tablePlugin) {  alert("PDF export unavailable."); return; }
     const head = [exportData[2]]; const body = exportData.slice(3);
     tablePlugin(doc, {
       head: head, body: body, startY: 20, theme: "grid",
@@ -391,7 +369,7 @@ const SunriseYearlyTrend = () => {
       styles: { cellPadding: 1.5, fontSize: 7, valign: "middle", lineColor: [0, 0, 0], lineWidth: 0.1 },
       columnStyles: { ...Array.from({ length: numGroupingCols + 1 }, (_, i) => i).reduce((acc, i) => { acc[i] = { halign: 'left' }; return acc; }, {}), ...uniqueYears.reduce((acc, _, index) => { acc[numGroupingCols + 1 + index] = { halign: 'center' }; return acc; }, {}) },
       didParseCell: (data) => {
-        // Styling logic (identical)
+       
         const rowIndexInExportData = data.row.index + 3; const colIndex = data.column.index; const rate = ratesMap.get(`${rowIndexInExportData}-${colIndex}`); const cellHasValue = data.cell.raw !== undefined && data.cell.raw !== ""; const isTotalRow = data.row.index === body.length - 1; const isGroupLabelCol = colIndex === numGroupingCols; const isGroupRow = !isTotalRow && data.row.raw[numGroupingCols] === "GROUP TOTAL DHU%";
         if (data.section === "body") {
             let fillColor = [255, 255, 255]; let textColor = [55, 65, 81]; let fontStyle = 'normal';
@@ -406,29 +384,24 @@ const SunriseYearlyTrend = () => {
     });
     doc.save("YearlyDefectTrend.pdf");
   };
-  // --- End Export Functions ---
 
 
-  // --- UI Event Handlers (Identical) ---
   const handleOptionToggle = (option) => { setGroupingOptions((prev) => ({ ...prev, [option]: !prev[option] })); };
   const handleAddAll = () => { setGroupingOptions({ addLines: true, addMO: true, addBuyer: true, addColors: true, addSizes: true }); };
   const handleClearAll = () => { setGroupingOptions({ addLines: false, addMO: false, addBuyer: false, addColors: false, addSizes: false }); };
-  // --- End UI Event Handlers ---
-
-  // --- Props for Child Components ---
+  
   const summaryStats = { totalCheckedQty: totalChecked, totalDefectsQty: totalDefects, defectRate: overallDhu };
   const tableGroupingHeaders = getCurrentGroupingFieldNames();
-  let lastDisplayedGroupValues = Array(tableGroupingHeaders.length).fill(null); // For render logic
-  // --- End Props ---
+  let lastDisplayedGroupValues = Array(tableGroupingHeaders.length).fill(null); 
 
 
-  // --- JSX Rendering ---
+
   return (
     <div className="p-4 space-y-6">
-      {/* === Filter Pane === */}
+   
       <QCSunriseFilterPane onFilterChange={handleFilterChange} initialFilters={activeFilters} />
 
-      {/* === Summary Card Section === */}
+   
       <div className="mb-6">
         {loading && <div className="text-center p-4 text-gray-500">Loading summary...</div>}
         {error && <div className="text-center p-4 text-red-500">Error loading summary: {error}</div>}
@@ -437,9 +410,9 @@ const SunriseYearlyTrend = () => {
         {!loading && !error && rawData.length > 0 && ( <QCSunriseSummaryCard summaryStats={summaryStats} /> )}
       </div>
 
-      {/* === Yearly Trend Table Section === */}
+    
       <div className="bg-white shadow-md rounded-lg p-4">
-        {/* Grouping Options and Export Buttons (Identical structure) */}
+ 
         {!loading && !error && (
           <>
             <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
@@ -457,30 +430,30 @@ const SunriseYearlyTrend = () => {
           </>
         )}
 
-        {/* Loading/Error/No Data States (Identical structure) */}
+   
         {loading && <div className="text-center p-4 text-gray-500">Loading yearly trend data...</div>}
         {error && <div className="text-center p-4 text-red-500">Error loading yearly trend data: {error}</div>}
         {!loading && !error && rows.length === 0 && rawData.length > 0 && ( <div className="text-center p-4 text-gray-500">No yearly trend data to display based on current grouping.</div> )}
         {!loading && !error && rows.length === 0 && rawData.length === 0 && (activeFilters.startDate || activeFilters.endDate) && ( <div className="text-center p-4 text-gray-500">No data found for the selected filters.</div> )}
 
-        {/* The Actual Yearly Trend Table */}
+       
         {!loading && !error && rows.length > 0 && (
           <div className="overflow-x-auto border border-gray-300 rounded-md" style={{ maxHeight: "60vh" }}>
             <table className="min-w-full border-collapse align-middle text-xs">
-              {/* Table Header (Adapted for Years) */}
+             
               <thead className="bg-gray-100 sticky top-0 z-10">
                  <tr>
                    {tableGroupingHeaders.map((header, index) => ( <th key={header} className="py-2 px-3 border-b border-r border-gray-300 text-left font-semibold text-gray-700 sticky bg-gray-100 z-20 whitespace-nowrap" style={{ left: `${index * 100}px`, minWidth: '100px' }}>{header}</th> ))}
                    <th className="py-2 px-3 border-b border-r border-gray-300 text-left font-semibold text-gray-700 sticky bg-gray-100 z-20 whitespace-nowrap" style={{ left: `${tableGroupingHeaders.length * 100}px`, minWidth: '150px' }}>Defect / Group</th>
-                   {/* Year Headers */}
-                   {uniqueYears.map((year) => ( <th key={year} className="py-2 px-3 border-b border-r border-gray-300 text-center font-semibold text-gray-700 whitespace-nowrap" style={{ minWidth: '80px'}}> {year} {/* Display YYYY */} </th> ))}
+                 
+                   {uniqueYears.map((year) => ( <th key={year} className="py-2 px-3 border-b border-r border-gray-300 text-center font-semibold text-gray-700 whitespace-nowrap" style={{ minWidth: '80px'}}> {year} </th> ))}
                  </tr>
               </thead>
-              {/* Table Body (Adapted for Years, uses hierarchy logic) */}
+       
               <tbody className="bg-white">
                 {rows.map((row) => {
                   const isGroupRow = row.type === "group"; const rowCells = [];
-                  // Grouping Columns (Hierarchy Logic - Identical)
+                 
                   for (let colIndex = 0; colIndex < tableGroupingHeaders.length; colIndex++) {
                     const currentValue = row.groupValues[colIndex]; let displayValue = ""; let shouldDisplay = false; let isSticky = false;
                     if (currentValue !== lastDisplayedGroupValues[colIndex]) { if (isGroupRow) { displayValue = currentValue; shouldDisplay = true; isSticky = true; } lastDisplayedGroupValues[colIndex] = currentValue; for (let k = colIndex + 1; k < lastDisplayedGroupValues.length; k++) lastDisplayedGroupValues[k] = null; }
@@ -488,22 +461,22 @@ const SunriseYearlyTrend = () => {
                     const cellClasses = `py-1.5 px-3 border-b border-r border-gray-300 whitespace-nowrap ${isGroupRow ? "bg-gray-50" : "bg-white"} ${shouldDisplay ? "font-medium text-gray-800" : "text-gray-600"} ${isSticky ? "sticky z-10" : ""}`;
                     rowCells.push( <td key={`group-${row.key}-${colIndex}`} className={cellClasses} style={{ left: `${colIndex * 100}px`, minWidth: "100px" }}>{displayValue}</td> );
                   }
-                  // Defect/Group Label Cell (Hierarchy Logic - Identical)
+                
                   const defectGroupLabelSticky = isGroupRow;
                   rowCells.push( <td key={`label-${row.key}`} className={`py-1.5 px-3 border-b border-r border-gray-300 whitespace-nowrap ${isGroupRow ? "font-bold text-gray-900 bg-gray-50" : "text-gray-700 bg-white pl-6"} ${defectGroupLabelSticky ? "sticky z-10" : ""}`} style={{ left: `${tableGroupingHeaders.length * 100}px`, minWidth: '150px' }}>{isGroupRow ? "GROUP TOTAL DHU%" : row.defectName}</td> );
-                  // Year Rate Cells
-                  uniqueYears.forEach((year) => { // Iterate using YYYY keys
+                 
+                  uniqueYears.forEach((year) => { 
                     const rate = row.data[year] || 0; const displayValue = rate > 0 ? `${rate.toFixed(2)}%` : "";
                     rowCells.push( <td key={`${row.key}-year-${year}`} className={`py-1.5 px-3 border-b border-r border-gray-300 text-center ${rate > 0 ? getBackgroundColor(rate) : (isGroupRow ? "bg-gray-50" : "bg-white")} ${rate > 0 ? getFontColor(rate) : "text-gray-500"}`} title={displayValue || "0.00%"} style={{ minWidth: '80px'}}> {displayValue} </td> );
                   });
-                  // Render Row
+              
                   return ( <tr key={row.key} className={isGroupRow ? "hover:bg-gray-100" : "hover:bg-gray-50"}>{rowCells}</tr> );
                 })}
-                {/* Overall Total Row (Adapted for Years) */}
+                
                 <tr className="bg-gray-200 font-semibold text-gray-800 sticky bottom-0 z-10">
                   {tableGroupingHeaders.map((_, index) => ( <td key={`total-group-${index}`} className="py-2 px-3 border-b border-r border-t border-gray-400 sticky bg-gray-200 z-20" style={{ left: `${index * 100}px`, minWidth: '100px' }}></td> ))}
                   <td className="py-2 px-3 border-b border-r border-t border-gray-400 sticky bg-gray-200 z-20 font-bold" style={{ left: `${tableGroupingHeaders.length * 100}px`, minWidth: '150px' }}>OVERALL TOTAL DHU%</td>
-                  {uniqueYears.map((year) => { // Iterate using YYYY keys
+                  {uniqueYears.map((year) => { 
                     const yearData = rawData.filter(d => formatDateToYYYY(d.inspectionDate) === year);
                     const totalCheckedForYear = yearData.reduce((sum, d) => sum + (d.CheckedQty || 0), 0);
                     const totalDefectsForYear = yearData.reduce((sum, d) => sum + (d.totalDefectsQty || 0), 0);
@@ -519,7 +492,6 @@ const SunriseYearlyTrend = () => {
       </div>
     </div>
   );
-  // --- End JSX Rendering ---
 };
 
 export default SunriseYearlyTrend;

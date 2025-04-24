@@ -5,11 +5,10 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FaFileExcel, FaFilePdf } from "react-icons/fa";
-import QCSunriseFilterPane from "./QCSunriseFilterPane"; // Re-use Filter Pane
-import QCSunriseSummaryCard from "./QCSunriseSummaryCard"; // Re-use Summary Card
+import QCSunriseFilterPane from "./QCSunriseFilterPane"; 
+import QCSunriseSummaryCard from "./QCSunriseSummaryCard"; 
 
-// --- Helper Functions ---
-// Format date string YYYY-MM-DD to YYYY-MM (for monthly grouping)
+
 const formatDateToYYYYMM = (dateStr) => {
   if (!dateStr || typeof dateStr !== 'string' || !dateStr.includes('-')) return null;
   const parts = dateStr.split("-");
@@ -18,11 +17,11 @@ const formatDateToYYYYMM = (dateStr) => {
   return `${year}-${month}`;
 };
 
-// Format YYYY-MM to MMM YYYY (e.g., Jan 2023) for display
+// Format YYYY-MM to MMM YYYY 
 const formatYYYYMMToDisplay = (yyyyMM) => {
     if (!yyyyMM || !yyyyMM.includes('-')) return yyyyMM;
     const [year, month] = yyyyMM.split('-');
-    const date = new Date(parseInt(year), parseInt(month) - 1); // Month is 0-indexed
+    const date = new Date(parseInt(year), parseInt(month) - 1);
     return date.toLocaleString('default', { month: 'short', year: 'numeric' });
 };
 
@@ -30,22 +29,22 @@ const formatYYYYMMToDisplay = (yyyyMM) => {
 const parseYYYYMM = (yyyyMM) => {
   if (!yyyyMM || !yyyyMM.includes('-')) return null;
   const [year, month] = yyyyMM.split("-").map(Number);
-  return new Date(year, month - 1, 1); // Use 1st day for sorting consistency
+  return new Date(year, month - 1, 1); 
 };
 
-// Default date range (adjust if needed, e.g., last 12 months)
+// Default date range 
 const getDefaultEndDate = () => new Date().toISOString().split("T")[0];
 const getDefaultStartDate = () => {
     const today = new Date();
-    today.setMonth(today.getMonth() - 12); // Default to last 12 months
-    today.setDate(1); // Start from the 1st of the month
+    today.setMonth(today.getMonth() - 12); 
+    today.setDate(1); 
     return today.toISOString().split("T")[0];
 };
-// --- End Helper Functions ---
+
 
 
 const SunriseMonthlyTrend = () => {
-  // --- State Variables (Similar to Daily Trend) ---
+ 
   const [rawData, setRawData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -67,13 +66,11 @@ const SunriseMonthlyTrend = () => {
     addSizes: true,
   });
   const [rows, setRows] = useState([]);
-  const [uniqueMonths, setUniqueMonths] = useState([]); // Changed from uniqueDates
+  const [uniqueMonths, setUniqueMonths] = useState([]);
   const [totalChecked, setTotalChecked] = useState(0);
   const [totalDefects, setTotalDefects] = useState(0);
   const [overallDhu, setOverallDhu] = useState(0);
-  // --- End State Variables ---
 
-  // --- Callbacks and Effects (Mostly similar to Daily Trend) ---
   const handleFilterChange = useCallback((newFilters) => {
     setActiveFilters(newFilters);
   }, []);
@@ -81,13 +78,13 @@ const SunriseMonthlyTrend = () => {
   const isFilterActive = (filterName) => (activeFilters[filterName] ?? "").trim() !== "";
 
   const fetchData = useCallback(async () => {
-    // Identical fetch logic as Daily Trend
+    
     try {
       setLoading(true);
       setError(null);
       setRawData([]);
       setRows([]);
-      setUniqueMonths([]); // Reset months
+      setUniqueMonths([]); 
       setTotalChecked(0);
       setTotalDefects(0);
       setOverallDhu(0);
@@ -101,10 +98,8 @@ const SunriseMonthlyTrend = () => {
 
       const queryString = new URLSearchParams(queryParams).toString();
       const url = `${API_BASE_URL}/api/sunrise/qc1-data?${queryString}`;
-      console.log("Fetching monthly trend data from:", url);
 
       const response = await axios.get(url);
-      console.log("Fetched monthly data:", response.data.length, "records");
       setRawData(response.data || []);
       setError(null);
     } catch (err) {
@@ -120,7 +115,7 @@ const SunriseMonthlyTrend = () => {
     fetchData();
   }, [fetchData]);
 
-  // Calculate Summary Stats (Identical to Daily Trend)
+ 
   useEffect(() => {
     if (loading || error || !Array.isArray(rawData) || rawData.length === 0) {
       setTotalChecked(0);
@@ -140,14 +135,14 @@ const SunriseMonthlyTrend = () => {
     setOverallDhu(dhu);
   }, [rawData, loading, error]);
 
-  // Process Data for Monthly Table (Adapted from Daily Trend)
+
   useEffect(() => {
     if (loading || error || !Array.isArray(rawData) || rawData.length === 0) {
       setRows([]);
       setUniqueMonths([]);
       return;
     }
-    console.log("Processing data for monthly table...");
+  
 
     // 1. Determine Grouping Fields (Identical logic)
     const groupingFieldsConfig = [
@@ -160,7 +155,7 @@ const SunriseMonthlyTrend = () => {
     const activeGroupingFields = groupingFieldsConfig
       .filter(field => groupingOptions[field.option] && !field.filterActive)
       .map(field => field.key);
-    console.log("Active Grouping Fields (Monthly):", activeGroupingFields);
+  
 
     // 2. Extract unique MONTHS and sort them
     const monthsSet = new Set(
@@ -173,24 +168,19 @@ const SunriseMonthlyTrend = () => {
       return dateA - dateB;
     });
     setUniqueMonths(sortedMonths);
-    console.log("Unique Months (YYYY-MM):", sortedMonths);
+
 
     // 3. Build hierarchical data structure (Adapted for Months)
-    const hierarchy = buildHierarchyMonthly(rawData, activeGroupingFields); // Use monthly builder
-    console.log("Built Monthly Hierarchy:", hierarchy);
+    const hierarchy = buildHierarchyMonthly(rawData, activeGroupingFields); 
+
 
     // 4. Build table rows from the hierarchy (Adapted for Months)
-    const tableRows = buildRowsMonthly(hierarchy, activeGroupingFields, sortedMonths); // Use monthly builder
-    console.log("Built Monthly Rows:", tableRows);
+    const tableRows = buildRowsMonthly(hierarchy, activeGroupingFields, sortedMonths); 
+
     setRows(tableRows);
 
   }, [rawData, groupingOptions, loading, error, activeFilters]);
-  // --- End Callbacks and Effects ---
 
-
-  // --- Data Processing Functions (ADAPTED FOR MONTHLY) ---
-
-  // Build hierarchical data structure (Groups by activeGroupingFields + MONTH)
   const buildHierarchyMonthly = (data, groupingFields) => {
     const hierarchy = {};
     const normalizeString = (str) => (str ? String(str).trim() : "N/A");
@@ -201,14 +191,14 @@ const SunriseMonthlyTrend = () => {
       if (!hierarchy[groupKey]) {
         hierarchy[groupKey] = {
           groupValues: groupingFields.map(field => normalizeString(doc[field])),
-          monthMap: {}, // Store aggregated data per MONTH (YYYY-MM)
+          monthMap: {}, 
         };
       }
 
-      const formattedMonth = formatDateToYYYYMM(doc.inspectionDate); // Get YYYY-MM
-      if (!formattedMonth) return; // Skip if month is invalid
+      const formattedMonth = formatDateToYYYYMM(doc.inspectionDate); 
+      if (!formattedMonth) return; 
 
-      // Aggregate data for the specific month within the group
+      
       if (!hierarchy[groupKey].monthMap[formattedMonth]) {
         hierarchy[groupKey].monthMap[formattedMonth] = {
           CheckedQty: doc.CheckedQty || 0,
@@ -216,12 +206,12 @@ const SunriseMonthlyTrend = () => {
           DefectArray: Array.isArray(doc.DefectArray) ? doc.DefectArray.map(def => ({ ...def })) : [],
         };
       } else {
-        // Add to existing data for this month
+     
         const monthEntry = hierarchy[groupKey].monthMap[formattedMonth];
         monthEntry.CheckedQty += (doc.CheckedQty || 0);
         monthEntry.totalDefectsQty += (doc.totalDefectsQty || 0);
 
-        // Aggregate defects within the DefectArray for this month
+     
         const existingDefects = monthEntry.DefectArray || [];
         const newDefects = Array.isArray(doc.DefectArray) ? doc.DefectArray : [];
         newDefects.forEach(newDefect => {
@@ -239,11 +229,10 @@ const SunriseMonthlyTrend = () => {
     return hierarchy;
   };
 
-  // Build table rows from the monthly hierarchical structure
   const buildRowsMonthly = (hierarchy, groupingFields, months) => {
     const rows = [];
     const sortedGroupKeys = Object.keys(hierarchy).sort((a, b) => {
-        // Sorting logic identical to daily
+       
         const aValues = hierarchy[a].groupValues;
         const bValues = hierarchy[b].groupValues;
         for (let i = 0; i < Math.min(aValues.length, bValues.length); i++) {
@@ -255,27 +244,26 @@ const SunriseMonthlyTrend = () => {
 
     sortedGroupKeys.forEach(groupKey => {
       const group = hierarchy[groupKey];
-      const groupData = {}; // To store overall DHU% for the group per month
+      const groupData = {}; 
 
-      // Calculate overall DHU% for the group for each month
+     
       months.forEach(month => {
-        const monthEntry = group.monthMap[month]; // Use monthMap
+        const monthEntry = group.monthMap[month];
         const checkedQty = monthEntry?.CheckedQty || 0;
         const defectsQty = monthEntry?.totalDefectsQty || 0;
         groupData[month] = checkedQty > 0 ? (defectsQty / checkedQty) * 100 : 0;
       });
 
-      // Add the main group row
+     
       rows.push({
         type: "group",
         key: groupKey + "-group",
         groupValues: group.groupValues,
-        data: groupData, // Contains DHU% for each month
+        data: groupData,
       });
 
-      // Find all unique defect names within this group across all months
       const defectNames = new Set();
-      Object.values(group.monthMap).forEach(monthEntry => { // Use monthMap
+      Object.values(group.monthMap).forEach(monthEntry => {
         if (monthEntry && Array.isArray(monthEntry.DefectArray)) {
           monthEntry.DefectArray.forEach(defect => {
             if (defect && defect.defectName) defectNames.add(defect.defectName);
@@ -283,11 +271,11 @@ const SunriseMonthlyTrend = () => {
         }
       });
 
-      // Add rows for each unique defect within the group
+   
       [...defectNames].sort().forEach(defectName => {
-        const defectData = {}; // To store specific defect's DHU% per month
+        const defectData = {}; 
         months.forEach(month => {
-          const monthEntry = group.monthMap[month]; // Use monthMap
+          const monthEntry = group.monthMap[month];
           if (monthEntry && Array.isArray(monthEntry.DefectArray)) {
             const defect = monthEntry.DefectArray.find(d => d.defectName === defectName);
             const checkedQty = monthEntry.CheckedQty || 0;
@@ -302,18 +290,15 @@ const SunriseMonthlyTrend = () => {
         rows.push({
           type: "defect",
           key: groupKey + "-" + defectName,
-          groupValues: group.groupValues, // Pass group values for hierarchy logic
+          groupValues: group.groupValues, 
           defectName: defectName,
-          data: defectData, // Contains DHU% for this defect for each month
+          data: defectData, 
         });
       });
     });
     return rows;
   };
-  // --- End Data Processing Functions ---
 
-
-  // --- Color Coding Functions (Identical to Daily Trend) ---
   const getBackgroundColor = (rate) => {
     if (rate > 3) return "bg-red-100";
     if (rate >= 2) return "bg-yellow-100";
@@ -339,12 +324,12 @@ const SunriseMonthlyTrend = () => {
     if (rate >= 2) return "FEF3C7";
     return "DCFCE7";
   };
-  // --- End Color Coding Functions ---
 
 
-  // --- Export Functions (ADAPTED FOR MONTHLY) ---
+
+  
   const getCurrentGroupingFieldNames = () => {
-    // Identical logic
+ 
     const names = [];
     if (groupingOptions.addLines && !isFilterActive('lineNo')) names.push("Line");
     if (groupingOptions.addMO && !isFilterActive('MONo')) names.push("MO");
@@ -355,19 +340,19 @@ const SunriseMonthlyTrend = () => {
   };
 
   const prepareExportData = () => {
-    // Adapted for months
+   
     const exportData = [];
     const ratesMap = new Map();
     const groupingFieldNames = getCurrentGroupingFieldNames();
     const numGroupingCols = groupingFieldNames.length;
-    const displayMonths = uniqueMonths.map(formatYYYYMMToDisplay); // Use display format like "Jan 2023"
+    const displayMonths = uniqueMonths.map(formatYYYYMMToDisplay); "Jan 2023"
 
     exportData.push(["Monthly Defect Trend Analysis", ...Array(uniqueMonths.length + numGroupingCols).fill("")]);
     ratesMap.set(`0-0`, -1);
     exportData.push(Array(uniqueMonths.length + numGroupingCols + 1).fill(""));
     ratesMap.set(`1-0`, -1);
 
-    const headerRow = [...groupingFieldNames, "Defect / Group", ...displayMonths]; // Use display month names
+    const headerRow = [...groupingFieldNames, "Defect / Group", ...displayMonths]; 
     exportData.push(headerRow);
     headerRow.forEach((_, colIndex) => ratesMap.set(`2-${colIndex}`, -1));
 
@@ -378,7 +363,7 @@ const SunriseMonthlyTrend = () => {
       const rowData = [];
       const isGroupRow = row.type === "group";
 
-      // Grouping Columns (Hierarchy logic)
+    
       for (let colIndex = 0; colIndex < numGroupingCols; colIndex++) {
         const currentValue = row.groupValues[colIndex];
         let displayValue = "";
@@ -395,8 +380,8 @@ const SunriseMonthlyTrend = () => {
 
       rowData.push(isGroupRow ? "GROUP TOTAL DHU%" : row.defectName);
 
-      // Month Rate Columns
-      uniqueMonths.forEach((month, monthIndex) => { // Iterate using YYYY-MM keys
+   
+      uniqueMonths.forEach((month, monthIndex) => {
         const rate = row.data[month] || 0;
         rowData.push(rate > 0 ? `${rate.toFixed(2)}%` : "");
         ratesMap.set(`${rowIndex}-${numGroupingCols + 1 + monthIndex}`, rate);
@@ -407,9 +392,9 @@ const SunriseMonthlyTrend = () => {
       rowIndex++;
     });
 
-    // Overall Total Row
+  
     const totalRow = [...Array(numGroupingCols).fill(""), "OVERALL TOTAL DHU%"];
-    uniqueMonths.forEach((month, monthIndex) => { // Iterate using YYYY-MM keys
+    uniqueMonths.forEach((month, monthIndex) => { 
         const monthData = rawData.filter(d => formatDateToYYYYMM(d.inspectionDate) === month);
         const totalCheckedForMonth = monthData.reduce((sum, d) => sum + (d.CheckedQty || 0), 0);
         const totalDefectsForMonth = monthData.reduce((sum, d) => sum + (d.totalDefectsQty || 0), 0);
@@ -424,13 +409,13 @@ const SunriseMonthlyTrend = () => {
   };
 
   const downloadExcel = () => {
-    // Excel export logic (mostly identical, uses prepareExportData which is adapted)
+    
     const { exportData, ratesMap, numGroupingCols } = prepareExportData();
     if (exportData.length <= 3) { alert("No data available to export."); return; }
     const ws = XLSX.utils.aoa_to_sheet(exportData);
     const range = XLSX.utils.decode_range(ws["!ref"]);
 
-    // Apply styles (identical logic, relies on ratesMap and exportData structure)
+ 
     for (let R = range.s.r; R <= range.e.r; ++R) {
       for (let C = range.s.c; C <= range.e.c; ++C) {
         const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
@@ -468,11 +453,11 @@ const SunriseMonthlyTrend = () => {
         };
       }
     }
-    // Column widths and merge (adjust month column width if needed)
+  
     const colWidths = [];
     groupingFieldNames.forEach(() => colWidths.push({ wch: 15 }));
     colWidths.push({ wch: 30 });
-    uniqueMonths.forEach(() => colWidths.push({ wch: 15 })); // Wider for "MMM YYYY"
+    uniqueMonths.forEach(() => colWidths.push({ wch: 15 }));
     ws['!cols'] = colWidths;
     if (range.e.c > 0) {
       ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: range.e.c } }];
@@ -484,12 +469,12 @@ const SunriseMonthlyTrend = () => {
   };
 
   const downloadPDF = () => {
-    // PDF export logic (mostly identical, uses prepareExportData which is adapted)
+
     const { exportData, ratesMap, numGroupingCols } = prepareExportData();
     if (exportData.length <= 3) { alert("No data available to export."); return; }
     const doc = new jsPDF({ orientation: "landscape" });
     const tablePlugin = typeof autoTable === "function" ? autoTable : window.autoTable;
-    if (!tablePlugin) { console.error("jsPDF-AutoTable not found."); alert("PDF export unavailable."); return; }
+    if (!tablePlugin) {  alert("PDF export unavailable."); return; }
     const head = [exportData[2]]; const body = exportData.slice(3);
 
     tablePlugin(doc, {
@@ -501,7 +486,7 @@ const SunriseMonthlyTrend = () => {
         ...uniqueMonths.reduce((acc, _, index) => { acc[numGroupingCols + 1 + index] = { halign: 'center' }; return acc; }, {})
       },
       didParseCell: (data) => {
-        // Styling logic (identical, relies on ratesMap and exportData structure)
+ 
         const rowIndexInExportData = data.row.index + 3; const colIndex = data.column.index;
         const rate = ratesMap.get(`${rowIndexInExportData}-${colIndex}`);
         const cellHasValue = data.cell.raw !== undefined && data.cell.raw !== "";
@@ -536,32 +521,28 @@ const SunriseMonthlyTrend = () => {
     });
     doc.save("MonthlyDefectTrend.pdf");
   };
-  // --- End Export Functions ---
 
 
-  // --- UI Event Handlers (Identical to Daily Trend) ---
+
+
   const handleOptionToggle = (option) => { setGroupingOptions((prev) => ({ ...prev, [option]: !prev[option] })); };
   const handleAddAll = () => { setGroupingOptions({ addLines: true, addMO: true, addBuyer: true, addColors: true, addSizes: true }); };
   const handleClearAll = () => { setGroupingOptions({ addLines: false, addMO: false, addBuyer: false, addColors: false, addSizes: false }); };
-  // --- End UI Event Handlers ---
 
-  // --- Props for Child Components ---
+
   const summaryStats = { totalCheckedQty: totalChecked, totalDefectsQty: totalDefects, defectRate: overallDhu };
   const tableGroupingHeaders = getCurrentGroupingFieldNames();
-  let lastDisplayedGroupValues = Array(tableGroupingHeaders.length).fill(null); // For render logic
-  // --- End Props ---
+  let lastDisplayedGroupValues = Array(tableGroupingHeaders.length).fill(null); 
 
-
-  // --- JSX Rendering ---
   return (
     <div className="p-4 space-y-6">
-      {/* === Filter Pane === */}
+      
       <QCSunriseFilterPane
         onFilterChange={handleFilterChange}
         initialFilters={activeFilters}
       />
 
-      {/* === Summary Card Section === */}
+    
       <div className="mb-6">
         {loading && <div className="text-center p-4 text-gray-500">Loading summary...</div>}
         {error && <div className="text-center p-4 text-red-500">Error loading summary: {error}</div>}
@@ -576,9 +557,9 @@ const SunriseMonthlyTrend = () => {
         )}
       </div>
 
-      {/* === Monthly Trend Table Section === */}
+  
       <div className="bg-white shadow-md rounded-lg p-4">
-        {/* Grouping Options and Export Buttons (Identical structure) */}
+      
         {!loading && !error && (
           <>
             <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
@@ -610,31 +591,31 @@ const SunriseMonthlyTrend = () => {
           </>
         )}
 
-        {/* Loading/Error/No Data States (Identical structure) */}
+       
         {loading && <div className="text-center p-4 text-gray-500">Loading monthly trend data...</div>}
         {error && <div className="text-center p-4 text-red-500">Error loading monthly trend data: {error}</div>}
         {!loading && !error && rows.length === 0 && rawData.length > 0 && ( <div className="text-center p-4 text-gray-500">No monthly trend data to display based on current grouping.</div> )}
         {!loading && !error && rows.length === 0 && rawData.length === 0 && (activeFilters.startDate || activeFilters.endDate) && ( <div className="text-center p-4 text-gray-500">No data found for the selected filters.</div> )}
 
-        {/* The Actual Monthly Trend Table */}
+        
         {!loading && !error && rows.length > 0 && (
           <div className="overflow-x-auto border border-gray-300 rounded-md" style={{ maxHeight: "60vh" }}>
             <table className="min-w-full border-collapse align-middle text-xs">
-              {/* Table Header (Adapted for Months) */}
+             
               <thead className="bg-gray-100 sticky top-0 z-10">
                  <tr>
                    {tableGroupingHeaders.map((header, index) => ( <th key={header} className="py-2 px-3 border-b border-r border-gray-300 text-left font-semibold text-gray-700 sticky bg-gray-100 z-20 whitespace-nowrap" style={{ left: `${index * 100}px`, minWidth: '100px' }}>{header}</th> ))}
                    <th className="py-2 px-3 border-b border-r border-gray-300 text-left font-semibold text-gray-700 sticky bg-gray-100 z-20 whitespace-nowrap" style={{ left: `${tableGroupingHeaders.length * 100}px`, minWidth: '150px' }}>Defect / Group</th>
-                   {/* Month Headers */}
+                  
                    {uniqueMonths.map((month) => ( <th key={month} className="py-2 px-3 border-b border-r border-gray-300 text-center font-semibold text-gray-700 whitespace-nowrap" style={{ minWidth: '90px'}}> {formatYYYYMMToDisplay(month)} {/* Display MMM YYYY */} </th> ))}
                  </tr>
               </thead>
-              {/* Table Body (Adapted for Months, uses hierarchy logic) */}
+           
               <tbody className="bg-white">
                 {rows.map((row) => {
                   const isGroupRow = row.type === "group";
                   const rowCells = [];
-                  // Grouping Columns (Hierarchy Logic - Identical)
+                  
                   for (let colIndex = 0; colIndex < tableGroupingHeaders.length; colIndex++) {
                     const currentValue = row.groupValues[colIndex]; let displayValue = ""; let shouldDisplay = false; let isSticky = false;
                     if (currentValue !== lastDisplayedGroupValues[colIndex]) {
@@ -645,22 +626,22 @@ const SunriseMonthlyTrend = () => {
                     const cellClasses = `py-1.5 px-3 border-b border-r border-gray-300 whitespace-nowrap ${isGroupRow ? "bg-gray-50" : "bg-white"} ${shouldDisplay ? "font-medium text-gray-800" : "text-gray-600"} ${isSticky ? "sticky z-10" : ""}`;
                     rowCells.push( <td key={`group-${row.key}-${colIndex}`} className={cellClasses} style={{ left: `${colIndex * 100}px`, minWidth: "100px" }}>{displayValue}</td> );
                   }
-                  // Defect/Group Label Cell (Hierarchy Logic - Identical)
+                
                   const defectGroupLabelSticky = isGroupRow;
                   rowCells.push( <td key={`label-${row.key}`} className={`py-1.5 px-3 border-b border-r border-gray-300 whitespace-nowrap ${isGroupRow ? "font-bold text-gray-900 bg-gray-50" : "text-gray-700 bg-white pl-6"} ${defectGroupLabelSticky ? "sticky z-10" : ""}`} style={{ left: `${tableGroupingHeaders.length * 100}px`, minWidth: '150px' }}>{isGroupRow ? "GROUP TOTAL DHU%" : row.defectName}</td> );
-                  // Month Rate Cells
-                  uniqueMonths.forEach((month) => { // Iterate using YYYY-MM keys
+                  
+                  uniqueMonths.forEach((month) => { 
                     const rate = row.data[month] || 0; const displayValue = rate > 0 ? `${rate.toFixed(2)}%` : "";
                     rowCells.push( <td key={`${row.key}-month-${month}`} className={`py-1.5 px-3 border-b border-r border-gray-300 text-center ${rate > 0 ? getBackgroundColor(rate) : (isGroupRow ? "bg-gray-50" : "bg-white")} ${rate > 0 ? getFontColor(rate) : "text-gray-500"}`} title={displayValue || "0.00%"} style={{ minWidth: '90px'}}> {displayValue} </td> );
                   });
-                  // Render Row
+                
                   return ( <tr key={row.key} className={isGroupRow ? "hover:bg-gray-100" : "hover:bg-gray-50"}>{rowCells}</tr> );
                 })}
-                {/* Overall Total Row (Adapted for Months) */}
+              
                 <tr className="bg-gray-200 font-semibold text-gray-800 sticky bottom-0 z-10">
                   {tableGroupingHeaders.map((_, index) => ( <td key={`total-group-${index}`} className="py-2 px-3 border-b border-r border-t border-gray-400 sticky bg-gray-200 z-20" style={{ left: `${index * 100}px`, minWidth: '100px' }}></td> ))}
                   <td className="py-2 px-3 border-b border-r border-t border-gray-400 sticky bg-gray-200 z-20 font-bold" style={{ left: `${tableGroupingHeaders.length * 100}px`, minWidth: '150px' }}>OVERALL TOTAL DHU%</td>
-                  {uniqueMonths.map((month) => { // Iterate using YYYY-MM keys
+                  {uniqueMonths.map((month) => { 
                     const monthData = rawData.filter(d => formatDateToYYYYMM(d.inspectionDate) === month);
                     const totalCheckedForMonth = monthData.reduce((sum, d) => sum + (d.CheckedQty || 0), 0);
                     const totalDefectsForMonth = monthData.reduce((sum, d) => sum + (d.totalDefectsQty || 0), 0);
@@ -676,7 +657,7 @@ const SunriseMonthlyTrend = () => {
       </div>
     </div>
   );
-  // --- End JSX Rendering ---
+
 };
 
 export default SunriseMonthlyTrend;
