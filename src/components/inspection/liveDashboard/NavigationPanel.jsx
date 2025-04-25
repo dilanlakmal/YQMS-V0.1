@@ -29,7 +29,14 @@ const NavigationPanel = ({
     { name: "Home", icon: <Home size={18} />, subMenus: [] }, // Add Home menu
     { name: "QC Inline Roving", icon: <Search size={16} />, subMenus: [] },
     { name: "Cutting", icon: <Search size={16} />, subMenus: [] },
-    { name: "Digital Measurement", icon: <Shirt size={16} />, subMenus: [] },
+    {
+      name: "Digital Measurement",
+      icon: <Shirt size={16} />,
+      subMenus: [
+        { name: "Buyer Specs", icon: <BarChart size={16} /> },
+        { name: "Measurement Summary", icon: <TrendingUp size={16} /> }
+      ]
+    },
     {
       name: "QC 1 Dashboard",
       icon: <BarChart size={16} />,

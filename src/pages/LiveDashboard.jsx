@@ -26,6 +26,7 @@ import CuttingReport from "../components/inspection/liveDashboard/CuttingReport"
 import HomeMenu from "../components/inspection/liveDashboard/HomeMenu";
 import QCSunriseDashboard from "../components/inspection/liveDashboard/QCSunriseDashboard";
 import DigitalMeasurement from "../components/inspection/liveDashboard/DigitalMeasurement";
+import DigitalMeasurementBuyerSpec from "../components/inspection/digital_measurement/DigitalMeasurementBuyerSpec";
 
 const LiveDashboard = () => {
   const [activeSection, setActiveSection] = useState("Home");
@@ -442,7 +443,8 @@ const LiveDashboard = () => {
 
         {activeSection === "QC Inline Roving" && <RovingReport />}
         {activeSection === "Cutting" && <CuttingReport />}
-        {activeSection === "Digital Measurement" && <DigitalMeasurement />}
+        {activeSection === "Buyer Specs" && <DigitalMeasurementBuyerSpec />}
+        {activeSection === "Measurement Summary" && <DigitalMeasurement />}
         {activeSection === "Daily Analysis" && <QCSunriseDashboard />}
         {activeSection === "Order Data" && <OrderData />}
 

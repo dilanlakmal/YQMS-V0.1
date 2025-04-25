@@ -7989,132 +7989,212 @@ app.post("/api/update-user-roles", async (req, res) => {
 ------------------------------ */
 
 // New Endpoints for Digital Measurement
-app.get("/api/digital-measurement-summary", async (req, res) => {
+
+// app.get("/api/digital-measurement-summary", async (req, res) => {
+//   try {
+//     const measurementDataCollection =
+//       ymEcoConnection.db.collection("measurement_data");
+//     const {
+//       startDate,
+//       endDate,
+//       factory,
+//       mono,
+//       custStyle,
+//       buyer,
+//       empId,
+//       stage
+//     } = req.query;
+
+//     const start = startDate ? new Date(startDate) : null;
+//     const end = endDate ? new Date(endDate) : null;
+
+//     let userIds = [];
+//     if (empId) {
+//       const users = await UserMain.find({ emp_id: empId }, "_id");
+//       userIds = users.map((u) => u._id.toString());
+//     }
+
+//     const measurementFilter = {};
+//     if (start && end) {
+//       measurementFilter.updated_at = { $gte: start, $lte: end };
+//     } else if (start) {
+//       measurementFilter.updated_at = { $gte: start };
+//     } else if (end) {
+//       measurementFilter.updated_at = { $lte: end };
+//     }
+//     if (userIds.length > 0) {
+//       measurementFilter["user.id"] = { $in: userIds };
+//     }
+//     if (stage) {
+//       measurementFilter.stage = stage; // Add stage filter
+//     }
+
+//     const distinctStyleIds = await measurementDataCollection.distinct(
+//       "style_id",
+//       measurementFilter
+//     );
+
+//     const orderFilter = {
+//       _id: {
+//         $in: distinctStyleIds.map((id) => new mongoose.Types.ObjectId(id))
+//       }
+//     };
+//     if (factory) orderFilter.Factory = factory;
+//     if (mono) orderFilter.Order_No = mono;
+//     if (custStyle) orderFilter.CustStyle = custStyle;
+//     if (buyer) orderFilter.ShortName = buyer;
+
+//     const filteredOrders = await ymEcoConnection.db
+//       .collection("dt_orders")
+//       .find(orderFilter, { projection: { TotalQty: 1 } })
+//       .toArray();
+//     const orderQty = filteredOrders.reduce(
+//       (sum, order) => sum + order.TotalQty,
+//       0
+//     );
+
+//     const filteredOrderIds = filteredOrders.map((order) =>
+//       order._id.toString()
+//     );
+
+//     const finalMeasurementFilter = {
+//       style_id: { $in: filteredOrderIds },
+//       ...measurementFilter
+//     };
+
+//     const measurementAggregation = await measurementDataCollection
+//       .aggregate([
+//         { $match: finalMeasurementFilter },
+//         {
+//           $group: {
+//             _id: null,
+//             totalInspected: { $sum: 1 },
+//             totalPass: { $sum: { $cond: [{ $eq: ["$status", 1] }, 1, 0] } }
+//           }
+//         }
+//       ])
+//       .toArray();
+
+//     const measurementSummary = measurementAggregation[0] || {
+//       totalInspected: 0,
+//       totalPass: 0
+//     };
+//     const totalInspected = measurementSummary.totalInspected;
+//     const totalPass = measurementSummary.totalPass;
+//     const totalReject = totalInspected - totalPass;
+//     const passRate =
+//       totalInspected > 0
+//         ? ((totalPass / totalInspected) * 100).toFixed(2)
+//         : "0.00";
+
+//     res.json({
+//       orderQty,
+//       totalInspected,
+//       totalPass,
+//       totalReject,
+//       passRate
+//     });
+//   } catch (error) {
+//     console.error("Error fetching digital measurement summary:", error);
+//     res.status(500).json({ error: "Failed to fetch summary" });
+//   }
+// });
+
+// New endpoint for filter options
+app.get("/api/filter-options", async (req, res) => {
   try {
-    const measurementDataCollection =
-      ymEcoConnection.db.collection("measurement_data");
-    const { startDate, endDate, factory, mono, custStyle, buyer, empId } =
+    const { factory, mono, custStyle, buyer, mode, country, origin, stage } =
       req.query;
-
-    const start = startDate ? new Date(startDate) : null;
-    const end = endDate ? new Date(endDate) : null;
-
-    let userIds = [];
-    if (empId) {
-      const users = await UserMain.find({ emp_id: empId }, "_id");
-      userIds = users.map((u) => u._id.toString());
-    }
-
-    const measurementFilter = {};
-    if (start && end) {
-      measurementFilter.updated_at = { $gte: start, $lte: end };
-    } else if (start) {
-      measurementFilter.updated_at = { $gte: start };
-    } else if (end) {
-      measurementFilter.updated_at = { $lte: end };
-    }
-    if (userIds.length > 0) {
-      measurementFilter["user.id"] = { $in: userIds };
-    }
-
-    const distinctStyleIds = await measurementDataCollection.distinct(
-      "style_id",
-      measurementFilter
-    );
-
-    const orderFilter = {
-      _id: {
-        $in: distinctStyleIds.map((id) => new mongoose.Types.ObjectId(id))
-      }
-    };
+    const orderFilter = {};
     if (factory) orderFilter.Factory = factory;
     if (mono) orderFilter.Order_No = mono;
     if (custStyle) orderFilter.CustStyle = custStyle;
     if (buyer) orderFilter.ShortName = buyer;
+    if (mode) orderFilter.Mode = mode;
+    if (country) orderFilter.Country = country;
+    if (origin) orderFilter.Origin = origin;
 
-    const filteredOrders = await ymEcoConnection.db
+    const factories = await ymEcoConnection.db
       .collection("dt_orders")
-      .find(orderFilter, { projection: { TotalQty: 1 } })
-      .toArray();
-    const orderQty = filteredOrders.reduce(
-      (sum, order) => sum + order.TotalQty,
-      0
-    );
+      .distinct("Factory", orderFilter);
+    const monos = await ymEcoConnection.db
+      .collection("dt_orders")
+      .distinct("Order_No", orderFilter);
+    const custStyles = await ymEcoConnection.db
+      .collection("dt_orders")
+      .distinct("CustStyle", orderFilter);
+    const buyers = await ymEcoConnection.db
+      .collection("dt_orders")
+      .distinct("ShortName", orderFilter);
+    const modes = await ymEcoConnection.db
+      .collection("dt_orders")
+      .distinct("Mode", orderFilter);
+    const countries = await ymEcoConnection.db
+      .collection("dt_orders")
+      .distinct("Country", orderFilter);
+    const origins = await ymEcoConnection.db
+      .collection("dt_orders")
+      .distinct("Origin", orderFilter);
 
-    const filteredOrderIds = filteredOrders.map((order) =>
-      order._id.toString()
-    );
+    // Fetch distinct stages from measurement_data, filtered by dt_orders
+    let measurementFilter = {};
+    if (mono) {
+      const order = await ymEcoConnection.db
+        .collection("dt_orders")
+        .findOne({ Order_No: mono }, { projection: { _id: 1 } });
+      if (order) {
+        measurementFilter.style_id = order._id.toString();
+      }
+    } else {
+      const filteredOrders = await ymEcoConnection.db
+        .collection("dt_orders")
+        .find(orderFilter, { projection: { _id: 1 } })
+        .toArray();
+      const orderIds = filteredOrders.map((order) => order._id.toString());
+      measurementFilter.style_id = { $in: orderIds };
+    }
+    if (stage) {
+      measurementFilter.stage = stage;
+    }
 
-    const finalMeasurementFilter = {
-      style_id: { $in: filteredOrderIds },
-      ...measurementFilter
-    };
+    const stages = await ymEcoConnection.db
+      .collection("measurement_data")
+      .distinct("stage", measurementFilter);
 
-    const measurementAggregation = await measurementDataCollection
+    // Fetch distinct emp_ids from UserMain where working_status is "Working"
+    const empIds = await UserMain.distinct("emp_id", {
+      working_status: "Working",
+      emp_id: { $ne: null } // Ensure emp_id is not null
+    });
+
+    // Add minDate and maxDate from measurement_data
+    const dateRange = await ymEcoConnection.db
+      .collection("measurement_data")
       .aggregate([
-        { $match: finalMeasurementFilter },
         {
           $group: {
             _id: null,
-            totalInspected: { $sum: 1 },
-            totalPass: { $sum: { $cond: [{ $eq: ["$status", 1] }, 1, 0] } }
+            minDate: { $min: "$created_at" },
+            maxDate: { $max: "$created_at" }
           }
         }
       ])
       .toArray();
-
-    const measurementSummary = measurementAggregation[0] || {
-      totalInspected: 0,
-      totalPass: 0
-    };
-    const totalInspected = measurementSummary.totalInspected;
-    const totalPass = measurementSummary.totalPass;
-    const totalReject = totalInspected - totalPass;
-    const passRate =
-      totalInspected > 0
-        ? ((totalPass / totalInspected) * 100).toFixed(2)
-        : "0.00";
-
-    res.json({
-      orderQty,
-      totalInspected,
-      totalPass,
-      totalReject,
-      passRate
-    });
-  } catch (error) {
-    console.error("Error fetching digital measurement summary:", error);
-    res.status(500).json({ error: "Failed to fetch summary" });
-  }
-});
-
-app.get("/api/filter-options", async (req, res) => {
-  try {
-    const { factory, mono, custStyle, buyer } = req.query;
-    const filter = {};
-    if (factory) filter.Factory = factory;
-    if (mono) filter.Order_No = mono;
-    if (custStyle) filter.CustStyle = custStyle;
-    if (buyer) filter.ShortName = buyer;
-
-    const factories = await ymEcoConnection.db
-      .collection("dt_orders")
-      .distinct("Factory", filter);
-    const monos = await ymEcoConnection.db
-      .collection("dt_orders")
-      .distinct("Order_No", filter);
-    const custStyles = await ymEcoConnection.db
-      .collection("dt_orders")
-      .distinct("CustStyle", filter);
-    const buyers = await ymEcoConnection.db
-      .collection("dt_orders")
-      .distinct("ShortName", filter);
+    const minDate = dateRange.length > 0 ? dateRange[0].minDate : null;
+    const maxDate = dateRange.length > 0 ? dateRange[0].maxDate : null;
 
     res.json({
       factories,
       monos,
       custStyles,
-      buyers
+      buyers,
+      modes,
+      countries,
+      origins,
+      stages, // Added stages
+      empIds, // Added empIds
+      minDate,
+      maxDate
     });
   } catch (error) {
     console.error("Error fetching filter options:", error);
@@ -8122,26 +8202,337 @@ app.get("/api/filter-options", async (req, res) => {
   }
 });
 
-app.get("/api/search-emp-id", async (req, res) => {
+// New endpoint for buyer spec order details
+app.get("/api/buyer-spec-order-details/:mono", async (req, res) => {
   try {
-    const term = req.query.term;
-    if (!term) {
-      return res.status(400).json({ error: "Search term is required" });
-    }
+    const collection = ymEcoConnection.db.collection("dt_orders");
+    const order = await collection.findOne({ Order_No: req.params.mono });
 
-    const regexPattern = new RegExp(term, "i");
-    const empIds = await UserMain.find(
-      { emp_id: { $regex: regexPattern } },
-      "emp_id"
-    )
-      .limit(100)
-      .lean();
-    const uniqueEmpIds = [...new Set(empIds.map((u) => u.emp_id))];
+    if (!order) return res.status(404).json({ error: "Order not found" });
 
-    res.json(uniqueEmpIds);
+    const colorSizeMap = {};
+    const sizes = new Set();
+    order.OrderColors.forEach((colorObj) => {
+      const color = colorObj.Color.trim();
+      colorSizeMap[color] = {};
+      colorObj.OrderQty.forEach((sizeEntry) => {
+        const sizeName = Object.keys(sizeEntry)[0].split(";")[0].trim();
+        const quantity = sizeEntry[sizeName];
+        if (quantity > 0) {
+          colorSizeMap[color][sizeName] = quantity;
+          sizes.add(sizeName);
+        }
+      });
+    });
+
+    const buyerSpec = order.SizeSpec.map((spec) => ({
+      seq: spec.Seq,
+      measurementPoint: spec.EnglishRemark,
+      chineseRemark: spec.ChineseArea,
+      tolMinus: spec.ToleranceMinus.decimal,
+      tolPlus: spec.TolerancePlus.decimal,
+      specs: spec.Specs.reduce((acc, sizeSpec, index) => {
+        const sizeName = Object.keys(sizeSpec)[0];
+        acc[sizeName] = sizeSpec[sizeName].decimal;
+        return acc;
+      }, {})
+    }));
+
+    res.json({
+      moNo: order.Order_No,
+      custStyle: order.CustStyle || "N/A",
+      buyer: order.ShortName || "N/A",
+      mode: order.Mode || "N/A",
+      country: order.Country || "N/A",
+      origin: order.Origin || "N/A",
+      orderQty: order.TotalQty,
+      colors: Object.keys(colorSizeMap),
+      sizes: Array.from(sizes),
+      colorSizeMap,
+      buyerSpec
+    });
   } catch (error) {
-    console.error("Error searching employee IDs:", error);
-    res.status(500).json({ error: "Failed to search employee IDs" });
+    console.error("Error fetching buyer spec order details:", error);
+    res.status(500).json({ error: "Failed to fetch buyer spec order details" });
+  }
+});
+
+// New endpoint for paginated MO Nos
+app.get("/api/paginated-monos", async (req, res) => {
+  try {
+    const {
+      page = 1,
+      factory,
+      custStyle,
+      buyer,
+      mode,
+      country,
+      origin
+    } = req.query;
+    const pageSize = 1; // One MO No per page
+    const skip = (parseInt(page) - 1) * pageSize;
+
+    const filter = {};
+    if (factory) filter.Factory = factory;
+    if (custStyle) filter.CustStyle = custStyle;
+    if (buyer) filter.ShortName = buyer;
+    if (mode) filter.Mode = mode;
+    if (country) filter.Country = country;
+    if (origin) filter.Origin = origin;
+
+    const total = await ymEcoConnection.db
+      .collection("dt_orders")
+      .countDocuments(filter);
+    const monos = await ymEcoConnection.db
+      .collection("dt_orders")
+      .find(filter)
+      .project({ Order_No: 1, _id: 0 })
+      .skip(skip)
+      .limit(pageSize)
+      .toArray();
+
+    res.json({
+      monos: monos.map((m) => m.Order_No),
+      totalPages: Math.ceil(total / pageSize),
+      currentPage: parseInt(page)
+    });
+  } catch (error) {
+    console.error("Error fetching paginated MONos:", error);
+    res.status(500).json({ error: "Failed to fetch paginated MONos" });
+  }
+});
+
+// New endpoint for overall measurement summary
+app.get("/api/measurement-summary", async (req, res) => {
+  try {
+    const {
+      factory,
+      startDate,
+      endDate,
+      mono,
+      custStyle,
+      buyer,
+      empId,
+      stage
+    } = req.query;
+    const orderFilter = {};
+    if (factory) orderFilter.Factory = factory;
+    if (mono) orderFilter.Order_No = mono;
+    if (custStyle) orderFilter.CustStyle = custStyle;
+    if (buyer) orderFilter.ShortName = buyer;
+
+    const selectedOrders = await ymEcoConnection.db
+      .collection("dt_orders")
+      .find(orderFilter)
+      .toArray();
+    const orderIds = selectedOrders.map((order) => order._id.toString());
+
+    const measurementFilter = { style_id: { $in: orderIds } };
+    if (startDate) measurementFilter.created_at = { $gte: new Date(startDate) };
+    if (endDate)
+      measurementFilter.created_at = {
+        ...measurementFilter.created_at,
+        $lte: new Date(endDate)
+      };
+    if (empId) measurementFilter["user.name"] = empId;
+    if (stage) measurementFilter.stage = stage;
+
+    const measurementRecords = await ymEcoConnection.db
+      .collection("measurement_data")
+      .find(measurementFilter)
+      .toArray();
+    const orderIdToSizeSpec = {};
+    selectedOrders.forEach((order) => {
+      orderIdToSizeSpec[order._id.toString()] = order.SizeSpec;
+    });
+
+    let orderQty = selectedOrders.reduce(
+      (sum, order) => sum + order.TotalQty,
+      0
+    );
+    let inspectedQty = measurementRecords.length;
+    let totalPass = 0;
+
+    measurementRecords.forEach((record) => {
+      const sizeSpec = orderIdToSizeSpec[record.style_id];
+      const size = record.size;
+      let isPass = true;
+      for (let i = 0; i < record.actual.length; i++) {
+        if (record.actual[i].value === 0) continue;
+        const spec = sizeSpec[i];
+        const tolMinus = spec.ToleranceMinus.decimal;
+        const tolPlus = spec.TolerancePlus.decimal;
+        const specValue = spec.Specs.find((s) => Object.keys(s)[0] === size)[
+          size
+        ].decimal;
+        const lower = specValue - tolMinus;
+        const upper = specValue + tolPlus;
+        const actualValue = record.actual[i].value;
+        if (actualValue < lower || actualValue > upper) {
+          isPass = false;
+          break;
+        }
+      }
+      if (isPass) totalPass++;
+    });
+
+    const totalReject = inspectedQty - totalPass;
+    const passRate =
+      inspectedQty > 0 ? ((totalPass / inspectedQty) * 100).toFixed(2) : "0.00";
+
+    res.json({ orderQty, inspectedQty, totalPass, totalReject, passRate });
+  } catch (error) {
+    console.error("Error fetching measurement summary:", error);
+    res.status(500).json({ error: "Failed to fetch measurement summary" });
+  }
+});
+
+// New endpoint for paginated measurement summary per MO No
+app.get("/api/measurement-summary-per-mono", async (req, res) => {
+  try {
+    const {
+      page = 1,
+      pageSize = 10,
+      factory,
+      startDate,
+      endDate,
+      mono,
+      custStyle,
+      buyer,
+      empId,
+      stage
+    } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+
+    const orderFilter = {};
+    if (factory) orderFilter.Factory = factory;
+    if (mono) orderFilter.Order_No = mono;
+    if (custStyle) orderFilter.CustStyle = custStyle;
+    if (buyer) orderFilter.ShortName = buyer;
+
+    const totalOrders = await ymEcoConnection.db
+      .collection("dt_orders")
+      .countDocuments(orderFilter);
+    const orders = await ymEcoConnection.db
+      .collection("dt_orders")
+      .find(orderFilter)
+      .sort({ Order_No: 1 })
+      .skip(skip)
+      .limit(parseInt(pageSize))
+      .toArray();
+    const orderIds = orders.map((order) => order._id.toString());
+
+    const measurementFilter = { style_id: { $in: orderIds } };
+    if (startDate) measurementFilter.created_at = { $gte: new Date(startDate) };
+    if (endDate)
+      measurementFilter.created_at = {
+        ...measurementFilter.created_at,
+        $lte: new Date(endDate)
+      };
+    if (empId) measurementFilter["user.name"] = empId;
+    if (stage) measurementFilter.stage = stage;
+
+    const measurementRecords = await ymEcoConnection.db
+      .collection("measurement_data")
+      .find(measurementFilter)
+      .toArray();
+    const recordsByOrder = {};
+    measurementRecords.forEach((record) => {
+      const styleId = record.style_id;
+      if (!recordsByOrder[styleId]) recordsByOrder[styleId] = [];
+      recordsByOrder[styleId].push(record);
+    });
+
+    const orderIdToSizeSpec = {};
+    orders.forEach((order) => {
+      orderIdToSizeSpec[order._id.toString()] = order.SizeSpec;
+    });
+
+    const summaryPerMono = orders.map((order) => {
+      const styleId = order._id.toString();
+      const records = recordsByOrder[styleId] || [];
+      let inspectedQty = records.length;
+      let totalPass = 0;
+      records.forEach((record) => {
+        const sizeSpec = orderIdToSizeSpec[styleId];
+        const size = record.size;
+        let isPass = true;
+        for (let i = 0; i < record.actual.length; i++) {
+          if (record.actual[i].value === 0) continue;
+          const spec = sizeSpec[i];
+          const tolMinus = spec.ToleranceMinus.decimal;
+          const tolPlus = spec.TolerancePlus.decimal;
+          const specValue = spec.Specs.find((s) => Object.keys(s)[0] === size)[
+            size
+          ].decimal;
+          const lower = specValue - tolMinus;
+          const upper = specValue + tolPlus;
+          const actualValue = record.actual[i].value;
+          if (actualValue < lower || actualValue > upper) {
+            isPass = false;
+            break;
+          }
+        }
+        if (isPass) totalPass++;
+      });
+      const totalReject = inspectedQty - totalPass;
+      const passRate =
+        inspectedQty > 0
+          ? ((totalPass / inspectedQty) * 100).toFixed(2)
+          : "0.00";
+      return {
+        moNo: order.Order_No,
+        custStyle: order.CustStyle,
+        buyer: order.ShortName,
+        country: order.Country,
+        origin: order.Origin,
+        mode: order.Mode,
+        orderQty: order.TotalQty,
+        inspectedQty,
+        totalPass,
+        totalReject,
+        passRate
+      };
+    });
+
+    const totalPages = Math.ceil(totalOrders / parseInt(pageSize));
+    res.json({ summaryPerMono, totalPages, currentPage: parseInt(page) });
+  } catch (error) {
+    console.error("Error fetching measurement summary per MO No:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to fetch measurement summary per MO No" });
+  }
+});
+
+// New endpoint for measurement details by MO No
+app.get("/api/measurement-details/:mono", async (req, res) => {
+  try {
+    const { startDate, endDate, empId, stage } = req.query;
+    const order = await ymEcoConnection.db
+      .collection("dt_orders")
+      .findOne({ Order_No: req.params.mono });
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    const styleId = order._id.toString();
+    const measurementFilter = { style_id: styleId };
+    if (startDate) measurementFilter.created_at = { $gte: new Date(startDate) };
+    if (endDate)
+      measurementFilter.created_at = {
+        ...measurementFilter.created_at,
+        $lte: new Date(endDate)
+      };
+    if (empId) measurementFilter["user.name"] = empId;
+    if (stage) measurementFilter.stage = stage;
+
+    const records = await ymEcoConnection.db
+      .collection("measurement_data")
+      .find(measurementFilter)
+      .toArray();
+    res.json({ records, sizeSpec: order.SizeSpec });
+  } catch (error) {
+    console.error("Error fetching measurement details:", error);
+    res.status(500).json({ error: "Failed to fetch measurement details" });
   }
 });
 
