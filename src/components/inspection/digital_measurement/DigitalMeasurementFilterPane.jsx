@@ -8,10 +8,29 @@ const DigitalMeasurementFilterPane = ({
   setFilters,
   filterOptions
 }) => {
+  // Handler to clear all filters
+  const handleClearFilters = () => {
+    setFilters({
+      factory: "",
+      startDate: null,
+      endDate: null,
+      mono: "",
+      custStyle: "",
+      buyer: "",
+      empId: "",
+      stage: ""
+    });
+  };
+
+  // Check if any filter is selected
+  const isFilterSelected = Object.values(filters).some(
+    (value) => value !== "" && value !== null
+  );
+
   return (
     <div className="p-4 bg-gray-100 rounded shadow mb-4">
       <h2 className="text-xl font-bold mb-4">Filter Pane</h2>
-      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-9 gap-2">
         <div>
           <label className="block text-sm font-medium">Factory</label>
           <Select
@@ -35,7 +54,7 @@ const DigitalMeasurementFilterPane = ({
             onChange={(date) => setFilters({ ...filters, startDate: date })}
             minDate={filterOptions.minDate}
             maxDate={new Date()}
-            className="w-full p-2 border rounded text-black"
+            className="w-full p-2 border rounded text-black h-10"
             dateFormat="yyyy-MM-dd"
           />
         </div>
@@ -46,7 +65,7 @@ const DigitalMeasurementFilterPane = ({
             onChange={(date) => setFilters({ ...filters, endDate: date })}
             minDate={filters.startDate || filterOptions.minDate}
             maxDate={new Date()}
-            className="w-full p-2 border rounded text-black"
+            className="w-full p-2 border rounded text-black h-10"
             dateFormat="yyyy-MM-dd"
           />
         </div>
@@ -125,6 +144,18 @@ const DigitalMeasurementFilterPane = ({
             isClearable
             className="text-black"
           />
+        </div>
+        <div className="flex items-end">
+          <button
+            onClick={handleClearFilters}
+            className={`w-full h-10 py-2.5 px-4 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+              isFilterSelected
+                ? "bg-blue-200 text-blue-800 hover:bg-blue-300 focus:ring-blue-400"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-400 focus:ring-gray-400"
+            }`}
+          >
+            Clear
+          </button>
         </div>
       </div>
     </div>
