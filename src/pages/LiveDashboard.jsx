@@ -28,6 +28,7 @@ import QCSunriseDashboard from "../components/inspection/liveDashboard/QCSunrise
 import SunriseDailyTrend from "../components/inspection/qc1_sunrise_mongodb/SunriseDailyTrend";
 import SunriseMonthlyTrend from "../components/inspection/qc1_sunrise_mongodb/SunriseMonthlyTrend";
 import SunriseYearlyTrend from "../components/inspection/qc1_sunrise_mongodb/SunriseYearlyTrend";
+import SunriseWeeklyTrend from "../components/inspection/qc1_sunrise_mongodb/SunriseWeeklyTrend";
 import { useTranslation } from "react-i18next";
 
 const LiveDashboard = () => {
@@ -829,6 +830,47 @@ const LiveDashboard = () => {
           />
         )}
         <SunriseDailyTrend
+          filteredData={filteredQc1Data}
+          filters={qc1Filters}
+        />
+      </>
+    )}
+    {activeSection === "Weekly Trend" && (
+      <>
+        {[
+          "Live Dashboard",
+          "MO Analysis",
+          "Line Hr Trend",
+          "Daily Summary",
+          "Weekly Analysis",
+          "Monthly Analysis"
+        ].includes(activeSection) && (
+          <FilterPane
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
+            moNo={moNo}
+            setMoNo={setMoNo}
+            color={color}
+            setColor={setColor}
+            size={size}
+            setSize={setSize}
+            department={department}
+            setDepartment={setDepartment}
+            empId={empId}
+            setEmpId={setEmpId}
+            buyer={buyer}
+            setBuyer={setBuyer}
+            lineNo={lineNo}
+            setLineNo={setLineNo}
+            appliedFilters={appliedFilters}
+            setAppliedFilters={setAppliedFilters}
+            onApplyFilters={handleQc1ApplyFilters}
+            onResetFilters={handleQc1ResetFilters}
+          />
+        )}
+        <SunriseWeeklyTrend
           filteredData={filteredQc1Data}
           filters={qc1Filters}
         />

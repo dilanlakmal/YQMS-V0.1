@@ -7284,6 +7284,740 @@ app.get("/api/sunrise/qc1-daily-trend", async (req, res) => {
   }
 });
 
+// Endpoint to fetch aggregated QC1 Sunrise data for the WEEKLY trend view
+app.get("/api/sunrise/qc1-weekly-data", async (req, res) => {
+  try {
+    const { startDate, endDate, lineNo, MONo, Color, Size, Buyer, defectName } =
+      req.query;
+
+   
+    if (!startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ error: "Start and end dates are required for weekly view." });
+    }
+    // Basic format check (frontend sends YYYY-MM-DD)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD." });
+    }
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: "Invalid date value." });
+    }
+    // Ensure end date includes the full day for matching
+    end.setHours(23, 59, 59, 999);
+
+
+    const matchStageBase = {};
+    // Add other filters
+    if (lineNo) matchStageBase.lineNo = lineNo;
+    if (MONo) matchStageBase.MONo = MONo;
+    if (Color) matchStageBase.Color = Color;
+    if (Size) matchStageBase.Size = Size;
+    if (Buyer) matchStageBase.Buyer = Buyer;
+    
+    if (defectName) {
+      matchStageBase["DefectArray.defectName"] = defectName;
+    }
+    
+    const pipeline = [];
+
+    // Stage 1: Convert inspectionDate string (MM/DD/YYYY) to Date object
+    pipeline.push({
+      $addFields: {
+        inspectionDateAsDate: {
+          $dateFromString: {
+            
+            dateString: "$inspectionDate",
+            format: "%m-%d-%Y", 
+            onError: null, 
+            onNull: null
+          }
+        }
+      }
+    });
+
+    // Stage 2: Apply date range filter and other filters
+    pipeline.push({
+      $match: {
+        inspectionDateAsDate: {
+          $gte: start,
+          $lte: end,
+          $ne: null 
+        },
+        ...matchStageBase 
+      }
+    });
+
+    // Stage 3: Add week starting date (Monday) and week key (YYYY-Www)
+    pipeline.push({
+        $addFields: {
+            weekStartDate: { 
+                $dateTrunc: {
+                    date: "$inspectionDateAsDate",
+                    unit: "week",
+                    startOfWeek: "Monday"
+                }
+            },
+            // Optional: Add week key string if frontend prefers it
+            // weekKey: {
+            //     $concat: [
+            //         { $toString: { $isoWeekYear: "$inspectionDateAsDate" } },
+            //         "-W",
+            //         { $toString: { // Pad week number with leading zero if needed
+            //             $cond: {
+            //                 if: { $lt: [{ $isoWeek: "$inspectionDateAsDate" }, 10] },
+            //                 then: { $concat: ["0", { $toString: { $isoWeek: "$inspectionDateAsDate" } }] },
+            //                 else: { $toString: { $isoWeek: "$inspectionDateAsDate" } }
+            //             }
+            //         }}
+            //     ]
+            // }
+        }
+    });
+
+    // Stage 4: Group by week AND dimensions to get totals and collect defects
+    pipeline.push({
+        $group: {
+            _id: {
+                week: "$weekStartDate", // Group by the calculated Monday
+                // weekKey: "$weekKey", // Or group by the string key
+                lineNo: "$lineNo",
+                MONo: "$MONo",
+                Buyer: "$Buyer",
+                Color: "$Color",
+                Size: "$Size"
+                
+            },
+            CheckedQty: { $sum: "$CheckedQty" },
+            totalDefectsQtyGroup: { $sum: "$totalDefectsQty" }, 
+            DefectArrays: { $push: "$DefectArray" } 
+        }
+    });
+
+    // Stage 5: Unwind the collected arrays
+    pipeline.push({ $unwind: { path: "$DefectArrays", preserveNullAndEmptyArrays: true } }); // Array of arrays -> arrays
+
+    // Stage 6: Unwind the individual defect arrays
+    pipeline.push({ $unwind: { path: "$DefectArrays", preserveNullAndEmptyArrays: true } }); // Arrays -> individual defect objects
+
+    // Stage 7: Group again by original key + defectName to sum specific defect quantities
+    pipeline.push({
+        $group: {
+            _id: {
+                originalId: "$_id", 
+                defectName: "$DefectArrays.defectName"
+            },
+            defectQty: { $sum: "$DefectArrays.defectQty" },
+            // Carry over the group totals using $first
+            CheckedQty: { $first: "$CheckedQty" },
+            totalDefectsQtyGroup: { $first: "$totalDefectsQtyGroup" }
+        }
+    });
+
+    pipeline.push({
+        $match: {
+            "_id.defectName": { $ne: null }
+        }
+    });
+
+    // Stage 8: Group back by the original week/dimension key to reconstruct the DefectArray
+    pipeline.push({
+        $group: {
+            _id: "$_id.originalId", 
+            CheckedQty: { $first: "$CheckedQty" },
+            totalDefectsQty: { $first: "$totalDefectsQtyGroup" }, 
+            DefectArray: {
+                $push: {
+                    defectName: "$_id.defectName",
+                    defectQty: "$defectQty"
+                }
+            }
+        }
+    });
+
+    // Stage 9: Project the final desired output shape
+    pipeline.push({
+        $project: {
+            _id: 0, // Exclude the complex _id
+            weekStartDate: "$_id.week", // Or weekKey: "$_id.weekKey"
+            lineNo: "$_id.lineNo",
+            MONo: "$_id.MONo",
+            Buyer: "$_id.Buyer",
+            Color: "$_id.Color",
+            Size: "$_id.Size",
+            CheckedQty: 1,
+            totalDefectsQty: 1,
+            DefectArray: { 
+                $filter: {
+                    input: "$DefectArray",
+                    as: "defect",
+                    cond: { $ne: ["$$defect.defectName", null] }
+                }
+            }
+        }
+    });
+
+    // Stage 10: Sort results for consistency
+    pipeline.push({
+        $sort: {
+            weekStartDate: 1, 
+            lineNo: 1,        
+            MONo: 1,
+            Buyer: 1,
+            Color: 1,
+            Size: 1
+        }
+    });
+
+
+    const data = await QC1Sunrise.aggregate(pipeline).exec();
+
+    
+    const transformedData = data.map(item => {
+        const year = item.weekStartDate.getFullYear();
+        const startOfYear = new Date(year, 0, 1);
+        const weekNum = Math.ceil(((item.weekStartDate - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+        return {
+            ...item,
+            weekKey: `${year}-W${String(weekNum).padStart(2, '0')}`
+        };
+    });
+
+
+    res.json(transformedData); 
+
+  } catch (err) {
+    console.error("Error fetching QC1 Sunrise weekly data:", err);
+    res.status(500).json({
+      message: "Failed to fetch QC1 Sunrise weekly data",
+      error: err.message
+    });
+  }
+});
+
+
+app.get("/api/sunrise/qc1-weekly-filters", async (req, res) => {
+  try {
+    const { startDate, endDate, lineNo, MONo, Color, Size, Buyer, defectName } =
+      req.query;
+
+
+     if (!startDate || !endDate) {
+    
+       return res
+        .status(400)
+        .json({ error: "Start and end dates are required to fetch weekly filters." });
+    }
+     if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD." });
+    }
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: "Invalid date value." });
+    }
+    end.setHours(23, 59, 59, 999);
+   
+    const basePipeline = [];
+
+    // Stage 1: Convert inspectionDate string to Date object
+    basePipeline.push({
+      $addFields: {
+        inspectionDateAsDate: {
+          $dateFromString: {
+            dateString: "$inspectionDate",
+            format: "%m-%d-%Y", 
+            onError: null,
+            onNull: null
+          }
+        }
+      }
+    });
+
+    // Stage 2: Apply date range filter
+    basePipeline.push({
+      $match: {
+        inspectionDateAsDate: {
+          $gte: start,
+          $lte: end,
+          $ne: null
+        }
+      }
+    });
+
+    // Stage 3: Apply other active filters to narrow down options
+    const matchStageOthers = {};
+    if (lineNo) matchStageOthers.lineNo = lineNo;
+    if (MONo) matchStageOthers.MONo = MONo;
+    if (Color) matchStageOthers.Color = Color;
+    if (Size) matchStageOthers.Size = Size;
+    if (Buyer) matchStageOthers.Buyer = Buyer;
+    if (defectName) matchStageOthers["DefectArray.defectName"] = defectName;
+
+    if (Object.keys(matchStageOthers).length > 0) {
+        basePipeline.push({ $match: matchStageOthers });
+    }
+  
+    const [
+      uniqueLineNos,
+      uniqueMONos,
+      uniqueColors,
+      uniqueSizes,
+      uniqueBuyers,
+      uniqueDefectNames
+    ] = await Promise.all([
+  
+      QC1Sunrise.aggregate([
+        ...basePipeline, 
+        { $match: { lineNo: { $ne: null, $ne: "" } } }, 
+        { $group: { _id: "$lineNo" } },
+        { $sort: { _id: 1 } }
+      ]).exec(),
+     
+      QC1Sunrise.aggregate([
+        ...basePipeline,
+        { $match: { MONo: { $ne: null, $ne: "" } } },
+        { $group: { _id: "$MONo" } },
+        { $sort: { _id: 1 } }
+      ]).exec(),
+    
+      QC1Sunrise.aggregate([
+        ...basePipeline,
+        { $match: { Color: { $ne: null, $ne: "" } } },
+        { $group: { _id: "$Color" } },
+        { $sort: { _id: 1 } }
+      ]).exec(),
+  
+      QC1Sunrise.aggregate([
+        ...basePipeline,
+        { $match: { Size: { $ne: null, $ne: "" } } },
+        { $group: { _id: "$Size" } },
+        { $sort: { _id: 1 } }
+      ]).exec(),
+ 
+      QC1Sunrise.aggregate([
+        ...basePipeline,
+        { $match: { Buyer: { $ne: null, $ne: "" } } },
+        { $group: { _id: "$Buyer" } },
+        { $sort: { _id: 1 } }
+      ]).exec(),
+      
+      QC1Sunrise.aggregate([
+        ...basePipeline,
+        { $unwind: "$DefectArray" },
+        { $match: { "DefectArray.defectName": { $ne: null, $ne: "" } } },
+        { $group: { _id: "$DefectArray.defectName" } },
+        { $sort: { _id: 1 } }
+      ]).exec()
+    ]);
+
+   
+    res.json({
+      lineNos: uniqueLineNos.map((item) => item._id), 
+      MONos: uniqueMONos.map((item) => item._id),
+      Colors: uniqueColors.map((item) => item._id),
+      Sizes: uniqueSizes.map((item) => item._id),
+      Buyers: uniqueBuyers.map((item) => item._id),
+      defectNames: uniqueDefectNames.map((item) => item._id)
+    });
+
+  } catch (err) {
+    console.error("Error fetching QC1 Sunrise weekly filter values:", err);
+    res.status(500).json({
+      message: "Failed to fetch weekly filter values",
+      error: err.message
+    });
+  }
+});
+
+
+
+app.get("/api/sunrise/qc1-monthly-data", async (req, res) => {
+  try {
+    const { startMonth, endMonth, lineNo, MONo, Color, Size, Buyer, defectName } = req.query;
+
+
+    if (!startMonth || !endMonth) {
+      return res.status(400).json({ error: "Start and end months are required." });
+    }
+    if (!/^\d{4}-\d{2}$/.test(startMonth) || !/^\d{4}-\d{2}$/.test(endMonth)) {
+      return res.status(400).json({ error: "Invalid month format. Use YYYY-MM." });
+    }
+
+    const matchStage = {};
+
+   
+    if (startMonth || endMonth) {
+      matchStage.$expr = matchStage.$expr || {};
+      matchStage.$expr.$and = matchStage.$expr.$and || [];
+
+   
+      const yearMonthExpr = {
+        $concat: [
+          { $substr: ["$inspectionDate", 6, 4] }, 
+          "-",
+          { $substr: ["$inspectionDate", 0, 2] }, 
+        ]
+      };
+
+      if (startMonth) {
+        matchStage.$expr.$and.push({
+          $gte: [yearMonthExpr, startMonth]
+        });
+      }
+      if (endMonth) {
+        matchStage.$expr.$and.push({
+          $lte: [yearMonthExpr, endMonth]
+        });
+      }
+    }
+
+   
+    if (lineNo) matchStage.lineNo = lineNo;
+    if (MONo) matchStage.MONo = MONo;
+    if (Color) matchStage.Color = Color;
+    if (Size) matchStage.Size = Size;
+    if (Buyer) matchStage.Buyer = Buyer;
+    if (defectName) {
+      matchStage["DefectArray.defectName"] = defectName;
+    }
+
+    
+    const pipeline = [];
+
+    // Stage 1: Apply initial match with month and other filters
+    pipeline.push({ $match: matchStage });
+
+    // Stage 2: Filter DefectArray to only include the selected defectName (if provided)
+    if (defectName) {
+      pipeline.push({
+        $addFields: {
+          DefectArray: {
+            $filter: {
+              input: "$DefectArray",
+              as: "defect",
+              cond: { $eq: ["$$defect.defectName", defectName] }
+            }
+          }
+        }
+      });
+
+      // Stage 3: Recalculate totalDefectsQty based on the filtered DefectArray
+      pipeline.push({
+        $addFields: {
+          totalDefectsQty: {
+            $sum: "$DefectArray.defectQty"
+          }
+        }
+      });
+    }
+
+    // Stage 4: Add year-month field for sorting and consistency
+    pipeline.push({
+      $addFields: {
+        yearMonth: {
+          $concat: [
+            { $substr: ["$inspectionDate", 6, 4] }, // YYYY
+            "-",
+            { $substr: ["$inspectionDate", 0, 2] }, // MM
+          ]
+        }
+      }
+    });
+
+    // Stage 5: Sort by yearMonth and lineNo
+    pipeline.push({
+      $sort: {
+        yearMonth: 1,
+        lineNo: 1
+      }
+    });
+
+    // Fetch data from MongoDB using aggregation
+    const data = await QC1Sunrise.aggregate(pipeline).exec();
+
+    // Transform the inspectionDate to DD/MM/YYYY format for display, keeping yearMonth
+    const transformedData = data.map((item) => {
+      const [month, day, year] = item.inspectionDate.split("-");
+      return {
+        ...item,
+        inspectionDate: `${day}/${month}/${year}` // Convert to DD/MM/YYYY
+      };
+    });
+
+    res.json(transformedData);
+  } catch (err) {
+    console.error("Error fetching QC1 Sunrise monthly data:", err);
+    res.status(500).json({
+      message: "Failed to fetch QC1 Sunrise monthly data",
+      error: err.message
+    });
+  }
+});
+
+// Endpoint to fetch monthly trend data
+app.get("/api/sunrise/qc1-monthly-trend", async (req, res) => {
+  try {
+    const { startMonth, endMonth, lineNo, MONo, Color, Size, Buyer, defectName } = req.query;
+
+    // Input validation
+    if (!startMonth || !endMonth) {
+      return res.status(400).json({ error: "Start and end months are required." });
+    }
+    if (!/^\d{4}-\d{2}$/.test(startMonth) || !/^\d{4}-\d{2}$/.test(endMonth)) {
+      return res.status(400).json({ error: "Invalid month format. Use YYYY-MM." });
+    }
+
+    // Build the match stage for the aggregation pipeline
+    const matchStage = {};
+
+    // Month filtering using $expr to handle string-based year-month comparison
+    if (startMonth || endMonth) {
+      matchStage.$expr = matchStage.$expr || {};
+      matchStage.$expr.$and = matchStage.$expr.$and || [];
+
+      // Extract year-month from inspectionDate (MM/DD/YYYY -> YYYY-MM)
+      const yearMonthExpr = {
+        $concat: [
+          { $substr: ["$inspectionDate", 6, 4] }, // YYYY
+          "-",
+          { $substr: ["$inspectionDate", 0, 2] }, // MM
+        ]
+      };
+
+      if (startMonth) {
+        matchStage.$expr.$and.push({
+          $gte: [yearMonthExpr, startMonth]
+        });
+      }
+      if (endMonth) {
+        matchStage.$expr.$and.push({
+          $lte: [yearMonthExpr, endMonth]
+        });
+      }
+    }
+
+    // Other filters
+    if (lineNo) matchStage.lineNo = lineNo;
+    if (MONo) matchStage.MONo = MONo;
+    if (Color) matchStage.Color = Color;
+    if (Size) matchStage.Size = Size;
+    if (Buyer) matchStage.Buyer = Buyer;
+    if (defectName) {
+      matchStage["DefectArray.defectName"] = defectName;
+    }
+
+    // Aggregation pipeline
+    const pipeline = [
+      { $match: matchStage },
+      // Stage 1: Filter DefectArray if defectName is specified
+      ...(defectName ? [{
+        $addFields: {
+          DefectArray: {
+            $filter: {
+              input: "$DefectArray",
+              as: "defect",
+              cond: { $eq: ["$$defect.defectName", defectName] }
+            }
+          }
+        }
+      }, {
+        $addFields: {
+          totalDefectsQty: {
+            $sum: "$DefectArray.defectQty"
+          }
+        }
+      }] : []),
+      // Stage 2: Extract year-month
+      {
+        $addFields: {
+          yearMonth: {
+            $concat: [
+              { $substr: ["$inspectionDate", 6, 4] }, // YYYY
+              "-",
+              { $substr: ["$inspectionDate", 0, 2] }, // MM
+            ]
+          }
+        }
+      },
+      // Stage 3: Group by year-month
+      {
+        $group: {
+          _id: "$yearMonth",
+          checkedQty: { $sum: "$CheckedQty" },
+          defectQty: { $sum: "$totalDefectsQty" },
+          records: {
+            $push: {
+              lineNo: "$lineNo",
+              MONo: "$MONo",
+              Color: "$Color",
+              Size: "$Size",
+              Buyer: "$Buyer",
+              DefectArray: "$DefectArray",
+              CheckedQty: "$CheckedQty",
+              totalDefectsQty: "$totalDefectsQty",
+              inspectionDate: "$inspectionDate"
+            }
+          }
+        }
+      },
+      // Stage 4: Project the desired output
+      {
+        $project: {
+          month: "$_id",
+          checkedQty: 1,
+          defectQty: 1,
+          defectRate: {
+            $cond: [
+              { $eq: ["$checkedQty", 0] },
+              0,
+              { $multiply: [{ $divide: ["$defectQty", "$checkedQty"] }, 100] }
+            ]
+          },
+          records: 1,
+          _id: 0
+        }
+      },
+      // Stage 5: Sort by month ascending
+      { $sort: { month: 1 } }
+    ];
+
+    // Execute aggregation
+    const data = await QC1Sunrise.aggregate(pipeline).exec();
+
+    // Transform data to include records for compatibility with frontend
+    const transformedData = data.map((item) => ({
+      ...item,
+      records: item.records.map((record) => ({
+        ...record,
+        inspectionDate: record.inspectionDate // Keep original format (MM/DD/YYYY)
+      }))
+    }));
+
+    res.json(transformedData);
+  } catch (err) {
+    console.error("Error fetching QC1 Sunrise monthly trend:", err);
+    res.status(500).json({
+      message: "Failed to fetch QC1 Sunrise monthly trend",
+      error: err.message
+    });
+  }
+});
+
+// Endpoint to fetch unique filter values with monthly cross-filtering
+app.get("/api/sunrise/qc1-monthly-filters", async (req, res) => {
+  try {
+    const { startMonth, endMonth, lineNo, MONo, Color, Size, Buyer, defectName } = req.query;
+
+    // Build the match stage for the aggregation pipeline
+    const matchStage = {};
+
+    // Month filtering using $expr
+    if (startMonth || endMonth) {
+      matchStage.$expr = matchStage.$expr || {};
+      matchStage.$expr.$and = matchStage.$expr.$and || [];
+
+      // Extract year-month from inspectionDate (MM/DD/YYYY -> YYYY-MM)
+      const yearMonthExpr = {
+        $concat: [
+          { $substr: ["$inspectionDate", 6, 4] }, // YYYY
+          "-",
+          { $substr: ["$inspectionDate", 0, 2] }, // MM
+        ]
+      };
+
+      if (startMonth) {
+        matchStage.$expr.$and.push({
+          $gte: [yearMonthExpr, startMonth]
+        });
+      }
+      if (endMonth) {
+        matchStage.$expr.$and.push({
+          $lte: [yearMonthExpr, endMonth]
+        });
+      }
+    }
+
+    // Apply other filters
+    if (lineNo) matchStage.lineNo = lineNo;
+    if (MONo) matchStage.MONo = MONo;
+    if (Color) matchStage.Color = Color;
+    if (Size) matchStage.Size = Size;
+    if (Buyer) matchStage.Buyer = Buyer;
+    if (defectName) matchStage["DefectArray.defectName"] = defectName;
+
+    // Fetch unique values for each filter using aggregation
+    const [
+      uniqueLineNos,
+      uniqueMONos,
+      uniqueColors,
+      uniqueSizes,
+      uniqueBuyers,
+      uniqueDefectNames
+    ] = await Promise.all([
+      QC1Sunrise.aggregate([
+        { $match: matchStage },
+        { $group: { _id: "$lineNo" } }
+      ]).exec(),
+      QC1Sunrise.aggregate([
+        { $match: matchStage },
+        { $group: { _id: "$MONo" } }
+      ]).exec(),
+      QC1Sunrise.aggregate([
+        { $match: matchStage },
+        { $group: { _id: "$Color" } }
+      ]).exec(),
+      QC1Sunrise.aggregate([
+        { $match: matchStage },
+        { $group: { _id: "$Size" } }
+      ]).exec(),
+      QC1Sunrise.aggregate([
+        { $match: matchStage },
+        { $group: { _id: "$Buyer" } }
+      ]).exec(),
+      QC1Sunrise.aggregate([
+        { $match: matchStage },
+        { $unwind: "$DefectArray" },
+        { $group: { _id: "$DefectArray.defectName" } }
+      ]).exec()
+    ]);
+
+    res.json({
+      lineNos: uniqueLineNos
+        .map((item) => item._id)
+        .filter(Boolean)
+        .sort((a, b) => parseInt(a) - parseInt(b)), // Sort numerically
+      MONos: uniqueMONos
+        .map((item) => item._id)
+        .filter(Boolean)
+        .sort(),
+      Colors: uniqueColors
+        .map((item) => item._id)
+        .filter(Boolean)
+        .sort(),
+      Sizes: uniqueSizes
+        .map((item) => item._id)
+        .filter(Boolean)
+        .sort(),
+      Buyers: uniqueBuyers
+        .map((item) => item._id)
+        .filter(Boolean)
+        .sort(),
+      defectNames: uniqueDefectNames
+        .map((item) => item._id)
+        .filter(Boolean)
+        .sort()
+    });
+  } catch (err) {
+    console.error("Error fetching QC1 Sunrise monthly filter values:", err);
+    res.status(500).json({
+      message: "Failed to fetch monthly filter values",
+      error: err.message
+    });
+  }
+});
 
 /* ------------------------------
    Cutting Inspection ENDPOINTS

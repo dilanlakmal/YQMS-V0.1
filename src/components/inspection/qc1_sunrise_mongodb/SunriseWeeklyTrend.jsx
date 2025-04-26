@@ -5,57 +5,102 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FaFileExcel, FaFilePdf } from "react-icons/fa";
-import MonthlyFilterPane from "./MonthlyFilterPlane";
+import WeeklyFilterPane from "./WeeklyFilterPane";
 import QCSunriseSummaryCard from "./QCSunriseSummaryCard";
 import {
   format,
   parse,
   isValid,
-  startOfMonth,
-  endOfMonth,
-  subMonths,
+  startOfWeek,
+  endOfWeek,
+  subWeeks,
+  addDays,
+  getISOWeek,
+  getISOWeekYear,
+  parseISO,
 } from "date-fns";
 
-const formatYYYYMMToDisplay = (yyyyMM) => {
-  if (!yyyyMM || !yyyyMM.includes("-")) return yyyyMM;
-  const parsedDate = parse(yyyyMM, "yyyy-MM", new Date());
-  return isValid(parsedDate) ? format(parsedDate, "MMM yyyy") : yyyyMM;
+const DATE_FORMAT_API = "yyyy-MM-dd";
+
+const getWeekKey = (dateInput) => {
+  let date;
+  if (dateInput instanceof Date && isValid(dateInput)) {
+    date = dateInput;
+  } else if (typeof dateInput === "string") {
+    date = parse(dateInput, DATE_FORMAT_API, new Date());
+    if (!isValid(date)) date = parseISO(dateInput);
+    if (!isValid(date)) date = parse(dateInput, "dd/MM/yyyy", new Date());
+  }
+
+  if (!date || !isValid(date)) {
+    console.warn(`Could not parse date to get week key: ${dateInput}`);
+    return null;
+  }
+
+  const year = getISOWeekYear(date);
+  const week = getISOWeek(date);
+  return `${year}-W${String(week).padStart(2, "0")}`;
 };
 
-const parseYYYYMM = (yyyyMM) => {
-  if (!yyyyMM || !yyyyMM.includes("-")) return null;
-  const parsedDate = parse(yyyyMM, "yyyy-MM", new Date());
-  return isValid(parsedDate) ? parsedDate : null;
-};
-
-const getYearMonthKey = (dateStr) => {
-  if (!dateStr || typeof dateStr !== "string") return null;
-  let parsedDate;
-  parsedDate = parse(dateStr, "yyyy-MM-dd", new Date());
-  if (isValid(parsedDate)) return format(parsedDate, "yyyy-MM");
-  parsedDate = parse(dateStr, "dd/MM/yyyy", new Date());
-  if (isValid(parsedDate)) return format(parsedDate, "yyyy-MM");
-  parsedDate = parse(dateStr, "yyyy/MM/dd", new Date());
-  if (isValid(parsedDate)) return format(parsedDate, "yyyy-MM");
+const parseWeekKey = (weekKey) => {
+  if (!weekKey || !weekKey.includes("-W")) return null;
   try {
-    parsedDate = new Date(dateStr);
-    if (isValid(parsedDate)) return format(parsedDate, "yyyy-MM");
-  } catch (e) {}
-  console.warn(`Could not parse date string to get YYYY-MM: ${dateStr}`);
-  return null;
+    const [yearStr, weekStr] = weekKey.split("-W");
+    const year = parseInt(yearStr, 10);
+    const week = parseInt(weekStr, 10);
+
+    if (isNaN(year) || isNaN(week) || week < 1 || week > 53) return null;
+
+    const jan4 = new Date(year, 0, 4);
+    const dayOfWeekJan4 = (jan4.getDay() + 6) % 7;
+
+    const mondayWeek1 = addDays(jan4, -dayOfWeekJan4);
+
+    const mondayTargetWeek = addDays(mondayWeek1, (week - 1) * 7);
+
+    if (getISOWeekYear(mondayTargetWeek) !== year) {
+      // console.warn(`Potential year mismatch for week key ${weekKey}. Calculated date: ${mondayTargetWeek}`);
+    }
+
+    return mondayTargetWeek;
+  } catch (e) {
+    console.error(`Error parsing week key ${weekKey}:`, e);
+    return null;
+  }
 };
 
-const getDefaultEndDate = () => format(endOfMonth(new Date()), "yyyy-MM-dd");
-const getDefaultStartDate = () =>
-  format(startOfMonth(subMonths(new Date(), 1)), "yyyy-MM-dd");
+const formatWeekKeyToDisplay = (weekKey) => {
+  const monday = parseWeekKey(weekKey);
+  if (!monday || !isValid(monday)) return weekKey;
 
-const SunriseMonthlyTrend = () => {
-  const [monthlyApiData, setMonthlyApiData] = useState([]);
+  const sunday = endOfWeek(monday, { weekStartsOn: 1 });
+  const yearShort = format(monday, "yy");
+  const weekNum = weekKey.split("-W")[1];
+
+  return `W${weekNum} '${yearShort} (${format(monday, "MMM dd")} - ${format(
+    sunday,
+    "MMM dd"
+  )})`;
+};
+
+const getDefaultDates = () => {
+  const today = new Date();
+  const lastSunday = endOfWeek(today, { weekStartsOn: 1 });
+  const fourWeeksAgoMonday = startOfWeek(subWeeks(lastSunday, 3), {
+    weekStartsOn: 1,
+  });
+  return {
+    startDate: format(fourWeeksAgoMonday, DATE_FORMAT_API),
+    endDate: format(lastSunday, DATE_FORMAT_API),
+  };
+};
+
+const SunriseWeeklyTrend = () => {
+  const [weeklyApiData, setWeeklyApiData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeFilters, setActiveFilters] = useState({
-    startDate: getDefaultStartDate(),
-    endDate: getDefaultEndDate(),
+    ...getDefaultDates(),
     lineNo: "",
     MONo: "",
     Color: "",
@@ -71,7 +116,7 @@ const SunriseMonthlyTrend = () => {
     addSizes: true,
   });
   const [rows, setRows] = useState([]);
-  const [uniqueMonths, setUniqueMonths] = useState([]);
+  const [uniqueWeeks, setUniqueWeeks] = useState([]);
   const [totalChecked, setTotalChecked] = useState(0);
   const [totalDefects, setTotalDefects] = useState(0);
   const [overallDhu, setOverallDhu] = useState(0);
@@ -79,8 +124,8 @@ const SunriseMonthlyTrend = () => {
   const handleFilterChange = useCallback((newFilters) => {
     const validatedFilters = {
       ...newFilters,
-      startDate: newFilters.startDate || getDefaultStartDate(),
-      endDate: newFilters.endDate || getDefaultEndDate(),
+      startDate: newFilters.startDate || getDefaultDates().startDate,
+      endDate: newFilters.endDate || getDefaultDates().endDate,
     };
     setActiveFilters(validatedFilters);
   }, []);
@@ -92,33 +137,16 @@ const SunriseMonthlyTrend = () => {
     try {
       setLoading(true);
       setError(null);
-      setMonthlyApiData([]);
+      setWeeklyApiData([]);
       setRows([]);
-      setUniqueMonths([]);
+      setUniqueWeeks([]);
       setTotalChecked(0);
       setTotalDefects(0);
       setOverallDhu(0);
 
-      let startMonthParam, endMonthParam;
-      try {
-        startMonthParam = format(
-          parse(activeFilters.startDate, "yyyy-MM-dd", new Date()),
-          "yyyy-MM"
-        );
-        endMonthParam = format(
-          parse(activeFilters.endDate, "yyyy-MM-dd", new Date()),
-          "yyyy-MM"
-        );
-      } catch (parseError) {
-        console.error("Error parsing filter dates:", parseError);
-        setError("Invalid date format in filters.");
-        setLoading(false);
-        return;
-      }
-
       const queryParams = {
-        startMonth: startMonthParam,
-        endMonth: endMonthParam,
+        startDate: activeFilters.startDate,
+        endDate: activeFilters.endDate,
         lineNo: activeFilters.lineNo,
         MONo: activeFilters.MONo,
         Color: activeFilters.Color,
@@ -131,19 +159,34 @@ const SunriseMonthlyTrend = () => {
       });
 
       const queryString = new URLSearchParams(queryParams).toString();
-      const url = `${API_BASE_URL}/api/sunrise/qc1-monthly-data?${queryString}`;
+
+      const url = `${API_BASE_URL}/api/sunrise/qc1-weekly-data?${queryString}`;
       const response = await axios.get(url);
 
-      setMonthlyApiData(response.data || []);
+      if (response.data && response.data.length > 0) {
+        if (response.data[0].DefectArray === undefined) {
+          //   console.warn("Weekly API data might be missing 'DefectArray'. Defect-level breakdown may not work as expected.");
+        }
+
+        if (
+          !response.data[0].weekKey &&
+          !response.data[0].weekStartDate &&
+          !response.data[0].inspectionDate
+        ) {
+          //    console.error("CRITICAL: Weekly API response missing 'weekKey', 'weekStartDate', or 'inspectionDate'. Cannot determine week.");
+        }
+      }
+
+      setWeeklyApiData(response.data || []);
       setError(null);
     } catch (err) {
-      console.error("Fetch error (monthly data):", err);
+      console.error("Fetch error (weekly data):", err);
       const errorMsg =
         err.response?.data?.message ||
         err.message ||
-        "Failed to fetch QC1 Sunrise monthly data";
+        "Failed to fetch QC1 Sunrise weekly data";
       setError(errorMsg);
-      setMonthlyApiData([]);
+      setWeeklyApiData([]);
     } finally {
       setLoading(false);
     }
@@ -157,19 +200,19 @@ const SunriseMonthlyTrend = () => {
     if (
       loading ||
       error ||
-      !Array.isArray(monthlyApiData) ||
-      monthlyApiData.length === 0
+      !Array.isArray(weeklyApiData) ||
+      weeklyApiData.length === 0
     ) {
       setTotalChecked(0);
       setTotalDefects(0);
       setOverallDhu(0);
       return;
     }
-    let checked = monthlyApiData.reduce(
+    let checked = weeklyApiData.reduce(
       (sum, item) => sum + (item.CheckedQty || 0),
       0
     );
-    let defects = monthlyApiData.reduce(
+    let defects = weeklyApiData.reduce(
       (sum, item) => sum + (item.totalDefectsQty || 0),
       0
     );
@@ -178,17 +221,17 @@ const SunriseMonthlyTrend = () => {
     setTotalChecked(checked);
     setTotalDefects(defects);
     setOverallDhu(dhu);
-  }, [monthlyApiData, loading, error]);
+  }, [weeklyApiData, loading, error]);
 
   useEffect(() => {
     if (
       loading ||
       error ||
-      !Array.isArray(monthlyApiData) ||
-      monthlyApiData.length === 0
+      !Array.isArray(weeklyApiData) ||
+      weeklyApiData.length === 0
     ) {
       setRows([]);
-      setUniqueMonths([]);
+      setUniqueWeeks([]);
       return;
     }
 
@@ -203,70 +246,76 @@ const SunriseMonthlyTrend = () => {
       .filter((field) => groupingOptions[field.option] && !field.filterActive)
       .map((field) => field.key);
 
-    const monthsSet = new Set(
-      monthlyApiData.map((d) => getYearMonthKey(d.inspectionDate)).filter(Boolean)
+    const weeksSet = new Set(
+      weeklyApiData
+        .map((d) =>
+          d.weekKey || getWeekKey(d.inspectionDate || d.weekStartDate)
+        )
+        .filter(Boolean)
     );
-    const sortedMonths = [...monthsSet].sort((a, b) => {
-      const dateA = parseYYYYMM(a);
-      const dateB = parseYYYYMM(b);
+    const sortedWeeks = [...weeksSet].sort((a, b) => {
+      const dateA = parseWeekKey(a);
+      const dateB = parseWeekKey(b);
       return dateA && dateB ? dateA - dateB : 0;
     });
-    setUniqueMonths(sortedMonths);
+    setUniqueWeeks(sortedWeeks);
 
-    const hierarchy = buildHierarchyFromMonthlyData(
-      monthlyApiData,
+    const hierarchy = buildHierarchyFromWeeklyData(
+      weeklyApiData,
       activeGroupingFields
     );
 
-    const tableRows = buildMonthlyRowsFromHierarchy(
+    const tableRows = buildWeeklyRowsFromHierarchy(
       hierarchy,
       activeGroupingFields,
-      sortedMonths
+      sortedWeeks
     );
     setRows(tableRows);
-  }, [monthlyApiData, groupingOptions, loading, error, activeFilters]);
+  }, [weeklyApiData, groupingOptions, loading, error, activeFilters]);
 
-  const buildHierarchyFromMonthlyData = (data, groupingFields) => {
+  const buildHierarchyFromWeeklyData = (data, groupingFields) => {
     const hierarchy = {};
     const normalizeString = (str) => (str ? String(str).trim() : "N/A");
 
-    data.forEach((monthlyRecord) => {
+    data.forEach((weeklyRecord) => {
       const groupKey = groupingFields
-        .map((field) => normalizeString(monthlyRecord[field]))
+        .map((field) => normalizeString(weeklyRecord[field]))
         .join("|");
 
       if (!hierarchy[groupKey]) {
         hierarchy[groupKey] = {
           groupValues: groupingFields.map((field) =>
-            normalizeString(monthlyRecord[field])
+            normalizeString(weeklyRecord[field])
           ),
-          monthMap: {},
+          weekMap: {},
         };
       }
 
-      const monthKey = getYearMonthKey(monthlyRecord.inspectionDate);
+      const weekKey =
+        weeklyRecord.weekKey ||
+        getWeekKey(weeklyRecord.inspectionDate || weeklyRecord.weekStartDate);
+      if (!weekKey) return;
 
-      if (!hierarchy[groupKey].monthMap[monthKey]) {
-        hierarchy[groupKey].monthMap[monthKey] = {
-          CheckedQty: monthlyRecord.CheckedQty || 0,
-          totalDefectsQty: monthlyRecord.totalDefectsQty || 0,
-          DefectArray: Array.isArray(monthlyRecord.DefectArray)
-            ? monthlyRecord.DefectArray.map((def) => ({
+      if (!hierarchy[groupKey].weekMap[weekKey]) {
+        hierarchy[groupKey].weekMap[weekKey] = {
+          CheckedQty: weeklyRecord.CheckedQty || 0,
+          totalDefectsQty: weeklyRecord.totalDefectsQty || 0,
+          DefectArray: Array.isArray(weeklyRecord.DefectArray)
+            ? weeklyRecord.DefectArray.map((def) => ({
                 ...def,
                 defectQty: def.defectQty || 0,
               }))
             : [],
         };
       } else {
-        const monthEntry = hierarchy[groupKey].monthMap[monthKey];
-        monthEntry.CheckedQty += monthlyRecord.CheckedQty || 0;
-        monthEntry.totalDefectsQty += monthlyRecord.totalDefectsQty || 0;
+        const weekEntry = hierarchy[groupKey].weekMap[weekKey];
+        weekEntry.CheckedQty += weeklyRecord.CheckedQty || 0;
+        weekEntry.totalDefectsQty += weeklyRecord.totalDefectsQty || 0;
 
-        const existingDefects = monthEntry.DefectArray || [];
-        const newDefects = Array.isArray(monthlyRecord.DefectArray)
-          ? monthlyRecord.DefectArray
+        const existingDefects = weekEntry.DefectArray || [];
+        const newDefects = Array.isArray(weeklyRecord.DefectArray)
+          ? weeklyRecord.DefectArray
           : [];
-
         newDefects.forEach((newDefect) => {
           if (!newDefect || !newDefect.defectName) return;
           const existing = existingDefects.find(
@@ -282,14 +331,14 @@ const SunriseMonthlyTrend = () => {
             });
           }
         });
-        monthEntry.DefectArray = existingDefects;
+        weekEntry.DefectArray = existingDefects;
       }
     });
 
     return hierarchy;
   };
 
-  const buildMonthlyRowsFromHierarchy = (hierarchy, groupingFields, months) => {
+  const buildWeeklyRowsFromHierarchy = (hierarchy, groupingFields, weeks) => {
     const rows = [];
 
     const sortedGroupKeys = Object.keys(hierarchy).sort((a, b) => {
@@ -306,11 +355,11 @@ const SunriseMonthlyTrend = () => {
       const group = hierarchy[groupKey];
       const groupData = {};
 
-      months.forEach((month) => {
-        const monthEntry = group.monthMap[month];
-        const checkedQty = monthEntry?.CheckedQty || 0;
-        const defectsQty = monthEntry?.totalDefectsQty || 0;
-        groupData[month] =
+      weeks.forEach((week) => {
+        const weekEntry = group.weekMap[week];
+        const checkedQty = weekEntry?.CheckedQty || 0;
+        const defectsQty = weekEntry?.totalDefectsQty || 0;
+        groupData[week] =
           checkedQty > 0
             ? parseFloat(((defectsQty / checkedQty) * 100).toFixed(2))
             : 0;
@@ -324,9 +373,9 @@ const SunriseMonthlyTrend = () => {
       });
 
       const defectNames = new Set();
-      Object.values(group.monthMap).forEach((monthEntry) => {
-        if (monthEntry && Array.isArray(monthEntry.DefectArray)) {
-          monthEntry.DefectArray.forEach((defect) => {
+      Object.values(group.weekMap).forEach((weekEntry) => {
+        if (weekEntry && Array.isArray(weekEntry.DefectArray)) {
+          weekEntry.DefectArray.forEach((defect) => {
             if (defect && defect.defectName) defectNames.add(defect.defectName);
           });
         }
@@ -334,21 +383,21 @@ const SunriseMonthlyTrend = () => {
 
       [...defectNames].sort().forEach((defectName) => {
         const defectData = {};
-        months.forEach((month) => {
-          const monthEntry = group.monthMap[month];
-          if (monthEntry && Array.isArray(monthEntry.DefectArray)) {
-            const defect = monthEntry.DefectArray.find(
+        weeks.forEach((week) => {
+          const weekEntry = group.weekMap[week];
+          if (weekEntry && Array.isArray(weekEntry.DefectArray)) {
+            const defect = weekEntry.DefectArray.find(
               (d) => d.defectName === defectName
             );
-            const checkedQty = monthEntry.CheckedQty || 0;
-            defectData[month] =
+            const checkedQty = weekEntry.CheckedQty || 0;
+            defectData[week] =
               defect && checkedQty > 0
                 ? parseFloat(
                     (((defect.defectQty || 0) / checkedQty) * 100).toFixed(2)
                   )
                 : 0;
           } else {
-            defectData[month] = 0;
+            defectData[week] = 0;
           }
         });
 
@@ -406,24 +455,23 @@ const SunriseMonthlyTrend = () => {
     const ratesMap = new Map();
     const groupingFieldNames = getCurrentGroupingFieldNames();
     const numGroupingCols = groupingFieldNames.length;
-    const displayMonths = uniqueMonths.map(formatYYYYMMToDisplay);
+    const displayWeeks = uniqueWeeks.map(formatWeekKeyToDisplay);
 
     exportData.push([
-      "Monthly Defect Trend Analysis",
-      ...Array(uniqueMonths.length + numGroupingCols).fill(""),
+      "Weekly Defect Trend Analysis",
+      ...Array(uniqueWeeks.length + numGroupingCols).fill(""),
     ]);
     ratesMap.set(`0-0`, -1);
 
-    exportData.push(Array(uniqueMonths.length + numGroupingCols + 1).fill(""));
+    exportData.push(Array(uniqueWeeks.length + numGroupingCols + 1).fill(""));
     ratesMap.set(`1-0`, -1);
 
-    const headerRow = [...groupingFieldNames, "Defect / Group", ...displayMonths];
+    const headerRow = [...groupingFieldNames, "Defect / Group", ...displayWeeks];
     exportData.push(headerRow);
     headerRow.forEach((_, colIndex) => ratesMap.set(`2-${colIndex}`, -1));
 
     let rowIndex = 3;
     let lastDisplayedGroupValues = Array(numGroupingCols).fill(null);
-
     rows.forEach((row) => {
       const rowData = [];
       const isGroupRow = row.type === "group";
@@ -434,31 +482,27 @@ const SunriseMonthlyTrend = () => {
         if (isGroupRow && currentValue !== lastDisplayedGroupValues[colIndex]) {
           displayValue = currentValue;
           lastDisplayedGroupValues[colIndex] = currentValue;
-          for (let k = colIndex + 1; k < numGroupingCols; k++) {
+          for (let k = colIndex + 1; k < numGroupingCols; k++)
             lastDisplayedGroupValues[k] = null;
-          }
         } else if (!isGroupRow) {
           if (currentValue !== lastDisplayedGroupValues[colIndex]) {
             lastDisplayedGroupValues[colIndex] = currentValue;
-            for (let k = colIndex + 1; k < numGroupingCols; k++) {
+            for (let k = colIndex + 1; k < numGroupingCols; k++)
               lastDisplayedGroupValues[k] = null;
-            }
           }
         }
         rowData.push(displayValue);
         ratesMap.set(`${rowIndex}-${colIndex}`, -1);
       }
 
-      const label = isGroupRow ? "TOTAL %" : row.defectName;
-      rowData.push(label);
+      rowData.push(isGroupRow ? "TOTAL %" : row.defectName);
       ratesMap.set(`${rowIndex}-${numGroupingCols}`, -1);
 
-      uniqueMonths.forEach((month, monthIndex) => {
-        const rate = row.data[month] || 0;
+      uniqueWeeks.forEach((week, weekIndex) => {
+        const rate = row.data[week] || 0;
         rowData.push(rate > 0 ? `${rate.toFixed(2)}%` : "");
-        ratesMap.set(`${rowIndex}-${numGroupingCols + 1 + monthIndex}`, rate);
+        ratesMap.set(`${rowIndex}-${numGroupingCols + 1 + weekIndex}`, rate);
       });
-
       exportData.push(rowData);
       rowIndex++;
     });
@@ -466,30 +510,30 @@ const SunriseMonthlyTrend = () => {
     const totalRow = [...Array(numGroupingCols).fill(""), "OVERALL TOTAL %"];
     ratesMap.set(`${rowIndex}-${numGroupingCols}`, -1);
     for (let c = 0; c < numGroupingCols; c++) ratesMap.set(`${rowIndex}-${c}`, -1);
-
-    uniqueMonths.forEach((month, monthIndex) => {
-      const monthData = monthlyApiData.filter(
-        (d) => getYearMonthKey(d.inspectionDate) === month
+    uniqueWeeks.forEach((week, weekIndex) => {
+      const weekData = weeklyApiData.filter(
+        (d) =>
+          (d.weekKey || getWeekKey(d.inspectionDate || d.weekStartDate)) === week
       );
-      const totalCheckedForMonth = monthData.reduce(
+      const totalCheckedForWeek = weekData.reduce(
         (sum, d) => sum + (d.CheckedQty || 0),
         0
       );
-      const totalDefectsForMonth = monthData.reduce(
+      const totalDefectsForWeek = weekData.reduce(
         (sum, d) => sum + (d.totalDefectsQty || 0),
         0
       );
       const rate =
-        totalCheckedForMonth > 0
+        totalCheckedForWeek > 0
           ? parseFloat(
-              ((totalDefectsForMonth / totalCheckedForMonth) * 100).toFixed(2)
+              ((totalDefectsForWeek / totalCheckedForWeek) * 100).toFixed(2)
             )
           : 0;
       totalRow.push(rate > 0 ? `${rate.toFixed(2)}%` : "");
-      ratesMap.set(`${rowIndex}-${numGroupingCols + 1 + monthIndex}`, rate);
+      ratesMap.set(`${rowIndex}-${numGroupingCols + 1 + weekIndex}`, rate);
     });
-
     exportData.push(totalRow);
+
     return { exportData, ratesMap, numGroupingCols };
   };
 
@@ -508,7 +552,6 @@ const SunriseMonthlyTrend = () => {
         const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
         const cell = ws[cellAddress];
         if (!cell) continue;
-
         const rate = ratesMap.get(`${R}-${C}`);
         const isHeaderRow = R === 2;
         const isTotalRow = R === range.e.r;
@@ -517,7 +560,6 @@ const SunriseMonthlyTrend = () => {
         const isActualGroupRow =
           isDataRow && exportData[R][numGroupingCols] === "TOTAL %";
         const cellHasValue = cell.v !== undefined && cell.v !== "";
-
         let fgColor = "FFFFFF";
         let fontStyle = {};
         let alignment = {
@@ -552,26 +594,22 @@ const SunriseMonthlyTrend = () => {
           if (isActualGroupRow) {
             fgColor = "F3F4F6";
             fontStyle = { bold: true };
-            if (C < numGroupingCols && !cellHasValue) {
+            if (C < numGroupingCols && !cellHasValue)
               fontStyle = { bold: true, color: { rgb: "F3F4F6" } };
-            }
           } else {
             fgColor = "FFFFFF";
             fontStyle = {};
-            if (C < numGroupingCols) {
-              fontStyle = { color: { rgb: "FFFFFF" } };
-            }
+            if (C < numGroupingCols) fontStyle = { color: { rgb: "FFFFFF" } };
           }
           if (C > numGroupingCols && rate !== undefined && rate !== -1) {
-            if (rate > 0) {
-              fgColor = getBackgroundColorHex(rate);
-            } else {
-              fgColor = "E5E7EB";
-            }
-            fontStyle = { ...fontStyle, ...(isActualGroupRow ? { bold: true } : {}) };
+            if (rate > 0) fgColor = getBackgroundColorHex(rate);
+            else fgColor = "E5E7EB";
+            fontStyle = {
+              ...fontStyle,
+              ...(isActualGroupRow ? { bold: true } : {}),
+            };
           }
         }
-
         cell.s = {
           border,
           fill: { fgColor: { rgb: fgColor } },
@@ -580,13 +618,11 @@ const SunriseMonthlyTrend = () => {
         };
       }
     }
-
     const colWidths = [];
     groupingFieldNames.forEach(() => colWidths.push({ wch: 15 }));
     colWidths.push({ wch: 30 });
-    uniqueMonths.forEach(() => colWidths.push({ wch: 15 }));
+    uniqueWeeks.forEach(() => colWidths.push({ wch: 25 }));
     ws["!cols"] = colWidths;
-
     if (range.e.c >= 0) {
       ws["!merges"] = ws["!merges"] || [];
       ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: range.e.c } });
@@ -596,10 +632,9 @@ const SunriseMonthlyTrend = () => {
         ws["A1"].s.font = { sz: 14, bold: true };
       }
     }
-
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Monthly Defect Trend");
-    XLSX.writeFile(wb, "MonthlyDefectTrend.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Weekly Defect Trend");
+    XLSX.writeFile(wb, "WeeklyDefectTrend.xlsx");
   };
 
   const downloadPDF = () => {
@@ -636,7 +671,7 @@ const SunriseMonthlyTrend = () => {
       },
       styles: {
         cellPadding: 1.5,
-        fontSize: 7,
+        fontSize: 6,
         valign: "middle",
         lineWidth: 0.1,
         lineColor: [0, 0, 0],
@@ -649,7 +684,7 @@ const SunriseMonthlyTrend = () => {
           },
           {}
         ),
-        ...uniqueMonths.reduce((acc, _, index) => {
+        ...uniqueWeeks.reduce((acc, _, index) => {
           acc[numGroupingCols + 1 + index] = { halign: "center" };
           return acc;
         }, {}),
@@ -663,7 +698,6 @@ const SunriseMonthlyTrend = () => {
         const isGroupLabelCol = colIndex === numGroupingCols;
         const isActualGroupRow =
           !isTotalRow && data.row.raw[numGroupingCols] === "TOTAL %";
-
         data.cell.styles.fillColor = [255, 255, 255];
         data.cell.styles.textColor = [55, 65, 81];
         data.cell.styles.fontStyle = "normal";
@@ -690,20 +724,18 @@ const SunriseMonthlyTrend = () => {
             if (isActualGroupRow) {
               data.cell.styles.fillColor = [243, 244, 246];
               data.cell.styles.fontStyle = "bold";
-              if (colIndex < numGroupingCols && !cellHasValue) {
+              if (colIndex < numGroupingCols && !cellHasValue)
                 data.cell.styles.textColor = [243, 244, 246];
-              }
             } else {
               data.cell.styles.fillColor = [255, 255, 255];
               data.cell.styles.fontStyle = "normal";
-              if (colIndex < numGroupingCols) {
+              if (colIndex < numGroupingCols)
                 data.cell.styles.textColor = [255, 255, 255];
-              } else if (isGroupLabelCol) {
+              else if (isGroupLabelCol)
                 data.cell.styles.cellPadding = {
                   ...data.cell.styles.cellPadding,
                   left: 3,
                 };
-              }
             }
             if (colIndex > numGroupingCols && rate !== undefined && rate !== -1) {
               if (rate > 0) {
@@ -727,15 +759,14 @@ const SunriseMonthlyTrend = () => {
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
         doc.text(
-          "Monthly Defect Trend Analysis",
+          "Weekly Defect Trend Analysis",
           doc.internal.pageSize.getWidth() / 2,
           15,
           { align: "center" }
         );
       },
     });
-
-    doc.save("MonthlyDefectTrend.pdf");
+    doc.save("WeeklyDefectTrend.pdf");
   };
 
   const handleOptionToggle = (option) => {
@@ -783,7 +814,7 @@ const SunriseMonthlyTrend = () => {
 
   return (
     <div className="p-4 space-y-6">
-      <MonthlyFilterPane
+      <WeeklyFilterPane
         onFilterChange={handleFilterChange}
         initialFilters={activeFilters}
       />
@@ -799,14 +830,14 @@ const SunriseMonthlyTrend = () => {
         )}
         {!loading &&
           !error &&
-          monthlyApiData.length === 0 &&
+          weeklyApiData.length === 0 &&
           (activeFilters.startDate || activeFilters.endDate) && (
             <div className="text-center p-4 text-gray-500 bg-white shadow-md rounded-lg">
-              No monthly data available for the selected filters. (Check API
-              endpoint: /api/sunrise/qc1-monthly-data)
+              No weekly data available for the selected filters. (Check API
+              endpoint: /api/sunrise/qc1-weekly-data)
             </div>
           )}
-        {!loading && !error && monthlyApiData.length > 0 && (
+        {!loading && !error && weeklyApiData.length > 0 && (
           <QCSunriseSummaryCard summaryStats={summaryStats} />
         )}
       </div>
@@ -816,7 +847,7 @@ const SunriseMonthlyTrend = () => {
           <>
             <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
               <h2 className="text-lg font-semibold text-gray-900 whitespace-nowrap">
-                Monthly Defect Trend
+                Weekly Defect Trend
               </h2>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span className="text-sm font-medium text-gray-600 mr-2">
@@ -892,15 +923,15 @@ const SunriseMonthlyTrend = () => {
 
         {loading && (
           <div className="text-center p-4 text-gray-500">
-            Loading monthly trend data...
+            Loading weekly trend data...
           </div>
         )}
         {error && (
           <div className="text-center p-4 text-red-500">
-            Error loading monthly data: {error}
+            Error loading weekly data: {error}
           </div>
         )}
-        {!loading && !error && rows.length === 0 && monthlyApiData.length > 0 && (
+        {!loading && !error && rows.length === 0 && weeklyApiData.length > 0 && (
           <div className="text-center p-4 text-gray-500">
             No trend data to display based on current grouping. Try adjusting
             'Group by' options.
@@ -909,10 +940,10 @@ const SunriseMonthlyTrend = () => {
         {!loading &&
           !error &&
           rows.length === 0 &&
-          monthlyApiData.length === 0 &&
+          weeklyApiData.length === 0 &&
           (activeFilters.startDate || activeFilters.endDate) && (
             <div className="text-center p-4 text-gray-500">
-              No monthly data found for the selected filters. (Check API endpoint
+              No weekly data found for the selected filters. (Check API endpoint
               and filters)
             </div>
           )}
@@ -934,6 +965,7 @@ const SunriseMonthlyTrend = () => {
                       {header}
                     </th>
                   ))}
+
                   <th
                     className="py-2 px-3 border-b border-r border-gray-300 text-left font-semibold text-gray-700 sticky bg-gray-100 z-20 whitespace-nowrap align-middle"
                     style={{
@@ -943,13 +975,14 @@ const SunriseMonthlyTrend = () => {
                   >
                     Defect / Group
                   </th>
-                  {uniqueMonths.map((month) => (
+
+                  {uniqueWeeks.map((week) => (
                     <th
-                      key={month}
+                      key={week}
                       className="py-2 px-3 border-b border-r border-gray-300 text-center font-semibold text-gray-700 whitespace-nowrap align-middle"
-                      style={{ minWidth: "90px" }}
+                      style={{ minWidth: "180px" }}
                     >
-                      {formatYYYYMMToDisplay(month)}
+                      {formatWeekKeyToDisplay(week)}
                     </th>
                   ))}
                 </tr>
@@ -989,13 +1022,13 @@ const SunriseMonthlyTrend = () => {
                         >
                           TOTAL %
                         </td>
-                        {uniqueMonths.map((month) => {
-                          const rate = row.data[month] || 0;
+                        {uniqueWeeks.map((week) => {
+                          const rate = row.data[week] || 0;
                           const displayValue =
                             rate > 0 ? `${rate.toFixed(2)}%` : "";
                           return (
                             <td
-                              key={`${row.key}-month-${month}`}
+                              key={`${row.key}-week-${week}`}
                               className={`py-1.5 px-3 border-b border-r border-slate-600 text-center align-middle font-semibold ${
                                 rate > 0
                                   ? getBackgroundColor(rate)
@@ -1026,13 +1059,13 @@ const SunriseMonthlyTrend = () => {
                         >
                           {row.defectName}
                         </td>
-                        {uniqueMonths.map((month) => {
-                          const rate = row.data[month] || 0;
+                        {uniqueWeeks.map((week) => {
+                          const rate = row.data[week] || 0;
                           const displayValue =
                             rate > 0 ? `${rate.toFixed(2)}%` : "";
                           return (
                             <td
-                              key={`${row.key}-month-${month}`}
+                              key={`${row.key}-week-${week}`}
                               className={`py-1.5 px-3 border-b border-r border-gray-300 text-center align-middle ${
                                 rate > 0 ? getBackgroundColor(rate) : "bg-white"
                               } ${
@@ -1070,23 +1103,26 @@ const SunriseMonthlyTrend = () => {
                   >
                     OVERALL TOTAL
                   </td>
-                  {uniqueMonths.map((month) => {
-                    const monthData = monthlyApiData.filter(
-                      (d) => getYearMonthKey(d.inspectionDate) === month
+                  {uniqueWeeks.map((week) => {
+                    const weekData = weeklyApiData.filter(
+                      (d) =>
+                        (d.weekKey ||
+                          getWeekKey(d.inspectionDate || d.weekStartDate)) ===
+                        week
                     );
-                    const totalCheckedForMonth = monthData.reduce(
+                    const totalCheckedForWeek = weekData.reduce(
                       (sum, d) => sum + (d.CheckedQty || 0),
                       0
                     );
-                    const totalDefectsForMonth = monthData.reduce(
+                    const totalDefectsForWeek = weekData.reduce(
                       (sum, d) => sum + (d.totalDefectsQty || 0),
                       0
                     );
                     const rate =
-                      totalCheckedForMonth > 0
+                      totalCheckedForWeek > 0
                         ? parseFloat(
                             (
-                              (totalDefectsForMonth / totalCheckedForMonth) *
+                              (totalDefectsForWeek / totalCheckedForWeek) *
                               100
                             ).toFixed(2)
                           )
@@ -1095,7 +1131,7 @@ const SunriseMonthlyTrend = () => {
                       rate > 0 ? `${rate.toFixed(2)}%` : "";
                     return (
                       <td
-                        key={`total-month-${month}`}
+                        key={`total-week-${week}`}
                         className={`py-2 px-3 border-b border-r border-t border-gray-400 text-center font-bold align-middle ${
                           rate > 0 ? getBackgroundColor(rate) : "bg-gray-200"
                         } ${
@@ -1118,4 +1154,4 @@ const SunriseMonthlyTrend = () => {
   );
 };
 
-export default SunriseMonthlyTrend;
+export default SunriseWeeklyTrend;
