@@ -30,6 +30,8 @@ import SunriseMonthlyTrend from "../components/inspection/qc1_sunrise_mongodb/Su
 import SunriseYearlyTrend from "../components/inspection/qc1_sunrise_mongodb/SunriseYearlyTrend";
 import SunriseWeeklyTrend from "../components/inspection/qc1_sunrise_mongodb/SunriseWeeklyTrend";
 import { useTranslation } from "react-i18next";
+import DigitalMeasurement from "../components/inspection/liveDashboard/DigitalMeasurement";
+import DigitalMeasurementBuyerSpec from "../components/inspection/digital_measurement/DigitalMeasurementBuyerSpec";
 
 const LiveDashboard = () => {
   const { t } = useTranslation();
@@ -562,7 +564,9 @@ const LiveDashboard = () => {
 
         {activeSection === "QC Inline Roving" && <RovingReport />}
         {activeSection === "Cutting" && <CuttingReport />}
-        {activeSection === "QC 1 Dashboard" && <QCSunriseDashboard />}
+        {activeSection === "Buyer Specs" && <DigitalMeasurementBuyerSpec />}
+        {activeSection === "Measurement Summary" && <DigitalMeasurement />}
+        {activeSection === "Daily Analysis" && <QCSunriseDashboard />}
         {activeSection === "Order Data" && <OrderData />}
 
         {activeSection === "Washing" && <WashingLive />}

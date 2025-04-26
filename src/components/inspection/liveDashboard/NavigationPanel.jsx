@@ -14,7 +14,10 @@ import {
   FileText,
   Box,
   Search, // Added Search icon for QC Inline Roving
-  Home // Add Home icon
+  Home, // Add Home icon
+  Scissors,
+  WashingMachine,
+  Monitor
 } from "lucide-react";
 
 const NavigationPanel = ({
@@ -28,17 +31,26 @@ const NavigationPanel = ({
   const menuItems = [
     { name: "Home", icon: <Home size={18} />, subMenus: [] }, // Add Home menu
     { name: "QC Inline Roving", icon: <Search size={16} />, subMenus: [] },
-    { name: "QC 1 Dashboard", 
-      icon: <BarChart size={16} />, 
+    { name: "Cutting", icon: <Scissors size={16} />, subMenus: [] },
+    {
+      name: "Digital Measurement",
+      icon: <Shirt size={16} />,
       subMenus: [
-        { name: "QC 1 Dashboard", icon: <BarChart size={16} /> },
+        { name: "Buyer Specs", icon: <BarChart size={16} /> },
+        { name: "Measurement Summary", icon: <TrendingUp size={16} /> }
+      ]
+    },    
+{ name: "QC 1 Dashboard", 
+      icon: <Monitor size={16} />, 
+      subMenus: [
+        { name: "QC 1 Dashboard", icon: <Monitor size={16} /> },
         { name: "Daily Trend", icon: <TrendingUp size={16} /> },
         { name: "Weekly Trend", icon: <TrendingUp size={16} /> },
         { name: "Monthly Trend", icon: <TrendingUp size={16} /> },
         // { name: "Yearly Trend", icon: <TrendingUp size={16} /> },
       ] },
     { name: "Order Data", icon: <Package size={18} />, subMenus: [] },
-    { name: "Washing", icon: <Shirt size={18} />, subMenus: [] },
+    { name: "Washing", icon: <WashingMachine size={18} />, subMenus: [] },
     { name: "Ironing", icon: <Shirt size={18} />, subMenus: [] }, // Replaced 'Iron' with 'Shirt'
     { name: "OPA", icon: <Eye size={18} />, subMenus: [] },
     {
