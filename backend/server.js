@@ -7188,7 +7188,6 @@ app.get("/api/sunrise/qc1-daily-trend", async (req, res) => {
   try {
     const { startDate, endDate, lineNo, MONo, Color, Size, Buyer, defectName } = req.query;
 
-    // Input validation: Check for required parameters and data types
     if (!startDate || !endDate) {
       return res.status(400).json({ error: "Start and end dates are required." });
     }
@@ -7196,16 +7195,12 @@ app.get("/api/sunrise/qc1-daily-trend", async (req, res) => {
       return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD." });
     }
 
-
-    // Build the match stage for the aggregation pipeline
     const matchStage = {};
 
-    // Date filtering using $expr for string dates
     if (startDate || endDate) {
       matchStage.$expr = matchStage.$expr || {};
       matchStage.$expr.$and = matchStage.$expr.$and || [];
 
-      // Normalize dates before comparison
       const normalizedStartDate = normalizeDateString(startDate);
       const normalizedEndDate = normalizeDateString(endDate);
 
@@ -7227,7 +7222,7 @@ app.get("/api/sunrise/qc1-daily-trend", async (req, res) => {
       }
     }
 
-    // Other filters
+   
     if (lineNo) matchStage.lineNo = lineNo;
     if (MONo) matchStage.MONo = MONo;
     if (Color) matchStage.Color = Color;
@@ -7237,7 +7232,6 @@ app.get("/api/sunrise/qc1-daily-trend", async (req, res) => {
       matchStage["DefectArray.defectName"] = defectName;
     }
 
-    // Aggregation pipeline
     const pipeline = [
       { $match: matchStage },
       {
@@ -7262,16 +7256,15 @@ app.get("/api/sunrise/qc1-daily-trend", async (req, res) => {
           _id: 0,
         },
       },
-      { $sort: { date: 1 } }, // Sort by date ascending
+      { $sort: { date: 1 } }, 
     ];
 
-    // Execute aggregation
     const data = await QC1Sunrise.aggregate(pipeline).exec();
 
-    // Transform date to MM/DD/YYYY for consistency with UI
+   
     const transformedData = data.map((item) => ({
       ...item,
-      date: item.date, // Already in MM/DD/YYYY from the group
+      date: item.date, 
     }));
 
     res.json(transformedData);
@@ -7284,7 +7277,7 @@ app.get("/api/sunrise/qc1-daily-trend", async (req, res) => {
   }
 });
 
-// Endpoint to fetch aggregated QC1 Sunrise data for the WEEKLY trend view
+
 app.get("/api/sunrise/qc1-weekly-data", async (req, res) => {
   try {
     const { startDate, endDate, lineNo, MONo, Color, Size, Buyer, defectName } =
@@ -7296,7 +7289,7 @@ app.get("/api/sunrise/qc1-weekly-data", async (req, res) => {
         .status(400)
         .json({ error: "Start and end dates are required for weekly view." });
     }
-    // Basic format check (frontend sends YYYY-MM-DD)
+
     if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
         return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD." });
     }
@@ -7305,12 +7298,12 @@ app.get("/api/sunrise/qc1-weekly-data", async (req, res) => {
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
         return res.status(400).json({ error: "Invalid date value." });
     }
-    // Ensure end date includes the full day for matching
+  
     end.setHours(23, 59, 59, 999);
 
 
     const matchStageBase = {};
-    // Add other filters
+
     if (lineNo) matchStageBase.lineNo = lineNo;
     if (MONo) matchStageBase.MONo = MONo;
     if (Color) matchStageBase.Color = Color;
@@ -7323,7 +7316,7 @@ app.get("/api/sunrise/qc1-weekly-data", async (req, res) => {
     
     const pipeline = [];
 
-    // Stage 1: Convert inspectionDate string (MM/DD/YYYY) to Date object
+
     pipeline.push({
       $addFields: {
         inspectionDateAsDate: {
@@ -7338,7 +7331,7 @@ app.get("/api/sunrise/qc1-weekly-data", async (req, res) => {
       }
     });
 
-    // Stage 2: Apply date range filter and other filters
+   
     pipeline.push({
       $match: {
         inspectionDateAsDate: {
@@ -7350,7 +7343,6 @@ app.get("/api/sunrise/qc1-weekly-data", async (req, res) => {
       }
     });
 
-    // Stage 3: Add week starting date (Monday) and week key (YYYY-Www)
     pipeline.push({
         $addFields: {
             weekStartDate: { 
@@ -7377,12 +7369,11 @@ app.get("/api/sunrise/qc1-weekly-data", async (req, res) => {
         }
     });
 
-    // Stage 4: Group by week AND dimensions to get totals and collect defects
+    
     pipeline.push({
         $group: {
             _id: {
-                week: "$weekStartDate", // Group by the calculated Monday
-                // weekKey: "$weekKey", // Or group by the string key
+                week: "$weekStartDate", 
                 lineNo: "$lineNo",
                 MONo: "$MONo",
                 Buyer: "$Buyer",
@@ -7396,13 +7387,12 @@ app.get("/api/sunrise/qc1-weekly-data", async (req, res) => {
         }
     });
 
-    // Stage 5: Unwind the collected arrays
-    pipeline.push({ $unwind: { path: "$DefectArrays", preserveNullAndEmptyArrays: true } }); // Array of arrays -> arrays
+ 
+    pipeline.push({ $unwind: { path: "$DefectArrays", preserveNullAndEmptyArrays: true } }); 
 
-    // Stage 6: Unwind the individual defect arrays
-    pipeline.push({ $unwind: { path: "$DefectArrays", preserveNullAndEmptyArrays: true } }); // Arrays -> individual defect objects
 
-    // Stage 7: Group again by original key + defectName to sum specific defect quantities
+    pipeline.push({ $unwind: { path: "$DefectArrays", preserveNullAndEmptyArrays: true } }); 
+
     pipeline.push({
         $group: {
             _id: {
@@ -7422,7 +7412,6 @@ app.get("/api/sunrise/qc1-weekly-data", async (req, res) => {
         }
     });
 
-    // Stage 8: Group back by the original week/dimension key to reconstruct the DefectArray
     pipeline.push({
         $group: {
             _id: "$_id.originalId", 
@@ -7437,11 +7426,11 @@ app.get("/api/sunrise/qc1-weekly-data", async (req, res) => {
         }
     });
 
-    // Stage 9: Project the final desired output shape
+   
     pipeline.push({
         $project: {
-            _id: 0, // Exclude the complex _id
-            weekStartDate: "$_id.week", // Or weekKey: "$_id.weekKey"
+            _id: 0, 
+            weekStartDate: "$_id.week", 
             lineNo: "$_id.lineNo",
             MONo: "$_id.MONo",
             Buyer: "$_id.Buyer",
@@ -7459,7 +7448,7 @@ app.get("/api/sunrise/qc1-weekly-data", async (req, res) => {
         }
     });
 
-    // Stage 10: Sort results for consistency
+
     pipeline.push({
         $sort: {
             weekStartDate: 1, 
@@ -7522,7 +7511,6 @@ app.get("/api/sunrise/qc1-weekly-filters", async (req, res) => {
    
     const basePipeline = [];
 
-    // Stage 1: Convert inspectionDate string to Date object
     basePipeline.push({
       $addFields: {
         inspectionDateAsDate: {
@@ -7536,7 +7524,6 @@ app.get("/api/sunrise/qc1-weekly-filters", async (req, res) => {
       }
     });
 
-    // Stage 2: Apply date range filter
     basePipeline.push({
       $match: {
         inspectionDateAsDate: {
@@ -7547,7 +7534,7 @@ app.get("/api/sunrise/qc1-weekly-filters", async (req, res) => {
       }
     });
 
-    // Stage 3: Apply other active filters to narrow down options
+
     const matchStageOthers = {};
     if (lineNo) matchStageOthers.lineNo = lineNo;
     if (MONo) matchStageOthers.MONo = MONo;
@@ -7687,10 +7674,10 @@ app.get("/api/sunrise/qc1-monthly-data", async (req, res) => {
     
     const pipeline = [];
 
-    // Stage 1: Apply initial match with month and other filters
+
     pipeline.push({ $match: matchStage });
 
-    // Stage 2: Filter DefectArray to only include the selected defectName (if provided)
+    
     if (defectName) {
       pipeline.push({
         $addFields: {
@@ -7704,7 +7691,6 @@ app.get("/api/sunrise/qc1-monthly-data", async (req, res) => {
         }
       });
 
-      // Stage 3: Recalculate totalDefectsQty based on the filtered DefectArray
       pipeline.push({
         $addFields: {
           totalDefectsQty: {
@@ -7714,20 +7700,18 @@ app.get("/api/sunrise/qc1-monthly-data", async (req, res) => {
       });
     }
 
-    // Stage 4: Add year-month field for sorting and consistency
     pipeline.push({
       $addFields: {
         yearMonth: {
           $concat: [
-            { $substr: ["$inspectionDate", 6, 4] }, // YYYY
+            { $substr: ["$inspectionDate", 6, 4] }, 
             "-",
-            { $substr: ["$inspectionDate", 0, 2] }, // MM
+            { $substr: ["$inspectionDate", 0, 2] }, 
           ]
         }
       }
     });
 
-    // Stage 5: Sort by yearMonth and lineNo
     pipeline.push({
       $sort: {
         yearMonth: 1,
@@ -7735,15 +7719,13 @@ app.get("/api/sunrise/qc1-monthly-data", async (req, res) => {
       }
     });
 
-    // Fetch data from MongoDB using aggregation
     const data = await QC1Sunrise.aggregate(pipeline).exec();
 
-    // Transform the inspectionDate to DD/MM/YYYY format for display, keeping yearMonth
     const transformedData = data.map((item) => {
       const [month, day, year] = item.inspectionDate.split("-");
       return {
         ...item,
-        inspectionDate: `${day}/${month}/${year}` // Convert to DD/MM/YYYY
+        inspectionDate: `${day}/${month}/${year}` 
       };
     });
 
@@ -7757,12 +7739,10 @@ app.get("/api/sunrise/qc1-monthly-data", async (req, res) => {
   }
 });
 
-// Endpoint to fetch monthly trend data
 app.get("/api/sunrise/qc1-monthly-trend", async (req, res) => {
   try {
     const { startMonth, endMonth, lineNo, MONo, Color, Size, Buyer, defectName } = req.query;
 
-    // Input validation
     if (!startMonth || !endMonth) {
       return res.status(400).json({ error: "Start and end months are required." });
     }
@@ -7770,15 +7750,12 @@ app.get("/api/sunrise/qc1-monthly-trend", async (req, res) => {
       return res.status(400).json({ error: "Invalid month format. Use YYYY-MM." });
     }
 
-    // Build the match stage for the aggregation pipeline
     const matchStage = {};
 
-    // Month filtering using $expr to handle string-based year-month comparison
     if (startMonth || endMonth) {
       matchStage.$expr = matchStage.$expr || {};
       matchStage.$expr.$and = matchStage.$expr.$and || [];
 
-      // Extract year-month from inspectionDate (MM/DD/YYYY -> YYYY-MM)
       const yearMonthExpr = {
         $concat: [
           { $substr: ["$inspectionDate", 6, 4] }, // YYYY
@@ -7799,7 +7776,6 @@ app.get("/api/sunrise/qc1-monthly-trend", async (req, res) => {
       }
     }
 
-    // Other filters
     if (lineNo) matchStage.lineNo = lineNo;
     if (MONo) matchStage.MONo = MONo;
     if (Color) matchStage.Color = Color;
@@ -7809,10 +7785,9 @@ app.get("/api/sunrise/qc1-monthly-trend", async (req, res) => {
       matchStage["DefectArray.defectName"] = defectName;
     }
 
-    // Aggregation pipeline
     const pipeline = [
       { $match: matchStage },
-      // Stage 1: Filter DefectArray if defectName is specified
+
       ...(defectName ? [{
         $addFields: {
           DefectArray: {
@@ -7830,19 +7805,19 @@ app.get("/api/sunrise/qc1-monthly-trend", async (req, res) => {
           }
         }
       }] : []),
-      // Stage 2: Extract year-month
+     
       {
         $addFields: {
           yearMonth: {
             $concat: [
-              { $substr: ["$inspectionDate", 6, 4] }, // YYYY
+              { $substr: ["$inspectionDate", 6, 4] },
               "-",
-              { $substr: ["$inspectionDate", 0, 2] }, // MM
+              { $substr: ["$inspectionDate", 0, 2] }, 
             ]
           }
         }
       },
-      // Stage 3: Group by year-month
+     
       {
         $group: {
           _id: "$yearMonth",
@@ -7863,7 +7838,7 @@ app.get("/api/sunrise/qc1-monthly-trend", async (req, res) => {
           }
         }
       },
-      // Stage 4: Project the desired output
+      
       {
         $project: {
           month: "$_id",
@@ -7880,19 +7855,17 @@ app.get("/api/sunrise/qc1-monthly-trend", async (req, res) => {
           _id: 0
         }
       },
-      // Stage 5: Sort by month ascending
+      
       { $sort: { month: 1 } }
     ];
 
-    // Execute aggregation
     const data = await QC1Sunrise.aggregate(pipeline).exec();
 
-    // Transform data to include records for compatibility with frontend
     const transformedData = data.map((item) => ({
       ...item,
       records: item.records.map((record) => ({
         ...record,
-        inspectionDate: record.inspectionDate // Keep original format (MM/DD/YYYY)
+        inspectionDate: record.inspectionDate 
       }))
     }));
 
@@ -7906,25 +7879,23 @@ app.get("/api/sunrise/qc1-monthly-trend", async (req, res) => {
   }
 });
 
-// Endpoint to fetch unique filter values with monthly cross-filtering
 app.get("/api/sunrise/qc1-monthly-filters", async (req, res) => {
   try {
     const { startMonth, endMonth, lineNo, MONo, Color, Size, Buyer, defectName } = req.query;
 
-    // Build the match stage for the aggregation pipeline
+
     const matchStage = {};
 
-    // Month filtering using $expr
     if (startMonth || endMonth) {
       matchStage.$expr = matchStage.$expr || {};
       matchStage.$expr.$and = matchStage.$expr.$and || [];
 
-      // Extract year-month from inspectionDate (MM/DD/YYYY -> YYYY-MM)
+
       const yearMonthExpr = {
         $concat: [
-          { $substr: ["$inspectionDate", 6, 4] }, // YYYY
+          { $substr: ["$inspectionDate", 6, 4] }, 
           "-",
-          { $substr: ["$inspectionDate", 0, 2] }, // MM
+          { $substr: ["$inspectionDate", 0, 2] }, 
         ]
       };
 
@@ -7940,7 +7911,7 @@ app.get("/api/sunrise/qc1-monthly-filters", async (req, res) => {
       }
     }
 
-    // Apply other filters
+
     if (lineNo) matchStage.lineNo = lineNo;
     if (MONo) matchStage.MONo = MONo;
     if (Color) matchStage.Color = Color;
@@ -7948,7 +7919,6 @@ app.get("/api/sunrise/qc1-monthly-filters", async (req, res) => {
     if (Buyer) matchStage.Buyer = Buyer;
     if (defectName) matchStage["DefectArray.defectName"] = defectName;
 
-    // Fetch unique values for each filter using aggregation
     const [
       uniqueLineNos,
       uniqueMONos,
@@ -7988,7 +7958,7 @@ app.get("/api/sunrise/qc1-monthly-filters", async (req, res) => {
       lineNos: uniqueLineNos
         .map((item) => item._id)
         .filter(Boolean)
-        .sort((a, b) => parseInt(a) - parseInt(b)), // Sort numerically
+        .sort((a, b) => parseInt(a) - parseInt(b)), 
       MONos: uniqueMONos
         .map((item) => item._id)
         .filter(Boolean)

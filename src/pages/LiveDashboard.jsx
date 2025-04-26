@@ -564,6 +564,7 @@ const LiveDashboard = () => {
 
         {activeSection === "QC Inline Roving" && <RovingReport />}
         {activeSection === "Cutting" && <CuttingReport />}
+        {activeSection === "QC 1 Dashboard" && <QCSunriseDashboard />}
         {activeSection === "Buyer Specs" && <DigitalMeasurementBuyerSpec />}
         {activeSection === "Measurement Summary" && <DigitalMeasurement />}
         {activeSection === "Daily Analysis" && <QCSunriseDashboard />}
