@@ -8702,6 +8702,48 @@ app.put("/api/update-measurement-value", async (req, res) => {
   }
 });
 
+// New endpoint to delete measurement record
+app.delete("/api/delete-measurement-record", async (req, res) => {
+  try {
+    const { moNo, referenceNo } = req.body;
+
+    if (!moNo || !referenceNo) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Find the dt_orders record to get its _id
+    const order = await ymEcoConnection.db
+      .collection("dt_orders")
+      .findOne({ Order_No: moNo });
+    if (!order) {
+      return res.status(404).json({ error: "Order not found for MO No" });
+    }
+
+    const styleId = order._id.toString();
+
+    // Delete the measurement_data record with matching style_id and reference_no
+    const result = await ymEcoConnection.db
+      .collection("measurement_data")
+      .deleteOne({ style_id: styleId, reference_no: referenceNo });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "Measurement record not found" });
+    }
+
+    res.json({ message: "Measurement record deleted successfully" });
+  } catch (error) {
+    console.error(
+      "Error deleting measurement record:",
+      error.message,
+      error.stack
+    );
+    res.status(500).json({
+      error: "Failed to delete measurement record",
+      details: error.message
+    });
+  }
+});
+
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`HTTPS Server is running on https://localhost:${PORT}`);
