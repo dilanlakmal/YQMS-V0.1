@@ -7679,6 +7679,253 @@ app.get("/api/sunrise/qc1-weekly-filters", async (req, res) => {
   }
 });
 
+// server.js or your routes file
+
+// Endpoint for Weekly Summary Data
+app.get("/api/sunrise/qc1-weekly-summary", async (req, res) => {
+  try {
+    const { startDate, endDate, lineNo, MONo, Color, Size, Buyer, defectName } =
+      req.query;
+
+    // --- Date Validation and Setup ---
+    if (!startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ error: "Start and end dates are required." });
+    }
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(startDate) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(endDate)
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Invalid date format. Use YYYY-MM-DD." });
+    }
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({ error: "Invalid date value." });
+    }
+    end.setHours(23, 59, 59, 999);
+
+    // --- Base Match Stage ---
+    const matchStageBase = {};
+    if (lineNo) matchStageBase.lineNo = lineNo;
+    if (MONo) matchStageBase.MONo = MONo;
+    if (Color) matchStageBase.Color = Color;
+    if (Size) matchStageBase.Size = Size;
+    if (Buyer) matchStageBase.Buyer = Buyer;
+    if (defectName) matchStageBase["DefectArray.defectName"] = defectName;
+
+    // --- Aggregation Pipeline ---
+    const pipeline = [];
+
+    // 1. Convert date string (assuming MM-DD-YYYY format in DB)
+    pipeline.push({
+      $addFields: {
+        inspectionDateAsDate: {
+          $dateFromString: {
+            dateString: "$inspectionDate",
+            format: "%m-%d-%Y", // Adjust if your DB format is different
+            onError: null,
+            onNull: null,
+          },
+        },
+      },
+    });
+
+    // 2. Match based on date range and other filters
+    pipeline.push({
+      $match: {
+        inspectionDateAsDate: {
+          $gte: start,
+          $lte: end,
+          $ne: null, // Ensure date was valid
+        },
+        ...matchStageBase, // Apply other filters
+      },
+    });
+
+    // 3. Optional: Recalculate totalDefectsQty if defectName filter is applied
+    if (defectName) {
+      pipeline.push({
+        $addFields: {
+          // Filter the DefectArray first
+          FilteredDefectArray: {
+            $filter: {
+              input: "$DefectArray",
+              as: "defect",
+              cond: { $eq: ["$$defect.defectName", defectName] },
+            },
+          },
+        },
+      });
+      pipeline.push({
+        // Sum only the filtered defects
+        $addFields: {
+          totalDefectsQty: { $sum: "$FilteredDefectArray.defectQty" },
+        },
+      });
+    }
+
+    // 4. Group ALL matching documents to get overall totals
+    pipeline.push({
+      $group: {
+        _id: null, // Group everything together
+        totalCheckedQty: { $sum: "$CheckedQty" },
+        totalDefectsQty: { $sum: "$totalDefectsQty" }, // Sum the (potentially recalculated) defects
+      },
+    });
+
+    // 5. Project the final output
+    pipeline.push({
+      $project: {
+        _id: 0,
+        totalCheckedQty: 1,
+        totalDefectsQty: 1,
+      },
+    });
+
+    // --- Execute Aggregation ---
+    const result = await QC1Sunrise.aggregate(pipeline).exec();
+
+    // --- Send Response ---
+    // If result is empty (no matching data), return zeros
+    const summary = result[0] || { totalCheckedQty: 0, totalDefectsQty: 0 };
+    res.json(summary);
+
+  } catch (err) {
+    console.error("Error fetching QC1 Sunrise weekly summary:", err);
+    res.status(500).json({
+      message: "Failed to fetch weekly summary data",
+      error: err.message,
+    });
+  }
+});
+
+// Endpoint for Monthly Summary Data
+app.get("/api/sunrise/qc1-monthly-summary", async (req, res) => {
+  try {
+    const { startMonth, endMonth, lineNo, MONo, Color, Size, Buyer, defectName } =
+      req.query;
+
+    // --- Month Validation ---
+    if (!startMonth || !endMonth) {
+      return res
+        .status(400)
+        .json({ error: "Start and end months are required." });
+    }
+    if (
+      !/^\d{4}-\d{2}$/.test(startMonth) ||
+      !/^\d{4}-\d{2}$/.test(endMonth)
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Invalid month format. Use YYYY-MM." });
+    }
+
+    // --- Base Match Stage ---
+    const matchStage = {};
+
+    // Month range filter using $expr
+    matchStage.$expr = {
+      $and: [
+        {
+          $gte: [
+            {
+              $concat: [ // Build YYYY-MM from DB date string
+                { $substr: ["$inspectionDate", 6, 4] }, // YYYY
+                "-",
+                { $substr: ["$inspectionDate", 0, 2] }, // MM
+              ],
+            },
+            startMonth,
+          ],
+        },
+        {
+          $lte: [
+            {
+              $concat: [ // Build YYYY-MM from DB date string
+                { $substr: ["$inspectionDate", 6, 4] }, // YYYY
+                "-",
+                { $substr: ["$inspectionDate", 0, 2] }, // MM
+              ],
+            },
+            endMonth,
+          ],
+        },
+      ],
+    };
+
+    // Add other filters
+    if (lineNo) matchStage.lineNo = lineNo;
+    if (MONo) matchStage.MONo = MONo;
+    if (Color) matchStage.Color = Color;
+    if (Size) matchStage.Size = Size;
+    if (Buyer) matchStage.Buyer = Buyer;
+    if (defectName) matchStage["DefectArray.defectName"] = defectName;
+
+    // --- Aggregation Pipeline ---
+    const pipeline = [];
+
+    // 1. Match based on month range and other filters
+    pipeline.push({ $match: matchStage });
+
+    // 2. Optional: Recalculate totalDefectsQty if defectName filter is applied
+    if (defectName) {
+      pipeline.push({
+        $addFields: {
+          FilteredDefectArray: {
+            $filter: {
+              input: "$DefectArray",
+              as: "defect",
+              cond: { $eq: ["$$defect.defectName", defectName] },
+            },
+          },
+        },
+      });
+      pipeline.push({
+        $addFields: {
+          totalDefectsQty: { $sum: "$FilteredDefectArray.defectQty" },
+        },
+      });
+    }
+
+    // 3. Group ALL matching documents
+    pipeline.push({
+      $group: {
+        _id: null,
+        totalCheckedQty: { $sum: "$CheckedQty" },
+        totalDefectsQty: { $sum: "$totalDefectsQty" },
+      },
+    });
+
+    // 4. Project the final output
+    pipeline.push({
+      $project: {
+        _id: 0,
+        totalCheckedQty: 1,
+        totalDefectsQty: 1,
+      },
+    });
+
+    // --- Execute Aggregation ---
+    const result = await QC1Sunrise.aggregate(pipeline).exec();
+
+    // --- Send Response ---
+    const summary = result[0] || { totalCheckedQty: 0, totalDefectsQty: 0 };
+    res.json(summary);
+
+  } catch (err) {
+    console.error("Error fetching QC1 Sunrise monthly summary:", err);
+    res.status(500).json({
+      message: "Failed to fetch monthly summary data",
+      error: err.message,
+    });
+  }
+});
+
+
 // Endpoint for monthly data aggregation
 app.get("/api/sunrise/qc1-monthly-data", async (req, res) => {
   try {

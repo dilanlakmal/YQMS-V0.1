@@ -39,7 +39,7 @@ const parseDDMMYYYY = (dateStr) => {
 const getDefaultEndDate = () => new Date().toISOString().split("T")[0];
 const getDefaultStartDate = () => {
   const today = new Date();
-  today.setDate(today.getDate() - 29);
+  today.setDate(today.getDate() - 10);
   return today.toISOString().split("T")[0];
 };
 
