@@ -8495,6 +8495,7 @@ app.get("/api/measurement-summary-per-mono", async (req, res) => {
 });
 
 // Updated endpoint for measurement details by MO No
+
 app.get("/api/measurement-details/:mono", async (req, res) => {
   try {
     const { startDate, endDate, empId, stage } = req.query;
@@ -8565,9 +8566,12 @@ app.get("/api/measurement-details/:mono", async (req, res) => {
 
           totalCount++;
 
-          const buyerSpec = spec.Specs.find(
-            (s) => Object.keys(s)[0] === record.size
-          )[record.size].decimal;
+          // Get the buyer spec for the specific size of the record
+          const buyerSpec =
+            spec.Specs.find((s) => Object.keys(s)[0] === record.size)?.[
+              record.size
+            ]?.decimal || 0;
+
           const lower = buyerSpec + tolMinus;
           const upper = buyerSpec + tolPlus;
 
@@ -8580,12 +8584,14 @@ app.get("/api/measurement-details/:mono", async (req, res) => {
         const passRate =
           totalCount > 0 ? ((totalPass / totalCount) * 100).toFixed(2) : "0.00";
 
-        // Use the first record's size to get the buyer spec (assuming all records use a consistent size for simplicity)
-        const sampleRecord = records.find((r) => r.size);
+        // Use the first valid size as a representative buyer spec (for summary display)
+        const sampleRecord = records.find(
+          (r) => r.size && spec.Specs.find((s) => Object.keys(s)[0] === r.size)
+        );
         const buyerSpec = sampleRecord
-          ? spec.Specs.find((s) => Object.keys(s)[0] === sampleRecord.size)[
+          ? spec.Specs.find((s) => Object.keys(s)[0] === sampleRecord.size)?.[
               sampleRecord.size
-            ].decimal
+            ]?.decimal || 0
           : 0;
 
         return {
@@ -8614,6 +8620,8 @@ app.get("/api/measurement-details/:mono", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch measurement details" });
   }
 });
+
+// New endpoint to update measurement value
 
 app.put("/api/update-measurement-value", async (req, res) => {
   try {

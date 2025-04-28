@@ -13,8 +13,8 @@ import {
   Calendar,
   FileText,
   Box,
-  Search, // Added Search icon for QC Inline Roving
-  Home // Add Home icon
+  Search,
+  Home
 } from "lucide-react";
 
 const NavigationPanel = ({
@@ -26,7 +26,7 @@ const NavigationPanel = ({
   const [expandedMenus, setExpandedMenus] = useState({});
 
   const menuItems = [
-    { name: "Home", icon: <Home size={18} />, subMenus: [] }, // Add Home menu
+    { name: "Home", icon: <Home size={18} />, subMenus: [] },
     { name: "QC Inline Roving", icon: <Search size={16} />, subMenus: [] },
     { name: "Cutting", icon: <Search size={16} />, subMenus: [] },
     {
@@ -49,13 +49,12 @@ const NavigationPanel = ({
     },
     { name: "Order Data", icon: <Package size={18} />, subMenus: [] },
     { name: "Washing", icon: <Shirt size={18} />, subMenus: [] },
-    { name: "Ironing", icon: <Shirt size={18} />, subMenus: [] }, // Replaced 'Iron' with 'Shirt'
+    { name: "Ironing", icon: <Shirt size={18} />, subMenus: [] },
     { name: "OPA", icon: <Eye size={18} />, subMenus: [] },
     {
       name: "QC2",
       icon: <BarChart size={18} />,
       subMenus: [
-        // { name: "Live TV", icon: <BarChart size={16} /> }, // Added Live TV as first submenu
         { name: "Live Dashboard", icon: <BarChart size={16} /> },
         { name: "MO Analysis", icon: <Clock size={16} /> },
         { name: "Line Hr Trend", icon: <TrendingUp size={16} /> },
@@ -76,24 +75,26 @@ const NavigationPanel = ({
 
   return (
     <>
-      {/* Toggle Button */}
-      <button
-        onClick={toggleNav}
-        className="fixed top-4 left-4 z-50 p-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200"
-      >
-        {isOpen ? <ChevronLeft size={24} /> : <Menu size={24} />}
-      </button>
-
       {/* Navigation Panel */}
       <div
         className={`fixed top-0 left-0 h-full bg-gray-900 text-white shadow-2xl transition-all duration-300 ease-in-out z-40 ${
           isOpen ? "w-72" : "w-0"
         } overflow-hidden`}
       >
-        <div className="p-6">
-          <h2 className="text-2xl font-semibold mb-8 mt-12 tracking-wide text-blue-100">
-            Dashboard
-          </h2>
+        <div className="p-6 pt-24">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-semibold tracking-wide text-blue-100">
+              Dashboard
+            </h2>
+            {isOpen && (
+              <button
+                onClick={toggleNav}
+                className="p-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200"
+              >
+                <ChevronLeft size={24} />
+              </button>
+            )}
+          </div>
           <ul className="space-y-2">
             {menuItems.map((item) => (
               <li key={item.name}>
@@ -148,6 +149,17 @@ const NavigationPanel = ({
           </ul>
         </div>
       </div>
+
+      {/* Toggle Button (Menu Icon) - Positioned below the Navbar on the left */}
+      {!isOpen && (
+        <button
+          onClick={toggleNav}
+          className="fixed left-4 z-50 p-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200"
+          style={{ top: "80px" }}
+        >
+          <Menu size={24} />
+        </button>
+      )}
     </>
   );
 };
