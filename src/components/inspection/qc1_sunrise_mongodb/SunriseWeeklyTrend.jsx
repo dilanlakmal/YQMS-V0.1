@@ -33,7 +33,6 @@ const getWeekKey = (dateInput) => {
   }
 
   if (!date || !isValid(date)) {
-    console.warn(`Could not parse date to get week key: ${dateInput}`);
     return null;
   }
 
@@ -59,7 +58,7 @@ const parseWeekKey = (weekKey) => {
     const mondayTargetWeek = addDays(mondayWeek1, (week - 1) * 7);
 
     if (getISOWeekYear(mondayTargetWeek) !== year) {
-      // console.warn(`Potential year mismatch for week key ${weekKey}. Calculated date: ${mondayTargetWeek}`);
+      // Handle edge cases
     }
 
     return mondayTargetWeek;
@@ -74,12 +73,12 @@ const formatWeekKeyToDisplay = (weekKey) => {
   if (!monday || !isValid(monday)) return weekKey;
 
   const sunday = endOfWeek(monday, { weekStartsOn: 1 });
-  const yearShort = format(monday, "yy");
+  const year = format(monday, "yyyy");
   const weekNum = weekKey.split("-W")[1];
 
-  return `W${weekNum} '${yearShort} (${format(monday, "MMM dd")} - ${format(
+  return `W${weekNum}  (${year} ${format(monday, "MMM dd")} - ${year} ${format(
     sunday,
-    "MMM dd"
+    "MMM dd",
   )})`;
 };
 
@@ -109,11 +108,11 @@ const SunriseWeeklyTrend = () => {
     defectName: "",
   });
   const [groupingOptions, setGroupingOptions] = useState({
-    addLines: true,
-    addMO: true,
-    addBuyer: true,
-    addColors: true,
-    addSizes: true,
+    addLines: false,
+    addMO: false,
+    addBuyer: false,
+    addColors: false,
+    addSizes: false,
   });
   const [rows, setRows] = useState([]);
   const [uniqueWeeks, setUniqueWeeks] = useState([]);
@@ -130,8 +129,12 @@ const SunriseWeeklyTrend = () => {
     setActiveFilters(validatedFilters);
   }, []);
 
-  const isFilterActive = (filterName) =>
-    (activeFilters[filterName] ?? "").trim() !== "";
+  const isFilterActive = useCallback(
+    (filterName) => {
+      return (activeFilters[filterName] ?? "").trim() !== "";
+    },
+    [activeFilters],
+  );
 
   const fetchData = useCallback(async () => {
     try {
@@ -144,36 +147,35 @@ const SunriseWeeklyTrend = () => {
       setTotalDefects(0);
       setOverallDhu(0);
 
-      const queryParams = {
-        startDate: activeFilters.startDate,
-        endDate: activeFilters.endDate,
-        lineNo: activeFilters.lineNo,
-        MONo: activeFilters.MONo,
-        Color: activeFilters.Color,
-        Size: activeFilters.Size,
-        Buyer: activeFilters.Buyer,
-        defectName: activeFilters.defectName,
-      };
+      const queryParams = { ...activeFilters };
       Object.keys(queryParams).forEach((key) => {
-        if (!queryParams[key]) delete queryParams[key];
+        if (
+          queryParams[key] === "" ||
+          queryParams[key] === null ||
+          queryParams[key] === undefined
+        ) {
+          delete queryParams[key];
+        }
       });
 
-      const queryString = new URLSearchParams(queryParams).toString();
+      if (!queryParams.startDate)
+        queryParams.startDate = getDefaultDates().startDate;
+      if (!queryParams.endDate) queryParams.endDate = getDefaultDates().endDate;
 
+      const queryString = new URLSearchParams(queryParams).toString();
       const url = `${API_BASE_URL}/api/sunrise/qc1-weekly-data?${queryString}`;
       const response = await axios.get(url);
 
       if (response.data && response.data.length > 0) {
         if (response.data[0].DefectArray === undefined) {
-          //   console.warn("Weekly API data might be missing 'DefectArray'. Defect-level breakdown may not work as expected.");
+          // Potential issue: DefectArray missing
         }
-
         if (
           !response.data[0].weekKey &&
           !response.data[0].weekStartDate &&
           !response.data[0].inspectionDate
         ) {
-          //    console.error("CRITICAL: Weekly API response missing 'weekKey', 'weekStartDate', or 'inspectionDate'. Cannot determine week.");
+          // Critical issue: Cannot determine week
         }
       }
 
@@ -187,6 +189,9 @@ const SunriseWeeklyTrend = () => {
         "Failed to fetch QC1 Sunrise weekly data";
       setError(errorMsg);
       setWeeklyApiData([]);
+      setTotalChecked(0);
+      setTotalDefects(0);
+      setOverallDhu(0);
     } finally {
       setLoading(false);
     }
@@ -210,11 +215,11 @@ const SunriseWeeklyTrend = () => {
     }
     let checked = weeklyApiData.reduce(
       (sum, item) => sum + (item.CheckedQty || 0),
-      0
+      0,
     );
     let defects = weeklyApiData.reduce(
       (sum, item) => sum + (item.totalDefectsQty || 0),
-      0
+      0,
     );
     const dhu =
       checked > 0 ? parseFloat(((defects / checked) * 100).toFixed(2)) : 0;
@@ -223,57 +228,7 @@ const SunriseWeeklyTrend = () => {
     setOverallDhu(dhu);
   }, [weeklyApiData, loading, error]);
 
-  useEffect(() => {
-    if (
-      loading ||
-      error ||
-      !Array.isArray(weeklyApiData) ||
-      weeklyApiData.length === 0
-    ) {
-      setRows([]);
-      setUniqueWeeks([]);
-      return;
-    }
-
-    const groupingFieldsConfig = [
-      { key: "lineNo", option: "addLines", filterActive: isFilterActive("lineNo") },
-      { key: "MONo", option: "addMO", filterActive: isFilterActive("MONo") },
-      { key: "Buyer", option: "addBuyer", filterActive: isFilterActive("Buyer") },
-      { key: "Color", option: "addColors", filterActive: isFilterActive("Color") },
-      { key: "Size", option: "addSizes", filterActive: isFilterActive("Size") },
-    ];
-    const activeGroupingFields = groupingFieldsConfig
-      .filter((field) => groupingOptions[field.option] && !field.filterActive)
-      .map((field) => field.key);
-
-    const weeksSet = new Set(
-      weeklyApiData
-        .map((d) =>
-          d.weekKey || getWeekKey(d.inspectionDate || d.weekStartDate)
-        )
-        .filter(Boolean)
-    );
-    const sortedWeeks = [...weeksSet].sort((a, b) => {
-      const dateA = parseWeekKey(a);
-      const dateB = parseWeekKey(b);
-      return dateA && dateB ? dateA - dateB : 0;
-    });
-    setUniqueWeeks(sortedWeeks);
-
-    const hierarchy = buildHierarchyFromWeeklyData(
-      weeklyApiData,
-      activeGroupingFields
-    );
-
-    const tableRows = buildWeeklyRowsFromHierarchy(
-      hierarchy,
-      activeGroupingFields,
-      sortedWeeks
-    );
-    setRows(tableRows);
-  }, [weeklyApiData, groupingOptions, loading, error, activeFilters]);
-
-  const buildHierarchyFromWeeklyData = (data, groupingFields) => {
+  const buildHierarchyFromWeeklyData = useCallback((data, groupingFields) => {
     const hierarchy = {};
     const normalizeString = (str) => (str ? String(str).trim() : "N/A");
 
@@ -285,7 +240,7 @@ const SunriseWeeklyTrend = () => {
       if (!hierarchy[groupKey]) {
         hierarchy[groupKey] = {
           groupValues: groupingFields.map((field) =>
-            normalizeString(weeklyRecord[field])
+            normalizeString(weeklyRecord[field]),
           ),
           weekMap: {},
         };
@@ -319,7 +274,7 @@ const SunriseWeeklyTrend = () => {
         newDefects.forEach((newDefect) => {
           if (!newDefect || !newDefect.defectName) return;
           const existing = existingDefects.find(
-            (d) => d.defectName === newDefect.defectName
+            (d) => d.defectName === newDefect.defectName,
           );
           if (existing) {
             existing.defectQty =
@@ -336,83 +291,145 @@ const SunriseWeeklyTrend = () => {
     });
 
     return hierarchy;
-  };
+  }, []);
 
-  const buildWeeklyRowsFromHierarchy = (hierarchy, groupingFields, weeks) => {
-    const rows = [];
+  const buildWeeklyRowsFromHierarchy = useCallback(
+    (hierarchy, groupingFields, weeks) => {
+      const rows = [];
 
-    const sortedGroupKeys = Object.keys(hierarchy).sort((a, b) => {
-      const aValues = hierarchy[a].groupValues;
-      const bValues = hierarchy[b].groupValues;
-      for (let i = 0; i < Math.min(aValues.length, bValues.length); i++) {
-        const comparison = String(aValues[i]).localeCompare(String(bValues[i]));
-        if (comparison !== 0) return comparison;
-      }
-      return aValues.length - bValues.length;
-    });
-
-    sortedGroupKeys.forEach((groupKey) => {
-      const group = hierarchy[groupKey];
-      const groupData = {};
-
-      weeks.forEach((week) => {
-        const weekEntry = group.weekMap[week];
-        const checkedQty = weekEntry?.CheckedQty || 0;
-        const defectsQty = weekEntry?.totalDefectsQty || 0;
-        groupData[week] =
-          checkedQty > 0
-            ? parseFloat(((defectsQty / checkedQty) * 100).toFixed(2))
-            : 0;
-      });
-
-      rows.push({
-        type: "group",
-        key: groupKey + "-group",
-        groupValues: group.groupValues,
-        data: groupData,
-      });
-
-      const defectNames = new Set();
-      Object.values(group.weekMap).forEach((weekEntry) => {
-        if (weekEntry && Array.isArray(weekEntry.DefectArray)) {
-          weekEntry.DefectArray.forEach((defect) => {
-            if (defect && defect.defectName) defectNames.add(defect.defectName);
-          });
+      const sortedGroupKeys = Object.keys(hierarchy).sort((a, b) => {
+        const aValues = hierarchy[a].groupValues;
+        const bValues = hierarchy[b].groupValues;
+        for (let i = 0; i < Math.min(aValues.length, bValues.length); i++) {
+          const comparison = String(aValues[i]).localeCompare(
+            String(bValues[i]),
+          );
+          if (comparison !== 0) return comparison;
         }
+        return aValues.length - bValues.length;
       });
 
-      [...defectNames].sort().forEach((defectName) => {
-        const defectData = {};
+      sortedGroupKeys.forEach((groupKey) => {
+        const group = hierarchy[groupKey];
+        const groupData = {};
+
         weeks.forEach((week) => {
           const weekEntry = group.weekMap[week];
-          if (weekEntry && Array.isArray(weekEntry.DefectArray)) {
-            const defect = weekEntry.DefectArray.find(
-              (d) => d.defectName === defectName
-            );
-            const checkedQty = weekEntry.CheckedQty || 0;
-            defectData[week] =
-              defect && checkedQty > 0
-                ? parseFloat(
-                    (((defect.defectQty || 0) / checkedQty) * 100).toFixed(2)
-                  )
-                : 0;
-          } else {
-            defectData[week] = 0;
-          }
+          const checkedQty = weekEntry?.CheckedQty || 0;
+          const defectsQty = weekEntry?.totalDefectsQty || 0;
+          groupData[week] =
+            checkedQty > 0
+              ? parseFloat(((defectsQty / checkedQty) * 100).toFixed(2))
+              : 0;
         });
 
         rows.push({
-          type: "defect",
-          key: groupKey + "-" + defectName,
+          type: "group",
+          key: groupKey + "-group",
           groupValues: group.groupValues,
-          defectName: defectName,
-          data: defectData,
+          data: groupData,
+        });
+
+        const defectNames = new Set();
+        Object.values(group.weekMap).forEach((weekEntry) => {
+          if (weekEntry && Array.isArray(weekEntry.DefectArray)) {
+            weekEntry.DefectArray.forEach((defect) => {
+              if (defect && defect.defectName)
+                defectNames.add(defect.defectName);
+            });
+          }
+        });
+
+        [...defectNames].sort().forEach((defectName) => {
+          const defectData = {};
+          weeks.forEach((week) => {
+            const weekEntry = group.weekMap[week];
+            if (weekEntry && Array.isArray(weekEntry.DefectArray)) {
+              const defect = weekEntry.DefectArray.find(
+                (d) => d.defectName === defectName,
+              );
+              const checkedQty = weekEntry.CheckedQty || 0;
+              defectData[week] =
+                defect && checkedQty > 0
+                  ? parseFloat(
+                      (((defect.defectQty || 0) / checkedQty) * 100).toFixed(2),
+                    )
+                  : 0;
+            } else {
+              defectData[week] = 0;
+            }
+          });
+
+          rows.push({
+            type: "defect",
+            key: groupKey + "-" + defectName,
+            groupValues: group.groupValues,
+            defectName: defectName,
+            data: defectData,
+          });
         });
       });
-    });
 
-    return rows;
-  };
+      return rows;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (
+      loading ||
+      error ||
+      !Array.isArray(weeklyApiData) ||
+      weeklyApiData.length === 0
+    ) {
+      setRows([]);
+      setUniqueWeeks([]);
+      return;
+    }
+
+    const groupingFieldsConfig = [
+      { key: "lineNo", option: "addLines" },
+      { key: "MONo", option: "addMO" },
+      { key: "Buyer", option: "addBuyer" },
+      { key: "Color", option: "addColors" },
+      { key: "Size", option: "addSizes" },
+    ];
+    const activeGroupingFields = groupingFieldsConfig
+      .filter((field) => groupingOptions[field.option])
+      .map((field) => field.key);
+
+    const weeksSet = new Set(
+      weeklyApiData
+        .map((d) =>
+          d.weekKey || getWeekKey(d.inspectionDate || d.weekStartDate),
+        )
+        .filter(Boolean),
+    );
+    const sortedWeeks = [...weeksSet].sort((a, b) => {
+      const dateA = parseWeekKey(a);
+      const dateB = parseWeekKey(b);
+      return dateA && dateB ? dateA - dateB : 0;
+    });
+    setUniqueWeeks(sortedWeeks);
+
+    const hierarchy = buildHierarchyFromWeeklyData(
+      weeklyApiData,
+      activeGroupingFields,
+    );
+    const tableRows = buildWeeklyRowsFromHierarchy(
+      hierarchy,
+      activeGroupingFields,
+      sortedWeeks,
+    );
+    setRows(tableRows);
+  }, [
+    weeklyApiData,
+    groupingOptions,
+    loading,
+    error,
+    buildHierarchyFromWeeklyData,
+    buildWeeklyRowsFromHierarchy,
+  ]);
 
   const getBackgroundColor = (rate) => {
     if (rate > 3) return "bg-red-100";
@@ -440,17 +457,17 @@ const SunriseWeeklyTrend = () => {
     return "DCFCE7";
   };
 
-  const getCurrentGroupingFieldNames = () => {
+  const getCurrentGroupingFieldNames = useCallback(() => {
     const names = [];
-    if (groupingOptions.addLines && !isFilterActive("lineNo")) names.push("Line");
-    if (groupingOptions.addMO && !isFilterActive("MONo")) names.push("MO");
-    if (groupingOptions.addBuyer && !isFilterActive("Buyer")) names.push("Buyer");
-    if (groupingOptions.addColors && !isFilterActive("Color")) names.push("Color");
-    if (groupingOptions.addSizes && !isFilterActive("Size")) names.push("Size");
+    if (groupingOptions.addLines) names.push("Line");
+    if (groupingOptions.addMO) names.push("MO");
+    if (groupingOptions.addBuyer) names.push("Buyer");
+    if (groupingOptions.addColors) names.push("Color");
+    if (groupingOptions.addSizes) names.push("Size");
     return names;
-  };
+  }, [groupingOptions]);
 
-  const prepareExportData = () => {
+  const prepareExportData = useCallback(() => {
     const exportData = [];
     const ratesMap = new Map();
     const groupingFieldNames = getCurrentGroupingFieldNames();
@@ -479,65 +496,74 @@ const SunriseWeeklyTrend = () => {
       for (let colIndex = 0; colIndex < numGroupingCols; colIndex++) {
         const currentValue = row.groupValues[colIndex];
         let displayValue = "";
-        if (isGroupRow && currentValue !== lastDisplayedGroupValues[colIndex]) {
-          displayValue = currentValue;
-          lastDisplayedGroupValues[colIndex] = currentValue;
-          for (let k = colIndex + 1; k < numGroupingCols; k++)
-            lastDisplayedGroupValues[k] = null;
-        } else if (!isGroupRow) {
+        if (isGroupRow) {
+          if (currentValue !== lastDisplayedGroupValues[colIndex]) {
+            displayValue = currentValue;
+            lastDisplayedGroupValues[colIndex] = currentValue;
+            for (let k = colIndex + 1; k < numGroupingCols; k++) {
+              lastDisplayedGroupValues[k] = null;
+            }
+          }
+        } else {
           if (currentValue !== lastDisplayedGroupValues[colIndex]) {
             lastDisplayedGroupValues[colIndex] = currentValue;
-            for (let k = colIndex + 1; k < numGroupingCols; k++)
+            for (let k = colIndex + 1; k < numGroupingCols; k++) {
               lastDisplayedGroupValues[k] = null;
+            }
           }
         }
         rowData.push(displayValue);
-        ratesMap.set(`${rowIndex}-${colIndex}`, -1);
       }
 
       rowData.push(isGroupRow ? "TOTAL %" : row.defectName);
-      ratesMap.set(`${rowIndex}-${numGroupingCols}`, -1);
 
       uniqueWeeks.forEach((week, weekIndex) => {
         const rate = row.data[week] || 0;
         rowData.push(rate > 0 ? `${rate.toFixed(2)}%` : "");
         ratesMap.set(`${rowIndex}-${numGroupingCols + 1 + weekIndex}`, rate);
       });
+
+      for (let c = 0; c <= numGroupingCols; c++) {
+        ratesMap.set(`${rowIndex}-${c}`, -1);
+      }
+
       exportData.push(rowData);
       rowIndex++;
     });
 
     const totalRow = [...Array(numGroupingCols).fill(""), "OVERALL TOTAL %"];
-    ratesMap.set(`${rowIndex}-${numGroupingCols}`, -1);
-    for (let c = 0; c < numGroupingCols; c++) ratesMap.set(`${rowIndex}-${c}`, -1);
     uniqueWeeks.forEach((week, weekIndex) => {
       const weekData = weeklyApiData.filter(
         (d) =>
-          (d.weekKey || getWeekKey(d.inspectionDate || d.weekStartDate)) === week
+          (d.weekKey || getWeekKey(d.inspectionDate || d.weekStartDate)) ===
+          week,
       );
       const totalCheckedForWeek = weekData.reduce(
         (sum, d) => sum + (d.CheckedQty || 0),
-        0
+        0,
       );
       const totalDefectsForWeek = weekData.reduce(
         (sum, d) => sum + (d.totalDefectsQty || 0),
-        0
+        0,
       );
       const rate =
         totalCheckedForWeek > 0
           ? parseFloat(
-              ((totalDefectsForWeek / totalCheckedForWeek) * 100).toFixed(2)
+              ((totalDefectsForWeek / totalCheckedForWeek) * 100).toFixed(2),
             )
           : 0;
       totalRow.push(rate > 0 ? `${rate.toFixed(2)}%` : "");
       ratesMap.set(`${rowIndex}-${numGroupingCols + 1 + weekIndex}`, rate);
     });
+    for (let c = 0; c <= numGroupingCols; c++) {
+      ratesMap.set(`${rowIndex}-${c}`, -1);
+    }
     exportData.push(totalRow);
 
     return { exportData, ratesMap, numGroupingCols };
-  };
+  }, [rows, uniqueWeeks, weeklyApiData, getCurrentGroupingFieldNames]);
 
-  const downloadExcel = () => {
+  const downloadExcel = useCallback(() => {
     const { exportData, ratesMap, numGroupingCols } = prepareExportData();
     if (exportData.length <= 3) {
       alert("No data available to export.");
@@ -545,13 +571,15 @@ const SunriseWeeklyTrend = () => {
     }
 
     const ws = XLSX.utils.aoa_to_sheet(exportData);
-    const range = XLSX.utils.decode_range(ws["!ref"]);
+    const groupingFieldNames = getCurrentGroupingFieldNames();
 
+    const range = XLSX.utils.decode_range(ws["!ref"]);
     for (let R = range.s.r; R <= range.e.r; ++R) {
       for (let C = range.s.c; C <= range.e.c; ++C) {
         const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
         const cell = ws[cellAddress];
         if (!cell) continue;
+
         const rate = ratesMap.get(`${R}-${C}`);
         const isHeaderRow = R === 2;
         const isTotalRow = R === range.e.r;
@@ -560,84 +588,170 @@ const SunriseWeeklyTrend = () => {
         const isActualGroupRow =
           isDataRow && exportData[R][numGroupingCols] === "TOTAL %";
         const cellHasValue = cell.v !== undefined && cell.v !== "";
+
         let fgColor = "FFFFFF";
         let fontStyle = {};
         let alignment = {
           horizontal: C <= numGroupingCols ? "left" : "center",
           vertical: "middle",
         };
-        let border = {
-          top: { style: "thin" },
-          bottom: { style: "thin" },
-          left: { style: "thin" },
-          right: { style: "thin" },
-        };
+        let fontColor = "000000";
+        let borderColor = "D1D5DB";
 
-        if (R < 2) {
+        if (R === 0) {
+        } else if (R === 1) {
         } else if (isHeaderRow) {
-          fgColor = "ADD8E6";
+          fgColor = "E5E7EB";
           fontStyle = { bold: true };
+          fontColor = "1F2937";
+          borderColor = "9CA3AF";
         } else if (isTotalRow) {
-          fgColor = "D3D3D3";
+          fgColor = "E5E7EB";
           fontStyle = { bold: true };
-          border = {
-            top: { style: "medium" },
-            bottom: { style: "thin" },
-            left: { style: "thin" },
-            right: { style: "thin" },
-          };
-          if (rate !== undefined && rate !== -1) {
-            if (rate > 0) fgColor = getBackgroundColorHex(rate);
-            else fgColor = "E5E7EB";
+          fontColor = "1F2937";
+          borderColor = "9CA3AF";
+          if (rate !== undefined && rate > 0) {
+            fgColor = getBackgroundColorHex(rate);
+            const rgbFont = getFontColorRGB(rate);
+            fontColor = rgbFont
+              .map((x) => x.toString(16).padStart(2, "0"))
+              .join("")
+              .toUpperCase();
+          } else if (rate === 0) {
+            fgColor = "E5E7EB";
+            fontColor = "1F2937";
           }
-        } else if (isDataRow) {
+        } else if (C < numGroupingCols) {
           if (isActualGroupRow) {
-            fgColor = "F3F4F6";
-            fontStyle = { bold: true };
-            if (C < numGroupingCols && !cellHasValue)
-              fontStyle = { bold: true, color: { rgb: "F3F4F6" } };
+            fgColor = "F1F5F9";
+            fontStyle = { bold: cellHasValue };
+            fontColor = "334155";
+            borderColor = "94A3B8";
+            if (cellHasValue) alignment.vertical = "top";
           } else {
             fgColor = "FFFFFF";
-            fontStyle = {};
-            if (C < numGroupingCols) fontStyle = { color: { rgb: "FFFFFF" } };
+            borderColor = "D1D5DB";
+            if (!cellHasValue) fontColor = "FFFFFF";
+            else fontColor = "374151";
           }
-          if (C > numGroupingCols && rate !== undefined && rate !== -1) {
-            if (rate > 0) fgColor = getBackgroundColorHex(rate);
-            else fgColor = "E5E7EB";
-            fontStyle = {
-              ...fontStyle,
-              ...(isActualGroupRow ? { bold: true } : {}),
-            };
+        } else if (isGroupLabelCol) {
+          if (isActualGroupRow) {
+            fgColor = "64748B";
+            fontStyle = { bold: true };
+            fontColor = "FFFFFF";
+            borderColor = "475569";
+          } else {
+            fgColor = "FFFFFF";
+            fontColor = "374151";
+            borderColor = "D1D5DB";
+            alignment.indent = 1;
+          }
+        } else if (rate !== undefined && rate > 0) {
+          fgColor = getBackgroundColorHex(rate);
+          const rgbFont = getFontColorRGB(rate);
+          fontColor = rgbFont
+            .map((x) => x.toString(16).padStart(2, "0"))
+            .join("")
+            .toUpperCase();
+          if (isActualGroupRow) {
+            fontStyle = { bold: true };
+            borderColor = "475569";
+          } else {
+            borderColor = "D1D5DB";
+          }
+        } else if (rate === 0) {
+          if (isActualGroupRow) {
+            fgColor = "64748B";
+            fontColor = "FFFFFF";
+            fontStyle = { bold: true };
+            borderColor = "475569";
+          } else {
+            fgColor = "FFFFFF";
+            fontColor = "6B7280";
+            borderColor = "D1D5DB";
           }
         }
+
         cell.s = {
-          border,
+          border: {
+            top: { style: "thin", color: { rgb: borderColor } },
+            bottom: { style: "thin", color: { rgb: borderColor } },
+            left: { style: "thin", color: { rgb: borderColor } },
+            right: { style: "thin", color: { rgb: borderColor } },
+          },
           fill: { fgColor: { rgb: fgColor } },
-          alignment,
-          font: { ...fontStyle },
+          alignment: alignment,
+          font: { ...fontStyle, color: { rgb: fontColor } },
         };
       }
     }
+
     const colWidths = [];
     groupingFieldNames.forEach(() => colWidths.push({ wch: 15 }));
     colWidths.push({ wch: 30 });
     uniqueWeeks.forEach(() => colWidths.push({ wch: 25 }));
     ws["!cols"] = colWidths;
-    if (range.e.c >= 0) {
-      ws["!merges"] = ws["!merges"] || [];
-      ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: range.e.c } });
+
+    if (range.e.c > 0) {
+      ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: range.e.c } }];
       if (ws["A1"]) {
         ws["A1"].s = ws["A1"].s || {};
         ws["A1"].s.alignment = { horizontal: "center", vertical: "middle" };
         ws["A1"].s.font = { sz: 14, bold: true };
       }
     }
+    let mergeSpans = ws["!merges"] || [];
+    let groupStartRow = {};
+    for (let R = 3; R < exportData.length - 1; ++R) {
+      const isGroupRow = exportData[R][numGroupingCols] === "TOTAL %";
+      const isFirstDataRowOfGroup = isGroupRow;
+      for (let C = 0; C < numGroupingCols; ++C) {
+        const cellValue = exportData[R][C];
+        if (isFirstDataRowOfGroup && cellValue !== "") {
+          if (groupStartRow[C] !== undefined && R > groupStartRow[C]) {
+            if (exportData[groupStartRow[C]][C] !== "") {
+              mergeSpans.push({
+                s: { r: groupStartRow[C], c: C },
+                e: { r: R - 1, c: C },
+              });
+            }
+          }
+          groupStartRow[C] = R;
+        }
+        let endOfBlock = false;
+        if (R + 1 < exportData.length - 1) {
+          if (exportData[R + 1][numGroupingCols] === "TOTAL %") {
+            if (C === 0 || exportData[R + 1][C] !== exportData[R][C]) {
+              endOfBlock = true;
+            }
+          }
+        } else if (R + 1 === exportData.length - 1) {
+          endOfBlock = true;
+        }
+        if (groupStartRow[C] !== undefined && endOfBlock) {
+          const startR = groupStartRow[C];
+          const endR = R;
+          if (endR >= startR) {
+            if (exportData[startR][C] !== "") {
+              mergeSpans.push({ s: { r: startR, c: C }, e: { r: endR, c: C } });
+            }
+          }
+          delete groupStartRow[C];
+        }
+      }
+      if (isFirstDataRowOfGroup && exportData[R][0] !== "") {
+        groupStartRow = {};
+        if (exportData[R][0] !== "") groupStartRow[0] = R;
+      }
+    }
+    ws["!merges"] = mergeSpans;
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Weekly Defect Trend");
     XLSX.writeFile(wb, "WeeklyDefectTrend.xlsx");
-  };
+  }, [prepareExportData, uniqueWeeks, getCurrentGroupingFieldNames]);
 
-  const downloadPDF = () => {
+  const downloadPDF = useCallback(() => {
     const { exportData, ratesMap, numGroupingCols } = prepareExportData();
     if (exportData.length <= 3) {
       alert("No data available to export.");
@@ -648,6 +762,7 @@ const SunriseWeeklyTrend = () => {
     const tablePlugin =
       typeof autoTable === "function" ? autoTable : window.autoTable;
     if (!tablePlugin) {
+      console.error("jsPDF-AutoTable plugin not found.");
       alert("PDF export unavailable.");
       return;
     }
@@ -661,20 +776,20 @@ const SunriseWeeklyTrend = () => {
       startY: 20,
       theme: "grid",
       headStyles: {
-        fillColor: [173, 216, 230],
-        textColor: [55, 65, 81],
+        fillColor: [229, 231, 235],
+        textColor: [31, 41, 55],
         fontStyle: "bold",
         halign: "center",
         valign: "middle",
         lineWidth: 0.1,
-        lineColor: [0, 0, 0],
+        lineColor: [156, 163, 175],
       },
       styles: {
         cellPadding: 1.5,
         fontSize: 6,
         valign: "middle",
+        lineColor: [209, 213, 219],
         lineWidth: 0.1,
-        lineColor: [0, 0, 0],
       },
       columnStyles: {
         ...Array.from({ length: numGroupingCols + 1 }, (_, i) => i).reduce(
@@ -682,7 +797,7 @@ const SunriseWeeklyTrend = () => {
             acc[i] = { halign: "left" };
             return acc;
           },
-          {}
+          {},
         ),
         ...uniqueWeeks.reduce((acc, _, index) => {
           acc[numGroupingCols + 1 + index] = { halign: "center" };
@@ -697,62 +812,82 @@ const SunriseWeeklyTrend = () => {
         const isTotalRow = data.row.index === body.length - 1;
         const isGroupLabelCol = colIndex === numGroupingCols;
         const isActualGroupRow =
-          !isTotalRow && data.row.raw[numGroupingCols] === "TOTAL %";
-        data.cell.styles.fillColor = [255, 255, 255];
-        data.cell.styles.textColor = [55, 65, 81];
-        data.cell.styles.fontStyle = "normal";
+          !isTotalRow && exportData[rowIndexInExportData][numGroupingCols] === "TOTAL %";
 
         if (data.section === "body") {
+          let fillColor = [255, 255, 255];
+          let textColor = [55, 65, 81];
+          let fontStyle = "normal";
+          let lineColor = [209, 213, 219];
+
           if (isTotalRow) {
-            data.cell.styles.fillColor = [211, 211, 211];
-            data.cell.styles.fontStyle = "bold";
-            data.cell.styles.lineWidth = {
-              top: 0.3,
-              bottom: 0.1,
-              left: 0.1,
-              right: 0.1,
-            };
-            if (rate !== undefined && rate !== -1) {
-              if (rate > 0) {
-                data.cell.styles.fillColor = getBackgroundColorRGB(rate);
-                data.cell.styles.textColor = getFontColorRGB(rate);
-              } else {
-                data.cell.styles.fillColor = [229, 231, 235];
-              }
+            fillColor = [229, 231, 235];
+            textColor = [31, 41, 55];
+            fontStyle = "bold";
+            lineColor = [156, 163, 175];
+            if (rate !== undefined && rate > 0) {
+              fillColor = getBackgroundColorRGB(rate);
+              textColor = getFontColorRGB(rate);
+            } else if (rate === 0) {
+              fillColor = [229, 231, 235];
+              textColor = [31, 41, 55];
             }
-          } else {
-            if (isActualGroupRow) {
-              data.cell.styles.fillColor = [243, 244, 246];
-              data.cell.styles.fontStyle = "bold";
-              if (colIndex < numGroupingCols && !cellHasValue)
-                data.cell.styles.textColor = [243, 244, 246];
+          } else if (colIndex < numGroupingCols) {
+            fillColor = isActualGroupRow ? [241, 245, 249] : [255, 255, 255];
+            lineColor = isActualGroupRow ? [148, 163, 184] : [209, 213, 219];
+            if (!cellHasValue) {
+              textColor = fillColor;
             } else {
-              data.cell.styles.fillColor = [255, 255, 255];
-              data.cell.styles.fontStyle = "normal";
-              if (colIndex < numGroupingCols)
-                data.cell.styles.textColor = [255, 255, 255];
-              else if (isGroupLabelCol)
-                data.cell.styles.cellPadding = {
-                  ...data.cell.styles.cellPadding,
-                  left: 3,
-                };
+              textColor = [51, 65, 85];
+              fontStyle = "bold";
+              data.cell.styles.valign = "top";
             }
-            if (colIndex > numGroupingCols && rate !== undefined && rate !== -1) {
-              if (rate > 0) {
-                data.cell.styles.fillColor = getBackgroundColorRGB(rate);
-                data.cell.styles.textColor = getFontColorRGB(rate);
-              } else {
-                data.cell.styles.fillColor = [229, 231, 235];
-                data.cell.styles.textColor = isActualGroupRow
-                  ? [55, 65, 81]
-                  : [55, 65, 81];
-              }
-              data.cell.styles.fontStyle = isActualGroupRow ? "bold" : "normal";
+          } else if (isGroupLabelCol) {
+            if (isActualGroupRow) {
+              fillColor = [100, 116, 139];
+              fontStyle = "bold";
+              textColor = [255, 255, 255];
+              lineColor = [71, 85, 105];
+            } else {
+              fillColor = [255, 255, 255];
+              fontStyle = "normal";
+              textColor = [55, 65, 81];
+              lineColor = [209, 213, 219];
+              data.cell.styles.cellPadding = {
+                ...data.cell.styles.cellPadding,
+                left: 3,
+              };
+            }
+          } else if (rate !== undefined && rate > 0) {
+            fillColor = getBackgroundColorRGB(rate);
+            textColor = getFontColorRGB(rate);
+            if (isActualGroupRow) {
+              fontStyle = "bold";
+              lineColor = [71, 85, 105];
+            } else {
+              fontStyle = "normal";
+              lineColor = [209, 213, 219];
+            }
+          } else if (rate === 0) {
+            if (isActualGroupRow) {
+              fillColor = [100, 116, 139];
+              textColor = [255, 255, 255];
+              fontStyle = "bold";
+              lineColor = [71, 85, 105];
+            } else {
+              fillColor = [255, 255, 255];
+              textColor = [156, 163, 175];
+              fontStyle = "normal";
+              lineColor = [209, 213, 219];
             }
           }
+
+          data.cell.styles.fillColor = fillColor;
+          data.cell.styles.textColor = textColor;
+          data.cell.styles.fontStyle = fontStyle;
+          data.cell.styles.lineColor = lineColor;
         } else if (data.section === "head") {
-          data.cell.styles.halign =
-            colIndex <= numGroupingCols ? "left" : "center";
+          data.cell.styles.halign = colIndex <= numGroupingCols ? "left" : "center";
         }
       },
       didDrawPage: (data) => {
@@ -762,17 +897,47 @@ const SunriseWeeklyTrend = () => {
           "Weekly Defect Trend Analysis",
           doc.internal.pageSize.getWidth() / 2,
           15,
-          { align: "center" }
+          { align: "center" },
         );
+      },
+      willDrawCell: (data) => {
+        if (data.section === "body" && data.column.index < numGroupingCols) {
+          const rowIndexInBody = data.row.index;
+          const colIndex = data.column.index;
+          const cellValue = body[rowIndexInBody][colIndex];
+          if (cellValue === "") {
+            let spanMasterRowIndex = rowIndexInBody - 1;
+            while (
+              spanMasterRowIndex >= 0 &&
+              body[spanMasterRowIndex][colIndex] === ""
+            ) {
+              spanMasterRowIndex--;
+            }
+            if (
+              spanMasterRowIndex >= 0 &&
+              spanMasterRowIndex >= data.table.startPage
+            ) {
+              const masterCell =
+                data.table.body[spanMasterRowIndex]?.cells[colIndex];
+              if (masterCell && masterCell.willDraw) {
+                masterCell.rowSpan = (masterCell.rowSpan || 1) + 1;
+                data.cell.willDraw = false;
+              }
+            }
+          } else {
+            data.cell.rowSpan = 1;
+          }
+        }
       },
     });
     doc.save("WeeklyDefectTrend.pdf");
-  };
+  }, [prepareExportData, uniqueWeeks]);
 
-  const handleOptionToggle = (option) => {
+  const handleOptionToggle = useCallback((option) => {
     setGroupingOptions((prev) => ({ ...prev, [option]: !prev[option] }));
-  };
-  const handleAddAll = () => {
+  }, []);
+
+  const handleAddAll = useCallback(() => {
     setGroupingOptions({
       addLines: true,
       addMO: true,
@@ -780,8 +945,9 @@ const SunriseWeeklyTrend = () => {
       addColors: true,
       addSizes: true,
     });
-  };
-  const handleClearAll = () => {
+  }, []);
+
+  const handleClearAll = useCallback(() => {
     setGroupingOptions({
       addLines: false,
       addMO: false,
@@ -789,28 +955,36 @@ const SunriseWeeklyTrend = () => {
       addColors: false,
       addSizes: false,
     });
-  };
+  }, []);
 
-  const summaryStats = {
-    totalCheckedQty: totalChecked,
-    totalDefectsQty: totalDefects,
-    defectRate: overallDhu,
-  };
-  const tableGroupingHeaders = getCurrentGroupingFieldNames();
+  const summaryStats = useMemo(
+    () => ({
+      totalCheckedQty: totalChecked,
+      totalDefectsQty: totalDefects,
+      defectRate: overallDhu,
+    }),
+    [totalChecked, totalDefects, overallDhu],
+  );
 
-  const calculateRowSpan = (groupRowIndex, groupKey) => {
-    let spanCount = 1;
-    for (let i = groupRowIndex + 1; i < rows.length; i++) {
-      if (rows[i].type === "defect" && rows[i].key.startsWith(groupKey + "-")) {
-        spanCount++;
-      } else {
-        break;
+  const tableGroupingHeaders = useMemo(
+    () => getCurrentGroupingFieldNames(),
+    [getCurrentGroupingFieldNames],
+  );
+
+  const calculateRowSpan = useCallback(
+    (groupRowIndex, groupKey) => {
+      let spanCount = 1;
+      for (let i = groupRowIndex + 1; i < rows.length; i++) {
+        if (rows[i].type === "defect" && rows[i].key.startsWith(groupKey + "-")) {
+          spanCount++;
+        } else {
+          break;
+        }
       }
-    }
-    return spanCount;
-  };
-
-  let lastDisplayedGroupValues = Array(tableGroupingHeaders.length).fill(null);
+      return spanCount;
+    },
+    [rows],
+  );
 
   return (
     <div className="p-4 space-y-6">
@@ -824,7 +998,7 @@ const SunriseWeeklyTrend = () => {
           <div className="text-center p-4 text-gray-500">Loading summary...</div>
         )}
         {error && (
-          <div className="text-center p-4 text-red-500">
+          <div className="text-center p-4 text-red-500 bg-red-50 rounded border border-red-200">
             Error loading summary: {error}
           </div>
         )}
@@ -833,8 +1007,7 @@ const SunriseWeeklyTrend = () => {
           weeklyApiData.length === 0 &&
           (activeFilters.startDate || activeFilters.endDate) && (
             <div className="text-center p-4 text-gray-500 bg-white shadow-md rounded-lg">
-              No weekly data available for the selected filters. (Check API
-              endpoint: /api/sunrise/qc1-weekly-data)
+              No weekly data available for the selected filters.
             </div>
           )}
         {!loading && !error && weeklyApiData.length > 0 && (
@@ -860,28 +1033,28 @@ const SunriseWeeklyTrend = () => {
                   { label: "Colors", option: "addColors", filterKey: "Color" },
                   { label: "Sizes", option: "addSizes", filterKey: "Size" },
                 ].map(({ label, option, filterKey }) => {
-                  const isDisabled = isFilterActive(filterKey);
+                  const isCurrentlyFiltered = isFilterActive(filterKey);
                   return (
                     <label
                       key={option}
-                      className={`flex items-center space-x-1 ${
-                        isDisabled
-                          ? "cursor-not-allowed opacity-50"
-                          : "cursor-pointer"
+                      className={`flex items-center space-x-1 cursor-pointer ${
+                        isCurrentlyFiltered ? "opacity-75" : ""
                       }`}
+                      title={
+                        isCurrentlyFiltered
+                          ? `${label} is currently filtered. Uncheck to hide column.`
+                          : `Group results by ${label}`
+                      }
                     >
                       <input
                         type="checkbox"
-                        checked={groupingOptions[option] || isDisabled}
-                        onChange={() => !isDisabled && handleOptionToggle(option)}
-                        disabled={isDisabled}
-                        className={`h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded ${
-                          isDisabled ? "" : "cursor-pointer"
-                        }`}
+                        checked={groupingOptions[option] || isCurrentlyFiltered}
+                        onChange={() => handleOptionToggle(option)}
+                        className={`h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer`}
                       />
                       <span
                         className={`text-sm ${
-                          isDisabled ? "text-gray-400" : "text-gray-700"
+                          isCurrentlyFiltered ? "text-gray-500" : "text-gray-700"
                         }`}
                       >
                         {label}
@@ -892,12 +1065,14 @@ const SunriseWeeklyTrend = () => {
                 <button
                   onClick={handleAddAll}
                   className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1"
+                  title="Select all available grouping options"
                 >
                   Add All
                 </button>
                 <button
                   onClick={handleClearAll}
                   className="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1"
+                  title="Clear all grouping options"
                 >
                   Clear All
                 </button>
@@ -906,6 +1081,7 @@ const SunriseWeeklyTrend = () => {
                   onClick={downloadExcel}
                   className="flex items-center px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={rows.length === 0}
+                  title="Download as Excel"
                 >
                   <FaFileExcel className="mr-1 h-4 w-4" /> Excel
                 </button>
@@ -913,6 +1089,7 @@ const SunriseWeeklyTrend = () => {
                   onClick={downloadPDF}
                   className="flex items-center px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={rows.length === 0}
+                  title="Download as PDF"
                 >
                   <FaFilePdf className="mr-1 h-4 w-4" /> PDF
                 </button>
@@ -927,7 +1104,7 @@ const SunriseWeeklyTrend = () => {
           </div>
         )}
         {error && (
-          <div className="text-center p-4 text-red-500">
+          <div className="text-center p-4 text-red-500 bg-red-50 rounded border border-red-200">
             Error loading weekly data: {error}
           </div>
         )}
@@ -943,8 +1120,7 @@ const SunriseWeeklyTrend = () => {
           weeklyApiData.length === 0 &&
           (activeFilters.startDate || activeFilters.endDate) && (
             <div className="text-center p-4 text-gray-500">
-              No weekly data found for the selected filters. (Check API endpoint
-              and filters)
+              No weekly data found for the selected filters.
             </div>
           )}
 
@@ -965,7 +1141,6 @@ const SunriseWeeklyTrend = () => {
                       {header}
                     </th>
                   ))}
-
                   <th
                     className="py-2 px-3 border-b border-r border-gray-300 text-left font-semibold text-gray-700 sticky bg-gray-100 z-20 whitespace-nowrap align-middle"
                     style={{
@@ -975,7 +1150,6 @@ const SunriseWeeklyTrend = () => {
                   >
                     Defect / Group
                   </th>
-
                   {uniqueWeeks.map((week) => (
                     <th
                       key={week}
@@ -993,7 +1167,7 @@ const SunriseWeeklyTrend = () => {
                   if (row.type === "group") {
                     const rowSpanCount = calculateRowSpan(
                       rowIndex,
-                      row.key.replace("-group", "")
+                      row.key.replace("-group", ""),
                     );
                     return (
                       <tr key={row.key} className="font-semibold">
@@ -1001,11 +1175,10 @@ const SunriseWeeklyTrend = () => {
                           <td
                             key={`group-${row.key}-${colIndex}`}
                             rowSpan={rowSpanCount}
-                            className="py-1.5 px-3 border-b border-r border-slate-400 whitespace-nowrap align-middle font-medium text-gray-800 bg-slate-100 sticky z-10"
+                            className="py-1.5 px-3 border-b border-r border-slate-400 whitespace-nowrap align-top font-medium text-gray-800 bg-slate-100 sticky z-10"
                             style={{
                               left: `${colIndex * 100}px`,
                               minWidth: "100px",
-                              verticalAlign: "top",
                             }}
                           >
                             {row.groupValues[colIndex]}
@@ -1017,7 +1190,6 @@ const SunriseWeeklyTrend = () => {
                           style={{
                             left: `${tableGroupingHeaders.length * 100}px`,
                             minWidth: "150px",
-                            verticalAlign: "middle",
                           }}
                         >
                           TOTAL %
@@ -1054,7 +1226,6 @@ const SunriseWeeklyTrend = () => {
                           style={{
                             left: `${tableGroupingHeaders.length * 100}px`,
                             minWidth: "150px",
-                            verticalAlign: "middle",
                           }}
                         >
                           {row.defectName}
@@ -1069,9 +1240,7 @@ const SunriseWeeklyTrend = () => {
                               className={`py-1.5 px-3 border-b border-r border-gray-300 text-center align-middle ${
                                 rate > 0 ? getBackgroundColor(rate) : "bg-white"
                               } ${
-                                rate > 0
-                                  ? getFontColor(rate)
-                                  : "text-gray-500"
+                                rate > 0 ? getFontColor(rate) : "text-gray-500"
                               }`}
                               title={displayValue || "0.00%"}
                               style={{ minWidth: "80px" }}
@@ -1108,15 +1277,15 @@ const SunriseWeeklyTrend = () => {
                       (d) =>
                         (d.weekKey ||
                           getWeekKey(d.inspectionDate || d.weekStartDate)) ===
-                        week
+                        week,
                     );
                     const totalCheckedForWeek = weekData.reduce(
                       (sum, d) => sum + (d.CheckedQty || 0),
-                      0
+                      0,
                     );
                     const totalDefectsForWeek = weekData.reduce(
                       (sum, d) => sum + (d.totalDefectsQty || 0),
-                      0
+                      0,
                     );
                     const rate =
                       totalCheckedForWeek > 0
@@ -1124,7 +1293,7 @@ const SunriseWeeklyTrend = () => {
                             (
                               (totalDefectsForWeek / totalCheckedForWeek) *
                               100
-                            ).toFixed(2)
+                            ).toFixed(2),
                           )
                         : 0;
                     const displayValue =

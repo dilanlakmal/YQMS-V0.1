@@ -5,55 +5,36 @@ import "react-datepicker/dist/react-datepicker.css";
 import { API_BASE_URL } from "../../../../config";
 import {
   format,
+  subMonths,
   parse,
+  startOfMonth,
+  endOfMonth,
   isValid,
-  startOfWeek,
-  endOfWeek,
-  subWeeks,
-  addDays,
-  getISOWeek,
-  getISOWeekYear,
 } from "date-fns";
 
-const DATE_FORMAT_API = "yyyy-MM-dd";
-const DATE_FORMAT_DISPLAY = "dd MMM yyyy";
-
-const getMonday = (date) => startOfWeek(date, { weekStartsOn: 1 });
-
-const getSunday = (date) => endOfWeek(date, { weekStartsOn: 1 });
-
-const formatRangeForDisplay = (start, end) => {
-  if (!start || !end) return "";
-  const mon = getMonday(start);
-  const sun = getSunday(end);
-  return `${format(mon, DATE_FORMAT_DISPLAY)} - ${format(
-    sun,
-    DATE_FORMAT_DISPLAY,
-  )}`;
+const parseYYYYMMDD = (dateStr) => {
+  if (!dateStr) return null;
+  const parsed = parse(dateStr, "yyyy-MM-dd", new Date());
+  return isValid(parsed) ? parsed : null;
 };
 
 const getDefaultDates = () => {
   const today = new Date();
-  const lastSunday = getSunday(today);
-  const fourWeeksAgoMonday = getMonday(subWeeks(lastSunday, 3));
-  return { startDate: fourWeeksAgoMonday, endDate: lastSunday };
+  const endDate = startOfMonth(today);
+  const startDate = startOfMonth(subMonths(today, 1));
+  return { startDate, endDate };
 };
 
-const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
+const MonthlyFilterPane = ({ onFilterChange, initialFilters }) => {
   const defaultDates = useMemo(() => getDefaultDates(), []);
 
   const initialStartDate = useMemo(() => {
-    const parsed = initialFilters?.startDate
-      ? parse(initialFilters.startDate, DATE_FORMAT_API, new Date())
-      : null;
-    return parsed && isValid(parsed) ? getMonday(parsed) : defaultDates.startDate;
+    const parsed = parseYYYYMMDD(initialFilters?.startDate);
+    return parsed ? startOfMonth(parsed) : defaultDates.startDate;
   }, [initialFilters, defaultDates]);
-
   const initialEndDate = useMemo(() => {
-    const parsed = initialFilters?.endDate
-      ? parse(initialFilters.endDate, DATE_FORMAT_API, new Date())
-      : null;
-    return parsed && isValid(parsed) ? parsed : defaultDates.endDate;
+    const parsed = parseYYYYMMDD(initialFilters?.endDate);
+    return parsed ? startOfMonth(parsed) : defaultDates.endDate;
   }, [initialFilters, defaultDates]);
 
   const [startDate, setStartDate] = useState(initialStartDate);
@@ -67,7 +48,6 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
     Buyer: initialFilters?.Buyer || "",
     defectName: initialFilters?.defectName || "",
   });
-
   const [filterOptions, setFilterOptions] = useState({
     lineNos: [],
     MONos: [],
@@ -78,28 +58,26 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
   });
   const [error, setError] = useState(null);
   const [loadingOptions, setLoadingOptions] = useState(false);
-  const maxDate = useMemo(() => getSunday(new Date()), []);
+  const maxDate = useMemo(() => endOfMonth(new Date()), []);
 
-  const derivedApiDateRange = useMemo(() => {
+  const derivedMonthRangeForOptions = useMemo(() => {
     const validStartDate = isValid(startDate)
       ? startDate
       : defaultDates.startDate;
-    const validEndDate = isValid(endDate)
-      ? endDate
-      : isValid(startDate)
-        ? startDate
-        : defaultDates.endDate;
+    const validEndDate = isValid(endDate) ? endDate : defaultDates.endDate;
+    const startMonthStr = format(validStartDate, "yyyy-MM");
+    const endMonthStr = format(validEndDate, "yyyy-MM");
+    return { startMonth: startMonthStr, endMonth: endMonthStr };
+  }, [startDate, endDate, defaultDates]);
 
-    const startMon = getMonday(validStartDate);
-    const endSun = getSunday(validEndDate);
-
-    const finalStart = startMon <= endSun ? startMon : endSun;
-    const finalEnd = endSun >= startMon ? endSun : startMon;
-
-    return {
-      startDate: format(finalStart, DATE_FORMAT_API),
-      endDate: format(finalEnd, DATE_FORMAT_API),
-    };
+  const derivedFullDateRangeForParent = useMemo(() => {
+    const validStartDate = isValid(startDate)
+      ? startDate
+      : defaultDates.startDate;
+    const validEndDate = isValid(endDate) ? endDate : defaultDates.endDate;
+    const startStr = format(startOfMonth(validStartDate), "yyyy-MM-dd");
+    const endStr = format(endOfMonth(validEndDate), "yyyy-MM-dd");
+    return { startDate: startStr, endDate: endStr };
   }, [startDate, endDate, defaultDates]);
 
   const fetchFilterOptions = useCallback(async () => {
@@ -107,15 +85,15 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
     setError(null);
     try {
       const params = {
-        startDate: derivedApiDateRange.startDate,
-        endDate: derivedApiDateRange.endDate,
+        startMonth: derivedMonthRangeForOptions.startMonth,
+        endMonth: derivedMonthRangeForOptions.endMonth,
         ...otherFilters,
       };
       Object.keys(params).forEach((key) => {
         if (params[key] === "" || params[key] === null) delete params[key];
       });
 
-      const url = `${API_BASE_URL}/api/sunrise/qc1-weekly-filters`;
+      const url = `${API_BASE_URL}/api/sunrise/qc1-monthly-filters`;
       const response = await axios.get(url, { params });
 
       setFilterOptions(
@@ -129,11 +107,11 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
         },
       );
     } catch (err) {
-      console.error("Error fetching weekly filter options:", err);
+      console.error("Error fetching monthly filter options:", err);
       const errorMsg =
         err.response?.data?.message ||
         err.message ||
-        "Failed to load weekly filter options.";
+        "Failed to load monthly filter options.";
       setError(errorMsg);
       setFilterOptions({
         lineNos: [],
@@ -146,28 +124,30 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
     } finally {
       setLoadingOptions(false);
     }
-  }, [derivedApiDateRange, otherFilters]);
+  }, [derivedMonthRangeForOptions, otherFilters]);
 
   useEffect(() => {
     fetchFilterOptions();
   }, [fetchFilterOptions]);
 
   useEffect(() => {
-    const filtersToSend = { ...derivedApiDateRange, ...otherFilters };
+    const filtersToSend = { ...derivedFullDateRangeForParent, ...otherFilters };
     if (typeof onFilterChange === "function") {
       onFilterChange(filtersToSend);
     } else {
       console.error(
-        "WeeklyFilterPane: onFilterChange is not a function!",
+        "MonthlyFilterPane: onFilterChange is not a function!",
         onFilterChange,
       );
     }
-  }, [derivedApiDateRange, otherFilters, onFilterChange]);
+  }, [derivedFullDateRangeForParent, otherFilters, onFilterChange]);
 
   const handleDateChange = (dates) => {
     const [start, end] = dates;
-    setStartDate(start);
-    setEndDate(end);
+    const newStart = start && end && start > end ? end : start;
+    const newEnd = start && end && end < start ? start : end;
+    setStartDate(newStart);
+    setEndDate(newEnd);
   };
 
   const handleOtherFilterChange = (e) => {
@@ -190,21 +170,21 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
   };
 
   return (
-    <div className="mb-6 rounded-lg bg-white p-4 shadow-md">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Filter Options </h2>
+    <div className="bg-white p-4 rounded-lg shadow-md mb-6">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold">Filter Options</h2>
         <button
           onClick={handleClearFilters}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 ease-in-out text-sm"
         >
           Clear
         </button>
       </div>
-      {error && <div className="mb-4 text-center text-red-600">{error}</div>}
-      <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
+      {error && <div className="text-center text-red-600 mb-4">{error}</div>}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 items-end">
         <div className="col-span-1 sm:col-span-2 md:col-span-2 lg:col-span-2">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Week Range (Mon-Sun)
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Month Range
           </label>
           <DatePicker
             selected={startDate}
@@ -212,23 +192,16 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
             startDate={startDate}
             endDate={endDate}
             selectsRange
-            dateFormat={DATE_FORMAT_DISPLAY}
-            placeholderText="Select week range"
-            showWeekNumbers
+            dateFormat="MMM yyyy"
+            showMonthYearPicker
+            showFullMonthYearPicker
             maxDate={maxDate}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             wrapperClassName="w-full"
             popperPlacement="bottom-start"
-            formatWeekDay={(nameOfDay) => nameOfDay.substring(0, 1)}
-            calendarStartDay={1}
-          >
-            <div className="p-1 text-center text-xs text-gray-500">
-              Selected: {formatRangeForDisplay(startDate, endDate)}
-            </div>
-          </DatePicker>
+          />
           <style>{`.react-datepicker-wrapper { width: 100%; } .react-datepicker__input-container input { width: 100%; padding: 0.5rem 0.75rem; line-height: 1.5; }`}</style>
         </div>
-
         <div className="col-span-1">
           <label className="block text-sm font-medium text-gray-700">
             Line No
@@ -236,9 +209,9 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
           <select
             name="lineNo"
             value={otherFilters.lineNo}
-           onChange={handleOtherFilterChange}
+            onChange={handleOtherFilterChange}
             disabled={loadingOptions}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 sm:text-sm"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100"
           >
             <option value="">All</option>{" "}
             {filterOptions.lineNos?.map((line) => (
@@ -257,7 +230,7 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
             value={otherFilters.MONo}
             onChange={handleOtherFilterChange}
             disabled={loadingOptions}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 sm:text-sm"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100"
           >
             <option value="">All</option>{" "}
             {filterOptions.MONos?.map((mo) => (
@@ -276,7 +249,7 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
             value={otherFilters.Color}
             onChange={handleOtherFilterChange}
             disabled={loadingOptions}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 sm:text-sm"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100"
           >
             <option value="">All</option>{" "}
             {filterOptions.Colors?.map((color) => (
@@ -295,7 +268,7 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
             value={otherFilters.Size}
             onChange={handleOtherFilterChange}
             disabled={loadingOptions}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 sm:text-sm"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100"
           >
             <option value="">All</option>{" "}
             {filterOptions.Sizes?.map((size) => (
@@ -314,7 +287,7 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
             value={otherFilters.Buyer}
             onChange={handleOtherFilterChange}
             disabled={loadingOptions}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 sm:text-sm"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100"
           >
             <option value="">All</option>{" "}
             {filterOptions.Buyers?.map((buyer) => (
@@ -333,7 +306,7 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
             value={otherFilters.defectName}
             onChange={handleOtherFilterChange}
             disabled={loadingOptions}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 sm:text-sm"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100"
           >
             <option value="">All</option>{" "}
             {filterOptions.defectNames?.map((defect) => (
@@ -348,4 +321,4 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
   );
 };
 
-export default WeeklyFilterPane;
+export default MonthlyFilterPane;
