@@ -8943,118 +8943,6 @@ app.post("/api/update-user-roles", async (req, res) => {
    End Points - Digital Measurement
 ------------------------------ */
 
-// New Endpoints for Digital Measurement
-
-// app.get("/api/digital-measurement-summary", async (req, res) => {
-//   try {
-//     const measurementDataCollection =
-//       ymEcoConnection.db.collection("measurement_data");
-//     const {
-//       startDate,
-//       endDate,
-//       factory,
-//       mono,
-//       custStyle,
-//       buyer,
-//       empId,
-//       stage
-//     } = req.query;
-
-//     const start = startDate ? new Date(startDate) : null;
-//     const end = endDate ? new Date(endDate) : null;
-
-//     let userIds = [];
-//     if (empId) {
-//       const users = await UserMain.find({ emp_id: empId }, "_id");
-//       userIds = users.map((u) => u._id.toString());
-//     }
-
-//     const measurementFilter = {};
-//     if (start && end) {
-//       measurementFilter.updated_at = { $gte: start, $lte: end };
-//     } else if (start) {
-//       measurementFilter.updated_at = { $gte: start };
-//     } else if (end) {
-//       measurementFilter.updated_at = { $lte: end };
-//     }
-//     if (userIds.length > 0) {
-//       measurementFilter["user.id"] = { $in: userIds };
-//     }
-//     if (stage) {
-//       measurementFilter.stage = stage; // Add stage filter
-//     }
-
-//     const distinctStyleIds = await measurementDataCollection.distinct(
-//       "style_id",
-//       measurementFilter
-//     );
-
-//     const orderFilter = {
-//       _id: {
-//         $in: distinctStyleIds.map((id) => new mongoose.Types.ObjectId(id))
-//       }
-//     };
-//     if (factory) orderFilter.Factory = factory;
-//     if (mono) orderFilter.Order_No = mono;
-//     if (custStyle) orderFilter.CustStyle = custStyle;
-//     if (buyer) orderFilter.ShortName = buyer;
-
-//     const filteredOrders = await ymEcoConnection.db
-//       .collection("dt_orders")
-//       .find(orderFilter, { projection: { TotalQty: 1 } })
-//       .toArray();
-//     const orderQty = filteredOrders.reduce(
-//       (sum, order) => sum + order.TotalQty,
-//       0
-//     );
-
-//     const filteredOrderIds = filteredOrders.map((order) =>
-//       order._id.toString()
-//     );
-
-//     const finalMeasurementFilter = {
-//       style_id: { $in: filteredOrderIds },
-//       ...measurementFilter
-//     };
-
-//     const measurementAggregation = await measurementDataCollection
-//       .aggregate([
-//         { $match: finalMeasurementFilter },
-//         {
-//           $group: {
-//             _id: null,
-//             totalInspected: { $sum: 1 },
-//             totalPass: { $sum: { $cond: [{ $eq: ["$status", 1] }, 1, 0] } }
-//           }
-//         }
-//       ])
-//       .toArray();
-
-//     const measurementSummary = measurementAggregation[0] || {
-//       totalInspected: 0,
-//       totalPass: 0
-//     };
-//     const totalInspected = measurementSummary.totalInspected;
-//     const totalPass = measurementSummary.totalPass;
-//     const totalReject = totalInspected - totalPass;
-//     const passRate =
-//       totalInspected > 0
-//         ? ((totalPass / totalInspected) * 100).toFixed(2)
-//         : "0.00";
-
-//     res.json({
-//       orderQty,
-//       totalInspected,
-//       totalPass,
-//       totalReject,
-//       passRate
-//     });
-//   } catch (error) {
-//     console.error("Error fetching digital measurement summary:", error);
-//     res.status(500).json({ error: "Failed to fetch summary" });
-//   }
-// });
-
 // New endpoint for filter options
 app.get("/api/filter-options", async (req, res) => {
   try {
@@ -9180,18 +9068,33 @@ app.get("/api/buyer-spec-order-details/:mono", async (req, res) => {
       });
     });
 
-    const buyerSpec = order.SizeSpec.map((spec) => ({
-      seq: spec.Seq,
-      measurementPoint: spec.EnglishRemark,
-      chineseRemark: spec.ChineseArea,
-      tolMinus: spec.ToleranceMinus.decimal,
-      tolPlus: spec.TolerancePlus.decimal,
-      specs: spec.Specs.reduce((acc, sizeSpec, index) => {
-        const sizeName = Object.keys(sizeSpec)[0];
-        acc[sizeName] = sizeSpec[sizeName].decimal;
-        return acc;
-      }, {})
-    }));
+    // Apply the same tolerance correction logic as in /api/measurement-details
+    const buyerSpec = order.SizeSpec.map((spec) => {
+      // Adjust tolMinus and tolPlus to their fractional parts
+      const tolMinusMagnitude =
+        Math.abs(spec.ToleranceMinus.decimal) >= 1
+          ? Math.abs(spec.ToleranceMinus.decimal) -
+            Math.floor(Math.abs(spec.ToleranceMinus.decimal))
+          : Math.abs(spec.ToleranceMinus.decimal);
+      const tolPlusMagnitude =
+        Math.abs(spec.TolerancePlus.decimal) >= 1
+          ? Math.abs(spec.TolerancePlus.decimal) -
+            Math.floor(Math.abs(spec.TolerancePlus.decimal))
+          : Math.abs(spec.TolerancePlus.decimal);
+
+      return {
+        seq: spec.Seq,
+        measurementPoint: spec.EnglishRemark,
+        chineseRemark: spec.ChineseArea,
+        tolMinus: tolMinusMagnitude === 0 ? 0 : -tolMinusMagnitude, // Ensure tolMinus is negative
+        tolPlus: tolPlusMagnitude,
+        specs: spec.Specs.reduce((acc, sizeSpec) => {
+          const sizeName = Object.keys(sizeSpec)[0];
+          acc[sizeName] = sizeSpec[sizeName].decimal;
+          return acc;
+        }, {})
+      };
+    });
 
     res.json({
       moNo: order.Order_No,
@@ -9283,13 +9186,20 @@ app.get("/api/measurement-summary", async (req, res) => {
     const orderIds = selectedOrders.map((order) => order._id.toString());
 
     const measurementFilter = { style_id: { $in: orderIds } };
-    if (startDate) measurementFilter.created_at = { $gte: new Date(startDate) };
-    if (endDate)
-      measurementFilter.created_at = {
-        ...measurementFilter.created_at,
-        $lte: new Date(endDate)
-      };
+    if (startDate || endDate) {
+      measurementFilter.created_at = {};
+      if (startDate) {
+        measurementFilter.created_at.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        measurementFilter.created_at.$lte = end;
+      }
+    }
+
     if (empId) measurementFilter["user.name"] = empId;
+
     if (stage) measurementFilter.stage = stage;
 
     const measurementRecords = await ymEcoConnection.db
@@ -9298,7 +9208,26 @@ app.get("/api/measurement-summary", async (req, res) => {
       .toArray();
     const orderIdToSizeSpec = {};
     selectedOrders.forEach((order) => {
-      orderIdToSizeSpec[order._id.toString()] = order.SizeSpec;
+      orderIdToSizeSpec[order._id.toString()] = order.SizeSpec.map((spec) => {
+        const tolMinusMagnitude =
+          Math.abs(spec.ToleranceMinus.decimal) >= 1
+            ? Math.abs(spec.ToleranceMinus.decimal) -
+              Math.floor(Math.abs(spec.ToleranceMinus.decimal))
+            : Math.abs(spec.ToleranceMinus.decimal);
+        const tolPlusMagnitude =
+          Math.abs(spec.TolerancePlus.decimal) >= 1
+            ? Math.abs(spec.TolerancePlus.decimal) -
+              Math.floor(Math.abs(spec.TolerancePlus.decimal))
+            : Math.abs(spec.TolerancePlus.decimal);
+
+        return {
+          ...spec,
+          ToleranceMinus: {
+            decimal: tolMinusMagnitude === 0 ? 0 : -tolMinusMagnitude
+          },
+          TolerancePlus: { decimal: tolPlusMagnitude }
+        };
+      });
     });
 
     let orderQty = selectedOrders.reduce(
@@ -9317,10 +9246,13 @@ app.get("/api/measurement-summary", async (req, res) => {
         const spec = sizeSpec[i];
         const tolMinus = spec.ToleranceMinus.decimal;
         const tolPlus = spec.TolerancePlus.decimal;
+
+        // Fix: Define specValue by extracting the buyer's spec for the given size
         const specValue = spec.Specs.find((s) => Object.keys(s)[0] === size)[
           size
         ].decimal;
-        const lower = specValue - tolMinus;
+
+        const lower = specValue + tolMinus;
         const upper = specValue + tolPlus;
         const actualValue = record.actual[i].value;
         if (actualValue < lower || actualValue > upper) {
@@ -9342,7 +9274,7 @@ app.get("/api/measurement-summary", async (req, res) => {
   }
 });
 
-// New endpoint for paginated measurement summary per MO No
+// Updated endpoint for paginated measurement summary per MO No, only including MO Nos with inspectedQty > 0
 app.get("/api/measurement-summary-per-mono", async (req, res) => {
   try {
     const {
@@ -9359,38 +9291,76 @@ app.get("/api/measurement-summary-per-mono", async (req, res) => {
     } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(pageSize);
 
+    // Build measurement filter
+    const measurementFilter = {};
+    if (startDate || endDate) {
+      measurementFilter.created_at = {};
+      if (startDate) {
+        measurementFilter.created_at.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        measurementFilter.created_at.$lte = end;
+      }
+    }
+
+    if (empId) measurementFilter["user.name"] = empId;
+
+    if (stage) measurementFilter.stage = stage;
+
+    // Build order filter
     const orderFilter = {};
     if (factory) orderFilter.Factory = factory;
     if (mono) orderFilter.Order_No = mono;
     if (custStyle) orderFilter.CustStyle = custStyle;
     if (buyer) orderFilter.ShortName = buyer;
 
-    const totalOrders = await ymEcoConnection.db
+    // Aggregation pipeline to join dt_orders with measurement_data
+    const pipeline = [
+      { $match: orderFilter },
+      {
+        $lookup: {
+          from: "measurement_data",
+          let: { orderId: { $toString: "$_id" } },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$style_id", "$$orderId"] },
+                ...measurementFilter
+              }
+            }
+          ],
+          as: "measurements"
+        }
+      },
+      { $match: { measurements: { $ne: [] } } }, // Only include orders with measurements
+      { $sort: { Order_No: 1 } },
+      {
+        $facet: {
+          metadata: [{ $count: "total" }],
+          data: [{ $skip: skip }, { $limit: parseInt(pageSize) }]
+        }
+      }
+    ];
+
+    const result = await ymEcoConnection.db
       .collection("dt_orders")
-      .countDocuments(orderFilter);
-    const orders = await ymEcoConnection.db
-      .collection("dt_orders")
-      .find(orderFilter)
-      .sort({ Order_No: 1 })
-      .skip(skip)
-      .limit(parseInt(pageSize))
+      .aggregate(pipeline)
       .toArray();
+    const orders = result[0].data || [];
+    const totalOrders = result[0].metadata[0]?.total || 0;
+    const totalPages = Math.ceil(totalOrders / parseInt(pageSize));
+
     const orderIds = orders.map((order) => order._id.toString());
-
-    const measurementFilter = { style_id: { $in: orderIds } };
-    if (startDate) measurementFilter.created_at = { $gte: new Date(startDate) };
-    if (endDate)
-      measurementFilter.created_at = {
-        ...measurementFilter.created_at,
-        $lte: new Date(endDate)
-      };
-    if (empId) measurementFilter["user.name"] = empId;
-    if (stage) measurementFilter.stage = stage;
-
     const measurementRecords = await ymEcoConnection.db
       .collection("measurement_data")
-      .find(measurementFilter)
+      .find({
+        style_id: { $in: orderIds },
+        ...measurementFilter
+      })
       .toArray();
+
     const recordsByOrder = {};
     measurementRecords.forEach((record) => {
       const styleId = record.style_id;
@@ -9400,7 +9370,26 @@ app.get("/api/measurement-summary-per-mono", async (req, res) => {
 
     const orderIdToSizeSpec = {};
     orders.forEach((order) => {
-      orderIdToSizeSpec[order._id.toString()] = order.SizeSpec;
+      orderIdToSizeSpec[order._id.toString()] = order.SizeSpec.map((spec) => {
+        const tolMinusMagnitude =
+          Math.abs(spec.ToleranceMinus.decimal) >= 1
+            ? Math.abs(spec.ToleranceMinus.decimal) -
+              Math.floor(Math.abs(spec.ToleranceMinus.decimal))
+            : Math.abs(spec.ToleranceMinus.decimal);
+        const tolPlusMagnitude =
+          Math.abs(spec.TolerancePlus.decimal) >= 1
+            ? Math.abs(spec.TolerancePlus.decimal) -
+              Math.floor(Math.abs(spec.TolerancePlus.decimal))
+            : Math.abs(spec.TolerancePlus.decimal);
+
+        return {
+          ...spec,
+          ToleranceMinus: {
+            decimal: tolMinusMagnitude === 0 ? 0 : -tolMinusMagnitude
+          },
+          TolerancePlus: { decimal: tolPlusMagnitude }
+        };
+      });
     });
 
     const summaryPerMono = orders.map((order) => {
@@ -9417,10 +9406,11 @@ app.get("/api/measurement-summary-per-mono", async (req, res) => {
           const spec = sizeSpec[i];
           const tolMinus = spec.ToleranceMinus.decimal;
           const tolPlus = spec.TolerancePlus.decimal;
+
           const specValue = spec.Specs.find((s) => Object.keys(s)[0] === size)[
             size
           ].decimal;
-          const lower = specValue - tolMinus;
+          const lower = specValue + tolMinus;
           const upper = specValue + tolPlus;
           const actualValue = record.actual[i].value;
           if (actualValue < lower || actualValue > upper) {
@@ -9450,7 +9440,6 @@ app.get("/api/measurement-summary-per-mono", async (req, res) => {
       };
     });
 
-    const totalPages = Math.ceil(totalOrders / parseInt(pageSize));
     res.json({ summaryPerMono, totalPages, currentPage: parseInt(page) });
   } catch (error) {
     console.error("Error fetching measurement summary per MO No:", error);
@@ -9460,7 +9449,7 @@ app.get("/api/measurement-summary-per-mono", async (req, res) => {
   }
 });
 
-// New endpoint for measurement details by MO No
+// Updated endpoint for measurement details by MO No
 app.get("/api/measurement-details/:mono", async (req, res) => {
   try {
     const { startDate, endDate, empId, stage } = req.query;
@@ -9471,23 +9460,192 @@ app.get("/api/measurement-details/:mono", async (req, res) => {
 
     const styleId = order._id.toString();
     const measurementFilter = { style_id: styleId };
-    if (startDate) measurementFilter.created_at = { $gte: new Date(startDate) };
-    if (endDate)
-      measurementFilter.created_at = {
-        ...measurementFilter.created_at,
-        $lte: new Date(endDate)
-      };
+    if (startDate || endDate) {
+      measurementFilter.created_at = {};
+      if (startDate) {
+        measurementFilter.created_at.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        measurementFilter.created_at.$lte = end;
+      }
+    }
+
     if (empId) measurementFilter["user.name"] = empId;
+
     if (stage) measurementFilter.stage = stage;
 
     const records = await ymEcoConnection.db
       .collection("measurement_data")
       .find(measurementFilter)
       .toArray();
-    res.json({ records, sizeSpec: order.SizeSpec });
+
+    const correctedSizeSpec = order.SizeSpec.map((spec) => {
+      const tolMinusMagnitude =
+        Math.abs(spec.ToleranceMinus.decimal) >= 1
+          ? Math.abs(spec.ToleranceMinus.decimal) -
+            Math.floor(Math.abs(spec.ToleranceMinus.decimal))
+          : Math.abs(spec.ToleranceMinus.decimal);
+      const tolPlusMagnitude =
+        Math.abs(spec.TolerancePlus.decimal) >= 1
+          ? Math.abs(spec.TolerancePlus.decimal) -
+            Math.floor(Math.abs(spec.TolerancePlus.decimal))
+          : Math.abs(spec.TolerancePlus.decimal);
+
+      return {
+        ...spec,
+        ToleranceMinus: {
+          decimal: tolMinusMagnitude === 0 ? 0 : -tolMinusMagnitude
+        },
+        TolerancePlus: {
+          decimal: tolPlusMagnitude
+        }
+      };
+    });
+
+    // Calculate the measurement point summary
+    const measurementPointSummary = correctedSizeSpec
+      .map((spec, index) => {
+        const measurementPoint = spec.EnglishRemark;
+        const tolMinus = spec.ToleranceMinus.decimal;
+        const tolPlus = spec.TolerancePlus.decimal;
+
+        let totalCount = 0;
+        let totalPass = 0;
+
+        records.forEach((record) => {
+          const actualValue = record.actual[index]?.value || 0;
+          if (actualValue === 0) return; // Skip if the value is 0
+
+          totalCount++;
+
+          const buyerSpec = spec.Specs.find(
+            (s) => Object.keys(s)[0] === record.size
+          )[record.size].decimal;
+          const lower = buyerSpec + tolMinus;
+          const upper = buyerSpec + tolPlus;
+
+          if (actualValue >= lower && actualValue <= upper) {
+            totalPass++;
+          }
+        });
+
+        const totalFail = totalCount - totalPass;
+        const passRate =
+          totalCount > 0 ? ((totalPass / totalCount) * 100).toFixed(2) : "0.00";
+
+        // Use the first record's size to get the buyer spec (assuming all records use a consistent size for simplicity)
+        const sampleRecord = records.find((r) => r.size);
+        const buyerSpec = sampleRecord
+          ? spec.Specs.find((s) => Object.keys(s)[0] === sampleRecord.size)[
+              sampleRecord.size
+            ].decimal
+          : 0;
+
+        return {
+          measurementPoint,
+          buyerSpec,
+          tolMinus,
+          tolPlus,
+          totalCount,
+          totalPass,
+          totalFail,
+          passRate
+        };
+      })
+      .filter((summary) => summary.totalCount > 0); // Only include measurement points with non-zero counts
+
+    res.json({
+      records: records.map((record) => ({
+        ...record,
+        reference_no: record.reference_no // Include reference_no in the response
+      })),
+      sizeSpec: correctedSizeSpec,
+      measurementPointSummary // Add the new summary data
+    });
   } catch (error) {
     console.error("Error fetching measurement details:", error);
     res.status(500).json({ error: "Failed to fetch measurement details" });
+  }
+});
+
+app.put("/api/update-measurement-value", async (req, res) => {
+  try {
+    const { moNo, referenceNo, index, newValue } = req.body;
+
+    // Validate inputs
+    if (
+      !moNo ||
+      !referenceNo ||
+      index === undefined ||
+      newValue === undefined
+    ) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Convert newValue to a float and ensure it's a valid number
+    const updatedValue = parseFloat(newValue);
+    if (isNaN(updatedValue)) {
+      return res.status(400).json({ error: "Invalid measurement value" });
+    }
+
+    // Find the dt_orders record to get its _id
+    const order = await ymEcoConnection.db
+      .collection("dt_orders")
+      .findOne({ Order_No: moNo });
+    if (!order) {
+      return res.status(404).json({ error: "Order not found for MO No" });
+    }
+
+    const styleId = order._id.toString();
+
+    // Find the measurement_data record with matching style_id and reference_no
+    const record = await ymEcoConnection.db
+      .collection("measurement_data")
+      .findOne({ style_id: styleId, reference_no: referenceNo });
+
+    if (!record) {
+      return res.status(404).json({ error: "Measurement record not found" });
+    }
+
+    // Validate the index against the actual array length
+    if (!record.actual || index < 0 || index >= record.actual.length) {
+      return res.status(400).json({ error: "Invalid index for actual array" });
+    }
+
+    // Update the specific index in the actual array
+    const result = await ymEcoConnection.db
+      .collection("measurement_data")
+      .updateOne(
+        { style_id: styleId, reference_no: referenceNo },
+        {
+          $set: {
+            [`actual.${index}.value`]: updatedValue,
+            updated_at: new Date()
+          }
+        }
+      );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: "Record not found during update" });
+    }
+
+    if (result.modifiedCount === 0) {
+      return res.status(500).json({ error: "Failed to update the record" });
+    }
+
+    res.json({ message: "Measurement value updated successfully" });
+  } catch (error) {
+    console.error(
+      "Error updating measurement value:",
+      error.message,
+      error.stack
+    );
+    res.status(500).json({
+      error: "Failed to update measurement value",
+      details: error.message
+    });
   }
 });
 

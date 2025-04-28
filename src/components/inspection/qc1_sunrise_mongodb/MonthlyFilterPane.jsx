@@ -11,6 +11,7 @@ import {
   endOfMonth,
   isValid,
 } from "date-fns";
+import { FaCalendarAlt } from "react-icons/fa"; // Import the icon
 
 const parseYYYYMMDD = (dateStr) => {
   if (!dateStr) return null;
@@ -20,8 +21,9 @@ const parseYYYYMMDD = (dateStr) => {
 
 const getDefaultDates = () => {
   const today = new Date();
+  // Default to the start of the previous month and the start of the current month
   const endDate = startOfMonth(today);
-  const startDate = startOfMonth(subMonths(today, 1));
+  const startDate = startOfMonth(subMonths(today, 4));
   return { startDate, endDate };
 };
 
@@ -58,7 +60,7 @@ const MonthlyFilterPane = ({ onFilterChange, initialFilters }) => {
   });
   const [error, setError] = useState(null);
   const [loadingOptions, setLoadingOptions] = useState(false);
-  const maxDate = useMemo(() => endOfMonth(new Date()), []);
+  const maxDate = useMemo(() => endOfMonth(new Date()), []); // Max date is end of current month
 
   const derivedMonthRangeForOptions = useMemo(() => {
     const validStartDate = isValid(startDate)
@@ -76,7 +78,7 @@ const MonthlyFilterPane = ({ onFilterChange, initialFilters }) => {
       : defaultDates.startDate;
     const validEndDate = isValid(endDate) ? endDate : defaultDates.endDate;
     const startStr = format(startOfMonth(validStartDate), "yyyy-MM-dd");
-    const endStr = format(endOfMonth(validEndDate), "yyyy-MM-dd");
+    const endStr = format(endOfMonth(validEndDate), "yyyy-MM-dd"); // Use endOfMonth for the parent
     return { startDate: startStr, endDate: endStr };
   }, [startDate, endDate, defaultDates]);
 
@@ -144,6 +146,7 @@ const MonthlyFilterPane = ({ onFilterChange, initialFilters }) => {
 
   const handleDateChange = (dates) => {
     const [start, end] = dates;
+    // Ensure start is always before or same as end
     const newStart = start && end && start > end ? end : start;
     const newEnd = start && end && end < start ? start : end;
     setStartDate(newStart);
@@ -170,38 +173,60 @@ const MonthlyFilterPane = ({ onFilterChange, initialFilters }) => {
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-md mb-6">
-      <div className="flex justify-between items-center mb-4">
+    <div className="mb-6 rounded-lg bg-white p-4 shadow-md">
+      <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Filter Options</h2>
         <button
           onClick={handleClearFilters}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 ease-in-out text-sm"
+          className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
         >
           Clear
         </button>
       </div>
-      {error && <div className="text-center text-red-600 mb-4">{error}</div>}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 items-end">
-        <div className="col-span-1 sm:col-span-2 md:col-span-2 lg:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+      {error && <div className="mb-4 text-center text-red-600">{error}</div>}
+      <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
+        {/* Date Picker Column */}
+        <div className="col-span-1 sm:col-span-1 md:col-span-1 lg:col-span-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             Month Range
           </label>
-          <DatePicker
-            selected={startDate}
-            onChange={handleDateChange}
-            startDate={startDate}
-            endDate={endDate}
-            selectsRange
-            dateFormat="MMM yyyy"
-            showMonthYearPicker
-            showFullMonthYearPicker
-            maxDate={maxDate}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            wrapperClassName="w-full"
-            popperPlacement="bottom-start"
-          />
-          <style>{`.react-datepicker-wrapper { width: 100%; } .react-datepicker__input-container input { width: 100%; padding: 0.5rem 0.75rem; line-height: 1.5; }`}</style>
+          {/* Add relative positioning */}
+          <div className="relative mt-1">
+            <DatePicker
+              selected={startDate}
+              onChange={handleDateChange}
+              startDate={startDate}
+              endDate={endDate}
+              selectsRange
+              dateFormat="MMM yyyy"
+              showMonthYearPicker
+              showFullMonthYearPicker // Use this for month-only selection
+              maxDate={maxDate}
+              // Add right padding (pr-10) and keep existing classes
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm pr-10"
+              wrapperClassName="w-full"
+              popperPlacement="bottom-start"
+              // Add popperClassName for z-index control
+              popperClassName="react-datepicker-popper-high-z"
+            />
+            {/* Absolutely positioned icon */}
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+              <FaCalendarAlt
+                className="h-5 w-5 text-gray-400"
+                aria-hidden="true"
+              />
+            </div>
+          </div>
+          {/* Style block for z-index */}
+          <style>{`
+            .react-datepicker-wrapper { width: 100%; }
+            .react-datepicker-popper, .react-datepicker-popper-high-z {
+              z-index: 50 !important; /* Ensure popup is above other elements */
+            }
+          `}</style>
         </div>
+
+        {/* Other filter selects */}
         <div className="col-span-1">
           <label className="block text-sm font-medium text-gray-700">
             Line No
@@ -211,7 +236,7 @@ const MonthlyFilterPane = ({ onFilterChange, initialFilters }) => {
             value={otherFilters.lineNo}
             onChange={handleOtherFilterChange}
             disabled={loadingOptions}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 sm:text-sm"
           >
             <option value="">All</option>{" "}
             {filterOptions.lineNos?.map((line) => (
@@ -230,7 +255,7 @@ const MonthlyFilterPane = ({ onFilterChange, initialFilters }) => {
             value={otherFilters.MONo}
             onChange={handleOtherFilterChange}
             disabled={loadingOptions}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 sm:text-sm"
           >
             <option value="">All</option>{" "}
             {filterOptions.MONos?.map((mo) => (
@@ -249,7 +274,7 @@ const MonthlyFilterPane = ({ onFilterChange, initialFilters }) => {
             value={otherFilters.Color}
             onChange={handleOtherFilterChange}
             disabled={loadingOptions}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 sm:text-sm"
           >
             <option value="">All</option>{" "}
             {filterOptions.Colors?.map((color) => (
@@ -268,7 +293,7 @@ const MonthlyFilterPane = ({ onFilterChange, initialFilters }) => {
             value={otherFilters.Size}
             onChange={handleOtherFilterChange}
             disabled={loadingOptions}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 sm:text-sm"
           >
             <option value="">All</option>{" "}
             {filterOptions.Sizes?.map((size) => (
@@ -287,7 +312,7 @@ const MonthlyFilterPane = ({ onFilterChange, initialFilters }) => {
             value={otherFilters.Buyer}
             onChange={handleOtherFilterChange}
             disabled={loadingOptions}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 sm:text-sm"
           >
             <option value="">All</option>{" "}
             {filterOptions.Buyers?.map((buyer) => (
@@ -306,7 +331,7 @@ const MonthlyFilterPane = ({ onFilterChange, initialFilters }) => {
             value={otherFilters.defectName}
             onChange={handleOtherFilterChange}
             disabled={loadingOptions}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 sm:text-sm"
           >
             <option value="">All</option>{" "}
             {filterOptions.defectNames?.map((defect) => (

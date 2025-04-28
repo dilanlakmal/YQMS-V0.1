@@ -14,6 +14,7 @@ import {
   getISOWeek,
   getISOWeekYear,
 } from "date-fns";
+import { FaCalendarAlt } from "react-icons/fa"; // Import the icon
 
 const DATE_FORMAT_API = "yyyy-MM-dd";
 const DATE_FORMAT_DISPLAY = "dd MMM yyyy";
@@ -202,33 +203,56 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
       </div>
       {error && <div className="mb-4 text-center text-red-600">{error}</div>}
       <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
-        <div className="col-span-1 sm:col-span-2 md:col-span-2 lg:col-span-2">
+        {/* Date Picker Column */}
+        <div className="col-span-1 sm:col-span-1 md:col-span-1 lg:col-span-1">
           <label className="mb-1 block text-sm font-medium text-gray-700">
             Week Range (Mon-Sun)
           </label>
-          <DatePicker
-            selected={startDate}
-            onChange={handleDateChange}
-            startDate={startDate}
-            endDate={endDate}
-            selectsRange
-            dateFormat={DATE_FORMAT_DISPLAY}
-            placeholderText="Select week range"
-            showWeekNumbers
-            maxDate={maxDate}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            wrapperClassName="w-full"
-            popperPlacement="bottom-start"
-            formatWeekDay={(nameOfDay) => nameOfDay.substring(0, 1)}
-            calendarStartDay={1}
-          >
-            <div className="p-1 text-center text-xs text-gray-500">
-              Selected: {formatRangeForDisplay(startDate, endDate)}
+          {/* Add relative positioning to this wrapper */}
+          <div className="relative mt-1">
+            <DatePicker
+              selected={startDate}
+              onChange={handleDateChange}
+              startDate={startDate}
+              endDate={endDate}
+              selectsRange
+              dateFormat={DATE_FORMAT_DISPLAY}
+              placeholderText="Select week range"
+              showWeekNumbers
+              maxDate={maxDate}
+              // Add right padding for the icon (pr-10)
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm pr-10"
+              wrapperClassName="w-full"
+              popperPlacement="bottom-start"
+              formatWeekDay={(nameOfDay) => nameOfDay.substring(0, 1)}
+              calendarStartDay={1}
+              popperClassName="react-datepicker-popper-high-z" // Keep z-index class
+            >
+              {/* Child element for display */}
+              <div className="p-1 text-center text-xs text-gray-500">
+                Selected: {formatRangeForDisplay(startDate, endDate)}
+              </div>
+            </DatePicker>
+            {/* Absolutely positioned icon */}
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+              <FaCalendarAlt
+                className="h-5 w-5 text-gray-400"
+                aria-hidden="true"
+              />
             </div>
-          </DatePicker>
-          <style>{`.react-datepicker-wrapper { width: 100%; } .react-datepicker__input-container input { width: 100%; padding: 0.5rem 0.75rem; line-height: 1.5; }`}</style>
+          </div>
+          {/* Style block */}
+          <style>{`
+            .react-datepicker-wrapper { width: 100%; }
+            /* Remove specific input padding from here if handled by className */
+            /* .react-datepicker__input-container input { width: 100%; padding: 0.5rem 0.75rem; line-height: 1.5; } */
+            .react-datepicker-popper, .react-datepicker-popper-high-z {
+              z-index: 50 !important;
+            }
+          `}</style>
         </div>
 
+        {/* Other filter selects */}
         <div className="col-span-1">
           <label className="block text-sm font-medium text-gray-700">
             Line No
@@ -236,7 +260,7 @@ const WeeklyFilterPane = ({ onFilterChange, initialFilters }) => {
           <select
             name="lineNo"
             value={otherFilters.lineNo}
-           onChange={handleOtherFilterChange}
+            onChange={handleOtherFilterChange}
             disabled={loadingOptions}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 sm:text-sm"
           >

@@ -43,14 +43,15 @@ const getYearMonthKey = (dateStr) => {
   try {
     parsedDate = new Date(dateStr);
     if (isValid(parsedDate)) return format(parsedDate, "yyyy-MM");
-  } catch (e) {}
+  } catch (e) {//
+    }
   // console.warn(`Could not parse date string to get YYYY-MM: ${dateStr}`); // Keep console logs minimal
   return null;
 };
 
 const getDefaultEndDate = () => format(endOfMonth(new Date()), "yyyy-MM-dd");
 const getDefaultStartDate = () =>
-  format(startOfMonth(subMonths(new Date(), 1)), "yyyy-MM-dd"); // Default to start of previous month
+  format(startOfMonth(subMonths(new Date(), 4)), "yyyy-MM-dd"); // Default to start of previous month
 // --- End Helper functions ---
 
 const SunriseMonthlyTrend = () => {
@@ -412,8 +413,6 @@ const SunriseMonthlyTrend = () => {
     );
     setRows(tableRows);
 
-    // Dependencies: monthlyApiData, groupingOptions, loading, error, buildHierarchyFromMonthlyData, buildMonthlyRowsFromHierarchy
-    // Removed activeFilters as direct dependency for grouping logic
   }, [
     monthlyApiData,
     groupingOptions,
@@ -451,8 +450,7 @@ const SunriseMonthlyTrend = () => {
   };
   // --- End Color coding functions ---
 
-  // Memoize getCurrentGroupingFieldNames
-  // *** MODIFICATION START ***
+ 
   const getCurrentGroupingFieldNames = useCallback(() => {
     const names = [];
     // Check ONLY if option is enabled
@@ -463,7 +461,6 @@ const SunriseMonthlyTrend = () => {
     if (groupingOptions.addSizes) names.push("Size"); // Corrected state key
     return names;
   }, [groupingOptions]); // Depends only on groupingOptions
-  // *** MODIFICATION END ***
 
   // Memoize prepareExportData
   const prepareExportData = useCallback(() => {
@@ -602,8 +599,8 @@ const SunriseMonthlyTrend = () => {
         let fontColor = "000000";
         let borderColor = "D1D5DB";
 
-        if (R === 0) {
-        } else if (R === 1) {
+        if (R === 0) {//con
+        } else if (R === 1) {//con
         } else if (isHeaderRow) {
           fgColor = "E5E7EB";
           fontStyle = { bold: true };

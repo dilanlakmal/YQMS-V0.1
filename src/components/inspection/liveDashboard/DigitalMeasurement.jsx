@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import DigitalMeasurementFilterPane from "../digital_measurement/DigitalMeasurementFilterPane";
 import DigialMeasurementSummaryCards from "../digital_measurement/DigialMeasurementSummaryCards";
+import DigitalMeasurementTotalSummary from "../digital_measurement/DigitalMeasurementTotalSummary"; // Import the new component
 import { API_BASE_URL } from "../../../../config";
 
 const DigitalMeasurement = () => {
@@ -33,6 +34,14 @@ const DigitalMeasurement = () => {
   const [measurementSummary, setMeasurementSummary] = useState([]);
   const [selectedMono, setSelectedMono] = useState(null);
   const [measurementDetails, setMeasurementDetails] = useState(null);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+  const [editingCell, setEditingCell] = useState(null); // Track which cell is being edited
+  const [editValue, setEditValue] = useState(""); // Store the value being edited
+
+  // Compute filtered measurement summary based on selected MO No
+  const filteredMeasurementSummary = selectedMono
+    ? measurementSummary.filter((item) => item.moNo === selectedMono)
+    : measurementSummary;
 
   // Fetch filter options
   useEffect(() => {
@@ -70,65 +79,72 @@ const DigitalMeasurement = () => {
   }, [filters]);
 
   // Fetch summary data
+  const fetchSummaryData = async () => {
+    try {
+      const params = {
+        factory: filters.factory,
+        startDate: filters.startDate ? filters.startDate.toISOString() : null,
+        endDate: filters.endDate ? filters.endDate.toISOString() : null,
+        mono: filters.mono,
+        custStyle: filters.custStyle,
+        buyer: filters.buyer,
+        empId: filters.empId,
+        stage: filters.stage
+      };
+      const response = await axios.get(
+        `${API_BASE_URL}/api/measurement-summary`,
+        {
+          params,
+          withCredentials: true
+        }
+      );
+      setSummaryData(response.data);
+    } catch (error) {
+      console.error("Error fetching summary data:", error);
+      setSummaryData(null);
+    }
+  };
+
+  // Fetch measurement summary per MO No
+  const fetchMeasurementSummary = async () => {
+    setIsLoadingSummary(true);
+    try {
+      const params = {
+        page: currentPage,
+        factory: filters.factory,
+        startDate: filters.startDate ? filters.startDate.toISOString() : null,
+        endDate: filters.endDate ? filters.endDate.toISOString() : null,
+        mono: filters.mono,
+        custStyle: filters.custStyle,
+        buyer: filters.buyer,
+        empId: filters.empId,
+        stage: filters.stage
+      };
+      const response = await axios.get(
+        `${API_BASE_URL}/api/measurement-summary-per-mono`,
+        {
+          params,
+          withCredentials: true
+        }
+      );
+      setMeasurementSummary(response.data.summaryPerMono);
+      setTotalPages(response.data.totalPages);
+    } catch (error) {
+      console.error("Error fetching measurement summary:", error);
+      setMeasurementSummary([]);
+      setTotalPages(1);
+    } finally {
+      setIsLoadingSummary(false);
+    }
+  };
+
+  // Fetch summary data on filters change
   useEffect(() => {
-    const fetchSummaryData = async () => {
-      try {
-        const params = {
-          factory: filters.factory,
-          startDate: filters.startDate ? filters.startDate.toISOString() : null,
-          endDate: filters.endDate ? filters.endDate.toISOString() : null,
-          mono: filters.mono,
-          custStyle: filters.custStyle,
-          buyer: filters.buyer,
-          empId: filters.empId,
-          stage: filters.stage
-        };
-        const response = await axios.get(
-          `${API_BASE_URL}/api/measurement-summary`,
-          {
-            params,
-            withCredentials: true
-          }
-        );
-        setSummaryData(response.data);
-      } catch (error) {
-        console.error("Error fetching summary data:", error);
-        setSummaryData(null);
-      }
-    };
     fetchSummaryData();
   }, [filters]);
 
-  // Fetch measurement summary per MO No
+  // Fetch measurement summary per MO No on page or filters change
   useEffect(() => {
-    const fetchMeasurementSummary = async () => {
-      try {
-        const params = {
-          page: currentPage,
-          factory: filters.factory,
-          startDate: filters.startDate ? filters.startDate.toISOString() : null,
-          endDate: filters.endDate ? filters.endDate.toISOString() : null,
-          mono: filters.mono,
-          custStyle: filters.custStyle,
-          buyer: filters.buyer,
-          empId: filters.empId,
-          stage: filters.stage
-        };
-        const response = await axios.get(
-          `${API_BASE_URL}/api/measurement-summary-per-mono`,
-          {
-            params,
-            withCredentials: true
-          }
-        );
-        setMeasurementSummary(response.data.summaryPerMono);
-        setTotalPages(response.data.totalPages);
-      } catch (error) {
-        console.error("Error fetching measurement summary:", error);
-        setMeasurementSummary([]);
-        setTotalPages(1);
-      }
-    };
     fetchMeasurementSummary();
   }, [currentPage, filters]);
 
@@ -164,13 +180,28 @@ const DigitalMeasurement = () => {
     }
   }, [selectedMono, filters]);
 
-  // Decimal to fraction conversion (reused from DigitalMeasurementBuyerSpec.jsx)
+  // Decimal to fraction conversion (used for Buyer Specs, TolMinus, TolPlus)
   const decimalToFraction = (decimal) => {
     if (!decimal || isNaN(decimal)) return <span> </span>;
 
-    const whole = Math.floor(decimal);
-    const fraction = decimal - whole;
-    if (fraction === 0) return <span>{whole}</span>;
+    // Extract the sign
+    const sign = decimal < 0 ? "-" : "";
+    // Work with the absolute value
+    const absDecimal = Math.abs(decimal);
+    // For tolerances, we expect the magnitude to be between 0 and 1
+    // If the value is greater than 1, take the fractional part
+    const fractionValue =
+      absDecimal >= 1 ? absDecimal - Math.floor(absDecimal) : absDecimal;
+    const whole = absDecimal >= 1 ? Math.floor(absDecimal) : 0;
+
+    // If there's no fractional part, return the whole number with sign
+    if (fractionValue === 0)
+      return (
+        <span>
+          {sign}
+          {whole || 0}
+        </span>
+      );
 
     const fractions = [
       { value: 0.0625, fraction: { numerator: 1, denominator: 16 } },
@@ -192,7 +223,7 @@ const DigitalMeasurement = () => {
 
     const tolerance = 0.01;
     const closestFraction = fractions.find(
-      (f) => Math.abs(fraction - f.value) < tolerance
+      (f) => Math.abs(fractionValue - f.value) < tolerance
     );
 
     if (closestFraction) {
@@ -206,12 +237,81 @@ const DigitalMeasurement = () => {
       );
       return (
         <span className="inline-flex items-center justify-center">
+          {sign}
           {whole !== 0 && <span className="mr-1">{whole}</span>}
           {fractionElement}
         </span>
       );
     }
-    return <span>{decimal.toFixed(3)}</span>;
+    return (
+      <span>
+        {sign}
+        {fractionValue.toFixed(3)}
+      </span>
+    );
+  };
+
+  // Handle Edit button click
+  const handleEditClick = (garmentIndex, pointIndex, currentValue) => {
+    setEditingCell(`${garmentIndex}-${pointIndex}`);
+    setEditValue(currentValue.toString());
+  };
+
+  // Handle Save button click
+  const handleSaveClick = async (
+    moNo,
+    referenceNo,
+    actualIndex,
+    garmentIndex,
+    pointIndex
+  ) => {
+    try {
+      const newValue = parseFloat(editValue);
+      if (isNaN(newValue)) {
+        alert("Please enter a valid number");
+        return;
+      }
+
+      console.log("Sending update request with:", {
+        moNo,
+        referenceNo,
+        index: actualIndex,
+        newValue
+      });
+
+      const response = await axios.put(
+        `${API_BASE_URL}/api/update-measurement-value`,
+        {
+          moNo,
+          referenceNo,
+          index: actualIndex,
+          newValue
+        },
+        { withCredentials: true }
+      );
+
+      console.log("Update response:", response.data);
+
+      const updatedRecords = [...measurementDetails.records];
+      updatedRecords[garmentIndex].actual[actualIndex].value = newValue;
+      setMeasurementDetails({ ...measurementDetails, records: updatedRecords });
+
+      setEditingCell(null);
+      setEditValue("");
+
+      await fetchSummaryData();
+      await fetchMeasurementSummary();
+    } catch (error) {
+      console.error(
+        "Error saving measurement value:",
+        error.response?.data || error.message
+      );
+      alert(
+        `Failed to save the measurement value: ${
+          error.response?.data?.error || error.message
+        }`
+      );
+    }
   };
 
   // Pagination handlers
@@ -247,8 +347,37 @@ const DigitalMeasurement = () => {
         <DigialMeasurementSummaryCards summaryData={summaryData} />
 
         {/* Measurement Summary */}
-        <h2 className="text-lg font-semibold mb-4">Measurement Summary</h2>
-        <div className="overflow-x-auto mb-6">
+        <div className="flex items-center mb-4">
+          {selectedMono && (
+            <button
+              onClick={() => setSelectedMono(null)}
+              className="mr-2 text-red-600 hover:text-red-800 focus:outline-none"
+              title="Clear selected MO No"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M6 18L18 6M6 6l12 12"
+                ></path>
+              </svg>
+            </button>
+          )}
+          <h2 className="text-lg font-semibold">Measurement Summary</h2>
+        </div>
+        <div className="relative overflow-x-auto mb-6">
+          {isLoadingSummary && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-75">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500"></div>
+            </div>
+          )}
           <table className="w-full bg-white rounded border table-auto">
             <thead>
               <tr className="bg-gray-200 text-sm">
@@ -266,8 +395,8 @@ const DigitalMeasurement = () => {
               </tr>
             </thead>
             <tbody>
-              {measurementSummary.length > 0 ? (
-                measurementSummary.map((item, index) => (
+              {filteredMeasurementSummary.length > 0 ? (
+                filteredMeasurementSummary.map((item, index) => (
                   <tr key={index} className="text-center text-sm">
                     <td
                       className="p-2 border cursor-pointer text-blue-600 hover:underline"
@@ -298,12 +427,12 @@ const DigitalMeasurement = () => {
           </table>
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
+        {/* Pagination (only shown when no MO No is selected) */}
+        {!selectedMono && totalPages > 1 && (
           <div className="flex justify-center items-center space-x-2 mb-6">
             <button
               onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
+              disabled={currentPage === 1 || isLoadingSummary}
               className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300"
             >
               Previous
@@ -312,18 +441,19 @@ const DigitalMeasurement = () => {
               <button
                 key={page}
                 onClick={() => handlePageChange(page)}
+                disabled={isLoadingSummary}
                 className={`px-4 py-2 rounded ${
                   page === currentPage
                     ? "bg-blue-500 text-white"
                     : "bg-gray-200 hover:bg-gray-300"
-                }`}
+                } disabled:opacity-50`}
               >
                 {page}
               </button>
             ))}
             <button
               onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
+              disabled={currentPage === totalPages || isLoadingSummary}
               className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300"
             >
               Next
@@ -332,116 +462,185 @@ const DigitalMeasurement = () => {
         )}
 
         {/* Inspected Summary */}
-        {selectedMono && measurementDetails && (
-          <div>
-            <h2 className="text-lg font-semibold mb-4">
-              Inspected Summary for MO No: {selectedMono}
-            </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full bg-white rounded border table-auto">
-                <thead>
-                  <tr className="bg-gray-200 text-sm">
-                    <th className="p-2 border">Inspection Date</th>
-                    <th className="p-2 border">Garment NO</th>
-                    <th className="p-2 border">Measurement Point</th>
-                    <th className="p-2 border">Buyer Specs</th>
-                    <th className="p-2 border">TolMinus</th>
-                    <th className="p-2 border">TolPlus</th>
-                    <th className="p-2 border">Measure Value</th>
-                    <th className="p-2 border">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {measurementDetails.records.length > 0 ? (
-                    measurementDetails.records.map((record, garmentIndex) => {
-                      const inspectionDate = new Date(
-                        record.created_at
-                      ).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit"
-                      });
-                      const garmentNo = garmentIndex + 1;
-                      const points = record.actual
-                        .map((actualItem, index) => {
-                          if (actualItem.value === 0) return null;
-                          const spec = measurementDetails.sizeSpec[index];
-                          const measurementPoint = spec.EnglishRemark;
-                          const tolMinus = spec.ToleranceMinus.decimal;
-                          const tolPlus = spec.TolerancePlus.decimal;
-                          const buyerSpec = spec.Specs.find(
-                            (s) => Object.keys(s)[0] === record.size
-                          )[record.size].decimal;
-                          const measureValue = actualItem.value;
-                          const lower = buyerSpec - tolMinus;
-                          const upper = buyerSpec + tolPlus;
-                          const status =
-                            measureValue >= lower && measureValue <= upper
-                              ? "Pass"
-                              : "Fail";
-                          return {
-                            measurementPoint,
-                            buyerSpec,
-                            tolMinus,
-                            tolPlus,
-                            measureValue,
-                            status
-                          };
-                        })
-                        .filter((p) => p !== null);
-
-                      return points.map((point, pointIndex) => (
-                        <tr
-                          key={`${garmentIndex}-${pointIndex}`}
-                          className="text-center text-sm"
-                        >
-                          {pointIndex === 0 ? (
-                            <td
-                              rowSpan={points.length}
-                              className="p-2 border align-middle"
-                            >
-                              {inspectionDate}
-                            </td>
-                          ) : null}
-                          {pointIndex === 0 ? (
-                            <td
-                              rowSpan={points.length}
-                              className="p-2 border align-middle"
-                            >
-                              {garmentNo}
-                            </td>
-                          ) : null}
-                          <td className="p-2 border">
-                            {point.measurementPoint}
-                          </td>
-                          <td className="p-2 border">
-                            {decimalToFraction(point.buyerSpec)}
-                          </td>
-                          <td className="p-2 border">
-                            {decimalToFraction(point.tolMinus)}
-                          </td>
-                          <td className="p-2 border">
-                            {decimalToFraction(point.tolPlus)}
-                          </td>
-                          <td className="p-2 border">
-                            {decimalToFraction(point.measureValue)}
-                          </td>
-                          <td className="p-2 border">{point.status}</td>
-                        </tr>
-                      ));
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan="8" className="p-4 text-center text-gray-500">
-                        No garments inspected for this MO No
-                      </td>
+        <div>
+          {selectedMono && measurementDetails ? (
+            <>
+              {/* Overall Measurement Point Summary */}
+              <DigitalMeasurementTotalSummary
+                summaryData={measurementDetails.measurementPointSummary || []}
+                decimalToFraction={decimalToFraction}
+              />
+              {/* Inspected Summary */}
+              <h2 className="text-lg font-semibold mb-4">
+                Inspected Summary for MO No: {selectedMono}
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="w-full bg-white rounded border table-auto">
+                  <thead>
+                    <tr className="bg-gray-200 text-sm">
+                      <th className="p-2 border">Inspection Date</th>
+                      <th className="p-2 border">Garment NO</th>
+                      <th className="p-2 border">Measurement Point</th>
+                      <th className="p-2 border">Buyer Specs</th>
+                      <th className="p-2 border">TolMinus</th>
+                      <th className="p-2 border">TolPlus</th>
+                      <th className="p-2 border">Measure Value</th>
+                      <th className="p-2 border">Status</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                  </thead>
+                  <tbody>
+                    {measurementDetails.records.length > 0 ? (
+                      measurementDetails.records.map((record, garmentIndex) => {
+                        const inspectionDate = new Date(
+                          record.created_at
+                        ).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit"
+                        });
+                        const garmentNo = garmentIndex + 1;
+                        const points = record.actual
+                          .map((actualItem, index) => {
+                            if (actualItem.value === 0) return null;
+                            const spec = measurementDetails.sizeSpec[index];
+                            const measurementPoint = spec.EnglishRemark;
+                            const tolMinus = spec.ToleranceMinus.decimal;
+                            const tolPlus = spec.TolerancePlus.decimal;
+                            const buyerSpec = spec.Specs.find(
+                              (s) => Object.keys(s)[0] === record.size
+                            )[record.size].decimal;
+                            const measureValue = actualItem.value;
+                            const lower = buyerSpec + tolMinus;
+                            const upper = buyerSpec + tolPlus;
+                            const status =
+                              measureValue >= lower && measureValue <= upper
+                                ? "Pass"
+                                : "Fail";
+                            return {
+                              measurementPoint,
+                              buyerSpec,
+                              tolMinus,
+                              tolPlus,
+                              measureValue,
+                              status,
+                              actualIndex: index, // Store the index in actual array
+                              referenceNo: record.reference_no // Store the reference_no
+                            };
+                          })
+                          .filter((p) => p !== null);
+
+                        return points.map((point, pointIndex) => {
+                          const cellId = `${garmentIndex}-${pointIndex}`;
+                          const isEditing = editingCell === cellId;
+
+                          return (
+                            <tr
+                              key={`${garmentIndex}-${pointIndex}`}
+                              className="text-center text-sm"
+                            >
+                              {pointIndex === 0 ? (
+                                <td
+                                  rowSpan={points.length}
+                                  className="p-2 border align-middle"
+                                >
+                                  {inspectionDate}
+                                </td>
+                              ) : null}
+                              {pointIndex === 0 ? (
+                                <td
+                                  rowSpan={points.length}
+                                  className="p-2 border align-middle"
+                                >
+                                  {garmentNo}
+                                </td>
+                              ) : null}
+                              <td className="p-2 border">
+                                {point.measurementPoint}
+                              </td>
+                              <td className="p-2 border">
+                                {decimalToFraction(point.buyerSpec)}
+                              </td>
+                              <td className="p-2 border">
+                                {decimalToFraction(point.tolMinus)}
+                              </td>
+                              <td className="p-2 border">
+                                {decimalToFraction(point.tolPlus)}
+                              </td>
+                              <td className="p-2 border">
+                                <div className="flex items-center justify-center space-x-2">
+                                  {isEditing ? (
+                                    <input
+                                      type="number"
+                                      inputMode="numeric"
+                                      value={editValue}
+                                      onChange={(e) =>
+                                        setEditValue(e.target.value)
+                                      }
+                                      className="w-20 p-1 border rounded text-center"
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <span>{point.measureValue.toFixed(1)}</span>
+                                  )}
+                                  <button
+                                    onClick={() =>
+                                      isEditing
+                                        ? handleSaveClick(
+                                            selectedMono, // Pass moNo
+                                            point.referenceNo, // Pass referenceNo
+                                            point.actualIndex,
+                                            garmentIndex,
+                                            pointIndex
+                                          )
+                                        : handleEditClick(
+                                            garmentIndex,
+                                            pointIndex,
+                                            point.measureValue
+                                          )
+                                    }
+                                    className={`px-2 py-1 rounded text-sm ${
+                                      isEditing
+                                        ? "bg-green-500 text-white hover:bg-green-600"
+                                        : "bg-blue-500 text-white hover:bg-blue-600"
+                                    }`}
+                                  >
+                                    {isEditing ? "Save" : "Edit"}
+                                  </button>
+                                </div>
+                              </td>
+                              <td
+                                className={`p-2 border ${
+                                  point.status === "Pass"
+                                    ? "bg-green-100"
+                                    : "bg-red-100"
+                                }`}
+                              >
+                                {point.status}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan="8"
+                          className="p-4 text-center text-gray-500"
+                        >
+                          No garments inspected for this MO No
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="text-center text-gray-500 mb-6">
+              Select a MO No to display in detail inspection summary
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -85,7 +85,7 @@ const formatWeekKeyToDisplay = (weekKey) => {
 const getDefaultDates = () => {
   const today = new Date();
   const lastSunday = endOfWeek(today, { weekStartsOn: 1 });
-  const fourWeeksAgoMonday = startOfWeek(subWeeks(lastSunday, 3), {
+  const fourWeeksAgoMonday = startOfWeek(subWeeks(lastSunday, 4), {
     weekStartsOn: 1,
   });
   return {

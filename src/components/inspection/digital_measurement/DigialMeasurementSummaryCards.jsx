@@ -14,7 +14,7 @@ const DigialMeasurementSummaryCards = ({ summaryData }) => {
     );
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+    <div className="grid grid-cols-5 md:grid-cols-5 gap-4 mb-6">
       <div className="bg-blue-100 p-4 rounded-lg shadow-lg flex items-center">
         <FaShoppingCart className="text-3xl text-blue-600 mr-3" />
         <div>
