@@ -30,7 +30,7 @@ const DigitalMeasurementFilterPane = ({
   return (
     <div className="p-4 bg-gray-100 rounded shadow mb-4">
       <h2 className="text-xl font-bold mb-4">Filter Pane</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-9 gap-2">
+      <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-9 gap-2">
         <div>
           <label className="block text-sm font-medium">Factory</label>
           <Select

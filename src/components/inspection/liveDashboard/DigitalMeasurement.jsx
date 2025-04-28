@@ -570,7 +570,8 @@ const DigitalMeasurement = () => {
                                 <div className="flex items-center justify-center space-x-2">
                                   {isEditing ? (
                                     <input
-                                      type="text"
+                                      type="number"
+                                      inputMode="numeric"
                                       value={editValue}
                                       onChange={(e) =>
                                         setEditValue(e.target.value)

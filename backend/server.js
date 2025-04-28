@@ -8113,18 +8113,33 @@ app.get("/api/buyer-spec-order-details/:mono", async (req, res) => {
       });
     });
 
-    const buyerSpec = order.SizeSpec.map((spec) => ({
-      seq: spec.Seq,
-      measurementPoint: spec.EnglishRemark,
-      chineseRemark: spec.ChineseArea,
-      tolMinus: spec.ToleranceMinus.decimal,
-      tolPlus: spec.TolerancePlus.decimal,
-      specs: spec.Specs.reduce((acc, sizeSpec, index) => {
-        const sizeName = Object.keys(sizeSpec)[0];
-        acc[sizeName] = sizeSpec[sizeName].decimal;
-        return acc;
-      }, {})
-    }));
+    // Apply the same tolerance correction logic as in /api/measurement-details
+    const buyerSpec = order.SizeSpec.map((spec) => {
+      // Adjust tolMinus and tolPlus to their fractional parts
+      const tolMinusMagnitude =
+        Math.abs(spec.ToleranceMinus.decimal) >= 1
+          ? Math.abs(spec.ToleranceMinus.decimal) -
+            Math.floor(Math.abs(spec.ToleranceMinus.decimal))
+          : Math.abs(spec.ToleranceMinus.decimal);
+      const tolPlusMagnitude =
+        Math.abs(spec.TolerancePlus.decimal) >= 1
+          ? Math.abs(spec.TolerancePlus.decimal) -
+            Math.floor(Math.abs(spec.TolerancePlus.decimal))
+          : Math.abs(spec.TolerancePlus.decimal);
+
+      return {
+        seq: spec.Seq,
+        measurementPoint: spec.EnglishRemark,
+        chineseRemark: spec.ChineseArea,
+        tolMinus: tolMinusMagnitude === 0 ? 0 : -tolMinusMagnitude, // Ensure tolMinus is negative
+        tolPlus: tolPlusMagnitude,
+        specs: spec.Specs.reduce((acc, sizeSpec) => {
+          const sizeName = Object.keys(sizeSpec)[0];
+          acc[sizeName] = sizeSpec[sizeName].decimal;
+          return acc;
+        }, {})
+      };
+    });
 
     res.json({
       moNo: order.Order_No,

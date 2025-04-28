@@ -28,14 +28,30 @@ const DigitalMeasurementBuyerSpec = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [currentMono, setCurrentMono] = useState(null);
-  const [isManualMonoSelection, setIsManualMonoSelection] = useState(false); // Track manual MO No selection
+  const [isManualMonoSelection, setIsManualMonoSelection] = useState(false);
 
+  // Updated decimal to fraction conversion to match DigitalMeasurement.jsx
   const decimalToFraction = (decimal) => {
     if (!decimal || isNaN(decimal)) return <span> </span>;
 
-    const whole = Math.floor(decimal);
-    const fraction = decimal - whole;
-    if (fraction === 0) return <span>{whole}</span>;
+    // Extract the sign
+    const sign = decimal < 0 ? "-" : "";
+    // Work with the absolute value
+    const absDecimal = Math.abs(decimal);
+    // For tolerances, we expect the magnitude to be between 0 and 1
+    // If the value is greater than 1, take the fractional part
+    const fractionValue =
+      absDecimal >= 1 ? absDecimal - Math.floor(absDecimal) : absDecimal;
+    const whole = absDecimal >= 1 ? Math.floor(absDecimal) : 0;
+
+    // If there's no fractional part, return the whole number with sign
+    if (fractionValue === 0)
+      return (
+        <span>
+          {sign}
+          {whole || 0}
+        </span>
+      );
 
     const fractions = [
       { value: 0.0625, fraction: { numerator: 1, denominator: 16 } },
@@ -57,7 +73,7 @@ const DigitalMeasurementBuyerSpec = () => {
 
     const tolerance = 0.01;
     const closestFraction = fractions.find(
-      (f) => Math.abs(fraction - f.value) < tolerance
+      (f) => Math.abs(fractionValue - f.value) < tolerance
     );
 
     if (closestFraction) {
@@ -69,16 +85,20 @@ const DigitalMeasurementBuyerSpec = () => {
           <span className="text-xs leading-none">{denominator}</span>
         </span>
       );
-
       return (
         <span className="inline-flex items-center justify-center">
+          {sign}
           {whole !== 0 && <span className="mr-1">{whole}</span>}
           {fractionElement}
         </span>
       );
     }
-
-    return <span>{decimal.toFixed(3)}</span>;
+    return (
+      <span>
+        {sign}
+        {fractionValue.toFixed(3)}
+      </span>
+    );
   };
 
   useEffect(() => {
@@ -116,10 +136,9 @@ const DigitalMeasurementBuyerSpec = () => {
   useEffect(() => {
     const fetchPaginatedMonos = async () => {
       try {
-        // Skip fetching if an MO No was manually selected
         if (isManualMonoSelection) {
-          setTotalPages(1); // Only one page when MO No is selected
-          setCurrentPage(1); // Ensure current page is 1
+          setTotalPages(1);
+          setCurrentPage(1);
           return;
         }
 
@@ -136,11 +155,11 @@ const DigitalMeasurementBuyerSpec = () => {
         } else {
           setCurrentMono(null);
           setOrderData(null);
-          setTotalPages(1); // Default to 1 page if no results
+          setTotalPages(1);
         }
       } catch (error) {
         console.error("Error fetching paginated MONos:", error);
-        setTotalPages(1); // Default to 1 page on error
+        setTotalPages(1);
       }
     };
     fetchPaginatedMonos();
@@ -167,34 +186,34 @@ const DigitalMeasurementBuyerSpec = () => {
       };
       fetchOrderDetails();
     } else {
-      setOrderData(null); // Clear orderData if currentMono is null
+      setOrderData(null);
     }
   }, [currentMono]);
 
   const handlePrevious = () => {
     if (currentPage > 1 && !isManualMonoSelection) {
       setCurrentPage(currentPage - 1);
-      setIsManualMonoSelection(false); // Allow pagination to take over
+      setIsManualMonoSelection(false);
     }
   };
 
   const handleNext = () => {
     if (currentPage < totalPages && !isManualMonoSelection) {
       setCurrentPage(currentPage + 1);
-      setIsManualMonoSelection(false); // Allow pagination to take over
+      setIsManualMonoSelection(false);
     }
   };
 
   const handlePageClick = (page) => {
     if (!isManualMonoSelection) {
       setCurrentPage(page);
-      setIsManualMonoSelection(false); // Allow pagination to take over
+      setIsManualMonoSelection(false);
     }
   };
 
   const getPaginationRange = () => {
     if (isManualMonoSelection) {
-      return [1]; // Only show page 1 when MO No is selected
+      return [1];
     }
 
     const maxPagesToShow = 10;
@@ -262,8 +281,8 @@ const DigitalMeasurementBuyerSpec = () => {
                   const monoValue = option ? option.value : "";
                   setFilters({ ...filters, mono: monoValue });
                   setCurrentMono(monoValue);
-                  setCurrentPage(1); // Reset to first page
-                  setIsManualMonoSelection(!!monoValue); // Set flag if MO No is selected
+                  setCurrentPage(1);
+                  setIsManualMonoSelection(!!monoValue);
                 }}
                 isClearable
                 className="text-black"
@@ -378,7 +397,7 @@ const DigitalMeasurementBuyerSpec = () => {
                     <td className="p-2 border align-middle">
                       {orderData.moNo}
                     </td>
-                    <td className="p-2 border align-middle">
+                    <td className=" vendedor-2 border align-middle">
                       {orderData.custStyle}
                     </td>
                     <td className="p-2 border align-middle">
