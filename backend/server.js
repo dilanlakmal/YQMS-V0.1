@@ -79,7 +79,7 @@ const server = https.createServer(credentials, app);
 const io = new Server(server, {
   cors: {
     origin: "https://192.167.14.32:3001", //"https://192.165.2.175:3001", //"https://localhost:3001"
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
   }
@@ -94,7 +94,7 @@ app.use(bodyParser.json());
 app.use(
   cors({
     origin: "https://192.167.14.32:3001", //["http://localhost:3001", "https://localhost:3001"],
-    methods: ["GET", "POST", "PUT"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
   })
@@ -8707,30 +8707,45 @@ app.delete("/api/delete-measurement-record", async (req, res) => {
   try {
     const { moNo, referenceNo } = req.body;
 
+    // Validate input
     if (!moNo || !referenceNo) {
-      return res.status(400).json({ error: "Missing required fields" });
+      return res
+        .status(400)
+        .json({ error: "moNo and referenceNo are required" });
     }
 
-    // Find the dt_orders record to get its _id
+    // Find the dt_orders record to get style_id
     const order = await ymEcoConnection.db
       .collection("dt_orders")
-      .findOne({ Order_No: moNo });
+      .findOne({ Order_No: moNo }, { projection: { _id: 1 } });
+
     if (!order) {
-      return res.status(404).json({ error: "Order not found for MO No" });
+      console.log("Order not found for MO No:", moNo);
+      return res
+        .status(404)
+        .json({ error: `Order not found for MO No: ${moNo}` });
     }
 
     const styleId = order._id.toString();
 
-    // Delete the measurement_data record with matching style_id and reference_no
+    // Delete the measurement_data record
     const result = await ymEcoConnection.db
       .collection("measurement_data")
-      .deleteOne({ style_id: styleId, reference_no: referenceNo });
+      .deleteOne({
+        style_id: styleId,
+        reference_no: referenceNo
+      });
 
     if (result.deletedCount === 0) {
-      return res.status(404).json({ error: "Measurement record not found" });
+      console.log("No measurement record found for:", { styleId, referenceNo });
+      return res.status(404).json({
+        error: `No measurement record found for reference_no: ${referenceNo}`
+      });
     }
 
-    res.json({ message: "Measurement record deleted successfully" });
+    res
+      .status(200)
+      .json({ message: "Measurement record deleted successfully" });
   } catch (error) {
     console.error(
       "Error deleting measurement record:",
