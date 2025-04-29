@@ -1,7 +1,7 @@
 import React from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { FileText } from "lucide-react";
+import { FaFilePdf } from "react-icons/fa";
 import { Buffer } from "buffer";
 
 // Function to load and convert font file to base64
@@ -438,7 +438,7 @@ const QCSunriseSummaryPDF = ({
           : "bg-red-600 hover:bg-red-700"
       } focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2`}
     >
-      <FileText className="w-5 h-5 mr-1" />
+      <FaFilePdf className="w-5 h-5 mr-1" />
       {isGenerating ? "Generating..." : ""}
     </button>
   );

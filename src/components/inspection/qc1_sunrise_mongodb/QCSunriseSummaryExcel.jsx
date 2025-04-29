@@ -1,6 +1,6 @@
 import React from "react";
 import * as XLSX from "xlsx";
-import { FileSpreadsheet } from "lucide-react";
+import { FaFileExcel } from "react-icons/fa";
 
 const QCSunriseSummaryExcel = ({
   groupedData,
@@ -76,7 +76,7 @@ const QCSunriseSummaryExcel = ({
           : "bg-green-600 hover:bg-green-700"
       } focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-150 ease-in-out`}
     >
-      <FileSpreadsheet className="w-5 h-5" />
+      <FaFileExcel className="w-5 h-5" />
     </button>
   );
 };

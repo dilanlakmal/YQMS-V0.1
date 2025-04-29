@@ -17,7 +17,9 @@ import {
   Home, // Add Home icon
   Scissors,
   WashingMachine,
-  Monitor
+  Monitor,
+  CalendarDays,
+  CalendarRange,
 } from "lucide-react";
 
 const NavigationPanel = ({
@@ -44,9 +46,9 @@ const NavigationPanel = ({
       icon: <Monitor size={16} />, 
       subMenus: [
         { name: "QC 1 Dashboard", icon: <Monitor size={16} /> },
-        { name: "Daily Trend", icon: <TrendingUp size={16} /> },
-        { name: "Weekly Trend", icon: <TrendingUp size={16} /> },
-        { name: "Monthly Trend", icon: <TrendingUp size={16} /> },
+        { name: "Daily Trend", icon: <CalendarDays size={16} /> },
+        { name: "Weekly Trend", icon: <CalendarRange size={16} /> },
+        { name: "Monthly Trend", icon: <Calendar size={16} /> },
         // { name: "Yearly Trend", icon: <TrendingUp size={16} /> },
       ] },
     { name: "Order Data", icon: <Package size={18} />, subMenus: [] },
