@@ -9451,6 +9451,7 @@ app.get("/api/measurement-summary-per-mono", async (req, res) => {
 });
 
 // Updated endpoint for measurement details by MO No
+
 app.get("/api/measurement-details/:mono", async (req, res) => {
   try {
     const { startDate, endDate, empId, stage } = req.query;
@@ -9521,9 +9522,12 @@ app.get("/api/measurement-details/:mono", async (req, res) => {
 
           totalCount++;
 
-          const buyerSpec = spec.Specs.find(
-            (s) => Object.keys(s)[0] === record.size
-          )[record.size].decimal;
+          // Get the buyer spec for the specific size of the record
+          const buyerSpec =
+            spec.Specs.find((s) => Object.keys(s)[0] === record.size)?.[
+              record.size
+            ]?.decimal || 0;
+
           const lower = buyerSpec + tolMinus;
           const upper = buyerSpec + tolPlus;
 
@@ -9536,12 +9540,14 @@ app.get("/api/measurement-details/:mono", async (req, res) => {
         const passRate =
           totalCount > 0 ? ((totalPass / totalCount) * 100).toFixed(2) : "0.00";
 
-        // Use the first record's size to get the buyer spec (assuming all records use a consistent size for simplicity)
-        const sampleRecord = records.find((r) => r.size);
+        // Use the first valid size as a representative buyer spec (for summary display)
+        const sampleRecord = records.find(
+          (r) => r.size && spec.Specs.find((s) => Object.keys(s)[0] === r.size)
+        );
         const buyerSpec = sampleRecord
-          ? spec.Specs.find((s) => Object.keys(s)[0] === sampleRecord.size)[
+          ? spec.Specs.find((s) => Object.keys(s)[0] === sampleRecord.size)?.[
               sampleRecord.size
-            ].decimal
+            ]?.decimal || 0
           : 0;
 
         return {
@@ -9570,6 +9576,8 @@ app.get("/api/measurement-details/:mono", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch measurement details" });
   }
 });
+
+// New endpoint to update measurement value
 
 app.put("/api/update-measurement-value", async (req, res) => {
   try {
@@ -9645,6 +9653,63 @@ app.put("/api/update-measurement-value", async (req, res) => {
     );
     res.status(500).json({
       error: "Failed to update measurement value",
+      details: error.message
+    });
+  }
+});
+
+// New endpoint to delete measurement record
+app.delete("/api/delete-measurement-record", async (req, res) => {
+  try {
+    const { moNo, referenceNo } = req.body;
+
+    // Validate input
+    if (!moNo || !referenceNo) {
+      return res
+        .status(400)
+        .json({ error: "moNo and referenceNo are required" });
+    }
+
+    // Find the dt_orders record to get style_id
+    const order = await ymEcoConnection.db
+      .collection("dt_orders")
+      .findOne({ Order_No: moNo }, { projection: { _id: 1 } });
+
+    if (!order) {
+      console.log("Order not found for MO No:", moNo);
+      return res
+        .status(404)
+        .json({ error: `Order not found for MO No: ${moNo}` });
+    }
+
+    const styleId = order._id.toString();
+
+    // Delete the measurement_data record
+    const result = await ymEcoConnection.db
+      .collection("measurement_data")
+      .deleteOne({
+        style_id: styleId,
+        reference_no: referenceNo
+      });
+
+    if (result.deletedCount === 0) {
+      console.log("No measurement record found for:", { styleId, referenceNo });
+      return res.status(404).json({
+        error: `No measurement record found for reference_no: ${referenceNo}`
+      });
+    }
+
+    res
+      .status(200)
+      .json({ message: "Measurement record deleted successfully" });
+  } catch (error) {
+    console.error(
+      "Error deleting measurement record:",
+      error.message,
+      error.stack
+    );
+    res.status(500).json({
+      error: "Failed to delete measurement record",
       details: error.message
     });
   }

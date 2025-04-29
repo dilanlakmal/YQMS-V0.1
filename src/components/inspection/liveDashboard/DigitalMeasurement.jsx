@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import "antd/dist/reset.css";
+import { Modal } from "antd";
+import { FaClock } from "react-icons/fa";
 import DigitalMeasurementFilterPane from "../digital_measurement/DigitalMeasurementFilterPane";
 import DigialMeasurementSummaryCards from "../digital_measurement/DigialMeasurementSummaryCards";
-import DigitalMeasurementTotalSummary from "../digital_measurement/DigitalMeasurementTotalSummary"; // Import the new component
+import DigitalMeasurementTotalSummary from "../digital_measurement/DigitalMeasurementTotalSummary";
 import { API_BASE_URL } from "../../../../config";
 
 const DigitalMeasurement = () => {
@@ -35,15 +38,13 @@ const DigitalMeasurement = () => {
   const [selectedMono, setSelectedMono] = useState(null);
   const [measurementDetails, setMeasurementDetails] = useState(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
-  const [editingCell, setEditingCell] = useState(null); // Track which cell is being edited
-  const [editValue, setEditValue] = useState(""); // Store the value being edited
+  const [editingCell, setEditingCell] = useState(null);
+  const [editValue, setEditValue] = useState("");
 
-  // Compute filtered measurement summary based on selected MO No
   const filteredMeasurementSummary = selectedMono
     ? measurementSummary.filter((item) => item.moNo === selectedMono)
     : measurementSummary;
 
-  // Fetch filter options
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
@@ -78,7 +79,6 @@ const DigitalMeasurement = () => {
     fetchFilterOptions();
   }, [filters]);
 
-  // Fetch summary data
   const fetchSummaryData = async () => {
     try {
       const params = {
@@ -105,7 +105,6 @@ const DigitalMeasurement = () => {
     }
   };
 
-  // Fetch measurement summary per MO No
   const fetchMeasurementSummary = async () => {
     setIsLoadingSummary(true);
     try {
@@ -138,63 +137,53 @@ const DigitalMeasurement = () => {
     }
   };
 
-  // Fetch summary data on filters change
+  const fetchMeasurementDetails = async () => {
+    if (selectedMono) {
+      try {
+        const params = {
+          startDate: filters.startDate ? filters.startDate.toISOString() : null,
+          endDate: filters.endDate ? filters.endDate.toISOString() : null,
+          empId: filters.empId,
+          stage: filters.stage
+        };
+        const response = await axios.get(
+          `${API_BASE_URL}/api/measurement-details/${selectedMono}`,
+          {
+            params,
+            withCredentials: true
+          }
+        );
+        setMeasurementDetails(response.data);
+      } catch (error) {
+        console.error("Error fetching measurement details:", error);
+        setMeasurementDetails(null);
+      }
+    } else {
+      setMeasurementDetails(null);
+    }
+  };
+
   useEffect(() => {
     fetchSummaryData();
   }, [filters]);
 
-  // Fetch measurement summary per MO No on page or filters change
   useEffect(() => {
     fetchMeasurementSummary();
   }, [currentPage, filters]);
 
-  // Fetch measurement details for selected MO No
   useEffect(() => {
-    if (selectedMono) {
-      const fetchMeasurementDetails = async () => {
-        try {
-          const params = {
-            startDate: filters.startDate
-              ? filters.startDate.toISOString()
-              : null,
-            endDate: filters.endDate ? filters.endDate.toISOString() : null,
-            empId: filters.empId,
-            stage: filters.stage
-          };
-          const response = await axios.get(
-            `${API_BASE_URL}/api/measurement-details/${selectedMono}`,
-            {
-              params,
-              withCredentials: true
-            }
-          );
-          setMeasurementDetails(response.data);
-        } catch (error) {
-          console.error("Error fetching measurement details:", error);
-          setMeasurementDetails(null);
-        }
-      };
-      fetchMeasurementDetails();
-    } else {
-      setMeasurementDetails(null);
-    }
+    fetchMeasurementDetails();
   }, [selectedMono, filters]);
 
-  // Decimal to fraction conversion (used for Buyer Specs, TolMinus, TolPlus)
   const decimalToFraction = (decimal) => {
     if (!decimal || isNaN(decimal)) return <span> </span>;
 
-    // Extract the sign
     const sign = decimal < 0 ? "-" : "";
-    // Work with the absolute value
     const absDecimal = Math.abs(decimal);
-    // For tolerances, we expect the magnitude to be between 0 and 1
-    // If the value is greater than 1, take the fractional part
     const fractionValue =
       absDecimal >= 1 ? absDecimal - Math.floor(absDecimal) : absDecimal;
     const whole = absDecimal >= 1 ? Math.floor(absDecimal) : 0;
 
-    // If there's no fractional part, return the whole number with sign
     if (fractionValue === 0)
       return (
         <span>
@@ -251,13 +240,11 @@ const DigitalMeasurement = () => {
     );
   };
 
-  // Handle Edit button click
   const handleEditClick = (garmentIndex, pointIndex, currentValue) => {
     setEditingCell(`${garmentIndex}-${pointIndex}`);
     setEditValue(currentValue.toString());
   };
 
-  // Handle Save button click
   const handleSaveClick = async (
     moNo,
     referenceNo,
@@ -272,13 +259,6 @@ const DigitalMeasurement = () => {
         return;
       }
 
-      console.log("Sending update request with:", {
-        moNo,
-        referenceNo,
-        index: actualIndex,
-        newValue
-      });
-
       const response = await axios.put(
         `${API_BASE_URL}/api/update-measurement-value`,
         {
@@ -290,8 +270,6 @@ const DigitalMeasurement = () => {
         { withCredentials: true }
       );
 
-      console.log("Update response:", response.data);
-
       const updatedRecords = [...measurementDetails.records];
       updatedRecords[garmentIndex].actual[actualIndex].value = newValue;
       setMeasurementDetails({ ...measurementDetails, records: updatedRecords });
@@ -299,8 +277,11 @@ const DigitalMeasurement = () => {
       setEditingCell(null);
       setEditValue("");
 
-      await fetchSummaryData();
-      await fetchMeasurementSummary();
+      await Promise.all([
+        fetchSummaryData(),
+        fetchMeasurementSummary(),
+        fetchMeasurementDetails()
+      ]);
     } catch (error) {
       console.error(
         "Error saving measurement value:",
@@ -314,7 +295,6 @@ const DigitalMeasurement = () => {
     }
   };
 
-  // Pagination handlers
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
@@ -336,17 +316,14 @@ const DigitalMeasurement = () => {
           Digital Measurement Dashboard
         </h1>
 
-        {/* Filter Pane */}
         <DigitalMeasurementFilterPane
           filters={filters}
           setFilters={setFilters}
           filterOptions={filterOptions}
         />
 
-        {/* Summary Cards */}
         <DigialMeasurementSummaryCards summaryData={summaryData} />
 
-        {/* Measurement Summary */}
         <div className="flex items-center mb-4">
           {selectedMono && (
             <button
@@ -427,7 +404,6 @@ const DigitalMeasurement = () => {
           </table>
         </div>
 
-        {/* Pagination (only shown when no MO No is selected) */}
         {!selectedMono && totalPages > 1 && (
           <div className="flex justify-center items-center space-x-2 mb-6">
             <button
@@ -461,16 +437,15 @@ const DigitalMeasurement = () => {
           </div>
         )}
 
-        {/* Inspected Summary */}
         <div>
           {selectedMono && measurementDetails ? (
             <>
-              {/* Overall Measurement Point Summary */}
               <DigitalMeasurementTotalSummary
                 summaryData={measurementDetails.measurementPointSummary || []}
+                records={measurementDetails.records || []}
+                sizeSpec={measurementDetails.sizeSpec || []}
                 decimalToFraction={decimalToFraction}
               />
-              {/* Inspected Summary */}
               <h2 className="text-lg font-semibold mb-4">
                 Inspected Summary for MO No: {selectedMono}
               </h2>
@@ -480,11 +455,13 @@ const DigitalMeasurement = () => {
                     <tr className="bg-gray-200 text-sm">
                       <th className="p-2 border">Inspection Date</th>
                       <th className="p-2 border">Garment NO</th>
+                      <th className="p-2 border">Size</th>
                       <th className="p-2 border">Measurement Point</th>
                       <th className="p-2 border">Buyer Specs</th>
                       <th className="p-2 border">TolMinus</th>
                       <th className="p-2 border">TolPlus</th>
                       <th className="p-2 border">Measure Value</th>
+                      <th className="p-2 border">Diff</th>
                       <th className="p-2 border">Status</th>
                     </tr>
                   </thead>
@@ -499,6 +476,7 @@ const DigitalMeasurement = () => {
                           day: "2-digit"
                         });
                         const garmentNo = garmentIndex + 1;
+                        const size = record.size || "N/A";
                         const points = record.actual
                           .map((actualItem, index) => {
                             if (actualItem.value === 0) return null;
@@ -506,10 +484,12 @@ const DigitalMeasurement = () => {
                             const measurementPoint = spec.EnglishRemark;
                             const tolMinus = spec.ToleranceMinus.decimal;
                             const tolPlus = spec.TolerancePlus.decimal;
-                            const buyerSpec = spec.Specs.find(
-                              (s) => Object.keys(s)[0] === record.size
-                            )[record.size].decimal;
+                            const buyerSpec =
+                              spec.Specs.find(
+                                (s) => Object.keys(s)[0] === record.size
+                              )?.[record.size]?.decimal || 0;
                             const measureValue = actualItem.value;
+                            const diff = buyerSpec - measureValue;
                             const lower = buyerSpec + tolMinus;
                             const upper = buyerSpec + tolPlus;
                             const status =
@@ -522,9 +502,10 @@ const DigitalMeasurement = () => {
                               tolMinus,
                               tolPlus,
                               measureValue,
+                              diff,
                               status,
-                              actualIndex: index, // Store the index in actual array
-                              referenceNo: record.reference_no // Store the reference_no
+                              actualIndex: index,
+                              referenceNo: record.reference_no
                             };
                           })
                           .filter((p) => p !== null);
@@ -532,6 +513,11 @@ const DigitalMeasurement = () => {
                         return points.map((point, pointIndex) => {
                           const cellId = `${garmentIndex}-${pointIndex}`;
                           const isEditing = editingCell === cellId;
+                          const diffBgColor =
+                            point.diff >= point.tolMinus &&
+                            point.diff <= point.tolPlus
+                              ? "bg-green-100"
+                              : "bg-red-100";
 
                           return (
                             <tr
@@ -543,7 +529,61 @@ const DigitalMeasurement = () => {
                                   rowSpan={points.length}
                                   className="p-2 border align-middle"
                                 >
-                                  {inspectionDate}
+                                  <div className="flex flex-col items-center">
+                                    <span>{inspectionDate}</span>
+                                    <button
+                                      onClick={() =>
+                                        Modal.confirm({
+                                          title: "Confirm Deletion",
+                                          content:
+                                            "Do you really need to delete this measurement record?",
+                                          okText: "Yes",
+                                          okType: "danger",
+                                          cancelText: "No",
+                                          onOk: async () => {
+                                            try {
+                                              await axios.delete(
+                                                `${API_BASE_URL}/api/delete-measurement-record`,
+                                                {
+                                                  data: {
+                                                    moNo: selectedMono,
+                                                    referenceNo:
+                                                      point.referenceNo
+                                                  },
+                                                  withCredentials: true,
+                                                  headers: {
+                                                    "Content-Type":
+                                                      "application/json"
+                                                  }
+                                                }
+                                              );
+                                              // Refresh all data
+                                              await Promise.all([
+                                                fetchSummaryData(),
+                                                fetchMeasurementSummary(),
+                                                fetchMeasurementDetails()
+                                              ]);
+                                            } catch (error) {
+                                              console.error(
+                                                "Error deleting measurement record:",
+                                                error.response?.data ||
+                                                  error.message
+                                              );
+                                              Modal.error({
+                                                title: "Deletion Failed",
+                                                content:
+                                                  error.response?.data?.error ||
+                                                  error.message
+                                              });
+                                            }
+                                          }
+                                        })
+                                      }
+                                      className="mt-1 px-2 py-1 bg-red-500 text-white rounded-md border-2 border-red-800 hover:bg-red-600 text-sm"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
                                 </td>
                               ) : null}
                               {pointIndex === 0 ? (
@@ -551,10 +591,43 @@ const DigitalMeasurement = () => {
                                   rowSpan={points.length}
                                   className="p-2 border align-middle"
                                 >
-                                  {garmentNo}
+                                  <div className="flex flex-col items-center">
+                                    <span>{garmentNo}</span>
+                                    <span>(Ref: "{point.referenceNo}")</span>
+                                    <span className="flex items-center">
+                                      <FaClock className="mr-1 text-sm" />
+                                      {new Date(
+                                        record.created_at
+                                      ).toLocaleTimeString("en-US", {
+                                        hour12: false,
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        second: "2-digit"
+                                      })}
+                                    </span>
+                                    <span
+                                      className={`mt-1 px-2 py-1 rounded-md border-2 text-sm font-semibold ${
+                                        points.every((p) => p.status === "Pass")
+                                          ? "bg-green-100 text-green-800 border-green-800"
+                                          : "bg-red-100 text-red-800 border-red-800"
+                                      }`}
+                                    >
+                                      {points.every((p) => p.status === "Pass")
+                                        ? "Pass"
+                                        : "Fail"}
+                                    </span>
+                                  </div>
                                 </td>
                               ) : null}
-                              <td className="p-2 border">
+                              {pointIndex === 0 ? (
+                                <td
+                                  rowSpan={points.length}
+                                  className="p-2 border align-middle"
+                                >
+                                  {size}
+                                </td>
+                              ) : null}
+                              <td className="p-2 border text-left">
                                 {point.measurementPoint}
                               </td>
                               <td className="p-2 border">
@@ -580,14 +653,14 @@ const DigitalMeasurement = () => {
                                       autoFocus
                                     />
                                   ) : (
-                                    <span>{point.measureValue.toFixed(1)}</span>
+                                    <span>{point.measureValue.toFixed(3)}</span>
                                   )}
                                   <button
                                     onClick={() =>
                                       isEditing
                                         ? handleSaveClick(
-                                            selectedMono, // Pass moNo
-                                            point.referenceNo, // Pass referenceNo
+                                            selectedMono,
+                                            point.referenceNo,
                                             point.actualIndex,
                                             garmentIndex,
                                             pointIndex
@@ -608,6 +681,9 @@ const DigitalMeasurement = () => {
                                   </button>
                                 </div>
                               </td>
+                              <td className={`p-2 border ${diffBgColor}`}>
+                                {point.diff.toFixed(3)}
+                              </td>
                               <td
                                 className={`p-2 border ${
                                   point.status === "Pass"
@@ -624,7 +700,7 @@ const DigitalMeasurement = () => {
                     ) : (
                       <tr>
                         <td
-                          colSpan="8"
+                          colSpan="9"
                           className="p-4 text-center text-gray-500"
                         >
                           No garments inspected for this MO No

@@ -24,20 +24,20 @@ const DigialMeasurementSummaryCards = ({ summaryData }) => {
           </p>
         </div>
       </div>
-      <div className="bg-green-100 p-4 rounded-lg shadow-lg flex items-center">
-        <FaSearch className="text-3xl text-green-600 mr-3" />
+      <div className="bg-yellow-100 p-4 rounded-lg shadow-lg flex items-center">
+        <FaSearch className="text-3xl text-yellow-600 mr-3" />
         <div>
           <h3 className="text-md font-semibold text-gray-700">Inspected Qty</h3>
-          <p className="text-xl font-bold text-green-800">
+          <p className="text-xl font-bold text-yellow-800">
             {summaryData.inspectedQty}
           </p>
         </div>
       </div>
-      <div className="bg-yellow-100 p-4 rounded-lg shadow-lg flex items-center">
-        <FaCheckCircle className="text-3xl text-yellow-600 mr-3" />
+      <div className="bg-green-100 p-4 rounded-lg shadow-lg flex items-center">
+        <FaCheckCircle className="text-3xl text-green-600 mr-3" />
         <div>
           <h3 className="text-md font-semibold text-gray-700">Total Pass</h3>
-          <p className="text-xl font-bold text-yellow-800">
+          <p className="text-xl font-bold text-green-800">
             {summaryData.totalPass}
           </p>
         </div>
@@ -51,11 +51,29 @@ const DigialMeasurementSummaryCards = ({ summaryData }) => {
           </p>
         </div>
       </div>
-      <div className="bg-purple-100 p-4 rounded-lg shadow-lg flex items-center">
-        <FaPercentage className="text-3xl text-purple-600 mr-3" />
+      <div
+        className={`p-4 rounded-lg shadow-lg flex items-center ${
+          summaryData.passRate > 98 ? "bg-green-200" : "bg-red-200"
+        }`}
+      >
+        <FaPercentage
+          className={`text-3xl mr-3 ${
+            summaryData.passRate > 98 ? "text-green-800" : "text-red-800"
+          }`}
+        />
         <div>
-          <h3 className="text-md font-semibold text-gray-700">Pass Rate</h3>
-          <p className="text-xl font-bold text-purple-800">
+          <h3
+            className={`text-md font-semibold ${
+              summaryData.passRate > 98 ? "text-green-800" : "text-red-800"
+            }`}
+          >
+            Pass Rate
+          </h3>
+          <p
+            className={`text-xl font-bold ${
+              summaryData.passRate > 98 ? "text-green-800" : "text-red-800"
+            }`}
+          >
             {summaryData.passRate}%
           </p>
         </div>
