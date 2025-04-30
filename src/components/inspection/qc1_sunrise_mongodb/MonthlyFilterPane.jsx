@@ -23,7 +23,7 @@ const getDefaultDates = () => {
   const today = new Date();
   // Default to the start of the previous month and the start of the current month
   const endDate = startOfMonth(today);
-  const startDate = startOfMonth(subMonths(today, 4));
+  const startDate = startOfMonth(subMonths(today, 11));
   return { startDate, endDate };
 };
 

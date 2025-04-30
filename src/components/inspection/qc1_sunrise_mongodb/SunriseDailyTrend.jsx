@@ -6,8 +6,9 @@ import autoTable from "jspdf-autotable";
 import { FaFileExcel, FaFilePdf } from "react-icons/fa";
 
 import { API_BASE_URL } from "../../../../config";
-import QCSunriseFilterPane from "./QCSunriseFilterPane";
+import DailyFilterPane from "./DailyFilterPlane";
 import QCSunriseSummaryCard from "./QCSunriseSummaryCard";
+
 
 const formatDateToDDMMYYYY = (dateStr) => {
   if (!dateStr || typeof dateStr !== "string" || !dateStr.includes("-"))
@@ -15,9 +16,17 @@ const formatDateToDDMMYYYY = (dateStr) => {
   const parts = dateStr.split("-");
   if (parts.length !== 3) return dateStr;
   const [year, month, day] = parts;
-  if (isNaN(parseInt(year)) || isNaN(parseInt(month)) || isNaN(parseInt(day)))
+
+  if (
+    year.length !== 4 ||
+    month.length !== 2 ||
+    day.length !== 2 ||
+    isNaN(parseInt(year)) ||
+    isNaN(parseInt(month)) ||
+    isNaN(parseInt(day))
+  )
     return dateStr;
-  return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
+  return `${day}/${month}/${year}`;
 };
 
 const parseDDMMYYYY = (dateStr) => {
@@ -30,11 +39,23 @@ const parseDDMMYYYY = (dateStr) => {
     month < 1 ||
     month > 12 ||
     day < 1 ||
-    day > 31
+    day > 31 ||
+    String(year).length !== 4
   )
     return null;
-  return new Date(year, month - 1, day);
+
+  const date = new Date(year, month - 1, day);
+
+  if (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  ) {
+    return date;
+  }
+  return null;
 };
+
 
 const getDefaultEndDate = () => new Date().toISOString().split("T")[0];
 const getDefaultStartDate = () => {
@@ -43,10 +64,13 @@ const getDefaultStartDate = () => {
   return today.toISOString().split("T")[0];
 };
 
+
 const QCSunriseDailyTrend = () => {
   const [rawData, setRawData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+
   const [activeFilters, setActiveFilters] = useState({
     startDate: getDefaultStartDate(),
     endDate: getDefaultEndDate(),
@@ -57,6 +81,7 @@ const QCSunriseDailyTrend = () => {
     Buyer: "",
     defectName: "",
   });
+
   const [groupingOptions, setGroupingOptions] = useState({
     addLines: false,
     addMO: false,
@@ -70,21 +95,30 @@ const QCSunriseDailyTrend = () => {
   const [totalDefects, setTotalDefects] = useState(0);
   const [overallDhu, setOverallDhu] = useState(0);
 
+
   const handleFilterChange = useCallback((newFilters) => {
+
     const validatedFilters = {
       ...newFilters,
       startDate: newFilters.startDate || getDefaultStartDate(),
       endDate: newFilters.endDate || getDefaultEndDate(),
     };
+
+    if (validatedFilters.endDate < validatedFilters.startDate) {
+      validatedFilters.endDate = validatedFilters.startDate;
+    }
     setActiveFilters(validatedFilters);
   }, []);
 
+
   const isFilterActive = useCallback(
     (filterName) => {
+
       return (activeFilters[filterName] ?? "").trim() !== "";
     },
     [activeFilters],
   );
+
 
   const fetchData = useCallback(async () => {
     try {
@@ -97,16 +131,15 @@ const QCSunriseDailyTrend = () => {
       setTotalDefects(0);
       setOverallDhu(0);
 
+
       const queryParams = { ...activeFilters };
       Object.keys(queryParams).forEach((key) => {
-        if (
-          queryParams[key] === "" ||
-          queryParams[key] === null ||
-          queryParams[key] === undefined
-        ) {
+
+        if (queryParams[key] === "") {
           delete queryParams[key];
         }
       });
+
 
       if (!queryParams.startDate) queryParams.startDate = getDefaultStartDate();
       if (!queryParams.endDate) queryParams.endDate = getDefaultEndDate();
@@ -125,6 +158,7 @@ const QCSunriseDailyTrend = () => {
         "Failed to fetch QC1 Sunrise data";
       setError(errorMsg);
       setRawData([]);
+
       setTotalChecked(0);
       setTotalDefects(0);
       setOverallDhu(0);
@@ -133,12 +167,15 @@ const QCSunriseDailyTrend = () => {
     }
   }, [activeFilters]);
 
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
+
   useEffect(() => {
     if (loading || error || !Array.isArray(rawData) || rawData.length === 0) {
+
       setTotalChecked(0);
       setTotalDefects(0);
       setOverallDhu(0);
@@ -148,8 +185,9 @@ const QCSunriseDailyTrend = () => {
     let checked = 0;
     let defects = 0;
     rawData.forEach((item) => {
-      checked += item.CheckedQty || 0;
-      defects += item.totalDefectsQty || 0;
+
+      checked += Number(item.CheckedQty) || 0;
+      defects += Number(item.totalDefectsQty) || 0;
     });
 
     const dhu =
@@ -158,6 +196,7 @@ const QCSunriseDailyTrend = () => {
     setTotalDefects(defects);
     setOverallDhu(dhu);
   }, [rawData, loading, error]);
+
 
   const buildHierarchy = useCallback((data, groupingFields) => {
     const hierarchy = {};
@@ -224,13 +263,16 @@ const QCSunriseDailyTrend = () => {
   const buildRows = useCallback((hierarchy, groupingFields, dates) => {
     const rows = [];
 
+
     const sortedGroupKeys = Object.keys(hierarchy).sort((a, b) => {
       const aValues = hierarchy[a].groupValues;
       const bValues = hierarchy[b].groupValues;
       for (let i = 0; i < Math.min(aValues.length, bValues.length); i++) {
+
         const comparison = String(aValues[i]).localeCompare(String(bValues[i]));
         if (comparison !== 0) return comparison;
       }
+
       return aValues.length - bValues.length;
     });
 
@@ -238,12 +280,17 @@ const QCSunriseDailyTrend = () => {
       const group = hierarchy[groupKey];
       const groupData = {};
 
+
       dates.forEach((date) => {
         const dateEntry = group.dateMap[date];
         const checkedQty = dateEntry?.CheckedQty || 0;
         const defectsQty = dateEntry?.totalDefectsQty || 0;
-        groupData[date] = checkedQty > 0 ? (defectsQty / checkedQty) * 100 : 0;
+        groupData[date] =
+          checkedQty > 0
+            ? parseFloat(((defectsQty / checkedQty) * 100).toFixed(2))
+            : 0;
       });
+
 
       rows.push({
         type: "group",
@@ -251,6 +298,7 @@ const QCSunriseDailyTrend = () => {
         groupValues: group.groupValues,
         data: groupData,
       });
+
 
       const defectNames = new Set();
       Object.values(group.dateMap).forEach((dateEntry) => {
@@ -260,6 +308,7 @@ const QCSunriseDailyTrend = () => {
           });
         }
       });
+
 
       [...defectNames].sort().forEach((defectName) => {
         const defectData = {};
@@ -272,12 +321,15 @@ const QCSunriseDailyTrend = () => {
             const checkedQty = dateEntry.CheckedQty || 0;
             defectData[date] =
               defect && checkedQty > 0
-                ? ((defect.defectQty || 0) / checkedQty) * 100
+                ? parseFloat(
+                    (((defect.defectQty || 0) / checkedQty) * 100).toFixed(2),
+                  )
                 : 0;
           } else {
             defectData[date] = 0;
           }
         });
+
 
         rows.push({
           type: "defect",
@@ -292,12 +344,15 @@ const QCSunriseDailyTrend = () => {
     return rows;
   }, []);
 
+
+
   useEffect(() => {
     if (loading || error || !Array.isArray(rawData) || rawData.length === 0) {
       setRows([]);
       setUniqueDates([]);
       return;
     }
+
 
     const groupingFieldsConfig = [
       { key: "lineNo", option: "addLines" },
@@ -307,9 +362,11 @@ const QCSunriseDailyTrend = () => {
       { key: "Size", option: "addSizes" },
     ];
 
+
     const activeGroupingFields = groupingFieldsConfig
       .filter((field) => groupingOptions[field.option])
       .map((field) => field.key);
+
 
     const datesSet = new Set(
       rawData.map((d) => formatDateToDDMMYYYY(d.inspectionDate)).filter(Boolean),
@@ -317,45 +374,49 @@ const QCSunriseDailyTrend = () => {
     const sortedDates = [...datesSet].sort((a, b) => {
       const dateA = parseDDMMYYYY(a);
       const dateB = parseDDMMYYYY(b);
-      if (!dateA || !dateB) return 0;
+
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
       return dateA - dateB;
     });
     setUniqueDates(sortedDates);
 
+
     const hierarchy = buildHierarchy(rawData, activeGroupingFields);
+
     const tableRows = buildRows(hierarchy, activeGroupingFields, sortedDates);
     setRows(tableRows);
   }, [rawData, groupingOptions, loading, error, buildHierarchy, buildRows]);
+
 
   const getBackgroundColor = (rate) => {
     if (rate > 3) return "bg-red-100";
     if (rate >= 2) return "bg-yellow-100";
     return "bg-green-100";
   };
-
   const getFontColor = (rate) => {
     if (rate > 3) return "text-red-800";
     if (rate >= 2) return "text-orange-800";
     return "text-green-800";
   };
-
   const getBackgroundColorRGB = (rate) => {
     if (rate > 3) return [254, 226, 226];
     if (rate >= 2) return [254, 243, 199];
     return [220, 252, 231];
   };
-
   const getFontColorRGB = (rate) => {
     if (rate > 3) return [153, 27, 27];
     if (rate >= 2) return [154, 52, 18];
     return [6, 95, 70];
   };
-
   const getBackgroundColorHex = (rate) => {
     if (rate > 3) return "FEE2E2";
     if (rate >= 2) return "FEF3C7";
     return "DCFCE7";
   };
+
+
 
   const getCurrentGroupingFieldNames = useCallback(() => {
     const names = [];
@@ -367,11 +428,13 @@ const QCSunriseDailyTrend = () => {
     return names;
   }, [groupingOptions]);
 
+
   const prepareExportData = useCallback(() => {
     const exportData = [];
     const ratesMap = new Map();
     const groupingFieldNames = getCurrentGroupingFieldNames();
     const numGroupingCols = groupingFieldNames.length;
+
 
     exportData.push([
       "Daily Defect Trend Analysis",
@@ -379,11 +442,14 @@ const QCSunriseDailyTrend = () => {
     ]);
     ratesMap.set(`0-0`, -1);
 
+
     exportData.push(Array(uniqueDates.length + numGroupingCols + 1).fill(""));
     ratesMap.set(`1-0`, -1);
 
+
     const headerRow = [...groupingFieldNames, "Defect / Group", ...uniqueDates];
     exportData.push(headerRow);
+
     headerRow.forEach((_, colIndex) => ratesMap.set(`2-${colIndex}`, -1));
 
     let rowIndex = 3;
@@ -393,36 +459,48 @@ const QCSunriseDailyTrend = () => {
       const rowData = [];
       const isGroupRow = row.type === "group";
 
+
       for (let colIndex = 0; colIndex < numGroupingCols; colIndex++) {
         const currentValue = row.groupValues[colIndex];
         let displayValue = "";
 
+
         if (isGroupRow) {
+
           if (currentValue !== lastDisplayedGroupValues[colIndex]) {
             displayValue = currentValue;
+
             lastDisplayedGroupValues[colIndex] = currentValue;
             for (let k = colIndex + 1; k < numGroupingCols; k++) {
               lastDisplayedGroupValues[k] = null;
             }
           }
         } else {
+
+
           if (currentValue !== lastDisplayedGroupValues[colIndex]) {
-            lastDisplayedGroupValues[colIndex] = currentValue;
-            for (let k = colIndex + 1; k < numGroupingCols; k++) {
-              lastDisplayedGroupValues[k] = null;
-            }
+             lastDisplayedGroupValues[colIndex] = currentValue;
+
+             for (let k = colIndex + 1; k < numGroupingCols; k++) {
+               lastDisplayedGroupValues[k] = null;
+             }
           }
+
         }
         rowData.push(displayValue);
       }
 
+
       rowData.push(isGroupRow ? "TOTAL %" : row.defectName);
+
 
       uniqueDates.forEach((date, dateIndex) => {
         const rate = row.data[date] || 0;
         rowData.push(rate > 0 ? `${rate.toFixed(2)}%` : "");
+
         ratesMap.set(`${rowIndex}-${numGroupingCols + 1 + dateIndex}`, rate);
       });
+
 
       for (let c = 0; c <= numGroupingCols; c++) {
         ratesMap.set(`${rowIndex}-${c}`, -1);
@@ -432,11 +510,14 @@ const QCSunriseDailyTrend = () => {
       rowIndex++;
     });
 
+
     const totalRow = [...Array(numGroupingCols).fill(""), "OVERALL TOTAL %"];
     uniqueDates.forEach((date, dateIndex) => {
+
       const dateData = rawData.filter(
         (d) => formatDateToDDMMYYYY(d.inspectionDate) === date,
       );
+
       const totalCheckedForDate = dateData.reduce(
         (sum, d) => sum + (d.CheckedQty || 0),
         0,
@@ -445,13 +526,16 @@ const QCSunriseDailyTrend = () => {
         (sum, d) => sum + (d.totalDefectsQty || 0),
         0,
       );
+
       const rate =
         totalCheckedForDate > 0
           ? (totalDefectsForDate / totalCheckedForDate) * 100
           : 0;
       totalRow.push(rate > 0 ? `${rate.toFixed(2)}%` : "");
+
       ratesMap.set(`${rowIndex}-${numGroupingCols + 1 + dateIndex}`, rate);
     });
+
     for (let c = 0; c <= numGroupingCols; c++) {
       ratesMap.set(`${rowIndex}-${c}`, -1);
     }
@@ -459,6 +543,7 @@ const QCSunriseDailyTrend = () => {
 
     return { exportData, ratesMap, numGroupingCols };
   }, [rows, uniqueDates, rawData, getCurrentGroupingFieldNames]);
+
 
   const downloadExcel = useCallback(() => {
     const { exportData, ratesMap, numGroupingCols } = prepareExportData();
@@ -469,6 +554,7 @@ const QCSunriseDailyTrend = () => {
     const ws = XLSX.utils.aoa_to_sheet(exportData);
     const groupingFieldNames = getCurrentGroupingFieldNames();
 
+
     const range = XLSX.utils.decode_range(ws["!ref"]);
     for (let R = range.s.r; R <= range.e.r; ++R) {
       for (let C = range.s.c; C <= range.e.c; ++C) {
@@ -476,26 +562,28 @@ const QCSunriseDailyTrend = () => {
         const cell = ws[cellAddress];
         if (!cell) continue;
 
+
         const rate = ratesMap.get(`${R}-${C}`);
         const isHeaderRow = R === 2;
         const isTotalRow = R === range.e.r;
         const isGroupLabelCol = C === numGroupingCols;
         const isDataRow = R > 2 && R < range.e.r;
-        const isActualGroupRow =
-          isDataRow && exportData[R][numGroupingCols] === "TOTAL %";
+
+        const isActualGroupRow = isDataRow && exportData[R][numGroupingCols] === "TOTAL %";
         const cellHasValue = cell.v !== undefined && cell.v !== "";
+
 
         let fgColor = "FFFFFF";
         let fontStyle = {};
-        let alignment = {
-          horizontal: C <= numGroupingCols ? "left" : "center",
-          vertical: "middle",
-        };
+        let alignment = { horizontal: C <= numGroupingCols ? "left" : "center", vertical: "middle" };
         let fontColor = "000000";
         let borderColor = "D1D5DB";
 
+
         if (R === 0) {
+
         } else if (R === 1) {
+
         } else if (isHeaderRow) {
           fgColor = "E5E7EB";
           fontStyle = { bold: true };
@@ -509,13 +597,10 @@ const QCSunriseDailyTrend = () => {
           if (rate !== undefined && rate > 0) {
             fgColor = getBackgroundColorHex(rate);
             const rgbFont = getFontColorRGB(rate);
-            fontColor = rgbFont
-              .map((x) => x.toString(16).padStart(2, "0"))
-              .join("")
-              .toUpperCase();
+            fontColor = rgbFont.map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
           } else if (rate === 0) {
-            fgColor = "E5E7EB";
-            fontColor = "1F2937";
+             fgColor = "E5E7EB";
+             fontColor = "1F2937";
           }
         } else if (C < numGroupingCols) {
           if (isActualGroupRow) {
@@ -545,10 +630,7 @@ const QCSunriseDailyTrend = () => {
         } else if (rate !== undefined && rate > 0) {
           fgColor = getBackgroundColorHex(rate);
           const rgbFont = getFontColorRGB(rate);
-          fontColor = rgbFont
-            .map((x) => x.toString(16).padStart(2, "0"))
-            .join("")
-            .toUpperCase();
+          fontColor = rgbFont.map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
           if (isActualGroupRow) {
             fontStyle = { bold: true };
             borderColor = "475569";
@@ -556,17 +638,18 @@ const QCSunriseDailyTrend = () => {
             borderColor = "D1D5DB";
           }
         } else if (rate === 0) {
-          if (isActualGroupRow) {
-            fgColor = "64748B";
-            fontColor = "FFFFFF";
-            fontStyle = { bold: true };
-            borderColor = "475569";
-          } else {
-            fgColor = "FFFFFF";
-            fontColor = "6B7280";
-            borderColor = "D1D5DB";
-          }
+           if (isActualGroupRow) {
+             fgColor = "64748B";
+             fontColor = "FFFFFF";
+             fontStyle = { bold: true };
+             borderColor = "475569";
+           } else {
+             fgColor = "FFFFFF";
+             fontColor = "6B7280";
+             borderColor = "D1D5DB";
+           }
         }
+
 
         cell.s = {
           border: {
@@ -582,14 +665,19 @@ const QCSunriseDailyTrend = () => {
       }
     }
 
+
+
     const colWidths = [];
     groupingFieldNames.forEach(() => colWidths.push({ wch: 15 }));
     colWidths.push({ wch: 30 });
     uniqueDates.forEach(() => colWidths.push({ wch: 12 }));
     ws["!cols"] = colWidths;
 
+
+
     if (range.e.c > 0) {
       ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: range.e.c } }];
+
       if (ws["A1"]) {
         ws["A1"].s = ws["A1"].s || {};
         ws["A1"].s.alignment = { horizontal: "center", vertical: "middle" };
@@ -597,62 +685,76 @@ const QCSunriseDailyTrend = () => {
       }
     }
 
+
     let mergeSpans = ws["!merges"] || [];
     let groupStartRow = {};
+
 
     for (let R = 3; R < exportData.length - 1; ++R) {
       const isGroupRow = exportData[R][numGroupingCols] === "TOTAL %";
       const isFirstDataRowOfGroup = isGroupRow;
 
+
       for (let C = 0; C < numGroupingCols; ++C) {
         const cellValue = exportData[R][C];
 
+
         if (isFirstDataRowOfGroup && cellValue !== "") {
+
           if (groupStartRow[C] !== undefined && R > groupStartRow[C]) {
-            if (exportData[groupStartRow[C]][C] !== "") {
-              mergeSpans.push({
-                s: { r: groupStartRow[C], c: C },
-                e: { r: R - 1, c: C },
-              });
-            }
+
+             if (exportData[groupStartRow[C]][C] !== "") {
+                mergeSpans.push({ s: { r: groupStartRow[C], c: C }, e: { r: R - 1, c: C } });
+             }
           }
+
           groupStartRow[C] = R;
         }
 
+
         let endOfBlock = false;
         if (R + 1 < exportData.length - 1) {
-          if (exportData[R + 1][numGroupingCols] === "TOTAL %") {
-            if (C === 0 || exportData[R + 1][C] !== exportData[R][C]) {
-              endOfBlock = true;
-            }
-          }
+
+           if (exportData[R + 1][numGroupingCols] === "TOTAL %") {
+
+              if (C === 0 || exportData[R + 1][C] !== exportData[R][C]) {
+                 endOfBlock = true;
+              }
+           }
         } else if (R + 1 === exportData.length - 1) {
-          endOfBlock = true;
+           endOfBlock = true;
         }
+
 
         if (groupStartRow[C] !== undefined && endOfBlock) {
           const startR = groupStartRow[C];
           const endR = R;
 
           if (endR >= startR) {
-            if (exportData[startR][C] !== "") {
-              mergeSpans.push({ s: { r: startR, c: C }, e: { r: endR, c: C } });
-            }
+
+             if (exportData[startR][C] !== "") {
+                mergeSpans.push({ s: { r: startR, c: C }, e: { r: endR, c: C } });
+             }
           }
+
           delete groupStartRow[C];
         }
       }
+
+
       if (isFirstDataRowOfGroup && exportData[R][0] !== "") {
-        groupStartRow = {};
-        if (exportData[R][0] !== "") groupStartRow[0] = R;
+         groupStartRow = {};
+         if (exportData[R][0] !== "") groupStartRow[0] = R;
       }
     }
     ws["!merges"] = mergeSpans;
 
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Defect Trend");
+    XLSX.utils.book_append_sheet(wb, ws, "Daily Defect Trend");
     XLSX.writeFile(wb, "DailyDefectTrend.xlsx");
   }, [prepareExportData, uniqueDates, getCurrentGroupingFieldNames]);
+
 
   const downloadPDF = useCallback(() => {
     const { exportData, ratesMap, numGroupingCols } = prepareExportData();
@@ -695,6 +797,7 @@ const QCSunriseDailyTrend = () => {
         lineWidth: 0.1,
       },
       columnStyles: {
+
         ...Array.from({ length: numGroupingCols + 1 }, (_, i) => i).reduce(
           (acc, i) => {
             acc[i] = { halign: "left" };
@@ -702,22 +805,25 @@ const QCSunriseDailyTrend = () => {
           },
           {},
         ),
+
         ...uniqueDates.reduce((acc, _, index) => {
           acc[numGroupingCols + 1 + index] = { halign: "center" };
           return acc;
         }, {}),
       },
       didParseCell: (data) => {
+
         const rowIndexInExportData = data.row.index + 3;
         const colIndex = data.column.index;
         const rate = ratesMap.get(`${rowIndexInExportData}-${colIndex}`);
         const cellHasValue = data.cell.raw !== undefined && data.cell.raw !== "";
         const isTotalRow = data.row.index === body.length - 1;
         const isGroupLabelCol = colIndex === numGroupingCols;
-        const isActualGroupRow =
-          !isTotalRow && exportData[rowIndexInExportData][numGroupingCols] === "TOTAL %";
+
+        const isActualGroupRow = !isTotalRow && exportData[rowIndexInExportData][numGroupingCols] === "TOTAL %";
 
         if (data.section === "body") {
+
           let fillColor = [255, 255, 255];
           let textColor = [55, 65, 81];
           let fontStyle = "normal";
@@ -732,15 +838,17 @@ const QCSunriseDailyTrend = () => {
               fillColor = getBackgroundColorRGB(rate);
               textColor = getFontColorRGB(rate);
             } else if (rate === 0) {
-              fillColor = [229, 231, 235];
-              textColor = [31, 41, 55];
+               fillColor = [229, 231, 235];
+               textColor = [31, 41, 55];
             }
           } else if (colIndex < numGroupingCols) {
             fillColor = isActualGroupRow ? [241, 245, 249] : [255, 255, 255];
             lineColor = isActualGroupRow ? [148, 163, 184] : [209, 213, 219];
             if (!cellHasValue) {
+
               textColor = fillColor;
             } else {
+
               textColor = [51, 65, 85];
               fontStyle = "bold";
               data.cell.styles.valign = "top";
@@ -756,10 +864,8 @@ const QCSunriseDailyTrend = () => {
               fontStyle = "normal";
               textColor = [55, 65, 81];
               lineColor = [209, 213, 219];
-              data.cell.styles.cellPadding = {
-                ...data.cell.styles.cellPadding,
-                left: 3,
-              };
+
+              data.cell.styles.cellPadding = { ...data.cell.styles.cellPadding, left: 3 };
             }
           } else if (rate !== undefined && rate > 0) {
             fillColor = getBackgroundColorRGB(rate);
@@ -772,28 +878,32 @@ const QCSunriseDailyTrend = () => {
               lineColor = [209, 213, 219];
             }
           } else if (rate === 0) {
-            if (isActualGroupRow) {
-              fillColor = [100, 116, 139];
-              textColor = [255, 255, 255];
-              fontStyle = "bold";
-              lineColor = [71, 85, 105];
-            } else {
-              fillColor = [255, 255, 255];
-              textColor = [156, 163, 175];
-              fontStyle = "normal";
-              lineColor = [209, 213, 219];
-            }
+             if (isActualGroupRow) {
+               fillColor = [100, 116, 139];
+               textColor = [255, 255, 255];
+               fontStyle = "bold";
+               lineColor = [71, 85, 105];
+             } else {
+               fillColor = [255, 255, 255];
+               textColor = [156, 163, 175];
+               fontStyle = "normal";
+               lineColor = [209, 213, 219];
+             }
           }
+
 
           data.cell.styles.fillColor = fillColor;
           data.cell.styles.textColor = textColor;
           data.cell.styles.fontStyle = fontStyle;
           data.cell.styles.lineColor = lineColor;
-        } else if (data.section === "head") {
-          data.cell.styles.halign = colIndex <= numGroupingCols ? "left" : "center";
+
+        } else if (data.section === 'head') {
+
+             data.cell.styles.halign = colIndex <= numGroupingCols ? 'left' : 'center';
         }
       },
       didDrawPage: (data) => {
+
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
         doc.text(
@@ -803,41 +913,45 @@ const QCSunriseDailyTrend = () => {
           { align: "center" },
         );
       },
+
       willDrawCell: (data) => {
-        if (data.section === "body" && data.column.index < numGroupingCols) {
+
+        if (data.section === 'body' && data.column.index < numGroupingCols) {
           const rowIndexInBody = data.row.index;
           const colIndex = data.column.index;
           const cellValue = body[rowIndexInBody][colIndex];
 
+
           if (cellValue === "") {
+
             let spanMasterRowIndex = rowIndexInBody - 1;
-            while (
-              spanMasterRowIndex >= 0 &&
-              body[spanMasterRowIndex][colIndex] === ""
-            ) {
+            while (spanMasterRowIndex >= 0 && body[spanMasterRowIndex][colIndex] === "") {
               spanMasterRowIndex--;
             }
 
-            if (
-              spanMasterRowIndex >= 0 &&
-              spanMasterRowIndex >= data.table.startPage
-            ) {
-              const masterCell =
-                data.table.body[spanMasterRowIndex]?.cells[colIndex];
-              if (masterCell && masterCell.willDraw) {
-                masterCell.rowSpan = (masterCell.rowSpan || 1) + 1;
-                data.cell.willDraw = false;
-              }
+
+            if (spanMasterRowIndex >= 0 && spanMasterRowIndex >= data.table.startPage) {
+
+               const masterCell = data.table.body[spanMasterRowIndex]?.cells[colIndex];
+
+               if (masterCell && masterCell.willDraw) {
+
+                  masterCell.rowSpan = (masterCell.rowSpan || 1) + 1;
+                  data.cell.willDraw = false;
+               }
             }
           } else {
+
             data.cell.rowSpan = 1;
           }
         }
       },
+
     });
 
     doc.save("DailyDefectTrend.pdf");
   }, [prepareExportData, uniqueDates]);
+
 
   const handleOptionToggle = useCallback((option) => {
     setGroupingOptions((prev) => ({ ...prev, [option]: !prev[option] }));
@@ -863,6 +977,7 @@ const QCSunriseDailyTrend = () => {
     });
   }, []);
 
+
   const summaryStats = useMemo(
     () => ({
       totalCheckedQty: totalChecked,
@@ -872,18 +987,23 @@ const QCSunriseDailyTrend = () => {
     [totalChecked, totalDefects, overallDhu],
   );
 
+
   const tableGroupingHeaders = useMemo(
     () => getCurrentGroupingFieldNames(),
     [getCurrentGroupingFieldNames],
   );
 
+
   const calculateRowSpan = useCallback(
     (groupRowIndex, groupKey) => {
       let spanCount = 1;
+
       for (let i = groupRowIndex + 1; i < rows.length; i++) {
+
         if (rows[i].type === "defect" && rows[i].key.startsWith(groupKey + "-")) {
           spanCount++;
         } else {
+
           break;
         }
       }
@@ -892,12 +1012,15 @@ const QCSunriseDailyTrend = () => {
     [rows],
   );
 
+
   return (
     <div className="p-4 space-y-6">
-      <QCSunriseFilterPane
+
+      <DailyFilterPane
         onFilterChange={handleFilterChange}
         initialFilters={activeFilters}
       />
+
 
       <div className="mb-6">
         {loading && (
@@ -908,6 +1031,7 @@ const QCSunriseDailyTrend = () => {
             Error loading summary: {error}
           </div>
         )}
+
         {!loading &&
           !error &&
           rawData.length === 0 &&
@@ -916,22 +1040,27 @@ const QCSunriseDailyTrend = () => {
               No data available for the selected filters.
             </div>
           )}
+
         {!loading && !error && rawData.length > 0 && (
           <QCSunriseSummaryCard summaryStats={summaryStats} />
         )}
       </div>
 
+
       <div className="bg-white shadow-md rounded-lg p-4">
+
         {!loading && !error && (
           <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
             <h2 className="text-lg font-semibold text-gray-900 whitespace-nowrap">
               Daily Defect Trend
             </h2>
 
+
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <span className="text-sm font-medium text-gray-600 mr-2">
                 Group by:
               </span>
+
 
               {[
                 { label: "Lines", option: "addLines", filterKey: "lineNo" },
@@ -957,6 +1086,7 @@ const QCSunriseDailyTrend = () => {
                       type="checkbox"
                       checked={groupingOptions[option] || isCurrentlyFiltered}
                       onChange={() => handleOptionToggle(option)}
+
                       className={`h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer`}
                     />
                     <span
@@ -985,7 +1115,9 @@ const QCSunriseDailyTrend = () => {
                 Clear All
               </button>
 
+
               <div className="border-l border-gray-300 h-6 mx-2"></div>
+
 
               <button
                 onClick={downloadExcel}
@@ -1007,22 +1139,26 @@ const QCSunriseDailyTrend = () => {
           </div>
         )}
 
+
         {loading && (
           <div className="text-center p-4 text-gray-500">
             Loading trend data...
           </div>
         )}
+
         {error && (
           <div className="text-center p-4 text-red-500 bg-red-50 rounded border border-red-200">
             Error loading trend data: {error}
           </div>
         )}
+
         {!loading && !error && rows.length === 0 && rawData.length > 0 && (
           <div className="text-center p-4 text-gray-500">
             No trend data to display based on current grouping. Try adjusting
-            'Group by' options.
+            Group by options.
           </div>
         )}
+
         {!loading &&
           !error &&
           rows.length === 0 &&
@@ -1033,23 +1169,28 @@ const QCSunriseDailyTrend = () => {
             </div>
           )}
 
+
         {!loading && !error && rows.length > 0 && (
           <div
             className="overflow-x-auto border border-gray-300 rounded-md"
             style={{ maxHeight: "60vh" }}
           >
             <table className="min-w-full border-collapse align-middle text-xs">
+
               <thead className="bg-gray-100 sticky top-0 z-10">
                 <tr>
+
                   {tableGroupingHeaders.map((header, index) => (
                     <th
                       key={header}
                       className="py-2 px-3 border-b border-r border-gray-300 text-left font-semibold text-gray-700 sticky bg-gray-100 z-20 whitespace-nowrap align-middle"
+
                       style={{ left: `${index * 100}px`, minWidth: "100px" }}
                     >
                       {header}
                     </th>
                   ))}
+
                   <th
                     className="py-2 px-3 border-b border-r border-gray-300 text-left font-semibold text-gray-700 sticky bg-gray-100 z-20 whitespace-nowrap align-middle"
                     style={{
@@ -1059,6 +1200,7 @@ const QCSunriseDailyTrend = () => {
                   >
                     Defect / Group
                   </th>
+
                   {uniqueDates.map((date) => (
                     <th
                       key={date}
@@ -1071,8 +1213,10 @@ const QCSunriseDailyTrend = () => {
                 </tr>
               </thead>
 
+
               <tbody className="bg-white">
                 {rows.map((row, rowIndex) => {
+
                   if (row.type === "group") {
                     const rowSpanCount = calculateRowSpan(
                       rowIndex,
@@ -1080,6 +1224,7 @@ const QCSunriseDailyTrend = () => {
                     );
                     return (
                       <tr key={row.key} className="font-semibold">
+
                         {tableGroupingHeaders.map((header, colIndex) => (
                           <td
                             key={`group-${row.key}-${colIndex}`}
@@ -1090,9 +1235,11 @@ const QCSunriseDailyTrend = () => {
                               minWidth: "100px",
                             }}
                           >
+
                             {row.groupValues[colIndex]}
                           </td>
                         ))}
+
                         <td
                           key={`label-${row.key}`}
                           className="py-1.5 px-3 border-b border-r border-slate-600 whitespace-nowrap align-middle font-bold text-white bg-slate-500 sticky z-10"
@@ -1124,7 +1271,9 @@ const QCSunriseDailyTrend = () => {
                         })}
                       </tr>
                     );
+
                   } else if (row.type === "defect") {
+
                     return (
                       <tr key={row.key} className="hover:bg-gray-50">
                         <td
@@ -1137,6 +1286,7 @@ const QCSunriseDailyTrend = () => {
                         >
                           {row.defectName}
                         </td>
+
                         {uniqueDates.map((date) => {
                           const rate = row.data[date] || 0;
                           const displayValue =
@@ -1162,6 +1312,7 @@ const QCSunriseDailyTrend = () => {
                   return null;
                 })}
 
+
                 <tr className="bg-gray-200 font-semibold text-gray-800 sticky bottom-0 z-10">
                   {tableGroupingHeaders.map((_, index) => (
                     <td
@@ -1183,6 +1334,7 @@ const QCSunriseDailyTrend = () => {
                     const dateData = rawData.filter(
                       (d) => formatDateToDDMMYYYY(d.inspectionDate) === date,
                     );
+
                     const totalCheckedForDate = dateData.reduce(
                       (sum, d) => sum + (d.CheckedQty || 0),
                       0,
@@ -1191,6 +1343,7 @@ const QCSunriseDailyTrend = () => {
                       (sum, d) => sum + (d.totalDefectsQty || 0),
                       0,
                     );
+
                     const rate =
                       totalCheckedForDate > 0
                         ? (totalDefectsForDate / totalCheckedForDate) * 100

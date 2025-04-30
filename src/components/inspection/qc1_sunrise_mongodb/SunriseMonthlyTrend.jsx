@@ -51,7 +51,7 @@ const getYearMonthKey = (dateStr) => {
 
 const getDefaultEndDate = () => format(endOfMonth(new Date()), "yyyy-MM-dd");
 const getDefaultStartDate = () =>
-  format(startOfMonth(subMonths(new Date(), 4)), "yyyy-MM-dd"); // Default to start of previous month
+  format(startOfMonth(subMonths(new Date(), 11)), "yyyy-MM-dd"); // Default to start of previous month
 // --- End Helper functions ---
 
 const SunriseMonthlyTrend = () => {
