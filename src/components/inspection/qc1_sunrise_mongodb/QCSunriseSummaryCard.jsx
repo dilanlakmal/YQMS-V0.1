@@ -8,6 +8,13 @@ const QCSunriseSummaryCard = ({ summaryStats }) => {
     return "bg-green-100";
   };
 
+  // Helper function to format numbers with thousands separators
+  const formatNumber = (num) => {
+    // Ensure it's a number, default to 0 if not
+    const number = Number(num) || 0;
+    return number.toLocaleString();
+  };
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
       {/* Checked Qty Card */}
@@ -15,7 +22,7 @@ const QCSunriseSummaryCard = ({ summaryStats }) => {
         <div>
           <h3 className="text-lg font-semibold text-gray-700">Checked Qty</h3>
           <p className="text-3xl font-bold text-indigo-600">
-            {summaryStats.totalCheckedQty}
+            {formatNumber(summaryStats.totalCheckedQty)}
           </p>
         </div>
       </div>
@@ -25,7 +32,7 @@ const QCSunriseSummaryCard = ({ summaryStats }) => {
         <div>
           <h3 className="text-lg font-semibold text-gray-700">Defects Qty</h3>
           <p className="text-3xl font-bold text-red-600">
-            {summaryStats.totalDefectsQty}
+            {formatNumber(summaryStats.totalDefectsQty)}
           </p>
         </div>
       </div>
@@ -39,6 +46,7 @@ const QCSunriseSummaryCard = ({ summaryStats }) => {
         <div>
           <h3 className="text-lg font-semibold text-gray-700">Defect Rate</h3>
           <p className="text-3xl font-bold text-gray-800">
+            {/* Defect rate is usually a percentage, formatting might not be needed unless it gets very large */}
             {summaryStats.defectRate}%
           </p>
         </div>
