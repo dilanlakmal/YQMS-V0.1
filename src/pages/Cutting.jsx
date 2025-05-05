@@ -21,7 +21,8 @@ const CuttingPage = () => {
   const [moNoOptions, setMoNoOptions] = useState([]);
   const [showMoNoDropdown, setShowMoNoDropdown] = useState(false);
   const moNoDropdownRef = useRef(null);
-  const [lotNo, setLotNo] = useState("");
+  //const [lotNo, setLotNo] = useState("");
+  const [lotNo, setLotNo] = useState([]); // Array to store multiple selected Lot Nos
   const [color, setColor] = useState("");
   const [tableNo, setTableNo] = useState("");
   const [cuttingTableL, setCuttingTableL] = useState("");
@@ -39,7 +40,12 @@ const CuttingPage = () => {
   const [showNumberPad, setShowNumberPad] = useState(false);
   const [showBundleQtyCheckNumberPad, setShowBundleQtyCheckNumberPad] =
     useState(false);
+
   const [isTablet, setIsTablet] = useState(false);
+  const [showTotalInspectionQtyNumberPad, setShowTotalInspectionQtyNumberPad] =
+    useState(false);
+  const [isTotalInspectionQtyManual, setIsTotalInspectionQtyManual] =
+    useState(false);
   const [selectedPanel, setSelectedPanel] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedSerialLetter, setSelectedSerialLetter] = useState("");
@@ -94,7 +100,11 @@ const CuttingPage = () => {
   });
 
   const [moData, setMoData] = useState(null);
-  const [lotNos, setLotNos] = useState([]);
+  const [lotNoSearch, setLotNoSearch] = useState(""); // Search input for filtering Lot Nos
+  const [lotNoInput, setLotNoInput] = useState(""); // Input for typing Lot Nos when no dropdown
+  const [lotNos, setLotNos] = useState([]); // List of available Lot Nos
+  const [showLotNoDropdown, setShowLotNoDropdown] = useState(false); // Control dropdown visibility
+  const lotNoInputRef = useRef(null); // Ref to handle clicks outside the dropdown
   const [colors, setColors] = useState([]);
   const [tableNos, setTableNos] = useState([]);
   const [markerData, setMarkerData] = useState([]);
@@ -143,7 +153,7 @@ const CuttingPage = () => {
       }
     };
     fetchMoNumbers();
-  }, [moNoSearch, t]);
+  }, [moNoSearch]);
 
   useEffect(() => {
     const fetchMoData = async () => {
@@ -164,9 +174,14 @@ const CuttingPage = () => {
         const lotNames =
           response.data[0]?.lotNo?.length > 0
             ? response.data[0].lotNo.map((l) => l.LotName)
-            : ["N/A"];
+            : [];
+        //: ["N/A"];
         setLotNos(lotNames);
-        setLotNo("");
+        setLotNo([]); // Reset to empty array
+        setLotNoSearch(""); // Reset search input
+        setLotNoInput(""); // Reset typed input
+        setShowLotNoDropdown(false); // Close dropdown
+        //setLotNo("");
         const uniqueColors = [
           ...new Set(response.data.map((d) => d.EngColor))
         ].filter((color) => color);
@@ -187,7 +202,20 @@ const CuttingPage = () => {
       }
     };
     fetchMoData();
-  }, [moNo, t]);
+  }, [moNo]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        lotNoInputRef.current &&
+        !lotNoInputRef.current.contains(event.target)
+      ) {
+        setShowLotNoDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (color && moData) {
@@ -289,17 +317,34 @@ const CuttingPage = () => {
         calculatedBundleQtyCheck = 20;
       else calculatedBundleQtyCheck = bundleQtyCheck || "";
       setBundleQtyCheck(calculatedBundleQtyCheck.toString());
-      setTotalInspectionQty(calculatedBundleQtyCheck * 15);
+      if (!isTotalInspectionQtyManual) {
+        setTotalInspectionQty(calculatedBundleQtyCheck * 15);
+      }
     } else {
       setBundleQtyCheck("");
-      setTotalInspectionQty(0);
+      if (!isTotalInspectionQtyManual) {
+        setTotalInspectionQty(0);
+      }
     }
-  }, [totalBundleQty, actualLayers, planLayerQty]);
+    //   setTotalInspectionQty(calculatedBundleQtyCheck * 15);
+    // } else {
+    //   setBundleQtyCheck("");
+    //   setTotalInspectionQty(0);
+    // }
+  }, [totalBundleQty, actualLayers, planLayerQty, isTotalInspectionQtyManual]);
 
   useEffect(() => {
-    if (bundleQtyCheck) setTotalInspectionQty(parseInt(bundleQtyCheck) * 15);
-    else setTotalInspectionQty(0);
-  }, [bundleQtyCheck]);
+    if (bundleQtyCheck && !isTotalInspectionQtyManual) {
+      setTotalInspectionQty(parseInt(bundleQtyCheck) * 15);
+    } else if (!bundleQtyCheck && !isTotalInspectionQtyManual) {
+      setTotalInspectionQty(0);
+    }
+  }, [bundleQtyCheck, isTotalInspectionQtyManual]);
+
+  // useEffect(() => {
+  //   if (bundleQtyCheck) setTotalInspectionQty(parseInt(bundleQtyCheck) * 15);
+  //   else setTotalInspectionQty(0);
+  // }, [bundleQtyCheck]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -319,7 +364,11 @@ const CuttingPage = () => {
     setMoNoOptions([]);
     setShowMoNoDropdown(false);
     setMoData(null);
-    setLotNo("");
+    setLotNo([]); // Changed to array
+    //setLotNo("");
+    setLotNoSearch(""); // Reset search input
+    setLotNoInput(""); // Reset typed input
+    setShowLotNoDropdown(false); // Close dropdown
     setColor("");
     setTableNo("");
     setCuttingTableL("");
@@ -331,6 +380,8 @@ const CuttingPage = () => {
     setTotalBundleQty("");
     setBundleQtyCheck("");
     setTotalInspectionQty(0);
+    setShowTotalInspectionQtyNumberPad(false); // Reset NumberPad visibility
+    setIsTotalInspectionQtyManual(false); // Reset manual edit flag
     setCuttingByAuto(true); // Reset to default
     setCuttingByManual(false);
     setSelectedPanel("");
@@ -414,6 +465,7 @@ const CuttingPage = () => {
       }
     });
     setTableData({ Top: [], Middle: [], Bottom: [] });
+
     setColumnDefects({
       Top: Array(colCounts.Top)
         .fill([])
@@ -430,23 +482,13 @@ const CuttingPage = () => {
 
   // New useEffect
   useEffect(() => {
-    // Reset tableData and columnDefects when selectedPanel changes
+    //Reset tableData and columnDefects when selectedPanel changes
     setTableData({
       Top: [],
       Middle: [],
       Bottom: []
     });
-    setColumnDefects({
-      Top: Array(colCounts.Top)
-        .fill([])
-        .map(() => Array(5).fill([])),
-      Middle: Array(colCounts.Middle)
-        .fill([])
-        .map(() => Array(5).fill([])),
-      Bottom: Array(colCounts.Bottom)
-        .fill([])
-        .map(() => Array(5).fill([]))
-    });
+
     // Reset summary to reflect the new panel
     setSummary({
       Top: {
@@ -474,9 +516,20 @@ const CuttingPage = () => {
         passRate: 0
       }
     });
+    setColumnDefects({
+      Top: Array(colCounts.Top)
+        .fill([])
+        .map(() => Array(5).fill([])),
+      Middle: Array(colCounts.Middle)
+        .fill([])
+        .map(() => Array(5).fill([])),
+      Bottom: Array(colCounts.Bottom)
+        .fill([])
+        .map(() => Array(5).fill([]))
+    });
     // Reset filters to ensure they don't interfere with the new panel
     setFilters({ panelName: "", side: "", direction: "", lw: "" });
-  }, [selectedPanel]);
+  }, [selectedPanel, colCounts.Top, colCounts.Middle, colCounts.Bottom]);
 
   const resetTableData = () => {
     setCuttingTableNo("");
@@ -562,7 +615,8 @@ const CuttingPage = () => {
     e.preventDefault();
     if (
       !moNo ||
-      !lotNo ||
+      //!lotNo ||
+      lotNo.length === 0 || // Changed to check array length
       !color ||
       !tableNo ||
       !totalBundleQty ||
@@ -670,7 +724,8 @@ const CuttingPage = () => {
       cutting_emp_dept: user.dept_name,
       cutting_emp_section: user.sect_name,
       moNo,
-      lotNo,
+      lotNo: lotNo.join(","), // Join array into comma-separated string
+      //lotNo,
       buyer: orderDetails?.Buyer || "N/A", // New field from orderDetails
       color,
       tableNo,
@@ -725,7 +780,7 @@ const CuttingPage = () => {
     String.fromCharCode(65 + i)
   );
   const toleranceOptions = [
-    { label: "-1/4, 1/4", value: { min: -0.25, max: 0.25 } },
+    { label: "-1/16, 1/16", value: { min: -0.0625, max: 0.0625 } },
     { label: "-1/8, 1/8", value: { min: -0.125, max: 0.125 } }
   ];
 
@@ -745,7 +800,10 @@ const CuttingPage = () => {
         .fill([])
         .map(() => Array(5).fill([]));
       for (let i = 0; i < Math.min(currentDefects.length, newCount); i++) {
-        newDefects[i] = currentDefects[i];
+        // Copy existing panel indices (up to 5)
+        for (let j = 0; j < Math.min(currentDefects[i].length, 5); j++) {
+          newDefects[i] = currentDefects[i];
+        }
       }
       return { ...prev, [tab]: newDefects };
     });
@@ -876,24 +934,136 @@ const CuttingPage = () => {
                     )}
                   </div>
                 </div>
+
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
                     {t("cutting.lotNo")}
                   </label>
-                  <select
-                    value={lotNo}
-                    onChange={(e) => setLotNo(e.target.value)}
-                    className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                    disabled={!moNo || lotNos.length === 0}
-                  >
-                    <option value="">{t("cutting.select_lot_no")}</option>
-                    {lotNos.map((lot, index) => (
-                      <option key={index} value={lot}>
-                        {lot}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative mt-1" ref={lotNoInputRef}>
+                    {lotNos.length > 0 ? (
+                      <>
+                        <div
+                          className={`w-full p-2 border border-gray-300 rounded-lg flex flex-wrap gap-1 items-center ${
+                            !moNo
+                              ? "bg-gray-100 cursor-not-allowed"
+                              : "bg-white"
+                          }`}
+                        >
+                          {lotNo.map((lot, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded"
+                            >
+                              {lot}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setLotNo(lotNo.filter((_, i) => i !== index));
+                                }}
+                                className="ml-1 text-blue-600 hover:text-blue-800"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                          <input
+                            type="text"
+                            value={lotNoSearch}
+                            onChange={(e) => {
+                              setLotNoSearch(e.target.value);
+                              setShowLotNoDropdown(true);
+                            }}
+                            onClick={() => moNo && setShowLotNoDropdown(true)}
+                            placeholder={t("cutting.search_lot_no")}
+                            className="flex-1 outline-none bg-transparent min-w-[100px]"
+                            disabled={!moNo}
+                          />
+                        </div>
+                        {showLotNoDropdown && (
+                          <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto shadow-lg">
+                            {lotNos
+                              .filter((lot) =>
+                                lot
+                                  .toLowerCase()
+                                  .includes(lotNoSearch.toLowerCase())
+                              )
+                              .map((lot, index) => (
+                                <li
+                                  key={index}
+                                  onClick={() => {
+                                    if (!lotNo.includes(lot)) {
+                                      setLotNo([...lotNo, lot]);
+                                      setLotNoSearch("");
+                                      setShowLotNoDropdown(false);
+                                    }
+                                  }}
+                                  className="p-2 hover:bg-blue-100 cursor-pointer"
+                                >
+                                  {lot}
+                                </li>
+                              ))}
+                          </ul>
+                        )}
+                      </>
+                    ) : (
+                      <div
+                        className={`w-full p-2 border border-gray-300 rounded-lg flex flex-wrap gap-1 items-center ${
+                          !moNo ? "bg-gray-100 cursor-not-allowed" : "bg-white"
+                        }`}
+                      >
+                        {lotNo.map((lot, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded"
+                          >
+                            {lot}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setLotNo(lotNo.filter((_, i) => i !== index))
+                              }
+                              className="ml-1 text-blue-600 hover:text-blue-800"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                        <div className="inline-flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={lotNoInput}
+                            onChange={(e) => setLotNoInput(e.target.value)}
+                            placeholder={t("cutting.enter_lot_no")}
+                            className="flex-1 outline-none bg-transparent"
+                            disabled={!moNo}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (
+                                lotNoInput.trim() &&
+                                !lotNo.includes(lotNoInput.trim())
+                              ) {
+                                setLotNo([...lotNo, lotNoInput.trim()]);
+                                setLotNoInput("");
+                              }
+                            }}
+                            className={`p-1 text-blue-600 hover:text-blue-800 ${
+                              !lotNoInput.trim() || !moNo
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }`}
+                            disabled={!lotNoInput.trim() || !moNo}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
+
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
                     {t("cutting.color")}
@@ -954,13 +1124,16 @@ const CuttingPage = () => {
                     <div className="mt-2 p-4 bg-gray-100 rounded-lg">
                       <div className="flex space-x-4 text-sm">
                         <p>
-                          <strong>Layer Qty:</strong> {planLayerQty}
+                          <strong>{t("cutting.layerQty")}</strong>{" "}
+                          {planLayerQty}
                         </p>
                         <p>
-                          <strong>TotalPcs:</strong> {totalPlanPcs}
+                          <strong>{t("cutting.totalPcs")}</strong>{" "}
+                          {totalPlanPcs}
                         </p>
                         <p>
-                          <strong>Actual Layer Qty:</strong> {actualLayers}
+                          <strong>{t("cutting.actualLayerQty")}</strong>{" "}
+                          {actualLayers}
                         </p>
                       </div>
                     </div>
@@ -1055,7 +1228,7 @@ const CuttingPage = () => {
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-medium text-gray-700">
-                      Total Bundle Qty
+                      {t("cutting.totalBundleQty")}
                     </label>
                     <div className="relative">
                       <input
@@ -1085,7 +1258,7 @@ const CuttingPage = () => {
                   </div>
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-medium text-gray-700">
-                      Bundle Qty Check
+                      {t("cutting.bundleQtyCheck")}
                     </label>
                     <div className="relative">
                       <input
@@ -1133,18 +1306,48 @@ const CuttingPage = () => {
                   </div>
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-medium text-gray-700">
-                      Total Inspection Qty
+                      {t("cutting.totalInspectionQty")}
                     </label>
-                    <input
-                      type="text"
-                      value={totalInspectionQty}
-                      readOnly
-                      className="mt-1 w-full p-2 border border-gray-300 rounded-lg bg-gray-100"
-                    />
+                    <div className="relative">
+                      <input
+                        type={isTablet ? "number" : "text"}
+                        inputMode="numeric"
+                        value={totalInspectionQty}
+                        onChange={(e) => {
+                          setTotalInspectionQty(e.target.value);
+                          setIsTotalInspectionQtyManual(true);
+                        }}
+                        className="mt-1 w-full p-2 border border-gray-300 rounded-lg pr-10"
+                        placeholder="Enter Total Inspection Qty"
+                      />
+                      {!isTablet && (
+                        <button
+                          onClick={() =>
+                            setShowTotalInspectionQtyNumberPad(true)
+                          }
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800"
+                        >
+                          <Keyboard className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+                    {showTotalInspectionQtyNumberPad && (
+                      <NumberPad
+                        onClose={() =>
+                          setShowTotalInspectionQtyNumberPad(false)
+                        }
+                        onInput={(value) => {
+                          setTotalInspectionQty(value);
+                          setIsTotalInspectionQtyManual(true);
+                        }}
+                        initialValue={totalInspectionQty}
+                      />
+                    )}
                   </div>
+
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-medium text-gray-700">
-                      Cutting by
+                      {t("cutting.cuttingBy")}
                     </label>
                     <div className="flex items-center space-x-4 mt-1">
                       <div className="flex items-center">
@@ -1155,7 +1358,7 @@ const CuttingPage = () => {
                           className="h-4 w-4 text-blue-600 border-gray-300 rounded"
                         />
                         <label className="ml-2 text-sm text-gray-700">
-                          Auto
+                          {t("cutting.auto")}
                         </label>
                       </div>
                       <div className="flex items-center">
@@ -1166,20 +1369,20 @@ const CuttingPage = () => {
                           className="h-4 w-4 text-blue-600 border-gray-300 rounded"
                         />
                         <label className="ml-2 text-sm text-gray-700">
-                          Manual
+                          {t("cutting.manual")}
                         </label>
                       </div>
                     </div>
                   </div>
                 </div>
                 <div className="mt-2 text-sm text-gray-600">
-                  Sampling standard: AQL 1.0
+                  {t("cutting.samplingStandard")}
                 </div>
                 <hr className="my-4 border-gray-300" />
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-medium text-gray-700">
-                      Panel
+                      {t("cutting.panel")}
                     </label>
                     <select
                       value={selectedPanel}
@@ -1190,14 +1393,14 @@ const CuttingPage = () => {
                       className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
                     >
                       <option value="">{t("cutting.select_panel")}</option>
-                      <option value="Top">Top</option>
-                      <option value="Bottom">Bottom</option>
-                      <option value="Top Hoodies">Top Hoodies</option>
+                      <option value="Top">{t("cutting.top")}</option>
+                      <option value="Bottom">{t("cutting.bottom")}</option>
+                      <option value="Top Hoodies">{t("cutting.zipper")}</option>
                     </select>
                   </div>
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-medium text-gray-700">
-                      Size
+                      {t("cutting.size")}
                     </label>
                     <select
                       value={selectedSize}
@@ -1215,7 +1418,7 @@ const CuttingPage = () => {
                   </div>
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-medium text-gray-700">
-                      Serial Letter
+                      {t("cutting.serialLetter")}
                     </label>
                     <select
                       value={selectedSerialLetter}
@@ -1234,7 +1437,7 @@ const CuttingPage = () => {
                   </div>
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-medium text-gray-700">
-                      Tolerance
+                      {t("cutting.tolerance")}
                     </label>
                     <select
                       value={
@@ -1259,31 +1462,31 @@ const CuttingPage = () => {
                   <>
                     <hr className="my-4 border-gray-300" />
                     <h3 className="text-sm font-medium text-gray-600 mb-2">
-                      Summary Details
+                      {t("cutting.summaryDetails")}
                     </h3>
                     <div className="mb-4">
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
                         <div className="p-4 bg-blue-100 rounded-lg text-center">
                           <p className="text-xs font-medium text-gray-700">
-                            Parts
+                            {t("cutting.parts")}
                           </p>
                           <p className="text-lg font-bold">{totalParts}</p>
                         </div>
                         <div className="p-4 bg-green-100 rounded-lg text-center">
                           <p className="text-xs font-medium text-gray-700">
-                            Pass
+                            {t("cutting.pass")}
                           </p>
                           <p className="text-lg font-bold">{totalPass}</p>
                         </div>
                         <div className="p-4 bg-red-100 rounded-lg text-center">
                           <p className="text-xs font-medium text-gray-700">
-                            Reject
+                            {t("cutting.reject")}
                           </p>
                           <p className="text-lg font-bold">{totalReject}</p>
                         </div>
                         <div className="p-4 bg-orange-100 rounded-lg text-center">
                           <p className="text-xs font-medium text-gray-700">
-                            Reject Measurements
+                            {t("cutting.rejectMeasurements")}
                           </p>
                           <p className="text-lg font-bold">
                             {summary.Top.rejectMeasurement +
@@ -1293,7 +1496,7 @@ const CuttingPage = () => {
                         </div>
                         <div className="p-4 bg-purple-100 rounded-lg text-center">
                           <p className="text-xs font-medium text-gray-700">
-                            Reject Defects
+                            {t("cutting.rejectDefects")}
                           </p>
                           <p className="text-lg font-bold">
                             {summary.Top.rejectDefects +
@@ -1303,7 +1506,7 @@ const CuttingPage = () => {
                         </div>
                         <div className="p-4 bg-yellow-100 rounded-lg text-center">
                           <p className="text-xs font-medium text-gray-700">
-                            Pass Rate
+                            {t("cutting.passRate")}
                           </p>
                           <p className="text-lg font-bold">
                             {totalParts > 0
@@ -1316,7 +1519,7 @@ const CuttingPage = () => {
                     </div>
                     <hr className="my-4 border-gray-300" />
                     <h3 className="text-sm font-medium text-gray-600 mb-2">
-                      Measurement Details
+                      {t("cutting.measurementDetails")}
                     </h3>
                     <div className="flex justify-center mb-4">
                       <button
@@ -1327,7 +1530,7 @@ const CuttingPage = () => {
                             : "bg-gray-200 text-gray-700"
                         } rounded-l-lg`}
                       >
-                        Top
+                        {t("cutting.top")}
                       </button>
                       <button
                         onClick={() => setActiveMeasurementTab("Middle")}
@@ -1337,7 +1540,7 @@ const CuttingPage = () => {
                             : "bg-gray-200 text-gray-700"
                         }`}
                       >
-                        Middle
+                        {t("cutting.middle")}
                       </button>
                       <button
                         onClick={() => setActiveMeasurementTab("Bottom")}
@@ -1347,7 +1550,7 @@ const CuttingPage = () => {
                             : "bg-gray-200 text-gray-700"
                         } rounded-r-lg`}
                       >
-                        Bottom
+                        {t("cutting.bottom")}
                       </button>
                     </div>
                     <div className="flex items-center gap-4 mb-4">
@@ -1361,7 +1564,7 @@ const CuttingPage = () => {
                         }
                         className="p-2 border border-gray-300 rounded-lg"
                       >
-                        {[...Array(15)].map((_, i) => (
+                        {[...Array(5)].map((_, i) => (
                           <option key={i + 1} value={i + 1}>
                             {i + 1}
                           </option>
@@ -1371,7 +1574,7 @@ const CuttingPage = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
-                          Panel Name
+                          {t("cutting.panelName")}
                         </label>
                         <select
                           value={filters.panelName}
@@ -1393,7 +1596,7 @@ const CuttingPage = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
-                          Side
+                          {t("cutting.side")}
                         </label>
                         <select
                           value={filters.side}
@@ -1412,7 +1615,7 @@ const CuttingPage = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
-                          Direction
+                          {t("cutting.direction")}
                         </label>
                         <select
                           value={filters.direction}
@@ -1436,7 +1639,7 @@ const CuttingPage = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
-                          L/W
+                          {t("cutting.lw")}
                         </label>
                         <select
                           value={filters.lw}
@@ -1459,7 +1662,7 @@ const CuttingPage = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 mb-4">
                       <div className="p-4 bg-blue-100 rounded-lg text-center">
                         <p className="text-xs font-medium text-gray-700">
-                          Parts
+                          {t("cutting.parts")}
                         </p>
                         <p className="text-lg font-bold">
                           {summary[activeMeasurementTab].totalParts}
@@ -1467,7 +1670,7 @@ const CuttingPage = () => {
                       </div>
                       <div className="p-4 bg-green-100 rounded-lg text-center">
                         <p className="text-xs font-medium text-gray-700">
-                          Pass
+                          {t("cutting.pass")}
                         </p>
                         <p className="text-lg font-bold">
                           {summary[activeMeasurementTab].totalPass}
@@ -1475,7 +1678,7 @@ const CuttingPage = () => {
                       </div>
                       <div className="p-4 bg-red-100 rounded-lg text-center">
                         <p className="text-xs font-medium text-gray-700">
-                          Reject
+                          {t("cutting.reject")}
                         </p>
                         <p className="text-lg font-bold">
                           {summary[activeMeasurementTab].totalReject}
@@ -1483,7 +1686,7 @@ const CuttingPage = () => {
                       </div>
                       <div className="p-4 bg-orange-100 rounded-lg text-center">
                         <p className="text-xs font-medium text-gray-700">
-                          Reject Measurements
+                          {t("cutting.rejectMeasurements")}
                         </p>
                         <p className="text-lg font-bold">
                           {summary[activeMeasurementTab].rejectMeasurement}
@@ -1491,7 +1694,7 @@ const CuttingPage = () => {
                       </div>
                       <div className="p-4 bg-purple-100 rounded-lg text-center">
                         <p className="text-xs font-medium text-gray-700">
-                          Reject Defects
+                          {t("cutting.rejectDefects")}
                         </p>
                         <p className="text-lg font-bold">
                           {summary[activeMeasurementTab].rejectDefects}
@@ -1499,7 +1702,7 @@ const CuttingPage = () => {
                       </div>
                       <div className="p-4 bg-yellow-100 rounded-lg text-center">
                         <p className="text-xs font-medium text-gray-700">
-                          Pass Rate
+                          {t("cutting.passRate")}
                         </p>
                         <p className="text-lg font-bold">
                           {summary[activeMeasurementTab].passRate}%

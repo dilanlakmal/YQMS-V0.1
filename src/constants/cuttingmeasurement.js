@@ -11,7 +11,8 @@ export const measurementPoints = [
     panelDirection: "Left",
     measurementSide: "Length",
     panelIndex: 1,
-    panelIndexName: "Body Front"
+    panelIndexName: "Front Body",
+    panelIndexNameKhmer: "ផ្ទាំងមុខ"
   },
   {
     no: 2,
@@ -24,7 +25,8 @@ export const measurementPoints = [
     panelDirection: "Left",
     measurementSide: "Width",
     panelIndex: 1,
-    panelIndexName: "Body Front"
+    panelIndexName: "Front Body",
+    panelIndexNameKhmer: "ផ្ទាំងមុខ"
   },
   {
     no: 3,
@@ -37,7 +39,8 @@ export const measurementPoints = [
     panelDirection: "Right",
     measurementSide: "Length",
     panelIndex: 1,
-    panelIndexName: "Body Front"
+    panelIndexName: "Front Body",
+    panelIndexNameKhmer: "ផ្ទាំងមុខ"
   },
   {
     no: 4,
@@ -50,7 +53,8 @@ export const measurementPoints = [
     panelDirection: "Right",
     measurementSide: "Width",
     panelIndex: 1,
-    panelIndexName: "Body Front"
+    panelIndexName: "Front Body",
+    panelIndexNameKhmer: "ផ្ទាំងមុខ"
   },
   {
     no: 5,
@@ -63,7 +67,8 @@ export const measurementPoints = [
     panelDirection: "NA",
     measurementSide: "Length",
     panelIndex: 2,
-    panelIndexName: "Body Back"
+    panelIndexName: "Back Body",
+    panelIndexNameKhmer: "ផ្ទាំងក្រោយ"
   },
   {
     no: 6,
@@ -76,7 +81,8 @@ export const measurementPoints = [
     panelDirection: "NA",
     measurementSide: "Width",
     panelIndex: 2,
-    panelIndexName: "Body Back"
+    panelIndexName: "Back Body",
+    panelIndexNameKhmer: "ផ្ទាំងក្រោយ"
   },
   {
     no: 7,
@@ -89,7 +95,8 @@ export const measurementPoints = [
     panelDirection: "Left",
     measurementSide: "Length",
     panelIndex: 3,
-    panelIndexName: "Sleeve Left"
+    panelIndexName: "Left Sleeve",
+    panelIndexNameKhmer: "ដៃឆ្វេង"
   },
   {
     no: 8,
@@ -102,7 +109,8 @@ export const measurementPoints = [
     panelDirection: "Left",
     measurementSide: "Width",
     panelIndex: 3,
-    panelIndexName: "Sleeve Left"
+    panelIndexName: "Left Sleeve",
+    panelIndexNameKhmer: "ដៃឆ្វេង"
   },
   {
     no: 9,
@@ -115,7 +123,8 @@ export const measurementPoints = [
     panelDirection: "Right",
     measurementSide: "Length",
     panelIndex: 4,
-    panelIndexName: "Sleeve Right"
+    panelIndexName: "Right Sleeve",
+    panelIndexNameKhmer: "ដៃស្តាំ"
   },
   {
     no: 10,
@@ -128,7 +137,8 @@ export const measurementPoints = [
     panelDirection: "Right",
     measurementSide: "Width",
     panelIndex: 4,
-    panelIndexName: "Sleeve Right"
+    panelIndexName: "Right Sleeve",
+    panelIndexNameKhmer: "ដៃស្តាំ"
   },
   {
     no: 11,
@@ -141,7 +151,8 @@ export const measurementPoints = [
     panelDirection: "NA",
     measurementSide: "Length",
     panelIndex: 5,
-    panelIndexName: "Other"
+    panelIndexName: "Other",
+    panelIndexNameKhmer: "ផ្សេងទៀត"
   },
   {
     no: 12,
@@ -154,7 +165,8 @@ export const measurementPoints = [
     panelDirection: "NA",
     measurementSide: "Width",
     panelIndex: 5,
-    panelIndexName: "Other"
+    panelIndexName: "Other",
+    panelIndexNameKhmer: "ផ្សេងទៀត"
   },
 
   // Top Hoodies Panel Measurements
@@ -169,7 +181,8 @@ export const measurementPoints = [
     panelDirection: "NA",
     measurementSide: "Length",
     panelIndex: 1,
-    panelIndexName: "Body Front"
+    panelIndexName: "Front Body",
+    panelIndexNameKhmer: "ផ្ទាំងមុខ"
   },
 
   {
@@ -183,7 +196,8 @@ export const measurementPoints = [
     panelDirection: "NA",
     measurementSide: "Width",
     panelIndex: 1,
-    panelIndexName: "Body Front"
+    panelIndexName: "Front Body",
+    panelIndexNameKhmer: "ផ្ទាំងមុខ"
   },
 
   {
@@ -197,7 +211,8 @@ export const measurementPoints = [
     panelDirection: "NA",
     measurementSide: "Length",
     panelIndex: 2,
-    panelIndexName: "Body Back"
+    panelIndexName: "Back Body",
+    panelIndexNameKhmer: "ផ្ទាំងក្រោយ"
   },
 
   {
@@ -211,7 +226,8 @@ export const measurementPoints = [
     panelDirection: "NA",
     measurementSide: "Width",
     panelIndex: 2,
-    panelIndexName: "Body Back"
+    panelIndexName: "Back Body",
+    panelIndexNameKhmer: "ផ្ទាំងក្រោយ"
   },
   {
     no: 17,
@@ -224,7 +240,8 @@ export const measurementPoints = [
     panelDirection: "Left",
     measurementSide: "Length",
     panelIndex: 3,
-    panelIndexName: "Sleeve Left"
+    panelIndexName: "Left Sleeve",
+    panelIndexNameKhmer: "ដៃឆ្វេង"
   },
   {
     no: 18,
@@ -237,7 +254,8 @@ export const measurementPoints = [
     panelDirection: "Left",
     measurementSide: "Width",
     panelIndex: 3,
-    panelIndexName: "Sleeve Left"
+    panelIndexName: "Left Sleeve",
+    panelIndexNameKhmer: "ដៃឆ្វេង"
   },
   {
     no: 19,
@@ -250,7 +268,8 @@ export const measurementPoints = [
     panelDirection: "Right",
     measurementSide: "Length",
     panelIndex: 4,
-    panelIndexName: "Sleeve Right"
+    panelIndexName: "Right Sleeve",
+    panelIndexNameKhmer: "ដៃស្តាំ"
   },
   {
     no: 20,
@@ -263,7 +282,8 @@ export const measurementPoints = [
     panelDirection: "Right",
     measurementSide: "Width",
     panelIndex: 4,
-    panelIndexName: "Sleeve Right"
+    panelIndexName: "Right Sleeve",
+    panelIndexNameKhmer: "ដៃស្តាំ"
   },
   {
     no: 21,
@@ -276,7 +296,8 @@ export const measurementPoints = [
     panelDirection: "NA",
     measurementSide: "Length",
     panelIndex: 5,
-    panelIndexName: "Pocket"
+    panelIndexName: "Pocket",
+    panelIndexNameKhmer: "ហ៉ោប៉ៅ"
   },
   {
     no: 22,
@@ -289,7 +310,8 @@ export const measurementPoints = [
     panelDirection: "NA",
     measurementSide: "Width",
     panelIndex: 5,
-    panelIndexName: "Pocket"
+    panelIndexName: "Pocket",
+    panelIndexNameKhmer: "ហ៉ោប៉ៅ"
   },
   {
     no: 23,
@@ -302,7 +324,8 @@ export const measurementPoints = [
     panelDirection: "NA",
     measurementSide: "Length",
     panelIndex: 6,
-    panelIndexName: "Other"
+    panelIndexName: "Other",
+    panelIndexNameKhmer: "ផ្សេងទៀត"
   },
   {
     no: 24,
@@ -315,7 +338,8 @@ export const measurementPoints = [
     panelDirection: "NA",
     measurementSide: "Width",
     panelIndex: 6,
-    panelIndexName: "Other"
+    panelIndexName: "Other",
+    panelIndexNameKhmer: "ផ្សេងទៀត"
   },
 
   // Bottom Panel Measurements
@@ -330,7 +354,8 @@ export const measurementPoints = [
     panelDirection: "Left",
     measurementSide: "Length",
     panelIndex: 1,
-    panelIndexName: "Body Front"
+    panelIndexName: "Front Body",
+    panelIndexNameKhmer: "ផ្ទាំងមុខ"
   },
   {
     no: 26,
@@ -343,7 +368,8 @@ export const measurementPoints = [
     panelDirection: "Left",
     measurementSide: "Width",
     panelIndex: 1,
-    panelIndexName: "Body Front"
+    panelIndexName: "Front Body",
+    panelIndexNameKhmer: "ផ្ទាំងមុខ"
   },
   {
     no: 27,
@@ -356,7 +382,8 @@ export const measurementPoints = [
     panelDirection: "Right",
     measurementSide: "Length",
     panelIndex: 1,
-    panelIndexName: "Body Front"
+    panelIndexName: "Front Body",
+    panelIndexNameKhmer: "ផ្ទាំងមុខ"
   },
   {
     no: 28,
@@ -369,7 +396,8 @@ export const measurementPoints = [
     panelDirection: "Right",
     measurementSide: "Width",
     panelIndex: 1,
-    panelIndexName: "Body Front"
+    panelIndexName: "Front Body",
+    panelIndexNameKhmer: "ផ្ទាំងមុខ"
   },
   {
     no: 29,
@@ -382,7 +410,8 @@ export const measurementPoints = [
     panelDirection: "Left",
     measurementSide: "Length",
     panelIndex: 2,
-    panelIndexName: "Body Back"
+    panelIndexName: "Back Body",
+    panelIndexNameKhmer: "ផ្ទាំងក្រោយ"
   },
   {
     no: 30,
@@ -395,7 +424,8 @@ export const measurementPoints = [
     panelDirection: "Left",
     measurementSide: "Width",
     panelIndex: 2,
-    panelIndexName: "Body Back"
+    panelIndexName: "Back Body",
+    panelIndexNameKhmer: "ផ្ទាំងក្រោយ"
   },
   {
     no: 31,
@@ -408,7 +438,8 @@ export const measurementPoints = [
     panelDirection: "Right",
     measurementSide: "Length",
     panelIndex: 2,
-    panelIndexName: "Body Back"
+    panelIndexName: "Back Body",
+    panelIndexNameKhmer: "ផ្ទាំងក្រោយ"
   },
   {
     no: 32,
@@ -421,7 +452,8 @@ export const measurementPoints = [
     panelDirection: "Right",
     measurementSide: "Width",
     panelIndex: 2,
-    panelIndexName: "Body Back"
+    panelIndexName: "Back Body",
+    panelIndexNameKhmer: "ផ្ទាំងក្រោយ"
   },
   {
     no: 33,
@@ -434,7 +466,8 @@ export const measurementPoints = [
     panelDirection: "NA",
     measurementSide: "Length",
     panelIndex: 3,
-    panelIndexName: "Pocket"
+    panelIndexName: "Pocket",
+    panelIndexNameKhmer: "ហ៉ោប៉ៅឆ្វេង"
   },
   {
     no: 34,
@@ -447,7 +480,8 @@ export const measurementPoints = [
     panelDirection: "NA",
     measurementSide: "Width",
     panelIndex: 3,
-    panelIndexName: "Pocket"
+    panelIndexName: "Pocket",
+    panelIndexNameKhmer: "ហ៉ោប៉ៅឆ្វេង"
   },
   {
     no: 35,
@@ -460,7 +494,8 @@ export const measurementPoints = [
     panelDirection: "Right",
     measurementSide: "Length",
     panelIndex: 4,
-    panelIndexName: "Pocket Right"
+    panelIndexName: "Right Pocket",
+    panelIndexNameKhmer: "ហ៉ោប៉ៅស្តាំ"
   },
   {
     no: 36,
@@ -473,6 +508,7 @@ export const measurementPoints = [
     panelDirection: "Right",
     measurementSide: "Width",
     panelIndex: 4,
-    panelIndexName: "Pocket Right"
+    panelIndexName: "Right Pocket",
+    panelIndexNameKhmer: "ហ៉ោប៉ៅស្តាំ"
   }
 ];

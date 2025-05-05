@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { X, Check, AlertCircle, Plus, Minus } from "lucide-react";
 import MeasurementNumPad from "./MeasurementNumPad";
+import { useTranslation } from "react-i18next"; // Add this line
 import { cuttingDefects } from "../../../constants/cuttingdefect";
 
 // Helper function to convert decimal to fraction for display
@@ -68,17 +69,118 @@ const MeasurementTable = ({
       .map(() => Array(5).fill(false))
   );
   const [currentPage, setCurrentPage] = useState(1);
+  const { t, i18n } = useTranslation();
+  const prevMeasurementPoints = useRef(measurementPoints);
+
+  const calculateSummary = (data, currentDefects) => {
+    const usedPanelIndices = [
+      ...new Set(data.filter((row) => row.isUsed).map((row) => row.panelIndex))
+    ];
+    const totalParts = numColumns * usedPanelIndices.length;
+
+    let rejectMeasurement = 0;
+    let rejectDefects = 0;
+    const rejectSet = new Set();
+
+    usedPanelIndices.forEach((panelIndex) => {
+      for (let colIndex = 0; colIndex < numColumns; colIndex++) {
+        const hasDefects = currentDefects[colIndex][panelIndex - 1]?.length > 0;
+        const measurements = data
+          .filter((row) => row.isUsed && row.panelIndex === panelIndex)
+          .map((row) => row.values[colIndex].decimal);
+
+        const anyMeasurementOutOfTolerance = measurements.some(
+          (value) =>
+            value !== null && (value < tolerance.min || value > tolerance.max)
+        );
+
+        if (hasDefects || anyMeasurementOutOfTolerance) {
+          const partKey = `${colIndex}-${panelIndex}`;
+          rejectSet.add(partKey);
+          if (hasDefects) rejectDefects++;
+          if (anyMeasurementOutOfTolerance) rejectMeasurement++;
+        }
+      }
+    });
+
+    const totalReject = rejectSet.size;
+    const totalPass = totalParts - totalReject;
+    const passRate =
+      totalParts > 0 ? ((totalPass / totalParts) * 100).toFixed(2) : 0;
+
+    onUpdate({
+      totalParts,
+      totalPass,
+      totalReject,
+      rejectMeasurement,
+      rejectDefects,
+      passRate
+    });
+  };
+
+  // useEffect(() => {
+  //   // Initialize or update tableData when measurementPoints or numColumns change
+  //   const initializeData = () => {
+  //     const initialData = measurementPoints.map((point, index) => ({
+  //       no: index + 1,
+  //       measurementPoint: point.pointName,
+  //       pointNameKhmer: point.pointNameKhmer,
+  //       panelName: point.panelName,
+  //       panelSide: point.panelSide,
+  //       panelDirection: point.panelDirection,
+  //       measurementSide: point.measurementSide,
+  //       panelIndex: point.panelIndex,
+  //       panelIndexName: point.panelIndexName,
+  //       panelIndexNameKhmer: point.panelIndexNameKhmer,
+  //       values: Array(numColumns).fill({ decimal: 0, fraction: "0" }),
+  //       isUsed: true
+  //     }));
+  //     return initialData;
+  //   };
+
+  //   if (
+  //     tableData.length === 0 ||
+  //     measurementPoints !== prevMeasurementPoints.current
+  //   ) {
+  //     const initialData = initializeData();
+  //     setTableData(initialData);
+  //     calculateSummary(initialData, defects);
+  //     prevMeasurementPoints.current = measurementPoints;
+  //   } else if (tableData[0].values.length !== numColumns) {
+  //     const updatedData = tableData.map((row) => {
+  //       const currentValues = row.values;
+  //       const newValues =
+  //         currentValues.length < numColumns
+  //           ? [
+  //               ...currentValues,
+  //               ...Array(numColumns - currentValues.length).fill({
+  //                 decimal: 0,
+  //                 fraction: "0"
+  //               })
+  //             ]
+  //           : currentValues.slice(0, numColumns);
+  //       return { ...row, values: newValues };
+  //     });
+  //     setTableData(updatedData);
+  //     calculateSummary(updatedData, defects);
+  //   } else {
+  //     calculateSummary(tableData, defects);
+  //   }
+  // }, [measurementPoints, numColumns, defects, setTableData, calculateSummary]);
 
   useEffect(() => {
     if (tableData.length === 0) {
       const initialData = measurementPoints.map((point, index) => ({
         no: index + 1,
         measurementPoint: point.pointName,
+        pointNameKhmer: point.pointNameKhmer, // Add this line
         panelName: point.panelName,
         panelSide: point.panelSide,
         panelDirection: point.panelDirection,
         measurementSide: point.measurementSide,
         panelIndex: point.panelIndex,
+        panelIndexName: point.panelIndexName, // Add this line
+        panelIndexNameKhmer: point.panelIndexNameKhmer, // Add this line
         values: Array(numColumns).fill({ decimal: 0, fraction: "0" }),
         isUsed: true
       }));
@@ -141,52 +243,6 @@ const MeasurementTable = ({
     });
     setTableData(updatedData);
     calculateSummary(updatedData, defects);
-  };
-
-  const calculateSummary = (data, currentDefects) => {
-    const usedPanelIndices = [
-      ...new Set(data.filter((row) => row.isUsed).map((row) => row.panelIndex))
-    ];
-    const totalParts = numColumns * usedPanelIndices.length;
-
-    let rejectMeasurement = 0;
-    let rejectDefects = 0;
-    const rejectSet = new Set();
-
-    usedPanelIndices.forEach((panelIndex) => {
-      for (let colIndex = 0; colIndex < numColumns; colIndex++) {
-        const hasDefects = currentDefects[colIndex][panelIndex - 1]?.length > 0;
-        const measurements = data
-          .filter((row) => row.isUsed && row.panelIndex === panelIndex)
-          .map((row) => row.values[colIndex].decimal);
-
-        const anyMeasurementOutOfTolerance = measurements.some(
-          (value) =>
-            value !== null && (value < tolerance.min || value > tolerance.max)
-        );
-
-        if (hasDefects || anyMeasurementOutOfTolerance) {
-          const partKey = `${colIndex}-${panelIndex}`;
-          rejectSet.add(partKey);
-          if (hasDefects) rejectDefects++;
-          if (anyMeasurementOutOfTolerance) rejectMeasurement++;
-        }
-      }
-    });
-
-    const totalReject = rejectSet.size;
-    const totalPass = totalParts - totalReject;
-    const passRate =
-      totalParts > 0 ? ((totalPass / totalParts) * 100).toFixed(2) : 0;
-
-    onUpdate({
-      totalParts,
-      totalPass,
-      totalReject,
-      rejectMeasurement,
-      rejectDefects,
-      passRate
-    });
   };
 
   const getColumnHeaders = () => {
@@ -322,17 +378,41 @@ const MeasurementTable = ({
                 <td className="border border-gray-300 p-2 text-center bg-white text-sm">
                   {row.no}
                 </td>
-                <td className="border border-gray-300 p-2 text-center bg-white text-sm">
-                  {row.panelIndex}
+                <td className="border border-gray-300 p-2 bg-white flex flex-col items-center justify-center">
+                  <div className="flex items-center text-sm">
+                    {row.panelIndex}
+                    <button
+                      onClick={() => togglePanelIndexUsage(row.panelIndex)}
+                      className="ml-2 text-red-600 hover:text-red-800"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="text-xs">
+                    (
+                    {i18n.language === "kh"
+                      ? row.panelIndexNameKhmer
+                      : row.panelIndexName}
+                    )
+                  </div>
+                  {/* <div className="text-xs">({row.panelIndexName})</div> */}
+                </td>
+                {/* <td className="border border-gray-300 p-2 text-center bg-white text-xs">
+                  {row.panelIndex} ({row.panelIndexName})
                   <button
                     onClick={() => togglePanelIndexUsage(row.panelIndex)}
                     className="ml-2 text-red-600 hover:text-red-800"
                   >
                     <X className="w-4 h-4" />
                   </button>
-                </td>
-                <td className="border border-gray-300 p-2 bg-white text-sm">
+                </td> */}
+                {/* <td className="border border-gray-300 p-2 bg-white text-sm">
                   {row.measurementPoint}
+                </td> */}
+                <td className="border border-gray-300 p-2 bg-white text-sm">
+                  {i18n.language === "kh"
+                    ? row.pointNameKhmer
+                    : row.measurementPoint}
                 </td>
                 <td className="border border-gray-300 p-2 text-center bg-white text-sm">
                   {row.panelName}
@@ -416,7 +496,15 @@ const MeasurementTable = ({
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold">
-                    {colName} - Panel {panelIndex}
+                    {colName} - Panel {panelIndex} --- (
+                    {tableData.find((row) => row.panelIndex === panelIndex)
+                      ? i18n.language === "kh"
+                        ? tableData.find((row) => row.panelIndex === panelIndex)
+                            .panelIndexNameKhmer
+                        : tableData.find((row) => row.panelIndex === panelIndex)
+                            .panelIndexName
+                      : "N/A"}
+                    )
                   </span>
                   <button
                     onClick={() => toggleDefectDropdown(colIndex, panelIndex)}

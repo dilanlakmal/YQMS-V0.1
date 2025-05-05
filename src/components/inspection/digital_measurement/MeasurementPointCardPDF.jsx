@@ -40,7 +40,7 @@
 // export default MeasurementPointCardPDF;
 
 //New code
-import React from "react";
+import autoTable from "jspdf-autotable";
 
 const MeasurementPointCardPDF = ({ doc, startY, measurementPointSummary }) => {
   try {
@@ -53,96 +53,137 @@ const MeasurementPointCardPDF = ({ doc, startY, measurementPointSummary }) => {
     doc.setFont("Helvetica", "normal");
   }
 
+  // Title
   doc.setFontSize(12);
+  doc.setTextColor(0, 0, 0);
   doc.text("Overall Measurement Point Summary", 14, startY);
   startY += 10;
 
+  // Handle empty data
   if (measurementPointSummary.length === 0) {
     doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
     doc.text("No measurement points available", 14, startY);
     return startY + 10;
   }
 
-  const cardWidth = 60;
-  const cardsPerRow = 4;
-  const margin = 5;
-  const cardHeight = 40;
+  // Define table columns
+  const columns = [
+    { header: "Measurement Point", dataKey: "measurementPoint", width: 100 },
+    { header: "Total Count", dataKey: "totalCount", width: 25 },
+    { header: "Total Pass", dataKey: "totalPass", width: 25 },
+    { header: "Total Fail", dataKey: "totalFail", width: 25 },
+    { header: "Pass Rate", dataKey: "passRate", width: 25 },
+    { header: "Status", dataKey: "status", width: 25 }
+  ];
 
-  let x = 14;
-  let y = startY;
+  // Prepare table data with calculated passRate and status
+  const data = measurementPointSummary.map((point) => {
+    const totalCount = point.totalCount || 0;
+    const totalPass = point.totalPass || 0;
+    const totalFail = point.totalFail || 0;
+    const passRate =
+      totalCount > 0 ? ((totalPass / totalCount) * 100).toFixed(2) : "0.00";
+    const status = parseFloat(passRate) >= 98 ? "Pass" : "Fail";
 
-  measurementPointSummary.forEach((point, index) => {
-    const isPass = parseFloat(point.passRate) > 98;
-    const statusColor = isPass ? [34, 197, 94] : [239, 68, 68]; // Green-500 or Red-500
-    const statusBgColor = isPass ? [220, 252, 231] : [254, 226, 226]; // Green-100 or Red-100
-
-    if (index % cardsPerRow === 0 && index !== 0) {
-      x = 14;
-      y += cardHeight + margin;
-    }
-
-    // Draw card border with shadow effect
-    doc.setLineWidth(0.2);
-    doc.setDrawColor(150, 150, 150);
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(x + 1, y + 1, cardWidth, cardHeight, 2, 2, "FD"); // Shadow
-    doc.setDrawColor(0, 0, 0);
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(x, y, cardWidth, cardHeight, 2, 2, "FD"); // Main card
-
-    // Title
-    doc.setFillColor(243, 244, 246); // Gray-100
-    doc.roundedRect(x, y, cardWidth, 8, 2, 0, "F");
-    doc.setFontSize(7); // Smaller font for title
-    doc.setFont("Roboto", "bold");
-    doc.text(point.measurementPoint, x + cardWidth / 2, y + 5, {
-      align: "center",
-      maxWidth: cardWidth - 4
-    });
-
-    // Content with icons (colored squares)
-    const contentY = y + 10;
-    const lineHeight = 5;
-    const metrics = [
-      { label: "Total Count", value: point.totalCount, color: [107, 114, 128] }, // Gray-500
-      { label: "Total Pass", value: point.totalPass, color: [34, 197, 94] }, // Green-500
-      { label: "Total Fail", value: point.totalFail, color: [239, 68, 68] }, // Red-500
-      { label: "Pass Rate", value: `${point.passRate}%`, color: [59, 130, 246] } // Blue-500
-    ];
-
-    metrics.forEach((metric, idx) => {
-      const metricY = contentY + idx * lineHeight;
-      // Draw icon (colored square)
-      doc.setFillColor(...metric.color);
-      doc.rect(x + 2, metricY - 1, 2, 2, "F");
-      // Draw text
-      doc.setFontSize(6); // Small font for metrics
-      doc.setFont("Roboto", "normal");
-      doc.setTextColor(0, 0, 0);
-      doc.text(`${metric.label}: ${metric.value}`, x + 6, metricY + 1);
-    });
-
-    // Footer (status) styled like web
-    const footerY = y + cardHeight - 8;
-    doc.setFillColor(...statusBgColor);
-    doc.setDrawColor(...statusColor);
-    doc.setLineWidth(0.2);
-    doc.roundedRect(x + 2, footerY + 1, cardWidth - 4, 6, 1, 1, "FD"); // Rounded rectangle with border
-    doc.setTextColor(...statusColor);
-    doc.setFont("Roboto", "bold");
-    doc.setFontSize(7);
-    doc.text(`Status: ${point.status}`, x + cardWidth / 2, footerY + 5, {
-      align: "center"
-    });
-    doc.setTextColor(0, 0, 0); // Reset text color
-    doc.setDrawColor(150, 150, 150); // Reset draw color
-    doc.setLineWidth(0.1); // Reset line width
-
-    x += cardWidth + margin;
+    return {
+      measurementPoint: point.measurementPoint || "N/A",
+      totalCount,
+      totalPass,
+      totalFail,
+      passRate: `${passRate}%`,
+      status
+    };
   });
 
-  const rows = Math.ceil(measurementPointSummary.length / cardsPerRow);
-  return y + rows * (cardHeight + margin);
+  // Draw table using autoTable
+  autoTable(doc, {
+    startY,
+    head: [columns.map((col) => col.header)],
+    body: data.map((row) => columns.map((col) => row[col.dataKey])),
+    theme: "grid",
+    columnStyles: columns.reduce(
+      (acc, col, idx) => ({
+        ...acc,
+        [idx]: {
+          cellWidth: col.width,
+          halign: idx === 0 ? "left" : "center",
+          valign: "middle"
+        }
+      }),
+      {}
+    ),
+    styles: {
+      font: "Roboto",
+      fontSize: 7, // Reduced font size
+      cellPadding: 2,
+      overflow: "linebreak",
+      lineColor: [150, 150, 150],
+      lineWidth: 0.2,
+      textColor: [0, 0, 0]
+    },
+    headStyles: {
+      fillColor: [229, 231, 235], // Gray-200
+      textColor: [0, 0, 0],
+      fontSize: 7, // Reduced font size
+      fontStyle: "bold",
+      halign: "center",
+      valign: "middle",
+      lineWidth: 0.2,
+      lineColor: [150, 150, 150]
+    },
+    bodyStyles: {
+      fillColor: [255, 255, 255],
+      textColor: [0, 0, 0],
+      fontSize: 7 // Reduced font size
+    },
+    alternateRowStyles: {
+      fillColor: [245, 245, 245] // Gray-50
+    },
+    didParseCell: (data) => {
+      const row = data.row.raw;
+      if (data.section === "body") {
+        // Pass Rate column (index 4)
+        if (data.column.index === 4) {
+          const passRateValue =
+            row.passRate && typeof row.passRate === "string"
+              ? row.passRate.replace("%", "")
+              : "0";
+          const passRate = parseFloat(passRateValue);
+          data.cell.styles.fillColor =
+            !isNaN(passRate) && passRate >= 98
+              ? [220, 252, 231]
+              : [254, 226, 226]; // bg-green-100 or bg-red-100
+          data.cell.styles.fontStyle = "bold";
+        }
+        // Status column (index 5)
+        if (data.column.index === 5) {
+          data.cell.styles.fillColor =
+            row.status === "Pass" ? [220, 252, 231] : [254, 226, 226]; // bg-green-100 or bg-red-100
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.textColor =
+            row.status === "Pass" ? [34, 197, 94] : [239, 68, 68]; // text-green-500 or text-red-500
+        }
+      }
+    },
+    didDrawCell: (data) => {
+      // Add a subtle shadow effect to the table
+      if (data.section === "body" && data.row.index === 0) {
+        doc.setFillColor(200, 200, 200);
+        doc.rect(data.cell.x, data.cell.y - 0.5, data.cell.width, 0.5, "F"); // Top shadow
+      }
+    },
+    margin: { left: 14, right: 14 }
+  });
+
+  // Add a footer line
+  const tableEndY = doc.lastAutoTable.finalY;
+  doc.setDrawColor(156, 163, 175);
+  doc.setLineDash([2, 2]);
+  doc.line(14, tableEndY + 3, 283, tableEndY + 3);
+  doc.setLineDash([]);
+
+  return tableEndY + 10;
 };
 
 export default MeasurementPointCardPDF;

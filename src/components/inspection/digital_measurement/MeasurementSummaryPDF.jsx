@@ -248,7 +248,6 @@
 // export default MeasurementSummaryPDF;
 
 //New code
-import React from "react";
 import autoTable from "jspdf-autotable";
 
 const MeasurementSummaryPDF = ({ doc, startY, measurementSummary }) => {
