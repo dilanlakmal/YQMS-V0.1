@@ -172,7 +172,7 @@ export const measurementPoints = [
   // Top Hoodies Panel Measurements
   {
     no: 13,
-    panel: "Top Hoodies",
+    panel: "Zipper Jacket",
     pointName: "Front Body Length",
     pointNameEng: "Front Body Length",
     pointNameKhmer: "សំរុងខ្លួនផ្ទាំងមុខ",
@@ -187,7 +187,7 @@ export const measurementPoints = [
 
   {
     no: 14,
-    panel: "Top Hoodies",
+    panel: "Zipper Jacket",
     pointName: "Front Chest Width",
     pointNameEng: "Front Chest Width",
     pointNameKhmer: "ទំហំទ្រូងមុខ",
@@ -202,7 +202,7 @@ export const measurementPoints = [
 
   {
     no: 15,
-    panel: "Top Hoodies",
+    panel: "Zipper Jacket",
     pointName: "Back Body Length",
     pointNameEng: "Back Body Length",
     pointNameKhmer: "សំរុងផ្ទាំងក្រោយ",
@@ -217,7 +217,7 @@ export const measurementPoints = [
 
   {
     no: 16,
-    panel: "Top Hoodies",
+    panel: "Zipper Jacket",
     pointName: "Back Chest Width",
     pointNameEng: "Back Chest Width",
     pointNameKhmer: "ទំហំទ្រូងផ្ទាំងក្រោយ",
@@ -231,7 +231,7 @@ export const measurementPoints = [
   },
   {
     no: 17,
-    panel: "Top Hoodies",
+    panel: "Zipper Jacket",
     pointName: "Left Sleeve Length",
     pointNameEng: "Left Sleeve Length",
     pointNameKhmer: "ប្រវែងដៃខាងឆ្វេង",
@@ -245,7 +245,7 @@ export const measurementPoints = [
   },
   {
     no: 18,
-    panel: "Top Hoodies",
+    panel: "Zipper Jacket",
     pointName: "Left Bicep Width",
     pointNameEng: "Left Bicep Width",
     pointNameKhmer: "ទំហំកំភួនដៃខាងឆ្វេង",
@@ -259,7 +259,7 @@ export const measurementPoints = [
   },
   {
     no: 19,
-    panel: "Top Hoodies",
+    panel: "Zipper Jacket",
     pointName: "Right Sleeve Length",
     pointNameEng: "Right Sleeve Length",
     pointNameKhmer: "ប្រវែងដៃខាងស្តាំ",
@@ -273,7 +273,7 @@ export const measurementPoints = [
   },
   {
     no: 20,
-    panel: "Top Hoodies",
+    panel: "Zipper Jacket",
     pointName: "Right Bicep Width",
     pointNameEng: "Right Bicep Width",
     pointNameKhmer: "ទំហំកំភួនដៃខាងស្តាំ",
@@ -287,7 +287,7 @@ export const measurementPoints = [
   },
   {
     no: 21,
-    panel: "Top Hoodies",
+    panel: "Zipper Jacket",
     pointName: "Pocket Length",
     pointNameEng: "Pocket Length",
     pointNameKhmer: "សំរុងហោប៉ៅ",
@@ -301,7 +301,7 @@ export const measurementPoints = [
   },
   {
     no: 22,
-    panel: "Top Hoodies",
+    panel: "Zipper Jacket",
     pointName: "Pocket Width",
     pointNameEng: "Pocket Width",
     pointNameKhmer: "ទំហំហោប៉ៅ",
@@ -315,7 +315,7 @@ export const measurementPoints = [
   },
   {
     no: 23,
-    panel: "Top Hoodies",
+    panel: "Zipper Jacket",
     pointName: "Hat Length",
     pointNameEng: "Hat Length",
     pointNameKhmer: "សំរុងមួក",
@@ -329,7 +329,7 @@ export const measurementPoints = [
   },
   {
     no: 24,
-    panel: "Top Hoodies",
+    panel: "Zipper Jacket",
     pointName: "Hat width",
     pointNameEng: "Hat width",
     pointNameKhmer: "ទំហំមួក",

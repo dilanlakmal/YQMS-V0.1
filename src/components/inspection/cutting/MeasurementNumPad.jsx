@@ -49,30 +49,41 @@ const decimalToFraction = (value) => {
 };
 
 const MeasurementNumPad = ({ onClose, onInput, initialValue }) => {
-  const [sign, setSign] = useState(initialValue < 0 ? "-" : "-"); // Default to negative as per requirement
+  const [sign, setSign] = useState("-"); // Default to negative
   const [wholeNumber, setWholeNumber] = useState(0); // For the 'N' button (0 to 5)
   const [fraction, setFraction] = useState(null); // Selected fraction (e.g., "1/8")
 
   // 4x4 grid of fractions
   const fractions = [
-    ["1/8", "3/8", "5/8", "7/8"],
-    ["1/16", "3/16", "5/16", "7/16"],
-    ["9/16", "11/16", "13/16", "15/16"],
-    ["1/4", "3/4", "1/2", "1"]
+    ["1/16", "1/8", "3/16", "1/4"],
+    ["5/16", "3/8", "7/16", "1/2"],
+    ["9/16", "5/8", "11/16", "3/4"],
+    ["13/16", "7/8", "15/16", "1"]
   ];
 
-  // Handle fraction button click
   const handleFractionClick = (frac) => {
     setFraction(frac);
-    const [numerator, denominator] = frac.split("/").map(Number);
+    let numerator, denominator;
+    if (frac === "1") {
+      numerator = 1;
+      denominator = 1;
+    } else {
+      [numerator, denominator] = frac.split("/").map(Number);
+    }
     const decimalValue = fractionToDecimal(numerator, denominator);
-    const finalValue = (sign === "-" ? -1 : 1) * (wholeNumber + decimalValue);
-    onInput(
-      finalValue,
-      `${wholeNumber > 0 ? wholeNumber + " " : ""}${
-        sign === "-" ? "-" : ""
-      }${frac}`
+    const finalValue = Number(
+      ((sign === "-" ? -1 : 1) * (wholeNumber + decimalValue)).toFixed(4)
     );
+    let fractionValue;
+    if (frac === "1" && wholeNumber >= 0) {
+      fractionValue = `${sign}${wholeNumber + 1}`;
+    } else {
+      fractionValue = `${
+        wholeNumber > 0 ? wholeNumber + " " : ""
+      }${sign}${frac}`;
+    }
+
+    onInput(finalValue, fractionValue);
     onClose();
   };
 
@@ -142,6 +153,7 @@ const MeasurementNumPad = ({ onClose, onInput, initialValue }) => {
         <div className="grid grid-cols-4 gap-2 mb-4">
           {fractions.flat().map((frac, index) => {
             const [numerator, denominator] = frac.split("/").map(Number);
+            const isWholeOne = frac === "1";
             return (
               <button
                 key={index}
@@ -152,9 +164,18 @@ const MeasurementNumPad = ({ onClose, onInput, initialValue }) => {
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 } flex flex-col items-center justify-center`}
               >
-                <span className="block">{numerator}</span>
-                <span className="block border-t border-gray-500 w-6"></span>
-                <span className="block">{denominator || 1}</span>
+                {isWholeOne ? (
+                  <span className="block">{sign}1</span>
+                ) : (
+                  <>
+                    <span className="block">
+                      {sign}
+                      {numerator}
+                    </span>
+                    <span className="block border-t border-gray-500 w-6"></span>
+                    <span className="block">{denominator}</span>
+                  </>
+                )}
               </button>
             );
           })}

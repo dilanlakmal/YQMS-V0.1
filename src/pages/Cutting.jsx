@@ -25,6 +25,10 @@ const CuttingPage = () => {
   const [lotNo, setLotNo] = useState([]); // Array to store multiple selected Lot Nos
   const [color, setColor] = useState("");
   const [tableNo, setTableNo] = useState("");
+  const [tableNoSearch, setTableNoSearch] = useState("");
+  const [showTableNoDropdown, setShowTableNoDropdown] = useState(false);
+  const tableNoDropdownRef = useRef(null);
+
   const [cuttingTableL, setCuttingTableL] = useState("");
   const [cuttingTableNo, setCuttingTableNo] = useState("");
   const [marker, setMarker] = useState("");
@@ -249,6 +253,19 @@ const CuttingPage = () => {
     setMarkerData([]);
     setAvailableSizes([]);
   }, [color, moData]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        tableNoDropdownRef.current &&
+        !tableNoDropdownRef.current.contains(event.target)
+      ) {
+        setShowTableNoDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (tableNo && color && moData) {
@@ -981,7 +998,7 @@ const CuttingPage = () => {
                           />
                         </div>
                         {showLotNoDropdown && (
-                          <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto shadow-lg">
+                          <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-80 overflow-y-auto shadow-lg">
                             {lotNos
                               .filter((lot) =>
                                 lot
@@ -1107,19 +1124,52 @@ const CuttingPage = () => {
                   <label className="block text-sm font-medium text-gray-700">
                     {t("cutting.tableNo")}
                   </label>
-                  <select
-                    value={tableNo}
-                    onChange={(e) => setTableNo(e.target.value)}
-                    className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                    disabled={!color || tableNos.length === 0}
-                  >
-                    <option value="">{t("cutting.select_table_no")}</option>
-                    {tableNos.map((table, index) => (
-                      <option key={index} value={table}>
-                        {table}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative" ref={tableNoDropdownRef}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={tableNoSearch}
+                      onChange={(e) => {
+                        setTableNoSearch(e.target.value);
+                        setShowTableNoDropdown(true);
+                      }}
+                      onClick={() => {
+                        if (color && tableNos.length > 0) {
+                          setShowTableNoDropdown(true);
+                        }
+                      }}
+                      placeholder={t("cutting.search_table_no")}
+                      className={`mt-1 w-full p-2 border border-gray-300 rounded-lg ${
+                        !color || tableNos.length === 0
+                          ? "bg-gray-100 cursor-not-allowed"
+                          : ""
+                      }`}
+                      disabled={!color || tableNos.length === 0}
+                    />
+                    {showTableNoDropdown && (
+                      <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-64 overflow-y-auto shadow-lg">
+                        {tableNos
+                          .filter((table) =>
+                            table
+                              .toLowerCase()
+                              .includes(tableNoSearch.toLowerCase())
+                          )
+                          .map((table, index) => (
+                            <li
+                              key={index}
+                              onClick={() => {
+                                setTableNo(table);
+                                setTableNoSearch(table);
+                                setShowTableNoDropdown(false);
+                              }}
+                              className="p-2 hover:bg-blue-100 cursor-pointer"
+                            >
+                              {table}
+                            </li>
+                          ))}
+                      </ul>
+                    )}
+                  </div>
                   {tableNo && (
                     <div className="mt-2 p-4 bg-gray-100 rounded-lg">
                       <div className="flex space-x-4 text-sm">
@@ -1139,6 +1189,7 @@ const CuttingPage = () => {
                     </div>
                   )}
                 </div>
+
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
                     {t("cutting.cuttingTable")}
@@ -1393,9 +1444,13 @@ const CuttingPage = () => {
                       className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
                     >
                       <option value="">{t("cutting.select_panel")}</option>
-                      <option value="Top">{t("cutting.top")}</option>
-                      <option value="Bottom">{t("cutting.bottom")}</option>
-                      <option value="Top Hoodies">{t("cutting.zipper")}</option>
+                      <option value="Top">{t("cutting.garment_top")}</option>
+                      <option value="Bottom">
+                        {t("cutting.garment_bottom")}
+                      </option>
+                      <option value="Zipper Jacket">
+                        {t("cutting.zipper")}
+                      </option>
                     </select>
                   </div>
                   <div className="flex-1 min-w-[200px]">
@@ -1465,7 +1520,7 @@ const CuttingPage = () => {
                       {t("cutting.summaryDetails")}
                     </h3>
                     <div className="mb-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+                      <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-6 gap-4">
                         <div className="p-4 bg-blue-100 rounded-lg text-center">
                           <p className="text-xs font-medium text-gray-700">
                             {t("cutting.parts")}
@@ -1571,7 +1626,7 @@ const CuttingPage = () => {
                         ))}
                       </select>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-4 gap-4 mb-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
                           {t("cutting.panelName")}
@@ -1659,7 +1714,7 @@ const CuttingPage = () => {
                         </select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 mb-4">
+                    <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-6 gap-4 mb-4">
                       <div className="p-4 bg-blue-100 rounded-lg text-center">
                         <p className="text-xs font-medium text-gray-700">
                           {t("cutting.parts")}

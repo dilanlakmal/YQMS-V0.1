@@ -488,7 +488,7 @@
     "buyer": "Buyer",
     "orderQty": "Order Quantity",
     "tableNo": "Table No",
-    "select_table_no": "Select Table No",
+    "search_table_no": "Search Table No",
     "cuttingTable": "Cutting Table",
     "l": "L",
     "layerQty": "Layer Qty :",
@@ -523,6 +523,8 @@
     "top": "Top",
     "middle": "Middle",
     "bottom": "Bottom",
+    "garment_top": "Top",
+    "garment_bottom": "Bottom",
     "zipper": "Zipper Jacket",
     "col": "Col",
     "panelName": "Panel Name",
@@ -542,7 +544,17 @@
     "success": "Success",
     "dataSaved": "Cutting data saved successfully!",
     "failedToSaveData": "Failed to save Cutting data.",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "defectBoxTitle": "Defect Details",
+    "noDefectsSelected": "No defects selected",
+    "addDefect": "Add Defect",
+    "defects": "Defect(s)",
+    "noDefects": "No defects",
+    "close": "Close",
+    "defectDetailsAcrossPanel": "Fabric Defect Details Across panel",
+    "panelIndex": "Panel Index",
+    "measurementPoint": "Measurement Points",
+    "cuttingDefectIssue": "Cutting Defect Issues"
   },
 
   "cuttingReport": {

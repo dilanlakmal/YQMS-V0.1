@@ -487,7 +487,7 @@
     "buyer": "买家",
     "orderQty": "订单数量",
     "tableNo": "桌子编号",
-    "select_table_no": "选择桌子编号",
+    "search_table_no": "选择桌子编号",
     "cuttingTable": "裁剪台",
     "l": "L",
     "layerQty": "层数量 :",
@@ -522,6 +522,8 @@
     "top": "顶部",
     "middle": "中间",
     "bottom": "底部",
+    "garment_top": "顶部",
+    "garment_bottom": "底部",
     "zipper": "拉链",
     "col": "列",
     "panelName": "面板名称",
@@ -541,7 +543,17 @@
     "success": "成功",
     "dataSaved": "裁剪数据保存成功！",
     "failedToSaveData": "无法保存裁剪数据。",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "defectBoxTitle": "缺陷",
+    "noDefectsSelected": "未选择缺陷",
+    "addDefect": "添加缺陷",
+    "defects": "缺陷",
+    "noDefects": "无缺陷",
+    "close": "关闭",
+    "defectDetailsAcrossPanel": "面板缺陷详情",
+    "panelIndex": "面板索引",
+    "measurementPoint": "测量点",
+    "cuttingDefectIssue": "缺陷"
   },
 
   "cuttingReport": {

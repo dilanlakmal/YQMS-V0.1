@@ -487,7 +487,7 @@
     "buyer": "អ្នកទិញ",
     "orderQty": "បរិមាណបញ្ជាទិញ",
     "tableNo": "លេខតុ",
-    "select_table_no": "ជ្រើសរើសលេខតុ",
+    "search_table_no": "ជ្រើសរើសលេខតុ",
     "cuttingTable": "តុកាត់",
     "l": "L",
     "layerQty": "ចំនួនផ្ទាំង :",
@@ -522,6 +522,8 @@
     "top": "លើ",
     "middle": "កណ្ដាល",
     "bottom": "ក្រោម",
+    "garment_top": "អាវ",
+    "garment_bottom": "ខោ",
     "zipper": "អាវបើកមុខ",
     "col": "ជួរឈរ",
     "panelName": "ឈ្មោះផ្ទាំង",
@@ -541,7 +543,17 @@
     "success": "ជោគជ័យ",
     "dataSaved": "ទិន្នន័យកាត់ត្រូវបានរក្សាទុកដោយជោគជ័យ!",
     "failedToSaveData": "បរាជ័យក្នុងការរក្សាទុកទិន្នន័យកាត់។",
-    "loading": "កំពុងផ្ទុក..."
+    "loading": "កំពុងផ្ទុក...",
+    "defectBoxTitle": "លម្អិតកំហុស",
+    "noDefectsSelected": "មិនមានកំហុស​ដែល​ត្រូវ​បាន​ជ្រើស",
+    "addDefect": "បន្ថែមកំហុស",
+    "defects": "កំហុស",
+    "noDefects": "គ្មានកំហុស",
+    "close": "បិទ",
+    "defectDetailsAcrossPanel": "ព័ត៌មានលម្អិតកំហុសនៅលើផ្ទាំង",
+    "panelIndex": "ផ្ទាំងសម្គាល់",
+    "measurementPoint": "ចំណុចវាស់ខ្នាត",
+    "cuttingDefectIssue": "សម្គាល់កំហុសក្រណាត់"
   },
 
   "cuttingReport": {
