@@ -37,6 +37,7 @@ import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
 import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
 import createCuttingAdditionalPointModel from "./models/CuttingAdditionalPoint.js"; // Import the new model
+import createCuttingMeasurementPointModel from "./models/CuttingMeasurementPoints.js"; // New model import
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
 
@@ -147,6 +148,8 @@ const CuttingOrders = createCuttingOrdersModel(ymProdConnection); // New model
 const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New model
 const CuttingAdditionalPoint =
   createCuttingAdditionalPointModel(ymProdConnection); // New model
+const CuttingMeasurementPoint =
+  createCuttingMeasurementPointModel(ymProdConnection); // New model instance
 const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
 const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection); // New model instance
 
@@ -7504,6 +7507,97 @@ app.get("/api/cutting-inspection-filter-options", async (req, res) => {
   } catch (error) {
     console.error("Error fetching filter options:", error);
     res.status(500).json({ message: "Failed to fetch filter options" });
+  }
+});
+
+/* ------------------------------
+   Cutting Measurement Points ENDPOINTS
+------------------------------ */
+
+// Endpoint to fetch unique MO numbers
+app.get("/api/cutting-measurement-mo-numbers", async (req, res) => {
+  try {
+    const { search } = req.query;
+    let moNumbers;
+    if (search) {
+      moNumbers = await CuttingAdditionalPoint.distinct("moNo", {
+        moNo: { $regex: search, $options: "i" }
+      });
+    } else {
+      moNumbers = await CuttingAdditionalPoint.distinct("moNo");
+    }
+    res.status(200).json(moNumbers);
+  } catch (error) {
+    console.error("Error fetching MO numbers:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch MO numbers", error: error.message });
+  }
+});
+
+// Endpoint to fetch unique panel values
+app.get("/api/cutting-measurement-panels", async (req, res) => {
+  try {
+    const panels = await CuttingMeasurementPoint.distinct("panel");
+    res.status(200).json(panels);
+  } catch (error) {
+    console.error("Error fetching panels:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch panels", error: error.message });
+  }
+});
+
+// Endpoint to fetch panelIndexNames for a given panel
+app.get("/api/cutting-measurement-panel-index-names", async (req, res) => {
+  try {
+    const { panel } = req.query;
+    if (!panel) {
+      return res.status(400).json({ message: "Panel is required" });
+    }
+    const panelIndexNames = await CuttingMeasurementPoint.find({
+      panel
+    }).distinct("panelIndexName");
+    const panelIndexNameKhmerMap = await CuttingMeasurementPoint.find({
+      panel,
+      panelIndexName: { $in: panelIndexNames }
+    }).select("panelIndexName panelIndexNameKhmer panelIndex");
+    res.status(200).json(panelIndexNameKhmerMap);
+  } catch (error) {
+    console.error("Error fetching panel index names:", error);
+    res
+      .status(500)
+      .json({
+        message: "Failed to fetch panel index names",
+        error: error.message
+      });
+  }
+});
+
+// Endpoint to save a new measurement point
+app.post("/api/save-measurement-point", async (req, res) => {
+  try {
+    const measurementPoint = req.body;
+    // Find the maximum 'no' in the collection
+    const maxNo = await CuttingMeasurementPoint.findOne()
+      .sort({ no: -1 })
+      .select("no");
+    const newNo = maxNo ? maxNo.no + 1 : 1;
+    // Create new document
+    const newDoc = new CuttingMeasurementPoint({
+      ...measurementPoint,
+      no: newNo
+    });
+    await newDoc.save();
+    res.status(200).json({ message: "Measurement point saved successfully" });
+  } catch (error) {
+    console.error("Error saving measurement point:", error);
+    res
+      .status(500)
+      .json({
+        message: "Failed to save measurement point",
+        error: error.message
+      });
   }
 });
 
