@@ -31,10 +31,12 @@ import createQC2ReworksModel from "./models/qc2_rework.js";
 import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
 import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
 import createCuttingOrdersModel from "./models/CuttingOrders.js"; // New model import
+import createCutPanelOrdersModel from "./models/CutPanelOrders.js"; // New model import
 import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
 
 import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
+import createCuttingAdditionalPointModel from "./models/CuttingAdditionalPoint.js"; // Import the new model
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
 
@@ -143,7 +145,10 @@ const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
 const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
 const CuttingOrders = createCuttingOrdersModel(ymProdConnection); // New model
 const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New model
+const CuttingAdditionalPoint =
+  createCuttingAdditionalPointModel(ymProdConnection); // New model
 const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
+const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection); // New model instance
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -297,6 +302,9 @@ dropConflictingIndex().then(() => {
       );
       syncCuttingOrders().then(() =>
         console.log("Initial cuttingOrders sync completed.")
+      );
+      syncCutPanelOrders().then(() =>
+        console.log("Initial cutpanelorders sync completed.")
       );
       syncQC1SunriseData().then(() =>
         console.log("Initial QC1 Sunrise sync completed.")
@@ -1408,6 +1416,281 @@ async function syncCuttingOrders() {
 }
 
 /* ------------------------------
+   New Cut Panel Orders Endpoint
+------------------------------ */
+
+async function syncCutPanelOrders() {
+  try {
+    console.log("Starting cutpanelorders sync at", new Date().toISOString());
+    await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
+
+    const query = `
+      SELECT 
+        v.StyleNo,
+        v.TxnDate,
+        v.TxnNo,
+        CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer,
+        v.EngColor AS Color,
+        REPLACE(v.PreparedBy, 'SPREAD ', '') AS SpreadTable,
+        v.TableNo,
+        v.BuyerStyle,
+        v.ChColor,
+        v.ColorCode,
+        v.FabricType,
+        v.Material,
+        v.RollQty,
+        ROUND(v.SpreadYds, 3) AS SpreadYds,
+        v.Unit,
+        ROUND(v.GrossKgs, 3) AS GrossKgs,
+        ROUND(v.NetKgs, 3) AS NetKgs,
+        v.MackerNo,
+        ROUND(v.MackerLength, 3) AS MackerLength,
+        v.SendFactory,
+        v.SendTxnDate,
+        v.SendTxnNo,
+        v.SendTotalQty,
+        v.Ratio1 AS CuttingRatio1,
+        v.Ratio2 AS CuttingRatio2,
+        v.Ratio3 AS CuttingRatio3,
+        v.Ratio4 AS CuttingRatio4,
+        v.Ratio5 AS CuttingRatio5,
+        v.Ratio6 AS CuttingRatio6,
+        v.Ratio7 AS CuttingRatio7,
+        v.Ratio8 AS CuttingRatio8,
+        v.Ratio9 AS CuttingRatio9,
+        v.Ratio10 AS CuttingRatio10,
+        MAX(v.PlanLayer) AS PlanLayer,
+        MAX(v.ActualLayer) AS ActualLayer,
+        MAX(v.PlanPcs) AS TotalPcs,
+        STUFF((
+          SELECT DISTINCT ', ' + CAST(s2.Batch AS VARCHAR)
+          FROM [YMWHSYS2].[dbo].[tbSpreading] s2
+          WHERE s2.StyleNo = v.StyleNo
+            AND s2.PreparedBy = v.PreparedBy
+            AND s2.Batch IS NOT NULL
+          FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos,
+        t.Size1,
+        t.Size2,
+        t.Size3,
+        t.Size4,
+        t.Size5,
+        t.Size6,
+        t.Size7,
+        t.Size8,
+        t.Size9,
+        t.Size10,
+        t.OrderQty1,
+        t.OrderQty2,
+        t.OrderQty3,
+        t.OrderQty4,
+        t.OrderQty5,
+        t.OrderQty6,
+        t.OrderQty7,
+        t.OrderQty8,
+        t.OrderQty9,
+        t.OrderQty10,
+        t.TotalOrderQty,
+        t.TotalTTLRoll,
+        t.TotalTTLQty,
+        t.TotalBiddingQty,
+        t.TotalBiddingRollQty
+      FROM [YMWHSYS2].[dbo].[ViewCuttingDetailReport] v
+      LEFT JOIN [YMWHSYS2].[dbo].[tbSpreading] s
+        ON v.StyleNo = s.StyleNo
+        AND v.PreparedBy = s.PreparedBy
+      LEFT JOIN (
+        SELECT DISTINCT
+          t.StyleNo,
+          t.EngColor AS Color,
+          t.Size1,
+          t.Size2,
+          t.Size3,
+          t.Size4,
+          t.Size5,
+          t.Size6,
+          t.Size7,
+          t.Size8,
+          t.Size9,
+          t.Size10,
+          agg.OrderQty1,
+          agg.OrderQty2,
+          agg.OrderQty3,
+          agg.OrderQty4,
+          agg.OrderQty5,
+          agg.OrderQty6,
+          agg.OrderQty7,
+          agg.OrderQty8,
+          agg.OrderQty9,
+          agg.OrderQty10,
+          agg.TotalOrderQty,
+          agg.TotalTTLRoll,
+          agg.TotalTTLQty,
+          agg.TotalBiddingQty,
+          agg.TotalBiddingRollQty
+        FROM [YMWHSYS2].[dbo].[ViewCuttingOrderReport] t
+        LEFT JOIN (
+          SELECT 
+            StyleNo,
+            EngColor,
+            SUM(TTLRoll) AS TotalTTLRoll,
+            SUM(TTLQty) AS TotalTTLQty,
+            SUM(BiddingQty) AS TotalBiddingQty,
+            SUM(BiddingRollQty) AS TotalBiddingRollQty,
+            COALESCE(SUM(Qty1), 0) AS OrderQty1,
+            COALESCE(SUM(Qty2), 0) AS OrderQty2,
+            COALESCE(SUM(Qty3), 0) AS OrderQty3,
+            COALESCE(SUM(Qty4), 0) AS OrderQty4,
+            COALESCE(SUM(Qty5), 0) AS OrderQty5,
+            COALESCE(SUM(Qty6), 0) AS OrderQty6,
+            COALESCE(SUM(Qty7), 0) AS OrderQty7,
+            COALESCE(SUM(Qty8), 0) AS OrderQty8,
+            COALESCE(SUM(Qty9), 0) AS OrderQty9,
+            COALESCE(SUM(Qty10), 0) AS OrderQty10,
+            COALESCE(SUM(Qty1), 0) + COALESCE(SUM(Qty2), 0) + COALESCE(SUM(Qty3), 0) + 
+            COALESCE(SUM(Qty4), 0) + COALESCE(SUM(Qty5), 0) + COALESCE(SUM(Qty6), 0) + 
+            COALESCE(SUM(Qty7), 0) + COALESCE(SUM(Qty8), 0) + COALESCE(SUM(Qty9), 0) + 
+            COALESCE(SUM(Qty10), 0) AS TotalOrderQty
+          FROM [YMWHSYS2].[dbo].[ViewCuttingOrderReport]
+          WHERE StyleNo IS NOT NULL AND EngColor IS NOT NULL
+          GROUP BY StyleNo, EngColor
+        ) agg
+          ON t.StyleNo = agg.StyleNo
+          AND t.EngColor = agg.EngColor
+        WHERE 
+          t.StyleNo IS NOT NULL
+          AND t.EngColor IS NOT NULL
+      ) t
+        ON v.StyleNo = t.StyleNo
+        AND v.EngColor = t.Color
+      WHERE v.TableNo IS NOT NULL AND v.TableNo <> ''
+      GROUP BY 
+        v.StyleNo,
+        v.TxnDate,
+        v.TxnNo,
+        v.Buyer,
+        v.EngColor,
+        v.PreparedBy,
+        v.TableNo,
+        v.BuyerStyle,
+        v.ChColor,
+        v.ColorCode,
+        v.FabricType,
+        v.Material,
+        v.RollQty,
+        v.SpreadYds,
+        v.Unit,
+        v.GrossKgs,
+        v.NetKgs,
+        v.MackerNo,
+        v.MackerLength,
+        v.SendFactory,
+        v.SendTxnDate,
+        v.SendTxnNo,
+        v.SendTotalQty,
+        v.Ratio1,
+        v.Ratio2,
+        v.Ratio3,
+        v.Ratio4,
+        v.Ratio5,
+        v.Ratio6,
+        v.Ratio7,
+        v.Ratio8,
+        v.Ratio9,
+        v.Ratio10,
+        t.Size1,
+        t.Size2,
+        t.Size3,
+        t.Size4,
+        t.Size5,
+        t.Size6,
+        t.Size7,
+        t.Size8,
+        t.Size9,
+        t.Size10,
+        t.OrderQty1,
+        t.OrderQty2,
+        t.OrderQty3,
+        t.OrderQty4,
+        t.OrderQty5,
+        t.OrderQty6,
+        t.OrderQty7,
+        t.OrderQty8,
+        t.OrderQty9,
+        t.OrderQty10,
+        t.TotalOrderQty,
+        t.TotalTTLRoll,
+        t.TotalTTLQty,
+        t.TotalBiddingQty,
+        t.TotalBiddingRollQty
+      ORDER BY v.TxnDate DESC
+    `;
+
+    const result = await poolYMWHSYS2.request().query(query);
+
+    const documents = result.recordset.map((row) => {
+      const markerRatio = [];
+      for (let i = 1; i <= 10; i++) {
+        markerRatio.push({
+          no: i,
+          size: row[`Size${i}`],
+          cuttingRatio: row[`CuttingRatio${i}`],
+          orderQty: row[`OrderQty${i}`]
+        });
+      }
+
+      const lotNos = row.LotNos
+        ? row.LotNos.split(",").map((lot) => lot.trim())
+        : [];
+
+      return {
+        StyleNo: row.StyleNo,
+        TxnDate: row.TxnDate ? new Date(row.TxnDate) : null,
+        TxnNo: row.TxnNo,
+        Buyer: row.Buyer,
+        Color: row.Color,
+        SpreadTable: row.SpreadTable,
+        TableNo: row.TableNo,
+        BuyerStyle: row.BuyerStyle,
+        ChColor: row.ChColor,
+        ColorCode: row.ColorCode,
+        FabricType: row.FabricType,
+        Material: row.Material,
+        RollQty: row.RollQty,
+        SpreadYds: row.SpreadYds,
+        Unit: row.Unit,
+        GrossKgs: row.GrossKgs,
+        NetKgs: row.NetKgs,
+        MackerNo: row.MackerNo,
+        MackerLength: row.MackerLength,
+        SendFactory: row.SendFactory,
+        SendTxnDate: row.SendTxnDate ? new Date(row.SendTxnDate) : null,
+        SendTxnNo: row.SendTxnNo,
+        SendTotalQty: row.SendTotalQty,
+        PlanLayer: row.PlanLayer,
+        ActualLayer: row.ActualLayer,
+        TotalPcs: row.TotalPcs,
+        LotNos: lotNos,
+        TotalOrderQty: row.TotalOrderQty,
+        TotalTTLRoll: row.TotalTTLRoll,
+        TotalTTLQty: row.TotalTTLQty,
+        TotalBiddingQty: row.TotalBiddingQty,
+        TotalBiddingRollQty: row.TotalBiddingRollQty,
+        MarkerRatio: markerRatio
+      };
+    });
+
+    await CutPanelOrders.deleteMany({});
+    await CutPanelOrders.insertMany(documents);
+    console.log(
+      `Successfully synced ${documents.length} documents to cutpanelorders.`
+    );
+  } catch (err) {
+    console.error("Error during cutpanelorders sync:", err);
+    throw err;
+  }
+}
+
+/* ------------------------------
    Manual Sync Endpoint
 ------------------------------ */
 
@@ -1426,6 +1709,21 @@ app.post("/api/sync-cutting-orders", async (req, res) => {
   }
 });
 
+app.post("/api/sync-cutpanel-orders", async (req, res) => {
+  try {
+    await syncCutPanelOrders();
+    res
+      .status(200)
+      .json({ message: "Cut panel orders sync completed successfully." });
+  } catch (err) {
+    console.error("Error in /api/sync-cutpanel-orders endpoint:", err);
+    res.status(500).json({
+      message: "Failed to sync cut panel orders",
+      error: err.message
+    });
+  }
+});
+
 /* ------------------------------
    Schedule Daily Sync
 ------------------------------ */
@@ -1436,6 +1734,104 @@ cron.schedule("0 7 * * *", async () => {
     await syncCuttingOrders();
   } catch (err) {
     console.error("Scheduled cuttingOrders sync failed:", err);
+  }
+});
+
+cron.schedule("0 8 * * *", async () => {
+  console.log("Running scheduled cutpanelorders sync at 8 AM...");
+  try {
+    await syncCutPanelOrders();
+  } catch (err) {
+    console.error("Scheduled cutpanelorders sync failed:", err);
+  }
+});
+
+/* ------------------------------
+   New Endpoints for CutPanelOrders
+------------------------------ */
+
+// Endpoint to Search MO Numbers (StyleNo) from cutpanelorders with partial matching
+app.get("/api/cutpanel-orders-mo-numbers", async (req, res) => {
+  try {
+    const searchTerm = req.query.search;
+    if (!searchTerm) {
+      return res.status(400).json({ error: "Search term is required" });
+    }
+
+    const regexPattern = new RegExp(searchTerm, "i");
+
+    const results = await CutPanelOrders.find({
+      StyleNo: { $regex: regexPattern }
+    })
+      .select("StyleNo")
+      .limit(100)
+      .sort({ StyleNo: 1 })
+      .exec();
+
+    const uniqueMONos = [...new Set(results.map((r) => r.StyleNo))];
+
+    res.json(uniqueMONos);
+  } catch (err) {
+    console.error("Error fetching MO numbers from cutpanelorders:", err);
+    res.status(500).json({
+      message: "Failed to fetch MO numbers from cutpanelorders",
+      error: err.message
+    });
+  }
+});
+
+// Endpoint to Fetch Table Nos for a given MO No (StyleNo)
+app.get("/api/cutpanel-orders-table-nos", async (req, res) => {
+  try {
+    const { styleNo } = req.query;
+    if (!styleNo) {
+      return res.status(400).json({ error: "StyleNo is required" });
+    }
+
+    const results = await CutPanelOrders.find({ StyleNo: styleNo })
+      .select("TableNo")
+      .exec();
+
+    const uniqueTableNos = [...new Set(results.map((r) => r.TableNo))].filter(
+      (table) => table
+    );
+
+    res.json(uniqueTableNos);
+  } catch (err) {
+    console.error("Error fetching Table Nos from cutpanelorders:", err);
+    res.status(500).json({
+      message: "Failed to fetch Table Nos from cutpanelorders",
+      error: err.message
+    });
+  }
+});
+
+// Endpoint to Fetch Cut Panel Order Details for a given MO No (StyleNo) and TableNo
+app.get("/api/cutpanel-orders-details", async (req, res) => {
+  try {
+    const { styleNo, tableNo } = req.query;
+    if (!styleNo || !tableNo) {
+      return res
+        .status(400)
+        .json({ error: "StyleNo and TableNo are required" });
+    }
+
+    const document = await CutPanelOrders.findOne({
+      StyleNo: styleNo,
+      TableNo: tableNo
+    }).exec();
+
+    if (!document) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    res.json(document);
+  } catch (err) {
+    console.error("Error fetching Cut Panel Orders details:", err);
+    res.status(500).json({
+      message: "Failed to fetch Cut Panel Orders details",
+      error: err.message
+    });
   }
 });
 
@@ -7108,6 +7504,30 @@ app.get("/api/cutting-inspection-filter-options", async (req, res) => {
   } catch (error) {
     console.error("Error fetching filter options:", error);
     res.status(500).json({ message: "Failed to fetch filter options" });
+  }
+});
+
+/* ------------------------------
+   Cutting Additional Measurement Points ENDPOINTS
+------------------------------ */
+
+// Endpoint to save additional points
+app.post("/api/save-additional-points", async (req, res) => {
+  try {
+    const { moNo, orderQty, orderDetails, additionalPoints } = req.body;
+    const newDoc = new CuttingAdditionalPoint({
+      moNo,
+      orderQty,
+      orderDetails,
+      additionalPoints
+    });
+    await newDoc.save();
+    res.status(200).json({ message: "Data saved successfully" });
+  } catch (error) {
+    console.error("Error saving additional points:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to save data", error: error.message });
   }
 });
 
