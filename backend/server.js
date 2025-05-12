@@ -38,6 +38,7 @@ import createCuttingInspectionModel from "./models/cutting_inspection.js"; // Ne
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
 import createCuttingMeasurementPointModel from "./models/CuttingMeasurementPoints.js"; // New model import
 import createCuttingFabricDefectModel from "./models/CuttingFabricDefects.js";
+import createCuttingIssueModel from "./models/CuttingIssues.js";
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
 
@@ -91,6 +92,7 @@ const io = new Server(server, {
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 app.use("/public", express.static(path.join(__dirname, "../public")));
+app.use("/storage", express.static(path.join(__dirname, "public/storage")));
 
 //app.use(cors());
 app.use(bodyParser.json());
@@ -151,6 +153,7 @@ const CuttingMeasurementPoint =
 const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
 const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection); // New model instance
 const CuttingFabricDefect = createCuttingFabricDefectModel(ymProdConnection);
+const CuttingIssue = createCuttingIssueModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -7513,10 +7516,27 @@ app.get("/api/cutting-inspection-filter-options", async (req, res) => {
    Cutting Measurement Points
 ------------------------------ */
 
-// Endpoint to fetch unique panel values from CuttingMeasurementPoint
 app.get("/api/cutting-measurement-panels", async (req, res) => {
   try {
-    const panels = await CuttingMeasurementPoint.distinct("panel");
+    /* CHANGE: Fetch panel, panelKhmer, and panelChinese for multilingual support */
+    const panels = await CuttingMeasurementPoint.aggregate([
+      {
+        $group: {
+          _id: "$panel",
+          panelKhmer: { $first: "$panelKhmer" },
+          panelChinese: { $first: "$panelChinese" }
+        }
+      },
+      {
+        $project: {
+          panel: "$_id",
+          panelKhmer: 1,
+          panelChinese: 1,
+          _id: 0
+        }
+      },
+      { $sort: { panel: 1 } }
+    ]).exec();
     res.status(200).json(panels);
   } catch (error) {
     console.error("Error fetching panels:", error);
@@ -7540,7 +7560,8 @@ app.get("/api/cutting-measurement-panel-index-names", async (req, res) => {
         $group: {
           _id: "$panelIndexName",
           panelIndex: { $max: "$panelIndex" },
-          panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" }
+          panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" },
+          panelIndexNameChinese: { $last: "$panelIndexNameChinese" }
         }
       },
       {
@@ -7548,6 +7569,7 @@ app.get("/api/cutting-measurement-panel-index-names", async (req, res) => {
           panelIndexName: "$_id",
           panelIndex: 1,
           panelIndexNameKhmer: 1,
+          panelIndexNameChinese: 1,
           _id: 0
         }
       },
@@ -7694,7 +7716,8 @@ app.get(
             $group: {
               _id: "$panelIndexName",
               panelIndex: { $max: "$panelIndex" },
-              panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" }
+              panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" },
+              panelIndexNameChinese: { $last: "$panelIndexNameChinese" }
             }
           },
           {
@@ -7702,6 +7725,7 @@ app.get(
               panelIndexName: "$_id",
               panelIndex: 1,
               panelIndexNameKhmer: 1,
+              panelIndexNameChinese: 1,
               _id: 0
             }
           }
@@ -7714,7 +7738,8 @@ app.get(
             $group: {
               _id: "$panelIndexName",
               panelIndex: { $max: "$panelIndex" },
-              panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" }
+              panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" },
+              panelIndexNameChinese: { $last: "$panelIndexNameChinese" }
             }
           },
           {
@@ -7722,6 +7747,7 @@ app.get(
               panelIndexName: "$_id",
               panelIndex: 1,
               panelIndexNameKhmer: 1,
+              panelIndexNameChinese: 1,
               _id: 0
             }
           }
@@ -7748,7 +7774,8 @@ app.get(
             $group: {
               _id: "$panelIndexName",
               panelIndex: { $max: "$panelIndex" },
-              panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" }
+              panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" },
+              panelIndexNameChinese: { $last: "$panelIndexNameChinese" }
             }
           },
           {
@@ -7756,6 +7783,7 @@ app.get(
               panelIndexName: "$_id",
               panelIndex: 1,
               panelIndexNameKhmer: 1,
+              panelIndexNameChinese: 1,
               _id: 0
             }
           }
@@ -7786,7 +7814,7 @@ app.put("/api/update-measurement-point/:id", async (req, res) => {
 
     const updatedPoint = await CuttingMeasurementPoint.findByIdAndUpdate(
       id,
-      { $set: updateData },
+      { $set: { ...updateData, updated_at: new Date() } },
       { new: true }
     );
 
@@ -7819,6 +7847,63 @@ app.get("/api/cutting-fabric-defects", async (req, res) => {
       .json({ message: "Failed to fetch defects", error: error.message });
   }
 });
+
+/* ------------------------------
+  Cutting Issues ENDPOINTS
+------------------------------ */
+
+// Add this endpoint after other endpoints
+app.get("/api/cutting-issues", async (req, res) => {
+  try {
+    const issues = await CuttingIssue.find().sort({ no: 1 });
+    res.status(200).json(issues);
+  } catch (error) {
+    console.error("Error fetching cutting issues:", error);
+    res.status(500).json({
+      message: "Failed to fetch cutting issues",
+      error: error.message
+    });
+  }
+});
+
+// Multer configuration for cutting images
+const cutting_storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "public/storage/cutting/");
+  },
+  filename: (req, file, cb) => {
+    cb(null, `cutting-${Date.now()}${path.extname(file.originalname)}`);
+  }
+});
+
+// File filter for JPEG/PNG only
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ["image/jpeg", "image/png"];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only JPEG and PNG images are allowed"), false);
+  }
+};
+
+const cutting_upload = multer({
+  storage: cutting_storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
+// Image upload endpoint
+app.post(
+  "/api/upload-cutting-image",
+  cutting_upload.single("image"),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+    const url = `/storage/cutting/${req.file.filename}`;
+    res.status(200).json({ url });
+  }
+);
 
 /* ------------------------------
    User Auth ENDPOINTS

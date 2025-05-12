@@ -5,7 +5,7 @@ import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../config";
 
 const CuttingMeasurementPointsModify = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [moNo, setMoNo] = useState("");
   const [moNoSearch, setMoNoSearch] = useState("");
   const [moNoOptions, setMoNoOptions] = useState([]);
@@ -100,13 +100,15 @@ const CuttingMeasurementPointsModify = () => {
             pointName: point.pointName,
             pointNameEng: point.pointNameEng,
             pointNameKhmer: point.pointNameKhmer,
+            pointNameChinese: point.pointNameChinese || "",
             panelName: point.panelName,
             panelSide: point.panelSide,
             panelDirection: point.panelDirection,
             measurementSide: point.measurementSide,
             panelIndex: point.panelIndex,
             panelIndexName: point.panelIndexName,
-            panelIndexNameKhmer: point.panelIndexNameKhmer
+            panelIndexNameKhmer: point.panelIndexNameKhmer,
+            panelIndexNameChinese: point.panelIndexNameChinese || ""
           }))
         );
       } catch (error) {
@@ -194,13 +196,15 @@ const CuttingMeasurementPointsModify = () => {
             pointName: point.pointName,
             pointNameEng: point.pointNameEng,
             pointNameKhmer: point.pointNameKhmer,
+            pointNameChinese: point.pointNameChinese,
             panelName: point.panelName,
             panelSide: point.panelSide,
             panelDirection: point.panelDirection,
             measurementSide: point.measurementSide,
             panelIndex: point.panelIndex,
             panelIndexName: point.panelIndexName,
-            panelIndexNameKhmer: point.panelIndexNameKhmer
+            panelIndexNameKhmer: point.panelIndexNameKhmer,
+            panelIndexNameChinese: point.panelIndexNameChinese
           },
           {
             headers: { "Content-Type": "application/json" },
@@ -291,9 +295,13 @@ const CuttingMeasurementPointsModify = () => {
               className="mt-1 w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
             >
               <option value="">{t("cutting.selectGarmentType")}</option>
-              {garmentTypes.map((type, index) => (
-                <option key={index} value={type}>
-                  {type}
+              {garmentTypes.map((typeObj, index) => (
+                <option key={index} value={typeObj.panel}>
+                  {i18n.language === "km"
+                    ? typeObj.panelKhmer || typeObj.panel
+                    : i18n.language === "zh"
+                    ? typeObj.panelChinese || typeObj.panel
+                    : typeObj.panel}
                 </option>
               ))}
             </select>
@@ -321,7 +329,7 @@ const CuttingMeasurementPointsModify = () => {
             </button>
           </div>
           <div className="max-h-120 overflow-y-auto">
-            <table className="w-full border-collapse border border-gray-300">
+            <table className="min-w-[1600px] border-collapse border border-gray-300">
               <thead className="sticky top-0 bg-gray-200">
                 <tr>
                   <th className="border border-gray-300 p-2 w-48 text-xs font-medium">
@@ -332,6 +340,9 @@ const CuttingMeasurementPointsModify = () => {
                   </th>
                   <th className="border border-gray-300 p-2 w-48 text-xs font-medium">
                     {t("cutting.measurementPointKhmer")}
+                  </th>
+                  <th className="border border-gray-300 p-2 w-48 text-xs font-medium">
+                    {t("cutting.measurementPointChinese")}
                   </th>
                   <th className="border border-gray-300 p-2 w-32 text-xs font-medium">
                     {t("cutting.panelName")}
@@ -353,6 +364,9 @@ const CuttingMeasurementPointsModify = () => {
                   </th>
                   <th className="border border-gray-300 p-2 w-32 text-xs font-medium">
                     {t("cutting.panelNameKhmer")}
+                  </th>
+                  <th className="border border-gray-300 p-2 w-32 text-xs font-medium">
+                    {t("cutting.panelNameChinese")}
                   </th>
                 </tr>
               </thead>
@@ -392,6 +406,23 @@ const CuttingMeasurementPointsModify = () => {
                           handlePointChange(
                             index,
                             "pointNameKhmer",
+                            e.target.value
+                          )
+                        }
+                        disabled={!isEditMode}
+                        className={`w-full p-1 border border-gray-300 rounded text-xs ${
+                          !isEditMode ? "bg-gray-100 cursor-not-allowed" : ""
+                        }`}
+                      />
+                    </td>
+                    <td className="border border-gray-300 p-2 w-20 text-xs">
+                      <input
+                        type="text"
+                        value={point.pointNameChinese}
+                        onChange={(e) =>
+                          handlePointChange(
+                            index,
+                            "pointNameChinese",
                             e.target.value
                           )
                         }
@@ -523,6 +554,23 @@ const CuttingMeasurementPointsModify = () => {
                           handlePointChange(
                             index,
                             "panelIndexNameKhmer",
+                            e.target.value
+                          )
+                        }
+                        disabled={!isEditMode}
+                        className={`w-full p-1 border border-gray-300 rounded text-xs ${
+                          !isEditMode ? "bg-gray-100 cursor-not-allowed" : ""
+                        }`}
+                      />
+                    </td>
+                    <td className="border border-gray-300 p-2 w-20 text-xs">
+                      <input
+                        type="text"
+                        value={point.panelIndexNameChinese}
+                        onChange={(e) =>
+                          handlePointChange(
+                            index,
+                            "panelIndexNameChinese",
                             e.target.value
                           )
                         }

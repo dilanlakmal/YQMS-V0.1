@@ -1873,6 +1873,7 @@ import NumberPad from "../components/forms/NumberPad";
 import CuttingOrderModify from "../components/inspection/cutting/CuttingOrderModify";
 import CuttingMeasurementPointsModify from "../components/inspection/cutting/CuttingMeasurementPointsModify ";
 import MeasurementTable from "../components/inspection/cutting/MeasurementTable";
+import CuttingIssues from "../components/inspection/cutting/CuttingIssues";
 
 //import { measurementPoints } from "../constants/cuttingmeasurement";
 
@@ -1959,6 +1960,11 @@ const CuttingPage = () => {
   });
   const [measurementPoints, setMeasurementPoints] = useState([]);
   const [fabricDefects, setFabricDefects] = useState([]);
+  const [cuttingIssuesData, setCuttingIssuesData] = useState({
+    issues: [],
+    additionalComments: "",
+    additionalImages: []
+  });
 
   useEffect(() => {
     const userAgent = navigator.userAgent.toLowerCase();
@@ -2699,6 +2705,7 @@ const CuttingPage = () => {
           )
         }
       ],
+      cuttingIssues: cuttingIssuesData, // Add cutting issues to inspection data
       inspectionTime: new Date().toLocaleTimeString("en-US", { hour12: false })
     };
 
@@ -2745,6 +2752,12 @@ const CuttingPage = () => {
         text: t("cutting.dataSaved")
       });
       resetMeasurementData();
+      // Reset cutting issues data after submission
+      setCuttingIssuesData({
+        issues: [],
+        additionalComments: "",
+        additionalImages: []
+      });
     } catch (error) {
       console.error("Error saving Cutting data:", error);
       Swal.fire({
@@ -3479,9 +3492,14 @@ const CuttingPage = () => {
                         className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
                       >
                         <option value="">{t("cutting.select_panel")}</option>
-                        {panels.map((panel, index) => (
-                          <option key={index} value={panel}>
-                            {panel}
+                        {panels.map((panelObj, index) => (
+                          <option key={index} value={panelObj.panel}>
+                            {i18n.language === "km"
+                              ? panelObj.panelKhmer || panelObj.panel
+                              : i18n.language === "zh"
+                              ? panelObj.panelChinese || panelObj.panel
+                              : panelObj.panel}
+                            :--({panelObj.panelKhmer})
                           </option>
                         ))}
                       </select>
@@ -4544,6 +4562,16 @@ const CuttingPage = () => {
                           </div>
                         );
                       })}
+                      {/* Add CuttingIssues here, after all bundles */}
+                      {bundleQty && (
+                        <>
+                          <hr className="my-4 border-gray-300" />
+                          <CuttingIssues
+                            moNo={moNo}
+                            selectedPanel={selectedPanel}
+                          />
+                        </>
+                      )}
                     </>
                   )}
                   <div className="mt-2 text-sm text-gray-600">

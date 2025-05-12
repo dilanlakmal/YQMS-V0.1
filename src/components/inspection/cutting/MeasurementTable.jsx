@@ -1034,11 +1034,15 @@ const MeasurementTable = ({
                 <td className="border border-gray-300 p-2 bg-white text-xs sm:text-sm">
                   {i18n.language === "kh"
                     ? row.panelIndexNameKhmer
+                    : i18n.language === "zh"
+                    ? row.panelIndexNameChinese
                     : row.panelIndexName}
                 </td>
                 <td className="border border-gray-300 p-2 bg-white text-xs sm:text-sm min-w-[50px]">
                   {i18n.language === "kh"
                     ? row.pointNameKhmer
+                    : i18n.language === "zh"
+                    ? row.panelIndexNameChinese
                     : row.measurementPoint}
                 </td>
                 {row.values.map((valueObj, colIdx) => (
@@ -1131,6 +1135,8 @@ const MeasurementTable = ({
                     {panelRowInfo
                       ? i18n.language === "kh"
                         ? panelRowInfo.panelIndexNameKhmer
+                        : i18n.language === "zh"
+                        ? panelRowInfo.panelIndexNameChinese
                         : panelRowInfo.panelIndexName
                       : `${t("cutting.panel")} ${panelIndex}`}
                   </td>
