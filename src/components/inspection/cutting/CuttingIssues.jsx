@@ -89,13 +89,14 @@ const CuttingIssues = ({ moNo, selectedPanel }) => {
     setSelectedImage(null);
   };
 
-  // Get display name based on language
   const getIssueDisplayName = (issueItem) => {
-    return i18n.language === "km"
-      ? issueItem.defectKhmer
-      : i18n.language === "zh"
-      ? issueItem.defectChinese
-      : issueItem.defectEng;
+    if (i18n.language === "kh") {
+      return issueItem.defectKhmer || issueItem.defectEng;
+    } else if (i18n.language === "zh") {
+      return issueItem.defectChinese || issueItem.defectEng;
+    } else {
+      return issueItem.defectEng;
+    }
   };
 
   return (
@@ -121,6 +122,15 @@ const CuttingIssues = ({ moNo, selectedPanel }) => {
               const selectedIssue = issuesList.find(
                 (item) => item._id === issue.issueId
               );
+              // Get all issueIds selected in other rows
+              const selectedIssueIds = issues
+                .filter((_, i) => i !== index) // Exclude current row
+                .map((i) => i.issueId)
+                .filter((id) => id); // Exclude empty strings
+              // Filter issuesList to exclude already selected issues
+              const availableIssues = issuesList.filter(
+                (issueItem) => !selectedIssueIds.includes(issueItem._id)
+              );
               return (
                 <tr key={index}>
                   <td className="border border-gray-300 p-2">
@@ -132,17 +142,12 @@ const CuttingIssues = ({ moNo, selectedPanel }) => {
                       className="w-full p-1 border border-gray-300 rounded text-xs"
                     >
                       <option value="">{t("cutting.selectIssue")}</option>
-                      {issuesList.map((issueItem) => (
+                      {availableIssues.map((issueItem) => (
                         <option key={issueItem._id} value={issueItem._id}>
                           {getIssueDisplayName(issueItem)}
                         </option>
                       ))}
                     </select>
-                    {selectedIssue && (
-                      <div className="mt-1 text-xs text-gray-700">
-                        {getIssueDisplayName(selectedIssue)}
-                      </div>
-                    )}
                   </td>
                   <td className="border border-gray-300 p-2">
                     <input
