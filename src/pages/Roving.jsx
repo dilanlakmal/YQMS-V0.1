@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { allDefects } from "../constants/defects";
 import { API_BASE_URL } from "../../config";
@@ -21,6 +21,7 @@ import EmpQRCodeScanner from "../components/inspection/qc_roving/EmpQRCodeScanne
 import PreviewRoving from "../components/inspection/qc_roving/PreviewRoving";
 import RovingCamera from "../components/inspection/qc_roving/RovingCamera";
 import RovingData from "../components/inspection/qc_roving/RovingData";
+import InlineWorkers from "../components/inspection/qc_roving/InlineWorkers";
 
 const RovingPage = () => {
   const { t } = useTranslation();
@@ -53,8 +54,20 @@ const RovingPage = () => {
   const [showMoNoDropdown, setShowMoNoDropdown] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const moNoDropdownRef = useRef(null);
+  const [inspectionRepOrdinal, setInspectionRepOrdinal] = useState('N/A');
+  const [inspectionRepLoading, setInspectionRepLoading] = useState(false);
+  const [inspectionsCompletedForProgress, setInspectionsCompletedForProgress] = useState(0);
+  const [lineWorkerData, setLineWorkerData] = useState([]);
+  const [lineWorkerDataLoading, setLineWorkerDataLoading] = useState(true);
+  const [lineWorkerDataError, setLineWorkerDataError] = useState(null);
 
-  // Initialize garments based on inspection type
+  const getNumericLineValue = useCallback((value) => {
+    if (value === null || value === undefined || String(value).trim() === '') return null;
+    const strValue = String(value).toLowerCase();
+    const numericPart = strValue.replace(/[^0-9]/g, ''); 
+    return numericPart ? parseInt(numericPart, 10) : null;
+  }, []);
+
   useEffect(() => {
     const size = inspectionType === 'Critical' ? 15 : 5;
     setGarments(Array.from({ length: size }, () => ({ garment_defect_id: '', defects: [], status: 'Pass' })));
@@ -63,7 +76,167 @@ const RovingPage = () => {
     setGarmentQuantity(size);
   }, [inspectionType]);
 
-  // Fetch MO Numbers when the user types in the MO No field
+  const fetchLineWorkerInfo = useCallback(async () => {
+    try {
+      setLineWorkerDataLoading(true);
+      const response = await axios.get(`${API_BASE_URL}/api/line-summary`);
+      const transformedData = response.data.map(summary => ({
+        lineNo: summary.line_no,
+        realWorkerCount: summary.real_worker_count,
+        editedWorkerCount: summary.edited_worker_count,
+      }));
+      setLineWorkerData(transformedData);
+      setLineWorkerDataError(null);
+    } catch (err) {
+      console.error("Error fetching line summary for progress:", err);
+      setLineWorkerDataError(t('qcRoving.lineWorkerFetchError', "Failed to fetch line worker data."));
+      setLineWorkerData([]);
+    } finally {
+      setLineWorkerDataLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    fetchLineWorkerInfo();
+  }, [fetchLineWorkerInfo]);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      setScannedUserData({
+        emp_id: user.emp_id || "N/A_USER_EMP_ID",
+        eng_name: user.eng_name || "N/A_USER_ENG_NAME",
+        kh_name: user.kh_name || "N/A_USER_KH_NAME", 
+        job_title: user.job_title || "N/A_USER_JOB_TITLE", 
+        dept_name: user.dept_name || "N/A_USER_DEPT_NAME", 
+        sect_name: user.sect_name || "N/A_USER_SECT_NAME", 
+      });
+    } else if (!authLoading && !user) {
+      setScannedUserData(null);
+    }
+  }, [user, authLoading]);
+
+  const fetchInspectionRepInfo = useCallback(async () => {
+    const toOrdinal = (n) => {
+      if (typeof n !== 'number' || isNaN(n) || n <= 0) return String(n);
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    };
+    if (lineNo && currentDate) {
+      setInspectionRepLoading(true);
+      try {
+        const year = currentDate.getFullYear();
+        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const day = String(currentDate.getDate()).padStart(2, '0');
+        const formattedDate = `${month}/${day}/${year}`;
+        const response = await axios.get(`${API_BASE_URL}/api/qc-inline-roving/inspection-time-info`, {
+          params: {
+            line_no: lineNo,
+            inspection_date: formattedDate,
+          },
+        });
+        const apiData = response.data;
+        if (typeof apiData.inspectionRepOrdinal === 'string' && apiData.inspectionRepOrdinal.toLowerCase().includes("line not configured")) {
+          setInspectionRepOrdinal(t('qcRoving.lineNotConfigured', "N/A (Line not configured)"));
+          setInspectionsCompletedForProgress(0);
+          return;
+        }
+        if (apiData.status === "line_not_configured") {
+           setInspectionRepOrdinal(t('qcRoving.lineNotConfigured', "N/A (Line not configured)"));
+           setInspectionsCompletedForProgress(0);
+           return;
+        }
+        const currentRoundOrdinal = apiData.currentRoundOrdinal;
+        const inspectionsCompletedInCurrentRound = apiData.inspectionsCompletedInCurrentRound;
+        if (currentRoundOrdinal === 0 || currentRoundOrdinal === null || typeof currentRoundOrdinal === 'undefined' || apiData.status === "no_data_yet") {
+          setInspectionRepOrdinal(t('qcRoving.firstInspection', "1st Inspection"));
+          setInspectionsCompletedForProgress(0);
+        } else {
+          if (lineWorkerDataLoading) {
+            setInspectionRepOrdinal(t('qcRoving.loadingWorkerData', "Loading worker data..."));
+            setInspectionsCompletedForProgress(0);
+            return;
+          }
+          if (lineWorkerDataError) {
+            setInspectionRepOrdinal(t('qcRoving.workerDataUnavailable', "N/A (Worker data error)"));
+            setInspectionsCompletedForProgress(0);
+            return;
+          }
+          const numericLineNoFromForm = getNumericLineValue(lineNo);
+          const selectedLineInfo = lineWorkerData.find(s => getNumericLineValue(s.lineNo) === numericLineNoFromForm);
+          if (!selectedLineInfo) {
+            setInspectionRepOrdinal(t('qcRoving.lineWorkerInfoNotFound', "N/A (Worker info not found)"));
+            setInspectionsCompletedForProgress(0);
+            return;
+          }
+          const workerCountToCompare = selectedLineInfo.editedWorkerCount !== null && selectedLineInfo.editedWorkerCount !== undefined
+                                        ? selectedLineInfo.editedWorkerCount
+                                        : selectedLineInfo.realWorkerCount;
+          if (typeof workerCountToCompare !== 'number' || workerCountToCompare <= 0) {
+            setInspectionRepOrdinal(t('qcRoving.invalidWorkerCount', "N/A (Invalid worker count)"));
+            setInspectionsCompletedForProgress(0);
+            return;
+          }
+          if (inspectionsCompletedInCurrentRound < workerCountToCompare) {
+            setInspectionRepOrdinal(
+              t('qcRoving.inspectionRepOngoing', `${toOrdinal(currentRoundOrdinal)} Inspection (Ongoing: ${inspectionsCompletedInCurrentRound}/${workerCountToCompare})`)
+            );
+          } else {
+            setInspectionRepOrdinal(`${toOrdinal(currentRoundOrdinal + 1)} Inspection`);
+          }
+          setInspectionsCompletedForProgress(inspectionsCompletedInCurrentRound);
+        }
+      } catch (error) {
+        console.error("Error fetching inspection time info:", error);
+        let newOrdinalMessage = t('qcRoving.inspectionRepError', "Error");
+        if (error.response) {
+          const status = error.response.status;
+          const errorData = error.response.data;
+          const errorMessage = (typeof errorData === 'string' ? errorData : errorData?.message || errorData?.error || "").toLowerCase();
+          if ((status === 400 || status === 404) && (errorMessage.includes("line not configured") || errorMessage.includes("line not found") || errorMessage.includes("invalid line"))) {
+            newOrdinalMessage = t('qcRoving.lineNotConfigured', "N/A (Line not configured)");
+          }
+        }
+        setInspectionRepOrdinal(newOrdinalMessage);
+        setInspectionsCompletedForProgress(0);
+      } finally {
+        setInspectionRepLoading(false);
+      }
+    } else {
+      setInspectionRepOrdinal(t('qcRoving.inspectionRepNA', "N/A"));
+      setInspectionsCompletedForProgress(0);
+    }
+  }, [lineNo, currentDate, t, lineWorkerData, lineWorkerDataLoading, lineWorkerDataError, getNumericLineValue]);
+
+  useEffect(() => {
+    fetchInspectionRepInfo();
+  }, [fetchInspectionRepInfo]);
+
+const fetchInspectionsCompleted = useCallback(async () => {
+  if (lineNo && currentDate) {
+    try {
+      const year = currentDate.getFullYear();
+      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+      const day = String(currentDate.getDate()).padStart(2, '0');
+      const formattedDate = `${month}/${day}/${year}`;
+      const response = await axios.get(`${API_BASE_URL}/api/inspections-completed`, {
+        params: {
+          line_no: lineNo,
+          inspection_date: formattedDate,
+        },
+      });
+      setInspectionsCompletedForProgress(response.data.completeInspectOperators);
+    } catch (error) {
+      console.error("Error fetching inspections completed:", error);
+      setInspectionsCompletedForProgress(0);
+    }
+  }
+}, [lineNo, currentDate]);
+
+  useEffect(() => {
+    fetchInspectionsCompleted();
+  }, [fetchInspectionsCompleted]);
+
   useEffect(() => {
     const fetchMoNumbers = async () => {
       if (moNoSearch.trim() === "") {
@@ -71,7 +244,6 @@ const RovingPage = () => {
         setShowMoNoDropdown(false);
         return;
       }
-
       try {
         const response = await axios.get(
           `${API_BASE_URL}/api/inline-orders-mo-numbers`,
@@ -92,18 +264,15 @@ const RovingPage = () => {
         });
       }
     };
-
     fetchMoNumbers();
   }, [moNoSearch]);
 
-  // Fetch Operation Data when MO No is selected
   useEffect(() => {
     const fetchOperationData = async () => {
       if (!moNo) {
         setOperationData([]);
         return;
       }
-
       try {
         const response = await axios.get(
           `${API_BASE_URL}/api/inline-orders-details`,
@@ -131,11 +300,9 @@ const RovingPage = () => {
         }
       }
     };
-
     fetchOperationData();
   }, [moNo]);
 
-  // Handle clicks outside the MO No dropdown to close it
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -145,7 +312,6 @@ const RovingPage = () => {
         setShowMoNoDropdown(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -163,7 +329,7 @@ const RovingPage = () => {
             defects: [
               ...newGarments[currentGarmentIndex].defects,
               {
-                name: defect.english, // Store English name
+                name: defect.english,
                 count: 1,
                 operationId: selectedOperationId,
                 repair: defect.repair
@@ -173,7 +339,7 @@ const RovingPage = () => {
           };
           return newGarments;
         });
-        setSelectedDefect(""); // Reset dropdown
+        setSelectedDefect("");
       }
     }
   };
@@ -194,7 +360,7 @@ const RovingPage = () => {
     setGarments((prevGarments) => {
       const newGarments = [...prevGarments];
       const defects = [...newGarments[currentGarmentIndex].defects];
-      defects[defectIndex] = { ...defects[defectIndex], count: defects[defectIndex].count + 1 };
+      defects[defectIndex] = { ...defects[defectIndex], count:        defects[defectIndex].count + 1 };
       newGarments[currentGarmentIndex] = { ...newGarments[currentGarmentIndex], defects };
       return newGarments;
     });
@@ -238,7 +404,6 @@ const RovingPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (
       !lineNo ||
       !moNo ||
@@ -254,10 +419,8 @@ const RovingPage = () => {
       });
       return;
     }
-
     const now = new Date();
     const inspectionTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-
     const updatedGarments = garments.map((garment) => {
       const hasDefects = garment.defects.length > 0;
       const garmentDefectCount = garment.defects.reduce((sum, defect) => sum + defect.count, 0);
@@ -276,6 +439,7 @@ const RovingPage = () => {
       (acc, g) => acc + g.garment_defect_count,
       0
     );
+
     const qualityStatus = updatedGarments.some((g) => g.status === "Fail")
       ? "Reject"
       : "Pass";
@@ -284,43 +448,73 @@ const RovingPage = () => {
       (data) => data.Tg_No === selectedOperationId
     );
 
+    const singleOperatorInspectionData = {
+      operator_emp_id: scannedUserData?.emp_id || "N/A",
+      operator_eng_name: scannedUserData?.eng_name || "N/A",
+      operator_kh_name: scannedUserData?.kh_name || "N/A",
+      operator_job_title: scannedUserData?.job_title || "N/A",
+      operator_dept_name: scannedUserData?.dept_name || "N/A",
+      operator_sect_name: scannedUserData?.sect_name || "N/A",
+      tg_no: selectedOperation?.Tg_No || "N/A",
+      tg_code: selectedOperation?.Tg_Code || "N/A",
+      ma_code: selectedOperation?.Ma_Code || "N/A",
+      operation_ch_name: selectedOperation?.ch_name || "N/A",
+      operation_kh_name: selectedOperation?.kh_name || "N/A",
+      type: inspectionType,
+      spi: spiStatus,
+      spi_image: spiImage,
+      measurement: measurementStatus,
+      measurement_image: measurementImage,
+      checked_quantity: garments.length,
+      inspection_time: inspectionTime,
+      qualityStatus,
+      rejectGarments: [
+        {
+          totalCount: totalDefectCount,
+          garments: updatedGarments.filter((g) => g.defects.length > 0),
+        },
+      ],
+    };
+
+    let totalOperatorsForLine = 0;
+    const numericLineNoFromForm = getNumericLineValue(lineNo);
+    if (numericLineNoFromForm !== null && lineWorkerData && lineWorkerData.length > 0) {
+      const selectedLineInfo = lineWorkerData.find(s => {
+        const numericLineNoFromData = getNumericLineValue(s.lineNo);
+        return numericLineNoFromData !== null && numericLineNoFromData === numericLineNoFromForm;
+      });
+      if (selectedLineInfo) {
+        totalOperatorsForLine = selectedLineInfo.editedWorkerCount !== null && selectedLineInfo.editedWorkerCount !== undefined
+          ? selectedLineInfo.editedWorkerCount
+          : (selectedLineInfo.realWorkerCount || 0);
+      } else {
+        console.warn(`Worker data not found for line ${lineNo}. total_operators will be defaulted to 0.`);
+      }
+    } else {
+      console.warn(`Line number (${lineNo}) is invalid or lineWorkerData is not available. total_operators will be defaulted to 0.`);
+    }
+
+    const completeInspectOperators = 1;
+
+    const inspectStatus = (totalOperatorsForLine > 0 && completeInspectOperators >= totalOperatorsForLine)
+      ? "Completed"
+      : "Not Complete";
+
     const report = {
       inline_roving_id: Date.now(),
       report_name: 'QC Inline Roving',
-      emp_id: user?.emp_id || 'Guest',
-      eng_name: user?.eng_name || 'Guest',
       inspection_date: currentDate.toLocaleDateString("en-US"),
       mo_no: moNo,
       line_no: lineNo,
-      inlineData: [
-        {
-          operator_emp_id: scannedUserData?.emp_id || "N/A",
-          operator_eng_name: scannedUserData?.eng_name || "N/A",
-          operator_kh_name: scannedUserData?.kh_name || "N/A",
-          operator_job_title: scannedUserData?.job_title || "N/A",
-          operator_dept_name: scannedUserData?.dept_name || "N/A",
-          operator_sect_name: scannedUserData?.sect_name || "N/A",
-          tg_no: selectedOperation?.Tg_No || "N/A",
-          tg_code: selectedOperation?.Tg_Code || "N/A",
-          ma_code: selectedOperation?.Ma_Code || "N/A",
-          operation_ch_name: selectedOperation?.ch_name || "N/A",
-          operation_kh_name: selectedOperation?.kh_name || "N/A",
-          type: inspectionType,
-          spi: spiStatus,
-          spi_image: spiImage,
-          measurement: measurementStatus,
-          measurement_image: measurementImage,
-          checked_quantity: garments.length,
-          inspection_time: inspectionTime,
-          qualityStatus,
-          rejectGarments: [
-            {
-              totalCount: totalDefectCount,
-              garments: updatedGarments.filter((g) => g.defects.length > 0),
-            },
-          ],
-        },
-      ],
+      inspection_rep: [{
+        inspection_rep_name: inspectionRepOrdinal,
+        emp_id: user?.emp_id || 'Guest',
+        eng_name: user?.eng_name || 'Guest',
+        total_operators: totalOperatorsForLine,
+        complete_inspect_operators: completeInspectOperators,
+        Inspect_status: inspectStatus,
+        inlineData: [singleOperatorInspectionData]
+      }],
     };
 
     try {
@@ -331,6 +525,8 @@ const RovingPage = () => {
         text: 'QC Inline Roving data saved successfully!',
       });
       resetForm();
+      fetchInspectionRepInfo(); // Refresh the inspection repetition info after saving
+      fetchInspectionsCompleted(); // Refresh the inspections completed info after saving
     } catch (error) {
       console.error("Error saving QC Inline Roving data:", error);
       Swal.fire({
@@ -365,10 +561,12 @@ const RovingPage = () => {
   const commonResultStatus = garments.some((g) => g.defects.length > 0)
     ? "Reject"
     : "Pass";
+
   const garment = garments[currentGarmentIndex] || {
     defects: [],
     status: "Pass"
   };
+
   const currentGarmentDefects = garment.defects;
 
   const totalDefects = garments.reduce(
@@ -376,10 +574,13 @@ const RovingPage = () => {
       acc + garment.defects.reduce((sum, defect) => sum + defect.count, 0),
     0
   );
+
   const defectGarments = garments.filter(
     (garment) => garment.defects.length > 0
   ).length;
+
   const defectRate = ((totalDefects / garmentQuantity) * 100).toFixed(2) + "%";
+
   const defectRatio =
     ((defectGarments / garmentQuantity) * 100).toFixed(2) + "%";
 
@@ -409,7 +610,6 @@ const RovingPage = () => {
         <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">
           {t("qcRoving.qc_inline_roving_inspection")}
         </h1>
-        {/* Tab Navigation */}
         <div className="flex justify-center mb-4">
           <button
             onClick={() => setActiveTab('form')}
@@ -433,19 +633,76 @@ const RovingPage = () => {
               activeTab === "db"
                 ? "bg-blue-600 text-white"
                 : "bg-gray-200 text-gray-700"
-            } rounded-r-lg`}
+            } `}
           >
             <Database className="w-5 h-5" />
             <span>DB</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("inlineWorkers")}
+            className={`px-4 py-2 ${
+              activeTab === "inlineWorkers"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700"
+            } rounded-r-lg`}
+          >
+            {t("qcRoving.inlineWorkers")}
           </button>
         </div>
 
         {activeTab === 'form' ? (
           <>
-            {/* Basic Info Section */}
-            <div className="mb-8">
-              {/* First Row: Date, Line No, MO No */}
+            <div className="my-4 p-4 bg-blue-100 rounded-lg shadow">
+              <h3 className="text-md font-semibold text-gray-700 mb-2">
+                {t("qcRoving.lineWorkerProgressTitle", "Line {{lineDisplayValue}} : Inspection Progress", { lineDisplayValue: getNumericLineValue(lineNo) || t('qcRoving.na', 'N/A') })} 
+                &nbsp;({inspectionRepLoading ? t('qcRoving.loading', "Loading...") : inspectionRepOrdinal})
+              </h3>
+              {(() => {
+                const numericLineNoFromForm = getNumericLineValue(lineNo); 
+                if (numericLineNoFromForm === null || lineWorkerDataLoading || lineWorkerDataError || inspectionRepLoading) {
+                  if (lineWorkerDataLoading) return <p className="text-sm text-gray-500">{t("qcRoving.loadingWorkerData", "Loading worker data...")}</p>;
+                  if (lineWorkerDataError) return <p className="text-sm text-red-500">{lineWorkerDataError}</p>;
+                  if (inspectionRepLoading) return <p className="text-sm text-gray-500">{t("qcRoving.loadingInspectionData", "Loading inspection data...")}</p>;
+                  return <p className="text-sm text-gray-500">{t("qcRoving.selectLineForProgress", "Select a line to see worker status.")}</p>;
+                }
+                const selectedLineInfo = lineWorkerData.find(s => {
+                  const numericLineNoFromData = getNumericLineValue(s.lineNo);
+                  return numericLineNoFromData !== null && numericLineNoFromData === numericLineNoFromForm;
+                });
+                if (selectedLineInfo) {
+                  const totalWorkersForLine = selectedLineInfo.editedWorkerCount !== null && selectedLineInfo.editedWorkerCount !== undefined
+                    ? selectedLineInfo.editedWorkerCount
+                    : (selectedLineInfo.realWorkerCount || 0);
+                  const progressPercent = totalWorkersForLine > 0 ? (inspectionsCompletedForProgress / totalWorkersForLine) * 100 : 0;
+                  return (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">
+                        {t("qcRoving.inspectionsCompleted", "Inspections Completed")} : {inspectionsCompletedForProgress} / {totalWorkersForLine}
+                      </p>
+                      <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                        <div
+                          className={`${progressPercent >= 100 ? 'bg-green-600' : 'bg-blue-600'} h-2.5 rounded-full`}
+                          style={{ width: `${progressPercent}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  );
+                } else {
+                  return <p className="text-sm text-gray-500">{t("qcRoving.noWorkerDataForLine", "No worker data available for selected line.")}</p>;
+                }
+              })()}
+              {lineWorkerDataLoading && (<p className="text-sm text-gray-500">{t("qcRoving.loadingWorkerData", "Loading worker data...")}</p>)}
+              {lineWorkerDataError && !lineWorkerDataLoading && (<p className="text-sm text-red-500">{lineWorkerDataError}</p>)}
+            </div>
+
+            <div className="mb-6">
               <div className="flex flex-wrap gap-4 items-end">
+                <div className="flex-1 min-w-[150px]">
+                  <label htmlFor="inspectionRep" className="block text-sm font-medium text-gray-700">
+                    {t("qcRoving.inspectionRep", "Inspection Repetition")}
+                  </label>
+                  <input type="text" id="inspectionRep" value={inspectionRepLoading ? t('qcRoving.loading', "Loading...") : inspectionRepOrdinal} readOnly className="mt-1 w-full p-2 border border-gray-300 rounded-lg bg-gray-100" />
+                </div>
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
                     {t("qcRoving.date")}
@@ -508,7 +765,6 @@ const RovingPage = () => {
                 </div>
               </div>
 
-              {/* Second Row: Operation No, Scan QR, Inspection Type, Language */}
               <div className="flex flex-wrap items-center gap-4 mt-4">
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
@@ -531,7 +787,7 @@ const RovingPage = () => {
                       ))}
                     </select>
                     {selectedOperation && (
-                      <button
+                                            <button
                         onClick={() =>
                           setShowOperationDetails(!showOperationDetails)
                         }
@@ -575,18 +831,12 @@ const RovingPage = () => {
                   <label className="block text-sm font-medium text-gray-700">
                     {t("qcRoving.scanQR")}
                   </label>
-                  <button
-                    onClick={() => setShowScanner(true)}
-                    className="mt-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 w-full justify-center"
-                  >
-                    <QrCode className="w-5 h-5" />
-                    {t("qcRoving.scanQR")}
-                  </button>
+                  <div className="mt-1 p-2 border border-gray-300 rounded-lg bg-gray-50 text-sm">
+                    {scannedUserData ? t("qcRoving.operatorDataSetToCurrentUser", "Operator: Current User") : t("qcRoving.operatorDataNotSet", "Operator: Not Set (QR Scan Disabled)")}
+                  </div>
                   {scannedUserData && (
                     <div className="mt-2 flex items-center gap-2">
-                      <p className="text-sm">
-                        <strong>Operator ID:</strong> {scannedUserData.emp_id}
-                      </p>
+                      <p className="text-sm"></p>
                       <button
                         onClick={() =>
                           setShowOperatorDetails(!showOperatorDetails)
@@ -678,10 +928,8 @@ const RovingPage = () => {
                 </div>
               </div>
 
-              {/* Horizontal Divider */}
               <hr className="my-6 border-gray-300" />
 
-              {/* Third Row: SPI and Measurement */}
               <div className="flex flex-wrap items-start gap-4">
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
@@ -765,7 +1013,6 @@ const RovingPage = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Quality Inspection Section */}
               <div className="md:col-span-2 mb-2">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">
                   {t("qcRoving.quality")}
@@ -858,7 +1105,7 @@ const RovingPage = () => {
                   </div>
                 </div>
               </div>
-              {/* Defect Rate and Ratio Section */}
+
               <div className="md:col-span-1 mb-2">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">
                   {t("qcRoving.defect_metrics")}
@@ -887,6 +1134,7 @@ const RovingPage = () => {
                 </table>
               </div>
             </div>
+
             <div className="flex justify-end mt-2">
               <div className="space-x-4">
                 <button
@@ -905,6 +1153,7 @@ const RovingPage = () => {
                 </button>
               </div>
             </div>
+
             <div className="flex justify-center mt-6 space-x-4">
               <button
                 onClick={() => setShowPreview(true)}
@@ -929,12 +1178,7 @@ const RovingPage = () => {
                 {t("qcRoving.finish_inspection")}
               </button>
             </div>
-            {showScanner && (
-              <EmpQRCodeScanner
-                onUserDataFetched={handleUserDataFetched}
-                onClose={() => setShowScanner(false)}
-              />
-            )}
+
             {showPreview && (
               <PreviewRoving
                 isOpen={showPreview}
@@ -959,6 +1203,7 @@ const RovingPage = () => {
                 }}
               />
             )}
+
             {showSpiCamera && (
               <RovingCamera
                 isOpen={showSpiCamera}
@@ -969,6 +1214,7 @@ const RovingPage = () => {
                 empId={user?.emp_id || "Guest"}
               />
             )}
+
             {showMeasurementCamera && (
               <RovingCamera
                 isOpen={showMeasurementCamera}
@@ -982,8 +1228,10 @@ const RovingPage = () => {
           </>
         ) : activeTab === "data" ? (
           <RovingData />
-        ) : (
+        ) : activeTab === "db" ? (
           <CEDatabase />
+        ) : (
+          <InlineWorkers onWorkerCountUpdated={fetchLineWorkerInfo} />
         )}
       </div>
     </div>
@@ -991,3 +1239,5 @@ const RovingPage = () => {
 };
 
 export default RovingPage;
+
+

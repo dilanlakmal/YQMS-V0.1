@@ -26,13 +26,14 @@ import axios from 'axios';
 import createRoleManagmentModel from "./models/RoleManagment.js";
 import createQC2InspectionPassBundle from "./models/qc2_inspection_pass_bundle.js";
 import createQC2DefectPrintModel from "./models/QC2DefectPrint.js";
-import createQC2ReworksModel from "./models/qc2_reworks.js";
+import createQC2ReworksModel from "./models/qc2_rework.js";
 import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
 import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
 import createCuttingOrdersModel from "./models/CuttingOrders.js"; // New model import
 import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
 
 import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
+import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron";
@@ -69,8 +70,9 @@ const server = https.createServer(options, app);
 // Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: "https://192.167.8.235:3001", // Update with your frontend URL  //"https://localhost:3001"
-    methods: ["GET", "POST"],
+    origin: ["https://192.167.8.235:3001", "http://localhost:3001",    // For local development (HTTP)
+      "https://localhost:3001"],// Update with your frontend URL  //"https://localhost:3001"
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   },
@@ -124,6 +126,7 @@ const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the ne
 const CuttingOrders = createCuttingOrdersModel(ymProdConnection); // New model
 const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New model
 const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
+const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection); 
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -6213,6 +6216,7 @@ app.get("/api/qc2-orderdata-summary", async (req, res) => {
   }
 });
 
+
 /* ------------------------------
    QC2 Washing Live Dashboard
 ------------------------------ */
@@ -6725,6 +6729,7 @@ app.post("/api/upload-qc-image", qcUpload, (req, res) => {
   }
 });
 
+
 // Updated endpoint to save or update QC Inline Roving data
 app.post("/api/save-qc-inline-roving", async (req, res) => {
   try {
@@ -6851,6 +6856,109 @@ app.get("/api/qc-inline-roving-qc-ids", async (req, res) => {
   }
 });
 
+app.get("/api/line-summary", async (req, res) => {
+  try {
+    const lineSummaries = await UserMain.aggregate([
+      {
+        $match: {
+          sect_name: { $ne: null, $ne: "" },
+          working_status: "Working",
+          job_title: "Sewing Worker"
+        }
+      },
+      {
+        $group: {
+          _id: "$sect_name",
+          worker_count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          line_no: "$_id",
+          // worker_count: 1
+          real_worker_count: "$worker_count" 
+        }
+      },
+      { $sort: { line_no: 1 } }
+    ]);
+    const editedCountsDocs = await LineSewingWorker.find({}, "line_no edited_worker_count").lean();
+    const editedCountsMap = new Map(editedCountsDocs.map(doc => [doc.line_no, doc.edited_worker_count]));
+
+    const mergedSummaries = lineSummaries.map(realSummary => ({
+      ...realSummary,
+      edited_worker_count: editedCountsMap.get(realSummary.line_no) // Can be undefined if no edit
+    }));
+
+    res.json(mergedSummaries);
+  } catch (error) {
+    console.error("Error fetching line summary:", error);
+    res.status(500).json({ message: "Failed to fetch line summary data.", error: error.message });
+  }
+});
+
+// New PUT endpoint to save/update edited line worker counts
+app.put("/api/line-sewing-workers/:lineNo", async (req, res) => { // Assuming authenticateUser middleware sets req.user
+  const { lineNo } = req.params;
+  const { edited_worker_count } = req.body;
+  
+  // Placeholder for user details if authentication is not fully set up yet
+  // In a real app, req.user would be populated by an authentication middleware
+  // const user = req.user || { emp_id: 'SYSTEM_USER', eng_name: 'System Edit' }; 
+  // const { emp_id: updated_by_emp_id, eng_name: updated_by_name } = user;
+
+  if (typeof edited_worker_count !== 'number' || edited_worker_count < 0 || !Number.isInteger(edited_worker_count)) {
+    return res.status(400).json({ message: "Edited worker count must be a non-negative integer." });
+  }
+
+  try {
+    const now = new Date();
+    const realCountResult = await UserMain.aggregate([
+      {
+        $match: {
+          sect_name: lineNo, // Match the specific line number
+          working_status: "Working",
+          job_title: "Sewing Worker"
+        }
+      },
+      {
+        $group: {
+          _id: null, // Group all matching documents for this line
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const current_real_worker_count = realCountResult.length > 0 ? realCountResult[0].count : 0;
+    const historyEntry = {
+        edited_worker_count,
+        // updated_by_emp_id,
+        // updated_by_name,
+        updated_at: now
+    };
+
+    const updatedLineWorker = await LineSewingWorker.findOneAndUpdate(
+      { line_no: lineNo },
+      {
+        $set: {
+           real_worker_count: current_real_worker_count,
+          edited_worker_count,
+          // updated_by_emp_id,
+          // updated_by_name,
+          updated_at: now,
+        },
+        $push: { history: historyEntry } // Push the new state to history
+      },
+      { new: true, upsert: true, runValidators: true } // upsert: true creates if not found
+    );
+
+    res.json({ message: "Line worker count updated successfully.", data: updatedLineWorker });
+  } catch (error) {
+    console.error(`Error updating line worker count for line ${lineNo}:`, error);
+    res.status(500).json({ message: "Failed to update line worker count.", error: error.message });
+  }
+});
+
 // Endpoint to fetch user data by emp_id
 app.get("/api/user-by-emp-id", async (req, res) => {
   try {
@@ -6880,6 +6988,7 @@ app.get("/api/user-by-emp-id", async (req, res) => {
     });
   }
 });
+
 
 app.get("/api/users-paginated", async (req, res) => {
   try {
@@ -6939,6 +7048,171 @@ app.get("/api/sections", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch sections" });
   }
 });
+
+// Helper function to get ordinal string (1st, 2nd, 3rd, etc.)
+function getOrdinal(n) {
+  if (n <= 0) return String(n);
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0] || "th"); // Added "th" as a final fallback
+}
+
+// Endpoint to get the current inspection time ordinal (1st, 2nd, etc.)
+app.get("/api/qc-inline-roving/inspection-time-info", async (req, res) => {
+  try {
+    const { line_no, inspection_date } = req.query;
+
+    if (!line_no || !inspection_date) {
+      return res.status(400).json({ message: "Line number and inspection date are required." });
+    }
+
+    // Validate date format (MM/DD/YYYY) - Adjust if your frontend sends a different format
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(inspection_date)) {
+      return res.status(400).json({ message: "Invalid inspection date format. Expected MM/DD/YYYY." });
+    }
+
+    // 1. Fetch Target Worker Count from LineSewingWorker
+    const lineWorkerInfo = await LineSewingWorker.findOne({ line_no });
+    if (!lineWorkerInfo) {
+      return res.json({ inspectionTimeOrdinal: "N/A (Line not configured)" });
+    }
+    // Prioritize edited_worker_count, it's required in the schema so should exist.
+    const target_worker_count = lineWorkerInfo.edited_worker_count;
+
+    if (target_worker_count === 0) {
+      return res.json({ inspectionTimeOrdinal: "N/A (Target 0 workers)" });
+    }
+
+    // 2. Fetch QC Roving Data for the given line and date
+    const rovingRecords = await QCInlineRoving.find({
+      line_no: line_no,
+      inspection_date: inspection_date, // Assumes inspection_date in DB is MM/DD/YYYY
+    });
+
+    if (rovingRecords.length === 0) {
+      return res.json({ inspectionTimeOrdinal: getOrdinal(1) }); // "1st"
+    }
+
+    // 3. Process Roving Data to count inspections per operator
+    const operatorInspectionCounts = {};
+    rovingRecords.forEach(record => {
+      record.inlineData.forEach(entry => {
+        const operatorId = entry.operator_emp_id;
+        if (operatorId) { // Ensure operatorId is valid
+          operatorInspectionCounts[operatorId] = (operatorInspectionCounts[operatorId] || 0) + 1;
+        }
+      });
+    });
+
+    if (Object.keys(operatorInspectionCounts).length === 0) {
+      return res.json({ inspectionTimeOrdinal: getOrdinal(1) }); // "1st" if records exist but no valid operator data
+    }
+
+    // 4. Calculate Completed Rounds
+    let completed_rounds = 0;
+    for (let round_num = 1; round_num <= 5; round_num++) {
+      let operators_finished_this_round = 0;
+      for (const operator_id in operatorInspectionCounts) {
+        if (operatorInspectionCounts[operator_id] >= round_num) {
+          operators_finished_this_round++;
+        }
+      }
+      if (operators_finished_this_round >= target_worker_count) {
+        completed_rounds = round_num;
+      } else {
+        break;
+      }
+    }
+
+    const current_inspection_time_number = completed_rounds + 1;
+    const ordinal = current_inspection_time_number > 5 ? `${getOrdinal(5)} (Completed)` : getOrdinal(current_inspection_time_number);
+
+    res.json({ inspectionTimeOrdinal: ordinal });
+
+  } catch (error) {
+    console.error("Error fetching inspection time info:", error);
+    res.status(500).json({ message: "Failed to fetch inspection time info.", error: error.message });
+  }
+});
+
+app.get('/api/inspections-completed', async (req, res) => {
+  const { line_no, inspection_date } = req.query;
+
+  try {
+    const inspection = await QCInlineRoving.findOne({
+      line_no,
+      inspection_date,
+    });
+
+    if (!inspection) {
+      return res.status(404).json({ message: 'Inspection not found' });
+    }
+
+    const completeInspectOperators = inspection.inspection_rep.reduce(
+      (acc, rep) => acc + rep.complete_inspect_operators,
+      0
+    );
+
+    res.json({ completeInspectOperators });
+  } catch (error) {
+    console.error('Error fetching inspections completed:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+app.get('/api/qc-inline-roving-reports/filtered', async (req, res) => {
+  try {
+    const { inspection_date, qcId, operatorId, lineNo, moNo } = req.query;
+    let queryConditions = {};
+
+    if (inspection_date) {
+     if (/^\d{2}\/\d{2}\/\d{4}$/.test(inspection_date)) {
+        const parts = inspection_date.split('/');
+        const month = parseInt(parts[0], 10);
+        const day = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+
+        // Construct a regex to match M/D/YYYY, MM/D/YYYY, M/DD/YYYY, MM/DD/YYYY
+        // e.g., for "05/08/2025", monthRegexPart = "0?5", dayRegexPart = "0?8"
+        const monthRegexPart = month < 10 ? `0?${month}` : `${month}`;
+        const dayRegexPart = day < 10 ? `0?${day}` : `${day}`;
+        
+        const dateRegex = new RegExp(`^${monthRegexPart}\\/${dayRegexPart}\\/${year}$`);
+        queryConditions.inspection_date = { $regex: dateRegex };
+      } else {
+        console.warn("Received date for filtering is not in MM/DD/YYYY format:", inspection_date, "- Date filter will not be applied effectively.");
+      }
+    }
+
+    if (qcId) {
+      queryConditions.emp_id = qcId;
+    }
+
+    if (lineNo) {
+      queryConditions.line_no = lineNo;
+    }
+
+    if (moNo) {
+      queryConditions.mo_no = moNo;
+    }
+
+    if (operatorId) {
+      const orConditions = [{ operator_emp_id: operatorId }]; // Match as string
+      // If operatorId is purely numeric, also try matching as a number
+      if (/^\d+$/.test(operatorId)) {
+        orConditions.push({ operator_emp_id: parseInt(operatorId, 10) });
+      }
+      queryConditions.inlineData = { $elemMatch: { $or: orConditions } };
+    }
+
+    const reports = await QCInlineRoving.find(queryConditions);
+    res.json(reports);
+  } catch (error) {
+    console.error('Error fetching filtered QC inline roving reports:', error);
+    res.status(500).json({ message: 'Failed to fetch filtered reports', error: error.message });
+  }
+});
+
 
 /* ------------------------------
    QC1 Sunrise Dashboard ENDPOINTS

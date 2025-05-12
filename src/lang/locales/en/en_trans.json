@@ -467,7 +467,8 @@
     "previous": "Previous",
     "next": "Next",
     "preview": "Preview",
-    "finish_inspection": "Finish Inspection"
+    "finish_inspection": "Finish Inspection",
+    "inlineWorkers":"Inline Workers"
   },
 
   "cutting": {
