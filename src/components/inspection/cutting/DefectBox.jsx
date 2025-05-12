@@ -1,22 +1,34 @@
 import React, { useState } from "react";
 import { X, Plus, Minus } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { cuttingDefects } from "../../../constants/cuttingdefect";
 
 const DefectBox = ({
   defects,
   onClose,
   onAddDefect,
   onRemoveDefect,
-  onUpdateDefectCount
+  onUpdateDefectCount,
+  fabricDefects // New prop
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [newDefect, setNewDefect] = useState("");
 
   const handleDefectSelect = (value) => {
     if (value) {
       onAddDefect(value);
       setNewDefect("");
+    }
+  };
+
+  const getDefectName = (defect) => {
+    switch (i18n.language) {
+      case "kh":
+        return defect.defectNameKhmer;
+      case "zh":
+        return defect.defectNameChinese;
+      case "en":
+      default:
+        return defect.defectNameEng;
     }
   };
 
@@ -61,7 +73,7 @@ const DefectBox = ({
               <select
                 value={defect.defectName}
                 onChange={(e) => {
-                  const newDefectData = cuttingDefects.find(
+                  const newDefectData = fabricDefects.find(
                     (d) => d.defectName === e.target.value
                   );
                   const updatedDefect = {
@@ -74,9 +86,9 @@ const DefectBox = ({
                 }}
                 className="p-2 border border-gray-300 rounded-lg text-sm flex-1 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
-                {cuttingDefects.map((d, i) => (
+                {fabricDefects.map((d, i) => (
                   <option key={i} value={d.defectName}>
-                    {d.defectNameEng} ({d.defectNameKhmer})
+                    {getDefectName(d)}
                   </option>
                 ))}
               </select>
@@ -95,9 +107,9 @@ const DefectBox = ({
               className="p-2 border border-gray-300 rounded-lg w-full text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
               <option value="">{t("cutting.addDefect")}</option>
-              {cuttingDefects.map((defect, index) => (
+              {fabricDefects.map((defect, index) => (
                 <option key={index} value={defect.defectName}>
-                  {defect.defectNameEng} ({defect.defectNameKhmer})
+                  {getDefectName(defect)}
                 </option>
               ))}
             </select>

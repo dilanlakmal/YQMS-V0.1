@@ -510,12 +510,12 @@
 
 // export default MeasurementTable;
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { X, Check } from "lucide-react";
-import MeasurementNumPad from "./MeasurementNumPad";
+import { Check, X } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { cuttingDefects } from "../../../constants/cuttingdefect";
+//import { cuttingDefects } from "../../../constants/cuttingdefect";
 import DefectBox from "./DefectBox";
+import MeasurementNumPad from "./MeasurementNumPad";
 
 const decimalToFraction = (value) => {
   if (value === null || value === undefined) return "";
@@ -569,7 +569,9 @@ const MeasurementTable = ({
   defects,
   setDefects,
   bundleIndex,
-  selectedParts
+  selectedParts,
+  moNo, // New prop to receive MO No
+  fabricDefects // Add new prop
 }) => {
   const [showNumPad, setShowNumPad] = useState(false);
   const [currentCell, setCurrentCell] = useState({
@@ -588,7 +590,7 @@ const MeasurementTable = ({
     const prefix = tab === "Top" ? "T" : tab === "Middle" ? "M" : "B";
     const headers = [
       "No",
-      t("cutting.panelIndex"),
+      t("cutting.panelName"),
       t("cutting.measurementPoint")
     ];
     for (let i = 1; i <= numColumns; i++) {
@@ -724,15 +726,40 @@ const MeasurementTable = ({
     let currentNo = 1;
 
     selectedParts.forEach((selectedPartName) => {
+      // Filter measurement points for the selected part and MO No or Common
       const pointsForThisPart = measurementPoints.filter(
-        (mp) => mp.panelIndexName === selectedPartName
+        (mp) =>
+          mp.panelIndexName === selectedPartName &&
+          (mp.moNo === moNo || mp.moNo === "Common")
       );
 
+      // Group by pointName to avoid duplicates, prioritizing specific MO No
+      const uniquePoints = [];
+      const seenPointNames = new Set();
+
       pointsForThisPart.forEach((point) => {
+        const key = `${point.panelIndexName}-${point.pointNameEng}`;
+        if (!seenPointNames.has(key)) {
+          seenPointNames.add(key);
+          uniquePoints.push(point);
+        } else if (point.moNo === moNo) {
+          // Replace with specific MO No record if it exists
+          const index = uniquePoints.findIndex(
+            (p) =>
+              p.panelIndexName === point.panelIndexName &&
+              p.pointNameEng === point.pointNameEng
+          );
+          if (index !== -1) {
+            uniquePoints[index] = point;
+          }
+        }
+      });
+
+      uniquePoints.forEach((point) => {
         const existingRow = tableData.find(
           (r) =>
             r.panelIndexName === point.panelIndexName &&
-            r.measurementPoint === point.pointName
+            r.measurementPoint === point.pointNameEng
         );
 
         let rowValues;
@@ -751,7 +778,7 @@ const MeasurementTable = ({
 
         newConstructedData.push({
           no: currentNo++,
-          measurementPoint: point.pointName,
+          measurementPoint: point.pointNameEng,
           pointNameKhmer: point.pointNameKhmer,
           panelName: point.panelName,
           panelSide: point.panelSide,
@@ -772,13 +799,11 @@ const MeasurementTable = ({
 
     if (JSON.stringify(tableData) !== JSON.stringify(newConstructedData)) {
       setTableData(newConstructedData);
-      // calculateSummary will be called in the next render cycle if tableData changes, or can be called here.
-      // To ensure summary is updated with the newConstructedData immediately:
-      calculateSummary(newConstructedData, defects);
-    } else {
-      // If data structure is same, but values or defects might have changed, ensure summary is current.
-      calculateSummary(tableData, defects);
     }
+    //   calculateSummary(newConstructedData, defects);
+    // } else {
+    //   calculateSummary(tableData, defects);
+    // }
   }, [
     selectedParts,
     measurementPoints,
@@ -786,8 +811,16 @@ const MeasurementTable = ({
     tableData,
     defects,
     setTableData,
-    calculateSummary
+    //calculateSummary,
+    moNo // Added moNo as dependency
   ]);
+
+  // Effect to calculate summary
+  useEffect(() => {
+    if (tableData && tableData.length > 0) {
+      calculateSummary(tableData, defects);
+    }
+  }, [tableData, defects]);
 
   const handleCellChange = useCallback(
     (decimalValue, fractionValue) => {
@@ -874,7 +907,8 @@ const MeasurementTable = ({
         }
       }
 
-      const defectDetail = cuttingDefects.find((d) => d.defectName === value);
+      //const defectDetail = cuttingDefects.find((d) => d.defectName === value);
+      const defectDetail = fabricDefects.find((d) => d.defectName === value);
       if (!defectDetail) return;
 
       if (!updatedDefectsCopy[colIndex])
@@ -893,13 +927,14 @@ const MeasurementTable = ({
         defectName: defectDetail.defectName,
         defectNameEng: defectDetail.defectNameEng,
         defectNameKhmer: defectDetail.defectNameKhmer,
+        defectNameChinese: defectDetail.defectNameChinese,
         defectCode: defectDetail.defectCode,
         count: 1
       });
       setDefects(updatedDefectsCopy);
       // Summary will be recalculated by useEffect due to defects change.
     },
-    [defects, setDefects, numColumns, panelIndicesForDefectTable]
+    [defects, setDefects, numColumns, panelIndicesForDefectTable, fabricDefects]
   );
 
   const removeDefect = useCallback(
@@ -1052,7 +1087,6 @@ const MeasurementTable = ({
       </div>
 
       {/* Defect Table */}
-
       <hr className="my-4 border-gray-300" />
       <h3 className="text-sm font-medium text-gray-600 mb-2">
         {t("cutting.defectDetailsAcrossPanel")}
@@ -1061,8 +1095,8 @@ const MeasurementTable = ({
         <table className="w-full border-collapse border border-gray-300">
           <thead>
             <tr className="bg-gray-200">
-              <th className="border border-gray-300 p-2 text-center text-xs sm:text-sm min-w-[120px] sm:min-w-[150px]">
-                {t("cutting.panelIndex")}
+              <th className="border border-gray-300 p-2 text-left text-xs sm:text-sm min-w-[120px] sm:min-w-[150px]">
+                {t("cutting.panelName")}
               </th>
               {Array.from({ length: numColumns }, (_, i) => (
                 <th
@@ -1083,7 +1117,8 @@ const MeasurementTable = ({
               const panelRowInfo = measurementPoints.find(
                 (row) =>
                   row.panelIndex === panelIndex &&
-                  selectedParts.includes(row.panelIndexName)
+                  selectedParts.includes(row.panelIndexName) &&
+                  (row.moNo === moNo || row.moNo === "Common")
               );
               return (
                 <tr
@@ -1092,7 +1127,7 @@ const MeasurementTable = ({
                     isPanelUsed ? "bg-white" : "bg-gray-200 opacity-50"
                   }`}
                 >
-                  <td className="border border-gray-300 p-2 text-center text-xs sm:text-sm">
+                  <td className="border border-gray-300 p-2 text-xs sm:text-sm">
                     {panelRowInfo
                       ? i18n.language === "kh"
                         ? panelRowInfo.panelIndexNameKhmer
@@ -1166,11 +1201,11 @@ const MeasurementTable = ({
                 newCount
               )
             }
+            fabricDefects={fabricDefects} // Pass fabricDefects prop
           />
         )}
 
       {/* Measurement NumPad */}
-
       {showNumPad &&
         currentCell.rowIndex !== null &&
         tableData[currentCell.rowIndex] && (

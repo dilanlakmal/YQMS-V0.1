@@ -1860,22 +1860,24 @@
 
 // export default CuttingPage;
 
-import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { API_BASE_URL } from "../../config";
-import { useAuth } from "../components/authentication/AuthContext";
-import { useTranslation } from "react-i18next";
-import { Eye, EyeOff, Database, Keyboard } from "lucide-react";
-import Swal from "sweetalert2";
+import { Database, Eye, EyeOff, Keyboard } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { useTranslation } from "react-i18next";
+import Swal from "sweetalert2";
+import { API_BASE_URL } from "../../config";
+import { useAuth } from "../components/authentication/AuthContext";
 import NumberPad from "../components/forms/NumberPad";
-import { measurementPoints } from "../constants/cuttingmeasurement";
-import MeasurementTable from "../components/inspection/cutting/MeasurementTable";
 import CuttingOrderModify from "../components/inspection/cutting/CuttingOrderModify";
+import CuttingMeasurementPointsModify from "../components/inspection/cutting/CuttingMeasurementPointsModify ";
+import MeasurementTable from "../components/inspection/cutting/MeasurementTable";
+
+//import { measurementPoints } from "../constants/cuttingmeasurement";
 
 const CuttingPage = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("form");
   const [inspectionDate, setInspectionDate] = useState(new Date());
@@ -1916,6 +1918,8 @@ const CuttingPage = () => {
   const [tolerance, setTolerance] = useState({ min: -0.125, max: 0.125 });
   const [activeMeasurementTab, setActiveMeasurementTab] = useState("Top");
   const [colCounts, setColCounts] = useState([]);
+  const [panels, setPanels] = useState([]);
+  const [panelIndexNames, setPanelIndexNames] = useState([]);
   const [summary, setSummary] = useState({
     Top: {
       totalParts: 0,
@@ -1953,6 +1957,8 @@ const CuttingPage = () => {
     direction: "",
     lw: ""
   });
+  const [measurementPoints, setMeasurementPoints] = useState([]);
+  const [fabricDefects, setFabricDefects] = useState([]);
 
   useEffect(() => {
     const userAgent = navigator.userAgent.toLowerCase();
@@ -2041,7 +2047,10 @@ const CuttingPage = () => {
         );
         setCutPanelData(response.data);
         const sizes = response.data.MarkerRatio.filter(
-          (mr) => mr.cuttingRatio !== null
+          (mr) =>
+            mr.cuttingRatio !== null &&
+            mr.cuttingRatio !== "" &&
+            mr.cuttingRatio > 0
         ).map((mr) => mr.size);
         setAvailableSizes([...new Set(sizes)]);
         setPlanLayerQty(response.data.PlanLayer || 0);
@@ -2085,7 +2094,9 @@ const CuttingPage = () => {
       const layersToUse = actualLayers || planLayerQty;
       const multiplication = parseInt(totalBundleQty) * layersToUse;
       let calculatedBundleQtyCheck;
-      if (multiplication >= 501 && multiplication <= 1200)
+      if (multiplication >= 1 && multiplication <= 500)
+        calculatedBundleQtyCheck = 3;
+      else if (multiplication >= 501 && multiplication <= 1200)
         calculatedBundleQtyCheck = 5;
       else if (multiplication >= 1201 && multiplication <= 3000)
         calculatedBundleQtyCheck = 9;
@@ -2169,7 +2180,6 @@ const CuttingPage = () => {
     setFilters({ panelName: "", side: "", direction: "", lw: "" });
   }, [bundleQty, selectedPanel]);
 
-  // CuttingPage.jsx
   useEffect(() => {
     const newColCounts = bundleTableData.map((row) => ({
       Top: parseInt(row.tValue) || 5,
@@ -2279,43 +2289,134 @@ const CuttingPage = () => {
     });
   }, [bundleTableData, selectedPanel, measurementPoints, colCounts]); // Added dependencies
 
-  // useEffect(() => {
-  //   setColCounts(
-  //     bundleTableData.map((row) => ({
-  //       Top: parseInt(row.tValue) || 5,
-  //       Middle: parseInt(row.mValue) || 5,
-  //       Bottom: parseInt(row.bValue) || 5
-  //     }))
-  //   );
-  //   setTableData(
-  //     bundleTableData.map((_, index) => ({
-  //       Top: tableData[index]?.Top || [],
-  //       Middle: tableData[index]?.Middle || [],
-  //       Bottom: tableData[index]?.Bottom || []
-  //     }))
-  //   );
-  //   setColumnDefects(
-  //     bundleTableData.map((row) => ({
-  //       Top: Array(parseInt(row.tValue) || 5)
-  //         .fill([])
-  //         .map(() => Array(5).fill([])),
-  //       Middle: Array(parseInt(row.mValue) || 5)
-  //         .fill([])
-  //         .map(() => Array(5).fill([])),
-  //       Bottom: Array(parseInt(row.bValue) || 5)
-  //         .fill([])
-  //         .map(() => Array(5).fill([]))
-  //     }))
-  //   );
-  // }, [bundleTableData]);
+  useEffect(() => {
+    const fetchPanels = async () => {
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/api/cutting-measurement-panels`,
+          {
+            headers: { "Content-Type": "application/json" },
+            withCredentials: true
+          }
+        );
+        setPanels(response.data);
+      } catch (error) {
+        console.error("Error fetching panels:", error);
+        Swal.fire({
+          icon: "error",
+          title: t("cutting.error"),
+          text: t("cutting.failedToFetchPanels")
+        });
+      }
+    };
+    fetchPanels();
+  }, [t]);
 
-  const uniquePanelIndexNames = [
-    ...new Set(
-      measurementPoints
-        .filter((point) => point.panel === selectedPanel)
-        .map((point) => point.panelIndexName)
-    )
-  ];
+  useEffect(() => {
+    const fetchPanelIndexNames = async () => {
+      if (!moNo || !selectedPanel) {
+        setPanelIndexNames([]);
+        return;
+      }
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/api/cutting-measurement-panel-index-names-by-mo`,
+          {
+            params: { moNo, panel: selectedPanel },
+            headers: { "Content-Type": "application/json" },
+            withCredentials: true
+          }
+        );
+        // Log the actual data received from the API
+        console.log("Fetched panelIndexNames data:", response.data);
+        setPanelIndexNames(response.data);
+      } catch (error) {
+        console.error("Error fetching panel index names:", error);
+        setPanelIndexNames([]);
+        Swal.fire({
+          icon: "error",
+          title: t("cutting.error"),
+          text: t("cutting.failedToFetchPanelIndexNames")
+        });
+      }
+    };
+    fetchPanelIndexNames();
+  }, [moNo, selectedPanel, i18n.language, t]);
+
+  useEffect(() => {
+    const fetchMeasurementPoints = async () => {
+      if (!moNo || !selectedPanel) {
+        setMeasurementPoints([]);
+        return;
+      }
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/api/cutting-measurement-points`,
+          {
+            params: { moNo, panel: selectedPanel },
+            headers: { "Content-Type": "application/json" },
+            withCredentials: true
+          }
+        );
+        // Fetch Common measurement points
+        const commonResponse = await axios.get(
+          `${API_BASE_URL}/api/cutting-measurement-points`,
+          {
+            params: { moNo: "Common", panel: selectedPanel },
+            headers: { "Content-Type": "application/json" },
+            withCredentials: true
+          }
+        );
+        // Combine and deduplicate measurement points, prioritizing specific moNo
+        const combinedPoints = [...response.data];
+        commonResponse.data.forEach((commonPoint) => {
+          if (
+            !combinedPoints.some(
+              (p) =>
+                p.panelIndexName === commonPoint.panelIndexName &&
+                p.pointNameEng === commonPoint.pointNameEng
+            )
+          ) {
+            combinedPoints.push(commonPoint);
+          }
+        });
+        setMeasurementPoints(combinedPoints);
+      } catch (error) {
+        console.error("Error fetching measurement points:", error);
+        setMeasurementPoints([]);
+        Swal.fire({
+          icon: "error",
+          title: t("cutting.error"),
+          text: t("cutting.failedToFetchMeasurementPoints")
+        });
+      }
+    };
+    fetchMeasurementPoints();
+  }, [moNo, selectedPanel, t]);
+
+  // Add this useEffect after other useEffects (e.g., after fetchMeasurementPoints)
+  useEffect(() => {
+    const fetchFabricDefects = async () => {
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/api/cutting-fabric-defects`,
+          {
+            headers: { "Content-Type": "application/json" },
+            withCredentials: true
+          }
+        );
+        setFabricDefects(response.data);
+      } catch (error) {
+        console.error("Error fetching fabric defects:", error);
+        Swal.fire({
+          icon: "error",
+          title: t("cutting.error"),
+          text: t("cutting.failedToFetchDefects")
+        });
+      }
+    };
+    fetchFabricDefects();
+  }, [t]); // Dependency on t for translation updates
 
   const resetForm = () => {
     setMoNo("");
@@ -2715,9 +2816,7 @@ const CuttingPage = () => {
         }
 
         newSummary[tab].bundles[bundleIndex] = data;
-        // if (!newSummary[tab].bundles)
-        //   newSummary[tab].bundles = Array(parseInt(bundleQty) || 0).fill(null);
-        // newSummary[tab].bundles[bundleIndex] = data;
+
         const totalParts = newSummary[tab].bundles.reduce(
           (acc, curr) => acc + (curr?.totalParts || 0),
           0
@@ -2807,17 +2906,6 @@ const CuttingPage = () => {
     [colCounts, measurementPoints, selectedPanel]
   ); // Dependencies for initializing defect structure
 
-  // const updateDefects = (bundleIndex, tab, newDefects) => {
-  //   setColumnDefects((prev) => {
-  //     const newDefectsData = [...prev];
-  //     newDefectsData[bundleIndex] = {
-  //       ...newDefectsData[bundleIndex],
-  //       [tab]: newDefects
-  //     };
-  //     return newDefectsData;
-  //   });
-  // };
-
   const totalParts =
     summary.Top.totalParts +
     summary.Middle.totalParts +
@@ -2830,9 +2918,7 @@ const CuttingPage = () => {
     summary.Bottom.totalReject;
 
   const uniqueOptions = (key) => [
-    ...new Set(
-      filteredMeasurementPoints.map((point) => point[key]).filter(Boolean)
-    )
+    ...new Set(measurementPoints.map((point) => point[key]).filter(Boolean))
   ];
 
   if (authLoading) return <div>{t("cutting.loading")}</div>;
@@ -2863,6 +2949,26 @@ const CuttingPage = () => {
             }`}
           >
             {t("cutting.data")}
+          </button>
+          <button
+            onClick={() => setActiveTab("Modify")}
+            className={`px-4 py-2 ${
+              activeTab === "Modify"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            {t("cutting.modify")}
+          </button>
+          <button
+            onClick={() => setActiveTab("Adding")}
+            className={`px-4 py-2 ${
+              activeTab === "Adding"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            {t("cutting.adding")}
           </button>
           <button
             onClick={() => setActiveTab("db")}
@@ -3022,13 +3128,13 @@ const CuttingPage = () => {
                           <td className="border border-gray-300 p-2 text-sm">
                             {cutPanelData.BuyerStyle}
                           </td>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.Color}
                           </td>
                           <td className="border border-gray-300 p-2 text-sm">
                             {cutPanelData.LotNos.join(", ")}
                           </td>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.TotalOrderQty}
                           </td>
                         </tr>
@@ -3076,22 +3182,22 @@ const CuttingPage = () => {
                           <td className="border border-gray-300 p-2 text-sm">
                             {cutPanelData.Material}
                           </td>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.RollQty}
                           </td>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.SpreadYds}
                           </td>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.Unit}
                           </td>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.GrossKgs}
                           </td>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.NetKgs}
                           </td>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.TotalTTLRoll}
                           </td>
                         </tr>
@@ -3130,25 +3236,25 @@ const CuttingPage = () => {
                       </thead>
                       <tbody>
                         <tr>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center  text-sm">
                             {cutPanelData.SpreadTable}
                           </td>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center text-sm">
                             {tableNo ? tableNo.replace(/^T\s*/, "") : ""}
                           </td>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.PlanLayer}
                           </td>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.ActualLayer}
                           </td>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.TotalPcs}
                           </td>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.MackerNo}
                           </td>
-                          <td className="border border-gray-300 p-2 text-sm">
+                          <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.MackerLength}
                           </td>
                         </tr>
@@ -3163,7 +3269,10 @@ const CuttingPage = () => {
                       <thead>
                         <tr className="bg-gray-100">
                           {cutPanelData.MarkerRatio.filter(
-                            (mr) => mr.cuttingRatio !== null
+                            (mr) =>
+                              mr.cuttingRatio !== null &&
+                              mr.cuttingRatio !== "" &&
+                              mr.cuttingRatio > 0
                           ).map((mr, index) => (
                             <th
                               key={index}
@@ -3177,7 +3286,10 @@ const CuttingPage = () => {
                       <tbody>
                         <tr>
                           {cutPanelData.MarkerRatio.filter(
-                            (mr) => mr.cuttingRatio !== null
+                            (mr) =>
+                              mr.cuttingRatio !== null &&
+                              mr.cuttingRatio !== "" &&
+                              mr.cuttingRatio > 0
                           ).map((mr, index) => (
                             <td
                               key={index}
@@ -3367,19 +3479,14 @@ const CuttingPage = () => {
                         className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
                       >
                         <option value="">{t("cutting.select_panel")}</option>
-                        <option value="Top">{t("cutting.garment_top")}</option>
-                        <option value="Bottom">
-                          {t("cutting.garment_bottom")}
-                        </option>
-                        <option value="Zipper Jacket">
-                          {t("cutting.zipper")}
-                        </option>
-                        <option value="Top Layer">
-                          {t("cutting.toplayer")}
-                        </option>
-                        <option value="Dress">{t("cutting.dress")}</option>
+                        {panels.map((panel, index) => (
+                          <option key={index} value={panel}>
+                            {panel}
+                          </option>
+                        ))}
                       </select>
                     </div>
+
                     <div className="flex-1 min-w-[200px]">
                       <label className="block text-sm font-medium text-gray-700">
                         {t("cutting.size")}
@@ -3569,23 +3676,27 @@ const CuttingPage = () => {
                                     ))}
                                   </select>
                                 </td>
+
                                 <td className="border border-gray-300 p-2 text-sm w-auto">
                                   <div className="flex flex-wrap gap-2">
-                                    {uniquePanelIndexNames.map((name, i) => (
+                                    {panelIndexNames.map((item, i) => (
                                       <label
                                         key={i}
                                         className="flex items-center space-x-1 text-sm"
                                       >
                                         <input
                                           type="checkbox"
-                                          checked={row.parts.includes(name)}
+                                          checked={row.parts.includes(
+                                            item.panelIndexName
+                                          )}
                                           onChange={(e) => {
                                             const newBundleTableDataState = [
                                               ...bundleTableData
                                             ];
                                             const currentBundleObject =
                                               newBundleTableDataState[index];
-                                            const partName = name; // 'name' is panelIndexName from uniquePanelIndexNames.map
+                                            const partName =
+                                              item.panelIndexName;
 
                                             let updatedPartsArray;
                                             if (e.target.checked) {
@@ -3605,54 +3716,38 @@ const CuttingPage = () => {
                                             setBundleTableData(
                                               newBundleTableDataState
                                             );
-                                            // REMOVED: updateTableData(index, activeMeasurementTab, []);
-                                            // MeasurementTable will now handle reconciling its data based on the new 'selectedParts' prop.
                                           }}
                                           className="h-4 w-4 text-blue-600 border-gray-300 rounded"
                                         />
-                                        {/* <input
-                                          type="checkbox"
-                                          checked={row.parts.includes(name)}
-                                          onChange={(e) => {
-                                            const newData = [
-                                              ...bundleTableData
-                                            ];
-                                            if (e.target.checked) {
-                                              newData[index].parts = [
-                                                ...row.parts,
-                                                name
-                                              ];
-                                            } else {
-                                              newData[index].parts =
-                                                row.parts.filter(
-                                                  (part) => part !== name
-                                                );
-                                            }
-                                            setBundleTableData(newData);
-                                            updateTableData(
-                                              index,
-                                              activeMeasurementTab,
-                                              []
-                                            );
-                                          }}
-                                          className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                                        /> */}
-                                        <span>{name}</span>
+                                        <span>
+                                          {i18n.language === "km"
+                                            ? item.panelIndexNameKhmer ||
+                                              item.panelIndexName
+                                            : item.panelIndexName}
+                                          ({item.panelIndexNameKhmer})
+                                          {/* <br /> ({item.panelIndexNameKhmer}) */}
+                                        </span>
                                       </label>
                                     ))}
                                   </div>
                                   <div className="mt-2 text-sm">
-                                    {row.parts.join(", ")}
+                                    {row.parts
+                                      .map((part) => {
+                                        const item = panelIndexNames.find(
+                                          (p) => p.panelIndexName === part
+                                        );
+                                        return item
+                                          ? i18n.language === "km"
+                                            ? item.panelIndexNameKhmer ||
+                                              item.panelIndexName
+                                            : item.panelIndexName
+                                          : part;
+                                      })
+                                      .join(", ")}
                                   </div>
                                 </td>
+
                                 <td className="border border-gray-300 p-2 text-sm w-40">
-                                  {/* <td
-                                  className={`border border-gray-300 p-2 text-sm w-40 ${
-                                    row.parts.length > 0
-                                      ? "bg-gray-100 cursor-not-allowed"
-                                      : ""
-                                  }`}
-                                > */}
                                   <div className="flex items-center gap-2">
                                     <span>T:</span>
                                     <select
@@ -4028,7 +4123,7 @@ const CuttingPage = () => {
                       <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-4 gap-4 mb-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700">
-                            {t("cutting.panelName")}
+                            {t("cutting.panelType")}
                           </label>
                           <select
                             value={filters.panelName}
@@ -4140,45 +4235,7 @@ const CuttingPage = () => {
                             <h2 className="text-sm font-semibold text-gray-700 mb-2">
                               {t("cutting.bundleNo")}: {bundle.bundleNo}
                             </h2>
-                            {/* <div className="flex items-center gap-4 mb-2">
-                              <label className="text-sm font-medium text-gray-700">
-                                Col:
-                              </label>
-                              <div
-                                className={`flex items-center p-2 rounded-lg ${
-                                  bundle.parts.length > 0
-                                    ? "bg-gray-100 cursor-not-allowed"
-                                    : ""
-                                }`}
-                              >
-                                <select
-                                  value={
-                                    colCounts[bundleIndex]?.[
-                                      activeMeasurementTab
-                                    ] || 5
-                                  }
-                                  onChange={(e) =>
-                                    handleColChange(
-                                      bundleIndex,
-                                      activeMeasurementTab,
-                                      e.target.value
-                                    )
-                                  }
-                                  className={`p-2 border border-gray-300 rounded-lg text-sm ${
-                                    bundle.parts.length > 0
-                                      ? "pointer-events-none opacity-50"
-                                      : ""
-                                  }`}
-                                  disabled={bundle.parts.length > 0}
-                                >
-                                  {[...Array(5)].map((_, i) => (
-                                    <option key={i + 1} value={i + 1}>
-                                      {i + 1}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div> */}
+
                             <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-6 gap-4 mb-4">
                               <div className="p-4 bg-blue-100 rounded-lg text-center">
                                 <p className="text-xs font-medium text-gray-700">
@@ -4401,7 +4458,7 @@ const CuttingPage = () => {
                               <MeasurementTable
                                 key={`Top-${selectedPanel}-${bundleIndex}`}
                                 tab="Top"
-                                measurementPoints={filteredMeasurementPoints}
+                                measurementPoints={measurementPoints} //{filteredMeasurementPoints}
                                 numColumns={colCounts[bundleIndex]?.Top || 5}
                                 tolerance={tolerance}
                                 onUpdate={(data) =>
@@ -4418,13 +4475,15 @@ const CuttingPage = () => {
                                 }
                                 bundleIndex={bundleIndex}
                                 selectedParts={bundle.parts}
+                                moNo={moNo}
+                                fabricDefects={fabricDefects} // Add this prop
                               />
                             )}
                             {activeMeasurementTab === "Middle" && (
                               <MeasurementTable
                                 key={`Middle-${selectedPanel}-${bundleIndex}`}
                                 tab="Middle"
-                                measurementPoints={filteredMeasurementPoints}
+                                measurementPoints={measurementPoints} //{filteredMeasurementPoints}
                                 numColumns={colCounts[bundleIndex]?.Middle || 5}
                                 tolerance={tolerance}
                                 onUpdate={(data) =>
@@ -4447,13 +4506,15 @@ const CuttingPage = () => {
                                 }
                                 bundleIndex={bundleIndex}
                                 selectedParts={bundle.parts}
+                                moNo={moNo}
+                                fabricDefects={fabricDefects} // Add this prop
                               />
                             )}
                             {activeMeasurementTab === "Bottom" && (
                               <MeasurementTable
                                 key={`Bottom-${selectedPanel}-${bundleIndex}`}
                                 tab="Bottom"
-                                measurementPoints={filteredMeasurementPoints}
+                                measurementPoints={measurementPoints} //{filteredMeasurementPoints}
                                 numColumns={colCounts[bundleIndex]?.Bottom || 5}
                                 tolerance={tolerance}
                                 onUpdate={(data) =>
@@ -4476,6 +4537,8 @@ const CuttingPage = () => {
                                 }
                                 bundleIndex={bundleIndex}
                                 selectedParts={bundle.parts}
+                                moNo={moNo}
+                                fabricDefects={fabricDefects} // Add this prop
                               />
                             )}
                           </div>
@@ -4499,11 +4562,17 @@ const CuttingPage = () => {
             </div>
           </>
         ) : activeTab === "data" ? (
-          <div className="text-center text-gray-600">
-            {t("cutting.dataTabPlaceholder")}
+          <div className="text-gray-600">{t("cutting.dataTabPlaceholder")}</div>
+        ) : activeTab === "Modify" ? (
+          <div className="text-gray-600">
+            <CuttingMeasurementPointsModify />
+          </div>
+        ) : activeTab === "Adding" ? (
+          <div className="text-gray-600">
+            <CuttingOrderModify />
           </div>
         ) : (
-          <CuttingOrderModify />
+          <div className="text-gray-600">{t("cutting.dataTabPlaceholder")}</div>
         )}
       </div>
     </div>

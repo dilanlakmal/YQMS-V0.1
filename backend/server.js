@@ -36,8 +36,8 @@ import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
 
 import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
-import createCuttingAdditionalPointModel from "./models/CuttingAdditionalPoint.js"; // Import the new model
 import createCuttingMeasurementPointModel from "./models/CuttingMeasurementPoints.js"; // New model import
+import createCuttingFabricDefectModel from "./models/CuttingFabricDefects.js";
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
 
@@ -146,12 +146,11 @@ const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
 const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
 const CuttingOrders = createCuttingOrdersModel(ymProdConnection); // New model
 const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New model
-const CuttingAdditionalPoint =
-  createCuttingAdditionalPointModel(ymProdConnection); // New model
 const CuttingMeasurementPoint =
   createCuttingMeasurementPointModel(ymProdConnection); // New model instance
 const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
 const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection); // New model instance
+const CuttingFabricDefect = createCuttingFabricDefectModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -7511,31 +7510,10 @@ app.get("/api/cutting-inspection-filter-options", async (req, res) => {
 });
 
 /* ------------------------------
-   Cutting Measurement Points ENDPOINTS
+   Cutting Measurement Points
 ------------------------------ */
 
-// Endpoint to fetch unique MO numbers
-app.get("/api/cutting-measurement-mo-numbers", async (req, res) => {
-  try {
-    const { search } = req.query;
-    let moNumbers;
-    if (search) {
-      moNumbers = await CuttingAdditionalPoint.distinct("moNo", {
-        moNo: { $regex: search, $options: "i" }
-      });
-    } else {
-      moNumbers = await CuttingAdditionalPoint.distinct("moNo");
-    }
-    res.status(200).json(moNumbers);
-  } catch (error) {
-    console.error("Error fetching MO numbers:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to fetch MO numbers", error: error.message });
-  }
-});
-
-// Endpoint to fetch unique panel values
+// Endpoint to fetch unique panel values from CuttingMeasurementPoint
 app.get("/api/cutting-measurement-panels", async (req, res) => {
   try {
     const panels = await CuttingMeasurementPoint.distinct("panel");
@@ -7548,29 +7526,63 @@ app.get("/api/cutting-measurement-panels", async (req, res) => {
   }
 });
 
-// Endpoint to fetch panelIndexNames for a given panel
+// Endpoint to fetch panelIndexNames and related data for a given panel
 app.get("/api/cutting-measurement-panel-index-names", async (req, res) => {
   try {
     const { panel } = req.query;
     if (!panel) {
       return res.status(400).json({ message: "Panel is required" });
     }
-    const panelIndexNames = await CuttingMeasurementPoint.find({
-      panel
-    }).distinct("panelIndexName");
-    const panelIndexNameKhmerMap = await CuttingMeasurementPoint.find({
-      panel,
-      panelIndexName: { $in: panelIndexNames }
-    }).select("panelIndexName panelIndexNameKhmer panelIndex");
-    res.status(200).json(panelIndexNameKhmerMap);
+    // Aggregate to get unique panelIndexName with their latest panelIndex and panelIndexNameKhmer
+    const panelIndexData = await CuttingMeasurementPoint.aggregate([
+      { $match: { panel } },
+      {
+        $group: {
+          _id: "$panelIndexName",
+          panelIndex: { $max: "$panelIndex" },
+          panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" }
+        }
+      },
+      {
+        $project: {
+          panelIndexName: "$_id",
+          panelIndex: 1,
+          panelIndexNameKhmer: 1,
+          _id: 0
+        }
+      },
+      { $sort: { panelIndexName: 1 } }
+    ]).exec();
+    res.status(200).json(panelIndexData);
   } catch (error) {
     console.error("Error fetching panel index names:", error);
-    res
-      .status(500)
-      .json({
-        message: "Failed to fetch panel index names",
-        error: error.message
-      });
+    res.status(500).json({
+      message: "Failed to fetch panel index names",
+      error: error.message
+    });
+  }
+});
+
+// Endpoint to fetch max panelIndex for a given panel
+app.get("/api/cutting-measurement-max-panel-index", async (req, res) => {
+  try {
+    const { panel } = req.query;
+    if (!panel) {
+      return res.status(400).json({ message: "Panel is required" });
+    }
+    const maxPanelIndexDoc = await CuttingMeasurementPoint.findOne({
+      panel
+    })
+      .sort({ panelIndex: -1 })
+      .select("panelIndex");
+    const maxPanelIndex = maxPanelIndexDoc ? maxPanelIndexDoc.panelIndex : 0;
+    res.status(200).json({ maxPanelIndex });
+  } catch (error) {
+    console.error("Error fetching max panel index:", error);
+    res.status(500).json({
+      message: "Failed to fetch max panel index",
+      error: error.message
+    });
   }
 });
 
@@ -7592,36 +7604,219 @@ app.post("/api/save-measurement-point", async (req, res) => {
     res.status(200).json({ message: "Measurement point saved successfully" });
   } catch (error) {
     console.error("Error saving measurement point:", error);
-    res
-      .status(500)
-      .json({
-        message: "Failed to save measurement point",
-        error: error.message
-      });
+    res.status(500).json({
+      message: "Failed to save measurement point",
+      error: error.message
+    });
   }
 });
 
 /* ------------------------------
-   Cutting Additional Measurement Points ENDPOINTS
+   Cutting Measurement Points Edit ENDPOINTS
 ------------------------------ */
 
-// Endpoint to save additional points
-app.post("/api/save-additional-points", async (req, res) => {
+// Endpoint to Search MO Numbers (moNo) from CuttingMeasurementPoint with partial matching
+app.get("/api/cutting-measurement-mo-numbers", async (req, res) => {
   try {
-    const { moNo, orderQty, orderDetails, additionalPoints } = req.body;
-    const newDoc = new CuttingAdditionalPoint({
-      moNo,
-      orderQty,
-      orderDetails,
-      additionalPoints
+    const searchTerm = req.query.search;
+    if (!searchTerm) {
+      return res.status(400).json({ error: "Search term is required" });
+    }
+
+    const regexPattern = new RegExp(searchTerm, "i");
+
+    const results = await CuttingMeasurementPoint.find({
+      moNo: { $regex: regexPattern }
+    })
+      .select("moNo")
+      .limit(100)
+      .sort({ moNo: 1 })
+      .exec();
+
+    const uniqueMONos = [...new Set(results.map((r) => r.moNo))];
+
+    res.json(uniqueMONos);
+  } catch (err) {
+    console.error(
+      "Error fetching MO numbers from CuttingMeasurementPoint:",
+      err
+    );
+    res.status(500).json({
+      message: "Failed to fetch MO numbers from CuttingMeasurementPoint",
+      error: err.message
     });
-    await newDoc.save();
-    res.status(200).json({ message: "Data saved successfully" });
+  }
+});
+
+// Endpoint to fetch measurement points for a given moNo and panel
+app.get("/api/cutting-measurement-points", async (req, res) => {
+  try {
+    const { moNo, panel } = req.query;
+    if (!moNo || !panel) {
+      return res.status(400).json({ error: "moNo and panel are required" });
+    }
+
+    const points = await CuttingMeasurementPoint.find({
+      moNo,
+      panel
+    }).exec();
+
+    res.json(points);
   } catch (error) {
-    console.error("Error saving additional points:", error);
+    console.error("Error fetching measurement points:", error);
+    res.status(500).json({
+      message: "Failed to fetch measurement points",
+      error: error.message
+    });
+  }
+});
+
+// Endpoint to fetch unique panelIndexName and panelIndexNameKhmer for a given moNo and panel, including Common
+app.get(
+  "/api/cutting-measurement-panel-index-names-by-mo",
+  async (req, res) => {
+    try {
+      const { moNo, panel } = req.query;
+      if (!moNo || !panel) {
+        return res.status(400).json({ message: "moNo and panel are required" });
+      }
+
+      // Check if the moNo exists in CuttingMeasurementPoint
+      const moExists = await CuttingMeasurementPoint.exists({ moNo });
+
+      let panelIndexData = [];
+
+      if (moExists) {
+        // Fetch unique panelIndexName for the specific moNo and panel
+        const specificMoData = await CuttingMeasurementPoint.aggregate([
+          { $match: { moNo, panel } },
+          {
+            $group: {
+              _id: "$panelIndexName",
+              panelIndex: { $max: "$panelIndex" },
+              panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" }
+            }
+          },
+          {
+            $project: {
+              panelIndexName: "$_id",
+              panelIndex: 1,
+              panelIndexNameKhmer: 1,
+              _id: 0
+            }
+          }
+        ]).exec();
+
+        // Fetch unique panelIndexName for moNo = 'Common' and panel
+        const commonData = await CuttingMeasurementPoint.aggregate([
+          { $match: { moNo: "Common", panel } },
+          {
+            $group: {
+              _id: "$panelIndexName",
+              panelIndex: { $max: "$panelIndex" },
+              panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" }
+            }
+          },
+          {
+            $project: {
+              panelIndexName: "$_id",
+              panelIndex: 1,
+              panelIndexNameKhmer: 1,
+              _id: 0
+            }
+          }
+        ]).exec();
+
+        // Combine data, ensuring no duplicates
+        const combinedData = [...commonData];
+        specificMoData.forEach((specific) => {
+          if (
+            !combinedData.some(
+              (item) => item.panelIndexName === specific.panelIndexName
+            )
+          ) {
+            combinedData.push(specific);
+          }
+        });
+
+        panelIndexData = combinedData;
+      } else {
+        // If moNo doesn't exist, fetch only for moNo = 'Common' and panel
+        panelIndexData = await CuttingMeasurementPoint.aggregate([
+          { $match: { moNo: "Common", panel } },
+          {
+            $group: {
+              _id: "$panelIndexName",
+              panelIndex: { $max: "$panelIndex" },
+              panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" }
+            }
+          },
+          {
+            $project: {
+              panelIndexName: "$_id",
+              panelIndex: 1,
+              panelIndexNameKhmer: 1,
+              _id: 0
+            }
+          }
+        ]).exec();
+      }
+
+      // Sort by panelIndexName
+      panelIndexData.sort((a, b) =>
+        a.panelIndexName.localeCompare(b.panelIndexName)
+      );
+
+      res.status(200).json(panelIndexData);
+    } catch (error) {
+      console.error("Error fetching panel index names by MO:", error);
+      res.status(500).json({
+        message: "Failed to fetch panel index names",
+        error: error.message
+      });
+    }
+  }
+);
+
+// Endpoint to update a measurement point by _id
+app.put("/api/update-measurement-point/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const updatedPoint = await CuttingMeasurementPoint.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true }
+    );
+
+    if (!updatedPoint) {
+      return res.status(404).json({ error: "Measurement point not found" });
+    }
+
+    res.status(200).json({ message: "Measurement point updated successfully" });
+  } catch (error) {
+    console.error("Error updating measurement point:", error);
+    res.status(500).json({
+      message: "Failed to update measurement point",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+  Cutting Fabric Defects ENDPOINTS
+------------------------------ */
+
+app.get("/api/cutting-fabric-defects", async (req, res) => {
+  try {
+    const defects = await CuttingFabricDefect.find({});
+    res.status(200).json(defects);
+  } catch (error) {
+    console.error("Error fetching cutting fabric defects:", error);
     res
       .status(500)
-      .json({ message: "Failed to save data", error: error.message });
+      .json({ message: "Failed to fetch defects", error: error.message });
   }
 });
 
