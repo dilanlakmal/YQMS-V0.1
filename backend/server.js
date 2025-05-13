@@ -35,6 +35,7 @@ import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
 import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
 import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
+import createSewingDefectsModel from "./models/SewingDefects.js";
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron";
@@ -128,6 +129,7 @@ const CuttingOrders = createCuttingOrdersModel(ymProdConnection); // New model
 const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New model
 const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
 const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection); 
+const SewingDefects = createSewingDefectsModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -1559,6 +1561,32 @@ process.on("SIGINT", async () => {
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
+
+/* ------------------------------
+   End Points - SewingDefects
+------------------------------ */
+app.get('/api/sewing-defects', async (req, res) => {
+  try {
+    // Extract query parameters
+    const { categoryEnglish, type, isCommon } = req.query;
+
+    // Build filter object based on provided query parameters
+    const filter = {};
+    if (categoryEnglish) filter.categoryEnglish = categoryEnglish;
+    if (type) filter.type = type;
+    if (isCommon) filter.isCommon = isCommon;
+
+    // Fetch defects from the database
+    const defects = await SewingDefects.find(filter);
+
+    // Send the response with fetched defects
+    res.json(defects);
+  } catch (error) {
+    // Handle errors
+    res.status(500).json({ message: error.message });
+  }
+});
+
 
 /* ------------------------------
    End Points - dt_orders

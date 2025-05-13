@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
-import { allDefects } from "../constants/defects";
+// import { allDefects } from "../constants/defects";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
 import { useTranslation } from "react-i18next";
@@ -61,13 +61,32 @@ const RovingPage = () => {
   const [lineWorkerDataLoading, setLineWorkerDataLoading] = useState(true);
   const [lineWorkerDataError, setLineWorkerDataError] = useState(null);
 
-  
+  const [defects, setDefects] = useState([]);
+  const [isLoadingDefects, setIsLoadingDefects] = useState(true);
+  const [defectsError, setDefectsError] = useState(null)  
 
   const getNumericLineValue = useCallback((value) => {
     if (value === null || value === undefined || String(value).trim() === '') return null;
     const strValue = String(value).toLowerCase();
     const numericPart = strValue.replace(/[^0-9]/g, ''); 
     return numericPart ? parseInt(numericPart, 10) : null;
+  }, []);
+
+  // Fetch defect data on component mount
+  useEffect(() => {
+    const fetchDefects = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/sewing-defects`);
+        setDefects(response.data);
+        setDefectsError(null);
+      } catch (error) {
+        console.error("Error fetching defects:", error);
+        setDefectsError("Failed to load defects. Please try again later.");
+      } finally {
+        setIsLoadingDefects(false);
+      }
+    };
+    fetchDefects();
   }, []);
 
  
@@ -323,7 +342,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
 
   const addDefect = (defectName) => {
     if (defectName && selectedOperationId && defects.length > 0) {
-      const defect =allDefects.find((d) => d.english === defectName);
+      const defect =defects.find((d) => d.english === defectName);
       if (defect) {
         setGarments((prevGarments) => {
           const newGarments = [...prevGarments];
@@ -1045,7 +1064,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
                   <div className="space-y-1">
                     {currentGarmentDefects.length > 0 ? (
                       currentGarmentDefects.map((defect, defectIndex) => {
-                        const defectInfo = allDefects.find(
+                        const defectInfo = defects.find(
                           (d) => d.english === defect.name
                         );
                         return (
@@ -1105,7 +1124,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
                         disabled={!moNo || !selectedOperationId}
                       >
                         <option value="">{t("qcRoving.select_defect")}</option>
-                        {allDefects.map((defect) => (
+                        {defects.map((defect) => (
                           <option key={defect.code} value={defect.english}>
                             {getDefectName(defect)}
                           </option>
