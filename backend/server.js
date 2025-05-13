@@ -7274,13 +7274,16 @@ app.get("/api/qc-inline-roving/inspection-time-info", async (req, res) => {
   }
 });
 
+
+
 app.get('/api/inspections-completed', async (req, res) => {
-  const { line_no, inspection_date } = req.query;
+  const { line_no, inspection_date, inspection_rep_name } = req.query;
 
   try {
     const inspection = await QCInlineRoving.findOne({
       line_no,
       inspection_date,
+      inspection_rep_name,
     });
 
     if (!inspection) {

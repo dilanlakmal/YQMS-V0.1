@@ -54,9 +54,11 @@ const RovingPage = () => {
   const [showMoNoDropdown, setShowMoNoDropdown] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const moNoDropdownRef = useRef(null);
-  const [inspectionRepOrdinal, setInspectionRepOrdinal] = useState('N/A');
-  const [inspectionRepLoading, setInspectionRepLoading] = useState(false);
-  const [inspectionsCompletedForProgress, setInspectionsCompletedForProgress] = useState(0);
+  // const [inspectionRepOrdinal, setInspectionRepOrdinal] = useState('N/A');
+  // const [inspectionRepLoading, setInspectionRepLoading] = useState(false);
+   const [selectedManualInspectionRep, setSelectedManualInspectionRep] = useState('');
+  // const [inspectionsCompletedForProgress, setInspectionsCompletedForProgress] = useState(0);
+  const [inspectionsCompletedForSelectedRep, setInspectionsCompletedForSelectedRep] = useState(0);
   const [lineWorkerData, setLineWorkerData] = useState([]);
   const [lineWorkerDataLoading, setLineWorkerDataLoading] = useState(true);
   const [lineWorkerDataError, setLineWorkerDataError] = useState(null);
@@ -137,105 +139,96 @@ const RovingPage = () => {
     }
   }, [user, authLoading]);
 
-  const fetchInspectionRepInfo = useCallback(async () => {
-    const toOrdinal = (n) => {
-      if (typeof n !== 'number' || isNaN(n) || n <= 0) return String(n);
-      const s = ["th", "st", "nd", "rd"];
-      const v = n % 100;
-      return n + (s[(v - 20) % 10] || s[v] || s[0]);
-    };
-    if (lineNo && currentDate) {
-      setInspectionRepLoading(true);
-      try {
-        const year = currentDate.getFullYear();
-        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-        const day = String(currentDate.getDate()).padStart(2, '0');
-        const formattedDate = `${month}/${day}/${year}`;
-        const response = await axios.get(`${API_BASE_URL}/api/qc-inline-roving/inspection-time-info`, {
-          params: {
-            line_no: lineNo,
-            inspection_date: formattedDate,
-          },
-        });
-        const apiData = response.data;
-        if (typeof apiData.inspectionRepOrdinal === 'string' && apiData.inspectionRepOrdinal.toLowerCase().includes("line not configured")) {
-          setInspectionRepOrdinal(t('qcRoving.lineNotConfigured', "N/A (Line not configured)"));
-          setInspectionsCompletedForProgress(0);
-          return;
-        }
-        if (apiData.status === "line_not_configured") {
-           setInspectionRepOrdinal(t('qcRoving.lineNotConfigured', "N/A (Line not configured)"));
-           setInspectionsCompletedForProgress(0);
-           return;
-        }
-        const currentRoundOrdinal = apiData.currentRoundOrdinal;
-        const inspectionsCompletedInCurrentRound = apiData.inspectionsCompletedInCurrentRound;
-        if (currentRoundOrdinal === 0 || currentRoundOrdinal === null || typeof currentRoundOrdinal === 'undefined' || apiData.status === "no_data_yet") {
-          setInspectionRepOrdinal(t('qcRoving.firstInspection', "1st Inspection"));
-          setInspectionsCompletedForProgress(0);
-        } else {
-          if (lineWorkerDataLoading) {
-            setInspectionRepOrdinal(t('qcRoving.loadingWorkerData', "Loading worker data..."));
-            setInspectionsCompletedForProgress(0);
-            return;
-          }
-          if (lineWorkerDataError) {
-            setInspectionRepOrdinal(t('qcRoving.workerDataUnavailable', "N/A (Worker data error)"));
-            setInspectionsCompletedForProgress(0);
-            return;
-          }
-          const numericLineNoFromForm = getNumericLineValue(lineNo);
-          const selectedLineInfo = lineWorkerData.find(s => getNumericLineValue(s.lineNo) === numericLineNoFromForm);
-          if (!selectedLineInfo) {
-            setInspectionRepOrdinal(t('qcRoving.lineWorkerInfoNotFound', "N/A (Worker info not found)"));
-            setInspectionsCompletedForProgress(0);
-            return;
-          }
-          const workerCountToCompare = selectedLineInfo.editedWorkerCount !== null && selectedLineInfo.editedWorkerCount !== undefined
-                                        ? selectedLineInfo.editedWorkerCount
-                                        : selectedLineInfo.realWorkerCount;
-          if (typeof workerCountToCompare !== 'number' || workerCountToCompare <= 0) {
-            setInspectionRepOrdinal(t('qcRoving.invalidWorkerCount', "N/A (Invalid worker count)"));
-            setInspectionsCompletedForProgress(0);
-            return;
-          }
-          if (inspectionsCompletedInCurrentRound < workerCountToCompare) {
-            setInspectionRepOrdinal(
-              t('qcRoving.inspectionRepOngoing', `${toOrdinal(currentRoundOrdinal)} Inspection (Ongoing: ${inspectionsCompletedInCurrentRound}/${workerCountToCompare})`)
-            );
-          } else {
-            setInspectionRepOrdinal(`${toOrdinal(currentRoundOrdinal + 1)} Inspection`);
-          }
-          setInspectionsCompletedForProgress(inspectionsCompletedInCurrentRound);
-        }
-      } catch (error) {
-        console.error("Error fetching inspection time info:", error);
-        let newOrdinalMessage = t('qcRoving.inspectionRepError', "Error");
-        if (error.response) {
-          const status = error.response.status;
-          const errorData = error.response.data;
-          const errorMessage = (typeof errorData === 'string' ? errorData : errorData?.message || errorData?.error || "").toLowerCase();
-          if ((status === 400 || status === 404) && (errorMessage.includes("line not configured") || errorMessage.includes("line not found") || errorMessage.includes("invalid line"))) {
-            newOrdinalMessage = t('qcRoving.lineNotConfigured', "N/A (Line not configured)");
-          }
-        }
-        setInspectionRepOrdinal(newOrdinalMessage);
-        setInspectionsCompletedForProgress(0);
-      } finally {
-        setInspectionRepLoading(false);
-      }
-    } else {
-      setInspectionRepOrdinal(t('qcRoving.inspectionRepNA', "N/A"));
-      setInspectionsCompletedForProgress(0);
-    }
-  }, [lineNo, currentDate, t, lineWorkerData, lineWorkerDataLoading, lineWorkerDataError, getNumericLineValue]);
+  // const fetchInspectionRepInfo = useCallback(async () => {
+  //   const toOrdinal = (n) => {
+  //     if (typeof n !== 'number' || isNaN(n) || n <= 0) return String(n);
+  //     const s = ["th", "st", "nd", "rd"];
+  //     const v = n % 100;
+  //     return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  //   };
+  //   if (lineNo && currentDate) {
+  //     setInspectionRepLoading(true);
+  //     try {
+  //       const year = currentDate.getFullYear();
+  //       const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+  //       const day = String(currentDate.getDate()).padStart(2, '0');
+  //       const formattedDate = `${month}/${day}/${year}`;
+  //       const response = await axios.get(`${API_BASE_URL}/api/qc-inline-roving/inspection-time-info`, {
+  //         params: {
+  //           line_no: lineNo,
+  //           inspection_date: formattedDate,
+  //         },
+  //       });
+  //       const apiData = response.data;
+  //       if (typeof apiData.inspectionRepOrdinal === 'string' && apiData.inspectionRepOrdinal.toLowerCase().includes("line not configured")) {
+  //         setInspectionRepOrdinal(t('qcRoving.lineNotConfigured', "N/A (Line not configured)"));
+  //         return;
+  //       }
+  //       if (apiData.status === "line_not_configured") {
+  //          setInspectionRepOrdinal(t('qcRoving.lineNotConfigured', "N/A (Line not configured)"));
+  //          return;
+  //       }
+  //       const currentRoundOrdinal = apiData.currentRoundOrdinal;
+  //       const inspectionsCompletedInCurrentRound = apiData.inspectionsCompletedInCurrentRound;
+  //       if (currentRoundOrdinal === 0 || currentRoundOrdinal === null || typeof currentRoundOrdinal === 'undefined' || apiData.status === "no_data_yet") {
+  //         setInspectionRepOrdinal(t('qcRoving.firstInspection', "1st Inspection"));
+  //       } else {
+  //         if (lineWorkerDataLoading) {
+  //           setInspectionRepOrdinal(t('qcRoving.loadingWorkerData', "Loading worker data..."));
+  //           return;
+  //         }
+  //         if (lineWorkerDataError) {
+  //           setInspectionRepOrdinal(t('qcRoving.workerDataUnavailable', "N/A (Worker data error)"));
+  //           return;
+  //         }
+  //         const numericLineNoFromForm = getNumericLineValue(lineNo);
+  //         const selectedLineInfo = lineWorkerData.find(s => getNumericLineValue(s.lineNo) === numericLineNoFromForm);
+  //         if (!selectedLineInfo) {
+  //           setInspectionRepOrdinal(t('qcRoving.lineWorkerInfoNotFound', "N/A (Worker info not found)"));
+  //           return;
+  //         }
+  //         const workerCountToCompare = selectedLineInfo.editedWorkerCount !== null && selectedLineInfo.editedWorkerCount !== undefined
+  //                                       ? selectedLineInfo.editedWorkerCount
+  //                                       : selectedLineInfo.realWorkerCount;
+  //         if (typeof workerCountToCompare !== 'number' || workerCountToCompare <= 0) {
+  //           setInspectionRepOrdinal(t('qcRoving.invalidWorkerCount', "N/A (Invalid worker count)"));
+  //           return;
+  //         }
+  //         if (inspectionsCompletedInCurrentRound < workerCountToCompare) {
+  //           setInspectionRepOrdinal(
+  //             t('qcRoving.inspectionRepOngoing', `${toOrdinal(currentRoundOrdinal)} Inspection (Ongoing: ${inspectionsCompletedInCurrentRound}/${workerCountToCompare})`)
+  //           );
+  //         } else {
+  //           setInspectionRepOrdinal(`${toOrdinal(currentRoundOrdinal + 1)} Inspection`);
+  //         }
+  //       }
+  //     } catch (error) {
+  //       console.error("Error fetching inspection time info:", error);
+  //       let newOrdinalMessage = t('qcRoving.inspectionRepError', "Error");
+  //       if (error.response) {
+  //         const status = error.response.status;
+  //         const errorData = error.response.data;
+  //         const errorMessage = (typeof errorData === 'string' ? errorData : errorData?.message || errorData?.error || "").toLowerCase();
+  //         if ((status === 400 || status === 404) && (errorMessage.includes("line not configured") || errorMessage.includes("line not found") || errorMessage.includes("invalid line"))) {
+  //           newOrdinalMessage = t('qcRoving.lineNotConfigured', "N/A (Line not configured)");
+  //         }
+  //       }
+  //       setInspectionRepOrdinal(newOrdinalMessage);
+  //     } finally {
+  //       setInspectionRepLoading(false);
+  //     }
+  //   } else {
+  //     setInspectionRepOrdinal(t('qcRoving.inspectionRepNA', "N/A"));
+  //   }
+  // }, [lineNo, currentDate, t, lineWorkerData, lineWorkerDataLoading, lineWorkerDataError, getNumericLineValue]);
 
-  useEffect(() => {
-    fetchInspectionRepInfo();
-  }, [fetchInspectionRepInfo]);
+  // useEffect(() => {
+  //   fetchInspectionRepInfo();
+  // }, [fetchInspectionRepInfo]);
 
 const fetchInspectionsCompleted = useCallback(async () => {
-  if (lineNo && currentDate) {
+  // if (lineNo && currentDate) {
+   if (lineNo && currentDate && selectedManualInspectionRep) {
     try {
       const year = currentDate.getFullYear();
       const month = String(currentDate.getMonth() + 1).padStart(2, '0');
@@ -245,15 +238,57 @@ const fetchInspectionsCompleted = useCallback(async () => {
         params: {
           line_no: lineNo,
           inspection_date: formattedDate,
+          inspection_rep_name: selectedManualInspectionRep, 
         },
       });
-      setInspectionsCompletedForProgress(response.data.completeInspectOperators);
+      const apiResponseData = response.data;
+      console.log("API response from /api/inspections-completed:", apiResponseData); // <-- Add this line to inspect
+
+      let completedCount = 0;
+
+      if (Array.isArray(apiResponseData)) {
+        // Case 1: API returns an ARRAY of roving documents
+        for (const doc of apiResponseData) {
+          if (doc && doc.inspection_rep && Array.isArray(doc.inspection_rep)) {
+            const repInfo = doc.inspection_rep.find(
+              (rep) => rep.inspection_rep_name === selectedManualInspectionRep
+            );
+            if (repInfo) {
+              completedCount = repInfo.complete_inspect_operators || 0;
+              // Assuming the specific inspection_rep_name is unique across documents for a given line/date,
+              // or we take the first one found.
+              break; 
+            }
+          }
+        }
+        setInspectionsCompletedForSelectedRep(completedCount);
+      } else if (apiResponseData && apiResponseData.inspection_rep && Array.isArray(apiResponseData.inspection_rep)) {
+        // Case 2: API returns a SINGLE document object which contains an inspection_rep array
+        const repInfo = apiResponseData.inspection_rep.find(
+          (rep) => rep.inspection_rep_name === selectedManualInspectionRep
+        );
+        if (repInfo) {
+          setInspectionsCompletedForSelectedRep(repInfo.complete_inspect_operators || 0);
+        } else {
+          setInspectionsCompletedForSelectedRep(0); // Repetition not found in this structure
+        }
+     } else if (apiResponseData && typeof apiResponseData.completeInspectOperators === 'number') {
+        // Case 3: API returns a single object that is the specific inspection_rep item itself, or a summary with a direct count
+                setInspectionsCompletedForSelectedRep(apiResponseData.completeInspectOperators || 0); 
+      } else {
+        console.warn("Unexpected data structure from /api/inspections-completed. Setting completed count to 0.", apiResponseData);
+        setInspectionsCompletedForSelectedRep(0); 
+      }
     } catch (error) {
-      console.error("Error fetching inspections completed:", error);
-      setInspectionsCompletedForProgress(0);
+      // console.error("Error fetching inspections completed:", error);
+      // setInspectionsCompletedForProgress(0);
+      console.error("Error fetching inspections completed for selected repetition:", error);
+      setInspectionsCompletedForSelectedRep(0);
     }
+     } else {
+    setInspectionsCompletedForSelectedRep(0); // Reset if not all params are available
   }
-}, [lineNo, currentDate]);
+}, [lineNo, currentDate, selectedManualInspectionRep]);
 
   useEffect(() => {
     fetchInspectionsCompleted();
@@ -421,6 +456,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
     setSpiStatus("");
     setMeasurementStatus("");
     setSpiImage(null);
+    setSelectedManualInspectionRep("");
     setMeasurementImage(null);
   };
 
@@ -430,6 +466,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
       !lineNo ||
       !moNo ||
       !selectedOperationId ||
+      !selectedManualInspectionRep ||
       !spiStatus ||
       !measurementStatus ||
       !scannedUserData
@@ -437,7 +474,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
       Swal.fire({
         icon: "warning",
         title: "Missing Information",
-        text: "Please fill all required fields and scan the operator QR code."
+        text: t("qcRoving.validation.fillAllFieldsAndSelectRep", "Please fill all required fields, select inspection repetition, and scan the operator QR code.")
       });
       return;
     }
@@ -517,10 +554,10 @@ const fetchInspectionsCompleted = useCallback(async () => {
     }
 
     // const completeInspectOperators = 1;
-    const newCumulativeCompleteInspectOperators = inspectionsCompletedForProgress + 1; 
+    const newCompleteInspectOperatorsForRep = inspectionsCompletedForSelectedRep + 1;
 
     // const inspectStatus = (totalOperatorsForLine > 0 && completeInspectOperators >= totalOperatorsForLine)
-     const newInspectStatus = (totalOperatorsForLine > 0 && newCumulativeCompleteInspectOperators >= totalOperatorsForLine)
+     const newInspectStatus = (totalOperatorsForLine > 0 && newCompleteInspectOperatorsForRep >= totalOperatorsForLine)
       ? "Completed"
       : "Not Complete";
 
@@ -531,11 +568,11 @@ const fetchInspectionsCompleted = useCallback(async () => {
       mo_no: moNo,
       line_no: lineNo,
      inspection_rep_item: { 
-        inspection_rep_name: inspectionRepOrdinal,
+        inspection_rep_name: selectedManualInspectionRep,
         emp_id: user?.emp_id || 'Guest',
         eng_name: user?.eng_name || 'Guest',
         total_operators: totalOperatorsForLine,
-        complete_inspect_operators: newCumulativeCompleteInspectOperators,
+        complete_inspect_operators: newCompleteInspectOperatorsForRep,
         Inspect_status: newInspectStatus,
         inlineData: [singleOperatorInspectionData]
       },
@@ -549,7 +586,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
         text: 'QC Inline Roving data saved successfully!',
       });
       resetForm();
-      fetchInspectionRepInfo(); // Refresh the inspection repetition info after saving
+      // fetchInspectionRepInfo(); // Refresh the inspection repetition info after saving
       fetchInspectionsCompleted(); // Refresh the inspections completed info after saving
     } catch (error) {
       console.error("Error saving QC Inline Roving data:", error);
@@ -618,15 +655,30 @@ const fetchInspectionsCompleted = useCallback(async () => {
 
   const lineNoOptions = Array.from({ length: 30 }, (_, i) =>
     (i + 1).toString()
-  );
+ );
+
+  const toOrdinalFormattedString = (n, transFunc) => {
+    if (typeof n !== 'number' || isNaN(n) || n <= 0) return String(n);
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    const suffix = s[(v - 20) % 10] || s[v] || s[0];
+    return `${n}${suffix} ${transFunc('qcRoving.inspectionText', "Inspection")}`;
+  };
+
+  const inspectionRepOptions = [1, 2, 3, 4, 5].map(num => ({
+    value: toOrdinalFormattedString(num, t),
+    label: toOrdinalFormattedString(num, t),
+  }));
 
   const isFormValid =
     lineNo &&
     moNo &&
     selectedOperationId &&
+    selectedManualInspectionRep && // Added check for manual selection
     spiStatus &&
     measurementStatus &&
     scannedUserData;
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 p-6">
@@ -678,15 +730,24 @@ const fetchInspectionsCompleted = useCallback(async () => {
           <>
             <div className="my-4 p-4 bg-blue-100 rounded-lg shadow">
               <h3 className="text-md font-semibold text-gray-700 mb-2">
-                {t("qcRoving.lineWorkerProgressTitle", "Line {{lineDisplayValue}} : Inspection Progress", { lineDisplayValue: getNumericLineValue(lineNo) || t('qcRoving.na', 'N/A') })} 
-                &nbsp;({inspectionRepLoading ? t('qcRoving.loading', "Loading...") : inspectionRepOrdinal})
+                {t("qcRoving.lineRepProgressTitle", "Line {{lineDisplayValue}} - {{repName}}: Inspection Progress", { 
+                  lineDisplayValue: getNumericLineValue(lineNo) || t('qcRoving.na', 'N/A'), 
+                  repName: selectedManualInspectionRep || t('qcRoving.na', 'N/A') 
+                })}
               </h3>
               {(() => {
                 const numericLineNoFromForm = getNumericLineValue(lineNo); 
-                if (numericLineNoFromForm === null || lineWorkerDataLoading || lineWorkerDataError || inspectionRepLoading) {
+                if (!selectedManualInspectionRep) {
+                  return <p className="text-sm text-gray-500">{t("qcRoving.selectInspectionRepForProgress", "Select an inspection repetition to see progress.")}</p>;
+                }
+                if (numericLineNoFromForm === null) {
+                  return <p className="text-sm text-gray-500">{t("qcRoving.selectLineForProgress", "Select a line to see worker status.")}</p>;
+                }
+                if (lineWorkerDataLoading || lineWorkerDataError) {
+
                   if (lineWorkerDataLoading) return <p className="text-sm text-gray-500">{t("qcRoving.loadingWorkerData", "Loading worker data...")}</p>;
                   if (lineWorkerDataError) return <p className="text-sm text-red-500">{lineWorkerDataError}</p>;
-                  if (inspectionRepLoading) return <p className="text-sm text-gray-500">{t("qcRoving.loadingInspectionData", "Loading inspection data...")}</p>;
+                  // if (inspectionRepLoading) return <p className="text-sm text-gray-500">{t("qcRoving.loadingInspectionData", "Loading inspection data...")}</p>;
                   return <p className="text-sm text-gray-500">{t("qcRoving.selectLineForProgress", "Select a line to see worker status.")}</p>;
                 }
                 const selectedLineInfo = lineWorkerData.find(s => {
@@ -697,11 +758,11 @@ const fetchInspectionsCompleted = useCallback(async () => {
                   const totalWorkersForLine = selectedLineInfo.editedWorkerCount !== null && selectedLineInfo.editedWorkerCount !== undefined
                     ? selectedLineInfo.editedWorkerCount
                     : (selectedLineInfo.realWorkerCount || 0);
-                  const progressPercent = totalWorkersForLine > 0 ? (inspectionsCompletedForProgress / totalWorkersForLine) * 100 : 0;
+                  const progressPercent = totalWorkersForLine > 0 ? (inspectionsCompletedForSelectedRep / totalWorkersForLine) * 100 : 0;
                   return (
                     <div>
                       <p className="text-sm text-gray-600 mb-1">
-                        {t("qcRoving.inspectionsCompleted", "Inspections Completed")} : {inspectionsCompletedForProgress} / {totalWorkersForLine}
+                         {t("qcRoving.inspectionsCompleted", "Inspections Completed")} : {inspectionsCompletedForSelectedRep} / {totalWorkersForLine}
                       </p>
                       <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
                         <div
@@ -715,17 +776,33 @@ const fetchInspectionsCompleted = useCallback(async () => {
                   return <p className="text-sm text-gray-500">{t("qcRoving.noWorkerDataForLine", "No worker data available for selected line.")}</p>;
                 }
               })()}
-              {lineWorkerDataLoading && (<p className="text-sm text-gray-500">{t("qcRoving.loadingWorkerData", "Loading worker data...")}</p>)}
-              {lineWorkerDataError && !lineWorkerDataLoading && (<p className="text-sm text-red-500">{lineWorkerDataError}</p>)}
+              {/* {lineWorkerDataLoading && (<p className="text-sm text-gray-500">{t("qcRoving.loadingWorkerData", "Loading worker data...")}</p>)}
+              {lineWorkerDataError && !lineWorkerDataLoading && (<p className="text-sm text-red-500">{lineWorkerDataError}</p>)} */}
             </div>
 
             <div className="mb-6">
               <div className="flex flex-wrap gap-4 items-end">
                 <div className="flex-1 min-w-[150px]">
-                  <label htmlFor="inspectionRep" className="block text-sm font-medium text-gray-700">
-                    {t("qcRoving.inspectionRep", "Inspection Repetition")}
+                   <label htmlFor="manualInspectionRep" className="block text-sm font-medium text-gray-700">
+                    {t("qcRoving.inspectionNo", "Inspection No")}
                   </label>
-                  <input type="text" id="inspectionRep" value={inspectionRepLoading ? t('qcRoving.loading', "Loading...") : inspectionRepOrdinal} readOnly className="mt-1 w-full p-2 border border-gray-300 rounded-lg bg-gray-100" />
+                  <select
+                    id="inspectionRep"
+                    value={selectedManualInspectionRep}
+                    onChange={(e) => setSelectedManualInspectionRep(e.target.value)}
+                    className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
+                    required
+                  >
+                    <option value="">
+                      {t("qcRoving.select_inspection_rep", "Select Inspection Rep...")}
+                    </option>
+                    {inspectionRepOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+
                 </div>
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
