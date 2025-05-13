@@ -1960,11 +1960,12 @@ const CuttingPage = () => {
   });
   const [measurementPoints, setMeasurementPoints] = useState([]);
   const [fabricDefects, setFabricDefects] = useState([]);
-  const [cuttingIssuesData, setCuttingIssuesData] = useState({
-    issues: [],
-    additionalComments: "",
-    additionalImages: []
-  });
+  const cuttingIssuesRef = useRef(null); // Ref for CuttingIssues component
+  // const [cuttingIssuesData, setCuttingIssuesData] = useState({
+  //   issues: [],
+  //   additionalComments: "",
+  //   additionalImages: []
+  // });
 
   useEffect(() => {
     const userAgent = navigator.userAgent.toLowerCase();
@@ -2602,6 +2603,11 @@ const CuttingPage = () => {
     });
   };
 
+  // // Handle updates from CuttingIssues
+  // const handleIssuesChange = (issuesData) => {
+  //   setCuttingIssuesData(issuesData);
+  // };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (
@@ -2611,7 +2617,7 @@ const CuttingPage = () => {
       !bundleQtyCheck ||
       !selectedPanel ||
       !selectedSize ||
-      !selectedSerialLetter
+      !bundleQty
     ) {
       Swal.fire({
         icon: "warning",
@@ -2627,85 +2633,235 @@ const CuttingPage = () => {
     else if (cuttingByManual) cuttingtype = "Manual";
     else cuttingtype = "None";
 
+    // Get cutting issues data from CuttingIssues component
+    const cuttingIssuesData = cuttingIssuesRef.current.getIssuesData();
+
     const inspectionData = {
-      size: selectedSize,
-      serialLetter: selectedSerialLetter,
+      inspectedSize: selectedSize,
+      bundleQtyCheckSize: parseInt(bundleQty),
       tolerance,
-      totalPcs: totalParts,
-      totalPass: totalPass,
-      totalReject: totalReject,
-      totalRejectMeasurement:
-        summary.Top.rejectMeasurement +
-        summary.Middle.rejectMeasurement +
-        summary.Bottom.rejectMeasurement,
-      totalRejectDefects:
-        summary.Top.rejectDefects +
-        summary.Middle.rejectDefects +
-        summary.Bottom.rejectDefects,
-      passRate:
-        totalParts > 0
-          ? parseFloat(((totalPass / totalParts) * 100).toFixed(2))
-          : 0,
-      pcsLocation: [
-        {
-          location: "Top",
-          pcs: summary.Top.totalParts,
-          pass: summary.Top.totalPass,
-          reject: summary.Top.totalReject,
-          rejectGarment: summary.Top.totalReject,
-          rejectMeasurement: summary.Top.rejectMeasurement,
-          passrate: summary.Top.passRate,
-          measurementData: bundleTableData.flatMap((bundle, bundleIndex) =>
-            collectMeasurementData(
-              "Top",
-              bundleIndex,
-              tableData[bundleIndex]?.Top || [],
-              columnDefects[bundleIndex]?.Top || [],
-              tolerance,
-              colCounts[bundleIndex]?.Top || 5
-            )
-          )
+      totalPcsSize: totalParts,
+      pcsSize: {
+        total: totalParts,
+        top: summary.Top.totalParts,
+        middle: summary.Middle.totalParts,
+        bottom: summary.Bottom.totalParts
+      },
+      passSize: {
+        total: totalPass,
+        top: summary.Top.totalPass,
+        middle: summary.Middle.totalPass,
+        bottom: summary.Bottom.totalPass
+      },
+      rejectSize: {
+        total: totalReject,
+        top: summary.Top.totalReject,
+        middle: summary.Middle.totalReject,
+        bottom: summary.Bottom.totalReject
+      },
+      rejectGarmentSize: {
+        total: totalReject,
+        top: summary.Top.totalReject,
+        middle: summary.Middle.totalReject,
+        bottom: summary.Bottom.totalReject
+      },
+      rejectMeasurementSize: {
+        total:
+          summary.Top.rejectMeasurement +
+          summary.Middle.rejectMeasurement +
+          summary.Bottom.rejectMeasurement,
+        top: summary.Top.rejectMeasurement,
+        middle: summary.Middle.rejectMeasurement,
+        bottom: summary.Bottom.rejectMeasurement
+      },
+      passrateSize: {
+        total:
+          totalParts > 0
+            ? parseFloat(((totalPass / totalParts) * 100).toFixed(2))
+            : 0,
+        top: summary.Top.passRate,
+        middle: summary.Middle.passRate,
+        bottom: summary.Bottom.passRate
+      },
+      bundleInspectionData: bundleTableData.map((bundle, bundleIndex) => ({
+        bundleNo: bundle.bundleNo,
+        serialLetter: bundle.serialLetter,
+        totalPcs: calculateTotalPcs(bundle),
+        pcs: {
+          total: calculateTotalPcs(bundle),
+          top: bundle.parts.length * (parseInt(bundle.tValue) || 5),
+          middle: bundle.parts.length * (parseInt(bundle.mValue) || 5),
+          bottom: bundle.parts.length * (parseInt(bundle.bValue) || 5)
         },
-        {
-          location: "Middle",
-          pcs: summary.Middle.totalParts,
-          pass: summary.Middle.totalPass,
-          reject: summary.Middle.totalReject,
-          rejectGarment: summary.Middle.totalReject,
-          rejectMeasurement: summary.Middle.rejectMeasurement,
-          passrate: summary.Middle.passRate,
-          measurementData: bundleTableData.flatMap((bundle, bundleIndex) =>
-            collectMeasurementData(
-              "Middle",
-              bundleIndex,
-              tableData[bundleIndex]?.Middle || [],
-              columnDefects[bundleIndex]?.Middle || [],
-              tolerance,
-              colCounts[bundleIndex]?.Middle || 5
-            )
-          )
+        pass: {
+          total:
+            calculateTotalPcs(bundle) -
+            (summary.Top.bundles[bundleIndex]?.totalReject || 0) -
+            (summary.Middle.bundles[bundleIndex]?.totalReject || 0) -
+            (summary.Bottom.bundles[bundleIndex]?.totalReject || 0),
+          top:
+            bundle.parts.length * (parseInt(bundle.tValue) || 5) -
+            (summary.Top.bundles[bundleIndex]?.totalReject || 0),
+          middle:
+            bundle.parts.length * (parseInt(bundle.mValue) || 5) -
+            (summary.Middle.bundles[bundleIndex]?.totalReject || 0),
+          bottom:
+            bundle.parts.length * (parseInt(bundle.bValue) || 5) -
+            (summary.Bottom.bundles[bundleIndex]?.totalReject || 0)
         },
-        {
-          location: "Bottom",
-          pcs: summary.Bottom.totalParts,
-          pass: summary.Bottom.totalPass,
-          reject: summary.Bottom.totalReject,
-          rejectGarment: summary.Bottom.totalReject,
-          rejectMeasurement: summary.Bottom.rejectMeasurement,
-          passrate: summary.Bottom.passRate,
-          measurementData: bundleTableData.flatMap((bundle, bundleIndex) =>
-            collectMeasurementData(
-              "Bottom",
-              bundleIndex,
-              tableData[bundleIndex]?.Bottom || [],
-              columnDefects[bundleIndex]?.Bottom || [],
-              tolerance,
-              colCounts[bundleIndex]?.Bottom || 5
-            )
-          )
+        reject: {
+          total:
+            (summary.Top.bundles[bundleIndex]?.totalReject || 0) +
+            (summary.Middle.bundles[bundleIndex]?.totalReject || 0) +
+            (summary.Bottom.bundles[bundleIndex]?.totalReject || 0),
+          top: summary.Top.bundles[bundleIndex]?.totalReject || 0,
+          middle: summary.Middle.bundles[bundleIndex]?.totalReject || 0,
+          bottom: summary.Bottom.bundles[bundleIndex]?.totalReject || 0
+        },
+        rejectGarment: {
+          total:
+            (summary.Top.bundles[bundleIndex]?.totalReject || 0) +
+            (summary.Middle.bundles[bundleIndex]?.totalReject || 0) +
+            (summary.Bottom.bundles[bundleIndex]?.totalReject || 0),
+          top: summary.Top.bundles[bundleIndex]?.totalReject || 0,
+          middle: summary.Middle.bundles[bundleIndex]?.totalReject || 0,
+          bottom: summary.Bottom.bundles[bundleIndex]?.totalReject || 0
+        },
+        rejectMeasurement: {
+          total:
+            (summary.Top.bundles[bundleIndex]?.rejectMeasurement || 0) +
+            (summary.Middle.bundles[bundleIndex]?.rejectMeasurement || 0) +
+            (summary.Bottom.bundles[bundleIndex]?.rejectMeasurement || 0),
+          top: summary.Top.bundles[bundleIndex]?.rejectMeasurement || 0,
+          middle: summary.Middle.bundles[bundleIndex]?.rejectMeasurement || 0,
+          bottom: summary.Bottom.bundles[bundleIndex]?.rejectMeasurement || 0
+        },
+        passrate: {
+          total:
+            calculateTotalPcs(bundle) > 0
+              ? parseFloat(
+                  (
+                    ((calculateTotalPcs(bundle) -
+                      ((summary.Top.bundles[bundleIndex]?.totalReject || 0) +
+                        (summary.Middle.bundles[bundleIndex]?.totalReject ||
+                          0) +
+                        (summary.Bottom.bundles[bundleIndex]?.totalReject ||
+                          0))) /
+                      calculateTotalPcs(bundle)) *
+                    100
+                  ).toFixed(2)
+                )
+              : 0,
+          top:
+            bundle.parts.length * (parseInt(bundle.tValue) || 5) > 0
+              ? parseFloat(
+                  (
+                    ((bundle.parts.length * (parseInt(bundle.tValue) || 5) -
+                      (summary.Top.bundles[bundleIndex]?.totalReject || 0)) /
+                      (bundle.parts.length * (parseInt(bundle.tValue) || 5))) *
+                    100
+                  ).toFixed(2)
+                )
+              : 0,
+          middle:
+            bundle.parts.length * (parseInt(bundle.mValue) || 5) > 0
+              ? parseFloat(
+                  (
+                    ((bundle.parts.length * (parseInt(bundle.mValue) || 5) -
+                      (summary.Middle.bundles[bundleIndex]?.totalReject || 0)) /
+                      (bundle.parts.length * (parseInt(bundle.mValue) || 5))) *
+                    100
+                  ).toFixed(2)
+                )
+              : 0,
+          bottom:
+            bundle.parts.length * (parseInt(bundle.bValue) || 5) > 0
+              ? parseFloat(
+                  (
+                    ((bundle.parts.length * (parseInt(bundle.bValue) || 5) -
+                      (summary.Bottom.bundles[bundleIndex]?.totalReject || 0)) /
+                      (bundle.parts.length * (parseInt(bundle.bValue) || 5))) *
+                    100
+                  ).toFixed(2)
+                )
+              : 0
         }
-      ],
-      cuttingIssues: cuttingIssuesData, // Add cutting issues to inspection data
+      })),
+      cuttingDefects: {
+        issues: cuttingIssuesData.issues,
+        additionalComments: cuttingIssuesData.additionalComments,
+        additionalImages: cuttingIssuesData.additionalImages
+      },
+      measurementInsepctionData: bundleTableData.flatMap(
+        (bundle, bundleIndex) =>
+          bundle.parts.map((partName) => {
+            const partInfo = panelIndexNames.find(
+              (p) => p.panelIndexName === partName
+            );
+            return {
+              partName,
+              partNo: partInfo?.panelIndex || 0,
+              partNameKhmer: partInfo?.panelIndexNameKhmer || "",
+              measurementPointsData: measurementPoints
+                .filter((mp) => mp.panelIndexName === partName)
+                .map((mp) => ({
+                  measurementPointName: mp.pointNameEng,
+                  measurementPointNameKhmer: mp.pointNameKhmer,
+                  panelName: mp.panelName,
+                  side: mp.panelSide,
+                  direction: mp.panelDirection,
+                  property: mp.measurementSide,
+                  measurementValues: ["Top", "Middle", "Bottom"].map(
+                    (location) => ({
+                      location,
+                      measurements: (tableData[bundleIndex]?.[location] || [])
+                        .filter(
+                          (row) =>
+                            row.measurementPoint === mp.pointNameEng &&
+                            row.isUsed
+                        )
+                        .flatMap((row) =>
+                          row.values.map((val, idx) => ({
+                            pcsName: `${location[0]}${idx + 1}`,
+                            valuedecimal: val.decimal,
+                            valuefraction: val.fraction,
+                            status:
+                              val.decimal < tolerance.min ||
+                              val.decimal > tolerance.max
+                                ? "Fail"
+                                : "Pass"
+                          }))
+                        )
+                    })
+                  )
+                })),
+              fabricDefects: ["Top", "Middle", "Bottom"].map((location) => ({
+                location,
+                defectData: (
+                  columnDefects[bundleIndex]?.[location] || []
+                ).flatMap((col, colIdx) =>
+                  col
+                    .map((defects, panelIdx) =>
+                      defects.length > 0
+                        ? {
+                            pcsName: `${location[0]}${colIdx + 1}`,
+                            totalDefects: defects.reduce(
+                              (sum, d) => sum + d.count,
+                              0
+                            ),
+                            defects: defects.map((d) => ({
+                              defectName: d.defectName,
+                              defectQty: d.count
+                            }))
+                          }
+                        : null
+                    )
+                    .filter(Boolean)
+                )
+              }))
+            };
+          })
+      ),
       inspectionTime: new Date().toLocaleTimeString("en-US", { hour12: false })
     };
 
@@ -2717,18 +2873,32 @@ const CuttingPage = () => {
       cutting_emp_dept: user.dept_name,
       cutting_emp_section: user.sect_name,
       moNo,
-      lotNo: cutPanelData?.LotNos.join(",") || "",
-      buyer: cutPanelData?.Buyer || "N/A",
-      orderQty: cutPanelData?.TotalOrderQty || 0,
-      color: cutPanelData?.Color || "",
       tableNo,
-      planLayerQty,
-      actualLayerQty: actualLayers,
-      totalPcs: totalPlanPcs,
-      cuttingtableLetter: cutPanelData?.SpreadTable || "",
-      cuttingtableNo: cutPanelData?.SpreadTableNo || "",
-      marker: cutPanelData?.MackerNo || "N/A",
-      markerRatio:
+      buyerStyle: cutPanelData?.BuyerStyle || "",
+      buyer: cutPanelData?.Buyer || "",
+      color: cutPanelData?.Color || "",
+      lotNo: cutPanelData?.LotNos || [],
+      orderQty: cutPanelData?.TotalOrderQty || 0,
+      fabricDetails: {
+        fabricType: cutPanelData?.FabricType || "",
+        material: cutPanelData?.Material || "",
+        rollQty: cutPanelData?.RollQty || 0,
+        spreadYds: cutPanelData?.SpreadYds || 0,
+        unit: cutPanelData?.Unit || "",
+        grossKgs: cutPanelData?.GrossKgs || 0,
+        netKgs: cutPanelData?.NetKgs || 0,
+        totalTTLRoll: cutPanelData?.TotalTTLRoll || 0
+      },
+      cuttingTableDetails: {
+        spreadTable: cutPanelData?.SpreadTable || "",
+        spreadTableNo: cutPanelData?.SpreadTableNo || "",
+        planLayers: planLayerQty,
+        actualLayers: actualLayers,
+        totalPcs: totalPlanPcs,
+        mackerNo: cutPanelData?.MackerNo || "",
+        mackerLength: cutPanelData?.MackerLength || 0
+      },
+      mackerRatio:
         cutPanelData?.MarkerRatio.filter((mr) => mr.cuttingRatio !== null).map(
           (data, index) => ({
             index: index + 1,
@@ -2751,13 +2921,44 @@ const CuttingPage = () => {
         title: t("cutting.success"),
         text: t("cutting.dataSaved")
       });
-      resetMeasurementData();
-      // Reset cutting issues data after submission
-      setCuttingIssuesData({
-        issues: [],
-        additionalComments: "",
-        additionalImages: []
+
+      // Reset inspection-specific states while preserving common data
+      setSelectedSize("");
+      setBundleQty("");
+      setBundleTableData([]);
+      setTableData([]);
+      setColumnDefects([]);
+      setSummary({
+        Top: {
+          totalParts: 0,
+          totalPass: 0,
+          totalReject: 0,
+          rejectMeasurement: 0,
+          rejectDefects: 0,
+          passRate: 0,
+          bundles: []
+        },
+        Middle: {
+          totalParts: 0,
+          totalPass: 0,
+          totalReject: 0,
+          rejectMeasurement: 0,
+          rejectDefects: 0,
+          passRate: 0,
+          bundles: []
+        },
+        Bottom: {
+          totalParts: 0,
+          totalPass: 0,
+          totalReject: 0,
+          rejectMeasurement: 0,
+          rejectDefects: 0,
+          passRate: 0,
+          bundles: []
+        }
       });
+      setActiveMeasurementTab("Top");
+      setFilters({ panelName: "", side: "", direction: "", lw: "" });
     } catch (error) {
       console.error("Error saving Cutting data:", error);
       Swal.fire({
@@ -4567,16 +4768,15 @@ const CuttingPage = () => {
                         <>
                           <hr className="my-4 border-gray-300" />
                           <CuttingIssues
+                            ref={cuttingIssuesRef}
                             moNo={moNo}
                             selectedPanel={selectedPanel}
+                            //onIssuesChange={handleIssuesChange}
                           />
                         </>
                       )}
                     </>
                   )}
-                  <div className="mt-2 text-sm text-gray-600">
-                    {t("cutting.additionalInformation")}
-                  </div>
                 </div>
               )}
             </div>

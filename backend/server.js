@@ -7279,18 +7279,15 @@ app.post("/api/save-cutting-inspection", async (req, res) => {
       cutting_emp_dept,
       cutting_emp_section,
       moNo,
-      lotNo,
-      buyer,
-      orderQty,
-      color,
       tableNo,
-      planLayerQty,
-      actualLayerQty,
-      totalPcs,
-      cuttingtableLetter,
-      cuttingtableNo,
-      marker,
-      markerRatio,
+      buyerStyle,
+      buyer,
+      color,
+      lotNo,
+      orderQty,
+      fabricDetails,
+      cuttingTableDetails,
+      mackerRatio,
       totalBundleQty,
       bundleQtyCheck,
       totalInspectionQty,
@@ -7302,18 +7299,16 @@ app.post("/api/save-cutting-inspection", async (req, res) => {
     const existingDoc = await CuttingInspection.findOne({
       inspectionDate,
       moNo,
-      lotNo,
-      color,
-      tableNo
+      tableNo,
+      color
     });
 
     if (existingDoc) {
-      // Append new inspectionData to existing document
       existingDoc.inspectionData.push(inspectionData);
+      existingDoc.updated_at = new Date();
       await existingDoc.save();
       res.status(200).json({ message: "Data appended successfully" });
     } else {
-      // Create a new document
       const newDoc = new CuttingInspection({
         inspectionDate,
         cutting_emp_id,
@@ -7322,24 +7317,23 @@ app.post("/api/save-cutting-inspection", async (req, res) => {
         cutting_emp_dept,
         cutting_emp_section,
         moNo,
-        lotNo,
-        buyer,
-        orderQty,
-        color,
         tableNo,
-        planLayerQty,
-        actualLayerQty,
-        totalPcs,
-        cuttingtableLetter,
-        cuttingtableNo,
-        marker,
-        markerRatio,
+        buyerStyle,
+        buyer,
+        color,
+        lotNo,
+        orderQty,
+        fabricDetails,
+        cuttingTableDetails,
+        mackerRatio,
         totalBundleQty,
         bundleQtyCheck,
         totalInspectionQty,
         cuttingtype,
         garmentType,
-        inspectionData: [inspectionData]
+        inspectionData: [inspectionData],
+        created_at: new Date(),
+        updated_at: new Date()
       });
       await newDoc.save();
       res.status(200).json({ message: "Data saved successfully" });
@@ -7351,6 +7345,89 @@ app.post("/api/save-cutting-inspection", async (req, res) => {
       .json({ message: "Failed to save data", error: error.message });
   }
 });
+
+// app.post("/api/save-cutting-inspection", async (req, res) => {
+//   try {
+//     const {
+//       inspectionDate,
+//       cutting_emp_id,
+//       cutting_emp_engName,
+//       cutting_emp_khName,
+//       cutting_emp_dept,
+//       cutting_emp_section,
+//       moNo,
+//       lotNo,
+//       buyer,
+//       orderQty,
+//       color,
+//       tableNo,
+//       planLayerQty,
+//       actualLayerQty,
+//       totalPcs,
+//       cuttingtableLetter,
+//       cuttingtableNo,
+//       marker,
+//       markerRatio,
+//       totalBundleQty,
+//       bundleQtyCheck,
+//       totalInspectionQty,
+//       cuttingtype,
+//       garmentType,
+//       inspectionData
+//     } = req.body;
+
+//     const existingDoc = await CuttingInspection.findOne({
+//       inspectionDate,
+//       moNo,
+//       lotNo,
+//       color,
+//       tableNo
+//     });
+
+//     if (existingDoc) {
+//       // Append new inspectionData to existing document
+//       existingDoc.inspectionData.push(inspectionData);
+//       await existingDoc.save();
+//       res.status(200).json({ message: "Data appended successfully" });
+//     } else {
+//       // Create a new document
+//       const newDoc = new CuttingInspection({
+//         inspectionDate,
+//         cutting_emp_id,
+//         cutting_emp_engName,
+//         cutting_emp_khName,
+//         cutting_emp_dept,
+//         cutting_emp_section,
+//         moNo,
+//         lotNo,
+//         buyer,
+//         orderQty,
+//         color,
+//         tableNo,
+//         planLayerQty,
+//         actualLayerQty,
+//         totalPcs,
+//         cuttingtableLetter,
+//         cuttingtableNo,
+//         marker,
+//         markerRatio,
+//         totalBundleQty,
+//         bundleQtyCheck,
+//         totalInspectionQty,
+//         cuttingtype,
+//         garmentType,
+//         inspectionData: [inspectionData]
+//       });
+//       await newDoc.save();
+//       res.status(200).json({ message: "Data saved successfully" });
+//     }
+//   } catch (error) {
+//     console.error("Error saving cutting inspection data:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to save data", error: error.message });
+//   }
+// });
 
 app.get("/api/cutting-inspection-detailed-report", async (req, res) => {
   try {
