@@ -35,6 +35,7 @@ import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
 import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
 import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
+
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron";
 

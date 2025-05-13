@@ -61,6 +61,8 @@ const RovingPage = () => {
   const [lineWorkerDataLoading, setLineWorkerDataLoading] = useState(true);
   const [lineWorkerDataError, setLineWorkerDataError] = useState(null);
 
+  
+
   const getNumericLineValue = useCallback((value) => {
     if (value === null || value === undefined || String(value).trim() === '') return null;
     const strValue = String(value).toLowerCase();
@@ -68,6 +70,7 @@ const RovingPage = () => {
     return numericPart ? parseInt(numericPart, 10) : null;
   }, []);
 
+ 
   useEffect(() => {
     const size = inspectionType === 'Critical' ? 15 : 5;
     setGarments(Array.from({ length: size }, () => ({ garment_defect_id: '', defects: [], status: 'Pass' })));
@@ -319,8 +322,8 @@ const fetchInspectionsCompleted = useCallback(async () => {
   }, []);
 
   const addDefect = (defectName) => {
-    if (defectName && selectedOperationId) {
-      const defect = allDefects.find((d) => d.english === defectName);
+    if (defectName && selectedOperationId && defects.length > 0) {
+      const defect =allDefects.find((d) => d.english === defectName);
       if (defect) {
         setGarments((prevGarments) => {
           const newGarments = [...prevGarments];
@@ -500,7 +503,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
       ? "Completed"
       : "Not Complete";
 
-    const report = {
+     const reportPayload = {
       inline_roving_id: Date.now(),
       report_name: 'QC Inline Roving',
       inspection_date: currentDate.toLocaleDateString("en-US"),
@@ -518,7 +521,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
     };
 
     try {
-      await axios.post(`${API_BASE_URL}/api/save-qc-inline-roving`, report);
+      await axios.post(`${API_BASE_URL}/api/save-qc-inline-roving`, reportPayload);
       Swal.fire({
         icon: 'success',
         title: 'Success',
@@ -537,10 +540,10 @@ const fetchInspectionsCompleted = useCallback(async () => {
     }
   };
 
-  const handleUserDataFetched = (userData) => {
-    setScannedUserData(userData);
-    setShowScanner(false);
-  };
+  // const handleUserDataFetched = (userData) => {
+  //   setScannedUserData(userData);
+  //   setShowScanner(false);
+  // };
 
   if (authLoading) {
     return <div>Loading...</div>;
@@ -831,6 +834,13 @@ const fetchInspectionsCompleted = useCallback(async () => {
                   <label className="block text-sm font-medium text-gray-700">
                     {t("qcRoving.scanQR")}
                   </label>
+                  {/* <button
+                    onClick={() => setShowScanner(true)}
+                    className="mt-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 w-full justify-center"
+                  >
+                    <QrCode className="w-5 h-5" />
+                    {t("qcRoving.scanQR")}
+                  </button> */}
                   <div className="mt-1 p-2 border border-gray-300 rounded-lg bg-gray-50 text-sm">
                     {scannedUserData ? t("qcRoving.operatorDataSetToCurrentUser", "Operator: Current User") : t("qcRoving.operatorDataNotSet", "Operator: Not Set (QR Scan Disabled)")}
                   </div>
@@ -1178,7 +1188,12 @@ const fetchInspectionsCompleted = useCallback(async () => {
                 {t("qcRoving.finish_inspection")}
               </button>
             </div>
-
+          {/* {showScanner && (
+              <EmpQRCodeScanner
+                onUserDataFetched={handleUserDataFetched}
+                onClose={() => setShowScanner(false)}
+              />
+            )} */}
             {showPreview && (
               <PreviewRoving
                 isOpen={showPreview}
