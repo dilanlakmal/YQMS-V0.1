@@ -516,9 +516,11 @@ const fetchInspectionsCompleted = useCallback(async () => {
       console.warn(`Line number (${lineNo}) is invalid or lineWorkerData is not available. total_operators will be defaulted to 0.`);
     }
 
-    const completeInspectOperators = 1;
+    // const completeInspectOperators = 1;
+    const newCumulativeCompleteInspectOperators = inspectionsCompletedForProgress + 1; 
 
-    const inspectStatus = (totalOperatorsForLine > 0 && completeInspectOperators >= totalOperatorsForLine)
+    // const inspectStatus = (totalOperatorsForLine > 0 && completeInspectOperators >= totalOperatorsForLine)
+     const newInspectStatus = (totalOperatorsForLine > 0 && newCumulativeCompleteInspectOperators >= totalOperatorsForLine)
       ? "Completed"
       : "Not Complete";
 
@@ -528,15 +530,15 @@ const fetchInspectionsCompleted = useCallback(async () => {
       inspection_date: currentDate.toLocaleDateString("en-US"),
       mo_no: moNo,
       line_no: lineNo,
-      inspection_rep: [{
+     inspection_rep_item: { 
         inspection_rep_name: inspectionRepOrdinal,
         emp_id: user?.emp_id || 'Guest',
         eng_name: user?.eng_name || 'Guest',
         total_operators: totalOperatorsForLine,
-        complete_inspect_operators: completeInspectOperators,
-        Inspect_status: inspectStatus,
+        complete_inspect_operators: newCumulativeCompleteInspectOperators,
+        Inspect_status: newInspectStatus,
         inlineData: [singleOperatorInspectionData]
-      }],
+      },
     };
 
     try {
@@ -559,10 +561,10 @@ const fetchInspectionsCompleted = useCallback(async () => {
     }
   };
 
-  // const handleUserDataFetched = (userData) => {
-  //   setScannedUserData(userData);
-  //   setShowScanner(false);
-  // };
+  const handleUserDataFetched = (userData) => {
+    setScannedUserData(userData);
+    setShowScanner(false);
+  };
 
   if (authLoading) {
     return <div>Loading...</div>;
@@ -853,16 +855,16 @@ const fetchInspectionsCompleted = useCallback(async () => {
                   <label className="block text-sm font-medium text-gray-700">
                     {t("qcRoving.scanQR")}
                   </label>
-                  {/* <button
+                  <button
                     onClick={() => setShowScanner(true)}
                     className="mt-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 w-full justify-center"
                   >
                     <QrCode className="w-5 h-5" />
                     {t("qcRoving.scanQR")}
-                  </button> */}
-                  <div className="mt-1 p-2 border border-gray-300 rounded-lg bg-gray-50 text-sm">
+                  </button>
+                  {/* <div className="mt-1 p-2 border border-gray-300 rounded-lg bg-gray-50 text-sm">
                     {scannedUserData ? t("qcRoving.operatorDataSetToCurrentUser", "Operator: Current User") : t("qcRoving.operatorDataNotSet", "Operator: Not Set (QR Scan Disabled)")}
-                  </div>
+                  </div> */}
                   {scannedUserData && (
                     <div className="mt-2 flex items-center gap-2">
                       <p className="text-sm"></p>
@@ -1207,12 +1209,12 @@ const fetchInspectionsCompleted = useCallback(async () => {
                 {t("qcRoving.finish_inspection")}
               </button>
             </div>
-          {/* {showScanner && (
+          {showScanner && (
               <EmpQRCodeScanner
                 onUserDataFetched={handleUserDataFetched}
                 onClose={() => setShowScanner(false)}
               />
-            )} */}
+            )}
             {showPreview && (
               <PreviewRoving
                 isOpen={showPreview}

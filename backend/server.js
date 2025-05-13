@@ -6762,22 +6762,132 @@ app.post("/api/upload-qc-image", qcUpload, (req, res) => {
 // Updated endpoint to save or update QC Inline Roving data
 app.post("/api/save-qc-inline-roving", async (req, res) => {
   try {
-    const qcInlineRovingData = req.body;
+    // const qcInlineRovingData = req.body;
 
     // Create a new instance of the QCInlineRoving model with the data from the request body
-    const newQCInlineRoving = new QCInlineRoving(qcInlineRovingData);
+    // const newQCInlineRoving = new QCInlineRoving(qcInlineRovingData);
 
     // Save the new QCInlineRoving document to the database
-    await newQCInlineRoving.save();
+    // await newQCInlineRoving.save();
 
-    res.status(201).json({
-      message: "QC Inline Roving data saved successfully",
-      data: newQCInlineRoving
-    });
+    // res.status(201).json({
+    //   message: "QC Inline Roving data saved successfully",
+    //   data: newQCInlineRoving
+    // });
+
+    const {
+      inspection_date,
+      mo_no,
+      line_no,
+      report_name, // Optional: for creating a new report or updating an existing one
+      inspection_rep_item // The actual inspection data for the current round
+    } = req.body;
+
+    // Validate essential data
+    if (!inspection_date || !mo_no || !line_no || !inspection_rep_item) {
+      return res.status(400).json({ message: "Missing required fields: inspection_date, mo_no, line_no, or inspection_rep_item." });
+    }
+    if (typeof inspection_rep_item !== 'object' || inspection_rep_item === null) {
+        return res.status(400).json({ message: "inspection_rep_item must be a valid object." });
+    }
+    if (!inspection_rep_item.inspection_rep_name || !inspection_rep_item.emp_id || !inspection_rep_item.eng_name) {
+        return res.status(400).json({ message: "inspection_rep_item is missing required fields like inspection_rep_name, emp_id, or eng_name." });
+    }
+
+    let doc = await QCInlineRoving.findOne({ inspection_date, mo_no, line_no });
+
+    if (doc) {
+      // Document exists
+      const existingRepIndex = doc.inspection_rep.findIndex(
+        (rep) => rep.inspection_rep_name === inspection_rep_item.inspection_rep_name
+      );
+
+      if (existingRepIndex !== -1) {
+         const repToUpdate = doc.inspection_rep[existingRepIndex];
+
+        // Ensure inlineData is an array
+        if (!Array.isArray(repToUpdate.inlineData)) {
+          repToUpdate.inlineData = [];
+        }
+
+        // inspection_rep_item.inlineData from the request is an array with a single element: [singleOperatorInspectionData]
+        if (inspection_rep_item.inlineData && inspection_rep_item.inlineData.length > 0) {
+          repToUpdate.inlineData.push(inspection_rep_item.inlineData[0]);
+        }
+
+        // Update summary fields from the request (frontend calculates these cumulatively)
+        repToUpdate.inspection_rep_name = inspection_rep_item.inspection_rep_name; // Should match
+        repToUpdate.emp_id = inspection_rep_item.emp_id; // Inspector for this rep
+        repToUpdate.eng_name = inspection_rep_item.eng_name; // Inspector for this rep
+        repToUpdate.total_operators = inspection_rep_item.total_operators; // Assumed correct from frontend for the line
+        repToUpdate.complete_inspect_operators = repToUpdate.inlineData.length; // Calculated by backend
+        repToUpdate.Inspect_status = (repToUpdate.total_operators > 0 && repToUpdate.complete_inspect_operators >= repToUpdate.total_operators)
+          ? "Completed"
+          : "Not Complete";
+      } else {
+        // Add new inspection_rep item if array is not full
+        if (doc.inspection_rep.length < 5) {
+          const newRepItem = { ...inspection_rep_item }; // Copy from request
+          if (!Array.isArray(newRepItem.inlineData)) { // Ensure inlineData is an array
+            newRepItem.inlineData = [];
+          }
+          // Backend calculates these for the new rep item
+          newRepItem.complete_inspect_operators = newRepItem.inlineData.length;
+          newRepItem.Inspect_status = (newRepItem.total_operators > 0 && newRepItem.complete_inspect_operators >= newRepItem.total_operators)
+            ? "Completed"
+            : "Not Complete";
+          doc.inspection_rep.push(newRepItem);
+        } else {
+          return res.status(400).json({
+            message: "Maximum number of 5 inspection reports already recorded for this combination."
+          });
+        }
+      }
+
+      if (report_name && doc.report_name !== report_name) {
+        doc.report_name = report_name;
+      }
+
+      await doc.save();
+      res.status(200).json({
+        message: "QC Inline Roving data updated successfully.",
+        data: doc
+      });
+    } else {
+      // Document does not exist, create a new one
+      const lastDoc = await QCInlineRoving.findOne().sort({ inline_roving_id: -1 }).select('inline_roving_id');
+      const newId = lastDoc && typeof lastDoc.inline_roving_id === 'number' ? lastDoc.inline_roving_id + 1 : 1;
+
+      const initialRepItem = { ...inspection_rep_item }; // Copy from request
+      if (!Array.isArray(initialRepItem.inlineData)) { // Ensure inlineData is an array
+          initialRepItem.inlineData = [];
+      }
+      // Backend calculates these for the initial rep item
+      initialRepItem.complete_inspect_operators = initialRepItem.inlineData.length;
+      initialRepItem.Inspect_status = (initialRepItem.total_operators > 0 && initialRepItem.complete_inspect_operators >= initialRepItem.total_operators)
+          ? "Completed"
+          : "Not Complete";
+
+      const newQCInlineRovingDoc = new QCInlineRoving({
+        inline_roving_id: newId,
+        report_name: report_name || `Report for ${inspection_date} - ${line_no} - ${mo_no}`,
+        inspection_date,
+        mo_no,
+        line_no,
+        inspection_rep: [initialRepItem] // Start with the current rep
+      });
+      await newQCInlineRovingDoc.save();
+      res.status(201).json({
+        message: "QC Inline Roving data saved successfully (new record created).",
+        data: newQCInlineRovingDoc
+      });
+    }
   } catch (error) {
-    console.error("Error saving QC Inline Roving data:", error);
+    // console.error("Error saving QC Inline Roving data:", error);
+     console.error("Error saving/updating QC Inline Roving data:", error);
     res.status(500).json({
-      message: "Failed to save QC Inline Roving data",
+      // message: "Failed to save QC Inline Roving data",
+      message: "Failed to save/update QC Inline Roving data",
       error: error.message,
     });
   }
@@ -7174,7 +7284,8 @@ app.get('/api/inspections-completed', async (req, res) => {
     });
 
     if (!inspection) {
-      return res.status(404).json({ message: 'Inspection not found' });
+      // return res.status(404).json({ message: 'Inspection not found' });
+       return res.json({ completeInspectOperators: 0 })
     }
 
     const completeInspectOperators = inspection.inspection_rep.reduce(
