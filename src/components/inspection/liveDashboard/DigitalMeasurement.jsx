@@ -320,6 +320,7 @@ const DigitalMeasurement = () => {
           filters={filters}
           setFilters={setFilters}
           filterOptions={filterOptions}
+          selectedMono={selectedMono}
         />
 
         <DigialMeasurementSummaryCards summaryData={summaryData} />
