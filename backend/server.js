@@ -37,6 +37,10 @@ import createCuttingInspectionModel from "./models/cutting_inspection.js"; // Ne
 import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
 import createSewingDefectsModel from "./models/SewingDefects.js";
+import createCuttingMeasurementPointModel from "./models/CuttingMeasurementPoints.js"; // New model import
+import createCuttingFabricDefectModel from "./models/CuttingFabricDefects.js";
+import createCuttingIssueModel from "./models/CuttingIssues.js";
+import createCutPanelOrdersModel from "./models/CutPanelOrders.js"; 
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron";
@@ -132,6 +136,11 @@ const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New
 const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
 const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection); 
 const SewingDefects = createSewingDefectsModel(ymProdConnection);
+const CuttingMeasurementPoint =
+  createCuttingMeasurementPointModel(ymProdConnection); // New model instance
+const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection); // New model instance
+const CuttingFabricDefect = createCuttingFabricDefectModel(ymProdConnection);
+const CuttingIssue = createCuttingIssueModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -285,6 +294,9 @@ dropConflictingIndex().then(() => {
       );
       syncCuttingOrders().then(() =>
         console.log("Initial cuttingOrders sync completed.")
+      );
+      syncCutPanelOrders().then(() =>
+        console.log("Initial cutpanelorders sync completed.")
       );
       syncQC1SunriseData().then(() =>
         console.log("Initial QC1 Sunrise sync completed.")
@@ -1394,6 +1406,298 @@ async function syncCuttingOrders() {
     throw err;
   }
 }
+
+
+/* ------------------------------
+   New Cut Panel Orders Endpoint
+------------------------------ */
+
+async function syncCutPanelOrders() {
+  try {
+    console.log("Starting cutpanelorders sync at", new Date().toISOString());
+
+    await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
+
+    const query = `
+      SELECT 
+        v.StyleNo,
+        v.TxnDate,
+        v.TxnNo,
+        CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer,
+        v.EngColor AS Color,
+        REPLACE(v.PreparedBy, 'SPREAD ', '') AS SpreadTable,
+        v.TableNo,
+        v.BuyerStyle,
+        v.ChColor,
+        v.ColorCode,
+        v.FabricType,
+        v.Material,
+        v.RollQty,
+        ROUND(v.SpreadYds, 3) AS SpreadYds,
+        v.Unit,
+        ROUND(v.GrossKgs, 3) AS GrossKgs,
+        ROUND(v.NetKgs, 3) AS NetKgs,
+        v.MackerNo,
+        ROUND(v.MackerLength, 3) AS MackerLength,
+        v.SendFactory,
+        v.SendTxnDate,
+        v.SendTxnNo,
+        v.SendTotalQty,
+        v.Ratio1 AS CuttingRatio1,
+        v.Ratio2 AS CuttingRatio2,
+        v.Ratio3 AS CuttingRatio3,
+        v.Ratio4 AS CuttingRatio4,
+        v.Ratio5 AS CuttingRatio5,
+        v.Ratio6 AS CuttingRatio6,
+        v.Ratio7 AS CuttingRatio7,
+        v.Ratio8 AS CuttingRatio8,
+        v.Ratio9 AS CuttingRatio9,
+        v.Ratio10 AS CuttingRatio10,
+        MAX(v.PlanLayer) AS PlanLayer,
+        MAX(v.ActualLayer) AS ActualLayer,
+        MAX(v.PlanPcs) AS TotalPcs,
+        STUFF((
+          SELECT DISTINCT ', ' + CAST(s2.Batch AS VARCHAR)
+          FROM [YMWHSYS2].[dbo].[tbSpreading] s2
+          WHERE s2.StyleNo = v.StyleNo
+            AND s2.PreparedBy = v.PreparedBy
+            AND s2.Batch IS NOT NULL
+          FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos,
+        t.Size1,
+        t.Size2,
+        t.Size3,
+        t.Size4,
+        t.Size5,
+        t.Size6,
+        t.Size7,
+        t.Size8,
+        t.Size9,
+        t.Size10,
+        t.OrderQty1,
+        t.OrderQty2,
+        t.OrderQty3,
+        t.OrderQty4,
+        t.OrderQty5,
+        t.OrderQty6,
+        t.OrderQty7,
+        t.OrderQty8,
+        t.OrderQty9,
+        t.OrderQty10,
+        t.TotalOrderQty,
+        t.TotalTTLRoll,
+        t.TotalTTLQty,
+        t.TotalBiddingQty,
+        t.TotalBiddingRollQty
+      FROM [YMWHSYS2].[dbo].[ViewCuttingDetailReport] v
+      LEFT JOIN [YMWHSYS2].[dbo].[tbSpreading] s
+        ON v.StyleNo = s.StyleNo
+        AND v.PreparedBy = s.PreparedBy
+      LEFT JOIN (
+        SELECT DISTINCT
+          t.StyleNo,
+          t.EngColor AS Color,
+          t.Size1,
+          t.Size2,
+          t.Size3,
+          t.Size4,
+          t.Size5,
+          t.Size6,
+          t.Size7,
+          t.Size8,
+          t.Size9,
+          t.Size10,
+          agg.OrderQty1,
+          agg.OrderQty2,
+          agg.OrderQty3,
+          agg.OrderQty4,
+          agg.OrderQty5,
+          agg.OrderQty6,
+          agg.OrderQty7,
+          agg.OrderQty8,
+          agg.OrderQty9,
+          agg.OrderQty10,
+          agg.TotalOrderQty,
+          agg.TotalTTLRoll,
+          agg.TotalTTLQty,
+          agg.TotalBiddingQty,
+          agg.TotalBiddingRollQty
+        FROM [YMWHSYS2].[dbo].[ViewCuttingOrderReport] t
+        LEFT JOIN (
+          SELECT 
+            StyleNo,
+            EngColor,
+            SUM(TTLRoll) AS TotalTTLRoll,
+            SUM(TTLQty) AS TotalTTLQty,
+            SUM(BiddingQty) AS TotalBiddingQty,
+            SUM(BiddingRollQty) AS TotalBiddingRollQty,
+            COALESCE(SUM(Qty1), 0) AS OrderQty1,
+            COALESCE(SUM(Qty2), 0) AS OrderQty2,
+            COALESCE(SUM(Qty3), 0) AS OrderQty3,
+            COALESCE(SUM(Qty4), 0) AS OrderQty4,
+            COALESCE(SUM(Qty5), 0) AS OrderQty5,
+            COALESCE(SUM(Qty6), 0) AS OrderQty6,
+            COALESCE(SUM(Qty7), 0) AS OrderQty7,
+            COALESCE(SUM(Qty8), 0) AS OrderQty8,
+            COALESCE(SUM(Qty9), 0) AS OrderQty9,
+            COALESCE(SUM(Qty10), 0) AS OrderQty10,
+            COALESCE(SUM(Qty1), 0) + COALESCE(SUM(Qty2), 0) + COALESCE(SUM(Qty3), 0) + 
+            COALESCE(SUM(Qty4), 0) + COALESCE(SUM(Qty5), 0) + COALESCE(SUM(Qty6), 0) + 
+            COALESCE(SUM(Qty7), 0) + COALESCE(SUM(Qty8), 0) + COALESCE(SUM(Qty9), 0) + 
+            COALESCE(SUM(Qty10), 0) AS TotalOrderQty
+          FROM [YMWHSYS2].[dbo].[ViewCuttingOrderReport]
+          WHERE StyleNo IS NOT NULL AND EngColor IS NOT NULL
+          GROUP BY StyleNo, EngColor
+        ) agg
+          ON t.StyleNo = agg.StyleNo
+          AND t.EngColor = agg.EngColor
+        WHERE 
+          t.StyleNo IS NOT NULL
+          AND t.EngColor IS NOT NULL
+      ) t
+        ON v.StyleNo = t.StyleNo
+        AND v.EngColor = t.Color
+      WHERE v.TableNo IS NOT NULL AND v.TableNo <> ''
+        AND v.TxnDate >= CAST(DATEADD(DAY, -7, GETDATE()) AS DATE)
+      GROUP BY 
+        v.StyleNo,
+        v.TxnDate,
+        v.TxnNo,
+        v.Buyer,
+        v.EngColor,
+        v.PreparedBy,
+        v.TableNo,
+        v.BuyerStyle,
+        v.ChColor,
+        v.ColorCode,
+        v.FabricType,
+        v.Material,
+        v.RollQty,
+        v.SpreadYds,
+        v.Unit,
+        v.GrossKgs,
+        v.NetKgs,
+        v.MackerNo,
+        v.MackerLength,
+        v.SendFactory,
+        v.SendTxnDate,
+        v.SendTxnNo,
+        v.SendTotalQty,
+        v.Ratio1,
+        v.Ratio2,
+        v.Ratio3,
+        v.Ratio4,
+        v.Ratio5,
+        v.Ratio6,
+        v.Ratio7,
+        v.Ratio8,
+        v.Ratio9,
+        v.Ratio10,
+        t.Size1,
+        t.Size2,
+        t.Size3,
+        t.Size4,
+        t.Size5,
+        t.Size6,
+        t.Size7,
+        t.Size8,
+        t.Size9,
+        t.Size10,
+        t.OrderQty1,
+        t.OrderQty2,
+        t.OrderQty3,
+        t.OrderQty4,
+        t.OrderQty5,
+        t.OrderQty6,
+        t.OrderQty7,
+        t.OrderQty8,
+        t.OrderQty9,
+        t.OrderQty10,
+        t.TotalOrderQty,
+        t.TotalTTLRoll,
+        t.TotalTTLQty,
+        t.TotalBiddingQty,
+        t.TotalBiddingRollQty
+      ORDER BY v.TxnDate DESC
+    `;
+
+    const result = await poolYMWHSYS2.request().query(query);
+
+    const bulkOps = result.recordset.map((row) => {
+      const markerRatio = [];
+
+      for (let i = 1; i <= 10; i++) {
+        markerRatio.push({
+          no: i,
+          size: row[`Size${i}`],
+          cuttingRatio: row[`CuttingRatio${i}`],
+          orderQty: row[`OrderQty${i}`]
+        });
+      }
+
+      const lotNos = row.LotNos
+        ? row.LotNos.split(",").map((lot) => lot.trim())
+        : [];
+
+      return {
+        updateOne: {
+          filter: { StyleNo: row.StyleNo, TxnNo: row.TxnNo },
+          update: {
+            $set: {
+              StyleNo: row.StyleNo,
+              TxnDate: row.TxnDate ? new Date(row.TxnDate) : null,
+              TxnNo: row.TxnNo,
+              Buyer: row.Buyer,
+              Color: row.Color,
+              SpreadTable: row.SpreadTable,
+              TableNo: row.TableNo,
+              BuyerStyle: row.BuyerStyle,
+              ChColor: row.ChColor,
+              ColorCode: row.ColorCode,
+              FabricType: row.FabricType,
+              Material: row.Material,
+              RollQty: row.RollQty,
+              SpreadYds: row.SpreadYds,
+              Unit: row.Unit,
+              GrossKgs: row.GrossKgs,
+              NetKgs: row.NetKgs,
+              MackerNo: row.MackerNo,
+              MackerLength: row.MackerLength,
+              SendFactory: row.SendFactory,
+              SendTxnDate: row.SendTxnDate ? new Date(row.SendTxnDate) : null,
+              SendTxnNo: row.SendTxnNo,
+              SendTotalQty: row.SendTotalQty,
+              PlanLayer: row.PlanLayer,
+              ActualLayer: row.ActualLayer,
+              TotalPcs: row.TotalPcs,
+              LotNos: lotNos,
+              TotalOrderQty: row.TotalOrderQty,
+              TotalTTLRoll: row.TotalTTLRoll,
+              TotalTTLQty: row.TotalTTLQty,
+              TotalBiddingQty: row.TotalBiddingQty,
+              TotalBiddingRollQty: row.TotalBiddingRollQty,
+              MarkerRatio: markerRatio
+            }
+          },
+          upsert: true
+        }
+      };
+    });
+
+    await CutPanelOrders.bulkWrite(bulkOps);
+    console.log(
+      `Successfully synced ${bulkOps.length} documents to cutpanelorders.`
+    );
+  } catch (err) {
+    console.error("Error during cutpanelorders sync:", err);
+    throw err;
+  }
+}
+
+// Schedule the syncCutPanelOrders function to run every 5 minutes
+cron.schedule('*/5 * * * *', syncCutPanelOrders);
+
+console.log("Scheduled cutpanelorders sync every 5 minutes.");
+
 
 /* ------------------------------
    Manual Sync Endpoint
@@ -3119,6 +3423,724 @@ app.post("/api/save-qc-data", async (req, res) => {
 });
 
 //-----------------------------USER FUNCTION------------------------------------------------//
+
+/* ------------------------------
+   Cutting Inspection ENDPOINTS
+------------------------------ */
+
+// New endpoint to save cutting inspection data
+app.post("/api/save-cutting-inspection", async (req, res) => {
+  try {
+    const {
+      inspectionDate,
+      cutting_emp_id,
+      cutting_emp_engName,
+      cutting_emp_khName,
+      cutting_emp_dept,
+      cutting_emp_section,
+      moNo,
+      tableNo,
+      buyerStyle,
+      buyer,
+      color,
+      lotNo,
+      orderQty,
+      fabricDetails,
+      cuttingTableDetails,
+      mackerRatio,
+      totalBundleQty,
+      bundleQtyCheck,
+      totalInspectionQty,
+      cuttingtype,
+      garmentType,
+      inspectionData
+    } = req.body;
+
+    const existingDoc = await CuttingInspection.findOne({
+      inspectionDate,
+      moNo,
+      tableNo,
+      color
+    });
+
+    if (existingDoc) {
+      existingDoc.inspectionData.push(inspectionData);
+      existingDoc.updated_at = new Date();
+      await existingDoc.save();
+      res.status(200).json({ message: "Data appended successfully" });
+    } else {
+      const newDoc = new CuttingInspection({
+        inspectionDate,
+        cutting_emp_id,
+        cutting_emp_engName,
+        cutting_emp_khName,
+        cutting_emp_dept,
+        cutting_emp_section,
+        moNo,
+        tableNo,
+        buyerStyle,
+        buyer,
+        color,
+        lotNo,
+        orderQty,
+        fabricDetails,
+        cuttingTableDetails,
+        mackerRatio,
+        totalBundleQty,
+        bundleQtyCheck,
+        totalInspectionQty,
+        cuttingtype,
+        garmentType,
+        inspectionData: [inspectionData],
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+      await newDoc.save();
+      res.status(200).json({ message: "Data saved successfully" });
+    }
+  } catch (error) {
+    console.error("Error saving cutting inspection data:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to save data", error: error.message });
+  }
+});
+
+// app.post("/api/save-cutting-inspection", async (req, res) => {
+//   try {
+//     const {
+//       inspectionDate,
+//       cutting_emp_id,
+//       cutting_emp_engName,
+//       cutting_emp_khName,
+//       cutting_emp_dept,
+//       cutting_emp_section,
+//       moNo,
+//       lotNo,
+//       buyer,
+//       orderQty,
+//       color,
+//       tableNo,
+//       planLayerQty,
+//       actualLayerQty,
+//       totalPcs,
+//       cuttingtableLetter,
+//       cuttingtableNo,
+//       marker,
+//       markerRatio,
+//       totalBundleQty,
+//       bundleQtyCheck,
+//       totalInspectionQty,
+//       cuttingtype,
+//       garmentType,
+//       inspectionData
+//     } = req.body;
+
+//     const existingDoc = await CuttingInspection.findOne({
+//       inspectionDate,
+//       moNo,
+//       lotNo,
+//       color,
+//       tableNo
+//     });
+
+//     if (existingDoc) {
+//       // Append new inspectionData to existing document
+//       existingDoc.inspectionData.push(inspectionData);
+//       await existingDoc.save();
+//       res.status(200).json({ message: "Data appended successfully" });
+//     } else {
+//       // Create a new document
+//       const newDoc = new CuttingInspection({
+//         inspectionDate,
+//         cutting_emp_id,
+//         cutting_emp_engName,
+//         cutting_emp_khName,
+//         cutting_emp_dept,
+//         cutting_emp_section,
+//         moNo,
+//         lotNo,
+//         buyer,
+//         orderQty,
+//         color,
+//         tableNo,
+//         planLayerQty,
+//         actualLayerQty,
+//         totalPcs,
+//         cuttingtableLetter,
+//         cuttingtableNo,
+//         marker,
+//         markerRatio,
+//         totalBundleQty,
+//         bundleQtyCheck,
+//         totalInspectionQty,
+//         cuttingtype,
+//         garmentType,
+//         inspectionData: [inspectionData]
+//       });
+//       await newDoc.save();
+//       res.status(200).json({ message: "Data saved successfully" });
+//     }
+//   } catch (error) {
+//     console.error("Error saving cutting inspection data:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to save data", error: error.message });
+//   }
+// });
+
+app.get("/api/cutting-inspection-detailed-report", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      moNo,
+      lotNo,
+      buyer,
+      color,
+      tableNo,
+      page = 0,
+      limit = 1
+    } = req.query;
+
+    let match = {};
+
+    // Date filtering
+    if (startDate || endDate) {
+      match.$expr = match.$expr || {};
+      match.$expr.$and = match.$expr.$and || [];
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspectionDate",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspectionDate",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+    }
+
+    // Other filters with case-insensitive regex
+    if (moNo) match.moNo = new RegExp(moNo, "i");
+    if (lotNo) match.lotNo = new RegExp(lotNo, "i");
+    if (buyer) match.buyer = new RegExp(buyer, "i");
+    if (color) match.color = new RegExp(color, "i");
+    if (tableNo) match.tableNo = new RegExp(tableNo, "i");
+
+    const totalDocs = await CuttingInspection.countDocuments(match);
+    const totalPages = Math.ceil(totalDocs / limit);
+
+    const inspections = await CuttingInspection.find(match)
+      .skip(page * limit)
+      .limit(parseInt(limit))
+      .lean();
+
+    // Calculate summary data for each inspection
+    inspections.forEach((inspection) => {
+      let totalPcs = 0;
+      let totalPass = 0;
+      let totalReject = 0;
+      let totalRejectMeasurement = 0;
+      let totalRejectDefects = 0;
+
+      inspection.inspectionData.forEach((data) => {
+        totalPcs += data.totalPcs;
+        totalPass += data.totalPass;
+        totalReject += data.totalReject;
+        totalRejectMeasurement += data.totalRejectMeasurement;
+        totalRejectDefects += data.totalRejectDefects;
+      });
+
+      const passRate =
+        totalPcs > 0 ? ((totalPass / totalPcs) * 100).toFixed(2) : "0.00";
+      const result = getResult(inspection.bundleQtyCheck, totalReject);
+
+      inspection.summary = {
+        totalPcs,
+        totalPass,
+        totalReject,
+        totalRejectMeasurement,
+        totalRejectDefects,
+        passRate,
+        result
+      };
+    });
+
+    res.status(200).json({ data: inspections, totalPages });
+  } catch (error) {
+    console.error("Error fetching detailed cutting inspection report:", error);
+    res.status(500).json({
+      message: "Failed to fetch detailed report",
+      error: error.message
+    });
+  }
+});
+
+// Helper function to determine AQL result
+function getResult(bundleQtyCheck, totalReject) {
+  if (bundleQtyCheck === 5) return totalReject > 1 ? "Fail" : "Pass";
+  if (bundleQtyCheck === 9) return totalReject > 3 ? "Fail" : "Pass";
+  if (bundleQtyCheck === 14) return totalReject > 5 ? "Fail" : "Pass";
+  if (bundleQtyCheck === 20) return totalReject > 7 ? "Fail" : "Pass";
+  return "N/A";
+}
+
+// Endpoint to fetch distinct MO Nos
+app.get("/api/cutting-inspection-mo-nos", async (req, res) => {
+  try {
+    const moNos = await CuttingInspection.distinct("moNo");
+    res.json(moNos.filter((mo) => mo));
+  } catch (error) {
+    console.error("Error fetching MO Nos:", error);
+    res.status(500).json({ message: "Failed to fetch MO Nos" });
+  }
+});
+
+// Endpoint to fetch distinct filter options based on MO No
+app.get("/api/cutting-inspection-filter-options", async (req, res) => {
+  try {
+    const { moNo } = req.query;
+    let match = {};
+    if (moNo) match.moNo = new RegExp(moNo, "i");
+
+    const lotNos = await CuttingInspection.distinct("lotNo", match);
+    const buyers = await CuttingInspection.distinct("buyer", match); // Add buyer filter options
+    const colors = await CuttingInspection.distinct("color", match);
+    const tableNos = await CuttingInspection.distinct("tableNo", match);
+
+    res.json({
+      lotNos: lotNos.filter((lot) => lot),
+      buyers: buyers.filter((buyer) => buyer), // Return distinct buyers
+      colors: colors.filter((color) => color),
+      tableNos: tableNos.filter((table) => table)
+    });
+  } catch (error) {
+    console.error("Error fetching filter options:", error);
+    res.status(500).json({ message: "Failed to fetch filter options" });
+  }
+});
+
+/* ------------------------------
+   Cutting Measurement Points
+------------------------------ */
+
+app.get("/api/cutting-measurement-panels", async (req, res) => {
+  try {
+    /* CHANGE: Fetch panel, panelKhmer, and panelChinese for multilingual support */
+    const panels = await CuttingMeasurementPoint.aggregate([
+      {
+        $group: {
+          _id: "$panel",
+          panelKhmer: { $first: "$panelKhmer" },
+          panelChinese: { $first: "$panelChinese" }
+        }
+      },
+      {
+        $project: {
+          panel: "$_id",
+          panelKhmer: 1,
+          panelChinese: 1,
+          _id: 0
+        }
+      },
+      { $sort: { panel: 1 } }
+    ]).exec();
+    res.status(200).json(panels);
+  } catch (error) {
+    console.error("Error fetching panels:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch panels", error: error.message });
+  }
+});
+
+// Endpoint to fetch panelIndexNames and related data for a given panel
+app.get("/api/cutting-measurement-panel-index-names", async (req, res) => {
+  try {
+    const { panel } = req.query;
+    if (!panel) {
+      return res.status(400).json({ message: "Panel is required" });
+    }
+    // Aggregate to get unique panelIndexName with their latest panelIndex and panelIndexNameKhmer
+    const panelIndexData = await CuttingMeasurementPoint.aggregate([
+      { $match: { panel } },
+      {
+        $group: {
+          _id: "$panelIndexName",
+          panelIndex: { $max: "$panelIndex" },
+          panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" },
+          panelIndexNameChinese: { $last: "$panelIndexNameChinese" }
+        }
+      },
+      {
+        $project: {
+          panelIndexName: "$_id",
+          panelIndex: 1,
+          panelIndexNameKhmer: 1,
+          panelIndexNameChinese: 1,
+          _id: 0
+        }
+      },
+      { $sort: { panelIndexName: 1 } }
+    ]).exec();
+    res.status(200).json(panelIndexData);
+  } catch (error) {
+    console.error("Error fetching panel index names:", error);
+    res.status(500).json({
+      message: "Failed to fetch panel index names",
+      error: error.message
+    });
+  }
+});
+
+// Endpoint to fetch max panelIndex for a given panel
+app.get("/api/cutting-measurement-max-panel-index", async (req, res) => {
+  try {
+    const { panel } = req.query;
+    if (!panel) {
+      return res.status(400).json({ message: "Panel is required" });
+    }
+    const maxPanelIndexDoc = await CuttingMeasurementPoint.findOne({
+      panel
+    })
+      .sort({ panelIndex: -1 })
+      .select("panelIndex");
+    const maxPanelIndex = maxPanelIndexDoc ? maxPanelIndexDoc.panelIndex : 0;
+    res.status(200).json({ maxPanelIndex });
+  } catch (error) {
+    console.error("Error fetching max panel index:", error);
+    res.status(500).json({
+      message: "Failed to fetch max panel index",
+      error: error.message
+    });
+  }
+});
+
+// Endpoint to save a new measurement point
+app.post("/api/save-measurement-point", async (req, res) => {
+  try {
+    const measurementPoint = req.body;
+    // Find the maximum 'no' in the collection
+    const maxNo = await CuttingMeasurementPoint.findOne()
+      .sort({ no: -1 })
+      .select("no");
+    const newNo = maxNo ? maxNo.no + 1 : 1;
+    // Create new document
+    const newDoc = new CuttingMeasurementPoint({
+      ...measurementPoint,
+      no: newNo
+    });
+    await newDoc.save();
+    res.status(200).json({ message: "Measurement point saved successfully" });
+  } catch (error) {
+    console.error("Error saving measurement point:", error);
+    res.status(500).json({
+      message: "Failed to save measurement point",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   Cutting Measurement Points Edit ENDPOINTS
+------------------------------ */
+
+// Endpoint to Search MO Numbers (moNo) from CuttingMeasurementPoint with partial matching
+app.get("/api/cutting-measurement-mo-numbers", async (req, res) => {
+  try {
+    const searchTerm = req.query.search;
+    if (!searchTerm) {
+      return res.status(400).json({ error: "Search term is required" });
+    }
+
+    const regexPattern = new RegExp(searchTerm, "i");
+
+    const results = await CuttingMeasurementPoint.find({
+      moNo: { $regex: regexPattern }
+    })
+      .select("moNo")
+      .limit(100)
+      .sort({ moNo: 1 })
+      .exec();
+
+    const uniqueMONos = [...new Set(results.map((r) => r.moNo))];
+
+    res.json(uniqueMONos);
+  } catch (err) {
+    console.error(
+      "Error fetching MO numbers from CuttingMeasurementPoint:",
+      err
+    );
+    res.status(500).json({
+      message: "Failed to fetch MO numbers from CuttingMeasurementPoint",
+      error: err.message
+    });
+  }
+});
+
+// Endpoint to fetch measurement points for a given moNo and panel
+app.get("/api/cutting-measurement-points", async (req, res) => {
+  try {
+    const { moNo, panel } = req.query;
+    if (!moNo || !panel) {
+      return res.status(400).json({ error: "moNo and panel are required" });
+    }
+
+    const points = await CuttingMeasurementPoint.find({
+      moNo,
+      panel
+    }).exec();
+
+    res.json(points);
+  } catch (error) {
+    console.error("Error fetching measurement points:", error);
+    res.status(500).json({
+      message: "Failed to fetch measurement points",
+      error: error.message
+    });
+  }
+});
+
+// Endpoint to fetch unique panelIndexName and panelIndexNameKhmer for a given moNo and panel, including Common
+app.get(
+  "/api/cutting-measurement-panel-index-names-by-mo",
+  async (req, res) => {
+    try {
+      const { moNo, panel } = req.query;
+      if (!moNo || !panel) {
+        return res.status(400).json({ message: "moNo and panel are required" });
+      }
+
+      // Check if the moNo exists in CuttingMeasurementPoint
+      const moExists = await CuttingMeasurementPoint.exists({ moNo });
+
+      let panelIndexData = [];
+
+      if (moExists) {
+        // Fetch unique panelIndexName for the specific moNo and panel
+        const specificMoData = await CuttingMeasurementPoint.aggregate([
+          { $match: { moNo, panel } },
+          {
+            $group: {
+              _id: "$panelIndexName",
+              panelIndex: { $max: "$panelIndex" },
+              panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" },
+              panelIndexNameChinese: { $last: "$panelIndexNameChinese" }
+            }
+          },
+          {
+            $project: {
+              panelIndexName: "$_id",
+              panelIndex: 1,
+              panelIndexNameKhmer: 1,
+              panelIndexNameChinese: 1,
+              _id: 0
+            }
+          }
+        ]).exec();
+
+        // Fetch unique panelIndexName for moNo = 'Common' and panel
+        const commonData = await CuttingMeasurementPoint.aggregate([
+          { $match: { moNo: "Common", panel } },
+          {
+            $group: {
+              _id: "$panelIndexName",
+              panelIndex: { $max: "$panelIndex" },
+              panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" },
+              panelIndexNameChinese: { $last: "$panelIndexNameChinese" }
+            }
+          },
+          {
+            $project: {
+              panelIndexName: "$_id",
+              panelIndex: 1,
+              panelIndexNameKhmer: 1,
+              panelIndexNameChinese: 1,
+              _id: 0
+            }
+          }
+        ]).exec();
+
+        // Combine data, ensuring no duplicates
+        const combinedData = [...commonData];
+        specificMoData.forEach((specific) => {
+          if (
+            !combinedData.some(
+              (item) => item.panelIndexName === specific.panelIndexName
+            )
+          ) {
+            combinedData.push(specific);
+          }
+        });
+
+        panelIndexData = combinedData;
+      } else {
+        // If moNo doesn't exist, fetch only for moNo = 'Common' and panel
+        panelIndexData = await CuttingMeasurementPoint.aggregate([
+          { $match: { moNo: "Common", panel } },
+          {
+            $group: {
+              _id: "$panelIndexName",
+              panelIndex: { $max: "$panelIndex" },
+              panelIndexNameKhmer: { $last: "$panelIndexNameKhmer" },
+              panelIndexNameChinese: { $last: "$panelIndexNameChinese" }
+            }
+          },
+          {
+            $project: {
+              panelIndexName: "$_id",
+              panelIndex: 1,
+              panelIndexNameKhmer: 1,
+              panelIndexNameChinese: 1,
+              _id: 0
+            }
+          }
+        ]).exec();
+      }
+
+      // Sort by panelIndexName
+      panelIndexData.sort((a, b) =>
+        a.panelIndexName.localeCompare(b.panelIndexName)
+      );
+
+      res.status(200).json(panelIndexData);
+    } catch (error) {
+      console.error("Error fetching panel index names by MO:", error);
+      res.status(500).json({
+        message: "Failed to fetch panel index names",
+        error: error.message
+      });
+    }
+  }
+);
+
+// Endpoint to update a measurement point by _id
+app.put("/api/update-measurement-point/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const updatedPoint = await CuttingMeasurementPoint.findByIdAndUpdate(
+      id,
+      { $set: { ...updateData, updated_at: new Date() } },
+      { new: true }
+    );
+
+    if (!updatedPoint) {
+      return res.status(404).json({ error: "Measurement point not found" });
+    }
+
+    res.status(200).json({ message: "Measurement point updated successfully" });
+  } catch (error) {
+    console.error("Error updating measurement point:", error);
+    res.status(500).json({
+      message: "Failed to update measurement point",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+  Cutting Fabric Defects ENDPOINTS
+------------------------------ */
+
+app.get("/api/cutting-fabric-defects", async (req, res) => {
+  try {
+    const defects = await CuttingFabricDefect.find({});
+    res.status(200).json(defects);
+  } catch (error) {
+    console.error("Error fetching cutting fabric defects:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch defects", error: error.message });
+  }
+});
+
+/* ------------------------------
+  Cutting Issues ENDPOINTS
+------------------------------ */
+
+// Add this endpoint after other endpoints
+app.get("/api/cutting-issues", async (req, res) => {
+  try {
+    const issues = await CuttingIssue.find().sort({ no: 1 });
+    res.status(200).json(issues);
+  } catch (error) {
+    console.error("Error fetching cutting issues:", error);
+    res.status(500).json({
+      message: "Failed to fetch cutting issues",
+      error: error.message
+    });
+  }
+});
+
+// Multer configuration for cutting images
+const cutting_storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "public/storage/cutting/");
+  },
+  filename: (req, file, cb) => {
+    cb(null, `cutting-${Date.now()}${path.extname(file.originalname)}`);
+  }
+});
+
+// File filter for JPEG/PNG only
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ["image/jpeg", "image/png"];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only JPEG and PNG images are allowed"), false);
+  }
+};
+
+const cutting_upload = multer({
+  storage: cutting_storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
+// Image upload endpoint
+app.post(
+  "/api/upload-cutting-image",
+  cutting_upload.single("image"),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+    const url = `/storage/cutting/${req.file.filename}`;
+    res.status(200).json({ url });
+  }
+);
 
 /* ----------------------------
    User Auth ENDPOINTS
