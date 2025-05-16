@@ -25,6 +25,3 @@ dist-ssr
 * text=auto 
 git rm --cached .gitignore
 
-#storage
-/public/storage
-/storage/*.key
