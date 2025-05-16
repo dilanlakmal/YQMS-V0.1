@@ -1978,6 +1978,33 @@ app.get("/api/health", (req, res) => {
 });
 
 /* ------------------------------
+   Helper Function to Convert Date to MM/DD/YYYY
+------------------------------ */
+
+// Helper function to normalize date strings (ensure MM/DD/YYYY format)
+const normalizeDateString = (dateStr) => {
+  if (!dateStr) return null;
+  try {
+    const date = new Date(dateStr);
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const day = date.getDate().toString().padStart(2, "0");
+    const year = date.getFullYear();
+    return `${month}/${day}/${year}`;
+  } catch (e) {
+    console.error("Error normalizing date string:", dateStr, e);
+    // If parsing fails, try to return as is or handle error appropriately
+    // For this use case, if it's already MM/DD/YYYY, it might be fine
+    const parts = dateStr.split(/[-/]/);
+    if (parts.length === 3) {
+      // Attempt to reformat if it looks like YYYY-MM-DD or DD-MM-YYYY
+      if (parts[0].length === 4) return `${parts[1]}/${parts[2]}/${parts[0]}`; // YYYY/MM/DD -> MM/DD/YYYY
+      if (parts[2].length === 4) return `${parts[0]}/${parts[1]}/${parts[2]}`; // DD/MM/YYYY -> MM/DD/YYYY
+    }
+    return dateStr; // Fallback
+  }
+};
+
+/* ------------------------------
    End Points - dt_orders
 ------------------------------ */
 
@@ -4045,22 +4072,22 @@ app.get(
 );
 
 // Helper function to normalize date strings with leading zeros
-const normalizeDateString = (dateStr) => {
-  if (!dateStr) return null;
-  try {
-    const [month, day, year] = dateStr.split("/").map((part) => part.trim());
-    if (!month || !day || !year || isNaN(month) || isNaN(day) || isNaN(year)) {
-      throw new Error("Invalid date format");
-    }
-    // Add leading zeros to month and day
-    const normalizedMonth = ("0" + parseInt(month, 10)).slice(-2);
-    const normalizedDay = ("0" + parseInt(day, 10)).slice(-2);
-    return `${normalizedMonth}/${normalizedDay}/${year}`;
-  } catch (error) {
-    console.error(`Invalid date string: ${dateStr}`, error);
-    return null;
-  }
-};
+// const normalizeDateString = (dateStr) => {
+//   if (!dateStr) return null;
+//   try {
+//     const [month, day, year] = dateStr.split("/").map((part) => part.trim());
+//     if (!month || !day || !year || isNaN(month) || isNaN(day) || isNaN(year)) {
+//       throw new Error("Invalid date format");
+//     }
+//     // Add leading zeros to month and day
+//     const normalizedMonth = ("0" + parseInt(month, 10)).slice(-2);
+//     const normalizedDay = ("0" + parseInt(day, 10)).slice(-2);
+//     return `${normalizedMonth}/${normalizedDay}/${year}`;
+//   } catch (error) {
+//     console.error(`Invalid date string: ${dateStr}`, error);
+//     return null;
+//   }
+// };
 
 // Helper function to escape special characters in regex
 const escapeRegExp = (string) => {
@@ -7268,7 +7295,6 @@ app.get("/api/sunrise/qc1-filters", async (req, res) => {
    Cutting Inspection ENDPOINTS
 ------------------------------ */
 
-// New endpoint to save cutting inspection data
 app.post("/api/save-cutting-inspection", async (req, res) => {
   try {
     const {
@@ -7296,6 +7322,33 @@ app.post("/api/save-cutting-inspection", async (req, res) => {
       inspectionData
     } = req.body;
 
+    // Basic validation
+    if (!inspectionData || !Array.isArray(inspectionData)) {
+      return res.status(400).json({ message: "Invalid inspectionData format" });
+    }
+
+    // Validate that each bundleInspectionData entry has measurementInsepctionData
+    for (const data of inspectionData) {
+      if (
+        !data.bundleInspectionData ||
+        !Array.isArray(data.bundleInspectionData)
+      ) {
+        return res
+          .status(400)
+          .json({ message: "Invalid bundleInspectionData format" });
+      }
+      for (const bundle of data.bundleInspectionData) {
+        if (
+          !bundle.measurementInsepctionData ||
+          !Array.isArray(bundle.measurementInsepctionData)
+        ) {
+          return res.status(400).json({
+            message: "Missing or invalid measurementInsepctionData for bundle"
+          });
+        }
+      }
+    }
+
     const existingDoc = await CuttingInspection.findOne({
       inspectionDate,
       moNo,
@@ -7304,7 +7357,7 @@ app.post("/api/save-cutting-inspection", async (req, res) => {
     });
 
     if (existingDoc) {
-      existingDoc.inspectionData.push(inspectionData);
+      existingDoc.inspectionData.push(...inspectionData);
       existingDoc.updated_at = new Date();
       await existingDoc.save();
       res.status(200).json({ message: "Data appended successfully" });
@@ -7331,9 +7384,7 @@ app.post("/api/save-cutting-inspection", async (req, res) => {
         totalInspectionQty,
         cuttingtype,
         garmentType,
-        inspectionData: [inspectionData],
-        created_at: new Date(),
-        updated_at: new Date()
+        inspectionData
       });
       await newDoc.save();
       res.status(200).json({ message: "Data saved successfully" });
@@ -7346,88 +7397,478 @@ app.post("/api/save-cutting-inspection", async (req, res) => {
   }
 });
 
-// app.post("/api/save-cutting-inspection", async (req, res) => {
-//   try {
-//     const {
-//       inspectionDate,
-//       cutting_emp_id,
-//       cutting_emp_engName,
-//       cutting_emp_khName,
-//       cutting_emp_dept,
-//       cutting_emp_section,
-//       moNo,
-//       lotNo,
-//       buyer,
-//       orderQty,
-//       color,
-//       tableNo,
-//       planLayerQty,
-//       actualLayerQty,
-//       totalPcs,
-//       cuttingtableLetter,
-//       cuttingtableNo,
-//       marker,
-//       markerRatio,
-//       totalBundleQty,
-//       bundleQtyCheck,
-//       totalInspectionQty,
-//       cuttingtype,
-//       garmentType,
-//       inspectionData
-//     } = req.body;
+app.get("/api/cutting-inspection-progress", async (req, res) => {
+  try {
+    const { moNo, tableNo, garmentType } = req.query;
 
-//     const existingDoc = await CuttingInspection.findOne({
-//       inspectionDate,
-//       moNo,
-//       lotNo,
-//       color,
-//       tableNo
-//     });
+    // Validate required query parameters
+    if (!moNo || !tableNo || !garmentType) {
+      return res
+        .status(400)
+        .json({ message: "moNo, tableNo, and garmentType are required" });
+    }
 
-//     if (existingDoc) {
-//       // Append new inspectionData to existing document
-//       existingDoc.inspectionData.push(inspectionData);
-//       await existingDoc.save();
-//       res.status(200).json({ message: "Data appended successfully" });
-//     } else {
-//       // Create a new document
-//       const newDoc = new CuttingInspection({
-//         inspectionDate,
-//         cutting_emp_id,
-//         cutting_emp_engName,
-//         cutting_emp_khName,
-//         cutting_emp_dept,
-//         cutting_emp_section,
-//         moNo,
-//         lotNo,
-//         buyer,
-//         orderQty,
-//         color,
-//         tableNo,
-//         planLayerQty,
-//         actualLayerQty,
-//         totalPcs,
-//         cuttingtableLetter,
-//         cuttingtableNo,
-//         marker,
-//         markerRatio,
-//         totalBundleQty,
-//         bundleQtyCheck,
-//         totalInspectionQty,
-//         cuttingtype,
-//         garmentType,
-//         inspectionData: [inspectionData]
-//       });
-//       await newDoc.save();
-//       res.status(200).json({ message: "Data saved successfully" });
-//     }
-//   } catch (error) {
-//     console.error("Error saving cutting inspection data:", error);
-//     res
-//       .status(500)
-//       .json({ message: "Failed to save data", error: error.message });
-//   }
-// });
+    // Find the inspection document
+    const inspection = await CuttingInspection.findOne({
+      moNo,
+      tableNo,
+      garmentType
+    });
+
+    if (!inspection) {
+      return res.status(200).json({
+        progress: null,
+        inspectedSizes: [],
+        message: "No inspection record found"
+      });
+    }
+
+    // Calculate progress and stats
+    const bundleQtyCheck = inspection.bundleQtyCheck || 0;
+    let completedBundles = 0;
+    let totalInspected = 0;
+    let totalPass = 0;
+    let totalReject = 0;
+    const inspectedSizes = [];
+
+    // Iterate through inspectionData to aggregate stats
+    if (inspection.inspectionData && Array.isArray(inspection.inspectionData)) {
+      inspection.inspectionData.forEach((data) => {
+        if (data.inspectedSize) {
+          inspectedSizes.push(data.inspectedSize);
+        }
+        if (data.bundleQtyCheckSize) {
+          completedBundles += data.bundleQtyCheckSize;
+        }
+        if (data.pcsSize && data.pcsSize.total) {
+          totalInspected += data.pcsSize.total;
+        }
+        if (data.passSize && data.passSize.total) {
+          totalPass += data.passSize.total;
+        }
+        if (data.rejectSize && data.rejectSize.total) {
+          totalReject += data.rejectSize.total;
+        }
+      });
+    }
+
+    // Calculate pass rate
+    const passRate =
+      totalInspected > 0 ? (totalPass / totalInspected) * 100 : 0;
+
+    // Prepare response
+    const progress = {
+      completed: completedBundles,
+      total: bundleQtyCheck,
+      inspected: totalInspected,
+      pass: totalPass,
+      reject: totalReject,
+      passRate: parseFloat(passRate.toFixed(2))
+    };
+
+    res.status(200).json({
+      progress,
+      inspectedSizes: [...new Set(inspectedSizes)], // Remove duplicates
+      message: "Inspection progress retrieved successfully"
+    });
+  } catch (error) {
+    console.error("Error fetching cutting inspection progress:", error);
+    res.status(500).json({
+      message: "Failed to fetch inspection progress",
+      error: error.message
+    });
+  }
+});
+
+// GET unique MO Numbers from cuttinginspections
+app.get("/api/cutting-inspections/mo-numbers", async (req, res) => {
+  try {
+    const { search } = req.query;
+    const query = search ? { moNo: { $regex: search, $options: "i" } } : {};
+    const moNumbers = await CuttingInspection.distinct("moNo", query);
+    res.json(moNumbers.sort());
+  } catch (error) {
+    console.error("Error fetching MO numbers from cutting inspections:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch MO numbers", error: error.message });
+  }
+});
+
+// GET unique Table Numbers for a given MO from cuttinginspections
+app.get("/api/cutting-inspections/table-numbers", async (req, res) => {
+  try {
+    const { moNo, search } = req.query;
+    if (!moNo) {
+      return res.status(400).json({ message: "MO Number is required" });
+    }
+    const query = { moNo };
+    if (search) {
+      query.tableNo = { $regex: search, $options: "i" };
+    }
+    const tableNumbers = await CuttingInspection.distinct("tableNo", query);
+    res.json(tableNumbers.sort());
+  } catch (error) {
+    console.error(
+      "Error fetching Table numbers from cutting inspections:",
+      error
+    );
+    res
+      .status(500)
+      .json({ message: "Failed to fetch Table numbers", error: error.message });
+  }
+});
+
+// GET full cutting inspection document for modification
+app.get("/api/cutting-inspection-details-for-modify", async (req, res) => {
+  try {
+    const { moNo, tableNo } = req.query;
+    if (!moNo || !tableNo) {
+      return res
+        .status(400)
+        .json({ message: "MO Number and Table Number are required" });
+    }
+    // To ensure we get the garmentType, we might need to fetch based on a unique combination if color is involved
+    // For simplicity, assuming moNo and tableNo are enough to find a unique parent document.
+    // If multiple documents can exist for moNo+tableNo (e.g. different colors), add color to query.
+    const inspectionDoc = await CuttingInspection.findOne({ moNo, tableNo });
+    if (!inspectionDoc) {
+      return res.status(404).json({ message: "Inspection document not found" });
+    }
+    res.json(inspectionDoc);
+  } catch (error) {
+    console.error("Error fetching inspection details for modify:", error);
+    res.status(500).json({
+      message: "Failed to fetch inspection details",
+      error: error.message
+    });
+  }
+});
+
+// PUT update cutting inspection document
+app.put("/api/cutting-inspection-update", async (req, res) => {
+  try {
+    const { moNo, tableNo, updatedFields, updatedInspectionDataItem } =
+      req.body;
+
+    if (!moNo || !tableNo) {
+      return res.status(400).json({
+        message: "MO Number and Table Number are required for update."
+      });
+    }
+    if (
+      !updatedInspectionDataItem ||
+      !updatedInspectionDataItem.inspectedSize
+    ) {
+      return res.status(400).json({
+        message:
+          "Valid 'updatedInspectionDataItem' with 'inspectedSize' is required."
+      });
+    }
+
+    const inspectionDoc = await CuttingInspection.findOne({ moNo, tableNo });
+
+    if (!inspectionDoc) {
+      return res
+        .status(404)
+        .json({ message: "Inspection document not found to update." });
+    }
+
+    // Update top-level fields if provided
+    if (updatedFields) {
+      if (updatedFields.totalBundleQty !== undefined)
+        inspectionDoc.totalBundleQty = updatedFields.totalBundleQty;
+      if (updatedFields.bundleQtyCheck !== undefined)
+        inspectionDoc.bundleQtyCheck = updatedFields.bundleQtyCheck;
+      if (updatedFields.totalInspectionQty !== undefined)
+        inspectionDoc.totalInspectionQty = updatedFields.totalInspectionQty;
+      if (updatedFields.cuttingtype !== undefined)
+        inspectionDoc.cuttingtype = updatedFields.cuttingtype;
+      // Potentially mackerRatio if it becomes editable
+    }
+
+    // Find and update the specific item in inspectionData array
+    const itemIndex = inspectionDoc.inspectionData.findIndex(
+      (item) => item.inspectedSize === updatedInspectionDataItem.inspectedSize
+    );
+
+    if (itemIndex > -1) {
+      // Ensure all nested structures are preserved or correctly updated
+      // The updatedInspectionDataItem comes from the client and should be complete for that size.
+      inspectionDoc.inspectionData[itemIndex] = {
+        ...inspectionDoc.inspectionData[itemIndex], // Preserve any fields not sent from client (like _id)
+        ...updatedInspectionDataItem, // Apply all changes from client
+        updated_at: new Date() // Ensure updated_at is set here
+      };
+    } else {
+      // This case means the client is trying to update a size that doesn't exist in the DB record's inspectionData.
+      // Depending on requirements, you could add it or return an error.
+      // For "modify", usually it means the item should exist.
+      // If adding new sizes is allowed through this "modify" screen, then:
+      // inspectionDoc.inspectionData.push({ ...updatedInspectionDataItem, created_at: new Date(), updated_at: new Date() });
+      return res.status(400).json({
+        message: `Inspection data for size ${updatedInspectionDataItem.inspectedSize} not found in the document. Cannot update.`
+      });
+    }
+
+    inspectionDoc.updated_at = new Date(); // Update top-level document timestamp
+    inspectionDoc.markModified("inspectionData"); // Important for nested array updates
+
+    await inspectionDoc.save();
+
+    res.status(200).json({
+      message: "Cutting inspection data updated successfully.",
+      data: inspectionDoc
+    });
+  } catch (error) {
+    console.error("Error updating cutting inspection data:", error);
+    res.status(500).json({
+      message: "Failed to update cutting inspection data",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   Cutting Report ENDPOINTS
+------------------------------ */
+
+// GET QC IDs (cutting_emp_id and names) from cuttinginspections
+app.get("/api/cutting-inspections/qc-inspectors", async (req, res) => {
+  try {
+    const inspectors = await CuttingInspection.aggregate([
+      {
+        $group: {
+          _id: "$cutting_emp_id",
+          engName: { $first: "$cutting_emp_engName" },
+          khName: { $first: "$cutting_emp_khName" }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          emp_id: "$_id",
+          eng_name: "$engName",
+          kh_name: "$khName"
+        }
+      },
+      { $sort: { emp_id: 1 } }
+    ]);
+    res.json(inspectors);
+  } catch (error) {
+    console.error(
+      "Error fetching QC inspectors from cutting inspections:",
+      error
+    );
+    res
+      .status(500)
+      .json({ message: "Failed to fetch QC inspectors", error: error.message });
+  }
+});
+
+// GET Paginated Cutting Inspection Reports
+app.get("/api/cutting-inspections-report", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      moNo,
+      tableNo,
+      qcId, // cutting_emp_id
+      page = 1,
+      limit = 15
+    } = req.query;
+
+    const match = {};
+
+    if (moNo) match.moNo = { $regex: moNo, $options: "i" };
+    if (tableNo) match.tableNo = { $regex: tableNo, $options: "i" };
+    if (qcId) match.cutting_emp_id = qcId;
+
+    // Date filtering
+    if (startDate || endDate) {
+      match.$expr = match.$expr || {};
+      match.$expr.$and = match.$expr.$and || [];
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspectionDate",
+                format: "%m/%d/%Y",
+                onError: new Date(0), // Handle parsing errors
+                onNull: new Date(0) // Handle null dates
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y",
+                onError: new Date(0),
+                onNull: new Date(0)
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspectionDate",
+                format: "%m/%d/%Y",
+                onError: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // Handle parsing errors
+                onNull: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // Handle null dates
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y",
+                onError: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+                onNull: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+              }
+            }
+          ]
+        });
+      }
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const reportsPipeline = [
+      { $match: match },
+      {
+        $addFields: {
+          // Convert inspectionDate to Date object for proper sorting
+          convertedDate: {
+            $dateFromString: {
+              dateString: "$inspectionDate",
+              format: "%m/%d/%Y",
+              onError: new Date(0),
+              onNull: new Date(0)
+            }
+          }
+        }
+      },
+      { $sort: { convertedDate: 1, moNo: 1, tableNo: 1 } }, // Sort by convertedDate
+      { $skip: skip },
+      { $limit: parseInt(limit) },
+      {
+        $project: {
+          _id: 1,
+          inspectionDate: 1,
+          moNo: 1,
+          tableNo: 1,
+          color: 1,
+          garmentType: 1,
+          totalBundleQty: 1,
+          bundleQtyCheck: 1,
+          totalInspectionQty: 1, // Add this line to include totalInspectionQty
+          cutting_emp_engName: 1,
+          numberOfInspectedSizes: {
+            $size: {
+              $ifNull: [{ $setUnion: "$inspectionData.inspectedSize" }, []]
+            }
+          },
+          sumTotalPcs: { $sum: "$inspectionData.totalPcsSize" },
+          sumTotalPass: { $sum: "$inspectionData.passSize.total" },
+          sumTotalReject: { $sum: "$inspectionData.rejectSize.total" },
+          sumTotalRejectMeasurement: {
+            $sum: "$inspectionData.rejectMeasurementSize.total"
+          },
+          // sumTotalRejectDefects: { /* More complex: sum of (rejectSize.total - rejectMeasurementSize.total) */
+          //   $sum: {
+          //     $map: {
+          //       input: "$inspectionData",
+          //       as: "data",
+          //       in: { $subtract: [ "$$data.rejectSize.total", "$$data.rejectMeasurementSize.total" ] }
+          //     }
+          //   }
+          // },
+          sumTotalRejectDefects: {
+            //This corresponds to rejectGarmentSize in your schema which is often total reject.
+            $sum: {
+              $map: {
+                input: "$inspectionData",
+                as: "data",
+                // Assuming rejectDefects = totalRejectFromDefects (non-measurement)
+                // This requires summing defects from bundleInspectionData.fabricDefects, which is deeply nested.
+                // Simpler approach: rejectGarmentSize often represents total defects. If it's supposed to be non-measurement defects:
+                in: {
+                  $subtract: [
+                    "$$data.rejectSize.total",
+                    { $ifNull: ["$$data.rejectMeasurementSize.total", 0] }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          overallPassRate: {
+            $cond: [
+              { $gt: ["$sumTotalPcs", 0] },
+              {
+                $multiply: [{ $divide: ["$sumTotalPass", "$sumTotalPcs"] }, 100]
+              },
+              0
+            ]
+          }
+        }
+      }
+    ];
+
+    const reports = await CuttingInspection.aggregate(reportsPipeline);
+
+    const totalDocuments = await CuttingInspection.countDocuments(match);
+
+    res.json({
+      reports,
+      totalPages: Math.ceil(totalDocuments / parseInt(limit)),
+      currentPage: parseInt(page),
+      totalReports: totalDocuments
+    });
+  } catch (error) {
+    console.error("Error fetching cutting inspection reports:", error);
+    res.status(500).json({
+      message: "Failed to fetch cutting inspection reports",
+      error: error.message
+    });
+  }
+});
+
+// GET Single Cutting Inspection Report Detail
+app.get("/api/cutting-inspection-report-detail/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid report ID format" });
+    }
+    const report = await CuttingInspection.findById(id);
+    if (!report) {
+      return res.status(404).json({ message: "Report not found" });
+    }
+    res.json(report);
+  } catch (error) {
+    console.error("Error fetching cutting inspection report detail:", error);
+    res.status(500).json({
+      message: "Failed to fetch report detail",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   Cutting Old ENDPOINTS - START
+------------------------------ */
+
+//Old endpoint remove later
 
 app.get("/api/cutting-inspection-detailed-report", async (req, res) => {
   try {
@@ -7588,6 +8029,10 @@ app.get("/api/cutting-inspection-filter-options", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch filter options" });
   }
 });
+
+/* ------------------------------
+   Cutting Old ENDPOINTS - END
+------------------------------ */
 
 /* ------------------------------
    Cutting Measurement Points
