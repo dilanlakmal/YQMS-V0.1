@@ -30,13 +30,8 @@ const RovingPage = () => {
   const [inspectionType, setInspectionType] = useState("Normal");
   const [spiStatus, setSpiStatus] = useState("");
   const [measurementStatus, setMeasurementStatus] = useState("");
-  // const [spiImage, setSpiImage] = useState(null);
-  // const [measurementImage, setMeasurementImage] = useState(null); // Kept for reference, replaced by file arrays
-  const [spiFilesToUpload, setSpiFilesToUpload] = useState([]); // Stores File objects for SPI
-  const [measurementFilesToUpload, setMeasurementFilesToUpload] = useState([]); // Stores File objects for Measurement
-  // These will store server paths after successful upload in handleSubmit
-  // const [spiImagePaths, setSpiImagePaths] = useState([]); 
-  // const [measurementImagePaths, setMeasurementImagePaths] = useState([]);
+  const [spiFilesToUpload, setSpiFilesToUpload] = useState([]); 
+  const [measurementFilesToUpload, setMeasurementFilesToUpload] = useState([]);
   const [showSpiUploader, setShowSpiUploader] = useState(false);
   const [showMeasurementUploader, setShowMeasurementUploader] = useState(false);
   const [garments, setGarments] = useState([]);
@@ -60,14 +55,12 @@ const RovingPage = () => {
   const [showMoNoDropdown, setShowMoNoDropdown] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const moNoDropdownRef = useRef(null);
-  // const [inspectionRepOrdinal, setInspectionRepOrdinal] = useState('N/A');
-  // const [inspectionRepLoading, setInspectionRepLoading] = useState(false);
    const [selectedManualInspectionRep, setSelectedManualInspectionRep] = useState('');
-  // const [inspectionsCompletedForProgress, setInspectionsCompletedForProgress] = useState(0);
   const [inspectionsCompletedForSelectedRep, setInspectionsCompletedForSelectedRep] = useState(0);
   const [lineWorkerData, setLineWorkerData] = useState([]);
   const [lineWorkerDataLoading, setLineWorkerDataLoading] = useState(true);
   const [lineWorkerDataError, setLineWorkerDataError] = useState(null);
+  const [imageUploaderKey, setImageUploaderKey] = useState(Date.now());
 
   const [defects, setDefects] = useState([]);
   const [isLoadingDefects, setIsLoadingDefects] = useState(true);
@@ -145,93 +138,7 @@ const RovingPage = () => {
     }
   }, [user, authLoading]);
 
-  // const fetchInspectionRepInfo = useCallback(async () => {
-  //   const toOrdinal = (n) => {
-  //     if (typeof n !== 'number' || isNaN(n) || n <= 0) return String(n);
-  //     const s = ["th", "st", "nd", "rd"];
-  //     const v = n % 100;
-  //     return n + (s[(v - 20) % 10] || s[v] || s[0]);
-  //   };
-  //   if (lineNo && currentDate) {
-  //     setInspectionRepLoading(true);
-  //     try {
-  //       const year = currentDate.getFullYear();
-  //       const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-  //       const day = String(currentDate.getDate()).padStart(2, '0');
-  //       const formattedDate = `${month}/${day}/${year}`;
-  //       const response = await axios.get(`${API_BASE_URL}/api/qc-inline-roving/inspection-time-info`, {
-  //         params: {
-  //           line_no: lineNo,
-  //           inspection_date: formattedDate,
-  //         },
-  //       });
-  //       const apiData = response.data;
-  //       if (typeof apiData.inspectionRepOrdinal === 'string' && apiData.inspectionRepOrdinal.toLowerCase().includes("line not configured")) {
-  //         setInspectionRepOrdinal(t('qcRoving.lineNotConfigured', "N/A (Line not configured)"));
-  //         return;
-  //       }
-  //       if (apiData.status === "line_not_configured") {
-  //          setInspectionRepOrdinal(t('qcRoving.lineNotConfigured', "N/A (Line not configured)"));
-  //          return;
-  //       }
-  //       const currentRoundOrdinal = apiData.currentRoundOrdinal;
-  //       const inspectionsCompletedInCurrentRound = apiData.inspectionsCompletedInCurrentRound;
-  //       if (currentRoundOrdinal === 0 || currentRoundOrdinal === null || typeof currentRoundOrdinal === 'undefined' || apiData.status === "no_data_yet") {
-  //         setInspectionRepOrdinal(t('qcRoving.firstInspection', "1st Inspection"));
-  //       } else {
-  //         if (lineWorkerDataLoading) {
-  //           setInspectionRepOrdinal(t('qcRoving.loadingWorkerData', "Loading worker data..."));
-  //           return;
-  //         }
-  //         if (lineWorkerDataError) {
-  //           setInspectionRepOrdinal(t('qcRoving.workerDataUnavailable', "N/A (Worker data error)"));
-  //           return;
-  //         }
-  //         const numericLineNoFromForm = getNumericLineValue(lineNo);
-  //         const selectedLineInfo = lineWorkerData.find(s => getNumericLineValue(s.lineNo) === numericLineNoFromForm);
-  //         if (!selectedLineInfo) {
-  //           setInspectionRepOrdinal(t('qcRoving.lineWorkerInfoNotFound', "N/A (Worker info not found)"));
-  //           return;
-  //         }
-  //         const workerCountToCompare = selectedLineInfo.editedWorkerCount !== null && selectedLineInfo.editedWorkerCount !== undefined
-  //                                       ? selectedLineInfo.editedWorkerCount
-  //                                       : selectedLineInfo.realWorkerCount;
-  //         if (typeof workerCountToCompare !== 'number' || workerCountToCompare <= 0) {
-  //           setInspectionRepOrdinal(t('qcRoving.invalidWorkerCount', "N/A (Invalid worker count)"));
-  //           return;
-  //         }
-  //         if (inspectionsCompletedInCurrentRound < workerCountToCompare) {
-  //           setInspectionRepOrdinal(
-  //             t('qcRoving.inspectionRepOngoing', `${toOrdinal(currentRoundOrdinal)} Inspection (Ongoing: ${inspectionsCompletedInCurrentRound}/${workerCountToCompare})`)
-  //           );
-  //         } else {
-  //           setInspectionRepOrdinal(`${toOrdinal(currentRoundOrdinal + 1)} Inspection`);
-  //         }
-  //       }
-  //     } catch (error) {
-  //       console.error("Error fetching inspection time info:", error);
-  //       let newOrdinalMessage = t('qcRoving.inspectionRepError', "Error");
-  //       if (error.response) {
-  //         const status = error.response.status;
-  //         const errorData = error.response.data;
-  //         const errorMessage = (typeof errorData === 'string' ? errorData : errorData?.message || errorData?.error || "").toLowerCase();
-  //         if ((status === 400 || status === 404) && (errorMessage.includes("line not configured") || errorMessage.includes("line not found") || errorMessage.includes("invalid line"))) {
-  //           newOrdinalMessage = t('qcRoving.lineNotConfigured', "N/A (Line not configured)");
-  //         }
-  //       }
-  //       setInspectionRepOrdinal(newOrdinalMessage);
-  //     } finally {
-  //       setInspectionRepLoading(false);
-  //     }
-  //   } else {
-  //     setInspectionRepOrdinal(t('qcRoving.inspectionRepNA', "N/A"));
-  //   }
-  // }, [lineNo, currentDate, t, lineWorkerData, lineWorkerDataLoading, lineWorkerDataError, getNumericLineValue]);
-
-  // useEffect(() => {
-  //   fetchInspectionRepInfo();
-  // }, [fetchInspectionRepInfo]);
-
+  
 const fetchInspectionsCompleted = useCallback(async () => {
   // if (lineNo && currentDate) {
    if (lineNo && currentDate && selectedManualInspectionRep) {
@@ -248,7 +155,6 @@ const fetchInspectionsCompleted = useCallback(async () => {
         },
       });
       const apiResponseData = response.data;
-      // console.log("API response from /api/inspections-completed:", apiResponseData);
 
       let completedCount = 0;
 
@@ -281,8 +187,6 @@ const fetchInspectionsCompleted = useCallback(async () => {
         setInspectionsCompletedForSelectedRep(0); 
       }
     } catch (error) {
-      // console.error("Error fetching inspections completed:", error);
-      // setInspectionsCompletedForProgress(0);
       console.error("Error fetching inspections completed for selected repetition:", error);
       setInspectionsCompletedForSelectedRep(0);
     }
@@ -457,13 +361,12 @@ const fetchInspectionsCompleted = useCallback(async () => {
     setShowOperationDetails(false);
     setSpiStatus("");
     setMeasurementStatus("");
-    // setSpiImage(null);
-    // setMeasurementImage(null);
-    setSpiFilesToUpload([]); // Clear file objects
-    setMeasurementFilesToUpload([]); // Clear file objects
-    setSelectedManualInspectionRep(""); // Reset this as well
+    setSpiFilesToUpload([]);
+    setMeasurementFilesToUpload([]); 
+    setSelectedManualInspectionRep(""); 
     setShowSpiUploader(false);
     setShowMeasurementUploader(false);
+    setImageUploaderKey(Date.now());
   };
 
   const handleSubmit = async (e) => {
@@ -494,25 +397,25 @@ const fetchInspectionsCompleted = useCallback(async () => {
       formData.append('lineNo', lineNo);
       formData.append('moNo', moNo);
       formData.append('operationId', selectedOperationId);
-      formData.append('operatorEmpId', operatorEmpId || 'UNKNOWN_OPERATOR'); // Pass operator emp_id
-      formData.append('fileIndex', fileIndex); // Optional: pass index for server-side naming
+      formData.append('operatorEmpId', operatorEmpId || 'UNKNOWN_OPERATOR'); 
+      formData.append('fileIndex', fileIndex); 
 
       try {
         const response = await axios.post(`${API_BASE_URL}/api/roving/upload-roving-image`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         if (response.data.success) {
-          return response.data.filePath; // Server should return the relative path
+          return response.data.filePath;
         } else {
           throw new Error(response.data.message || `Failed to upload ${imageTypeForUpload} image ${file.name}`);
         }
       } catch (uploadError) {
         console.error(`Error uploading ${imageTypeForUpload} image ${file.name}:`, uploadError);
-        throw uploadError; // Re-throw to be caught by handleSubmit
+        throw uploadError; 
       }
     };
 
-    // Upload images before saving inspection data
+  
     let uploadedSpiImagePaths = [];
     let uploadedMeasurementImagePaths = [];
 
@@ -530,7 +433,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
       Swal.close();
     } catch (uploadError) {
       Swal.fire(t('qcRoving.submission.imageUploadFailedTitle', 'Image Upload Failed'), uploadError.message || t('qcRoving.submission.imageUploadFailedText', 'One or more images could not be uploaded. Please try again.'), 'error');
-      return; // Stop submission if image upload fails
+      return; 
     }
 
     const now = new Date();
@@ -576,9 +479,9 @@ const fetchInspectionsCompleted = useCallback(async () => {
       operation_kh_name: selectedOperation?.kh_name || "N/A",
       type: inspectionType,
       spi: spiStatus,
-      spi_images: uploadedSpiImagePaths, // Use paths from successful upload
+      spi_images: uploadedSpiImagePaths, 
       measurement: measurementStatus,
-      measurement_images: uploadedMeasurementImagePaths, // Use paths from successful upload
+      measurement_images: uploadedMeasurementImagePaths, 
       checked_quantity: garments.length,
       inspection_time: inspectionTime,
       qualityStatus,
@@ -608,10 +511,8 @@ const fetchInspectionsCompleted = useCallback(async () => {
       console.warn(`Line number (${lineNo}) is invalid or lineWorkerData is not available. total_operators will be defaulted to 0.`);
     }
 
-    // const completeInspectOperators = 1;
     const newCompleteInspectOperatorsForRep = inspectionsCompletedForSelectedRep + 1;
 
-    // const inspectStatus = (totalOperatorsForLine > 0 && completeInspectOperators >= totalOperatorsForLine)
      const newInspectStatus = (totalOperatorsForLine > 0 && newCompleteInspectOperatorsForRep >= totalOperatorsForLine)
       ? "Completed"
       : "Not Complete";
@@ -641,15 +542,14 @@ const fetchInspectionsCompleted = useCallback(async () => {
         text: t('qcRoving.submission.success', 'QC Inline Roving data saved successfully!'),
       });
       resetForm();
-      // fetchInspectionRepInfo(); 
-      fetchInspectionsCompleted(); // Refresh the inspections completed info after saving
+      fetchInspectionsCompleted(); 
     } catch (error) {
       console.error("Error saving QC Inline Roving data:", error);
       Swal.fire({
         icon: 'error',
         title: 'Error',
         text: 'Failed to save QC Inline Roving data.',
-      }); // Consider more specific error from backend if available
+      });
     }
   };
 
@@ -691,7 +591,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
 
   const hasCriticalDefect = currentGarmentDefects.some(d => d.type === '02');
   const totalMinorDefectCount = currentGarmentDefects
-    .filter(d => d.type !== '02') // Assuming minor defects are not type '02'
+    .filter(d => d.type !== '02') 
     .reduce((sum, d) => sum + d.count, 0);
   const totalDefectCountInCurrentGarment = currentGarmentDefects.reduce((sum, d) => sum + d.count, 0);
 
@@ -714,19 +614,17 @@ const fetchInspectionsCompleted = useCallback(async () => {
       overallStatusText = t('qcRoving.overallStatus.rejectMinor', 'Reject-Minor');
       overallStatusColor = 'bg-yellow-100 text-yellow-800';
     } else if (totalMinorDefectCount > 1) {
-      overallStatusText = t('qcRoving.overallStatus.rejectMinor', 'Reject-Minor'); // Text is same
-      overallStatusColor = 'bg-red-100 text-red-800'; // Color is red for multiple minor
+      overallStatusText = t('qcRoving.overallStatus.rejectMinor', 'Reject-Minor'); 
+      overallStatusColor = 'bg-red-100 text-red-800'; 
     } else if (totalDefectCountInCurrentGarment === 0) {
       overallStatusText = t('qcRoving.overallStatus.pass', 'Pass');
       overallStatusColor = 'bg-green-100 text-green-800';
     } else {
-      // Fallback for unexpected defect states (e.g., defect present but not critical or minor)
+    
       overallStatusText = t('qcRoving.overallStatus.reject', 'Reject');
       overallStatusColor = 'bg-red-100 text-red-800';
     }
   } else {
-    // Should not be reached if spiStatus and measurementStatus are always 'Pass', 'Reject', or empty
-    // but as a safeguard:
     overallStatusText = t('qcRoving.overallStatus.unknown', 'Unknown');
     overallStatusColor = 'bg-gray-200 text-gray-700';
   }
@@ -775,7 +673,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
     lineNo &&
     moNo &&
     selectedOperationId &&
-    selectedManualInspectionRep && // Added check for manual selection
+    selectedManualInspectionRep && 
     spiStatus &&
     measurementStatus &&
     scannedUserData;
@@ -785,7 +683,6 @@ const fetchInspectionsCompleted = useCallback(async () => {
     lineNo: lineNo || 'NA_Line',
     moNo: moNo || 'NA_MO',
     operationId: selectedOperationId || 'NA_Op',
-    // empId: user?.emp_id || 'Guest' // If needed by backend for naming/logging
   };
   
   
@@ -1176,6 +1073,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
                  {showSpiUploader && (
                     <div className="mt-2">
                       <ImageCaptureUpload
+                        key={`spi-${imageUploaderKey}`}
                         imageType="spi"
                         maxImages={5}
                         onImageFilesChange={setSpiFilesToUpload} // Changed prop
@@ -1211,6 +1109,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
                   {showMeasurementUploader && (
                      <div className="mt-2">
                       <ImageCaptureUpload
+                        key={`measurement-${imageUploaderKey}`}
                         imageType="measurement"
                         maxImages={5}
                         onImageFilesChange={setMeasurementFilesToUpload} // Changed prop
