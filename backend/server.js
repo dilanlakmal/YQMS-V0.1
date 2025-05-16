@@ -10,7 +10,8 @@ import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
-import fs from 'fs';
+import fs from 'fs'; 
+import fsPromises from 'fs/promises';
 import https from 'https';
 import { Server } from "socket.io"; // Import Socket.io
 import createUserModel from "./models/User.js";
@@ -85,6 +86,7 @@ const io = new Server(server, {
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use('/public', express.static(path.join(__dirname, '../public')));
+app.use('/storage', express.static(path.join(__dirname, '..', 'public', 'storage')));
 
 app.use(bodyParser.json());
 app.use(
@@ -3153,7 +3155,7 @@ const storage = multer.diskStorage({
       return cb(new Error('User ID is not defined'));
     }
     const dir = `../public/storage/profiles/${userId}`;
-    fs.mkdirSync(dir, { recursive: true });
+     fsPromises.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
   filename: (req, file, cb) => {
@@ -7356,6 +7358,125 @@ app.get('/api/qc-inline-roving-reports/filtered', async (req, res) => {
   }
 });
 
+// Helper to sanitize inputs for filenames/paths to prevent path traversal and invalid characters
+const sanitize = (input) => {
+    if (typeof input !== 'string') input = String(input);
+    // Remove potentially harmful characters, allow alphanumeric, hyphens, underscores
+    let sane = input.replace(/[^a-zA-Z0-9-_]/g, '_');
+    // Prevent names like "." or ".."
+    if (sane === '.' || sane === '..') return '_';
+    return sane;
+};
+
+
+// Multer setup for memory storage (we'll write to disk manually)
+const rovingStorage = multer.memoryStorage();
+const rovingUpload = multer({
+    storage: rovingStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit per file
+    fileFilter: (req, file, cb) => {
+        const allowedExtensions = /^(jpeg|jpg|png|gif)$/i;
+        const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i; // pjpeg for some older browsers
+
+        // Get extension without dot, and lowercase
+        const fileExt = path.extname(file.originalname).toLowerCase().substring(1); 
+        const isExtAllowed = allowedExtensions.test(fileExt);
+        // Lowercase mimetype for robust comparison
+        const isMimeAllowed = allowedMimeTypes.test(file.mimetype.toLowerCase()); 
+
+        if (isMimeAllowed && isExtAllowed) {
+            cb(null, true); // Accept the file
+        } else {
+            // THIS IS THE CRUCIAL LOG TO CHECK ON YOUR SERVER CONSOLE:
+            console.error(`File rejected by filter: name='${file.originalname}', mime='${file.mimetype}', ext='${fileExt}'. IsMimeAllowed: ${isMimeAllowed}, IsExtAllowed: ${isExtAllowed}`);
+            cb(new Error('Error: Images Only! (jpeg, jpg, png, gif)')); // Reject the file
+        }
+    }
+});
+
+// ... rest of your server.js ...
+
+// Your route handler for image upload
+app.post('/api/roving/upload-roving-image', rovingUpload.single('imageFile'), async (req, res) => {
+    try {
+        const { imageType, date, lineNo, moNo, operationId } = req.body;
+        const imageFile = req.file; // This will be undefined if fileFilter rejected the file
+
+        // This log was added in a previous step, it's helpful to see what the route receives
+        // console.log('Backend /upload-roving-image received:', {
+        //     file: imageFile ? { originalname: imageFile.originalname, mimetype: imageFile.mimetype, size: imageFile.size } : 'No file object',
+        //     body: req.body,
+        //     fileValidationError: req.fileValidationError // Multer might attach error here
+        // });
+
+        if (!imageFile) {
+            // If fileFilter called cb(new Error(...)), Multer usually sets req.fileValidationError
+            // or the error from fileFilter is caught in the main catch block.
+            const errorMessage = req.fileValidationError || (req.multerError && req.multerError.message) || 'No image file provided or file rejected by filter.';
+            return res.status(400).json({ success: false, message: errorMessage });
+        }
+
+        // Metadata validation
+        if (!date || !lineNo || lineNo === 'NA_Line' || !moNo || moNo === 'NA_MO' || !operationId || operationId === 'NA_Op') {
+            return res.status(400).json({ success: false, message: 'Missing or invalid required metadata: date, lineNo, moNo, operationId must be actual values.' });
+        }
+        if (!imageType || !['spi', 'measurement'].includes(imageType.toLowerCase())) {
+            return res.status(400).json({ success: false, message: 'Invalid image type. Must be "spi" or "measurement".' });
+        }
+
+        const sanitizedDate = sanitize(date);
+        const sanitizedLineNo = sanitize(lineNo);
+        const sanitizedMoNo = sanitize(moNo);
+        const sanitizedOperationId = sanitize(operationId);
+        const upperImageType = imageType.toUpperCase();
+        
+        const targetDir = path.resolve(__dirname, '..', 'public', 'storage', 'roving', upperImageType);
+
+        await fsPromises.mkdir(targetDir, { recursive: true });
+        
+        const imagePrefix = `${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
+        let existingImageCount = 0;
+        try {
+            const filesInDir = await fsPromises.readdir(targetDir);
+            filesInDir.forEach(file => {
+                if (file.startsWith(imagePrefix)) {
+                    existingImageCount++;
+                }
+            });
+        } catch (readDirError) {
+            if (readDirError.code !== 'ENOENT') { // Ignore if directory doesn't exist yet
+                 console.error('Error reading directory for indexing:', targetDir, readDirError);
+            }
+        }
+        const imageIndex = existingImageCount + 1;
+
+        if (imageIndex > 5) { // Max 5 images per context
+             return res.status(400).json({ success: false, message: 'Maximum 5 images allowed for this context.' });
+        }
+
+        const fileExtension = path.extname(imageFile.originalname);
+        const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
+        const filePathInPublic = path.join(targetDir, newFilename);
+
+        await fsPromises.writeFile(filePathInPublic, imageFile.buffer);
+        const publicUrl = `/storage/roving/${upperImageType}/${newFilename}`; // Relative URL for client
+
+        res.json({ success: true, filePath: publicUrl, filename: newFilename });
+
+    } catch (error) {
+        console.error('Error uploading roving image:', error);
+        // Check if the error is from Multer's fileFilter specifically
+        if (error.message && error.message.startsWith('Error: Images Only!')) {
+             return res.status(400).json({ success: false, message: error.message });
+        }
+        // Handle other Multer errors (like file size limit)
+        if (error instanceof multer.MulterError) {
+            return res.status(400).json({ success: false, message: `Multer error: ${error.message}` });
+        }
+        // Generic server error
+        res.status(500).json({ success: false, message: 'Server error during image upload.' });
+    }
+});
 
 /* ------------------------------
    QC1 Sunrise Dashboard ENDPOINTS

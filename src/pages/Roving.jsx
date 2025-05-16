@@ -22,6 +22,7 @@ import PreviewRoving from "../components/inspection/qc_roving/PreviewRoving";
 import RovingCamera from "../components/inspection/qc_roving/RovingCamera";
 import RovingData from "../components/inspection/qc_roving/RovingData";
 import InlineWorkers from "../components/inspection/qc_roving/InlineWorkers";
+import ImageCaptureUpload from "../components/inspection/qc_roving/ImageCaptureupload";
 
 const RovingPage = () => {
   const { t } = useTranslation();
@@ -29,10 +30,15 @@ const RovingPage = () => {
   const [inspectionType, setInspectionType] = useState("Normal");
   const [spiStatus, setSpiStatus] = useState("");
   const [measurementStatus, setMeasurementStatus] = useState("");
-  const [spiImage, setSpiImage] = useState(null);
-  const [measurementImage, setMeasurementImage] = useState(null);
-  const [showSpiCamera, setShowSpiCamera] = useState(false);
-  const [showMeasurementCamera, setShowMeasurementCamera] = useState(false);
+  // const [spiImage, setSpiImage] = useState(null);
+  // const [measurementImage, setMeasurementImage] = useState(null); // Kept for reference, replaced by file arrays
+  const [spiFilesToUpload, setSpiFilesToUpload] = useState([]); // Stores File objects for SPI
+  const [measurementFilesToUpload, setMeasurementFilesToUpload] = useState([]); // Stores File objects for Measurement
+  // These will store server paths after successful upload in handleSubmit
+  // const [spiImagePaths, setSpiImagePaths] = useState([]); 
+  // const [measurementImagePaths, setMeasurementImagePaths] = useState([]);
+  const [showSpiUploader, setShowSpiUploader] = useState(false);
+  const [showMeasurementUploader, setShowMeasurementUploader] = useState(false);
   const [garments, setGarments] = useState([]);
   const [inspectionStartTime, setInspectionStartTime] = useState(null);
   const [currentGarmentIndex, setCurrentGarmentIndex] = useState(0);
@@ -242,12 +248,11 @@ const fetchInspectionsCompleted = useCallback(async () => {
         },
       });
       const apiResponseData = response.data;
-      console.log("API response from /api/inspections-completed:", apiResponseData); // <-- Add this line to inspect
+      // console.log("API response from /api/inspections-completed:", apiResponseData);
 
       let completedCount = 0;
 
       if (Array.isArray(apiResponseData)) {
-        // Case 1: API returns an ARRAY of roving documents
         for (const doc of apiResponseData) {
           if (doc && doc.inspection_rep && Array.isArray(doc.inspection_rep)) {
             const repInfo = doc.inspection_rep.find(
@@ -255,25 +260,21 @@ const fetchInspectionsCompleted = useCallback(async () => {
             );
             if (repInfo) {
               completedCount = repInfo.complete_inspect_operators || 0;
-              // Assuming the specific inspection_rep_name is unique across documents for a given line/date,
-              // or we take the first one found.
               break; 
             }
           }
         }
         setInspectionsCompletedForSelectedRep(completedCount);
       } else if (apiResponseData && apiResponseData.inspection_rep && Array.isArray(apiResponseData.inspection_rep)) {
-        // Case 2: API returns a SINGLE document object which contains an inspection_rep array
         const repInfo = apiResponseData.inspection_rep.find(
           (rep) => rep.inspection_rep_name === selectedManualInspectionRep
         );
         if (repInfo) {
           setInspectionsCompletedForSelectedRep(repInfo.complete_inspect_operators || 0);
         } else {
-          setInspectionsCompletedForSelectedRep(0); // Repetition not found in this structure
+          setInspectionsCompletedForSelectedRep(0);
         }
      } else if (apiResponseData && typeof apiResponseData.completeInspectOperators === 'number') {
-        // Case 3: API returns a single object that is the specific inspection_rep item itself, or a summary with a direct count
                 setInspectionsCompletedForSelectedRep(apiResponseData.completeInspectOperators || 0); 
       } else {
         console.warn("Unexpected data structure from /api/inspections-completed. Setting completed count to 0.", apiResponseData);
@@ -286,7 +287,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
       setInspectionsCompletedForSelectedRep(0);
     }
      } else {
-    setInspectionsCompletedForSelectedRep(0); // Reset if not all params are available
+    setInspectionsCompletedForSelectedRep(0); 
   }
 }, [lineNo, currentDate, selectedManualInspectionRep]);
 
@@ -389,7 +390,8 @@ const fetchInspectionsCompleted = useCallback(async () => {
                 name: defect.english,
                 count: 1,
                 operationId: selectedOperationId,
-                repair: defect.repair
+                repair: defect.repair,
+                type: defect.type
               }
             ],
             status: 'Fail',
@@ -455,9 +457,13 @@ const fetchInspectionsCompleted = useCallback(async () => {
     setShowOperationDetails(false);
     setSpiStatus("");
     setMeasurementStatus("");
-    setSpiImage(null);
-    setSelectedManualInspectionRep("");
-    setMeasurementImage(null);
+    // setSpiImage(null);
+    // setMeasurementImage(null);
+    setSpiFilesToUpload([]); // Clear file objects
+    setMeasurementFilesToUpload([]); // Clear file objects
+    setSelectedManualInspectionRep(""); // Reset this as well
+    setShowSpiUploader(false);
+    setShowMeasurementUploader(false);
   };
 
   const handleSubmit = async (e) => {
@@ -478,6 +484,55 @@ const fetchInspectionsCompleted = useCallback(async () => {
       });
       return;
     }
+
+    // Helper function to upload a single file
+    const uploadFile = async (file, imageTypeForUpload, operatorEmpId, fileIndex) => {
+      const formData = new FormData();
+      formData.append('imageFile', file);
+      formData.append('imageType', imageTypeForUpload);
+      formData.append('date', currentDate.toISOString().split("T")[0]);
+      formData.append('lineNo', lineNo);
+      formData.append('moNo', moNo);
+      formData.append('operationId', selectedOperationId);
+      formData.append('operatorEmpId', operatorEmpId || 'UNKNOWN_OPERATOR'); // Pass operator emp_id
+      formData.append('fileIndex', fileIndex); // Optional: pass index for server-side naming
+
+      try {
+        const response = await axios.post(`${API_BASE_URL}/api/roving/upload-roving-image`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        if (response.data.success) {
+          return response.data.filePath; // Server should return the relative path
+        } else {
+          throw new Error(response.data.message || `Failed to upload ${imageTypeForUpload} image ${file.name}`);
+        }
+      } catch (uploadError) {
+        console.error(`Error uploading ${imageTypeForUpload} image ${file.name}:`, uploadError);
+        throw uploadError; // Re-throw to be caught by handleSubmit
+      }
+    };
+
+    // Upload images before saving inspection data
+    let uploadedSpiImagePaths = [];
+    let uploadedMeasurementImagePaths = [];
+
+    try {
+      Swal.fire({ title: t('qcRoving.submission.uploadingImages', 'Uploading images...'), allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+      for (let i = 0; i < spiFilesToUpload.length; i++) {
+        const path = await uploadFile(spiFilesToUpload[i], 'spi', scannedUserData?.emp_id, i);
+        uploadedSpiImagePaths.push(path);
+      }
+      for (let i = 0; i < measurementFilesToUpload.length; i++) {
+        const path = await uploadFile(measurementFilesToUpload[i], 'measurement', scannedUserData?.emp_id, i);
+        uploadedMeasurementImagePaths.push(path);
+      }
+      Swal.close();
+    } catch (uploadError) {
+      Swal.fire(t('qcRoving.submission.imageUploadFailedTitle', 'Image Upload Failed'), uploadError.message || t('qcRoving.submission.imageUploadFailedText', 'One or more images could not be uploaded. Please try again.'), 'error');
+      return; // Stop submission if image upload fails
+    }
+
     const now = new Date();
     const inspectionTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
     const updatedGarments = garments.map((garment) => {
@@ -521,9 +576,9 @@ const fetchInspectionsCompleted = useCallback(async () => {
       operation_kh_name: selectedOperation?.kh_name || "N/A",
       type: inspectionType,
       spi: spiStatus,
-      spi_image: spiImage,
+      spi_images: uploadedSpiImagePaths, // Use paths from successful upload
       measurement: measurementStatus,
-      measurement_image: measurementImage,
+      measurement_images: uploadedMeasurementImagePaths, // Use paths from successful upload
       checked_quantity: garments.length,
       inspection_time: inspectionTime,
       qualityStatus,
@@ -583,10 +638,10 @@ const fetchInspectionsCompleted = useCallback(async () => {
       Swal.fire({
         icon: 'success',
         title: 'Success',
-        text: 'QC Inline Roving data saved successfully!',
+        text: t('qcRoving.submission.success', 'QC Inline Roving data saved successfully!'),
       });
       resetForm();
-      // fetchInspectionRepInfo(); // Refresh the inspection repetition info after saving
+      // fetchInspectionRepInfo(); 
       fetchInspectionsCompleted(); // Refresh the inspections completed info after saving
     } catch (error) {
       console.error("Error saving QC Inline Roving data:", error);
@@ -594,7 +649,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
         icon: 'error',
         title: 'Error',
         text: 'Failed to save QC Inline Roving data.',
-      });
+      }); // Consider more specific error from backend if available
     }
   };
 
@@ -629,6 +684,52 @@ const fetchInspectionsCompleted = useCallback(async () => {
   };
 
   const currentGarmentDefects = garment.defects;
+
+    // Calculate Overall Status for the current garment
+  let overallStatusText = '';
+  let overallStatusColor = '';
+
+  const hasCriticalDefect = currentGarmentDefects.some(d => d.type === '02');
+  const totalMinorDefectCount = currentGarmentDefects
+    .filter(d => d.type !== '02') // Assuming minor defects are not type '02'
+    .reduce((sum, d) => sum + d.count, 0);
+  const totalDefectCountInCurrentGarment = currentGarmentDefects.reduce((sum, d) => sum + d.count, 0);
+
+  if (!spiStatus || !measurementStatus) {
+    overallStatusText = t('qcRoving.overallStatus.pending', 'Pending Input');
+    overallStatusColor = 'bg-gray-200 text-gray-700';
+  } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
+    if (hasCriticalDefect) {
+      overallStatusText = t('qcRoving.overallStatus.rejectCritical', 'Reject-Critical');
+      overallStatusColor = 'bg-red-100 text-red-800';
+    } else {
+      overallStatusText = t('qcRoving.overallStatus.reject', 'Reject');
+      overallStatusColor = 'bg-red-100 text-red-800';
+    }
+  } else if (spiStatus === 'Pass' && measurementStatus === 'Pass') {
+    if (hasCriticalDefect) {
+      overallStatusText = t('qcRoving.overallStatus.rejectCritical', 'Reject-Critical');
+      overallStatusColor = 'bg-red-100 text-red-800';
+    } else if (totalMinorDefectCount === 1) {
+      overallStatusText = t('qcRoving.overallStatus.rejectMinor', 'Reject-Minor');
+      overallStatusColor = 'bg-yellow-100 text-yellow-800';
+    } else if (totalMinorDefectCount > 1) {
+      overallStatusText = t('qcRoving.overallStatus.rejectMinor', 'Reject-Minor'); // Text is same
+      overallStatusColor = 'bg-red-100 text-red-800'; // Color is red for multiple minor
+    } else if (totalDefectCountInCurrentGarment === 0) {
+      overallStatusText = t('qcRoving.overallStatus.pass', 'Pass');
+      overallStatusColor = 'bg-green-100 text-green-800';
+    } else {
+      // Fallback for unexpected defect states (e.g., defect present but not critical or minor)
+      overallStatusText = t('qcRoving.overallStatus.reject', 'Reject');
+      overallStatusColor = 'bg-red-100 text-red-800';
+    }
+  } else {
+    // Should not be reached if spiStatus and measurementStatus are always 'Pass', 'Reject', or empty
+    // but as a safeguard:
+    overallStatusText = t('qcRoving.overallStatus.unknown', 'Unknown');
+    overallStatusColor = 'bg-gray-200 text-gray-700';
+  }
 
   const totalDefects = garments.reduce(
     (acc, garment) =>
@@ -678,6 +779,15 @@ const fetchInspectionsCompleted = useCallback(async () => {
     spiStatus &&
     measurementStatus &&
     scannedUserData;
+
+    const inspectionContextData = {
+    date: currentDate.toISOString().split("T")[0],
+    lineNo: lineNo || 'NA_Line',
+    moNo: moNo || 'NA_MO',
+    operationId: selectedOperationId || 'NA_Op',
+    // empId: user?.emp_id || 'Guest' // If needed by backend for naming/logging
+  };
+  
   
 
   return (
@@ -1040,79 +1150,71 @@ const fetchInspectionsCompleted = useCallback(async () => {
 
               <div className="flex flex-wrap items-start gap-4">
                 <div className="flex-1 min-w-[150px]">
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-gray-700 mt-2">
+
                     {t("qcRoving.spi")}
                   </label>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={spiStatus}
-                      onChange={(e) => setSpiStatus(e.target.value)}
-                      className="mt-1 w-3/4 p-2 border border-gray-300 rounded-lg"
-                    >
-                      <option value="">
-                        {t("qcRoving.select_spi_status")}
-                      </option>
-                      <option value="Pass">{t("qcRoving.pass")}</option>
-                      <option value="Reject">{t("qcRoving.reject")}</option>
-                    </select>
-                    <button
-                      onClick={() => setShowSpiCamera(true)}
-                      className="mt-1 p-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-                    >
-                      <Camera className="w-5 h-5" />
-                    </button>
-                  </div>
-                  {spiImage && (
-                    <div className="mt-2 relative p-2 bg-gray-100 rounded-lg">
-                      <button
-                        onClick={() => setSpiImage(null)}
-                        className="absolute top-2 right-2 text-red-600 hover:text-red-800"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                      <img
-                        src={`${API_BASE_URL}${spiImage}`}
-                        alt="SPI Image"
-                        className="w-full h-auto rounded-lg"
+                 
+                  <select
+                    value={spiStatus}
+                    onChange={(e) => setSpiStatus(e.target.value)}
+                    className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">{t("qcRoving.select_spi_status")}</option>
+                    <option value="Pass">{t("qcRoving.pass")}</option>
+                    <option value="Reject">{t("qcRoving.reject")}</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowSpiUploader(!showSpiUploader)}
+                    className="mt-2 w-full flex items-center justify-center px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-100 text-xs"
+                    title={showSpiUploader ? t('qcRoving.buttons.hideImages') : t('qcRoving.buttons.showImages')}
+                  >
+                    <Camera size={16} className="mr-1" /> 
+                    {t("qcRoving.spiImages")} ({spiFilesToUpload.length}/5)
+                  </button>
+                 {showSpiUploader && (
+                    <div className="mt-2">
+                      <ImageCaptureUpload
+                        imageType="spi"
+                        maxImages={5}
+                        onImageFilesChange={setSpiFilesToUpload} // Changed prop
+                        inspectionData={inspectionContextData}
                       />
                     </div>
                   )}
+
                 </div>
                 <div className="flex-1 min-w-[150px]">
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-gray-700 mt-2">
                     {t("qcRoving.measurement")}
                   </label>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={measurementStatus}
-                      onChange={(e) => setMeasurementStatus(e.target.value)}
-                      className="mt-1 w-3/4 p-2 border border-gray-300 rounded-lg"
-                    >
-                      <option value="">
-                        {t("qcRoving.select_measurement_status")}
-                      </option>
-                      <option value="Pass">{t("qcRoving.pass")}</option>
-                      <option value="Reject">{t("qcRoving.reject")}</option>
-                    </select>
-                    <button
-                      onClick={() => setShowMeasurementCamera(true)}
-                      className="mt-1 p-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-                    >
-                      <Camera className="w-5 h-5" />
-                    </button>
-                  </div>
-                  {measurementImage && (
-                    <div className="mt-2 relative p-2 bg-gray-100 rounded-lg">
-                      <button
-                        onClick={() => setMeasurementImage(null)}
-                        className="absolute top-2 right-2 text-red-600 hover:text-red-800"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                      <img
-                        src={`${API_BASE_URL}${measurementImage}`}
-                        alt="Measurement Image"
-                        className="w-full h-auto rounded-lg"
+                  
+                  <select
+                    value={measurementStatus}
+                    onChange={(e) => setMeasurementStatus(e.target.value)}
+                    className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">{t("qcRoving.select_measurement_status")}</option>
+                    <option value="Pass">{t("qcRoving.pass")}</option>
+                    <option value="Reject">{t("qcRoving.reject")}</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowMeasurementUploader(!showMeasurementUploader)}
+                     className="mt-2 w-full flex items-center justify-center px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-100 text-xs"
+                    title={showMeasurementUploader ? t('qcRoving.buttons.hideImages') : t('qcRoving.buttons.showImages')}
+                  >
+                    <Camera size={16} className="mr-1" />
+                    {t("qcRoving.measurementImages")} ({measurementFilesToUpload.length}/5)
+                  </button>
+                  {showMeasurementUploader && (
+                     <div className="mt-2">
+                      <ImageCaptureUpload
+                        imageType="measurement"
+                        maxImages={5}
+                        onImageFilesChange={setMeasurementFilesToUpload} // Changed prop
+                        inspectionData={inspectionContextData}
                       />
                     </div>
                   )}
@@ -1146,17 +1248,37 @@ const fetchInspectionsCompleted = useCallback(async () => {
                         const defectInfo = defects.find(
                           (d) => d.english === defect.name
                         );
+                        let defectSeverityText = '';
+                        let defectSeverityColor = '';
+
+                        // defect.repair comes from the item added to garment.defects
+                        // which in turn got it from the defect.repair of the main defect list item
+                        if (defect.type === '02') { // Assuming 'No' repair means Critical
+                          defectSeverityText = t('qcRoving.defectStatus.rejectCritical', 'Reject-Critical');
+                          defectSeverityColor = 'bg-red-100 text-red-800';
+                        } else { // Assuming 'Yes' repair or other values mean Minor
+                          defectSeverityText = t('qcRoving.defectStatus.rejectMinor', 'Reject-Minor');
+                          defectSeverityColor = 'bg-yellow-100 text-yellow-800';
+                        }
                         return (
                           <div
                             key={`${currentGarmentIndex}-${defectIndex}`}
-                            className="flex items-center space-x-2 bg-white p-3 rounded-lg shadow-sm flex-wrap gap-y-2"
+                            className="flex items-center justify-between bg-white p-3 shadow-sm flex-wrap gap-y-2 px-3 py-1 rounded-full text-lg"
                           >
-                            <span className="max-w-[220px] md:max-w-[400px] p-2">
+                            {/* <span className="max-w-[220px] md:max-w-[400px] p-2">
                               {defectInfo
                                 ? getDefectName(defectInfo)
                                 : defect.name}
-                            </span>
-                            <div className="flex items-center space-x-2">
+                            </span> */}
+                            <div className="flex items-center flex-grow mr-2">
+                              <span className="truncate">
+                                {defectInfo ? getDefectName(defectInfo) : defect.name}
+                              </span>
+                              <span className={`font-semibold ${defectSeverityColor} mr-2`}>
+                                {`(${defectSeverityText})`}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2"> 
                               <button
                                 onClick={() => decrementDefect(defectIndex)}
                                 className="bg-gray-300 text-gray-700 px-2 py-1 rounded-l hover:bg-gray-400"
@@ -1210,6 +1332,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
                         ))}
                       </select>
                     </div>
+                    
                   </div>
                 </div>
               </div>
@@ -1261,6 +1384,18 @@ const fetchInspectionsCompleted = useCallback(async () => {
                 </button>
               </div>
             </div>
+
+             {/* Overall Status Display for Current Garment */}
+                    <div className="mt-6 pt-4 border-t border-gray-300">
+                      <h4 className="text-md font-semibold text-gray-700 mb-2">
+                        {t("qcRoving.rovingStatus", "Roving Status")}
+                      </h4>
+                      <span
+                        className={`px-4 py-2 rounded-full text-lg font-semibold ${overallStatusColor}`}
+                      >
+                        {overallStatusText}
+                      </span>
+                    </div>
 
             <div className="flex justify-center mt-6 space-x-4">
               <button
@@ -1317,7 +1452,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
               />
             )}
 
-            {showSpiCamera && (
+            {/* {showSpiCamera && (
               <RovingCamera
                 isOpen={showSpiCamera}
                 onClose={() => setShowSpiCamera(false)}
@@ -1326,9 +1461,9 @@ const fetchInspectionsCompleted = useCallback(async () => {
                 type="spi"
                 empId={user?.emp_id || "Guest"}
               />
-            )}
+            )} */}
 
-            {showMeasurementCamera && (
+            {/* {showMeasurementCamera && (
               <RovingCamera
                 isOpen={showMeasurementCamera}
                 onClose={() => setShowMeasurementCamera(false)}
@@ -1337,7 +1472,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
                 type="measurement"
                 empId={user?.emp_id || "Guest"}
               />
-            )}
+            )} */}
           </>
         ) : activeTab === "data" ? (
           <RovingData />
@@ -1352,5 +1487,3 @@ const fetchInspectionsCompleted = useCallback(async () => {
 };
 
 export default RovingPage;
-
-

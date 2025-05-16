@@ -30,9 +30,9 @@ const qcInlineRovingSchema = new mongoose.Schema(
             operation_kh_name: { type: String, required: true },
             type: { type: String, required: true },
             spi: { type: String, required: true },
-            spi_image: { type: String }, // Path to the SPI image
+            spi_images: [{type: String}], // Path to the SPI image
             measurement: { type: String, required: true },
-            measurement_image: { type: String }, // Path to the Measurement image
+            measurement_images: [ {type: String} ], // Path to the Measurement image
             checked_quantity: { type: Number, required: true },
             inspection_time: { type: String, required: true }, // Store as string in HH:MM:SS
             qualityStatus: { type: String, required: true },
