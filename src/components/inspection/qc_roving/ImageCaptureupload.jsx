@@ -9,7 +9,7 @@ const ImageCaptureUpload = ({
   imageType, // 'spi' or 'measurement'
   maxImages = 5,
   onImageFilesChange, // (files: File[]) => void
-  inspectionData, // { date: string (YYYY-MM-DD), lineNo: string, moNo: string, operationId: string }
+  inspectionData, 
 }) => {
   const { t } = useTranslation();
   const [imageFiles, setImageFiles] = useState([]); // Stores File objects

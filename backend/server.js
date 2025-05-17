@@ -8472,9 +8472,9 @@ app.post('/api/roving/upload-roving-image', rovingUpload.single('imageFile'), as
         }
         const imageIndex = existingImageCount + 1;
 
-        if (imageIndex > 5) { // Max 5 images per context
-             return res.status(400).json({ success: false, message: 'Maximum 5 images allowed for this context.' });
-        }
+        // if (imageIndex > 5) { // Max 5 images per context
+        //      return res.status(400).json({ success: false, message: 'Maximum 5 images allowed for this context.' });
+        // }
 
         const fileExtension = path.extname(imageFile.originalname);
         const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
