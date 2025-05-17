@@ -36,6 +36,7 @@ import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
 
 import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
+import createSewingDefectsModel from "./models/SewingDefects.js";
 import createCuttingMeasurementPointModel from "./models/CuttingMeasurementPoints.js"; // New model import
 import createCuttingFabricDefectModel from "./models/CuttingFabricDefects.js";
 import createCuttingIssueModel from "./models/CuttingIssues.js";
@@ -157,6 +158,7 @@ const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection); // New model
 const CuttingFabricDefect = createCuttingFabricDefectModel(ymProdConnection);
 const CuttingIssue = createCuttingIssueModel(ymProdConnection);
 const AQLChart = createAQLChartModel(ymProdConnection);
+const SewingDefects = createSewingDefectsModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -2006,6 +2008,31 @@ const normalizeDateString = (dateStr) => {
     return dateStr; // Fallback
   }
 };
+
+/* ------------------------------
+   End Points - SewingDefects
+------------------------------ */
+app.get("/api/sewing-defects", async (req, res) => {
+  try {
+    // Extract query parameters
+    const { categoryEnglish, type, isCommon } = req.query;
+
+    // Build filter object based on provided query parameters
+    const filter = {};
+    if (categoryEnglish) filter.categoryEnglish = categoryEnglish;
+    if (type) filter.type = type;
+    if (isCommon) filter.isCommon = isCommon;
+
+    // Fetch defects from the database
+    const defects = await SewingDefects.find(filter);
+
+    // Send the response with fetched defects
+    res.json(defects);
+  } catch (error) {
+    // Handle errors
+    res.status(500).json({ message: error.message });
+  }
+});
 
 /* ------------------------------
    End Points - dt_orders
@@ -6759,196 +6786,870 @@ app.get("/api/opa-autocomplete", async (req, res) => {
    QC Inline Roving ENDPOINTS
 ------------------------------ */
 
-// ------------------------
-// Multer Storage Setup for QC Inline Roving
-// ------------------------
-const qcStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, "../public/storage/qcinline");
-    // Create directory if it doesn't exist
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const { date, type, emp_id } = req.body;
-    // Validate the inputs to prevent 'undefined' in the filename
-    const currentDate = date || new Date().toISOString().split("T")[0]; // Fallback to current date if not provided
-    const imageType = type || "spi-measurement"; // Fallback to 'unknown' if type is not provided
-    const userEmpId = emp_id || "emp"; // Fallback to 'guest' if emp_id is not provided
-    const randomId = Math.random().toString(36).substring(2, 15);
-    const fileName = `${currentDate}-${imageType}-${userEmpId}-${randomId}.jpg`;
-    cb(null, fileName);
+/* ------------------------------
+   QC Inline Roving New
+------------------------------ */
+app.get("/api/line-summary", async (req, res) => {
+  try {
+    const lineSummaries = await UserMain.aggregate([
+      {
+        $match: {
+          sect_name: { $ne: null, $ne: "" },
+          working_status: "Working",
+          job_title: "Sewing Worker"
+        }
+      },
+      {
+        $group: {
+          _id: "$sect_name",
+          worker_count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          line_no: "$_id",
+          // worker_count: 1
+          real_worker_count: "$worker_count"
+        }
+      },
+      { $sort: { line_no: 1 } }
+    ]);
+    const editedCountsDocs = await LineSewingWorker.find(
+      {},
+      "line_no edited_worker_count"
+    ).lean();
+    const editedCountsMap = new Map(
+      editedCountsDocs.map((doc) => [doc.line_no, doc.edited_worker_count])
+    );
+
+    const mergedSummaries = lineSummaries.map((realSummary) => ({
+      ...realSummary,
+      edited_worker_count: editedCountsMap.get(realSummary.line_no) // Can be undefined if no edit
+    }));
+
+    res.json(mergedSummaries);
+  } catch (error) {
+    console.error("Error fetching line summary:", error);
+    res.status(500).json({
+      message: "Failed to fetch line summary data.",
+      error: error.message
+    });
   }
 });
 
-const qcUpload = multer({
-  storage: qcStorage,
-  limits: { fileSize: 5000000 }, // Limit file size to 5MB
-  fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png|gif/;
-    const extname = filetypes.test(
-      path.extname(file.originalname).toLowerCase()
-    );
-    const mimetype = filetypes.test(file.mimetype);
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb("Error: Images Only (jpeg, jpg, png, gif)!");
-    }
+// New PUT endpoint to save/update edited line worker counts
+app.put("/api/line-sewing-workers/:lineNo", async (req, res) => {
+  // Assuming authenticateUser middleware sets req.user
+  const { lineNo } = req.params;
+  const { edited_worker_count } = req.body;
+
+  // Placeholder for user details if authentication is not fully set up yet
+  // In a real app, req.user would be populated by an authentication middleware
+  // const user = req.user || { emp_id: 'SYSTEM_USER', eng_name: 'System Edit' };
+  // const { emp_id: updated_by_emp_id, eng_name: updated_by_name } = user;
+
+  if (
+    typeof edited_worker_count !== "number" ||
+    edited_worker_count < 0 ||
+    !Number.isInteger(edited_worker_count)
+  ) {
+    return res
+      .status(400)
+      .json({ message: "Edited worker count must be a non-negative integer." });
   }
-}).single("image");
 
-// Serve static files (for accessing uploaded images)
-app.use("/storage", express.static(path.join(__dirname, "../public/storage")));
-
-// Endpoint to upload images for QC Inline Roving
-app.post("/api/upload-qc-image", qcUpload, (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: "No image uploaded" });
-    }
-    const imagePath = `/storage/qcinline/${req.file.filename}`;
-    res.status(200).json({ imagePath });
+    const now = new Date();
+    const realCountResult = await UserMain.aggregate([
+      {
+        $match: {
+          sect_name: lineNo, // Match the specific line number
+          working_status: "Working",
+          job_title: "Sewing Worker"
+        }
+      },
+      {
+        $group: {
+          _id: null, // Group all matching documents for this line
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const current_real_worker_count =
+      realCountResult.length > 0 ? realCountResult[0].count : 0;
+    const historyEntry = {
+      edited_worker_count,
+      // updated_by_emp_id,
+      // updated_by_name,
+      updated_at: now
+    };
+
+    const updatedLineWorker = await LineSewingWorker.findOneAndUpdate(
+      { line_no: lineNo },
+      {
+        $set: {
+          real_worker_count: current_real_worker_count,
+          edited_worker_count,
+          // updated_by_emp_id,
+          // updated_by_name,
+          updated_at: now
+        },
+        $push: { history: historyEntry } // Push the new state to history
+      },
+      { new: true, upsert: true, runValidators: true } // upsert: true creates if not found
+    );
+
+    res.json({
+      message: "Line worker count updated successfully.",
+      data: updatedLineWorker
+    });
   } catch (error) {
-    console.error("Error uploading image:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to upload image", error: error.message });
+    console.error(
+      `Error updating line worker count for line ${lineNo}:`,
+      error
+    );
+    res.status(500).json({
+      message: "Failed to update line worker count.",
+      error: error.message
+    });
   }
 });
 
 // Updated endpoint to save or update QC Inline Roving data
 app.post("/api/save-qc-inline-roving", async (req, res) => {
   try {
-    const qcInlineRovingData = req.body;
+    // const qcInlineRovingData = req.body;
 
-    const { inspection_date, line_no, mo_no } = qcInlineRovingData;
+    // Create a new instance of the QCInlineRoving model with the data from the request body
+    // const newQCInlineRoving = new QCInlineRoving(qcInlineRovingData);
 
-    // Check if a record exists with the same emp_id and inspection_date
-    let existingRecord = await QCInlineRoving.findOne({
+    // Save the new QCInlineRoving document to the database
+    // await newQCInlineRoving.save();
+
+    // res.status(201).json({
+    //   message: "QC Inline Roving data saved successfully",
+    //   data: newQCInlineRoving
+    // });
+
+    const {
       inspection_date,
+      mo_no,
       line_no,
-      mo_no
-    });
+      report_name, // Optional: for creating a new report or updating an existing one
+      inspection_rep_item // The actual inspection data for the current round
+    } = req.body;
 
-    if (existingRecord) {
-      // If a matching record exists, append the new inlineData to the existing record
-      existingRecord.inlineData.push(qcInlineRovingData.inlineData[0]);
-      await existingRecord.save();
+    // Validate essential data
+    if (!inspection_date || !mo_no || !line_no || !inspection_rep_item) {
+      return res.status(400).json({
+        message:
+          "Missing required fields: inspection_date, mo_no, line_no, or inspection_rep_item."
+      });
+    }
+    if (
+      typeof inspection_rep_item !== "object" ||
+      inspection_rep_item === null
+    ) {
+      return res
+        .status(400)
+        .json({ message: "inspection_rep_item must be a valid object." });
+    }
+    if (
+      !inspection_rep_item.inspection_rep_name ||
+      !inspection_rep_item.emp_id ||
+      !inspection_rep_item.eng_name
+    ) {
+      return res.status(400).json({
+        message:
+          "inspection_rep_item is missing required fields like inspection_rep_name, emp_id, or eng_name."
+      });
+    }
+
+    let doc = await QCInlineRoving.findOne({ inspection_date, mo_no, line_no });
+
+    if (doc) {
+      // Document exists
+      const existingRepIndex = doc.inspection_rep.findIndex(
+        (rep) =>
+          rep.inspection_rep_name === inspection_rep_item.inspection_rep_name
+      );
+
+      if (existingRepIndex !== -1) {
+        const repToUpdate = doc.inspection_rep[existingRepIndex];
+
+        // Ensure inlineData is an array
+        if (!Array.isArray(repToUpdate.inlineData)) {
+          repToUpdate.inlineData = [];
+        }
+
+        // inspection_rep_item.inlineData from the request is an array with a single element: [singleOperatorInspectionData]
+        if (
+          inspection_rep_item.inlineData &&
+          inspection_rep_item.inlineData.length > 0
+        ) {
+          repToUpdate.inlineData.push(inspection_rep_item.inlineData[0]);
+        }
+
+        // Update summary fields from the request (frontend calculates these cumulatively)
+        repToUpdate.inspection_rep_name =
+          inspection_rep_item.inspection_rep_name; // Should match
+        repToUpdate.emp_id = inspection_rep_item.emp_id; // Inspector for this rep
+        repToUpdate.eng_name = inspection_rep_item.eng_name; // Inspector for this rep
+        repToUpdate.total_operators = inspection_rep_item.total_operators; // Assumed correct from frontend for the line
+        repToUpdate.complete_inspect_operators = repToUpdate.inlineData.length; // Calculated by backend
+        repToUpdate.Inspect_status =
+          repToUpdate.total_operators > 0 &&
+          repToUpdate.complete_inspect_operators >= repToUpdate.total_operators
+            ? "Completed"
+            : "Not Complete";
+      } else {
+        // Add new inspection_rep item if array is not full
+        if (doc.inspection_rep.length < 5) {
+          const newRepItem = { ...inspection_rep_item }; // Copy from request
+          if (!Array.isArray(newRepItem.inlineData)) {
+            // Ensure inlineData is an array
+            newRepItem.inlineData = [];
+          }
+          // Backend calculates these for the new rep item
+          newRepItem.complete_inspect_operators = newRepItem.inlineData.length;
+          newRepItem.Inspect_status =
+            newRepItem.total_operators > 0 &&
+            newRepItem.complete_inspect_operators >= newRepItem.total_operators
+              ? "Completed"
+              : "Not Complete";
+          doc.inspection_rep.push(newRepItem);
+        } else {
+          return res.status(400).json({
+            message:
+              "Maximum number of 5 inspection reports already recorded for this combination."
+          });
+        }
+      }
+
+      if (report_name && doc.report_name !== report_name) {
+        doc.report_name = report_name;
+      }
+
+      await doc.save();
       res.status(200).json({
-        message: "QC Inline Roving data updated successfully",
-        data: existingRecord
+        message: "QC Inline Roving data updated successfully.",
+        data: doc
       });
     } else {
-      // If no matching record exists, create a new one
-      const newQCInlineRoving = new QCInlineRoving(qcInlineRovingData);
-      await newQCInlineRoving.save();
+      // Document does not exist, create a new one
+      const lastDoc = await QCInlineRoving.findOne()
+        .sort({ inline_roving_id: -1 })
+        .select("inline_roving_id");
+      const newId =
+        lastDoc && typeof lastDoc.inline_roving_id === "number"
+          ? lastDoc.inline_roving_id + 1
+          : 1;
+
+      const initialRepItem = { ...inspection_rep_item }; // Copy from request
+      if (!Array.isArray(initialRepItem.inlineData)) {
+        // Ensure inlineData is an array
+        initialRepItem.inlineData = [];
+      }
+      // Backend calculates these for the initial rep item
+      initialRepItem.complete_inspect_operators =
+        initialRepItem.inlineData.length;
+      initialRepItem.Inspect_status =
+        initialRepItem.total_operators > 0 &&
+        initialRepItem.complete_inspect_operators >=
+          initialRepItem.total_operators
+          ? "Completed"
+          : "Not Complete";
+
+      const newQCInlineRovingDoc = new QCInlineRoving({
+        inline_roving_id: newId,
+        report_name:
+          report_name ||
+          `Report for ${inspection_date} - ${line_no} - ${mo_no}`,
+        inspection_date,
+        mo_no,
+        line_no,
+        inspection_rep: [initialRepItem] // Start with the current rep
+      });
+      await newQCInlineRovingDoc.save();
       res.status(201).json({
-        message: "QC Inline Roving data saved successfully",
-        data: newQCInlineRoving
+        message:
+          "QC Inline Roving data saved successfully (new record created).",
+        data: newQCInlineRovingDoc
       });
     }
   } catch (error) {
-    console.error("Error saving QC Inline Roving data:", error);
+    // console.error("Error saving QC Inline Roving data:", error);
+    console.error("Error saving/updating QC Inline Roving data:", error);
     res.status(500).json({
-      message: "Failed to save QC Inline Roving data",
+      // message: "Failed to save QC Inline Roving data",
+      message: "Failed to save/update QC Inline Roving data",
       error: error.message
     });
   }
 });
 
-// Endpoint to fetch QC Inline Roving reports
-app.get("/api/qc-inline-roving-reports", async (req, res) => {
+// Helper function to get ordinal string (1st, 2nd, 3rd, etc.)
+function getOrdinal(n) {
+  if (n <= 0) return String(n);
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0] || "th"); // Added "th" as a final fallback
+}
+
+// Endpoint to get the current inspection time ordinal (1st, 2nd, etc.)
+app.get("/api/qc-inline-roving/inspection-time-info", async (req, res) => {
   try {
-    const reports = await QCInlineRoving.find();
-    res.json(reports);
+    const { line_no, inspection_date } = req.query;
+
+    if (!line_no || !inspection_date) {
+      return res
+        .status(400)
+        .json({ message: "Line number and inspection date are required." });
+    }
+
+    // Validate date format (MM/DD/YYYY) - Adjust if your frontend sends a different format
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(inspection_date)) {
+      return res.status(400).json({
+        message: "Invalid inspection date format. Expected MM/DD/YYYY."
+      });
+    }
+
+    // 1. Fetch Target Worker Count from LineSewingWorker
+    const lineWorkerInfo = await LineSewingWorker.findOne({ line_no });
+    if (!lineWorkerInfo) {
+      return res.json({ inspectionTimeOrdinal: "N/A (Line not configured)" });
+    }
+    // Prioritize edited_worker_count, it's required in the schema so should exist.
+    const target_worker_count = lineWorkerInfo.edited_worker_count;
+
+    if (target_worker_count === 0) {
+      return res.json({ inspectionTimeOrdinal: "N/A (Target 0 workers)" });
+    }
+
+    // 2. Fetch QC Roving Data for the given line and date
+    const rovingRecords = await QCInlineRoving.find({
+      line_no: line_no,
+      inspection_date: inspection_date // Assumes inspection_date in DB is MM/DD/YYYY
+    });
+
+    if (rovingRecords.length === 0) {
+      return res.json({ inspectionTimeOrdinal: getOrdinal(1) }); // "1st"
+    }
+
+    // 3. Process Roving Data to count inspections per operator
+    const operatorInspectionCounts = {};
+    rovingRecords.forEach((record) => {
+      record.inlineData.forEach((entry) => {
+        const operatorId = entry.operator_emp_id;
+        if (operatorId) {
+          // Ensure operatorId is valid
+          operatorInspectionCounts[operatorId] =
+            (operatorInspectionCounts[operatorId] || 0) + 1;
+        }
+      });
+    });
+
+    if (Object.keys(operatorInspectionCounts).length === 0) {
+      return res.json({ inspectionTimeOrdinal: getOrdinal(1) }); // "1st" if records exist but no valid operator data
+    }
+
+    // 4. Calculate Completed Rounds
+    let completed_rounds = 0;
+    for (let round_num = 1; round_num <= 5; round_num++) {
+      let operators_finished_this_round = 0;
+      for (const operator_id in operatorInspectionCounts) {
+        if (operatorInspectionCounts[operator_id] >= round_num) {
+          operators_finished_this_round++;
+        }
+      }
+      if (operators_finished_this_round >= target_worker_count) {
+        completed_rounds = round_num;
+      } else {
+        break;
+      }
+    }
+
+    const current_inspection_time_number = completed_rounds + 1;
+    const ordinal =
+      current_inspection_time_number > 5
+        ? `${getOrdinal(5)} (Completed)`
+        : getOrdinal(current_inspection_time_number);
+
+    res.json({ inspectionTimeOrdinal: ordinal });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching reports", error });
+    console.error("Error fetching inspection time info:", error);
+    res.status(500).json({
+      message: "Failed to fetch inspection time info.",
+      error: error.message
+    });
   }
 });
 
-// New endpoint to fetch filtered QC Inline Roving reports with date handling
-app.get("/api/qc-inline-roving-reports-filtered", async (req, res) => {
+app.get("/api/inspections-completed", async (req, res) => {
+  const { line_no, inspection_date, mo_no, operation_id, inspection_rep_name } =
+    req.query;
+
   try {
-    const { startDate, endDate, line_no, mo_no, emp_id } = req.query;
+    const findQuery = {
+      line_no,
+      inspection_date
+    };
 
-    let match = {};
-
-    // Date filtering using $expr for string dates
-    if (startDate || endDate) {
-      match.$expr = match.$expr || {};
-      match.$expr.$and = match.$expr.$and || [];
-      if (startDate) {
-        const normalizedStartDate = normalizeDateString(startDate);
-        match.$expr.$and.push({
-          $gte: [
-            {
-              $dateFromString: {
-                dateString: "$inspection_date",
-                format: "%m/%d/%Y"
-              }
-            },
-            {
-              $dateFromString: {
-                dateString: normalizedStartDate,
-                format: "%m/%d/%Y"
-              }
-            }
-          ]
-        });
-      }
-      if (endDate) {
-        const normalizedEndDate = normalizeDateString(endDate);
-        match.$expr.$and.push({
-          $lte: [
-            {
-              $dateFromString: {
-                dateString: "$inspection_date",
-                format: "%m/%d/%Y"
-              }
-            },
-            {
-              $dateFromString: {
-                dateString: normalizedEndDate,
-                format: "%m/%d/%Y"
-              }
-            }
-          ]
-        });
-      }
-    }
-
-    // Other filters
-    if (line_no) {
-      match.line_no = line_no;
-    }
     if (mo_no) {
-      match.mo_no = mo_no;
-    }
-    if (emp_id) {
-      match.emp_id = emp_id;
+      findQuery.mo_no = mo_no;
     }
 
-    const reports = await QCInlineRoving.find(match);
+    const elemMatchConditions = { inspection_rep_name };
+    if (operation_id) {
+      elemMatchConditions["inlineData.tg_no"] = operation_id; // Assuming operation_id maps to tg_no
+    }
+
+    findQuery.inspection_rep = { $elemMatch: elemMatchConditions };
+
+    const inspection = await QCInlineRoving.findOne(findQuery);
+
+    if (!inspection) {
+      // return res.status(404).json({ message: 'Inspection not found' });
+      return res.json({ completeInspectOperators: 0 });
+    }
+
+    // Find the specific inspection_rep entry that matches the request
+    const specificRep = inspection.inspection_rep.find(
+      (rep) => rep.inspection_rep_name === inspection_rep_name
+    );
+
+    if (!specificRep) {
+      // This case should ideally not be reached if $elemMatch worked and data is consistent
+      return res.json({ completeInspectOperators: 0 });
+    }
+    const completeInspectOperators =
+      specificRep.complete_inspect_operators || 0;
+
+    res.json({ completeInspectOperators });
+  } catch (error) {
+    console.error("Error fetching inspections completed:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.get("/api/qc-inline-roving-reports/filtered", async (req, res) => {
+  try {
+    const { inspection_date, qcId, operatorId, lineNo, moNo } = req.query;
+    let queryConditions = {};
+
+    if (inspection_date) {
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(inspection_date)) {
+        const parts = inspection_date.split("/");
+        const month = parseInt(parts[0], 10);
+        const day = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+
+        // Construct a regex to match M/D/YYYY, MM/D/YYYY, M/DD/YYYY, MM/DD/YYYY
+        // e.g., for "05/08/2025", monthRegexPart = "0?5", dayRegexPart = "0?8"
+        const monthRegexPart = month < 10 ? `0?${month}` : `${month}`;
+        const dayRegexPart = day < 10 ? `0?${day}` : `${day}`;
+
+        const dateRegex = new RegExp(
+          `^${monthRegexPart}\\/${dayRegexPart}\\/${year}$`
+        );
+        queryConditions.inspection_date = { $regex: dateRegex };
+      } else {
+        console.warn(
+          "Received date for filtering is not in MM/DD/YYYY format:",
+          inspection_date,
+          "- Date filter will not be applied effectively."
+        );
+      }
+    }
+
+    if (qcId) {
+      queryConditions.emp_id = qcId;
+    }
+
+    if (lineNo) {
+      queryConditions.line_no = lineNo;
+    }
+
+    if (moNo) {
+      queryConditions.mo_no = moNo;
+    }
+
+    if (operatorId) {
+      const orConditions = [{ operator_emp_id: operatorId }]; // Match as string
+      // If operatorId is purely numeric, also try matching as a number
+      if (/^\d+$/.test(operatorId)) {
+        orConditions.push({ operator_emp_id: parseInt(operatorId, 10) });
+      }
+      queryConditions.inlineData = { $elemMatch: { $or: orConditions } };
+    }
+
+    const reports = await QCInlineRoving.find(queryConditions);
     res.json(reports);
   } catch (error) {
-    console.error("Error fetching filtered roving reports:", error);
-    res.status(500).json({ message: "Error fetching filtered reports", error });
+    console.error("Error fetching filtered QC inline roving reports:", error);
+    res.status(500).json({
+      message: "Failed to fetch filtered reports",
+      error: error.message
+    });
   }
 });
 
-// Endpoint to fetch distinct MO Nos
-app.get("/api/qc-inline-roving-mo-nos", async (req, res) => {
-  try {
-    const moNos = await QCInlineRoving.distinct("mo_no");
-    res.json(moNos.filter((mo) => mo)); // Filter out null/empty values
-  } catch (error) {
-    console.error("Error fetching MO Nos:", error);
-    res.status(500).json({ message: "Failed to fetch MO Nos" });
+// Helper to sanitize inputs for filenames/paths to prevent path traversal and invalid characters
+const sanitize = (input) => {
+  if (typeof input !== "string") input = String(input);
+  // Remove potentially harmful characters, allow alphanumeric, hyphens, underscores
+  let sane = input.replace(/[^a-zA-Z0-9-_]/g, "_");
+  // Prevent names like "." or ".."
+  if (sane === "." || sane === "..") return "_";
+  return sane;
+};
+
+// Multer setup for memory storage (we'll write to disk manually)
+const rovingStorage = multer.memoryStorage();
+const rovingUpload = multer({
+  storage: rovingStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit per file
+  fileFilter: (req, file, cb) => {
+    const allowedExtensions = /^(jpeg|jpg|png|gif)$/i;
+    const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i; // pjpeg for some older browsers
+
+    // Get extension without dot, and lowercase
+    const fileExt = path.extname(file.originalname).toLowerCase().substring(1);
+    const isExtAllowed = allowedExtensions.test(fileExt);
+    // Lowercase mimetype for robust comparison
+    const isMimeAllowed = allowedMimeTypes.test(file.mimetype.toLowerCase());
+
+    if (isMimeAllowed && isExtAllowed) {
+      cb(null, true); // Accept the file
+    } else {
+      // THIS IS THE CRUCIAL LOG TO CHECK ON YOUR SERVER CONSOLE:
+      console.error(
+        `File rejected by filter: name='${file.originalname}', mime='${file.mimetype}', ext='${fileExt}'. IsMimeAllowed: ${isMimeAllowed}, IsExtAllowed: ${isExtAllowed}`
+      );
+      cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)")); // Reject the file
+    }
   }
 });
+
+// ... rest of your server.js ...
+
+// Your route handler for image upload
+app.post(
+  "/api/roving/upload-roving-image",
+  rovingUpload.single("imageFile"),
+  async (req, res) => {
+    try {
+      const { imageType, date, lineNo, moNo, operationId } = req.body;
+      const imageFile = req.file; // This will be undefined if fileFilter rejected the file
+
+      // This log was added in a previous step, it's helpful to see what the route receives
+      // console.log('Backend /upload-roving-image received:', {
+      //     file: imageFile ? { originalname: imageFile.originalname, mimetype: imageFile.mimetype, size: imageFile.size } : 'No file object',
+      //     body: req.body,
+      //     fileValidationError: req.fileValidationError // Multer might attach error here
+      // });
+
+      if (!imageFile) {
+        // If fileFilter called cb(new Error(...)), Multer usually sets req.fileValidationError
+        // or the error from fileFilter is caught in the main catch block.
+        const errorMessage =
+          req.fileValidationError ||
+          (req.multerError && req.multerError.message) ||
+          "No image file provided or file rejected by filter.";
+        return res.status(400).json({ success: false, message: errorMessage });
+      }
+
+      // Metadata validation
+      if (
+        !date ||
+        !lineNo ||
+        lineNo === "NA_Line" ||
+        !moNo ||
+        moNo === "NA_MO" ||
+        !operationId ||
+        operationId === "NA_Op"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Missing or invalid required metadata: date, lineNo, moNo, operationId must be actual values."
+        });
+      }
+      if (
+        !imageType ||
+        !["spi", "measurement"].includes(imageType.toLowerCase())
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid image type. Must be "spi" or "measurement".'
+        });
+      }
+
+      const sanitizedDate = sanitize(date);
+      const sanitizedLineNo = sanitize(lineNo);
+      const sanitizedMoNo = sanitize(moNo);
+      const sanitizedOperationId = sanitize(operationId);
+      const upperImageType = imageType.toUpperCase();
+
+      const targetDir = path.resolve(
+        __dirname,
+        "..",
+        "public",
+        "storage",
+        "roving",
+        upperImageType
+      );
+
+      await fsPromises.mkdir(targetDir, { recursive: true });
+
+      const imagePrefix = `${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
+      let existingImageCount = 0;
+      try {
+        const filesInDir = await fsPromises.readdir(targetDir);
+        filesInDir.forEach((file) => {
+          if (file.startsWith(imagePrefix)) {
+            existingImageCount++;
+          }
+        });
+      } catch (readDirError) {
+        if (readDirError.code !== "ENOENT") {
+          // Ignore if directory doesn't exist yet
+          console.error(
+            "Error reading directory for indexing:",
+            targetDir,
+            readDirError
+          );
+        }
+      }
+      const imageIndex = existingImageCount + 1;
+
+      // if (imageIndex > 5) { // Max 5 images per context
+      //      return res.status(400).json({ success: false, message: 'Maximum 5 images allowed for this context.' });
+      // }
+
+      const fileExtension = path.extname(imageFile.originalname);
+      const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
+      const filePathInPublic = path.join(targetDir, newFilename);
+
+      await fsPromises.writeFile(filePathInPublic, imageFile.buffer);
+      const publicUrl = `/storage/roving/${upperImageType}/${newFilename}`; // Relative URL for client
+
+      res.json({ success: true, filePath: publicUrl, filename: newFilename });
+    } catch (error) {
+      console.error("Error uploading roving image:", error);
+      // Check if the error is from Multer's fileFilter specifically
+      if (error.message && error.message.startsWith("Error: Images Only!")) {
+        return res.status(400).json({ success: false, message: error.message });
+      }
+      // Handle other Multer errors (like file size limit)
+      if (error instanceof multer.MulterError) {
+        return res
+          .status(400)
+          .json({ success: false, message: `Multer error: ${error.message}` });
+      }
+      // Generic server error
+      res
+        .status(500)
+        .json({ success: false, message: "Server error during image upload." });
+    }
+  }
+);
+
+//Old end points
+
+// // ------------------------
+// // Multer Storage Setup for QC Inline Roving
+// // ------------------------
+// const qcStorage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     const uploadPath = path.join(__dirname, "../public/storage/qcinline");
+//     // Create directory if it doesn't exist
+//     if (!fs.existsSync(uploadPath)) {
+//       fs.mkdirSync(uploadPath, { recursive: true });
+//     }
+//     cb(null, uploadPath);
+//   },
+//   filename: (req, file, cb) => {
+//     const { date, type, emp_id } = req.body;
+//     // Validate the inputs to prevent 'undefined' in the filename
+//     const currentDate = date || new Date().toISOString().split("T")[0]; // Fallback to current date if not provided
+//     const imageType = type || "spi-measurement"; // Fallback to 'unknown' if type is not provided
+//     const userEmpId = emp_id || "emp"; // Fallback to 'guest' if emp_id is not provided
+//     const randomId = Math.random().toString(36).substring(2, 15);
+//     const fileName = `${currentDate}-${imageType}-${userEmpId}-${randomId}.jpg`;
+//     cb(null, fileName);
+//   }
+// });
+
+// const qcUpload = multer({
+//   storage: qcStorage,
+//   limits: { fileSize: 5000000 }, // Limit file size to 5MB
+//   fileFilter: (req, file, cb) => {
+//     const filetypes = /jpeg|jpg|png|gif/;
+//     const extname = filetypes.test(
+//       path.extname(file.originalname).toLowerCase()
+//     );
+//     const mimetype = filetypes.test(file.mimetype);
+//     if (mimetype && extname) {
+//       return cb(null, true);
+//     } else {
+//       cb("Error: Images Only (jpeg, jpg, png, gif)!");
+//     }
+//   }
+// }).single("image");
+
+// // Serve static files (for accessing uploaded images)
+// app.use("/storage", express.static(path.join(__dirname, "../public/storage")));
+
+// // Endpoint to upload images for QC Inline Roving
+// app.post("/api/upload-qc-image", qcUpload, (req, res) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ message: "No image uploaded" });
+//     }
+//     const imagePath = `/storage/qcinline/${req.file.filename}`;
+//     res.status(200).json({ imagePath });
+//   } catch (error) {
+//     console.error("Error uploading image:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to upload image", error: error.message });
+//   }
+// });
+
+// // Updated endpoint to save or update QC Inline Roving data
+// app.post("/api/save-qc-inline-roving", async (req, res) => {
+//   try {
+//     const qcInlineRovingData = req.body;
+
+//     const { inspection_date, line_no, mo_no } = qcInlineRovingData;
+
+//     // Check if a record exists with the same emp_id and inspection_date
+//     let existingRecord = await QCInlineRoving.findOne({
+//       inspection_date,
+//       line_no,
+//       mo_no
+//     });
+
+//     if (existingRecord) {
+//       // If a matching record exists, append the new inlineData to the existing record
+//       existingRecord.inlineData.push(qcInlineRovingData.inlineData[0]);
+//       await existingRecord.save();
+//       res.status(200).json({
+//         message: "QC Inline Roving data updated successfully",
+//         data: existingRecord
+//       });
+//     } else {
+//       // If no matching record exists, create a new one
+//       const newQCInlineRoving = new QCInlineRoving(qcInlineRovingData);
+//       await newQCInlineRoving.save();
+//       res.status(201).json({
+//         message: "QC Inline Roving data saved successfully",
+//         data: newQCInlineRoving
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Error saving QC Inline Roving data:", error);
+//     res.status(500).json({
+//       message: "Failed to save QC Inline Roving data",
+//       error: error.message
+//     });
+//   }
+// });
+
+// //Dashboard Old Endpoints
+// // Endpoint to fetch QC Inline Roving reports
+// app.get("/api/qc-inline-roving-reports", async (req, res) => {
+//   try {
+//     const reports = await QCInlineRoving.find();
+//     res.json(reports);
+//   } catch (error) {
+//     res.status(500).json({ message: "Error fetching reports", error });
+//   }
+// });
+
+// // New endpoint to fetch filtered QC Inline Roving reports with date handling
+// app.get("/api/qc-inline-roving-reports-filtered", async (req, res) => {
+//   try {
+//     const { startDate, endDate, line_no, mo_no, emp_id } = req.query;
+
+//     let match = {};
+
+//     // Date filtering using $expr for string dates
+//     if (startDate || endDate) {
+//       match.$expr = match.$expr || {};
+//       match.$expr.$and = match.$expr.$and || [];
+//       if (startDate) {
+//         const normalizedStartDate = normalizeDateString(startDate);
+//         match.$expr.$and.push({
+//           $gte: [
+//             {
+//               $dateFromString: {
+//                 dateString: "$inspection_date",
+//                 format: "%m/%d/%Y"
+//               }
+//             },
+//             {
+//               $dateFromString: {
+//                 dateString: normalizedStartDate,
+//                 format: "%m/%d/%Y"
+//               }
+//             }
+//           ]
+//         });
+//       }
+//       if (endDate) {
+//         const normalizedEndDate = normalizeDateString(endDate);
+//         match.$expr.$and.push({
+//           $lte: [
+//             {
+//               $dateFromString: {
+//                 dateString: "$inspection_date",
+//                 format: "%m/%d/%Y"
+//               }
+//             },
+//             {
+//               $dateFromString: {
+//                 dateString: normalizedEndDate,
+//                 format: "%m/%d/%Y"
+//               }
+//             }
+//           ]
+//         });
+//       }
+//     }
+
+//     // Other filters
+//     if (line_no) {
+//       match.line_no = line_no;
+//     }
+//     if (mo_no) {
+//       match.mo_no = mo_no;
+//     }
+//     if (emp_id) {
+//       match.emp_id = emp_id;
+//     }
+
+//     const reports = await QCInlineRoving.find(match);
+//     res.json(reports);
+//   } catch (error) {
+//     console.error("Error fetching filtered roving reports:", error);
+//     res.status(500).json({ message: "Error fetching filtered reports", error });
+//   }
+// });
+
+// // Endpoint to fetch distinct MO Nos
+// app.get("/api/qc-inline-roving-mo-nos", async (req, res) => {
+//   try {
+//     const moNos = await QCInlineRoving.distinct("mo_no");
+//     res.json(moNos.filter((mo) => mo)); // Filter out null/empty values
+//   } catch (error) {
+//     console.error("Error fetching MO Nos:", error);
+//     res.status(500).json({ message: "Failed to fetch MO Nos" });
+//   }
+// });
 
 // Endpoint to fetch distinct QC IDs (emp_id)
 app.get("/api/qc-inline-roving-qc-ids", async (req, res) => {
