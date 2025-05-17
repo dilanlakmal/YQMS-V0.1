@@ -649,7 +649,8 @@
     "additionalImage": "Additional Image",
     "noCuttingIssuesReported": "No cutting issues reported for this size.",
     "failedToFetchQcInspectors": "Failed to fetch QC inspectors.",
-    "inspectionDate": "Inspection Date"
+    "inspectionDate": "Inspection Date",
+    "partName": "Part Name"
   },
 
   "common": {

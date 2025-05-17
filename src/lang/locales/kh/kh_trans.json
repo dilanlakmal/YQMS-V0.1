@@ -648,7 +648,8 @@
     "additionalImage": "រូបភាពបន្ថែម",
     "noCuttingIssuesReported": "គ្មានបញ្ហាការកាត់ត្រូវបានរាយការណ៍សម្រាប់ទំហំនេះទេ។",
     "failedToFetchQcInspectors": "បរាជ័យក្នុងការទាញយកអ្នកត្រួតពិនិត្យ QC",
-    "inspectionDate": "ថ្ងៃ​ចាប់ផ្តើម"
+    "inspectionDate": "ថ្ងៃ​ចាប់ផ្តើម",
+    "partName": "ឈ្មោះផ្នែក"
   },
 
   "common": {

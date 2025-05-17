@@ -648,7 +648,8 @@
     "additionalImage": "附加图片",
     "noCuttingIssuesReported": "此尺码未报告裁剪问题。",
     "failedToFetchQcInspectors": "获取QC检验员失败。",
-    "inspectionDate": "开始日期"
+    "inspectionDate": "开始日期",
+    "partName": "零件名称"
   },
 
   "common": {

@@ -578,13 +578,23 @@ const getResultStatus = (
   }
 
   // Logic for Pass/Fail based on totalInspectionQty and sumTotalReject
-  if (totalInspectionQty > 0 && totalInspectionQty < 75) {
+  if (totalInspectionQty >= 30 && totalInspectionQty < 45) {
+    if (sumTotalReject > 0) {
+      return { status: t("common.fail"), color: "bg-red-100 text-red-600" };
+    }
+    return { status: t("common.pass"), color: "bg-green-100 text-green-600" };
+  } else if (totalInspectionQty >= 45 && totalInspectionQty < 60) {
+    if (sumTotalReject > 0) {
+      return { status: t("common.fail"), color: "bg-red-100 text-red-600" };
+    }
+    return { status: t("common.pass"), color: "bg-green-100 text-green-600" };
+  } else if (totalInspectionQty >= 60 && totalInspectionQty < 90) {
     if (sumTotalReject > 1) {
       return { status: t("common.fail"), color: "bg-red-100 text-red-600" };
     }
     return { status: t("common.pass"), color: "bg-green-100 text-green-600" };
-  } else if (totalInspectionQty >= 75 && totalInspectionQty < 135) {
-    if (sumTotalReject > 1) {
+  } else if (totalInspectionQty >= 90 && totalInspectionQty < 135) {
+    if (sumTotalReject > 2) {
       return { status: t("common.fail"), color: "bg-red-100 text-red-600" };
     }
     return { status: t("common.pass"), color: "bg-green-100 text-green-600" };
@@ -593,12 +603,12 @@ const getResultStatus = (
       return { status: t("common.fail"), color: "bg-red-100 text-red-600" };
     }
     return { status: t("common.pass"), color: "bg-green-100 text-green-600" };
-  } else if (totalInspectionQty >= 210 && totalInspectionQty < 300) {
+  } else if (totalInspectionQty >= 210 && totalInspectionQty < 315) {
     if (sumTotalReject > 5) {
       return { status: t("common.fail"), color: "bg-red-100 text-red-600" };
     }
     return { status: t("common.pass"), color: "bg-green-100 text-green-600" };
-  } else if (totalInspectionQty >= 300) {
+  } else if (totalInspectionQty >= 315) {
     if (sumTotalReject > 7) {
       return { status: t("common.fail"), color: "bg-red-100 text-red-600" };
     }
