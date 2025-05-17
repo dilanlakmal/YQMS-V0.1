@@ -19,9 +19,10 @@ import CEDatabase from "../components/inspection/qc_roving/CEDatabase";
 import EmpQRCodeScanner from "../components/inspection/qc_roving/EmpQRCodeScanner";
 import PreviewRoving from "../components/inspection/qc_roving/PreviewRoving";
 import RovingCamera from "../components/inspection/qc_roving/RovingCamera";
-import RovingData from "../components/inspection/qc_roving/RovingData";
+import RovingData from "../components/inspection/qc_roving/RovingData"; 
 import InlineWorkers from "../components/inspection/qc_roving/InlineWorkers";
 import ImageCaptureUpload from "../components/inspection/qc_roving/ImageCaptureupload";
+import DefectBuyerStatus from "../components/inspection/qc_roving/defectBuyserStatus";
 
 const RovingPage = () => {
   const { t } = useTranslation();
@@ -152,9 +153,7 @@ const RovingPage = () => {
         });
 
         const completeInspectOperators = response.data.completeInspectOperators || 0;
-        console.log(
-          `Fetched completed inspections for Line: ${lineNo}, Date: ${formattedDate}, Rep: ${selectedManualInspectionRep}, MO: ${moNo} - Count: ${completeInspectOperators}`
-        );
+        
 
         setInspectionsCompletedForSelectedRep(completeInspectOperators);
       } catch (error) {
@@ -734,9 +733,19 @@ const RovingPage = () => {
               activeTab === "inlineWorkers"
                 ? "bg-blue-600 text-white"
                 : "bg-gray-200 text-gray-700"
-            } rounded-r-lg`}
+            }`}
           >
             {t("qcRoving.inlineWorkers")}
+          </button>
+          <button
+            onClick={() => setActiveTab("defectStatus")}
+            className={`px-4 py-2 ${
+              activeTab === "defectStatus"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700"
+            } rounded-r-lg`}
+          >
+            {t("qcRoving.defectStatus")}
           </button>
         </div>
 
@@ -1321,7 +1330,9 @@ const RovingPage = () => {
           <CEDatabase />
         ) : (
           <InlineWorkers onWorkerCountUpdated={fetchLineWorkerInfo} />
-        )}
+        ): activeTab === "db" ? (
+          <CEDatabase />
+        }
       </div>
     </div>
   );

@@ -468,7 +468,8 @@
     "next": "Next",
     "preview": "Preview",
     "finish_inspection": "Finish Inspection",
-    "inlineWorkers":"Inline Workers"
+    "inlineWorkers":"Inline Workers",
+    "defectStatus":"Defect Status"
   },
 
   "cutting": {

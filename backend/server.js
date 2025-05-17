@@ -7783,6 +7783,308 @@ app.post("/api/upload-qc-image", qcUpload, (req, res) => {
 });
 
 
+
+// Endpoint to fetch QC Inline Roving reports
+app.get("/api/qc-inline-roving-reports", async (req, res) => {
+  try {
+    const reports = await QCInlineRoving.find();
+    res.json(reports);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching reports", error });
+  }
+});
+
+// New endpoint to fetch filtered QC Inline Roving reports with date handling
+app.get("/api/qc-inline-roving-reports-filtered", async (req, res) => {
+  try {
+    const { startDate, endDate, line_no, mo_no, emp_id } = req.query;
+
+    let match = {};
+
+    // Date filtering using $expr for string dates
+    if (startDate || endDate) {
+      match.$expr = match.$expr || {};
+      match.$expr.$and = match.$expr.$and || [];
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+    }
+
+    // Other filters
+    if (line_no) {
+      match.line_no = line_no;
+    }
+    if (mo_no) {
+      match.mo_no = mo_no;
+    }
+    if (emp_id) {
+      match.emp_id = emp_id;
+    }
+
+    const reports = await QCInlineRoving.find(match);
+    res.json(reports);
+  } catch (error) {
+    console.error("Error fetching filtered roving reports:", error);
+    res.status(500).json({ message: "Error fetching filtered reports", error });
+  }
+});
+
+// Endpoint to fetch distinct MO Nos
+app.get("/api/qc-inline-roving-mo-nos", async (req, res) => {
+  try {
+    const moNos = await QCInlineRoving.distinct("mo_no");
+    res.json(moNos.filter((mo) => mo)); // Filter out null/empty values
+  } catch (error) {
+    console.error("Error fetching MO Nos:", error);
+    res.status(500).json({ message: "Failed to fetch MO Nos" });
+  }
+});
+
+// Endpoint to fetch distinct QC IDs (emp_id)
+app.get("/api/qc-inline-roving-qc-ids", async (req, res) => {
+  try {
+    const qcIds = await QCInlineRoving.distinct("emp_id");
+    res.json(qcIds.filter((id) => id)); // Filter out null/empty values
+  } catch (error) {
+    console.error("Error fetching QC IDs:", error);
+    res.status(500).json({ message: "Failed to fetch QC IDs" });
+  }
+});
+
+// Endpoint to fetch user data by emp_id
+app.get("/api/user-by-emp-id", async (req, res) => {
+  try {
+    const empId = req.query.emp_id;
+    if (!empId) {
+      return res.status(400).json({ error: "emp_id is required" });
+    }
+
+    const user = await UserMain.findOne({ emp_id: empId }).exec(); // Use UserMain
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      emp_id: user.emp_id,
+      eng_name: user.eng_name,
+      kh_name: user.kh_name,
+      job_title: user.job_title,
+      dept_name: user.dept_name,
+      sect_name: user.sect_name
+    });
+  } catch (err) {
+    console.error("Error fetching user by emp_id:", err);
+    res.status(500).json({
+      message: "Failed to fetch user data",
+      error: err.message
+    });
+  }
+});
+
+
+app.get("/api/users-paginated", async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const jobTitle = req.query.jobTitle || ""; // Optional jobTitle filter
+    const empId = req.query.empId || ""; // Optional empId filter
+    const section = req.query.section || ""; // Optional section filter
+
+    // Build the query object
+    const query = {};
+    if (jobTitle) {
+      query.job_title = jobTitle;
+    }
+    if (empId) {
+      query.emp_id = empId;
+    }
+    if (section) {
+      query.sect_name = section;
+    }
+    query.working_status = "Working"; // Ensure only working users are fetched
+
+    // Fetch users with pagination and filters
+    const users = await UserMain.find(query)
+      .skip(skip)
+      .limit(limit)
+      .select("emp_id eng_name kh_name dept_name sect_name job_title")
+      .exec();
+
+    // Get total count for pagination (with filters applied)
+    const total = await UserMain.countDocuments(query);
+
+    res.json({
+      users,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (err) {
+    console.error("Error fetching paginated users:", err);
+    res.status(500).json({
+      message: "Failed to fetch users",
+      error: err.message
+    });
+  }
+});
+
+app.get("/api/sections", async (req, res) => {
+  try {
+    const sections = await UserMain.distinct("sect_name", {
+      working_status: "Working"
+    });
+    res.json(sections.filter((section) => section)); // Filter out null/empty values
+  } catch (error) {
+    console.error("Error fetching sections:", error);
+    res.status(500).json({ message: "Failed to fetch sections" });
+  }
+});
+
+
+
+
+/* ------------------------------
+   QC Inline Roving New
+------------------------------ */
+app.get("/api/line-summary", async (req, res) => {
+  try {
+    const lineSummaries = await UserMain.aggregate([
+      {
+        $match: {
+          sect_name: { $ne: null, $ne: "" },
+          working_status: "Working",
+          job_title: "Sewing Worker"
+        }
+      },
+      {
+        $group: {
+          _id: "$sect_name",
+          worker_count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          line_no: "$_id",
+          // worker_count: 1
+          real_worker_count: "$worker_count" 
+        }
+      },
+      { $sort: { line_no: 1 } }
+    ]);
+    const editedCountsDocs = await LineSewingWorker.find({}, "line_no edited_worker_count").lean();
+    const editedCountsMap = new Map(editedCountsDocs.map(doc => [doc.line_no, doc.edited_worker_count]));
+
+    const mergedSummaries = lineSummaries.map(realSummary => ({
+      ...realSummary,
+      edited_worker_count: editedCountsMap.get(realSummary.line_no) // Can be undefined if no edit
+    }));
+
+    res.json(mergedSummaries);
+  } catch (error) {
+    console.error("Error fetching line summary:", error);
+    res.status(500).json({ message: "Failed to fetch line summary data.", error: error.message });
+  }
+});
+
+// New PUT endpoint to save/update edited line worker counts
+app.put("/api/line-sewing-workers/:lineNo", async (req, res) => { // Assuming authenticateUser middleware sets req.user
+  const { lineNo } = req.params;
+  const { edited_worker_count } = req.body;
+  
+  // Placeholder for user details if authentication is not fully set up yet
+  // In a real app, req.user would be populated by an authentication middleware
+  // const user = req.user || { emp_id: 'SYSTEM_USER', eng_name: 'System Edit' }; 
+  // const { emp_id: updated_by_emp_id, eng_name: updated_by_name } = user;
+
+  if (typeof edited_worker_count !== 'number' || edited_worker_count < 0 || !Number.isInteger(edited_worker_count)) {
+    return res.status(400).json({ message: "Edited worker count must be a non-negative integer." });
+  }
+
+  try {
+    const now = new Date();
+    const realCountResult = await UserMain.aggregate([
+      {
+        $match: {
+          sect_name: lineNo, // Match the specific line number
+          working_status: "Working",
+          job_title: "Sewing Worker"
+        }
+      },
+      {
+        $group: {
+          _id: null, // Group all matching documents for this line
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const current_real_worker_count = realCountResult.length > 0 ? realCountResult[0].count : 0;
+    const historyEntry = {
+        edited_worker_count,
+        // updated_by_emp_id,
+        // updated_by_name,
+        updated_at: now
+    };
+
+    const updatedLineWorker = await LineSewingWorker.findOneAndUpdate(
+      { line_no: lineNo },
+      {
+        $set: {
+           real_worker_count: current_real_worker_count,
+          edited_worker_count,
+          // updated_by_emp_id,
+          // updated_by_name,
+          updated_at: now,
+        },
+        $push: { history: historyEntry } // Push the new state to history
+      },
+      { new: true, upsert: true, runValidators: true } // upsert: true creates if not found
+    );
+
+    res.json({ message: "Line worker count updated successfully.", data: updatedLineWorker });
+  } catch (error) {
+    console.error(`Error updating line worker count for line ${lineNo}:`, error);
+    res.status(500).json({ message: "Failed to update line worker count.", error: error.message });
+  }
+});
+
 // Updated endpoint to save or update QC Inline Roving data
 app.post("/api/save-qc-inline-roving", async (req, res) => {
   try {
@@ -7917,300 +8219,6 @@ app.post("/api/save-qc-inline-roving", async (req, res) => {
   }
 });
 
-// Endpoint to fetch QC Inline Roving reports
-app.get("/api/qc-inline-roving-reports", async (req, res) => {
-  try {
-    const reports = await QCInlineRoving.find();
-    res.json(reports);
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching reports", error });
-  }
-});
-
-// New endpoint to fetch filtered QC Inline Roving reports with date handling
-app.get("/api/qc-inline-roving-reports-filtered", async (req, res) => {
-  try {
-    const { startDate, endDate, line_no, mo_no, emp_id } = req.query;
-
-    let match = {};
-
-    // Date filtering using $expr for string dates
-    if (startDate || endDate) {
-      match.$expr = match.$expr || {};
-      match.$expr.$and = match.$expr.$and || [];
-      if (startDate) {
-        const normalizedStartDate = normalizeDateString(startDate);
-        match.$expr.$and.push({
-          $gte: [
-            {
-              $dateFromString: {
-                dateString: "$inspection_date",
-                format: "%m/%d/%Y"
-              }
-            },
-            {
-              $dateFromString: {
-                dateString: normalizedStartDate,
-                format: "%m/%d/%Y"
-              }
-            }
-          ]
-        });
-      }
-      if (endDate) {
-        const normalizedEndDate = normalizeDateString(endDate);
-        match.$expr.$and.push({
-          $lte: [
-            {
-              $dateFromString: {
-                dateString: "$inspection_date",
-                format: "%m/%d/%Y"
-              }
-            },
-            {
-              $dateFromString: {
-                dateString: normalizedEndDate,
-                format: "%m/%d/%Y"
-              }
-            }
-          ]
-        });
-      }
-    }
-
-    // Other filters
-    if (line_no) {
-      match.line_no = line_no;
-    }
-    if (mo_no) {
-      match.mo_no = mo_no;
-    }
-    if (emp_id) {
-      match.emp_id = emp_id;
-    }
-
-    const reports = await QCInlineRoving.find(match);
-    res.json(reports);
-  } catch (error) {
-    console.error("Error fetching filtered roving reports:", error);
-    res.status(500).json({ message: "Error fetching filtered reports", error });
-  }
-});
-
-// Endpoint to fetch distinct MO Nos
-app.get("/api/qc-inline-roving-mo-nos", async (req, res) => {
-  try {
-    const moNos = await QCInlineRoving.distinct("mo_no");
-    res.json(moNos.filter((mo) => mo)); // Filter out null/empty values
-  } catch (error) {
-    console.error("Error fetching MO Nos:", error);
-    res.status(500).json({ message: "Failed to fetch MO Nos" });
-  }
-});
-
-// Endpoint to fetch distinct QC IDs (emp_id)
-app.get("/api/qc-inline-roving-qc-ids", async (req, res) => {
-  try {
-    const qcIds = await QCInlineRoving.distinct("emp_id");
-    res.json(qcIds.filter((id) => id)); // Filter out null/empty values
-  } catch (error) {
-    console.error("Error fetching QC IDs:", error);
-    res.status(500).json({ message: "Failed to fetch QC IDs" });
-  }
-});
-
-app.get("/api/line-summary", async (req, res) => {
-  try {
-    const lineSummaries = await UserMain.aggregate([
-      {
-        $match: {
-          sect_name: { $ne: null, $ne: "" },
-          working_status: "Working",
-          job_title: "Sewing Worker"
-        }
-      },
-      {
-        $group: {
-          _id: "$sect_name",
-          worker_count: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          line_no: "$_id",
-          // worker_count: 1
-          real_worker_count: "$worker_count" 
-        }
-      },
-      { $sort: { line_no: 1 } }
-    ]);
-    const editedCountsDocs = await LineSewingWorker.find({}, "line_no edited_worker_count").lean();
-    const editedCountsMap = new Map(editedCountsDocs.map(doc => [doc.line_no, doc.edited_worker_count]));
-
-    const mergedSummaries = lineSummaries.map(realSummary => ({
-      ...realSummary,
-      edited_worker_count: editedCountsMap.get(realSummary.line_no) // Can be undefined if no edit
-    }));
-
-    res.json(mergedSummaries);
-  } catch (error) {
-    console.error("Error fetching line summary:", error);
-    res.status(500).json({ message: "Failed to fetch line summary data.", error: error.message });
-  }
-});
-
-// New PUT endpoint to save/update edited line worker counts
-app.put("/api/line-sewing-workers/:lineNo", async (req, res) => { // Assuming authenticateUser middleware sets req.user
-  const { lineNo } = req.params;
-  const { edited_worker_count } = req.body;
-  
-  // Placeholder for user details if authentication is not fully set up yet
-  // In a real app, req.user would be populated by an authentication middleware
-  // const user = req.user || { emp_id: 'SYSTEM_USER', eng_name: 'System Edit' }; 
-  // const { emp_id: updated_by_emp_id, eng_name: updated_by_name } = user;
-
-  if (typeof edited_worker_count !== 'number' || edited_worker_count < 0 || !Number.isInteger(edited_worker_count)) {
-    return res.status(400).json({ message: "Edited worker count must be a non-negative integer." });
-  }
-
-  try {
-    const now = new Date();
-    const realCountResult = await UserMain.aggregate([
-      {
-        $match: {
-          sect_name: lineNo, // Match the specific line number
-          working_status: "Working",
-          job_title: "Sewing Worker"
-        }
-      },
-      {
-        $group: {
-          _id: null, // Group all matching documents for this line
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    const current_real_worker_count = realCountResult.length > 0 ? realCountResult[0].count : 0;
-    const historyEntry = {
-        edited_worker_count,
-        // updated_by_emp_id,
-        // updated_by_name,
-        updated_at: now
-    };
-
-    const updatedLineWorker = await LineSewingWorker.findOneAndUpdate(
-      { line_no: lineNo },
-      {
-        $set: {
-           real_worker_count: current_real_worker_count,
-          edited_worker_count,
-          // updated_by_emp_id,
-          // updated_by_name,
-          updated_at: now,
-        },
-        $push: { history: historyEntry } // Push the new state to history
-      },
-      { new: true, upsert: true, runValidators: true } // upsert: true creates if not found
-    );
-
-    res.json({ message: "Line worker count updated successfully.", data: updatedLineWorker });
-  } catch (error) {
-    console.error(`Error updating line worker count for line ${lineNo}:`, error);
-    res.status(500).json({ message: "Failed to update line worker count.", error: error.message });
-  }
-});
-
-// Endpoint to fetch user data by emp_id
-app.get("/api/user-by-emp-id", async (req, res) => {
-  try {
-    const empId = req.query.emp_id;
-    if (!empId) {
-      return res.status(400).json({ error: "emp_id is required" });
-    }
-
-    const user = await UserMain.findOne({ emp_id: empId }).exec(); // Use UserMain
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    res.json({
-      emp_id: user.emp_id,
-      eng_name: user.eng_name,
-      kh_name: user.kh_name,
-      job_title: user.job_title,
-      dept_name: user.dept_name,
-      sect_name: user.sect_name
-    });
-  } catch (err) {
-    console.error("Error fetching user by emp_id:", err);
-    res.status(500).json({
-      message: "Failed to fetch user data",
-      error: err.message
-    });
-  }
-});
-
-
-app.get("/api/users-paginated", async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-    const jobTitle = req.query.jobTitle || ""; // Optional jobTitle filter
-    const empId = req.query.empId || ""; // Optional empId filter
-    const section = req.query.section || ""; // Optional section filter
-
-    // Build the query object
-    const query = {};
-    if (jobTitle) {
-      query.job_title = jobTitle;
-    }
-    if (empId) {
-      query.emp_id = empId;
-    }
-    if (section) {
-      query.sect_name = section;
-    }
-    query.working_status = "Working"; // Ensure only working users are fetched
-
-    // Fetch users with pagination and filters
-    const users = await UserMain.find(query)
-      .skip(skip)
-      .limit(limit)
-      .select("emp_id eng_name kh_name dept_name sect_name job_title")
-      .exec();
-
-    // Get total count for pagination (with filters applied)
-    const total = await UserMain.countDocuments(query);
-
-    res.json({
-      users,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit)
-    });
-  } catch (err) {
-    console.error("Error fetching paginated users:", err);
-    res.status(500).json({
-      message: "Failed to fetch users",
-      error: err.message
-    });
-  }
-});
-
-app.get("/api/sections", async (req, res) => {
-  try {
-    const sections = await UserMain.distinct("sect_name", {
-      working_status: "Working"
-    });
-    res.json(sections.filter((section) => section)); // Filter out null/empty values
-  } catch (error) {
-    console.error("Error fetching sections:", error);
-    res.status(500).json({ message: "Failed to fetch sections" });
-  }
-});
 
 // Helper function to get ordinal string (1st, 2nd, 3rd, etc.)
 function getOrdinal(n) {
