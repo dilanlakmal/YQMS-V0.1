@@ -123,19 +123,29 @@ const RovingData = ({ refreshTrigger }) => {
           <ul className="list-disc list-inside space-y-1 flex-1 min-w-[250px]">
             <li><span className="text-green-600 font-bold text-lg">✓</span> : Pass</li>
             <li><span className="text-red-600 font-bold text-lg">✗</span> : Fail / Reject</li>
+            {/* <li><span className="text-green-600 font-bold text-lg">✓</span> : Individual Check Pass</li> */}
+            {/* <li><span className="text-red-600 font-bold text-lg">✗</span> : Individual Check Fail / Reject</li> */}
             <li><span className="font-semibold">SPI</span> : Stitches Per Inch</li>
             <li><span className="font-semibold">Meas.</span> : Measurement</li>
+            {/* <li><span className="font-semibold">Chk'd/Def</span> : Qty Checked / Total Defects for Operator</li> */}
           </ul>
           <ul className="list-disc list-inside space-y-1 flex-1 min-w-[250px] mt-2 md:mt-0">
             <li><span className="font-semibold">Chk'd/Def</span> : Quantity Checked / Total Defects for Operator</li>
             <li>
               <span className="inline-block w-3 h-3 bg-green-100 border border-green-300 mr-1 align-middle"></span>
               <span className="font-semibold align-middle">Green Background</span> : Indicates the specific garment/check passed.
+              {/* <span className="font-semibold align-middle">Green BG</span> : Operator Overall PASS (SPI/Meas. Pass, 0 Defects). */}
             </li>
+            {/* <li>
+              <span className="inline-block w-3 h-3 bg-yellow-100 border border-yellow-300 mr-1 align-middle"></span>
+              <span className="font-semibold align-middle">Yellow BG</span> : Operator REJECT (SPI/Meas. Fail OR 1 Minor Defect).
+            </li> */}
             <li>
               <span className="inline-block w-3 h-3 bg-red-100 border border-red-300 mr-1 align-middle"></span>
               <span className="font-semibold align-middle">Red Background</span> : Indicates the specific garment/check failed or was rejected.
+               {/* <span className="font-semibold align-middle">Red BG</span> : Operator REJECT (Critical Defect OR &gt;1 Minor Defects). */}
             </li>
+            {/* <li><span className="font-semibold">BG</span> : Background Color (applies to SPI, Meas., Chk'd/Def cells for an operator)</li> */}
           </ul>
         </div>
       </div>
@@ -185,6 +195,23 @@ const RovingData = ({ refreshTrigger }) => {
                       if (status === 'Pass') return 'bg-green-100 hover:bg-green-200';
                       if (status === 'Fail' || status === 'Reject') return 'bg-red-100 hover:bg-red-200';
                       return 'hover:bg-gray-50'; // Default for N/A or other statuses
+                    // const overallOperatorStatus = data.overall_roving_status || 'NOT_CALCULATED';
+
+                    // Helper function to determine cell background color based on OVERALL operator status
+                    // const getOverallCellBackgroundColor = (statusKey) => {
+                    //   switch (statusKey) {
+                    //     case 'Pass':
+                    //       return 'bg-green-100 hover:bg-green-200';
+                    //     case 'Reject-Critical':
+                    //     case 'Reject-Multiple-Minors':
+                    //       return 'bg-red-100 hover:bg-red-200';
+                    //     case 'Reject-Single-Minor':
+                    //     case 'Reject-General': // Covers SPI/Measurement fail with 0 defects
+                    //       return 'bg-yellow-100 hover:bg-yellow-200';
+                    //     default: // 'Pending', 'NOT_CALCULATED', or unknown
+                    //       return 'bg-gray-100 hover:bg-gray-200';
+                    //   }
+
                     };
 
                      const renderResultSymbol = (status) => {
@@ -215,7 +242,7 @@ const RovingData = ({ refreshTrigger }) => {
                       return `Inspection Details:
                       Date: ${reportDetails.inspection_date || 'N/A'}
                       QC ID: ${reportDetails.emp_id || 'N/A'}
-                      Line No: ${reportDetails.line_no || 'N/A'}a
+                      Line No: ${reportDetails.line_no || 'N/A'}
                       MO No: ${reportDetails.mo_no || 'N/A'}
                       ------------------------------
                       Operator ID: ${operatorInspectionData.operator_emp_id || 'N/A'}
@@ -229,6 +256,7 @@ const RovingData = ({ refreshTrigger }) => {
                       Meas: ${operatorInspectionData.measurement || 'N/A'} 
                       Total Defects (Op): ${totalDefectsForOp}
                       Overall Result (Op): ${operatorInspectionData.qualityStatus || 'N/A'}
+                      Overall Roving Status: ${operatorInspectionData.overall_roving_status || 'N/A'}
                       ------------------------------
                       ${defectsString}`;
                                           };

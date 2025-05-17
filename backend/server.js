@@ -8301,24 +8301,42 @@ app.get("/api/qc-inline-roving/inspection-time-info", async (req, res) => {
 
 
 app.get('/api/inspections-completed', async (req, res) => {
-  const { line_no, inspection_date, inspection_rep_name } = req.query;
+  const { line_no, inspection_date, mo_no, operation_id, inspection_rep_name } = req.query;
 
   try {
-    const inspection = await QCInlineRoving.findOne({
+    const findQuery = {
       line_no,
       inspection_date,
-      inspection_rep_name,
-    });
+      };
+
+    if (mo_no) {
+      findQuery.mo_no = mo_no;
+    }
+
+    const elemMatchConditions = { inspection_rep_name };
+    if (operation_id) {
+      elemMatchConditions['inlineData.tg_no'] = operation_id; // Assuming operation_id maps to tg_no
+    }
+
+    findQuery.inspection_rep = { $elemMatch: elemMatchConditions };
+
+    const inspection = await QCInlineRoving.findOne(findQuery);
 
     if (!inspection) {
       // return res.status(404).json({ message: 'Inspection not found' });
        return res.json({ completeInspectOperators: 0 })
     }
 
-    const completeInspectOperators = inspection.inspection_rep.reduce(
-      (acc, rep) => acc + rep.complete_inspect_operators,
-      0
+   // Find the specific inspection_rep entry that matches the request
+    const specificRep = inspection.inspection_rep.find(
+      (rep) => rep.inspection_rep_name === inspection_rep_name
     );
+
+    if (!specificRep) {
+      // This case should ideally not be reached if $elemMatch worked and data is consistent
+      return res.json({ completeInspectOperators: 0 });
+    }
+    const completeInspectOperators = specificRep.complete_inspect_operators || 0;
 
     res.json({ completeInspectOperators });
   } catch (error) {

@@ -36,6 +36,7 @@ const qcInlineRovingSchema = new mongoose.Schema(
             checked_quantity: { type: Number, required: true },
             inspection_time: { type: String, required: true }, // Store as string in HH:MM:SS
             qualityStatus: { type: String, required: true },
+            overall_roving_status: { type: String, required: true, default: 'NOT_CALCULATED' },
             rejectGarments: [
               {
                 totalCount: { type: Number, required: true },

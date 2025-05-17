@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
-// import { allDefects } from "../constants/defects";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
 import { useTranslation } from "react-i18next";
@@ -32,8 +31,6 @@ const RovingPage = () => {
   const [measurementStatus, setMeasurementStatus] = useState("");
   const [spiFilesToUpload, setSpiFilesToUpload] = useState([]); 
   const [measurementFilesToUpload, setMeasurementFilesToUpload] = useState([]);
-  // const [showSpiUploader, setShowSpiUploader] = useState(false);
-  // const [showMeasurementUploader, setShowMeasurementUploader] = useState(false);
   const [garments, setGarments] = useState([]);
   const [inspectionStartTime, setInspectionStartTime] = useState(null);
   const [currentGarmentIndex, setCurrentGarmentIndex] = useState(0);
@@ -64,7 +61,7 @@ const RovingPage = () => {
 
   const [defects, setDefects] = useState([]);
   const [isLoadingDefects, setIsLoadingDefects] = useState(true);
-  const [defectsError, setDefectsError] = useState(null)  
+  const [defectsError, setDefectsError] = useState(null);
 
   const getNumericLineValue = useCallback((value) => {
     if (value === null || value === undefined || String(value).trim() === '') return null;
@@ -90,7 +87,6 @@ const RovingPage = () => {
     fetchDefects();
   }, []);
 
- 
   useEffect(() => {
     const size = inspectionType === 'Critical' ? 15 : 5;
     setGarments(Array.from({ length: size }, () => ({ garment_defect_id: '', defects: [], status: 'Pass' })));
@@ -138,62 +134,37 @@ const RovingPage = () => {
     }
   }, [user, authLoading]);
 
-  
-const fetchInspectionsCompleted = useCallback(async () => {
-  // if (lineNo && currentDate) {
-   if (lineNo && currentDate && selectedManualInspectionRep) {
-    try {
-      const year = currentDate.getFullYear();
-      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-      const day = String(currentDate.getDate()).padStart(2, '0');
-      const formattedDate = `${month}/${day}/${year}`;
-      const response = await axios.get(`${API_BASE_URL}/api/inspections-completed`, {
-        params: {
-          line_no: lineNo,
-          inspection_date: formattedDate,
-          inspection_rep_name: selectedManualInspectionRep, 
-        },
-      });
-      const apiResponseData = response.data;
+  const fetchInspectionsCompleted = useCallback(async () => {
+    if (lineNo && currentDate && selectedManualInspectionRep && moNo) {
+      try {
+        const year = currentDate.getFullYear();
+        const month = String(currentDate.getMonth() + 1); // No padding
+        const day = String(currentDate.getDate()); // No padding
+        const formattedDate = `${month}/${day}/${year}`; // e.g., "5/17/2025"
 
-      let completedCount = 0;
+        const response = await axios.get(`${API_BASE_URL}/api/inspections-completed`, {
+          params: {
+            line_no: lineNo,
+            inspection_date: formattedDate,
+            inspection_rep_name: selectedManualInspectionRep,
+            mo_no: moNo,
+          },
+        });
 
-      if (Array.isArray(apiResponseData)) {
-        for (const doc of apiResponseData) {
-          if (doc && doc.inspection_rep && Array.isArray(doc.inspection_rep)) {
-            const repInfo = doc.inspection_rep.find(
-              (rep) => rep.inspection_rep_name === selectedManualInspectionRep
-            );
-            if (repInfo) {
-              completedCount = repInfo.complete_inspect_operators || 0;
-              break; 
-            }
-          }
-        }
-        setInspectionsCompletedForSelectedRep(completedCount);
-      } else if (apiResponseData && apiResponseData.inspection_rep && Array.isArray(apiResponseData.inspection_rep)) {
-        const repInfo = apiResponseData.inspection_rep.find(
-          (rep) => rep.inspection_rep_name === selectedManualInspectionRep
+        const completeInspectOperators = response.data.completeInspectOperators || 0;
+        console.log(
+          `Fetched completed inspections for Line: ${lineNo}, Date: ${formattedDate}, Rep: ${selectedManualInspectionRep}, MO: ${moNo} - Count: ${completeInspectOperators}`
         );
-        if (repInfo) {
-          setInspectionsCompletedForSelectedRep(repInfo.complete_inspect_operators || 0);
-        } else {
-          setInspectionsCompletedForSelectedRep(0);
-        }
-     } else if (apiResponseData && typeof apiResponseData.completeInspectOperators === 'number') {
-                setInspectionsCompletedForSelectedRep(apiResponseData.completeInspectOperators || 0); 
-      } else {
-        console.warn("Unexpected data structure from /api/inspections-completed. Setting completed count to 0.", apiResponseData);
-        setInspectionsCompletedForSelectedRep(0); 
+
+        setInspectionsCompletedForSelectedRep(completeInspectOperators);
+      } catch (error) {
+        console.error("Error fetching inspections completed:", error);
+        setInspectionsCompletedForSelectedRep(0);
       }
-    } catch (error) {
-      console.error("Error fetching inspections completed for selected repetition:", error);
+    } else {
       setInspectionsCompletedForSelectedRep(0);
     }
-     } else {
-    setInspectionsCompletedForSelectedRep(0); 
-  }
-}, [lineNo, currentDate, selectedManualInspectionRep]);
+  }, [lineNo, currentDate, selectedManualInspectionRep, moNo, API_BASE_URL]);
 
   useEffect(() => {
     fetchInspectionsCompleted();
@@ -282,7 +253,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
 
   const addDefect = (defectName) => {
     if (defectName && selectedOperationId && defects.length > 0) {
-      const defect =defects.find((d) => d.english === defectName);
+      const defect = defects.find((d) => d.english === defectName);
       if (defect) {
         setGarments((prevGarments) => {
           const newGarments = [...prevGarments];
@@ -323,7 +294,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
     setGarments((prevGarments) => {
       const newGarments = [...prevGarments];
       const defects = [...newGarments[currentGarmentIndex].defects];
-      defects[defectIndex] = { ...defects[defectIndex], count:        defects[defectIndex].count + 1 };
+      defects[defectIndex] = { ...defects[defectIndex], count: defects[defectIndex].count + 1 };
       newGarments[currentGarmentIndex] = { ...newGarments[currentGarmentIndex], defects };
       return newGarments;
     });
@@ -362,10 +333,6 @@ const fetchInspectionsCompleted = useCallback(async () => {
     setSpiStatus("");
     setMeasurementStatus("");
     setSpiFilesToUpload([]);
-    // setMeasurementFilesToUpload([]); 
-    // setSelectedManualInspectionRep(""); 
-    // setShowSpiUploader(false);
-    // setShowMeasurementUploader(false);
     setMeasurementFilesToUpload([]);
     setSelectedManualInspectionRep("");
     setImageUploaderKey(Date.now());
@@ -417,7 +384,6 @@ const fetchInspectionsCompleted = useCallback(async () => {
       }
     };
 
-  
     let uploadedSpiImagePaths = [];
     let uploadedMeasurementImagePaths = [];
 
@@ -463,6 +429,47 @@ const fetchInspectionsCompleted = useCallback(async () => {
       ? "Reject"
       : "Pass";
 
+    // Calculate a more detailed overall roving status for the operator
+    let overallOperatorStatusKey = '';
+    const anyGarmentHasCriticalDefect = updatedGarments.some(g => g.defects.some(d => d.type === '02'));
+    
+    const garmentsMinorDefectCounts = updatedGarments.map(g =>
+        g.defects.filter(d => d.type !== '02').reduce((sum, defect) => sum + defect.count, 0)
+    );
+    const totalMinorDefectsOverall = garmentsMinorDefectCounts.reduce((sum, count) => sum + count, 0);
+    const maxMinorDefectsInSingleGarment = Math.max(0, ...garmentsMinorDefectCounts);
+
+    if (!spiStatus || !measurementStatus) { // Should be caught by validation
+        overallOperatorStatusKey = 'Pending';
+    } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
+        if (anyGarmentHasCriticalDefect) {
+            overallOperatorStatusKey = 'Reject-Critical';
+        } else {
+            overallOperatorStatusKey = 'Reject-General'; // General reject due to SPI/Measurement failure
+        }
+    } else { // SPI 'Pass' and Measurement 'Pass'
+        if (anyGarmentHasCriticalDefect) {
+            overallOperatorStatusKey = 'Reject-Critical';
+        } else {
+            if (maxMinorDefectsInSingleGarment > 1 || (maxMinorDefectsInSingleGarment <= 1 && totalMinorDefectsOverall > 1) ) {
+                // Covers: one garment with >1 minor, or multiple garments with 1 minor each leading to total > 1.
+                // This corresponds to the UI's more severe "Reject-Minor" (often red background).
+                overallOperatorStatusKey = 'Reject-Multiple-Minors';
+            } else if (totalMinorDefectsOverall === 1) {
+                // Exactly one minor defect in total.
+                // This corresponds to the UI's less severe "Reject-Minor" (often yellow background).
+                overallOperatorStatusKey = 'Reject-Single-Minor';
+            } else if (totalMinorDefectsOverall === 0) { // No criticals, no minors
+                overallOperatorStatusKey = 'Pass';
+            } else {
+                // Fallback for any other defect scenario not explicitly categorized as Pass or a specific Reject type.
+                // If defects exist but don't fit the specific minor/critical categories above.
+                overallOperatorStatusKey = updatedGarments.some(g => g.defects.length > 0) ? 'Reject-General' : 'Pass';
+            }
+        }
+    }
+    // End of overall_roving_status calculation
+
     const selectedOperation = operationData.find(
       (data) => data.Tg_No === selectedOperationId
     );
@@ -487,6 +494,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
       checked_quantity: garments.length,
       inspection_time: inspectionTime,
       qualityStatus,
+      overall_roving_status: overallOperatorStatusKey,
       rejectGarments: [
         {
           totalCount: totalDefectCount,
@@ -515,17 +523,17 @@ const fetchInspectionsCompleted = useCallback(async () => {
 
     const newCompleteInspectOperatorsForRep = inspectionsCompletedForSelectedRep + 1;
 
-     const newInspectStatus = (totalOperatorsForLine > 0 && newCompleteInspectOperatorsForRep >= totalOperatorsForLine)
+    const newInspectStatus = (totalOperatorsForLine > 0 && newCompleteInspectOperatorsForRep >= totalOperatorsForLine)
       ? "Completed"
       : "Not Complete";
 
-     const reportPayload = {
+    const reportPayload = {
       inline_roving_id: Date.now(),
       report_name: 'QC Inline Roving',
       inspection_date: currentDate.toLocaleDateString("en-US"),
       mo_no: moNo,
       line_no: lineNo,
-     inspection_rep_item: { 
+      inspection_rep_item: { 
         inspection_rep_name: selectedManualInspectionRep,
         emp_id: user?.emp_id || 'Guest',
         eng_name: user?.eng_name || 'Guest',
@@ -587,7 +595,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
 
   const currentGarmentDefects = garment.defects;
 
-    // Calculate Overall Status for the current garment
+  // Calculate Overall Status for the current garment
   let overallStatusText = '';
   let overallStatusColor = '';
 
@@ -606,7 +614,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
       overallStatusColor = 'bg-red-100 text-red-800';
     } else {
       overallStatusText = t('qcRoving.overallStatus.reject', 'Reject');
-      overallStatusColor = 'bg-red-100 text-red-800';
+      overallStatusColor = 'bg-yellow-100 text-yellow-800';
     }
   } else if (spiStatus === 'Pass' && measurementStatus === 'Pass') {
     if (hasCriticalDefect) {
@@ -622,7 +630,6 @@ const fetchInspectionsCompleted = useCallback(async () => {
       overallStatusText = t('qcRoving.overallStatus.pass', 'Pass');
       overallStatusColor = 'bg-green-100 text-green-800';
     } else {
-    
       overallStatusText = t('qcRoving.overallStatus.reject', 'Reject');
       overallStatusColor = 'bg-red-100 text-red-800';
     }
@@ -656,7 +663,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
 
   const lineNoOptions = Array.from({ length: 30 }, (_, i) =>
     (i + 1).toString()
- );
+  );
 
   const toOrdinalFormattedString = (n, transFunc) => {
     if (typeof n !== 'number' || isNaN(n) || n <= 0) return String(n);
@@ -680,14 +687,12 @@ const fetchInspectionsCompleted = useCallback(async () => {
     measurementStatus &&
     scannedUserData;
 
-    const inspectionContextData = {
+  const inspectionContextData = {
     date: currentDate.toISOString().split("T")[0],
     lineNo: lineNo || 'NA_Line',
     moNo: moNo || 'NA_MO',
     operationId: selectedOperationId || 'NA_Op',
   };
-  
-  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 p-6">
@@ -749,14 +754,12 @@ const fetchInspectionsCompleted = useCallback(async () => {
                 if (!selectedManualInspectionRep) {
                   return <p className="text-sm text-gray-500">{t("qcRoving.selectInspectionRepForProgress", "Select an inspection repetition to see progress.")}</p>;
                 }
-                if (numericLineNoFromForm === null) {
-                  return <p className="text-sm text-gray-500">{t("qcRoving.selectLineForProgress", "Select a line to see worker status.")}</p>;
+                if (!lineNo || !moNo || !selectedOperationId) {
+                  return <p className="text-sm text-gray-500">{t("qcRoving.fillLineMoOpForProgress", "Please select Line, MO, and Operation to see specific progress.")}</p>;
                 }
                 if (lineWorkerDataLoading || lineWorkerDataError) {
-
                   if (lineWorkerDataLoading) return <p className="text-sm text-gray-500">{t("qcRoving.loadingWorkerData", "Loading worker data...")}</p>;
                   if (lineWorkerDataError) return <p className="text-sm text-red-500">{lineWorkerDataError}</p>;
-                  // if (inspectionRepLoading) return <p className="text-sm text-gray-500">{t("qcRoving.loadingInspectionData", "Loading inspection data...")}</p>;
                   return <p className="text-sm text-gray-500">{t("qcRoving.selectLineForProgress", "Select a line to see worker status.")}</p>;
                 }
                 const selectedLineInfo = lineWorkerData.find(s => {
@@ -771,7 +774,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
                   return (
                     <div>
                       <p className="text-sm text-gray-600 mb-1">
-                         {t("qcRoving.inspectionsCompleted", "Inspections Completed")} : {inspectionsCompletedForSelectedRep} / {totalWorkersForLine}
+                        {t("qcRoving.inspectionsCompleted", "Inspections Completed")} : {inspectionsCompletedForSelectedRep} / {totalWorkersForLine}
                       </p>
                       <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
                         <div
@@ -785,14 +788,12 @@ const fetchInspectionsCompleted = useCallback(async () => {
                   return <p className="text-sm text-gray-500">{t("qcRoving.noWorkerDataForLine", "No worker data available for selected line.")}</p>;
                 }
               })()}
-              {/* {lineWorkerDataLoading && (<p className="text-sm text-gray-500">{t("qcRoving.loadingWorkerData", "Loading worker data...")}</p>)}
-              {lineWorkerDataError && !lineWorkerDataLoading && (<p className="text-sm text-red-500">{lineWorkerDataError}</p>)} */}
             </div>
 
             <div className="mb-6">
               <div className="flex flex-wrap gap-4 items-end">
                 <div className="flex-1 min-w-[150px]">
-                   <label htmlFor="manualInspectionRep" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="manualInspectionRep" className="block text-sm font-medium text-gray-700">
                     {t("qcRoving.inspectionNo", "Inspection No")}
                   </label>
                   <select
@@ -811,7 +812,6 @@ const fetchInspectionsCompleted = useCallback(async () => {
                       </option>
                     ))}
                   </select>
-
                 </div>
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
@@ -897,7 +897,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
                       ))}
                     </select>
                     {selectedOperation && (
-                                            <button
+                      <button
                         onClick={() =>
                           setShowOperationDetails(!showOperationDetails)
                         }
@@ -948,9 +948,6 @@ const fetchInspectionsCompleted = useCallback(async () => {
                     <QrCode className="w-5 h-5" />
                     {t("qcRoving.scanQR")}
                   </button>
-                  {/* <div className="mt-1 p-2 border border-gray-300 rounded-lg bg-gray-50 text-sm">
-                    {scannedUserData ? t("qcRoving.operatorDataSetToCurrentUser", "Operator: Current User") : t("qcRoving.operatorDataNotSet", "Operator: Not Set (QR Scan Disabled)")}
-                  </div> */}
                   {scannedUserData && (
                     <div className="mt-2 flex items-center gap-2">
                       <p className="text-sm"></p>
@@ -1050,10 +1047,8 @@ const fetchInspectionsCompleted = useCallback(async () => {
               <div className="flex flex-wrap items-start gap-4">
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700 mt-2">
-
                     {t("qcRoving.spi")}
                   </label>
-                 
                   <select
                     value={spiStatus}
                     onChange={(e) => setSpiStatus(e.target.value)}
@@ -1063,28 +1058,6 @@ const fetchInspectionsCompleted = useCallback(async () => {
                     <option value="Pass">{t("qcRoving.pass")}</option>
                     <option value="Reject">{t("qcRoving.reject")}</option>
                   </select>
-                  {/* <button
-                    type="button"
-                    onClick={() => setShowSpiUploader(!showSpiUploader)}
-                    className="mt-2 w-full flex items-center justify-center px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-100 text-xs"
-                    title={showSpiUploader ? t('qcRoving.buttons.hideImages') : t('qcRoving.buttons.showImages')}
-                  >
-                    <Camera size={16} className="mr-1" /> 
-                    {t("qcRoving.spiImages")} ({spiFilesToUpload.length}/5)
-                  </button>
-                 {showSpiUploader && (
-                    <div className="mt-2">
-                      <ImageCaptureUpload
-                        key={`spi-${imageUploaderKey}`}
-                        imageType="spi"
-                        maxImages={5}
-                        onImageFilesChange={setSpiFilesToUpload} // Changed prop
-                        inspectionData={inspectionContextData}
-                      />
-                    </div>
-                  )} */}
-
-                  {/* ImageCaptureUpload for SPI is now always rendered */}
                   <div className="mt-2">
                     <ImageCaptureUpload
                       key={`spi-${imageUploaderKey}`}
@@ -1094,13 +1067,11 @@ const fetchInspectionsCompleted = useCallback(async () => {
                       inspectionData={inspectionContextData}
                     />
                   </div>
-
                 </div>
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700 mt-2">
                     {t("qcRoving.measurement")}
                   </label>
-                  
                   <select
                     value={measurementStatus}
                     onChange={(e) => setMeasurementStatus(e.target.value)}
@@ -1110,34 +1081,13 @@ const fetchInspectionsCompleted = useCallback(async () => {
                     <option value="Pass">{t("qcRoving.pass")}</option>
                     <option value="Reject">{t("qcRoving.reject")}</option>
                   </select>
-                  {/* <button
-                    type="button"
-                    onClick={() => setShowMeasurementUploader(!showMeasurementUploader)}
-                     className="mt-2 w-full flex items-center justify-center px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-100 text-xs"
-                    title={showMeasurementUploader ? t('qcRoving.buttons.hideImages') : t('qcRoving.buttons.showImages')}
-                  >
-                    <Camera size={16} className="mr-1" />
-                    {t("qcRoving.measurementImages")} ({measurementFilesToUpload.length}/5)
-                  </button>
-                  {showMeasurementUploader && (
-                     <div className="mt-2">
-                      <ImageCaptureUpload
-                        key={`measurement-${imageUploaderKey}`}
-                        imageType="measurement"
-                        maxImages={5}
-                        onImageFilesChange={setMeasurementFilesToUpload} // Changed prop
-                        inspectionData={inspectionContextData}
-                      />
-                    </div>
-                  )} */}
-                  {/* ImageCaptureUpload for SPI is now always rendered */}
                   <div className="mt-2">
                     <ImageCaptureUpload
-                       key={`measurement-${imageUploaderKey}`}
-                       imageType="measurement"
-                       maxImages={5}
-                       onImageFilesChange={setMeasurementFilesToUpload} // Changed prop
-                       inspectionData={inspectionContextData}
+                      key={`measurement-${imageUploaderKey}`}
+                      imageType="measurement"
+                      maxImages={5}
+                      onImageFilesChange={setMeasurementFilesToUpload}
+                      inspectionData={inspectionContextData}
                     />
                   </div>
                 </div>
@@ -1173,12 +1123,10 @@ const fetchInspectionsCompleted = useCallback(async () => {
                         let defectSeverityText = '';
                         let defectSeverityColor = '';
 
-                        // defect.repair comes from the item added to garment.defects
-                        // which in turn got it from the defect.repair of the main defect list item
-                        if (defect.type === '02') { // Assuming 'No' repair means Critical
+                        if (defect.type === '02') {
                           defectSeverityText = t('qcRoving.defectStatus.rejectCritical', 'Reject-Critical');
                           defectSeverityColor = 'bg-red-100 text-red-800';
-                        } else { // Assuming 'Yes' repair or other values mean Minor
+                        } else {
                           defectSeverityText = t('qcRoving.defectStatus.rejectMinor', 'Reject-Minor');
                           defectSeverityColor = 'bg-yellow-100 text-yellow-800';
                         }
@@ -1187,11 +1135,6 @@ const fetchInspectionsCompleted = useCallback(async () => {
                             key={`${currentGarmentIndex}-${defectIndex}`}
                             className="flex items-center justify-between bg-white p-3 shadow-sm flex-wrap gap-y-2 px-3 py-1 rounded-full text-lg"
                           >
-                            {/* <span className="max-w-[220px] md:max-w-[400px] p-2">
-                              {defectInfo
-                                ? getDefectName(defectInfo)
-                                : defect.name}
-                            </span> */}
                             <div className="flex items-center flex-grow mr-2">
                               <span className="truncate">
                                 {defectInfo ? getDefectName(defectInfo) : defect.name}
@@ -1254,7 +1197,6 @@ const fetchInspectionsCompleted = useCallback(async () => {
                         ))}
                       </select>
                     </div>
-                    
                   </div>
                 </div>
               </div>
@@ -1307,17 +1249,16 @@ const fetchInspectionsCompleted = useCallback(async () => {
               </div>
             </div>
 
-             {/* Overall Status Display for Current Garment */}
-                    <div className="mt-6 pt-4 border-t border-gray-300">
-                      <h4 className="text-md font-semibold text-gray-700 mb-2">
-                        {t("qcRoving.rovingStatus", "Roving Status")}
-                      </h4>
-                      <span
-                        className={`px-4 py-2 rounded-full text-lg font-semibold ${overallStatusColor}`}
-                      >
-                        {overallStatusText}
-                      </span>
-                    </div>
+            <div className="mt-6 pt-4 border-t border-gray-300">
+              <h4 className="text-md font-semibold text-gray-700 mb-2">
+                {t("qcRoving.rovingStatus", "Roving Status")}
+              </h4>
+              <span
+                className={`px-4 py-2 rounded-full text-lg font-semibold ${overallStatusColor}`}
+              >
+                {overallStatusText}
+              </span>
+            </div>
 
             <div className="flex justify-center mt-6 space-x-4">
               <button
@@ -1373,28 +1314,6 @@ const fetchInspectionsCompleted = useCallback(async () => {
                 }}
               />
             )}
-
-            {/* {showSpiCamera && (
-              <RovingCamera
-                isOpen={showSpiCamera}
-                onClose={() => setShowSpiCamera(false)}
-                onImageCaptured={(imagePath) => setSpiImage(imagePath)}
-                date={currentDate.toISOString().split("T")[0]}
-                type="spi"
-                empId={user?.emp_id || "Guest"}
-              />
-            )} */}
-
-            {/* {showMeasurementCamera && (
-              <RovingCamera
-                isOpen={showMeasurementCamera}
-                onClose={() => setShowMeasurementCamera(false)}
-                onImageCaptured={(imagePath) => setMeasurementImage(imagePath)}
-                date={currentDate.toISOString().split("T")[0]}
-                type="measurement"
-                empId={user?.emp_id || "Guest"}
-              />
-            )} */}
           </>
         ) : activeTab === "data" ? (
           <RovingData />
