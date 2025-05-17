@@ -6,43 +6,57 @@ import Swal from 'sweetalert2';
 import { useTranslation } from 'react-i18next';
 
 const ImageCaptureUpload = ({
-  imageType, // 'spi' or 'measurement'
+  imageType, 
   maxImages = 5,
-  onImageFilesChange, // (files: File[]) => void
+  onImageFilesChange, 
   inspectionData, 
+  initialImageFiles = [],
 }) => {
   const { t } = useTranslation();
-  const [imageFiles, setImageFiles] = useState([]); // Stores File objects
-  const [previewUrls, setPreviewUrls] = useState([]); // Stores blob URLs for preview
+  const [imageFiles, setImageFiles] = useState(initialImageFiles);
+  const [previewUrls, setPreviewUrls] = useState([]); 
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
-  // const captureInputRef = useRef(null); // Capture functionality can be added similarly if needed
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState('');
+  const initialRenderForContext = useRef(true);
 
-  // Effect to clear images if the context (inspectionData) changes
   useEffect(() => {
-    console.log(`ImageCaptureUpload (${imageType}): useEffect triggered due to inspectionData/imageType change. Resetting images. InspectionData:`, JSON.stringify(inspectionData));
-    // Revoke existing blob URLs before clearing
-    previewUrls.forEach(url => URL.revokeObjectURL(url));
+  
+    const currentGeneratedPreviewUrls = imageFiles.map(file => {
+      if (file instanceof File) {
+        return URL.createObjectURL(file);
+      }
+      return null;
+    }).filter(url => url !== null); 
+
+    setPreviewUrls(currentGeneratedPreviewUrls);
+
+    return () => {
+      currentGeneratedPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [imageFiles]); 
+
+
+  useEffect(() => {
+    if (initialRenderForContext.current) {
+      initialRenderForContext.current = false; 
+      if (imageFiles.length > 0 && imageFiles === initialImageFiles) {
+        return; 
+      }
+    
+      return;
+    }
+  
+    console.log(`ImageCaptureUpload (${imageType}): Context/type changed AFTER initial setup. Resetting. InspectionData:`, JSON.stringify(inspectionData));
     setImageFiles([]);
-    setPreviewUrls([]);
     if (onImageFilesChange) {
-      onImageFilesChange([]);
+      onImageFilesChange([]); 
     }
     setError('');
-    setShowPreviewModal(false);
-    setPreviewImageUrl('');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inspectionData.date, inspectionData.lineNo, inspectionData.moNo, inspectionData.operationId, imageType, onImageFilesChange]);
 
-  // Cleanup blob URLs on component unmount
-  useEffect(() => {
-    return () => {
-      previewUrls.forEach(url => URL.revokeObjectURL(url));
-    };
-  }, [previewUrls]);
+  }, [inspectionData.date, inspectionData.lineNo, inspectionData.moNo, inspectionData.operationId, imageType]);
 
   const handleFileChange = async (event) => {
     const files = Array.from(event.target.files);
@@ -52,32 +66,31 @@ const ImageCaptureUpload = ({
     if (imageFiles.length >= maxImages) {
       console.warn(`ImageCaptureUpload (${imageType}): Max images (${maxImages}) reached or exceeded. Current count: ${imageFiles.length}.`);
       Swal.fire(t('qcRoving.imageUpload.limitTitle'), t('qcRoving.imageUpload.maxImagesReached', { max: maxImages, current: imageFiles.length }), 'warning');
+      if (event.target) event.target.value = null;
       return;
     }
     
     setError('');
-    setIsUploading(true); // Indicate processing
-
-    const newImageFiles = [...imageFiles];
-    const newPreviewUrls = [...previewUrls];
+    setIsUploading(true); 
+    const combinedImageFiles = [...imageFiles];
     let filesAddedCount = 0;
 
     for (const file of files) {
-      if (newImageFiles.length >= maxImages) {
-       Swal.fire(t('qcRoving.imageUpload.limitTitle'), t('qcRoving.imageUpload.maxImagesReachedSome', { max: maxImages, uploaded: newImageFiles.length, attempting: files.length - filesAddedCount }), 'warning');
-        break; // Stop processing if limit reached during loop
+       if (combinedImageFiles.length >= maxImages) {
+       Swal.fire(t('qcRoving.imageUpload.limitTitle'), t('qcRoving.imageUpload.maxImagesReachedSome', { max: maxImages, uploaded: combinedImageFiles.length, attempting: files.length - filesAddedCount }), 'warning');
+        break;
       }
-      newImageFiles.push(file);
-      newPreviewUrls.push(URL.createObjectURL(file));
+    
+      combinedImageFiles.push(file);
       filesAddedCount++;
     }
-    setImageFiles(newImageFiles);
-    setPreviewUrls(newPreviewUrls);
+  
+    setImageFiles(combinedImageFiles);
     if (onImageFilesChange) {
-      onImageFilesChange(newImageFiles);
+      onImageFilesChange(combinedImageFiles);
     }
     setIsUploading(false);
-    if (event.target) event.target.value = null; // Clear file input
+    if (event.target) event.target.value = null; 
   };
 
   const handleDeleteImage = (indexToDelete) => {
@@ -92,14 +105,10 @@ const ImageCaptureUpload = ({
       cancelButtonText: t('qcRoving.buttons.cancel'),
     }).then((result) => {
       if (result.isConfirmed) {
-        // Revoke the blob URL for the image being deleted
-        URL.revokeObjectURL(previewUrls[indexToDelete]);
-
-        const updatedFiles = imageFiles.filter((_, index) => index !== indexToDelete);
-        const updatedPreviewUrls = previewUrls.filter((_, index) => index !== indexToDelete);
         
-        setImageFiles(updatedFiles);
-        setPreviewUrls(updatedPreviewUrls);
+        const updatedFiles = imageFiles.filter((_, index) => index !== indexToDelete);
+       
+        setImageFiles(updatedFiles); 
 
         if (onImageFilesChange) {
           onImageFilesChange(updatedFiles);
@@ -154,8 +163,8 @@ const ImageCaptureUpload = ({
           {previewUrls.map((url, index) => (
             <div key={index} className="relative group border rounded-md overflow-hidden shadow">
               <img 
-                // src={`${API_BASE_URL}${path}`} // Old: using server path
-                src={url} // New: using local blob URL
+                
+                src={url} 
                 alt={`${imageType} ${index + 1}`} 
                 className="w-full h-20 object-cover cursor-pointer hover:opacity-75"
                 onClick={() => openImagePreview(url)}
@@ -171,7 +180,7 @@ const ImageCaptureUpload = ({
       )}
       {/* Image Preview Modal */}
       {showPreviewModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[70]"> {/* Higher z-index if needed */}
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[70]"> 
           <div className="bg-white p-4 rounded-lg shadow-xl max-w-3xl max-h-[90vh] relative">
             <button
               onClick={closeImagePreview}

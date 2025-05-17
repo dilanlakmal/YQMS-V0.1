@@ -32,8 +32,8 @@ const RovingPage = () => {
   const [measurementStatus, setMeasurementStatus] = useState("");
   const [spiFilesToUpload, setSpiFilesToUpload] = useState([]); 
   const [measurementFilesToUpload, setMeasurementFilesToUpload] = useState([]);
-  const [showSpiUploader, setShowSpiUploader] = useState(false);
-  const [showMeasurementUploader, setShowMeasurementUploader] = useState(false);
+  // const [showSpiUploader, setShowSpiUploader] = useState(false);
+  // const [showMeasurementUploader, setShowMeasurementUploader] = useState(false);
   const [garments, setGarments] = useState([]);
   const [inspectionStartTime, setInspectionStartTime] = useState(null);
   const [currentGarmentIndex, setCurrentGarmentIndex] = useState(0);
@@ -55,7 +55,7 @@ const RovingPage = () => {
   const [showMoNoDropdown, setShowMoNoDropdown] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const moNoDropdownRef = useRef(null);
-   const [selectedManualInspectionRep, setSelectedManualInspectionRep] = useState('');
+  const [selectedManualInspectionRep, setSelectedManualInspectionRep] = useState('');
   const [inspectionsCompletedForSelectedRep, setInspectionsCompletedForSelectedRep] = useState(0);
   const [lineWorkerData, setLineWorkerData] = useState([]);
   const [lineWorkerDataLoading, setLineWorkerDataLoading] = useState(true);
@@ -362,10 +362,12 @@ const fetchInspectionsCompleted = useCallback(async () => {
     setSpiStatus("");
     setMeasurementStatus("");
     setSpiFilesToUpload([]);
-    setMeasurementFilesToUpload([]); 
-    setSelectedManualInspectionRep(""); 
-    setShowSpiUploader(false);
-    setShowMeasurementUploader(false);
+    // setMeasurementFilesToUpload([]); 
+    // setSelectedManualInspectionRep(""); 
+    // setShowSpiUploader(false);
+    // setShowMeasurementUploader(false);
+    setMeasurementFilesToUpload([]);
+    setSelectedManualInspectionRep("");
     setImageUploaderKey(Date.now());
   };
 
@@ -1061,7 +1063,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
                     <option value="Pass">{t("qcRoving.pass")}</option>
                     <option value="Reject">{t("qcRoving.reject")}</option>
                   </select>
-                  <button
+                  {/* <button
                     type="button"
                     onClick={() => setShowSpiUploader(!showSpiUploader)}
                     className="mt-2 w-full flex items-center justify-center px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-100 text-xs"
@@ -1080,7 +1082,18 @@ const fetchInspectionsCompleted = useCallback(async () => {
                         inspectionData={inspectionContextData}
                       />
                     </div>
-                  )}
+                  )} */}
+
+                  {/* ImageCaptureUpload for SPI is now always rendered */}
+                  <div className="mt-2">
+                    <ImageCaptureUpload
+                      key={`spi-${imageUploaderKey}`}
+                      imageType="spi"
+                      maxImages={5}
+                      onImageFilesChange={setSpiFilesToUpload}
+                      inspectionData={inspectionContextData}
+                    />
+                  </div>
 
                 </div>
                 <div className="flex-1 min-w-[150px]">
@@ -1097,7 +1110,7 @@ const fetchInspectionsCompleted = useCallback(async () => {
                     <option value="Pass">{t("qcRoving.pass")}</option>
                     <option value="Reject">{t("qcRoving.reject")}</option>
                   </select>
-                  <button
+                  {/* <button
                     type="button"
                     onClick={() => setShowMeasurementUploader(!showMeasurementUploader)}
                      className="mt-2 w-full flex items-center justify-center px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-100 text-xs"
@@ -1116,7 +1129,17 @@ const fetchInspectionsCompleted = useCallback(async () => {
                         inspectionData={inspectionContextData}
                       />
                     </div>
-                  )}
+                  )} */}
+                  {/* ImageCaptureUpload for SPI is now always rendered */}
+                  <div className="mt-2">
+                    <ImageCaptureUpload
+                       key={`measurement-${imageUploaderKey}`}
+                       imageType="measurement"
+                       maxImages={5}
+                       onImageFilesChange={setMeasurementFilesToUpload} // Changed prop
+                       inspectionData={inspectionContextData}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
