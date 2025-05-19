@@ -9352,82 +9352,98 @@ app.get("/api/cutting/trend/garment-type", async (req, res) => {
   try {
     const data = await CuttingInspection.aggregate([
       { $match: matchConditions },
-      // $group by garmentType first to count unique inspections (MO+Table+GarmentType combo)
+      // Step 1: Sum inspectionData fields within each document
       {
-        $group: {
-          _id: {
-            garmentType: "$garmentType",
-            moNo: "$moNo",
-            tableNo: "$tableNo",
-            // Add other fields that define a unique "inspection instance" for AQL
-            totalInspectionQtyParent: "$totalInspectionQty"
+        $project: {
+          garmentType: 1,
+          moNo: 1,
+          tableNo: 1,
+          totalInspectionQty: 1,
+          totalBundleQty: 1,
+          bundleQtyCheck: 1,
+          totalPcsTop: {
+            $sum: "$inspectionData.pcsSize.top"
           },
-          // Sums from the parent document level, if they make sense to sum across all its inspectionData items
-          totalBundleQtyDoc: { $first: "$totalBundleQty" },
-          bundleQtyCheckDoc: { $first: "$bundleQtyCheck" },
-          // Sums from inspectionData array for this specific garmentType (if garmentType is also in inspectionData)
-          // This requires unwinding inspectionData if you want per-size-per-garment-type stats
-          // For simplicity, let's assume the table wants overall sums for a garment type from parent docs
-          inspectionDataArray: { $first: "$inspectionData" } // Take the whole array to process later or unwind
+          totalPcsMiddle: {
+            $sum: "$inspectionData.pcsSize.middle"
+          },
+          totalPcsBottom: {
+            $sum: "$inspectionData.pcsSize.bottom"
+          },
+          totalPassTop: {
+            $sum: "$inspectionData.passSize.top"
+          },
+          totalPassMiddle: {
+            $sum: "$inspectionData.passSize.middle"
+          },
+          totalPassBottom: {
+            $sum: "$inspectionData.passSize.bottom"
+          },
+          totalRejectTop: {
+            $sum: "$inspectionData.rejectSize.top"
+          },
+          totalRejectMiddle: {
+            $sum: "$inspectionData.rejectSize.middle"
+          },
+          totalRejectBottom: {
+            $sum: "$inspectionData.rejectSize.bottom"
+          },
+          totalRejectMeasTop: {
+            $sum: "$inspectionData.rejectMeasurementSize.top"
+          },
+          totalRejectMeasMiddle: {
+            $sum: "$inspectionData.rejectMeasurementSize.middle"
+          },
+          totalRejectMeasBottom: {
+            $sum: "$inspectionData.rejectMeasurementSize.bottom"
+          },
+          totalRejectGarmentTop: {
+            $sum: "$inspectionData.rejectGarmentSize.top"
+          },
+          totalRejectGarmentMiddle: {
+            $sum: "$inspectionData.rejectGarmentSize.middle"
+          },
+          totalRejectGarmentBottom: {
+            $sum: "$inspectionData.rejectGarmentSize.bottom"
+          },
+          totalPcsAll: {
+            $sum: "$inspectionData.totalPcsSize"
+          },
+          sumTotalReject: {
+            $sum: "$inspectionData.rejectSize.total"
+          }
         }
       },
-      { $unwind: "$inspectionDataArray" }, // Process each size inspection within the doc
-      {
-        $match: {
-          // Further filter if garmentType is also within inspectionData (unlikely for parent garmentType)
-          // "_id.garmentType": "$inspectionDataArray.someFieldRelatedToGarmentType"
-        }
-      },
+      // Step 2: Group by garmentType, collecting AQL data per record
       {
         $group: {
-          _id: "$_id.garmentType",
+          _id: "$garmentType",
           noOfInspections: {
-            $addToSet: { moNo: "$_id.moNo", tableNo: "$_id.tableNo" }
-          }, // Count unique MO+Table combinations for this garment type
-          totalBundleQty: { $sum: "$totalBundleQtyDoc" }, // Summing from potentially multiple docs if grouped only by garmentType
-          bundleQtyCheck: { $sum: "$bundleQtyCheckDoc" },
-
-          totalInspectedQty: { $sum: "$inspectionDataArray.totalPcsSize" }, // Sum of pieces for this garment type across all sizes/docs
-
-          sumTotalPcsTop: { $sum: "$inspectionDataArray.pcsSize.top" },
-          sumTotalPcsMiddle: { $sum: "$inspectionDataArray.pcsSize.middle" },
-          sumTotalPcsBottom: { $sum: "$inspectionDataArray.pcsSize.bottom" },
-
-          sumTotalRejectTop: { $sum: "$inspectionDataArray.rejectSize.top" },
-          sumTotalRejectMiddle: {
-            $sum: "$inspectionDataArray.rejectSize.middle"
+            $addToSet: { moNo: "$moNo", tableNo: "$tableNo" }
           },
-          sumTotalRejectBottom: {
-            $sum: "$inspectionDataArray.rejectSize.bottom"
-          },
-
-          sumTotalRejectMeasTop: {
-            $sum: "$inspectionDataArray.rejectMeasurementSize.top"
-          },
-          sumTotalRejectMeasMiddle: {
-            $sum: "$inspectionDataArray.rejectMeasurementSize.middle"
-          },
-          sumTotalRejectMeasBottom: {
-            $sum: "$inspectionDataArray.rejectMeasurementSize.bottom"
-          },
-
-          sumTotalRejectGarmentTop: {
-            $sum: "$inspectionDataArray.rejectGarmentSize.top"
-          },
-          sumTotalRejectGarmentMiddle: {
-            $sum: "$inspectionDataArray.rejectGarmentSize.middle"
-          },
-          sumTotalRejectGarmentBottom: {
-            $sum: "$inspectionDataArray.rejectGarmentSize.bottom"
-          },
-
-          // For AQL, collect necessary data points per inspection instance
+          totalBundleQty: { $sum: "$totalBundleQty" },
+          bundleQtyCheck: { $sum: "$bundleQtyCheck" },
+          totalInspectedQty: { $sum: "$totalPcsAll" },
+          sumTotalPcsTop: { $sum: "$totalPcsTop" },
+          sumTotalPcsMiddle: { $sum: "$totalPcsMiddle" },
+          sumTotalPcsBottom: { $sum: "$totalPcsBottom" },
+          sumTotalPassTop: { $sum: "$totalPassTop" },
+          sumTotalPassMiddle: { $sum: "$totalPassMiddle" },
+          sumTotalPassBottom: { $sum: "$totalPassBottom" },
+          sumTotalRejectTop: { $sum: "$totalRejectTop" },
+          sumTotalRejectMiddle: { $sum: "$totalRejectMiddle" },
+          sumTotalRejectBottom: { $sum: "$totalRejectBottom" },
+          sumTotalRejectMeasTop: { $sum: "$totalRejectMeasTop" },
+          sumTotalRejectMeasMiddle: { $sum: "$totalRejectMeasMiddle" },
+          sumTotalRejectMeasBottom: { $sum: "$totalRejectMeasBottom" },
+          sumTotalRejectGarmentTop: { $sum: "$totalRejectGarmentTop" },
+          sumTotalRejectGarmentMiddle: { $sum: "$totalRejectGarmentMiddle" },
+          sumTotalRejectGarmentBottom: { $sum: "$totalRejectGarmentBottom" },
           aqlRelevantData: {
             $push: {
-              totalInspectionQtyParent: "$_id.totalInspectionQtyParent", // This is the totalInspectionQty from parent for AQL decision
-              sumTotalRejectForSizeInstance:
-                "$inspectionDataArray.rejectSize.total",
-              totalPcsForSizeInstance: "$inspectionDataArray.totalPcsSize"
+              totalInspectionQty: "$totalInspectionQty",
+              sumTotalReject: "$sumTotalReject",
+              totalPcsAll: "$totalPcsAll"
             }
           }
         }
@@ -9445,6 +9461,11 @@ app.get("/api/cutting/trend/garment-type", async (req, res) => {
             middle: "$sumTotalPcsMiddle",
             bottom: "$sumTotalPcsBottom"
           },
+          totalPass: {
+            top: "$sumTotalPassTop",
+            middle: "$sumTotalPassMiddle",
+            bottom: "$sumTotalPassBottom"
+          },
           totalReject: {
             top: "$sumTotalRejectTop",
             middle: "$sumTotalRejectMiddle",
@@ -9459,29 +9480,42 @@ app.get("/api/cutting/trend/garment-type", async (req, res) => {
             top: "$sumTotalRejectGarmentTop",
             middle: "$sumTotalRejectGarmentMiddle",
             bottom: "$sumTotalRejectGarmentBottom"
-          }, // from rejectGarmentSize
+          },
           aqlRelevantData: 1
         }
       },
       { $sort: { garmentType: 1 } }
     ]);
 
-    // Post-process for PassRate and AQL Summary on server-side
     const getAQLResultStatusServer = (
       totalInspectionQty,
       sumTotalReject,
-      totalPcsForAQL
+      totalPcsAll
     ) => {
-      // Replicate your client-side AQL logic here
-      // totalPcsForAQL refers to the number of pieces inspected for THIS AQL decision instance
-      if (totalPcsForAQL < totalInspectionQty) {
-        // totalInspectionQty is the parent document's target
+      if (!totalInspectionQty || totalPcsAll < totalInspectionQty) {
         return { key: "pending" };
       }
       if (totalInspectionQty >= 30 && totalInspectionQty < 45) {
         return sumTotalReject > 0 ? { key: "reject" } : { key: "pass" };
       }
-      // ... (complete AQL logic)
+      if (totalInspectionQty >= 45 && totalInspectionQty < 60) {
+        return sumTotalReject > 0 ? { key: "reject" } : { key: "pass" };
+      }
+      if (totalInspectionQty >= 60 && totalInspectionQty < 90) {
+        return sumTotalReject > 1 ? { key: "reject" } : { key: "pass" };
+      }
+      if (totalInspectionQty >= 90 && totalInspectionQty < 135) {
+        return sumTotalReject > 2 ? { key: "reject" } : { key: "pass" };
+      }
+      if (totalInspectionQty >= 135 && totalInspectionQty < 210) {
+        return sumTotalReject > 3 ? { key: "reject" } : { key: "pass" };
+      }
+      if (totalInspectionQty >= 210 && totalInspectionQty < 315) {
+        return sumTotalReject > 5 ? { key: "reject" } : { key: "pass" };
+      }
+      if (totalInspectionQty >= 315) {
+        return sumTotalReject > 7 ? { key: "reject" } : { key: "pass" };
+      }
       return { key: "pending" };
     };
 
@@ -9491,9 +9525,9 @@ app.get("/api/cutting/trend/garment-type", async (req, res) => {
         aqlPending = 0;
       item.aqlRelevantData.forEach((aqlItem) => {
         const status = getAQLResultStatusServer(
-          aqlItem.totalInspectionQtyParent,
-          aqlItem.sumTotalRejectForSizeInstance,
-          aqlItem.totalPcsForSizeInstance
+          aqlItem.totalInspectionQty,
+          aqlItem.sumTotalReject,
+          aqlItem.totalPcsAll
         );
         if (status.key === "pass") aqlPass++;
         else if (status.key === "reject") aqlReject++;
@@ -9505,31 +9539,24 @@ app.get("/api/cutting/trend/garment-type", async (req, res) => {
         (item.totalPcs.middle || 0) +
         (item.totalPcs.bottom || 0);
       const totalPassOverall =
-        totalPcsOverall -
-        ((item.totalReject.top || 0) +
-          (item.totalReject.middle || 0) +
-          (item.totalReject.bottom || 0));
+        (item.totalPass.top || 0) +
+        (item.totalPass.middle || 0) +
+        (item.totalPass.bottom || 0);
 
       return {
         ...item,
         passRate: {
           top:
             item.totalPcs.top > 0
-              ? ((item.totalPcs.top - (item.totalReject.top || 0)) /
-                  item.totalPcs.top) *
-                100
+              ? ((item.totalPass.top || 0) / item.totalPcs.top) * 100
               : 0,
           middle:
             item.totalPcs.middle > 0
-              ? ((item.totalPcs.middle - (item.totalReject.middle || 0)) /
-                  item.totalPcs.middle) *
-                100
+              ? ((item.totalPass.middle || 0) / item.totalPcs.middle) * 100
               : 0,
           bottom:
             item.totalPcs.bottom > 0
-              ? ((item.totalPcs.bottom - (item.totalReject.bottom || 0)) /
-                  item.totalPcs.bottom) *
-                100
+              ? ((item.totalPass.bottom || 0) / item.totalPcs.bottom) * 100
               : 0,
           overall:
             totalPcsOverall > 0 ? (totalPassOverall / totalPcsOverall) * 100 : 0

@@ -696,7 +696,9 @@
     "pending": "Pending",
     "print": "Print",
     "legend": "Legend",
-    "totalSamplesShort": "Total"
+    "totalSamplesShort": "Total",
+    "applyFilters": "Apply",
+    "clearFilters": "Clear"
   },
 
   "cuttingReport": {
