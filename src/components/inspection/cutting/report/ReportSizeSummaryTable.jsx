@@ -83,7 +83,11 @@ const ReportSizeSummaryTable = ({ bundleInspectionData, inspectedSize }) => {
                   bundle.rejectMeasurement.middle +
                   bundle.rejectMeasurement.bottom;
                 const bundleTotalRejectDefects =
-                  bundleTotalReject - bundleTotalRejectMeasurement;
+                  bundle.rejectGarment.top +
+                  bundle.rejectGarment.middle +
+                  bundle.rejectGarment.bottom;
+                // const bundleTotalRejectDefects =
+                //   bundleTotalReject - bundleTotalRejectMeasurement;
                 const bundlePassRate =
                   bundleTotalPcs > 0
                     ? ((bundleTotalPass / bundleTotalPcs) * 100).toFixed(2)
@@ -150,11 +154,11 @@ const ReportSizeSummaryTable = ({ bundleInspectionData, inspectedSize }) => {
                         {bundle.rejectMeasurement.bottom}
                       </td>
                       <td className="border border-gray-300 p-1 text-center">
-                        T:{bundle.reject.top - bundle.rejectMeasurement.top}, M:
-                        {bundle.reject.middle - bundle.rejectMeasurement.middle}
-                        , B:
-                        {bundle.reject.bottom - bundle.rejectMeasurement.bottom}
+                        T:{bundle.rejectGarment.top}, M:
+                        {bundle.rejectGarment.middle}, B:
+                        {bundle.rejectGarment.bottom}
                       </td>
+
                       <td className="border border-gray-300 p-1 text-center">
                         T:{bundle.passrate.top.toFixed(0)}% M:
                         {bundle.passrate.middle.toFixed(0)}% B:

@@ -649,7 +649,28 @@
     "noCuttingIssuesReported": "គ្មានបញ្ហាការកាត់ត្រូវបានរាយការណ៍សម្រាប់ទំហំនេះទេ។",
     "failedToFetchQcInspectors": "បរាជ័យក្នុងការទាញយកអ្នកត្រួតពិនិត្យ QC",
     "inspectionDate": "ថ្ងៃ​ចាប់ផ្តើម",
-    "partName": "ឈ្មោះផ្នែក"
+    "partName": "ឈ្មោះផ្នែក",
+    "trendAnalysisTitle": "ការវិភាគនិន្នាការត្រួតពិនិត្យការកាត់",
+    "trendAnalysisSubtitle": "វិភាគនិន្នាការត្រួតពិនិត្យការកាត់តាមពេលវេលា និងវិមាត្រផ្សេងៗ។",
+    "garmentTypeTrendAnalysis": "ការវិភាគនិន្នាការតាមប្រភេទសម្លៀកបំពាក់",
+    "noOfInspections": "ចំនួនការត្រួតពិនិត្យ",
+    "aqlResults": "លទ្ធផល AQL",
+    "aqlPassRate": "អត្រាជាប់ AQL",
+    "filterForSubTrends": "តម្រងសម្រាប់និន្នាការវាស់វែង និងកំហុស",
+    "partNameFilter": "តម្រងតាមឈ្មោះផ្នែក",
+    "measurementPointsTrendAnalysis": "ការវិភាគនិន្នាការចំណុចវាស់វែង",
+    "totalCountWithinTolerancePoints": "ចំនួនសរុបនៃចំណុចក្នុងកម្រិតអនុញ្ញាត",
+    "totalNegTolerancePoints": "ចំនួនសរុបនៃចំណុចខ្វះកម្រិត",
+    "totalPosTolerancePoints": "ចំនួនសរុបនៃចំណុចលើសកម្រិត",
+    "fabricDefectTrendChart": "ការវិភាគនិន្នាការកំហុសក្រណាត់",
+    "topMeasurementIssues": "បញ្ហាវាស់វែងកំពូល",
+    "passPoints": "ចំណុចជាប់",
+    "rejectTolNegPoints": "ចំណុចធ្លាក់ (ខ្វះ)",
+    "rejectTolPosPoints": "ចំណុចធ្លាក់ (លើស)",
+    "issuePercentage": "ភាគរយបញ្ហា",
+    "topDefectIssues": "បញ្ហាកំហុសកំពូល",
+    "failedToFetchTrendData": "បរាជ័យក្នុងការទាញយកទិន្នន័យនិន្នាការ។",
+    "failedToFetchTopIssues": "បរាជ័យក្នុងការទាញយកទិន្នន័យបញ្ហាកំពូល។"
   },
 
   "common": {
@@ -669,7 +690,12 @@
     "backToList": "ត្រឡប់ទៅបញ្ជីវិញ",
     "invalidDateRange": "ជួរកាលបរិច្ឆេទមិនត្រឹមត្រូវ",
     "endDateCannotBeBeforeStartDate": "កាលបរិច្ឆេទបញ្ចប់មិនអាចនៅមុនកាលបរិច្ឆេទចាប់ផ្តើមបានទេ។",
-    "total": "សរុប"
+    "total": "សរុប",
+    "result": "លទ្ធផល",
+    "pending": "កំពុងរង់ចាំ",
+    "print": "បោះពុម្ព",
+    "legend": "និមិត្តសញ្ញា",
+    "totalSamplesShort": "សរុប"
   },
 
   "cuttingReport": {

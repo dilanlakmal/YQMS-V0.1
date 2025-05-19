@@ -649,7 +649,28 @@
     "noCuttingIssuesReported": "此尺码未报告裁剪问题。",
     "failedToFetchQcInspectors": "获取QC检验员失败。",
     "inspectionDate": "开始日期",
-    "partName": "零件名称"
+    "partName": "零件名称",
+    "trendAnalysisTitle": "裁剪检验趋势分析",
+    "trendAnalysisSubtitle": "分析不同时间段和维度的裁剪检验趋势。",
+    "garmentTypeTrendAnalysis": "成衣类型趋势分析",
+    "noOfInspections": "检验次数",
+    "aqlResults": "AQL 结果",
+    "aqlPassRate": "AQL 合格率",
+    "filterForSubTrends": "测量与疵点趋势筛选",
+    "partNameFilter": "部件名称筛选",
+    "measurementPointsTrendAnalysis": "测量点趋势分析",
+    "totalCountWithinTolerancePoints": "公差内点总数",
+    "totalNegTolerancePoints": "负公差点总数",
+    "totalPosTolerancePoints": "正公差点总数",
+    "fabricDefectTrendChart": "面料疵点趋势分析",
+    "topMeasurementIssues": "主要测量问题",
+    "passPoints": "合格点数",
+    "rejectTolNegPoints": "拒收负公差点数",
+    "rejectTolPosPoints": "拒收正公差点数",
+    "issuePercentage": "问题百分比",
+    "topDefectIssues": "主要疵点问题",
+    "failedToFetchTrendData": "获取趋势数据失败。",
+    "failedToFetchTopIssues": "获取主要问题数据失败。"
   },
 
   "common": {
@@ -669,7 +690,12 @@
     "backToList": "返回列表",
     "invalidDateRange": "无效日期范围",
     "endDateCannotBeBeforeStartDate": "结束日期不能早于开始日期。",
-    "total": "总计"
+    "total": "总计",
+    "result": "结果",
+    "pending": "待办的",
+    "print": "打印",
+    "legend": "图例",
+    "totalSamplesShort": "总计"
   },
 
   "cuttingReport": {

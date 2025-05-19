@@ -13,10 +13,8 @@ const ReportInspectionSummary = ({ inspectionData }) => {
       acc.totalPass += curr.passSize?.total || 0;
       acc.totalReject += curr.rejectSize?.total || 0;
       acc.totalRejectMeasurement += curr.rejectMeasurementSize?.total || 0;
-      // Assuming rejectDefects is total reject - measurement reject
-      acc.totalRejectDefects +=
-        (curr.rejectSize?.total || 0) -
-        (curr.rejectMeasurementSize?.total || 0);
+      acc.totalRejectDefects += curr.rejectGarmentSize?.total || 0;
+
       return acc;
     },
     {
@@ -67,9 +65,6 @@ const ReportInspectionSummary = ({ inspectionData }) => {
           </thead>
           <tbody>
             {inspectionData.map((data, index) => {
-              const rejectDefects =
-                (data.rejectSize?.total || 0) -
-                (data.rejectMeasurementSize?.total || 0);
               return (
                 <tr key={index}>
                   <td className="border border-gray-300 p-2 text-center">
@@ -88,8 +83,11 @@ const ReportInspectionSummary = ({ inspectionData }) => {
                     {data.rejectMeasurementSize?.total}
                   </td>
                   <td className="border border-gray-300 p-2 text-center">
-                    {rejectDefects < 0 ? 0 : rejectDefects}
+                    {data.rejectGarmentSize?.total < 0
+                      ? 0
+                      : data.rejectGarmentSize?.total}
                   </td>
+
                   <td className="border border-gray-300 p-2 text-center">
                     {data.passrateSize?.total.toFixed(2)}
                   </td>

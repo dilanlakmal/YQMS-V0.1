@@ -1863,16 +1863,16 @@
 import axios from "axios";
 import {
   AlertCircle,
+  Box,
   CheckCircle,
   Database,
   Eye,
   EyeOff,
   Keyboard,
-  Percent,
-  XCircle,
-  Tag,
   Layers,
-  Box
+  Percent,
+  Tag,
+  XCircle
 } from "lucide-react"; // Added icons for stats
 
 import React, { useEffect, useRef, useState } from "react";
@@ -1883,12 +1883,13 @@ import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
 import NumberPad from "../components/forms/NumberPad";
+import AQLChart from "../components/inspection/cutting/AQLChart";
 import CuttingInspectionModify from "../components/inspection/cutting/CuttingInspectionModify";
 import CuttingIssues from "../components/inspection/cutting/CuttingIssues";
-import CuttingMeasurementPointsModify from "../components/inspection/cutting/CuttingMeasurementPointsModify ";
+import CuttingMeasurementPointsModify from "../components/inspection/cutting/CuttingMeasurementPointsModify";
 import CuttingOrderModify from "../components/inspection/cutting/CuttingOrderModify";
 import MeasurementTable from "../components/inspection/cutting/MeasurementTable";
-import AQLChart from "../components/inspection/cutting/AQLChart";
+import CuttingReportQCView from "../components/inspection/cutting/report/CuttingReportQCView";
 
 const CuttingPage = () => {
   const { t, i18n } = useTranslation();
@@ -2770,11 +2771,15 @@ const CuttingPage = () => {
       passSize,
       rejectSize,
       rejectGarmentSize: {
-        total: totalReject,
-        top: summary.Top.totalReject,
-        middle: summary.Middle.totalReject,
-        bottom: summary.Bottom.totalReject
+        total:
+          summary.Top.rejectDefects +
+          summary.Middle.rejectDefects +
+          summary.Bottom.rejectDefects,
+        top: summary.Top.rejectDefects,
+        middle: summary.Middle.rejectDefects,
+        bottom: summary.Bottom.rejectDefects
       },
+
       rejectMeasurementSize: {
         total:
           summary.Top.rejectMeasurement +
@@ -2840,13 +2845,14 @@ const CuttingPage = () => {
         },
         rejectGarment: {
           total:
-            (summary.Top.bundles[bundleIndex]?.totalReject || 0) +
-            (summary.Middle.bundles[bundleIndex]?.totalReject || 0) +
-            (summary.Bottom.bundles[bundleIndex]?.totalReject || 0),
-          top: summary.Top.bundles[bundleIndex]?.totalReject || 0,
-          middle: summary.Middle.bundles[bundleIndex]?.totalReject || 0,
-          bottom: summary.Bottom.bundles[bundleIndex]?.totalReject || 0
+            (summary.Top.bundles[bundleIndex]?.rejectDefects || 0) +
+            (summary.Middle.bundles[bundleIndex]?.rejectDefects || 0) +
+            (summary.Bottom.bundles[bundleIndex]?.rejectDefects || 0),
+          top: summary.Top.bundles[bundleIndex]?.rejectDefects || 0,
+          middle: summary.Middle.bundles[bundleIndex]?.rejectDefects || 0,
+          bottom: summary.Bottom.bundles[bundleIndex]?.rejectDefects || 0
         },
+
         rejectMeasurement: {
           total:
             (summary.Top.bundles[bundleIndex]?.rejectMeasurement || 0) +
@@ -3326,6 +3332,16 @@ const CuttingPage = () => {
             }`}
           >
             {t("cutting.data")}
+          </button>
+          <button
+            onClick={() => setActiveTab("report")}
+            className={`px-4 py-2 ${
+              activeTab === "report"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            {t("cutting.report")}
           </button>
           <button
             onClick={() => setActiveTab("Modify")}
@@ -5093,8 +5109,11 @@ const CuttingPage = () => {
           </>
         ) : activeTab === "data" ? (
           <div className="text-gray-600">
-            {" "}
-            <CuttingInspectionModify />{" "}
+            <CuttingInspectionModify />
+          </div>
+        ) : activeTab === "report" ? (
+          <div className="text-gray-600">
+            <CuttingReportQCView />
           </div>
         ) : activeTab === "Modify" ? (
           <div className="text-gray-600">

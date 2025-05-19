@@ -650,7 +650,28 @@
     "noCuttingIssuesReported": "No cutting issues reported for this size.",
     "failedToFetchQcInspectors": "Failed to fetch QC inspectors.",
     "inspectionDate": "Inspection Date",
-    "partName": "Part Name"
+    "partName": "Part Name",
+    "trendAnalysisTitle": "Cutting Inspection Trend Analysis",
+    "trendAnalysisSubtitle": "Analyze cutting inspection trends over time and across various dimensions.",
+    "garmentTypeTrendAnalysis": "Garment Type Trend Analysis",
+    "noOfInspections": "No. of Inspections",
+    "aqlResults": "AQL Results",
+    "aqlPassRate": "AQL Pass Rate",
+    "filterForSubTrends": "Filter For Measurement & Defect Trends",
+    "partNameFilter": "Part Name Filter",
+    "measurementPointsTrendAnalysis": "Measurement Points Trend Analysis",
+    "totalCountWithinTolerancePoints": "Total Count of Within Tol. Points",
+    "totalNegTolerancePoints": "Total Neg. Tol. Points",
+    "totalPosTolerancePoints": "Total Pos. Tol. Points",
+    "fabricDefectTrendChart": "Fabric Defect Trend Analysis",
+    "topMeasurementIssues": "Top Measurement Issues",
+    "passPoints": "Pass Points",
+    "rejectTolNegPoints": "Reject Tol. (-) Points",
+    "rejectTolPosPoints": "Reject Tol. (+) Points",
+    "issuePercentage": "Issue %",
+    "topDefectIssues": "Top Defect Issues",
+    "failedToFetchTrendData": "Failed to fetch trend data.",
+    "failedToFetchTopIssues": "Failed to fetch top issues data."
   },
 
   "common": {
@@ -670,7 +691,12 @@
     "backToList": "Back to List",
     "invalidDateRange": "Invalid Date Range",
     "endDateCannotBeBeforeStartDate": "End date cannot be before start date.",
-    "total": "Total"
+    "total": "Total",
+    "result": "Result",
+    "pending": "Pending",
+    "print": "Print",
+    "legend": "Legend",
+    "totalSamplesShort": "Total"
   },
 
   "cuttingReport": {
