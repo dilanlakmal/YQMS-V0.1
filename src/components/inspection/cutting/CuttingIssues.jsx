@@ -1,14 +1,14 @@
 import axios from "axios";
+import { Camera, Eye, Upload, X } from "lucide-react";
 import React, {
-  useEffect,
-  useRef,
-  useState,
   forwardRef,
-  useImperativeHandle
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState
 } from "react";
 import { useTranslation } from "react-i18next";
 import Webcam from "react-webcam";
-import { Camera, Eye, X, Upload } from "lucide-react";
 import { API_BASE_URL } from "../../../../config";
 
 const CuttingIssues = forwardRef(({ moNo, selectedPanel }, ref) => {

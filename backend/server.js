@@ -92,10 +92,11 @@ const io = new Server(server, {
   }
 });
 
+app.use("/storage", express.static(path.join(__dirname, "public/storage")));
+app.use("/public", express.static(path.join(__dirname, "../public")));
+
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
-app.use("/public", express.static(path.join(__dirname, "../public")));
-app.use("/storage", express.static(path.join(__dirname, "public/storage")));
 
 //app.use(cors());
 app.use(bodyParser.json());
@@ -9107,7 +9108,17 @@ app.get("/api/cutting-issues", async (req, res) => {
 // Multer configuration for cutting images
 const cutting_storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "public/storage/cutting/");
+    const dir = path.join(__dirname, "public/storage/cutting/");
+    try {
+      // Create directory synchronously if it doesn't exist
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      cb(null, dir);
+    } catch (error) {
+      console.error("Error creating directory:", error);
+      cb(error);
+    }
   },
   filename: (req, file, cb) => {
     cb(null, `cutting-${Date.now()}${path.extname(file.originalname)}`);
