@@ -1908,6 +1908,7 @@ const CuttingPage = () => {
   const tableNoDropdownRef = useRef(null);
   const [cutPanelData, setCutPanelData] = useState(null);
   const [availableSizes, setAvailableSizes] = useState([]);
+  const [overallTotalOrderQty, setOverallTotalOrderQty] = useState(0);
 
   // New state variables
   const [inspectionProgress, setInspectionProgress] = useState(null);
@@ -2057,6 +2058,7 @@ const CuttingPage = () => {
       if (!moNo || !tableNo) {
         setCutPanelData(null);
         setAvailableSizes([]);
+        setOverallTotalOrderQty(0); // Reset when moNo or tableNo is cleared
         return;
       }
       try {
@@ -2079,10 +2081,24 @@ const CuttingPage = () => {
         setPlanLayerQty(response.data.PlanLayer || 0);
         setTotalPlanPcs(response.data.TotalPcs || 0);
         setActualLayers(response.data.ActualLayer || 0);
+
+        // Fetch overall total order quantity
+        const totalQtyResponse = await axios.get(
+          `${API_BASE_URL}/api/cutpanel-orders-total-order-qty`,
+          {
+            params: { styleNo: moNo },
+            headers: { "Content-Type": "application/json" },
+            withCredentials: true
+          }
+        );
+        setOverallTotalOrderQty(
+          totalQtyResponse.data.overallTotalOrderQty || 0
+        );
       } catch (error) {
         console.error("Error fetching Cut Panel data:", error);
         setCutPanelData(null);
         setAvailableSizes([]);
+        setOverallTotalOrderQty(0);
         Swal.fire({
           icon: "error",
           title: t("cutting.error"),
@@ -2506,6 +2522,7 @@ const CuttingPage = () => {
     setShowTableNoDropdown(false);
     setCutPanelData(null);
     setAvailableSizes([]);
+    setOverallTotalOrderQty(0); // Reset new state
     setPlanLayerQty(0);
     setTotalPlanPcs(0);
     setActualLayers(0);
@@ -3529,6 +3546,17 @@ const CuttingPage = () => {
                           </td>
                           <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.TotalOrderQty}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="border border-gray-300 p-2 text-sm font-bold text-gray-900 text-right"
+                          >
+                            Total
+                          </td>
+                          <td className="border border-gray-300 p-2 text-center text-sm font-bold text-gray-900">
+                            {overallTotalOrderQty}
                           </td>
                         </tr>
                       </tbody>

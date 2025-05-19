@@ -1876,6 +1876,57 @@ app.get("/api/cutpanel-orders-details", async (req, res) => {
   }
 });
 
+// Endpoint to Fetch Total Order Quantity for unique StyleNo and Color combinations
+app.get("/api/cutpanel-orders-total-order-qty", async (req, res) => {
+  try {
+    const { styleNo } = req.query;
+    if (!styleNo) {
+      return res.status(400).json({ error: "StyleNo is required" });
+    }
+
+    const results = await CutPanelOrders.aggregate([
+      // Match documents for the given StyleNo
+      { $match: { StyleNo: styleNo } },
+      // Group by StyleNo and Color to deduplicate and sum TotalOrderQty
+      {
+        $group: {
+          _id: { StyleNo: "$StyleNo", Color: "$Color" },
+          totalOrderQty: { $sum: "$TotalOrderQty" }
+        }
+      },
+      // Group all results to get the overall sum
+      {
+        $group: {
+          _id: null,
+          overallTotalOrderQty: { $sum: "$totalOrderQty" }
+        }
+      },
+      // Project only the overallTotalOrderQty field
+      {
+        $project: {
+          _id: 0,
+          overallTotalOrderQty: 1
+        }
+      }
+    ]).exec();
+
+    if (results.length === 0) {
+      return res.json({ overallTotalOrderQty: 0 });
+    }
+
+    res.json(results[0]);
+  } catch (err) {
+    console.error(
+      "Error fetching total order quantity from cutpanelorders:",
+      err
+    );
+    res.status(500).json({
+      message: "Failed to fetch total order quantity from cutpanelorders",
+      error: err.message
+    });
+  }
+});
+
 /* ------------------------------
    Updated Endpoints for Cutting.jsx
 ------------------------------ */
