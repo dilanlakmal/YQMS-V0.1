@@ -10473,7 +10473,7 @@ app.get("/api/defects/all-details", async (req, res) => {
 
 // Endpoint for /api/buyers
 app.get("/api/buyers", (req, res) => {
-  const buyers = ["Costco", "Aritzia", "Reitmans", "ANF", "STORI", "MWW"];
+  const buyers = ["Costco", "Aritzia", "Reitmans", "ANF", "MWW"];
   res.json(buyers);
 });
 
@@ -10492,8 +10492,8 @@ app.post("/api/sewing-defects/buyer-statuses", async (req, res) => {
       }
    acc[defectCode].push({
         buyerName: status.buyerName,
-        isCritical: status.isCritical || false,
-        isMinor: status.isMinor || false,
+        defectStatus: Array.isArray(status.defectStatus) ? status.defectStatus : [], 
+        isCommon: ["Critical", "Major", "Minor"].includes(status.isCommon) ? status.isCommon : "Minor",
       });
       return acc;
     }, {});

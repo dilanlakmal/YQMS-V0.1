@@ -45,10 +45,10 @@ const DefectBuyerStatus = () => {
         (defect.statusByBuyer || []).forEach(statusEntry => {
           if (statusEntry.buyerName) {
             if (!initialStatuses[defect.code][statusEntry.buyerName]) {
-              initialStatuses[defect.code][statusEntry.buyerName] = { critical: false, minor: false };
+              initialStatuses[defect.code][statusEntry.buyerName] = { defectStatus: [], isCommon: "Minor" };
             }
-            initialStatuses[defect.code][statusEntry.buyerName].critical = statusEntry.isCritical === "Yes";
-            initialStatuses[defect.code][statusEntry.buyerName].minor = statusEntry.isMinor === "Yes";
+            initialStatuses[defect.code][statusEntry.buyerName].defectStatus = Array.isArray(statusEntry.defectStatus) ? statusEntry.defectStatus : [];
+            initialStatuses[defect.code][statusEntry.buyerName].isCommon = statusEntry.isCommon || "Minor";
           }
         });
       });
@@ -110,21 +110,36 @@ const DefectBuyerStatus = () => {
         newStatuses[defectCode] = {};
       }
       if (!newStatuses[defectCode][buyerName]) {
-        newStatuses[defectCode][buyerName] = { critical: false, minor: false };
+         newStatuses[defectCode][buyerName] = { defectStatus: [], isCommon: "Minor" };
       }
+      
+      const currentDefectStatuses = newStatuses[defectCode][buyerName].defectStatus || []; 
 
-       const currentlyChecked = newStatuses[defectCode][buyerName][statusType];
+      const isChecked = currentDefectStatuses.includes(statusType); 
 
-      if (!currentlyChecked) { 
-        newStatuses[defectCode][buyerName][statusType] = true; 
-        if (statusType === 'critical') {
-          newStatuses[defectCode][buyerName]['minor'] = false; 
-        } else if (statusType === 'minor') {
-          newStatuses[defectCode][buyerName]['critical'] = false; 
-        }
-      } else { // If user is trying to uncheck this box
-        newStatuses[defectCode][buyerName][statusType] = false; 
+
+      if (isChecked) {
+        // Uncheck: remove from array
+       newStatuses[defectCode][buyerName].defectStatus = currentDefectStatuses.filter(c => c !== statusType);
+      } else {
+        // Check: add to array
+        newStatuses[defectCode][buyerName].defectStatus = [...currentDefectStatuses, statusType]; 
       }
+      return newStatuses;
+    });
+  };
+
+  const handleDropdownChange = (defectCode, buyerName, newCommonClassification) => {
+    setDefectStatuses(prevStatuses => {
+      const newStatuses = JSON.parse(JSON.stringify(prevStatuses)); // Deep copy
+      if (!newStatuses[defectCode]) {
+        newStatuses[defectCode] = {};
+      }
+      if (!newStatuses[defectCode][buyerName]) {
+        newStatuses[defectCode][buyerName] = { defectStatus: [], isCommon: "Minor" };
+      }
+      newStatuses[defectCode][buyerName].isCommon = newCommonClassification;
+        
       return newStatuses;
     });
   };
@@ -140,8 +155,8 @@ const DefectBuyerStatus = () => {
          payload.push({
           defectCode,
           buyerName,
-          isCritical: status.critical ? "Yes" : "No",
-          isMinor: status.minor ? "Yes" : "No",
+          defectStatus: status.defectStatus || [], 
+          isCommon: status.isCommon || "Minor",
         });
       }
     }
@@ -192,82 +207,86 @@ const DefectBuyerStatus = () => {
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 border border-gray-300">
             <thead className="bg-gray-100">
-              <tr>
-                <th scope="col" rowSpan="2" className="px-4 py-3 text-left text-m font-medium text-gray-600 uppercase tracking-wider border-r border-gray-300 align-middle">
+              <tr className="text-xs font-medium text-gray-600 uppercase tracking-wider">
+                <th scope="col" rowSpan="2" className="px-4 py-3 text-left border-r border-gray-300 align-middle">
                   {t('defectBuyerStatus.defectName', 'Defect Name')}
                 </th>
-               <th scope="col" colSpan="2" className="px-4 py-3 text-center text-m font-medium text-gray-600 uppercase tracking-wider">
-                  {t('defectBuyerStatus.buyerStatuses', 'Buyer Statuses')}
-                </th>
-                 </tr>
-              <tr>
-                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-600 uppercase tracking-wider border-r border-t border-gray-300">
-                  {t('defectBuyerStatus.critical', 'Critical')}
-                </th>
-                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-600 uppercase tracking-wider border-t">
-                  {t('defectBuyerStatus.minor', 'Minor')}
-                </th>
+               {allBuyers.map(buyer => (
+                  <th key={buyer} scope="col" colSpan="2" className="px-4 py-3 text-center border-r border-gray-300">
+                    {buyer}
+                  </th>
+                ))}
+              </tr>
+              <tr className="text-xs font-medium text-gray-600 uppercase tracking-wider">
+                {allBuyers.map(buyer => (
+                  <React.Fragment key={`${buyer}-sub`}>
+                    <th scope="col" className="px-2 py-2 text-left border-r border-gray-300">
+                      {t('defectBuyerStatus.classifications', 'Status')}
+                    </th>
+                    <th scope="col" className="px-2 py-2 text-left border-r border-gray-300">
+                      {t('defectBuyerStatus.commonStatus', 'Common')}
+                    </th>
+                  </React.Fragment>
+                ))}
+
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {allDefects.length === 0 && (
                 <tr>
-                  <td colSpan="3" className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={1 + allBuyers.length * 2} className="px-4 py-10 text-center text-gray-500">
                     {t('defectBuyerStatus.noDefectsFound', 'No defects found.')}
                   </td>
                 </tr>
               )}
               {allBuyers.length === 0 && allDefects.length > 0 && (
                  <tr>
-                  <td colSpan="3" className="px-4 py-10 text-center text-gray-500">
+                   <td colSpan={1 + allBuyers.length * 2} className="px-4 py-10 text-center text-gray-500">
                     {t('defectBuyerStatus.noBuyersFound', 'No buyers found. Please add buyers to the system.')}
                   </td>
                 </tr>
               )}
               {allDefects.map((defect) => (
                 <tr key={defect.code} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 align-top border-r border-gray-300 md:w-1/3">
+                  <td className="px-4 py-3 align-top border-r border-gray-300 md:w-auto whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{getDefectDisplayName(defect)}</div>
                     <div className="text-xs text-gray-500">({defect.code})</div>
                   </td>
-                  <td className="px-4 py-3 align-top border-r border-gray-300 md:w-1/3"> 
-                    {allBuyers.length > 0 ? (
-                      <div className="flex flex-wrap gap-x-4 gap-y-1">
-                        {allBuyers.map((buyer) => (
-                          <label key={`${defect.code}-${buyer}-critical`} className="flex items-center space-x-1 text-sm">
-                            <input
-                              type="checkbox"
-                              className="form-checkbox h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                              checked={defectStatuses[defect.code]?.[buyer]?.critical || false}
-                              onChange={() => handleCheckboxChange(defect.code, buyer, 'critical')}
-                            />
-                            <span>{buyer}</span>
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400 italic">{t('defectBuyerStatus.noBuyersToAssign', 'No buyers available to assign status.')}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 align-top md:w-1/3"> {/* Minor Statuses Cell */}
-                    {allBuyers.length > 0 ? (
-                      <div className="flex flex-wrap gap-x-4 gap-y-1">
-                        {allBuyers.map((buyer) => (
-                          <label key={`${defect.code}-${buyer}-minor`} className="flex items-center space-x-1 text-sm">
-                            <input
-                              type="checkbox"
-                              className="form-checkbox h-4 w-4 text-yellow-500 border-gray-300 rounded focus:ring-yellow-400"
-                              checked={defectStatuses[defect.code]?.[buyer]?.minor || false}
-                              onChange={() => handleCheckboxChange(defect.code, buyer, 'minor')}
-                            />
-                            <span>{buyer}</span>
-                          </label>
-                        ))}
+                  {allBuyers.map(buyer => (
+                    <React.Fragment key={`${defect.code}-${buyer}`}>
+                      <td className="px-2 py-3 align-top border-r border-gray-300">
+                        <div className="space-y-1">
+                          {["Critical", "Major", "Minor"].map(classification => (
+                            <label key={classification} className="flex items-center space-x-1 text-sm">
+                              <input
+                                type="checkbox"
+                                className={`form-checkbox h-4 w-4 border-gray-300 rounded ${
+                                  classification === "Critical" ? "text-red-600 focus:ring-red-500" :
+                                  classification === "Major" ? "text-orange-500 focus:ring-orange-400" :
+                                  "text-yellow-500 focus:ring-yellow-400"
+                                }`}
+                                checked={defectStatuses[defect.code]?.[buyer]?.defectStatus?.includes(classification) || false}
+                                onChange={() => handleCheckboxChange(defect.code, buyer, classification)}
+                              />
+                              <span>{t(`defectBuyerStatus.classifications.${classification.toLowerCase()}`, classification)}</span>
+                            </label>
+                          ))}
+
                         </div>
-                    ) : (
-                      <span className="text-xs text-gray-400 italic">{t('defectBuyerStatus.noBuyersToAssign', 'No buyers available to assign status.')}</span>
-                    )}
-                  </td>
+                    </td>
+                      <td className="px-2 py-3 align-top border-r border-gray-300">
+                        <select
+                          value={defectStatuses[defect.code]?.[buyer]?.isCommon || "Minor"}
+                          onChange={(e) => handleDropdownChange(defect.code, buyer, e.target.value)}
+                          className="block w-full text-xs p-1 border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md shadow-sm"
+                        >
+                          <option value="Minor">{t('defectBuyerStatus.classifications.minor', 'Minor')}</option>
+                          <option value="Major">{t('defectBuyerStatus.classifications.major', 'Major')}</option>
+                          <option value="Critical">{t('defectBuyerStatus.classifications.critical', 'Critical')}</option>
+                        </select>
+                      </td>
+                    </React.Fragment>
+                  ))}
                 </tr>
               ))}
             </tbody>

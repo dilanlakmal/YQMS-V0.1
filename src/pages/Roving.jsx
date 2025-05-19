@@ -314,10 +314,15 @@ const RovingPage = () => {
                     (status) => status.buyerName === apiDeterminedBuyer 
                   );
                   if (buyerStatus) {
-                    if (buyerStatus.isCritical === "Yes") return "Critical";
-                    if (buyerStatus.isMinor === "Yes") return "Minor";
+                    // Set initial severity based on isCommon for this buyer
+                    // Ensure isCommon is one of the allowed defectStatus values, or default
+                    if (buyerStatus.isCommon && (buyerStatus.defectStatus?.includes(buyerStatus.isCommon))) {
+                      return buyerStatus.isCommon;
+                    }
+                    // If isCommon is not valid or not in defectStatus, pick the first from defectStatus or default to Minor
+                    return buyerStatus.defectStatus?.[0] || "Minor";
                   }
-                  return "Minor"; 
+                  return "Minor"; // Default if no buyer-specific info at all
                 })(),
               },
             ],
@@ -330,6 +335,26 @@ const RovingPage = () => {
     }
   };
 
+  
+   const handleDefectSeverityChange = (defectIndexInGarment, newSeverity) => {
+    setGarments((prevGarments) => {
+      const newGarments = [...prevGarments];
+      const currentDefectsArray = [...newGarments[currentGarmentIndex].defects];
+  
+      if (currentDefectsArray[defectIndexInGarment]) {
+        currentDefectsArray[defectIndexInGarment] = {
+          ...currentDefectsArray[defectIndexInGarment],
+          severity: newSeverity, // Update the severity
+        };
+        newGarments[currentGarmentIndex] = {
+          ...newGarments[currentGarmentIndex],
+          defects: currentDefectsArray,
+        };
+      }
+      return newGarments;
+    });
+  };
+  
   const deleteDefect = (defectIndex) => {
     setGarments((prevGarments) => {
       const newGarments = [...prevGarments];
@@ -481,38 +506,43 @@ const RovingPage = () => {
       ? "Reject"
       : "Pass";
 
-    let overallOperatorStatusKey = '';
-   const anyGarmentHasCriticalDefect = updatedGarments.some(g => 
+     let overallOperatorStatusKey = '';
+    const anyCriticalDefectInUpdatedGarments = updatedGarments.some(g =>
       g.defects.some(d => d.severity === 'Critical')
     );
     
-   const garmentsMinorDefectCounts = updatedGarments.map(g => 
-      g.defects.filter(d => d.severity === 'Minor').reduce((sum, defect) => sum + defect.count, 0));
-    const totalMinorDefectsOverall = garmentsMinorDefectCounts.reduce((sum, count) => sum + count, 0);
-    const maxMinorDefectsInSingleGarment = Math.max(0, ...garmentsMinorDefectCounts);
+  const totalMajorDefectsInUpdatedGarments = updatedGarments.reduce((sum, g) =>
+      sum + g.defects.filter(d => d.severity === 'Major').reduce((defectSum, defect) => defectSum + defect.count, 0),
+      0
+    );
+
+    const totalMinorDefectsInUpdatedGarments = updatedGarments.reduce((sum, g) =>
+      sum + g.defects.filter(d => d.severity === 'Minor').reduce((defectSum, defect) => defectSum + defect.count, 0),
+      0
+    );
 
     if (!spiStatus || !measurementStatus) { 
         overallOperatorStatusKey = 'Pending';
+    } else if (anyCriticalDefectInUpdatedGarments) {
+        overallOperatorStatusKey = 'Reject-Critical';
+    } else if (totalMajorDefectsInUpdatedGarments >= 2) {
+        overallOperatorStatusKey = 'Reject-Major-Severe';
+    } else if (totalMinorDefectsInUpdatedGarments >= 2) {
+        overallOperatorStatusKey = 'Reject-Minor-Severe';
     } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
-        if (anyGarmentHasCriticalDefect) {
-            overallOperatorStatusKey = 'Reject-Critical';
-        } else {
-            overallOperatorStatusKey = 'Reject-General'; 
-        }
+        // This condition is met if not critical, <2 Major, <2 Minor, but SPI/Meas is Reject
+        overallOperatorStatusKey = 'Reject-SpiMeas';
+    } else if (totalMajorDefectsInUpdatedGarments === 1) {
+        // This condition is met if SPI/Meas Pass, not critical, <2 Minor, 1 Major
+        overallOperatorStatusKey = 'Reject-Major-Moderate';
+    } else if (totalMinorDefectsInUpdatedGarments === 1) {
+        // This condition is met if SPI/Meas Pass, not critical, no Major, 1 Minor
+        overallOperatorStatusKey = 'Reject-Minor-Moderate';
+    } else if (spiStatus === 'Pass' && measurementStatus === 'Pass' && totalMajorDefectsInUpdatedGarments === 0 && totalMinorDefectsInUpdatedGarments === 0) {
+        overallOperatorStatusKey = 'Pass';
     } else {
-        if (anyGarmentHasCriticalDefect) {
-            overallOperatorStatusKey = 'Reject-Critical';
-        } else {
-            if (maxMinorDefectsInSingleGarment > 1 || (maxMinorDefectsInSingleGarment <= 1 && totalMinorDefectsOverall > 1) ) {
-                overallOperatorStatusKey = 'Reject-Multiple-Minors';
-            } else if (totalMinorDefectsOverall === 1) {
-                overallOperatorStatusKey = 'Reject-Single-Minor';
-            } else if (totalMinorDefectsOverall === 0) { 
-                overallOperatorStatusKey = 'Pass';
-            } else {
-                overallOperatorStatusKey = updatedGarments.some(g => g.defects.length > 0) ? 'Reject-General' : 'Pass';
-            }
-        }
+        // Fallback, though ideally all cases should be covered
+        overallOperatorStatusKey = 'Unknown'; 
     }
 
 
@@ -646,37 +676,44 @@ const RovingPage = () => {
   let overallStatusText = '';
   let overallStatusColor = '';
 
-  const hasCriticalDefectInCurrentGarment = currentGarmentDefects.some(d => d.severity === 'Critical');
-  const totalMinorDefectCountInCurrentGarment  = currentGarmentDefects
-    .filter(d => d.severity === 'Minor')
-    .reduce((sum, d) => sum + d.count, 0);
-  const totalDefectCountInCurrentGarment = currentGarmentDefects.reduce((sum, d) => sum + d.count, 0);
+  const anyCriticalDefectInOverallGarments = garments.some(g =>
+    g.defects.some(d => d.severity === 'Critical')
+  );
+
+  const totalMajorDefectsInOverallGarments = garments.reduce((sum, g) =>
+    sum + g.defects.filter(d => d.severity === 'Major').reduce((defectSum, defect) => defectSum + defect.count, 0),
+    0
+  );
+
+  const totalMinorDefectsInOverallGarments = garments.reduce((sum, g) =>
+    sum + g.defects.filter(d => d.severity === 'Minor').reduce((defectSum, defect) => defectSum + defect.count, 0),
+    0
+  );
 
   if (!spiStatus || !measurementStatus) {
     overallStatusText = t('qcRoving.overallStatus.pending', 'Pending Input');
     overallStatusColor = 'bg-gray-200 text-gray-700';
+   } else if (anyCriticalDefectInOverallGarments) {
+    overallStatusText = t('qcRoving.overallStatus.rejectCritical', 'Reject-Critical');
+    overallStatusColor = 'bg-red-100 text-red-800';
+  } else if (totalMajorDefectsInOverallGarments >= 2) {
+    overallStatusText = t('qcRoving.overallStatus.rejectMajorMultiple', 'Reject-Major');
+    overallStatusColor = 'bg-red-100 text-red-800';
+  } else if (totalMinorDefectsInOverallGarments >= 2) {
+    overallStatusText = t('qcRoving.overallStatus.rejectMinorMultiple', 'Reject-Minor');
+    overallStatusColor = 'bg-red-100 text-red-800';
   } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
-     if (hasCriticalDefectInCurrentGarment) { // Check critical for current garment
-      overallStatusText = t('qcRoving.overallStatus.rejectCritical', 'Reject-Critical');
-      overallStatusColor = 'bg-red-100 text-red-800';
-    } else {
-      overallStatusText = t('qcRoving.overallStatus.reject', 'Reject');
-      overallStatusColor = 'bg-yellow-100 text-yellow-800';
-    }
-  } else if (spiStatus === 'Pass' && measurementStatus === 'Pass') {
-     if (hasCriticalDefectInCurrentGarment) {
-      overallStatusText = t('qcRoving.overallStatus.rejectCritical', 'Reject-Critical');
-      overallStatusColor = 'bg-red-100 text-red-800';
- } else if (totalMinorDefectCountInCurrentGarment >= 1) {
-      overallStatusText = t('qcRoving.overallStatus.rejectMinor', 'Reject-Minor'); 
-      overallStatusColor = 'bg-red-100 text-red-800'; 
-    } else if (totalDefectCountInCurrentGarment === 0) {
-      overallStatusText = t('qcRoving.overallStatus.pass', 'Pass');
-      overallStatusColor = 'bg-green-100 text-green-800';
-    } else {
-      overallStatusText = t('qcRoving.overallStatus.reject', 'Reject');
-      overallStatusColor = 'bg-red-100 text-red-800';
-    }
+    overallStatusText = t('qcRoving.overallStatus.rejectSpiMeas', 'Reject');
+    overallStatusColor = 'bg-yellow-100 text-yellow-800';
+  } else if (totalMajorDefectsInOverallGarments === 1) {
+    overallStatusText = t('qcRoving.overallStatus.rejectMajorSingle', 'Reject-Major');
+    overallStatusColor = 'bg-yellow-100 text-yellow-800';
+  } else if (totalMinorDefectsInOverallGarments === 1) {
+    overallStatusText = t('qcRoving.overallStatus.rejectMinorSingle', 'Reject-Minor');
+    overallStatusColor = 'bg-yellow-100 text-yellow-800';
+  } else if (spiStatus === 'Pass' && measurementStatus === 'Pass' && totalMajorDefectsInOverallGarments === 0 && totalMinorDefectsInOverallGarments === 0) {
+    overallStatusText = t('qcRoving.overallStatus.pass', 'Pass');
+    overallStatusColor = 'bg-green-100 text-green-800';
   } else {
     overallStatusText = t('qcRoving.overallStatus.unknown', 'Unknown');
     overallStatusColor = 'bg-gray-200 text-gray-700';
@@ -1163,10 +1200,32 @@ const RovingPage = () => {
                         let defectSeverityText = '';
                         let defectSeverityColor = '';
 
+                        let buyerSpecificStatus = null;
+                        let availableSeverityOptions = [];
+                        let initialSeverityForDropdown = "Minor";
+
+                        const defectMasterInfo = defects.find(d => d.english === defect.name);
+                        if (defectMasterInfo && defectMasterInfo.statusByBuyer) {
+                          buyerSpecificStatus = defectMasterInfo.statusByBuyer.find(
+                            bs => bs.buyerName === apiDeterminedBuyer
+                          );
+                          if (buyerSpecificStatus) {
+                            availableSeverityOptions = Array.isArray(buyerSpecificStatus.defectStatus) && buyerSpecificStatus.defectStatus.length > 0 ? [...buyerSpecificStatus.defectStatus] : ["Minor"]; 
+                            initialSeverityForDropdown = buyerSpecificStatus.isCommon || "Minor";
+                            } else {
+                             availableSeverityOptions = ["Minor", "Major", "Critical"];
+                             initialSeverityForDropdown = "Minor";
+                          }
+                        }
+                        const currentValidSeverity = availableSeverityOptions.includes(defect.severity) ? defect.severity : initialSeverityForDropdown;
+
                         if (defect.severity === 'Critical') {
                           defectSeverityText = t('qcRoving.defectStatus.rejectCritical', 'Reject-Critical');
                           defectSeverityColor = 'bg-red-100 text-red-800';
-                       } else if (defect.severity === 'Minor') {
+                       } else if (defect.severity === 'Major') { 
+                          defectSeverityText = t('qcRoving.defectStatus.rejectMajor', 'Reject-Major'); 
+                          defectSeverityColor = 'bg-orange-500 text-orange-800'; 
+                       }  else if (defect.severity === 'Minor') {
                           defectSeverityText = t('qcRoving.defectStatus.rejectMinor', 'Reject-Minor');
                           defectSeverityColor = 'bg-yellow-100 text-yellow-800';
                         }
@@ -1179,10 +1238,29 @@ const RovingPage = () => {
                               <span className="truncate">
                                 {defectInfo ? getDefectNameForDisplay(defectInfo) : defect.name}
                               </span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                              {buyerSpecificStatus && availableSeverityOptions.length > 0 && (
+                              <select
+                                value={currentValidSeverity} // Use the validated current severity
+                                onChange={(e) => handleDefectSeverityChange(defectIndex, e.target.value)}
+                                className="text-xs p-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                                onClick={(e) => e.stopPropagation()} 
+                              >
+                                {availableSeverityOptions.map(opt => (
+                                  <option key={opt} value={opt}>
+                                    {t(`defectBuyerStatus.classifications.${opt.toLowerCase()}`, opt)}
+                                  </option>
+                                ))}
+                              </select>
+                              )}
+                            </div>
+                            <div className="flex items-center flex-grow mr-2">  
                               <span className={`font-semibold ${defectSeverityColor} mr-2`}>
                                 {`(${defectSeverityText})`}
                               </span>
                             </div>
+                            
                             <div className="flex items-center space-x-2"> 
                               <button
                                 onClick={() => decrementDefect(defectIndex)}
