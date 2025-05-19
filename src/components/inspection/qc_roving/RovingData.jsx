@@ -15,6 +15,7 @@ const getTodayDateString = () => {
 const RovingData = ({ refreshTrigger }) => {
   const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  
   const [filters, setFilters] = useState({
     date: getTodayDateString(), // Expects 'MM/DD/YYYY' string or empty
     qcId: '',
@@ -106,6 +107,17 @@ const RovingData = ({ refreshTrigger }) => {
   const handleFilterChange = useCallback((newFilters) => {
     setFilters(newFilters);
   }, []);
+
+   const showDetailsOnTap = (tooltipText) => {
+    Swal.fire({
+      title: 'Inspection Details',
+      html: `<pre style="text-align: left; white-space: pre-wrap; font-size: 0.8rem;">${tooltipText}</pre>`,
+      confirmButtonText: 'Close',
+      customClass: {
+        popup: 'roving-data-swal-popup' // Optional: for custom styling
+      }
+    });
+  };
 
   return (
     <div className="mt-4">
@@ -295,9 +307,9 @@ const RovingData = ({ refreshTrigger }) => {
 
                         // SPI, Measurement cells display their status (Pass/Reject/N/A) using renderResultSymbol (✓/✗/N/A)
                         // Chk'd/Def cell displays the ratio.
-                        inspectionCells.push(<td key={`spi-${i}`} title={tooltipTitle} className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${cellBgClass} transition-colors duration-150 text-center`}>{renderResultSymbol(spiDisplay)}</td>);
-                        inspectionCells.push(<td key={`meas-${i}`} title={tooltipTitle} className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${cellBgClass} transition-colors duration-150 text-center`}>{renderResultSymbol(measDisplay)}</td>);
-                        inspectionCells.push(<td key={`chkdef-${i}`} title={tooltipTitle} className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${cellBgClass} transition-colors duration-150`}>{chkdDefDisplay}</td>);
+                        inspectionCells.push(<td key={`spi-${i}`} title={tooltipTitle} onClick={() => showDetailsOnTap(tooltipTitle)} className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${cellBgClass} transition-colors duration-150 text-center cursor-pointer`}>{renderResultSymbol(spiDisplay)}</td>);
+                        inspectionCells.push(<td key={`meas-${i}`} title={tooltipTitle} onClick={() => showDetailsOnTap(tooltipTitle)} className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${cellBgClass} transition-colors duration-150 text-center cursor-pointer`}>{renderResultSymbol(measDisplay)}</td>);
+                        inspectionCells.push(<td key={`chkdef-${i}`} title={tooltipTitle} onClick={() => showDetailsOnTap(tooltipTitle)} className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${cellBgClass} transition-colors duration-150 cursor-pointer`}>{chkdDefDisplay}</td>);
                       } else {
                         // This garment group is beyond the actual checked_quantity for this record, fill with N/A
                         for (let k = 0; k < 5; k++) {
