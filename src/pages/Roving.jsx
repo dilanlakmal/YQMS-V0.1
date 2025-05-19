@@ -10,6 +10,7 @@ import {
   Eye,
   EyeOff,
   Camera,
+  Languages,
   X
 } from "lucide-react";
 import Swal from "sweetalert2";
@@ -23,6 +24,7 @@ import RovingData from "../components/inspection/qc_roving/RovingData";
 import InlineWorkers from "../components/inspection/qc_roving/InlineWorkers";
 import ImageCaptureUpload from "../components/inspection/qc_roving/ImageCaptureupload";
 import DefectBuyerStatus from "../components/inspection/qc_roving/defectBuyserStatus";
+import i18next from 'i18next';
 
 const RovingPage = () => {
   const { t } = useTranslation();
@@ -36,7 +38,14 @@ const RovingPage = () => {
   const [inspectionStartTime, setInspectionStartTime] = useState(null);
   const [currentGarmentIndex, setCurrentGarmentIndex] = useState(0);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDefect, setSelectedDefect] = useState("");
+  const [selectedDefectName, setSelectedDefectName] = useState(""); 
+  const [apiDeterminedBuyer, setApiDeterminedBuyer] = useState("Other");
+
+  const mapI18nLangToDisplayLang = (lang) => {
+    if (lang.startsWith('kh')) return 'kh';
+    if (lang.startsWith('ch') || lang.startsWith('zh')) return 'ch';
+    return 'en';
+  };
   const [selectedOperationId, setSelectedOperationId] = useState("");
   const [language, setLanguage] = useState("khmer");
   const [garmentQuantity, setGarmentQuantity] = useState(5);
@@ -59,6 +68,7 @@ const RovingPage = () => {
   const [lineWorkerDataLoading, setLineWorkerDataLoading] = useState(true);
   const [lineWorkerDataError, setLineWorkerDataError] = useState(null);
   const [imageUploaderKey, setImageUploaderKey] = useState(Date.now());
+  const [defectDisplayLanguage, setDefectDisplayLanguage] = useState(mapI18nLangToDisplayLang(i18next.language));
 
   const [defects, setDefects] = useState([]);
   const [isLoadingDefects, setIsLoadingDefects] = useState(true);
@@ -86,6 +96,19 @@ const RovingPage = () => {
       }
     };
     fetchDefects();
+  }, []);
+
+  // Effect to update defectDisplayLanguage when i18next.language changes
+  useEffect(() => {
+    const handleGlobalLanguageChanged = (lng) => {
+      setDefectDisplayLanguage(mapI18nLangToDisplayLang(lng));
+    };
+    i18next.on('languageChanged', handleGlobalLanguageChanged);
+    // Initial sync
+    setDefectDisplayLanguage(mapI18nLangToDisplayLang(i18next.language));
+    return () => {
+      i18next.off('languageChanged', handleGlobalLanguageChanged);
+    };
   }, []);
 
   useEffect(() => {
@@ -120,6 +143,26 @@ const RovingPage = () => {
     fetchLineWorkerInfo();
   }, [fetchLineWorkerInfo]);
 
+    // Effect to fetch buyer name when moNo changes
+  useEffect(() => {
+    const fetchBuyerByMo = async () => {
+      if (moNo) {
+        try {
+          const response = await axios.get(`${API_BASE_URL}/api/buyer-by-mo`, {
+            params: { moNo },
+          });
+          setApiDeterminedBuyer(response.data.buyerName || "Other");
+        } catch (error) {
+          console.error("Error fetching buyer by MO:", error);
+          setApiDeterminedBuyer("Other"); // Fallback on error
+        }
+      } else {
+        setApiDeterminedBuyer("Other"); // Default if no MO
+      }
+    };
+    fetchBuyerByMo();
+  }, [moNo]);
+
   useEffect(() => {
     if (!authLoading && user) {
       setScannedUserData({
@@ -139,9 +182,9 @@ const RovingPage = () => {
     if (lineNo && currentDate && selectedManualInspectionRep && moNo) {
       try {
         const year = currentDate.getFullYear();
-        const month = String(currentDate.getMonth() + 1); // No padding
-        const day = String(currentDate.getDate()); // No padding
-        const formattedDate = `${month}/${day}/${year}`; // e.g., "5/17/2025"
+        const month = String(currentDate.getMonth() + 1); 
+        const day = String(currentDate.getDate()); 
+        const formattedDate = `${month}/${day}/${year}`; 
 
         const response = await axios.get(`${API_BASE_URL}/api/inspections-completed`, {
           params: {
@@ -250,9 +293,9 @@ const RovingPage = () => {
     };
   }, []);
 
-  const addDefect = (defectName) => {
-    if (defectName && selectedOperationId && defects.length > 0) {
-      const defect = defects.find((d) => d.english === defectName);
+  const addDefect = (defectEnglishName) => {
+    if (defectEnglishName && selectedOperationId && defects.length > 0) {
+      const defect = defects.find((d) => d.english === defectEnglishName); 
       if (defect) {
         setGarments((prevGarments) => {
           const newGarments = [...prevGarments];
@@ -261,18 +304,28 @@ const RovingPage = () => {
             defects: [
               ...newGarments[currentGarmentIndex].defects,
               {
-                name: defect.english,
-                count: 1,
+                name: defect.english, 
                 operationId: selectedOperationId,
-                repair: defect.repair,
-                type: defect.type
-              }
+                repair: defect.repair, 
+                type: defect.type, 
+                count: 1,
+                severity: (() => {
+                  const buyerStatus = defect.statusByBuyer?.find(
+                    (status) => status.buyerName === apiDeterminedBuyer 
+                  );
+                  if (buyerStatus) {
+                    if (buyerStatus.isCritical === "Yes") return "Critical";
+                    if (buyerStatus.isMinor === "Yes") return "Minor";
+                  }
+                  return "Minor"; 
+                })(),
+              },
             ],
-            status: 'Fail',
+            status: "Fail", 
           };
           return newGarments;
         });
-        setSelectedDefect("");
+        setSelectedDefectName("");
       }
     }
   };
@@ -323,7 +376,7 @@ const RovingPage = () => {
     setGarments(Array.from({ length: size }, () => ({ garment_defect_id: '', defects: [], status: 'Pass' })));
     setInspectionStartTime(new Date());
     setCurrentGarmentIndex(0);
-    setSelectedDefect("");
+    setSelectedDefectName("");
     setSelectedOperationId("");
     setLanguage("khmer");
     setScannedUserData(null);
@@ -414,7 +467,7 @@ const RovingPage = () => {
         garment_defect_count: garmentDefectCount,
         defects: garment.defects.map((defect) => ({
           ...defect,
-          name: defect.name // Already in English
+          name: defect.name 
         }))
       };
     });
@@ -428,46 +481,40 @@ const RovingPage = () => {
       ? "Reject"
       : "Pass";
 
-    // Calculate a more detailed overall roving status for the operator
     let overallOperatorStatusKey = '';
-    const anyGarmentHasCriticalDefect = updatedGarments.some(g => g.defects.some(d => d.type === '02'));
-    
-    const garmentsMinorDefectCounts = updatedGarments.map(g =>
-        g.defects.filter(d => d.type !== '02').reduce((sum, defect) => sum + defect.count, 0)
+   const anyGarmentHasCriticalDefect = updatedGarments.some(g => 
+      g.defects.some(d => d.severity === 'Critical')
     );
+    
+   const garmentsMinorDefectCounts = updatedGarments.map(g => 
+      g.defects.filter(d => d.severity === 'Minor').reduce((sum, defect) => sum + defect.count, 0));
     const totalMinorDefectsOverall = garmentsMinorDefectCounts.reduce((sum, count) => sum + count, 0);
     const maxMinorDefectsInSingleGarment = Math.max(0, ...garmentsMinorDefectCounts);
 
-    if (!spiStatus || !measurementStatus) { // Should be caught by validation
+    if (!spiStatus || !measurementStatus) { 
         overallOperatorStatusKey = 'Pending';
     } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
         if (anyGarmentHasCriticalDefect) {
             overallOperatorStatusKey = 'Reject-Critical';
         } else {
-            overallOperatorStatusKey = 'Reject-General'; // General reject due to SPI/Measurement failure
+            overallOperatorStatusKey = 'Reject-General'; 
         }
-    } else { // SPI 'Pass' and Measurement 'Pass'
+    } else {
         if (anyGarmentHasCriticalDefect) {
             overallOperatorStatusKey = 'Reject-Critical';
         } else {
             if (maxMinorDefectsInSingleGarment > 1 || (maxMinorDefectsInSingleGarment <= 1 && totalMinorDefectsOverall > 1) ) {
-                // Covers: one garment with >1 minor, or multiple garments with 1 minor each leading to total > 1.
-                // This corresponds to the UI's more severe "Reject-Minor" (often red background).
                 overallOperatorStatusKey = 'Reject-Multiple-Minors';
             } else if (totalMinorDefectsOverall === 1) {
-                // Exactly one minor defect in total.
-                // This corresponds to the UI's less severe "Reject-Minor" (often yellow background).
                 overallOperatorStatusKey = 'Reject-Single-Minor';
-            } else if (totalMinorDefectsOverall === 0) { // No criticals, no minors
+            } else if (totalMinorDefectsOverall === 0) { 
                 overallOperatorStatusKey = 'Pass';
             } else {
-                // Fallback for any other defect scenario not explicitly categorized as Pass or a specific Reject type.
-                // If defects exist but don't fit the specific minor/critical categories above.
                 overallOperatorStatusKey = updatedGarments.some(g => g.defects.length > 0) ? 'Reject-General' : 'Pass';
             }
         }
     }
-    // End of overall_roving_status calculation
+
 
     const selectedOperation = operationData.find(
       (data) => data.Tg_No === selectedOperationId
@@ -571,15 +618,16 @@ const RovingPage = () => {
     return <div>Loading...</div>;
   }
 
-  const getDefectName = (defect, lang = language) => {
-    switch (lang) {
-      case 'english':
-        return defect.english;
-      case 'chinese':
-        return defect.chinese;
-      case 'khmer':
+  const getDefectNameForDisplay = (defect) => { // Renamed for clarity
+    if (!defect) return "N/A";
+    switch (defectDisplayLanguage) { // Use defectDisplayLanguage state
+      case 'kh':
+        return defect.khmer || defect.english;
+      case 'ch':
+        return defect.chinese || defect.english;
+      case 'en':
       default:
-        return defect.khmer;
+        return defect.english;
     }
   };
 
@@ -598,9 +646,9 @@ const RovingPage = () => {
   let overallStatusText = '';
   let overallStatusColor = '';
 
-  const hasCriticalDefect = currentGarmentDefects.some(d => d.type === '02');
-  const totalMinorDefectCount = currentGarmentDefects
-    .filter(d => d.type !== '02') 
+  const hasCriticalDefectInCurrentGarment = currentGarmentDefects.some(d => d.severity === 'Critical');
+  const totalMinorDefectCountInCurrentGarment  = currentGarmentDefects
+    .filter(d => d.severity === 'Minor')
     .reduce((sum, d) => sum + d.count, 0);
   const totalDefectCountInCurrentGarment = currentGarmentDefects.reduce((sum, d) => sum + d.count, 0);
 
@@ -608,7 +656,7 @@ const RovingPage = () => {
     overallStatusText = t('qcRoving.overallStatus.pending', 'Pending Input');
     overallStatusColor = 'bg-gray-200 text-gray-700';
   } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
-    if (hasCriticalDefect) {
+     if (hasCriticalDefectInCurrentGarment) { // Check critical for current garment
       overallStatusText = t('qcRoving.overallStatus.rejectCritical', 'Reject-Critical');
       overallStatusColor = 'bg-red-100 text-red-800';
     } else {
@@ -616,13 +664,10 @@ const RovingPage = () => {
       overallStatusColor = 'bg-yellow-100 text-yellow-800';
     }
   } else if (spiStatus === 'Pass' && measurementStatus === 'Pass') {
-    if (hasCriticalDefect) {
+     if (hasCriticalDefectInCurrentGarment) {
       overallStatusText = t('qcRoving.overallStatus.rejectCritical', 'Reject-Critical');
       overallStatusColor = 'bg-red-100 text-red-800';
-    } else if (totalMinorDefectCount === 1) {
-      overallStatusText = t('qcRoving.overallStatus.rejectMinor', 'Reject-Minor');
-      overallStatusColor = 'bg-yellow-100 text-yellow-800';
-    } else if (totalMinorDefectCount > 1) {
+ } else if (totalMinorDefectCountInCurrentGarment >= 1) {
       overallStatusText = t('qcRoving.overallStatus.rejectMinor', 'Reject-Minor'); 
       overallStatusColor = 'bg-red-100 text-red-800'; 
     } else if (totalDefectCountInCurrentGarment === 0) {
@@ -1007,20 +1052,6 @@ const RovingPage = () => {
                 </div>
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
-                    {t("qcRoving.language")}
-                  </label>
-                  <select
-                    value={language}
-                    onChange={(e) => setLanguage(e.target.value)}
-                    className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                  >
-                    <option value="khmer">Khmer</option>
-                    <option value="english">English</option>
-                    <option value="chinese">Chinese</option>
-                  </select>
-                </div>
-                <div className="flex-1 min-w-[150px]">
-                  <label className="block text-sm font-medium text-gray-700">
                     {t("qcRoving.inspectionType")}
                   </label>
                   <div className="mt-1 w-full p-2 border border-gray-300 rounded-lg">
@@ -1132,10 +1163,10 @@ const RovingPage = () => {
                         let defectSeverityText = '';
                         let defectSeverityColor = '';
 
-                        if (defect.type === '02') {
+                        if (defect.severity === 'Critical') {
                           defectSeverityText = t('qcRoving.defectStatus.rejectCritical', 'Reject-Critical');
                           defectSeverityColor = 'bg-red-100 text-red-800';
-                        } else {
+                       } else if (defect.severity === 'Minor') {
                           defectSeverityText = t('qcRoving.defectStatus.rejectMinor', 'Reject-Minor');
                           defectSeverityColor = 'bg-yellow-100 text-yellow-800';
                         }
@@ -1146,7 +1177,7 @@ const RovingPage = () => {
                           >
                             <div className="flex items-center flex-grow mr-2">
                               <span className="truncate">
-                                {defectInfo ? getDefectName(defectInfo) : defect.name}
+                                {defectInfo ? getDefectNameForDisplay(defectInfo) : defect.name}
                               </span>
                               <span className={`font-semibold ${defectSeverityColor} mr-2`}>
                                 {`(${defectSeverityText})`}
@@ -1188,9 +1219,9 @@ const RovingPage = () => {
                     )}
                     <div className="flex items-center space-x-2 mt-4">
                       <select
-                        value={selectedDefect}
+                        value={selectedDefectName}
                         onChange={(e) => {
-                          setSelectedDefect(e.target.value);
+                          setSelectedDefectName(e.target.value);
                           if (e.target.value) {
                             addDefect(e.target.value);
                           }
@@ -1199,9 +1230,9 @@ const RovingPage = () => {
                         disabled={!moNo || !selectedOperationId}
                       >
                         <option value="">{t("qcRoving.select_defect")}</option>
-                        {defects.map((defect) => (
+                        {defects.sort((a,b) => getDefectNameForDisplay(a).localeCompare(getDefectNameForDisplay(b))).map((defect) => ( 
                           <option key={defect.code} value={defect.english}>
-                            {getDefectName(defect)}
+                            {getDefectNameForDisplay(defect)}
                           </option>
                         ))}
                       </select>
@@ -1328,11 +1359,11 @@ const RovingPage = () => {
           <RovingData />
         ) : activeTab === "db" ? (
           <CEDatabase />
-        ) : (
+        ) :  activeTab === "defectStatus" ? (
+          <DefectBuyerStatus />
+        ): (
           <InlineWorkers onWorkerCountUpdated={fetchLineWorkerInfo} />
-        ): activeTab === "db" ? (
-          <CEDatabase />
-        }
+        )}
       </div>
     </div>
   );

@@ -49,7 +49,6 @@ const ImageCaptureUpload = ({
       return;
     }
   
-    console.log(`ImageCaptureUpload (${imageType}): Context/type changed AFTER initial setup. Resetting. InspectionData:`, JSON.stringify(inspectionData));
     setImageFiles([]);
     if (onImageFilesChange) {
       onImageFilesChange([]); 
@@ -60,12 +59,10 @@ const ImageCaptureUpload = ({
 
   const handleFileChange = async (event) => {
     const files = Array.from(event.target.files);
-    console.log(`ImageCaptureUpload (${imageType}): handleFileChange called. Current local imageFiles.length: ${imageFiles.length}, Files selected: ${files.length}`);
     if (files.length === 0) return;
 
     if (imageFiles.length >= maxImages) {
-      console.warn(`ImageCaptureUpload (${imageType}): Max images (${maxImages}) reached or exceeded. Current count: ${imageFiles.length}.`);
-      Swal.fire(t('qcRoving.imageUpload.limitTitle'), t('qcRoving.imageUpload.maxImagesReached', { max: maxImages, current: imageFiles.length }), 'warning');
+      Swal.fire('Image Limit Reached', `Maximum ${maxImages} images allowed. You have ${combinedImageFiles.length} and tried to add ${files.length - filesAddedCount} more. Some were not added.`, 'warning');
       if (event.target) event.target.value = null;
       return;
     }
@@ -77,7 +74,7 @@ const ImageCaptureUpload = ({
 
     for (const file of files) {
        if (combinedImageFiles.length >= maxImages) {
-       Swal.fire(t('qcRoving.imageUpload.limitTitle'), t('qcRoving.imageUpload.maxImagesReachedSome', { max: maxImages, uploaded: combinedImageFiles.length, attempting: files.length - filesAddedCount }), 'warning');
+       Swal.fire('Image Limit Reached', `Maximum ${maxImages} images allowed. You have ${combinedImageFiles.length} and tried to add ${files.length - filesAddedCount} more. Some were not added.`, 'warning');
         break;
       }
     
@@ -95,14 +92,14 @@ const ImageCaptureUpload = ({
 
   const handleDeleteImage = (indexToDelete) => {
     Swal.fire({
-      title: t('qcRoving.imageUpload.confirmDeleteTitle'),
-      text: t('qcRoving.imageUpload.confirmDeleteText'),
+      title: 'Confirm Delete',
+      text: 'Are you sure you want to delete this image?',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
       cancelButtonColor: '#3085d6',
-      confirmButtonText: t('qcRoving.imageUpload.confirmDeleteButton'),
-      cancelButtonText: t('qcRoving.buttons.cancel'),
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'Cancel',
     }).then((result) => {
       if (result.isConfirmed) {
         

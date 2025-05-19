@@ -691,6 +691,7 @@ const determineBuyer = (MONo) => {
   if (MONo.includes("RT")) return "Reitmans";
   if (MONo.includes("AF")) return "ANF";
   if (MONo.includes("NT")) return "STORI";
+  if (MONo.includes("COM")) return "MWW";
   return "Other";
 };
 
@@ -1694,9 +1695,9 @@ async function syncCutPanelOrders() {
 }
 
 // Schedule the syncCutPanelOrders function to run every 5 minutes
-cron.schedule('*/5 * * * *', syncCutPanelOrders);
+// cron.schedule('*/5 * * * *', syncCutPanelOrders);
 
-console.log("Scheduled cutpanelorders sync every 5 minutes.");
+// console.log("Scheduled cutpanelorders sync every 5 minutes.");
 
 
 /* ------------------------------
@@ -8526,6 +8527,18 @@ app.post('/api/roving/upload-roving-image', rovingUpload.single('imageFile'), as
     }
 });
 
+//Endpoint for get the buyer status
+app.get("/api/buyer-by-mo", (req, res) => {
+  const { moNo } = req.query; // Get moNo from query parameters
+
+  if (!moNo) {
+    return res.status(400).json({ message: "MO number is required" });
+  }
+
+  const buyerName = determineBuyer(moNo);
+  res.json({ buyerName });
+});
+
 /* ------------------------------
    QC1 Sunrise Dashboard ENDPOINTS
 ------------------------------ */
@@ -10430,6 +10443,83 @@ app.get("/api/role-management", async (req, res) => {
   } catch (error) {
     console.error("Error fetching roles:", error);
     res.status(500).json({ message: "Failed to fetch roles" });
+  }
+});
+
+/* ------------------------------
+   Defect Buyer Status ENDPOINTS
+------------------------------ */
+
+// Endpoint for /api/defects/all-details
+app.get("/api/defects/all-details", async (req, res) => {
+  try {
+    const defects = await SewingDefects.find({}).lean();
+    const transformedDefects = defects.map(defect => ({
+      code: defect.code.toString(),
+      name_en: defect.english,
+      name_kh: defect.khmer,
+      name_ch: defect.chinese,
+      categoryEnglish: defect.categoryEnglish,
+      type: defect.type,
+      repair: defect.repair,
+      statusByBuyer: defect.statusByBuyer || [],
+    }));
+    res.json(transformedDefects);
+  } catch (error) {
+    console.error("Error fetching all defect details:", error);
+    res.status(500).json({ message: "Failed to fetch defect details", error: error.message });
+  }
+});
+
+// Endpoint for /api/buyers
+app.get("/api/buyers", (req, res) => {
+  const buyers = ["Costco", "Aritzia", "Reitmans", "ANF", "STORI", "MWW"];
+  res.json(buyers);
+});
+
+// New Endpoint for updating buyer statuses in SewingDefects
+app.post("/api/sewing-defects/buyer-statuses", async (req, res) => {
+  try {
+    const statusesPayload = req.body; // Expects an array of status objects
+    if (!Array.isArray(statusesPayload)) {
+      return res.status(400).json({ message: "Invalid payload: Expected an array of statuses." });
+    }
+    // Group statuses by defectCode to update each defect's statusByBuyer array once
+    const updatesByDefect = statusesPayload.reduce((acc, status) => {
+      const defectCode = status.defectCode; // This is string from frontend
+      if (!acc[defectCode]) {
+        acc[defectCode] = [];
+      }
+   acc[defectCode].push({
+        buyerName: status.buyerName,
+        isCritical: status.isCritical || false,
+        isMinor: status.isMinor || false,
+      });
+      return acc;
+    }, {});
+
+    const bulkOps = [];
+    for (const defectCodeStr in updatesByDefect) {
+      const defectCodeNum = parseInt(defectCodeStr, 10); // Convert to number for query
+      if (isNaN(defectCodeNum)) {
+          console.warn(`Invalid defectCode received: ${defectCodeStr}, skipping.`);
+          continue; 
+      }
+      const newStatusByBuyerArray = updatesByDefect[defectCodeStr];
+      bulkOps.push({
+        updateOne: {
+          filter: { code: defectCodeNum }, // Query by numeric code in SewingDefects model
+          update: { $set: { statusByBuyer: newStatusByBuyerArray, updatedAt: new Date() } },
+        },
+      });
+    }
+    if (bulkOps.length > 0) {
+      await SewingDefects.bulkWrite(bulkOps);
+    }
+    res.status(200).json({ message: "Defect buyer statuses updated successfully in SewingDefects." });
+  } catch (error) {
+    console.error("Error updating defect buyer statuses:", error);
+    res.status(500).json({ message: "Failed to update defect buyer statuses", error: error.message });
   }
 });
 
