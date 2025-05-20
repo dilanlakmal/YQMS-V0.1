@@ -700,19 +700,19 @@ const RovingPage = () => {
     overallStatusText = t('qcRoving.overallStatus.rejectCritical', 'Reject-Critical');
     overallStatusColor = 'bg-red-100 text-red-800';
   } else if (totalMajorDefectsInOverallGarments >= 2) {
-    overallStatusText = t('qcRoving.overallStatus.rejectMajorMultiple', 'Reject-Major');
+    overallStatusText = t('qcRoving.overallStatus.rejectMajorMultiple', 'Reject-Major-M');
     overallStatusColor = 'bg-red-100 text-red-800';
   } else if (totalMinorDefectsInOverallGarments >= 2) {
-    overallStatusText = t('qcRoving.overallStatus.rejectMinorMultiple', 'Reject-Minor');
+    overallStatusText = t('qcRoving.overallStatus.rejectMinorMultiple', 'Reject-Minor-M');
     overallStatusColor = 'bg-red-100 text-red-800';
   } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
     overallStatusText = t('qcRoving.overallStatus.rejectSpiMeas', 'Reject');
     overallStatusColor = 'bg-yellow-100 text-yellow-800';
   } else if (totalMajorDefectsInOverallGarments === 1) {
-    overallStatusText = t('qcRoving.overallStatus.rejectMajorSingle', 'Reject-Major');
+    overallStatusText = t('qcRoving.overallStatus.rejectMajorSingle', 'Reject-Major-S');
     overallStatusColor = 'bg-yellow-100 text-yellow-800';
   } else if (totalMinorDefectsInOverallGarments === 1) {
-    overallStatusText = t('qcRoving.overallStatus.rejectMinorSingle', 'Reject-Minor');
+    overallStatusText = t('qcRoving.overallStatus.rejectMinorSingle', 'Reject-Minor-S');
     overallStatusColor = 'bg-yellow-100 text-yellow-800';
   } else if (spiStatus === 'Pass' && measurementStatus === 'Pass' && totalMajorDefectsInOverallGarments === 0 && totalMinorDefectsInOverallGarments === 0) {
     overallStatusText = t('qcRoving.overallStatus.pass', 'Pass');

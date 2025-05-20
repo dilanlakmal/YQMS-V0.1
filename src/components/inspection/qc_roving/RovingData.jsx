@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
-import { API_BASE_URL } from "../../../../config"; // Adjust the path as needed
+import { API_BASE_URL } from "../../../../config"; 
 import Swal from "sweetalert2";
 import RovingFilterPlane from "../qc_roving/RovingDataFilterPane";
 
@@ -54,14 +54,14 @@ const RovingData = ({ refreshTrigger }) => {
         // Handle new schema with inspection_rep
         if (report.inspection_rep && Array.isArray(report.inspection_rep)) {
           report.inspection_rep.forEach(repItem => {
-            if (repItem.emp_id) qcIds.add(repItem.emp_id); // QC ID from inspection_rep
+            if (repItem.emp_id) qcIds.add(repItem.emp_id); 
             repItem.inlineData?.forEach((data) => {
               if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
             });
           });
         } else if (report.inlineData && Array.isArray(report.inlineData)) {
-          // Handle old schema (legacy)
-          if (report.emp_id) qcIds.add(report.emp_id); // QC ID from top-level report
+         
+          if (report.emp_id) qcIds.add(report.emp_id); 
           report.inlineData.forEach((data) => {
             if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
           });
@@ -108,27 +108,13 @@ const RovingData = ({ refreshTrigger }) => {
 
         populateUniqueFilterOptions(rawReportsFromApi);
 
-        // let reportsForDisplay = rawReportsFromApi;
-
-        // if (currentFilters.operatorId) {
-          // reportsForDisplay = rawReportsFromApi
-            // .map((report) => {
-              // const filteredInlineData =
-              //   report.inlineData?.filter(
-              //     (inlineEntry) =>
-              //       String(inlineEntry.operator_emp_id) ===
-              //       String(currentFilters.operatorId)
-              //   ) || [];
-
-              // return { ...report, inlineData: filteredInlineData };
-              // Transform data: Group by operator, then by repetition
         const processedData = rawReportsFromApi.flatMap((report) => {
           const operatorInspectionsMap = new Map();
 
           const processInlineData = (inlineDataArray, repNameForLegacy = null, topLevelEmpIdForLegacy = null) => {
             inlineDataArray?.forEach((operatorData) => {
               const operatorKey = `${operatorData.operator_emp_id}_${operatorData.tg_no}`;
-              const currentRepName = repNameForLegacy || (operatorData.inspection_rep_name || "Unknown Rep"); // Fallback if rep name is directly on operatorData
+              const currentRepName = repNameForLegacy || (operatorData.inspection_rep_name || "Unknown Rep"); 
 
               if (!operatorInspectionsMap.has(operatorKey)) {
                 operatorInspectionsMap.set(operatorKey, {
@@ -145,10 +131,9 @@ const RovingData = ({ refreshTrigger }) => {
               }
               const existingEntry = operatorInspectionsMap.get(operatorKey);
               
-              // For new schema, repLevelData comes from repItem. For legacy, mock it or use report level.
               const repLevelDataForThisRep = repNameForLegacy 
                 ? { emp_id: topLevelEmpIdForLegacy || report.emp_id, inspection_rep_name: repNameForLegacy } 
-                : (operatorData.repLevelData || { emp_id: report.emp_id, inspection_rep_name: currentRepName }); // Assuming repLevelData might be nested if not legacy
+                : (operatorData.repLevelData || { emp_id: report.emp_id, inspection_rep_name: currentRepName }); 
 
               existingEntry.inspectionsByRep[currentRepName] = {
                 operatorLevelData: operatorData,
@@ -159,25 +144,23 @@ const RovingData = ({ refreshTrigger }) => {
 
           if (report.inspection_rep && Array.isArray(report.inspection_rep)) {
             report.inspection_rep.forEach(repItem => {
-              // Pass repItem itself as repLevelData to be associated with each operatorData under it
               const augmentedInlineData = repItem.inlineData?.map(opData => ({...opData, repLevelData: repItem, inspection_rep_name: repItem.inspection_rep_name }));
               processInlineData(augmentedInlineData);
             });
-          } else if (report.inlineData && Array.isArray(report.inlineData)) { // Legacy
-            processInlineData(report.inlineData, "1st Inspection", report.emp_id); // Assume legacy is "1st Inspection"
+          } else if (report.inlineData && Array.isArray(report.inlineData)) { 
+            processInlineData(report.inlineData, "1st Inspection", report.emp_id); 
           }
           return Array.from(operatorInspectionsMap.values());
         });
 
         let reportsForDisplay = processedData;
 
-        if (currentFilters.operatorId) { // Filter based on the primary operator_emp_id
+        if (currentFilters.operatorId) { 
           reportsForDisplay = processedData.filter(
             (opSummary) => String(opSummary.operator_emp_id) === String(currentFilters.operatorId)
           );
         }
 
-        // If QC ID filter is applied, ensure the operator has an inspection by that QC
         if (currentFilters.qcId) {
           reportsForDisplay = reportsForDisplay.filter(opSummary => {
             return Object.values(opSummary.inspectionsByRep).some(
@@ -195,12 +178,12 @@ const RovingData = ({ refreshTrigger }) => {
         });
 
         setReports([]);
-        populateUniqueFilterOptions([]); // Pass empty array to clear options on error
+        populateUniqueFilterOptions([]); 
       } finally {
         setIsLoading(false);
       }
     },
-    [populateUniqueFilterOptions] // populateUniqueFilterOptions is stable due to useCallback
+    [populateUniqueFilterOptions] 
   );
 
   useEffect(() => {
@@ -276,7 +259,7 @@ const RovingData = ({ refreshTrigger }) => {
                 <span className="font-semibold align-middle">
                   Red
                 </span>{" "}
-                : Overall Roving Status is 'Reject-Critical', 'Reject-Major-' (multiple), or 'Reject-Minor' (multiple - *see note below*).
+                : Overall Roving Status is 'Reject-Critical', 'Reject-Major' (multiple), or 'Reject-Minor' (multiple - *see note below*).
               </li>
               <li>
                 <span className="inline-block w-3 h-3 bg-gray-200 border border-gray-400 mr-1 align-middle"></span>
@@ -379,24 +362,16 @@ const RovingData = ({ refreshTrigger }) => {
                           case 'Unknown':
                             return "bg-gray-200 hover:bg-gray-300";
                           case 'Reject-Critical':
-                          case 'Reject-Major-': // This is for >=2 Major, RovingPage colors it red
+                          case 'Reject-Major-M':
+                          case 'Reject-Minor-M': 
                             return "bg-red-100 hover:bg-red-200";
-                          case 'Reject': // This is for SPI/Meas reject, RovingPage colors it yellow
-                          case 'Reject-Major': // This is for 1 Major, RovingPage colors it yellow
-                            return "bg-yellow-100 hover:bg-yellow-200";
-                          case 'Reject-Minor':
-                            // AMBIGUOUS: In RovingPage.jsx, 'Reject-Minor' is generated for:
-                            // 1. >=2 Minor defects (colored RED in RovingPage)
-                            // 2. 1 Minor defect (colored YELLOW in RovingPage)
-                            // Without a change in RovingPage.jsx to send distinct keys,
-                            // we default to yellow here. For correct coloring, RovingPage.jsx
-                            // should send distinct status keys (e.g., 'Reject-Minor-Multiple' and 'Reject-Minor-Single').
-                            console.warn("Ambiguous 'Reject-Minor' status received. Defaulting to yellow. RovingPage.jsx should be updated to send distinct status keys for accurate coloring.");
+                          case 'Reject': 
+                          case 'Reject-Major-s': 
+                          case 'Reject-Minor-S':
                             return "bg-yellow-100 hover:bg-yellow-200"; 
                           case 'Pass':
                             return "bg-green-100 hover:bg-green-200";
                           default:
-                            console.warn(`Unknown overall_roving_status for color coding: ${overallStatusKey}. Defaulting to gray.`);
                             return "bg-gray-200 hover:bg-gray-300";
                         }
                       };
@@ -421,10 +396,11 @@ const RovingData = ({ refreshTrigger }) => {
                           currentOperatorInspectionData.rejectGarments[0].garments
                         ) {
                           currentOperatorInspectionData.rejectGarments[0].garments.forEach(
-                            (garment) => {
-                              garment.defects.forEach((defect) => {
+                            (garment, garmentIndex) => {
+                              garment.defects.forEach((defect, defectIndex) => {
+
                                 defectsList.push(
-                                  `  - ${defect.name} (Qty: ${defect.count}, Op.ID: ${defect.operationId || "N/A"})`
+                                 `  Garment ${garmentIndex + 1}, Defect ${defectIndex + 1}: ${defect.name} (Qty: ${defect.count})`
                                 );
                               });
                             }
