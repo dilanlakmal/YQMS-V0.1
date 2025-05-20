@@ -14,6 +14,7 @@ const cuttingInspectionSchema = new mongoose.Schema({
   color: { type: String, required: true },
   lotNo: { type: [String], default: [] },
   orderQty: { type: Number },
+  totalOrderQtyStyle: { type: Number },
   fabricDetails: {
     fabricType: { type: String },
     material: { type: String },

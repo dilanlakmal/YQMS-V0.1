@@ -1927,6 +1927,53 @@ app.get("/api/cutpanel-orders-total-order-qty", async (req, res) => {
   }
 });
 
+// Endpoint to get aggregated TotalOrderQty for a given StyleNo (MO No)
+// This sums the TotalOrderQty for each unique color associated with the StyleNo.
+app.get("/api/cutpanel-orders/aggregated-total-order-qty", async (req, res) => {
+  try {
+    const { styleNo } = req.query;
+    if (!styleNo) {
+      return res.status(400).json({ error: "StyleNo (MO No) is required" });
+    }
+
+    const aggregationPipeline = [
+      {
+        $match: { StyleNo: styleNo } // Filter by the specific StyleNo
+      },
+      {
+        $group: {
+          _id: { styleNo: "$StyleNo", color: "$Color" }, // Group by StyleNo and Color
+          // Assuming TotalOrderQty is the same for all records of a given StyleNo+Color.
+          // If not, and you want the sum per StyleNo+Color, use $sum: '$TotalOrderQty' here.
+          // But for the final sum across colors, we need one value per color.
+          uniqueTotalOrderQtyForColor: { $first: "$TotalOrderQty" }
+        }
+      },
+      {
+        $group: {
+          _id: "$_id.styleNo", // Group again by StyleNo (effectively just one group now)
+          aggregatedTotal: { $sum: "$uniqueTotalOrderQtyForColor" } // Sum the unique TotalOrderQty for each color
+        }
+      }
+    ];
+
+    const result = await CutPanelOrders.aggregate(aggregationPipeline);
+
+    if (result.length > 0) {
+      res.json({ aggregatedTotalOrderQty: result[0].aggregatedTotal });
+    } else {
+      // If no matching StyleNo, or no orders, return 0 or an appropriate message
+      res.json({ aggregatedTotalOrderQty: 0 });
+    }
+  } catch (err) {
+    console.error("Error fetching aggregated total order quantity:", err);
+    res.status(500).json({
+      message: "Failed to fetch aggregated total order quantity",
+      error: err.message
+    });
+  }
+});
+
 /* ------------------------------
    Updated Endpoints for Cutting.jsx
 ------------------------------ */
@@ -8097,6 +8144,7 @@ app.post("/api/save-cutting-inspection", async (req, res) => {
       color,
       lotNo,
       orderQty,
+      totalOrderQtyStyle,
       fabricDetails,
       cuttingTableDetails,
       mackerRatio,
@@ -8162,6 +8210,7 @@ app.post("/api/save-cutting-inspection", async (req, res) => {
         color,
         lotNo,
         orderQty,
+        totalOrderQtyStyle,
         fabricDetails,
         cuttingTableDetails,
         mackerRatio,

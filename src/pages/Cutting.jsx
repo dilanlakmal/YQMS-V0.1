@@ -1908,7 +1908,7 @@ const CuttingPage = () => {
   const tableNoDropdownRef = useRef(null);
   const [cutPanelData, setCutPanelData] = useState(null);
   const [availableSizes, setAvailableSizes] = useState([]);
-  const [overallTotalOrderQty, setOverallTotalOrderQty] = useState(0);
+  const [aggregatedTotalOrderQty, setAggregatedTotalOrderQty] = useState(null);
 
   // New state variables
   const [inspectionProgress, setInspectionProgress] = useState(null);
@@ -2024,10 +2024,39 @@ const CuttingPage = () => {
     fetchMoNumbers();
   }, [moNoSearch, t]);
 
+  // Add this useEffect to fetch aggregated total order quantity
+  useEffect(() => {
+    const fetchAggregatedTotalOrderQty = async () => {
+      if (!moNo) {
+        setAggregatedTotalOrderQty(null);
+        return;
+      }
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/api/cutpanel-orders/aggregated-total-order-qty`,
+          {
+            params: { styleNo: moNo },
+            headers: { "Content-Type": "application/json" },
+            withCredentials: true
+          }
+        );
+        setAggregatedTotalOrderQty(response.data.aggregatedTotalOrderQty);
+      } catch (error) {
+        console.error("Error fetching aggregated total order quantity:", error);
+        setAggregatedTotalOrderQty(null); // Or set to 0 or show an error
+        // Optionally, show a user-facing error, but for now, just log it.
+      }
+    };
+
+    fetchAggregatedTotalOrderQty();
+  }, [moNo]); // Re-fetch when moNo changes
+
   useEffect(() => {
     const fetchTableNoOptions = async () => {
       if (!moNo) {
         setTableNoOptions([]);
+        setTableNoSearch(""); // Also clear search if moNo is cleared
+        setTableNo(""); // And the selected tableNo
         return;
       }
       try {
@@ -2053,12 +2082,28 @@ const CuttingPage = () => {
     fetchTableNoOptions();
   }, [moNo, t]);
 
+  // useEffect to reset cutPanelData and other dependent states when moNo or tableNo changes
+  useEffect(() => {
+    if (!moNo || !tableNo) {
+      setCutPanelData(null);
+      setAvailableSizes([]);
+      setPlanLayerQty(0);
+      setTotalPlanPcs(0);
+      setActualLayers(0);
+      // Potentially reset other states that depend on cutPanelData
+    }
+    // If moNo changes but tableNo is not yet selected (or reset),
+    // cutPanelData should also be null.
+    if (!tableNo) {
+      setCutPanelData(null);
+    }
+  }, [moNo, tableNo]);
+
   useEffect(() => {
     const fetchCutPanelData = async () => {
       if (!moNo || !tableNo) {
         setCutPanelData(null);
         setAvailableSizes([]);
-        setOverallTotalOrderQty(0); // Reset when moNo or tableNo is cleared
         return;
       }
       try {
@@ -2081,24 +2126,10 @@ const CuttingPage = () => {
         setPlanLayerQty(response.data.PlanLayer || 0);
         setTotalPlanPcs(response.data.TotalPcs || 0);
         setActualLayers(response.data.ActualLayer || 0);
-
-        // Fetch overall total order quantity
-        const totalQtyResponse = await axios.get(
-          `${API_BASE_URL}/api/cutpanel-orders-total-order-qty`,
-          {
-            params: { styleNo: moNo },
-            headers: { "Content-Type": "application/json" },
-            withCredentials: true
-          }
-        );
-        setOverallTotalOrderQty(
-          totalQtyResponse.data.overallTotalOrderQty || 0
-        );
       } catch (error) {
         console.error("Error fetching Cut Panel data:", error);
         setCutPanelData(null);
         setAvailableSizes([]);
-        setOverallTotalOrderQty(0);
         Swal.fire({
           icon: "error",
           title: t("cutting.error"),
@@ -2522,7 +2553,6 @@ const CuttingPage = () => {
     setShowTableNoDropdown(false);
     setCutPanelData(null);
     setAvailableSizes([]);
-    setOverallTotalOrderQty(0); // Reset new state
     setPlanLayerQty(0);
     setTotalPlanPcs(0);
     setActualLayers(0);
@@ -2691,6 +2721,18 @@ const CuttingPage = () => {
         }))
       };
     });
+  };
+
+  // Helper function to determine if a checkbox should be disabled
+  const isPartCheckboxDisabled = (bundleRow, currentPartName) => {
+    // bundleRow.parts is an array of selected part names for this bundle
+    if (
+      bundleRow.parts.length === 1 &&
+      !bundleRow.parts.includes(currentPartName)
+    ) {
+      return true; // Disable if one part is selected AND it's not the current part's checkbox
+    }
+    return false; // Otherwise, enable
   };
 
   const handleSubmit = async (e) => {
@@ -3042,6 +3084,10 @@ const CuttingPage = () => {
       color: cutPanelData?.Color || "",
       lotNo: cutPanelData?.LotNos || [],
       orderQty: cutPanelData?.TotalOrderQty || 0,
+      totalOrderQtyStyle:
+        aggregatedTotalOrderQty !== null
+          ? aggregatedTotalOrderQty
+          : cutPanelData?.TotalOrderQty || 0, // <<<--- ADD THIS LINE
       fabricDetails: {
         fabricType: cutPanelData?.FabricType || "",
         material: cutPanelData?.Material || "",
@@ -3428,10 +3474,26 @@ const CuttingPage = () => {
                           <li
                             key={index}
                             onClick={() => {
-                              setMoNo(option);
-                              setMoNoSearch(option);
+                              const newMoNo = option;
+                              // Check if MO No actually changed to prevent unnecessary resets
+                              if (moNo !== newMoNo) {
+                                setMoNo(newMoNo);
+                                setTableNo(""); // Reset selected Table No
+                                setTableNoSearch(""); // Reset Table No search input
+                                setTableNoOptions([]); // Clear old table options
+                                setCutPanelData(null); // Reset cut panel data
+                                setAvailableSizes([]); // Reset sizes
+                                setAggregatedTotalOrderQty(null); // Reset aggregated Qty
+                                // Add any other state resets that depend on MO or TableNo
+                              }
+                              setMoNoSearch(newMoNo); // Update search to reflect selection
                               setShowMoNoDropdown(false);
                             }}
+                            // onClick={() => {
+                            //   setMoNo(option);
+                            //   setMoNoSearch(option);
+                            //   setShowMoNoDropdown(false);
+                            // }}
                             className="p-2 hover:bg-blue-100 cursor-pointer"
                           >
                             {option}
@@ -3546,17 +3608,15 @@ const CuttingPage = () => {
                           </td>
                           <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.TotalOrderQty}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td
-                            colSpan={4}
-                            className="border border-gray-300 p-2 text-sm font-bold text-gray-900 text-right"
-                          >
-                            Total
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm font-bold text-gray-900">
-                            {overallTotalOrderQty}
+                            {/* New aggregated total display */}
+                            {aggregatedTotalOrderQty !== null &&
+                              aggregatedTotalOrderQty !== undefined && (
+                                <div className="mt-1">
+                                  <span className="font-bold text-xs text-green-600">
+                                    Total: {aggregatedTotalOrderQty}
+                                  </span>
+                                </div>
+                              )}
                           </td>
                         </tr>
                       </tbody>
@@ -4188,6 +4248,7 @@ const CuttingPage = () => {
                       </select>
                     </div>
                   </div>
+
                   {bundleQty && !bundleQtyError && (
                     <div className="mt-4">
                       <h2 className="text-sm font-semibold text-gray-700">
@@ -4244,69 +4305,112 @@ const CuttingPage = () => {
 
                                 <td className="border border-gray-300 p-2 text-sm w-auto">
                                   <div className="flex flex-wrap gap-2">
-                                    {panelIndexNames.map((item, i) => (
-                                      <label
-                                        key={i}
-                                        className="flex items-center space-x-1 text-sm"
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={row.parts.includes(
-                                            item.panelIndexName
-                                          )}
-                                          onChange={(e) => {
-                                            const newBundleTableDataState = [
-                                              ...bundleTableData
-                                            ];
-                                            const currentBundleObject =
-                                              newBundleTableDataState[index];
-                                            const partName =
-                                              item.panelIndexName;
+                                    {panelIndexNames.map((item, i) => {
+                                      // Using 'i' for the inner loop index
+                                      const isChecked = row.parts.includes(
+                                        item.panelIndexName
+                                      );
+                                      // 'row' comes from the outer map (bundleTableData.map((row, index) => ...))
+                                      const isDisabled = isPartCheckboxDisabled(
+                                        row,
+                                        item.panelIndexName
+                                      );
 
-                                            let updatedPartsArray;
-                                            if (e.target.checked) {
-                                              updatedPartsArray = [
-                                                ...currentBundleObject.parts,
-                                                partName
+                                      return (
+                                        // Explicit return for the label JSX
+                                        <label
+                                          key={i} // Using 'i' for the key
+                                          className={`flex items-center space-x-1 text-sm ${
+                                            isDisabled
+                                              ? "text-gray-400 cursor-not-allowed"
+                                              : "cursor-pointer"
+                                          }`}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            disabled={isDisabled}
+                                            onChange={(e) => {
+                                              const newBundleTableDataState = [
+                                                ...bundleTableData
                                               ];
-                                            } else {
-                                              updatedPartsArray =
-                                                currentBundleObject.parts.filter(
-                                                  (part) => part !== partName
+                                              // Use 'index' from the outer map to get the correct bundle object
+                                              const currentBundleObject =
+                                                newBundleTableDataState[index];
+                                              const partName =
+                                                item.panelIndexName;
+                                              let updatedPartsArray;
+
+                                              if (e.target.checked) {
+                                                updatedPartsArray = [partName]; // Single selection logic
+                                              } else {
+                                                updatedPartsArray = []; // Clear selection on uncheck
+                                              }
+                                              // Use 'index' from the outer map to update the correct bundle's parts
+                                              newBundleTableDataState[
+                                                index
+                                              ].parts = updatedPartsArray;
+                                              setBundleTableData(
+                                                newBundleTableDataState
+                                              );
+                                            }}
+                                            className={`h-4 w-4 text-blue-600 border-gray-300 rounded ${
+                                              isDisabled
+                                                ? "cursor-not-allowed"
+                                                : "cursor-pointer"
+                                            }`}
+                                          />
+                                          <span>
+                                            {(() => {
+                                              if (i18n.language === "km") {
+                                                return (
+                                                  item.panelIndexNameKhmer ||
+                                                  item.panelIndexName
                                                 );
-                                            }
-                                            newBundleTableDataState[
-                                              index
-                                            ].parts = updatedPartsArray;
-                                            setBundleTableData(
-                                              newBundleTableDataState
-                                            );
-                                          }}
-                                          className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                                        />
-                                        <span>
-                                          {i18n.language === "km"
-                                            ? item.panelIndexNameKhmer ||
-                                              item.panelIndexName
-                                            : item.panelIndexName}
-                                          ({item.panelIndexNameKhmer})
-                                          {/* <br /> ({item.panelIndexNameKhmer}) */}
-                                        </span>
-                                      </label>
-                                    ))}
+                                              } else if (
+                                                i18n.language === "zh" &&
+                                                item.panelIndexNameChinese
+                                              ) {
+                                                return (
+                                                  item.panelIndexNameChinese ||
+                                                  item.panelIndexName
+                                                );
+                                              } else {
+                                                return item.panelIndexName;
+                                              }
+                                            })()}
+                                            {i18n.language !== "km" &&
+                                              item.panelIndexNameKhmer &&
+                                              ` (${item.panelIndexNameKhmer})`}
+                                          </span>
+                                        </label>
+                                      );
+                                    })}
                                   </div>
                                   <div className="mt-2 text-sm">
                                     {row.parts
                                       .map((part) => {
-                                        const item = panelIndexNames.find(
+                                        const partDetail = panelIndexNames.find(
                                           (p) => p.panelIndexName === part
                                         );
-                                        return item
-                                          ? i18n.language === "km"
-                                            ? item.panelIndexNameKhmer ||
-                                              item.panelIndexName
-                                            : item.panelIndexName
-                                          : part;
+                                        if (!partDetail) return part;
+
+                                        if (i18n.language === "km") {
+                                          return (
+                                            partDetail.panelIndexNameKhmer ||
+                                            partDetail.panelIndexName
+                                          );
+                                        } else if (
+                                          i18n.language === "zh" &&
+                                          partDetail.panelIndexNameChinese
+                                        ) {
+                                          return (
+                                            partDetail.panelIndexNameChinese ||
+                                            partDetail.panelIndexName
+                                          );
+                                        } else {
+                                          return partDetail.panelIndexName;
+                                        }
                                       })
                                       .join(", ")}
                                   </div>
