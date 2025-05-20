@@ -137,7 +137,8 @@ const ImageCaptureUpload = ({
       {!isContextDataComplete && (
          <div className="mb-2 p-2 text-xs bg-yellow-100 text-yellow-700 rounded-md flex items-center">
             <AlertTriangle size={16} className="mr-1 flex-shrink-0" />
-            {t('qcRoving.imageUpload.fillRequiredFields')}
+            {/* {t('qcRoving.imageUpload.fillRequiredFields')} */}
+            Fill Required Field
         </div>
       )}
       <div className="flex items-center space-x-2 mb-3">

@@ -17,8 +17,13 @@ const PreviewRoving = ({ isOpen, onClose, data }) => {
     measurementStatus,
     garments,
     defectRate,
-    defectRatio
-  } = data;
+    defectRatio,
+    remark, 
+    spiFilesToUpload, 
+    measurementFilesToUpload, 
+    rovingStatus, 
+    overallStatusColor, // <-- Destructure the new prop
+  } = data || {}; 
 
   // Compute defect details for the table
   const defectDetails = garments
@@ -129,6 +134,20 @@ const PreviewRoving = ({ isOpen, onClose, data }) => {
           </div>
         </div>
 
+         {/* Display SPI Images */}
+        {spiFilesToUpload && spiFilesToUpload.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">SPI Images</h3>
+            <div className="flex flex-wrap gap-2">
+              {spiFilesToUpload.map((file, index) => (
+                <div key={`spi-preview-${index}`} className="w-24 h-24 border border-gray-300 rounded overflow-hidden">
+                  <img src={URL.createObjectURL(file)} alt={`SPI ${index + 1}`} className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Defect Details Section */}
         <h3 className="text-xl font-semibold text-gray-800 mb-4">
           Defect Details
@@ -162,6 +181,30 @@ const PreviewRoving = ({ isOpen, onClose, data }) => {
           <p className="text-gray-600 mb-4">No defects recorded.</p>
         )}
 
+        {/* Display Measurement Images */}
+        {measurementFilesToUpload && measurementFilesToUpload.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">Measurement Images</h3>
+            <div className="flex flex-wrap gap-2">
+              {measurementFilesToUpload.map((file, index) => (
+                <div key={`measurement-preview-${index}`} className="w-24 h-24 border border-gray-300 rounded overflow-hidden">
+                  <img src={URL.createObjectURL(file)} alt={`Measurement ${index + 1}`} className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Remark Section */}
+        {remark && (
+          <div className="mb-6">
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">Remark</h3>
+            <p className="text-gray-700 bg-gray-50 p-3 rounded-md border border-gray-200 whitespace-pre-wrap">
+              {remark}
+            </p>
+          </div>
+        )}
+
         {/* Defect Metrics */}
         <div className="grid grid-cols-2 gap-4">
           <p>
@@ -171,6 +214,17 @@ const PreviewRoving = ({ isOpen, onClose, data }) => {
             <strong>Defect Ratio:</strong> {defectRatio}
           </p>
         </div>
+
+        {/* Roving Status Section */}
+        {rovingStatus && (
+          <div className="mt-6">
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">Roving Status</h3>
+            <p className={`text-lg font-medium p-2 rounded-md inline-block ${overallStatusColor || 'bg-gray-200 text-gray-700'}`}>
+              {rovingStatus}
+            </p>
+          </div>
+        )}
+
 
         {/* Close Button */}
         <div className="flex justify-end mt-6">

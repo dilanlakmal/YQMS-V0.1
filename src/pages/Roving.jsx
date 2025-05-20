@@ -69,6 +69,7 @@ const RovingPage = () => {
   const [lineWorkerDataError, setLineWorkerDataError] = useState(null);
   const [imageUploaderKey, setImageUploaderKey] = useState(Date.now());
   const [defectDisplayLanguage, setDefectDisplayLanguage] = useState(mapI18nLangToDisplayLang(i18next.language));
+  const [remarkText, setRemarkText] = useState("");
 
   const [defects, setDefects] = useState([]);
   const [isLoadingDefects, setIsLoadingDefects] = useState(true);
@@ -413,6 +414,7 @@ const RovingPage = () => {
     setMeasurementFilesToUpload([]);
     setSelectedManualInspectionRep("");
     setImageUploaderKey(Date.now());
+    setRemarkText("");
   };
 
   const handleSubmit = async (e) => {
@@ -526,18 +528,18 @@ const RovingPage = () => {
     } else if (anyCriticalDefectInUpdatedGarments) {
         overallOperatorStatusKey = 'Reject-Critical';
     } else if (totalMajorDefectsInUpdatedGarments >= 2) {
-        overallOperatorStatusKey = 'Reject-Major-Severe';
+        overallOperatorStatusKey = 'Reject-Major-';
     } else if (totalMinorDefectsInUpdatedGarments >= 2) {
-        overallOperatorStatusKey = 'Reject-Minor-Severe';
+        overallOperatorStatusKey = 'Reject-Minor';
     } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
         // This condition is met if not critical, <2 Major, <2 Minor, but SPI/Meas is Reject
-        overallOperatorStatusKey = 'Reject-SpiMeas';
+        overallOperatorStatusKey = 'Reject';
     } else if (totalMajorDefectsInUpdatedGarments === 1) {
         // This condition is met if SPI/Meas Pass, not critical, <2 Minor, 1 Major
-        overallOperatorStatusKey = 'Reject-Major-Moderate';
+        overallOperatorStatusKey = 'Reject-Major';
     } else if (totalMinorDefectsInUpdatedGarments === 1) {
         // This condition is met if SPI/Meas Pass, not critical, no Major, 1 Minor
-        overallOperatorStatusKey = 'Reject-Minor-Moderate';
+        overallOperatorStatusKey = 'Reject-Minor';
     } else if (spiStatus === 'Pass' && measurementStatus === 'Pass' && totalMajorDefectsInUpdatedGarments === 0 && totalMinorDefectsInUpdatedGarments === 0) {
         overallOperatorStatusKey = 'Pass';
     } else {
@@ -569,6 +571,7 @@ const RovingPage = () => {
       measurement_images: uploadedMeasurementImagePaths, 
       checked_quantity: garments.length,
       inspection_time: inspectionTime,
+      remark: remarkText,
       qualityStatus,
       overall_roving_status: overallOperatorStatusKey,
       rejectGarments: [
@@ -627,8 +630,8 @@ const RovingPage = () => {
         title: 'Success',
         text: t('qcRoving.submission.success', 'QC Inline Roving data saved successfully!'),
       });
-      resetForm();
       fetchInspectionsCompleted(); 
+      resetForm();
     } catch (error) {
       console.error("Error saving QC Inline Roving data:", error);
       Swal.fire({
@@ -691,7 +694,7 @@ const RovingPage = () => {
   );
 
   if (!spiStatus || !measurementStatus) {
-    overallStatusText = t('qcRoving.overallStatus.pending', 'Pending Input');
+    overallStatusText = t('qcRoving.overallStatus.pending', 'Pending');
     overallStatusColor = 'bg-gray-200 text-gray-700';
    } else if (anyCriticalDefectInOverallGarments) {
     overallStatusText = t('qcRoving.overallStatus.rejectCritical', 'Reject-Critical');
@@ -1378,6 +1381,23 @@ const RovingPage = () => {
               </span>
             </div>
 
+            <div className="mt-6">
+              <label htmlFor="remark" className="block text-sm font-medium text-gray-700">
+                {t("qcRoving.remark", "Remark (Optional)")}
+              </label>
+              <textarea
+                id="remark"
+                name="remark"
+                rows="3"
+                maxLength="250"
+                value={remarkText}
+                onChange={(e) => setRemarkText(e.target.value)}
+                className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                placeholder={t("qcRoving.remarkPlaceholder", "Enter any remarks here...")}
+              ></textarea>
+              <p className="mt-1 text-xs text-gray-500 text-right">{remarkText.length} / 250 {t("qcRoving.characters", "characters")}</p>
+            </div>
+
             <div className="flex justify-center mt-6 space-x-4">
               <button
                 onClick={() => setShowPreview(true)}
@@ -1428,7 +1448,12 @@ const RovingPage = () => {
                   measurementStatus,
                   garments,
                   defectRate,
-                  defectRatio
+                  defectRatio,
+                  remark: remarkText,
+                  spiFilesToUpload,
+                  measurementFilesToUpload,
+                  rovingStatus: overallStatusText,
+                  overallStatusColor: overallStatusColor, // <-- Add this line
                 }}
               />
             )}

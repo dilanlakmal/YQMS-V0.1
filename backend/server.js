@@ -7983,6 +7983,8 @@ app.get("/api/sections", async (req, res) => {
 /* ------------------------------
    QC Inline Roving New
 ------------------------------ */
+
+//get the each line related working worker count
 app.get("/api/line-summary", async (req, res) => {
   try {
     const lineSummaries = await UserMain.aggregate([
@@ -7990,184 +7992,200 @@ app.get("/api/line-summary", async (req, res) => {
         $match: {
           sect_name: { $ne: null, $ne: "" },
           working_status: "Working",
-          job_title: "Sewing Worker"
-        }
+          job_title: "Sewing Worker",
+        },
       },
       {
         $group: {
           _id: "$sect_name",
-          worker_count: { $sum: 1 }
-        }
+          worker_count: { $sum: 1 },
+        },
       },
       {
         $project: {
           _id: 0,
           line_no: "$_id",
-          // worker_count: 1
-          real_worker_count: "$worker_count" 
-        }
+          real_worker_count: "$worker_count",
+        },
       },
-      { $sort: { line_no: 1 } }
+      { $sort: { line_no: 1 } },
     ]);
-    const editedCountsDocs = await LineSewingWorker.find({}, "line_no edited_worker_count").lean();
-    const editedCountsMap = new Map(editedCountsDocs.map(doc => [doc.line_no, doc.edited_worker_count]));
 
-    const mergedSummaries = lineSummaries.map(realSummary => ({
+    const editedCountsDocs = await LineSewingWorker.find(
+      {},
+      "line_no edited_worker_count"
+    ).lean();
+
+    const editedCountsMap = new Map(
+      editedCountsDocs.map((doc) => [doc.line_no, doc.edited_worker_count])
+    );
+
+    const mergedSummaries = lineSummaries.map((realSummary) => ({
       ...realSummary,
-      edited_worker_count: editedCountsMap.get(realSummary.line_no) // Can be undefined if no edit
+      edited_worker_count: editedCountsMap.get(realSummary.line_no),
     }));
 
     res.json(mergedSummaries);
   } catch (error) {
     console.error("Error fetching line summary:", error);
-    res.status(500).json({ message: "Failed to fetch line summary data.", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch line summary data.", error: error.message });
   }
 });
 
-// New PUT endpoint to save/update edited line worker counts
-app.put("/api/line-sewing-workers/:lineNo", async (req, res) => { // Assuming authenticateUser middleware sets req.user
+//Edit the line worker count
+app.put("/api/line-sewing-workers/:lineNo", async (req, res) => {
   const { lineNo } = req.params;
   const { edited_worker_count } = req.body;
-  
-  // Placeholder for user details if authentication is not fully set up yet
-  // In a real app, req.user would be populated by an authentication middleware
-  // const user = req.user || { emp_id: 'SYSTEM_USER', eng_name: 'System Edit' }; 
-  // const { emp_id: updated_by_emp_id, eng_name: updated_by_name } = user;
 
-  if (typeof edited_worker_count !== 'number' || edited_worker_count < 0 || !Number.isInteger(edited_worker_count)) {
-    return res.status(400).json({ message: "Edited worker count must be a non-negative integer." });
+  if (
+    typeof edited_worker_count !== "number" ||
+    edited_worker_count < 0 ||
+    !Number.isInteger(edited_worker_count)
+  ) {
+    return res
+      .status(400)
+      .json({ message: "Edited worker count must be a non-negative integer." });
   }
-
   try {
     const now = new Date();
     const realCountResult = await UserMain.aggregate([
       {
         $match: {
-          sect_name: lineNo, // Match the specific line number
+          sect_name: lineNo,
           working_status: "Working",
-          job_title: "Sewing Worker"
-        }
+          job_title: "Sewing Worker",
+        },
       },
       {
         $group: {
-          _id: null, // Group all matching documents for this line
-          count: { $sum: 1 }
-        }
-      }
+          _id: null,
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
-    const current_real_worker_count = realCountResult.length > 0 ? realCountResult[0].count : 0;
+    const current_real_worker_count =
+      realCountResult.length > 0 ? realCountResult[0].count : 0;
+
     const historyEntry = {
-        edited_worker_count,
-        // updated_by_emp_id,
-        // updated_by_name,
-        updated_at: now
+      edited_worker_count,
+      updated_at: now,
     };
 
     const updatedLineWorker = await LineSewingWorker.findOneAndUpdate(
       { line_no: lineNo },
       {
         $set: {
-           real_worker_count: current_real_worker_count,
+          real_worker_count: current_real_worker_count,
           edited_worker_count,
-          // updated_by_emp_id,
-          // updated_by_name,
           updated_at: now,
         },
-        $push: { history: historyEntry } // Push the new state to history
+        $push: { history: historyEntry },
       },
-      { new: true, upsert: true, runValidators: true } // upsert: true creates if not found
+      { new: true, upsert: true, runValidators: true }
     );
 
-    res.json({ message: "Line worker count updated successfully.", data: updatedLineWorker });
+    res.json({
+      message: "Line worker count updated successfully.",
+      data: updatedLineWorker,
+    });
   } catch (error) {
     console.error(`Error updating line worker count for line ${lineNo}:`, error);
-    res.status(500).json({ message: "Failed to update line worker count.", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to update line worker count.", error: error.message });
   }
 });
-
-// Updated endpoint to save or update QC Inline Roving data
+//Save the inline Roving data
 app.post("/api/save-qc-inline-roving", async (req, res) => {
   try {
-    // const qcInlineRovingData = req.body;
-
-    // Create a new instance of the QCInlineRoving model with the data from the request body
-    // const newQCInlineRoving = new QCInlineRoving(qcInlineRovingData);
-
-    // Save the new QCInlineRoving document to the database
-    // await newQCInlineRoving.save();
-
-    // res.status(201).json({
-    //   message: "QC Inline Roving data saved successfully",
-    //   data: newQCInlineRoving
-    // });
-
     const {
       inspection_date,
       mo_no,
       line_no,
-      report_name, // Optional: for creating a new report or updating an existing one
-      inspection_rep_item // The actual inspection data for the current round
+      report_name,
+      inspection_rep_item,
     } = req.body;
 
-    // Validate essential data
     if (!inspection_date || !mo_no || !line_no || !inspection_rep_item) {
-      return res.status(400).json({ message: "Missing required fields: inspection_date, mo_no, line_no, or inspection_rep_item." });
+      return res
+        .status(400)
+        .json({
+          message:
+            "Missing required fields: inspection_date, mo_no, line_no, or inspection_rep_item.",
+        });
     }
-    if (typeof inspection_rep_item !== 'object' || inspection_rep_item === null) {
-        return res.status(400).json({ message: "inspection_rep_item must be a valid object." });
+
+    if (typeof inspection_rep_item !== "object" || inspection_rep_item === null) {
+      return res
+        .status(400)
+        .json({ message: "inspection_rep_item must be a valid object." });
     }
-    if (!inspection_rep_item.inspection_rep_name || !inspection_rep_item.emp_id || !inspection_rep_item.eng_name) {
-        return res.status(400).json({ message: "inspection_rep_item is missing required fields like inspection_rep_name, emp_id, or eng_name." });
+
+    if (
+      !inspection_rep_item.inspection_rep_name ||
+      !inspection_rep_item.emp_id ||
+      !inspection_rep_item.eng_name
+    ) {
+      return res
+        .status(400)
+        .json({
+          message:
+            "inspection_rep_item is missing required fields like inspection_rep_name, emp_id, or eng_name.",
+        });
     }
 
     let doc = await QCInlineRoving.findOne({ inspection_date, mo_no, line_no });
 
     if (doc) {
-      // Document exists
       const existingRepIndex = doc.inspection_rep.findIndex(
         (rep) => rep.inspection_rep_name === inspection_rep_item.inspection_rep_name
       );
 
       if (existingRepIndex !== -1) {
-         const repToUpdate = doc.inspection_rep[existingRepIndex];
+        const repToUpdate = doc.inspection_rep[existingRepIndex];
 
-        // Ensure inlineData is an array
         if (!Array.isArray(repToUpdate.inlineData)) {
           repToUpdate.inlineData = [];
         }
 
-        // inspection_rep_item.inlineData from the request is an array with a single element: [singleOperatorInspectionData]
         if (inspection_rep_item.inlineData && inspection_rep_item.inlineData.length > 0) {
           repToUpdate.inlineData.push(inspection_rep_item.inlineData[0]);
         }
 
-        // Update summary fields from the request (frontend calculates these cumulatively)
-        repToUpdate.inspection_rep_name = inspection_rep_item.inspection_rep_name; // Should match
-        repToUpdate.emp_id = inspection_rep_item.emp_id; // Inspector for this rep
-        repToUpdate.eng_name = inspection_rep_item.eng_name; // Inspector for this rep
-        repToUpdate.total_operators = inspection_rep_item.total_operators; // Assumed correct from frontend for the line
-        repToUpdate.complete_inspect_operators = repToUpdate.inlineData.length; // Calculated by backend
-        repToUpdate.Inspect_status = (repToUpdate.total_operators > 0 && repToUpdate.complete_inspect_operators >= repToUpdate.total_operators)
-          ? "Completed"
-          : "Not Complete";
-      } else {
-        // Add new inspection_rep item if array is not full
-        if (doc.inspection_rep.length < 5) {
-          const newRepItem = { ...inspection_rep_item }; // Copy from request
-          if (!Array.isArray(newRepItem.inlineData)) { // Ensure inlineData is an array
-            newRepItem.inlineData = [];
-          }
-          // Backend calculates these for the new rep item
-          newRepItem.complete_inspect_operators = newRepItem.inlineData.length;
-          newRepItem.Inspect_status = (newRepItem.total_operators > 0 && newRepItem.complete_inspect_operators >= newRepItem.total_operators)
+        repToUpdate.inspection_rep_name = inspection_rep_item.inspection_rep_name;
+        repToUpdate.emp_id = inspection_rep_item.emp_id;
+        repToUpdate.eng_name = inspection_rep_item.eng_name;
+        repToUpdate.complete_inspect_operators = repToUpdate.inlineData.length;
+        repToUpdate.Inspect_status =
+          repToUpdate.total_operators > 0 &&
+          repToUpdate.complete_inspect_operators >= repToUpdate.total_operators
             ? "Completed"
             : "Not Complete";
+      } else {
+        if (doc.inspection_rep.length < 5) {
+          const newRepItem = { ...inspection_rep_item };
+          if (!Array.isArray(newRepItem.inlineData)) {
+            newRepItem.inlineData = [];
+          }
+
+          newRepItem.complete_inspect_operators = newRepItem.inlineData.length;
+          newRepItem.Inspect_status =
+            newRepItem.total_operators > 0 &&
+            newRepItem.complete_inspect_operators >= newRepItem.total_operators
+              ? "Completed"
+              : "Not Complete";
+
           doc.inspection_rep.push(newRepItem);
         } else {
-          return res.status(400).json({
-            message: "Maximum number of 5 inspection reports already recorded for this combination."
-          });
+          return res
+            .status(400)
+            .json({
+              message:
+                "Maximum number of 5 inspection reports already recorded for this combination.",
+            });
         }
       }
 
@@ -8178,117 +8196,125 @@ app.post("/api/save-qc-inline-roving", async (req, res) => {
       await doc.save();
       res.status(200).json({
         message: "QC Inline Roving data updated successfully.",
-        data: doc
+        data: doc,
       });
     } else {
-      // Document does not exist, create a new one
-      const lastDoc = await QCInlineRoving.findOne().sort({ inline_roving_id: -1 }).select('inline_roving_id');
-      const newId = lastDoc && typeof lastDoc.inline_roving_id === 'number' ? lastDoc.inline_roving_id + 1 : 1;
+      const lastDoc = await QCInlineRoving.findOne()
+        .sort({ inline_roving_id: -1 })
+        .select("inline_roving_id");
 
-      const initialRepItem = { ...inspection_rep_item }; // Copy from request
-      if (!Array.isArray(initialRepItem.inlineData)) { // Ensure inlineData is an array
-          initialRepItem.inlineData = [];
+      const newId =
+        lastDoc && typeof lastDoc.inline_roving_id === "number"
+          ? lastDoc.inline_roving_id + 1
+          : 1;
+
+      const initialRepItem = { ...inspection_rep_item };
+      if (!Array.isArray(initialRepItem.inlineData)) {
+        initialRepItem.inlineData = [];
       }
-      // Backend calculates these for the initial rep item
+
       initialRepItem.complete_inspect_operators = initialRepItem.inlineData.length;
-      initialRepItem.Inspect_status = (initialRepItem.total_operators > 0 && initialRepItem.complete_inspect_operators >= initialRepItem.total_operators)
+      initialRepItem.Inspect_status =
+        initialRepItem.total_operators > 0 &&
+        initialRepItem.complete_inspect_operators >= initialRepItem.total_operators
           ? "Completed"
           : "Not Complete";
 
       const newQCInlineRovingDoc = new QCInlineRoving({
         inline_roving_id: newId,
-        report_name: report_name || `Report for ${inspection_date} - ${line_no} - ${mo_no}`,
+        report_name:
+          report_name || `Report for ${inspection_date} - ${line_no} - ${mo_no}`,
         inspection_date,
         mo_no,
         line_no,
-        inspection_rep: [initialRepItem] // Start with the current rep
+        inspection_rep: [initialRepItem],
       });
+
       await newQCInlineRovingDoc.save();
       res.status(201).json({
         message: "QC Inline Roving data saved successfully (new record created).",
-        data: newQCInlineRovingDoc
+        data: newQCInlineRovingDoc,
       });
     }
   } catch (error) {
-    // console.error("Error saving QC Inline Roving data:", error);
-     console.error("Error saving/updating QC Inline Roving data:", error);
+    console.error("Error saving/updating QC Inline Roving data:", error);
     res.status(500).json({
-      // message: "Failed to save QC Inline Roving data",
       message: "Failed to save/update QC Inline Roving data",
       error: error.message,
     });
   }
 });
 
-
-// Helper function to get ordinal string (1st, 2nd, 3rd, etc.)
 function getOrdinal(n) {
   if (n <= 0) return String(n);
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0] || "th"); // Added "th" as a final fallback
+  return n + (s[(v - 20) % 10] || s[v] || s[0] || "th");
 }
 
-// Endpoint to get the current inspection time ordinal (1st, 2nd, etc.)
+//Get the inspection Number
 app.get("/api/qc-inline-roving/inspection-time-info", async (req, res) => {
   try {
     const { line_no, inspection_date } = req.query;
-
     if (!line_no || !inspection_date) {
-      return res.status(400).json({ message: "Line number and inspection date are required." });
+      return res
+        .status(400)
+        .json({ message: "Line number and inspection date are required." });
     }
-
-    // Validate date format (MM/DD/YYYY) - Adjust if your frontend sends a different format
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(inspection_date)) {
-      return res.status(400).json({ message: "Invalid inspection date format. Expected MM/DD/YYYY." });
+      return res
+        .status(400)
+        .json({ message: "Invalid inspection date format. Expected MM/DD/YYYY." });
     }
 
-    // 1. Fetch Target Worker Count from LineSewingWorker
     const lineWorkerInfo = await LineSewingWorker.findOne({ line_no });
+
     if (!lineWorkerInfo) {
       return res.json({ inspectionTimeOrdinal: "N/A (Line not configured)" });
     }
-    // Prioritize edited_worker_count, it's required in the schema so should exist.
+
     const target_worker_count = lineWorkerInfo.edited_worker_count;
 
     if (target_worker_count === 0) {
       return res.json({ inspectionTimeOrdinal: "N/A (Target 0 workers)" });
     }
 
-    // 2. Fetch QC Roving Data for the given line and date
     const rovingRecords = await QCInlineRoving.find({
       line_no: line_no,
-      inspection_date: inspection_date, // Assumes inspection_date in DB is MM/DD/YYYY
+      inspection_date: inspection_date,
     });
 
     if (rovingRecords.length === 0) {
-      return res.json({ inspectionTimeOrdinal: getOrdinal(1) }); // "1st"
+      return res.json({ inspectionTimeOrdinal: getOrdinal(1) });
     }
 
-    // 3. Process Roving Data to count inspections per operator
     const operatorInspectionCounts = {};
-    rovingRecords.forEach(record => {
-      record.inlineData.forEach(entry => {
+
+    rovingRecords.forEach((record) => {
+      record.inlineData.forEach((entry) => {
         const operatorId = entry.operator_emp_id;
-        if (operatorId) { // Ensure operatorId is valid
-          operatorInspectionCounts[operatorId] = (operatorInspectionCounts[operatorId] || 0) + 1;
+        if (operatorId) {
+          operatorInspectionCounts[operatorId] =
+            (operatorInspectionCounts[operatorId] || 0) + 1;
         }
       });
     });
 
     if (Object.keys(operatorInspectionCounts).length === 0) {
-      return res.json({ inspectionTimeOrdinal: getOrdinal(1) }); // "1st" if records exist but no valid operator data
+      return res.json({ inspectionTimeOrdinal: getOrdinal(1) });
     }
 
-    // 4. Calculate Completed Rounds
     let completed_rounds = 0;
+
     for (let round_num = 1; round_num <= 5; round_num++) {
       let operators_finished_this_round = 0;
+
       for (const operator_id in operatorInspectionCounts) {
         if (operatorInspectionCounts[operator_id] >= round_num) {
           operators_finished_this_round++;
         }
       }
+
       if (operators_finished_this_round >= target_worker_count) {
         completed_rounds = round_num;
       } else {
@@ -8297,34 +8323,40 @@ app.get("/api/qc-inline-roving/inspection-time-info", async (req, res) => {
     }
 
     const current_inspection_time_number = completed_rounds + 1;
-    const ordinal = current_inspection_time_number > 5 ? `${getOrdinal(5)} (Completed)` : getOrdinal(current_inspection_time_number);
+
+    const ordinal =
+      current_inspection_time_number > 5
+        ? `${getOrdinal(5)} (Completed)`
+        : getOrdinal(current_inspection_time_number);
 
     res.json({ inspectionTimeOrdinal: ordinal });
-
   } catch (error) {
     console.error("Error fetching inspection time info:", error);
-    res.status(500).json({ message: "Failed to fetch inspection time info.", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch inspection time info.", error: error.message });
   }
 });
 
-
-
-app.get('/api/inspections-completed', async (req, res) => {
-  const { line_no, inspection_date, mo_no, operation_id, inspection_rep_name } = req.query;
+//Get the completed inspect operators
+app.get("/api/inspections-completed", async (req, res) => {
+  const { line_no, inspection_date, mo_no, operation_id, inspection_rep_name } =
+    req.query;
 
   try {
     const findQuery = {
       line_no,
       inspection_date,
-      };
+    };
 
     if (mo_no) {
       findQuery.mo_no = mo_no;
     }
 
     const elemMatchConditions = { inspection_rep_name };
+
     if (operation_id) {
-      elemMatchConditions['inlineData.tg_no'] = operation_id; // Assuming operation_id maps to tg_no
+      elemMatchConditions["inlineData.tg_no"] = operation_id;
     }
 
     findQuery.inspection_rep = { $elemMatch: elemMatchConditions };
@@ -8332,49 +8364,52 @@ app.get('/api/inspections-completed', async (req, res) => {
     const inspection = await QCInlineRoving.findOne(findQuery);
 
     if (!inspection) {
-      // return res.status(404).json({ message: 'Inspection not found' });
-       return res.json({ completeInspectOperators: 0 })
+      return res.json({ completeInspectOperators: 0 });
     }
 
-   // Find the specific inspection_rep entry that matches the request
     const specificRep = inspection.inspection_rep.find(
       (rep) => rep.inspection_rep_name === inspection_rep_name
     );
 
     if (!specificRep) {
-      // This case should ideally not be reached if $elemMatch worked and data is consistent
       return res.json({ completeInspectOperators: 0 });
     }
+
     const completeInspectOperators = specificRep.complete_inspect_operators || 0;
 
     res.json({ completeInspectOperators });
   } catch (error) {
-    console.error('Error fetching inspections completed:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("Error fetching inspections completed:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
-app.get('/api/qc-inline-roving-reports/filtered', async (req, res) => {
+// Roving data filter function
+app.get("/api/qc-inline-roving-reports/filtered", async (req, res) => {
   try {
     const { inspection_date, qcId, operatorId, lineNo, moNo } = req.query;
+
     let queryConditions = {};
 
     if (inspection_date) {
-     if (/^\d{2}\/\d{2}\/\d{4}$/.test(inspection_date)) {
-        const parts = inspection_date.split('/');
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(inspection_date)) {
+        const parts = inspection_date.split("/");
+
         const month = parseInt(parts[0], 10);
         const day = parseInt(parts[1], 10);
         const year = parseInt(parts[2], 10);
 
-        // Construct a regex to match M/D/YYYY, MM/D/YYYY, M/DD/YYYY, MM/DD/YYYY
-        // e.g., for "05/08/2025", monthRegexPart = "0?5", dayRegexPart = "0?8"
         const monthRegexPart = month < 10 ? `0?${month}` : `${month}`;
         const dayRegexPart = day < 10 ? `0?${day}` : `${day}`;
-        
+
         const dateRegex = new RegExp(`^${monthRegexPart}\\/${dayRegexPart}\\/${year}$`);
         queryConditions.inspection_date = { $regex: dateRegex };
       } else {
-        console.warn("Received date for filtering is not in MM/DD/YYYY format:", inspection_date, "- Date filter will not be applied effectively.");
+        console.warn(
+          "Received date for filtering is not in MM/DD/YYYY format:",
+          inspection_date,
+          "- Date filter will not be applied effectively."
+        );
       }
     }
 
@@ -8391,8 +8426,7 @@ app.get('/api/qc-inline-roving-reports/filtered', async (req, res) => {
     }
 
     if (operatorId) {
-      const orConditions = [{ operator_emp_id: operatorId }]; // Match as string
-      // If operatorId is purely numeric, also try matching as a number
+      const orConditions = [{ operator_emp_id: operatorId }];
       if (/^\d+$/.test(operatorId)) {
         orConditions.push({ operator_emp_id: parseInt(operatorId, 10) });
       }
@@ -8400,141 +8434,139 @@ app.get('/api/qc-inline-roving-reports/filtered', async (req, res) => {
     }
 
     const reports = await QCInlineRoving.find(queryConditions);
+
     res.json(reports);
   } catch (error) {
-    console.error('Error fetching filtered QC inline roving reports:', error);
-    res.status(500).json({ message: 'Failed to fetch filtered reports', error: error.message });
+    console.error("Error fetching filtered QC inline roving reports:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch filtered reports", error: error.message });
   }
 });
 
-// Helper to sanitize inputs for filenames/paths to prevent path traversal and invalid characters
 const sanitize = (input) => {
-    if (typeof input !== 'string') input = String(input);
-    // Remove potentially harmful characters, allow alphanumeric, hyphens, underscores
-    let sane = input.replace(/[^a-zA-Z0-9-_]/g, '_');
-    // Prevent names like "." or ".."
-    if (sane === '.' || sane === '..') return '_';
-    return sane;
+  if (typeof input !== "string") input = String(input);
+  let sane = input.replace(/[^a-zA-Z0-9-_]/g, "_");
+  if (sane === "." || sane === "..") return "_";
+  return sane;
 };
 
-
-// Multer setup for memory storage (we'll write to disk manually)
 const rovingStorage = multer.memoryStorage();
+
 const rovingUpload = multer({
-    storage: rovingStorage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit per file
-    fileFilter: (req, file, cb) => {
-        const allowedExtensions = /^(jpeg|jpg|png|gif)$/i;
-        const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i; // pjpeg for some older browsers
-
-        // Get extension without dot, and lowercase
-        const fileExt = path.extname(file.originalname).toLowerCase().substring(1); 
-        const isExtAllowed = allowedExtensions.test(fileExt);
-        // Lowercase mimetype for robust comparison
-        const isMimeAllowed = allowedMimeTypes.test(file.mimetype.toLowerCase()); 
-
-        if (isMimeAllowed && isExtAllowed) {
-            cb(null, true); // Accept the file
-        } else {
-            // THIS IS THE CRUCIAL LOG TO CHECK ON YOUR SERVER CONSOLE:
-            console.error(`File rejected by filter: name='${file.originalname}', mime='${file.mimetype}', ext='${fileExt}'. IsMimeAllowed: ${isMimeAllowed}, IsExtAllowed: ${isExtAllowed}`);
-            cb(new Error('Error: Images Only! (jpeg, jpg, png, gif)')); // Reject the file
-        }
+  storage: rovingStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedExtensions = /^(jpeg|jpg|png|gif)$/i;
+    const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i;
+    const fileExt = path.extname(file.originalname).toLowerCase().substring(1);
+    const isExtAllowed = allowedExtensions.test(fileExt);
+    const isMimeAllowed = allowedMimeTypes.test(file.mimetype.toLowerCase());
+    if (isMimeAllowed && isExtAllowed) {
+      cb(null, true);
+    } else {
+      console.error(
+        `File rejected by filter: name='${file.originalname}', mime='${file.mimetype}', ext='${fileExt}'. IsMimeAllowed: ${isMimeAllowed}, IsExtAllowed: ${isExtAllowed}`
+      );
+      cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)"));
     }
+  },
 });
 
-// ... rest of your server.js ...
-
-// Your route handler for image upload
-app.post('/api/roving/upload-roving-image', rovingUpload.single('imageFile'), async (req, res) => {
+//Roving image upload
+app.post("/api/roving/upload-roving-image",rovingUpload.single("imageFile"),async (req, res) => {
     try {
-        const { imageType, date, lineNo, moNo, operationId } = req.body;
-        const imageFile = req.file; // This will be undefined if fileFilter rejected the file
+      const { imageType, date, lineNo, moNo, operationId } = req.body;
+      const imageFile = req.file;
+      if (!imageFile) {
+        const errorMessage =
+          req.fileValidationError ||
+          (req.multerError && req.multerError.message) ||
+          "No image file provided or file rejected by filter.";
+        return res.status(400).json({ success: false, message: errorMessage });
+      }
 
-        // This log was added in a previous step, it's helpful to see what the route receives
-        // console.log('Backend /upload-roving-image received:', {
-        //     file: imageFile ? { originalname: imageFile.originalname, mimetype: imageFile.mimetype, size: imageFile.size } : 'No file object',
-        //     body: req.body,
-        //     fileValidationError: req.fileValidationError // Multer might attach error here
-        // });
+      if (
+        !date ||
+        !lineNo ||
+        lineNo === "NA_Line" ||
+        !moNo ||
+        moNo === "NA_MO" ||
+        !operationId ||
+        operationId === "NA_Op"
+      ) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message:
+              "Missing or invalid required metadata: date, lineNo, moNo, operationId must be actual values.",
+          });
+      }
 
-        if (!imageFile) {
-            // If fileFilter called cb(new Error(...)), Multer usually sets req.fileValidationError
-            // or the error from fileFilter is caught in the main catch block.
-            const errorMessage = req.fileValidationError || (req.multerError && req.multerError.message) || 'No image file provided or file rejected by filter.';
-            return res.status(400).json({ success: false, message: errorMessage });
+      if (!imageType || !["spi", "measurement"].includes(imageType.toLowerCase())) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'Invalid image type. Must be "spi" or "measurement".' });
+      }
+
+      const sanitizedDate = sanitize(date);
+      const sanitizedLineNo = sanitize(lineNo);
+      const sanitizedMoNo = sanitize(moNo);
+      const sanitizedOperationId = sanitize(operationId);
+      const upperImageType = imageType.toUpperCase();
+
+      const targetDir = path.resolve(
+        __dirname,
+        "..",
+        "public",
+        "storage",
+        "roving",
+        upperImageType
+      );
+      await fsPromises.mkdir(targetDir, { recursive: true });
+
+      const imagePrefix = `${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
+      let existingImageCount = 0;
+      try {
+        const filesInDir = await fsPromises.readdir(targetDir);
+        filesInDir.forEach((file) => {
+          if (file.startsWith(imagePrefix)) {
+            existingImageCount++;
+          }
+        });
+      } catch (readDirError) {
+        if (readDirError.code !== "ENOENT") {
+                    console.error("Error reading directory for indexing:", targetDir, readDirError);
         }
+      }
 
-        // Metadata validation
-        if (!date || !lineNo || lineNo === 'NA_Line' || !moNo || moNo === 'NA_MO' || !operationId || operationId === 'NA_Op') {
-            return res.status(400).json({ success: false, message: 'Missing or invalid required metadata: date, lineNo, moNo, operationId must be actual values.' });
-        }
-        if (!imageType || !['spi', 'measurement'].includes(imageType.toLowerCase())) {
-            return res.status(400).json({ success: false, message: 'Invalid image type. Must be "spi" or "measurement".' });
-        }
-
-        const sanitizedDate = sanitize(date);
-        const sanitizedLineNo = sanitize(lineNo);
-        const sanitizedMoNo = sanitize(moNo);
-        const sanitizedOperationId = sanitize(operationId);
-        const upperImageType = imageType.toUpperCase();
-        
-        const targetDir = path.resolve(__dirname, '..', 'public', 'storage', 'roving', upperImageType);
-
-        await fsPromises.mkdir(targetDir, { recursive: true });
-        
-        const imagePrefix = `${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
-        let existingImageCount = 0;
-        try {
-            const filesInDir = await fsPromises.readdir(targetDir);
-            filesInDir.forEach(file => {
-                if (file.startsWith(imagePrefix)) {
-                    existingImageCount++;
-                }
-            });
-        } catch (readDirError) {
-            if (readDirError.code !== 'ENOENT') { // Ignore if directory doesn't exist yet
-                 console.error('Error reading directory for indexing:', targetDir, readDirError);
-            }
-        }
-        const imageIndex = existingImageCount + 1;
-
-        // if (imageIndex > 5) { // Max 5 images per context
-        //      return res.status(400).json({ success: false, message: 'Maximum 5 images allowed for this context.' });
-        // }
-
-        const fileExtension = path.extname(imageFile.originalname);
-        const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
-        const filePathInPublic = path.join(targetDir, newFilename);
-
-        await fsPromises.writeFile(filePathInPublic, imageFile.buffer);
-        const publicUrl = `/storage/roving/${upperImageType}/${newFilename}`; // Relative URL for client
-
-        res.json({ success: true, filePath: publicUrl, filename: newFilename });
-
+      const imageIndex = existingImageCount + 1;
+      const fileExtension = path.extname(imageFile.originalname);
+      const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
+      const filePathInPublic = path.join(targetDir, newFilename);
+      await fsPromises.writeFile(filePathInPublic, imageFile.buffer);
+      const publicUrl = `/storage/roving/${upperImageType}/${newFilename}`;
+      res.json({ success: true, filePath: publicUrl, filename: newFilename });
     } catch (error) {
-        console.error('Error uploading roving image:', error);
-        // Check if the error is from Multer's fileFilter specifically
-        if (error.message && error.message.startsWith('Error: Images Only!')) {
-             return res.status(400).json({ success: false, message: error.message });
-        }
-        // Handle other Multer errors (like file size limit)
-        if (error instanceof multer.MulterError) {
-            return res.status(400).json({ success: false, message: `Multer error: ${error.message}` });
-        }
-        // Generic server error
-        res.status(500).json({ success: false, message: 'Server error during image upload.' });
+      console.error("Error uploading roving image:", error);
+      if (error.message && error.message.startsWith("Error: Images Only!")) {
+        return res.status(400).json({ success: false, message: error.message });
+      }
+      if (error instanceof multer.MulterError) {
+        return res.status(400).json({ success: false, message: `Multer error: ${error.message}` });
+      }
+      res.status(500).json({ success: false, message: "Server error during image upload." });
     }
-});
+  }
+);
 
-//Endpoint for get the buyer status
+// Endpoint for get the buyer status
 app.get("/api/buyer-by-mo", (req, res) => {
-  const { moNo } = req.query; // Get moNo from query parameters
-
+  const { moNo } = req.query;
   if (!moNo) {
     return res.status(400).json({ message: "MO number is required" });
   }
-
   const buyerName = determineBuyer(moNo);
   res.json({ buyerName });
 });
@@ -10480,13 +10512,12 @@ app.get("/api/buyers", (req, res) => {
 // New Endpoint for updating buyer statuses in SewingDefects
 app.post("/api/sewing-defects/buyer-statuses", async (req, res) => {
   try {
-    const statusesPayload = req.body; // Expects an array of status objects
+    const statusesPayload = req.body; 
     if (!Array.isArray(statusesPayload)) {
       return res.status(400).json({ message: "Invalid payload: Expected an array of statuses." });
     }
-    // Group statuses by defectCode to update each defect's statusByBuyer array once
     const updatesByDefect = statusesPayload.reduce((acc, status) => {
-      const defectCode = status.defectCode; // This is string from frontend
+      const defectCode = status.defectCode; 
       if (!acc[defectCode]) {
         acc[defectCode] = [];
       }
@@ -10500,7 +10531,7 @@ app.post("/api/sewing-defects/buyer-statuses", async (req, res) => {
 
     const bulkOps = [];
     for (const defectCodeStr in updatesByDefect) {
-      const defectCodeNum = parseInt(defectCodeStr, 10); // Convert to number for query
+      const defectCodeNum = parseInt(defectCodeStr, 10); 
       if (isNaN(defectCodeNum)) {
           console.warn(`Invalid defectCode received: ${defectCodeStr}, skipping.`);
           continue; 
@@ -10508,7 +10539,7 @@ app.post("/api/sewing-defects/buyer-statuses", async (req, res) => {
       const newStatusByBuyerArray = updatesByDefect[defectCodeStr];
       bulkOps.push({
         updateOne: {
-          filter: { code: defectCodeNum }, // Query by numeric code in SewingDefects model
+          filter: { code: defectCodeNum }, 
           update: { $set: { statusByBuyer: newStatusByBuyerArray, updatedAt: new Date() } },
         },
       });
