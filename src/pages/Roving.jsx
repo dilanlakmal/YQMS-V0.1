@@ -1214,20 +1214,20 @@ const RovingPage = () => {
     fetchBuyerByMo();
   }, [moNo]);
 
-  useEffect(() => {
-    if (!authLoading && user) {
-      setScannedUserData({
-        emp_id: user.emp_id || "N/A_USER_EMP_ID",
-        eng_name: user.eng_name || "N/A_USER_ENG_NAME",
-        kh_name: user.kh_name || "N/A_USER_KH_NAME",
-        job_title: user.job_title || "N/A_USER_JOB_TITLE",
-        dept_name: user.dept_name || "N/A_USER_DEPT_NAME",
-        sect_name: user.sect_name || "N/A_USER_SECT_NAME"
-      });
-    } else if (!authLoading && !user) {
-      setScannedUserData(null);
-    }
-  }, [user, authLoading]);
+  // useEffect(() => {
+  //   if (!authLoading && user) {
+  //     setScannedUserData({
+  //       emp_id: user.emp_id || "N/A_USER_EMP_ID",
+  //       eng_name: user.eng_name || "N/A_USER_ENG_NAME",
+  //       kh_name: user.kh_name || "N/A_USER_KH_NAME",
+  //       job_title: user.job_title || "N/A_USER_JOB_TITLE",
+  //       dept_name: user.dept_name || "N/A_USER_DEPT_NAME",
+  //       sect_name: user.sect_name || "N/A_USER_SECT_NAME",
+  //     });
+  //   } else if (!authLoading && !user) {
+  //     setScannedUserData(null);
+  //   }
+  // }, [user, authLoading]);
 
   const fetchInspectionsCompleted = useCallback(async () => {
     if (lineNo && currentDate && selectedManualInspectionRep && moNo) {
@@ -2389,7 +2389,7 @@ const RovingPage = () => {
                   <select
                     value={spiStatus}
                     onChange={(e) => setSpiStatus(e.target.value)}
-                    className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
+                    className="mt-1 w-full p-2 border border-gray-300 rounded-md"
                   >
                     <option value="">{t("qcRoving.select_spi_status")}</option>
                     <option value="Pass">{t("qcRoving.pass")}</option>
@@ -2412,7 +2412,7 @@ const RovingPage = () => {
                   <select
                     value={measurementStatus}
                     onChange={(e) => setMeasurementStatus(e.target.value)}
-                    className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
+                    className="mt-1 w-full p-2 border border-gray-300 rounded-md"
                   >
                     <option value="">
                       {t("qcRoving.select_measurement_status")}
@@ -2444,7 +2444,7 @@ const RovingPage = () => {
                       {t("qcRoving.part")} {currentGarmentIndex + 1}
                     </h3>
                     <span
-                      className={`px-3 py-1 rounded-full text-lg ${
+                      className={`px-3 py-1 rounded-md text-sm ${
                         commonResultStatus === "Pass"
                           ? "bg-green-100 text-green-800"
                           : "bg-red-100 text-red-800"
@@ -2521,10 +2521,10 @@ const RovingPage = () => {
                         return (
                           <div
                             key={`${currentGarmentIndex}-${defectIndex}`}
-                            className="flex items-center justify-between bg-white p-3 shadow-sm flex-wrap gap-y-2 px-3 py-1 rounded-full text-lg"
+                            className="flex items-center justify-between bg-white p-3 shadow-sm flex-wrap gap-y-2 px-3 py-1 text-lg"
                           >
                             <div className="flex items-center flex-grow mr-2">
-                              <span className="truncate">
+                              <span className="truncate text-sm">
                                 {defectInfo
                                   ? getDefectNameForDisplay(defectInfo)
                                   : defect.name}
@@ -2557,7 +2557,7 @@ const RovingPage = () => {
                             </div>
                             <div className="flex items-center flex-grow mr-2">
                               <span
-                                className={`font-semibold ${defectSeverityColor} mr-2`}
+                                className={`font-semibold text-sm rounded-md ${defectSeverityColor} mr-2`}
                               >
                                 {`(${defectSeverityText})`}
                               </span>
@@ -2683,10 +2683,10 @@ const RovingPage = () => {
 
             <div className="mt-6 pt-4 border-t border-gray-300">
               <h4 className="text-md font-semibold text-gray-700 mb-2">
-                {t("qcRoving.rovingStatus", "Roving Status")}
+                {t("qcRoving.rovingStatus", "Quality Status")}
               </h4>
               <span
-                className={`px-4 py-2 rounded-full text-lg font-semibold ${overallStatusColor}`}
+                className={`px-4 py-2 text-lg font-semibold rounded-md ${overallStatusColor}`}
               >
                 {overallStatusText}
               </span>
