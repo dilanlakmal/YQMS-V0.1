@@ -1,190 +1,6 @@
-// import React, { useState, useEffect } from "react";
-// import axios from "axios";
-// import { API_BASE_URL } from "../../../../config"; // Adjust the path as needed
-// import Swal from "sweetalert2";
-
-// const RovingData = ({ refreshTrigger }) => {
-//   const [reports, setReports] = useState([]);
-
-//   // Fetch reports when the component mounts or when refreshTrigger changes
-//   useEffect(() => {
-//     fetchReports();
-//   }, [refreshTrigger]);
-
-//   const fetchReports = async () => {
-//     try {
-//       const response = await axios.get(
-//         `${API_BASE_URL}/api/qc-inline-roving-reports`
-//       );
-//       setReports(response.data);
-//     } catch (error) {
-//       console.error("Error fetching reports:", error);
-//       Swal.fire({
-//         icon: "error",
-//         title: "Error",
-//         text: "Failed to fetch reports."
-//       });
-//     }
-//   };
-
-//   return (
-//     <div className="mt-4">
-//       {/* Wrap the table in a div with overflow-x-auto to enable horizontal scrolling */}
-//       <div className="overflow-x-auto">
-//         <table className="min-w-full divide-y divide-gray-200">
-//           <thead className="bg-gray-200">
-//             <tr>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 Date
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 QC ID
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 QC Name
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 Line No
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 MO No
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 Operator ID
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 Type
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 Checked Qty
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 Operation
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 Machine Code
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 SPI Status
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 Measurement Status
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 Quality Status
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 Inspection Time
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 Total Defects
-//               </th>
-//               <th className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-500">
-//                 Defect Details
-//               </th>
-//             </tr>
-//           </thead>
-//           <tbody className="bg-white divide-y divide-gray-200">
-//             {reports.map((report) =>
-//               report.inlineData.map((data, index) => (
-//                 <tr key={`${report.inline_roving_id}-${index}`}>
-//                   <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-//                     {report.inspection_date}
-//                   </td>
-//                   <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-//                     {report.emp_id}
-//                   </td>
-//                   <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-//                     {report.eng_name}
-//                   </td>
-//                   <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-//                     {report.line_no}
-//                   </td>
-//                   <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-//                     {report.mo_no}
-//                   </td>
-//                   <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-//                     {data.operator_emp_id || "N/A"}
-//                   </td>
-//                   <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-//                     {data.type || "N/A"}
-//                   </td>
-//                   <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-//                     {data.checked_quantity || "N/A"}
-//                   </td>
-//                   <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-//                     {data.operation_kh_name || data.operation_ch_name || "N/A"}
-//                   </td>
-//                   <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-//                     {data.ma_code || "N/A"}
-//                   </td>
-//                   <td
-//                     className={`px-2 py-1 text-sm border border-gray-200 ${
-//                       data.spi === "Pass"
-//                         ? "bg-green-100 text-green-800"
-//                         : "bg-red-100 text-red-600"
-//                     }`}
-//                   >
-//                     {data.spi || "N/A"}
-//                   </td>
-//                   <td
-//                     className={`px-2 py-1 text-sm border border-gray-200 ${
-//                       data.measurement === "Pass"
-//                         ? "bg-green-100 text-green-800"
-//                         : "bg-red-100 text-red-600"
-//                     }`}
-//                   >
-//                     {data.measurement || "N/A"}
-//                   </td>
-//                   <td
-//                     className={`px-2 py-1 text-sm border border-gray-200 ${
-//                       data.qualityStatus === "Pass"
-//                         ? "bg-green-100 text-green-800"
-//                         : "bg-red-100 text-red-600"
-//                     }`}
-//                   >
-//                     {data.qualityStatus || "N/A"}
-//                   </td>
-//                   <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-//                     {data.inspection_time || "N/A"}
-//                   </td>
-//                   <td className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-//                     {data.rejectGarments && data.rejectGarments.length > 0
-//                       ? data.rejectGarments[0].totalCount || 0
-//                       : 0}
-//                   </td>
-//                   <td className="px-2 py-1 text-xs text-gray-700 border border-gray-200">
-//                     {data.rejectGarments && data.rejectGarments.length > 0
-//                       ? data.rejectGarments[0].garments.map(
-//                           (garment, gIndex) => (
-//                             <div key={gIndex}>
-//                               <ul>
-//                                 {garment.defects.map((defect, dIndex) => (
-//                                   <li key={dIndex}>
-//                                     {defect.name} : {defect.count}
-//                                   </li>
-//                                 ))}
-//                               </ul>
-//                             </div>
-//                           )
-//                         )
-//                       : "No Defects"}
-//                   </td>
-//                 </tr>
-//               ))
-//             )}
-//           </tbody>
-//         </table>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default RovingData;
-
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
-import { API_BASE_URL } from "../../../../config"; // Adjust the path as needed
+import { API_BASE_URL } from "../../../../config";
 import Swal from "sweetalert2";
 import RovingFilterPlane from "../qc_roving/RovingDataFilterPane";
 
@@ -193,14 +9,23 @@ const getTodayDateString = () => {
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, "0");
   const day = String(today.getDate()).padStart(2, "0");
-  return `${month}/${day}/${year}`; // YYYY-MM-DD
+  return `${month}/${day}/${year}`; // MM/DD/YYYY
 };
+
+const REPETITION_KEYS = [
+  "1st Inspection",
+  "2nd Inspection",
+  "3rd Inspection",
+  "4th Inspection",
+  "5th Inspection"
+];
 
 const RovingData = ({ refreshTrigger }) => {
   const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+
   const [filters, setFilters] = useState({
-    date: getTodayDateString(), // Expects 'MM/DD/YYYY' string or empty
+    date: getTodayDateString(),
     qcId: "",
     operatorId: "",
     lineNo: "",
@@ -220,12 +45,26 @@ const RovingData = ({ refreshTrigger }) => {
       const moNos = new Set();
 
       sourceReports.forEach((report) => {
-        if (report.emp_id) qcIds.add(report.emp_id);
+        // if (report.emp_id) qcIds.add(report.emp_id);
         if (report.line_no) lineNos.add(report.line_no);
         if (report.mo_no) moNos.add(report.mo_no);
-        report.inlineData?.forEach((data) => {
-          if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
-        });
+        // report.inlineData?.forEach((data) => {
+        //   if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
+        // });
+        // Handle new schema with inspection_rep
+        if (report.inspection_rep && Array.isArray(report.inspection_rep)) {
+          report.inspection_rep.forEach((repItem) => {
+            if (repItem.emp_id) qcIds.add(repItem.emp_id);
+            repItem.inlineData?.forEach((data) => {
+              if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
+            });
+          });
+        } else if (report.inlineData && Array.isArray(report.inlineData)) {
+          if (report.emp_id) qcIds.add(report.emp_id);
+          report.inlineData.forEach((data) => {
+            if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
+          });
+        }
       });
 
       setUniqueQcIds(Array.from(qcIds).sort());
@@ -267,23 +106,92 @@ const RovingData = ({ refreshTrigger }) => {
 
         const response = await axios.get(endpoint);
         const rawReportsFromApi = response.data || [];
+
         populateUniqueFilterOptions(rawReportsFromApi);
 
-        let reportsForDisplay = rawReportsFromApi;
-        if (currentFilters.operatorId) {
-          reportsForDisplay = rawReportsFromApi
-            .map((report) => {
-              const filteredInlineData =
-                report.inlineData?.filter(
-                  (inlineEntry) =>
-                    String(inlineEntry.operator_emp_id) ===
-                    String(currentFilters.operatorId)
-                ) || [];
-              return { ...report, inlineData: filteredInlineData };
-            })
-            .filter(
-              (report) => report.inlineData && report.inlineData.length > 0
+        const processedData = rawReportsFromApi.flatMap((report) => {
+          const operatorInspectionsMap = new Map();
+
+          const processInlineData = (
+            inlineDataArray,
+            repNameForLegacy = null,
+            topLevelEmpIdForLegacy = null
+          ) => {
+            inlineDataArray?.forEach((operatorData) => {
+              const operatorKey = `${operatorData.operator_emp_id}_${operatorData.tg_no}`;
+              const currentRepName =
+                repNameForLegacy ||
+                operatorData.inspection_rep_name ||
+                "Unknown Rep";
+
+              if (!operatorInspectionsMap.has(operatorKey)) {
+                operatorInspectionsMap.set(operatorKey, {
+                  reportTopLevel: report,
+                  operator_emp_id: operatorData.operator_emp_id,
+                  operator_eng_name: operatorData.operator_eng_name,
+                  operator_kh_name: operatorData.operator_kh_name,
+                  operation_ch_name: operatorData.operation_ch_name,
+                  operation_kh_name: operatorData.operation_kh_name,
+                  ma_code: operatorData.ma_code,
+                  tg_no: operatorData.tg_no,
+                  inspectionsByRep: {}
+                });
+              }
+              const existingEntry = operatorInspectionsMap.get(operatorKey);
+
+              const repLevelDataForThisRep = repNameForLegacy
+                ? {
+                    emp_id: topLevelEmpIdForLegacy || report.emp_id,
+                    inspection_rep_name: repNameForLegacy
+                  }
+                : operatorData.repLevelData || {
+                    emp_id: report.emp_id,
+                    inspection_rep_name: currentRepName
+                  };
+
+              existingEntry.inspectionsByRep[currentRepName] = {
+                operatorLevelData: operatorData,
+                repLevelData: repLevelDataForThisRep
+              };
+            });
+          };
+
+          if (report.inspection_rep && Array.isArray(report.inspection_rep)) {
+            report.inspection_rep.forEach((repItem) => {
+              const augmentedInlineData = repItem.inlineData?.map((opData) => ({
+                ...opData,
+                repLevelData: repItem,
+                inspection_rep_name: repItem.inspection_rep_name
+              }));
+              processInlineData(augmentedInlineData);
+            });
+          } else if (report.inlineData && Array.isArray(report.inlineData)) {
+            processInlineData(
+              report.inlineData,
+              "1st Inspection",
+              report.emp_id
             );
+          }
+          return Array.from(operatorInspectionsMap.values());
+        });
+
+        let reportsForDisplay = processedData;
+
+        if (currentFilters.operatorId) {
+          reportsForDisplay = processedData.filter(
+            (opSummary) =>
+              String(opSummary.operator_emp_id) ===
+              String(currentFilters.operatorId)
+          );
+        }
+
+        if (currentFilters.qcId) {
+          reportsForDisplay = reportsForDisplay.filter((opSummary) => {
+            return Object.values(opSummary.inspectionsByRep).some(
+              (inspection) =>
+                inspection.repLevelData?.emp_id === currentFilters.qcId
+            );
+          });
         }
 
         setReports(reportsForDisplay);
@@ -293,6 +201,7 @@ const RovingData = ({ refreshTrigger }) => {
           title: "Error",
           text: "Failed to fetch reports."
         });
+
         setReports([]);
         populateUniqueFilterOptions([]);
       } finally {
@@ -309,6 +218,17 @@ const RovingData = ({ refreshTrigger }) => {
   const handleFilterChange = useCallback((newFilters) => {
     setFilters(newFilters);
   }, []);
+
+  const showDetailsOnTap = (tooltipText) => {
+    Swal.fire({
+      title: "Inspection Details",
+      html: `<pre style="text-align: left; white-space: pre-wrap; font-size: 0.8rem;">${tooltipText}</pre>`,
+      confirmButtonText: "Close",
+      customClass: {
+        popup: "roving-data-swal-popup"
+      }
+    });
+  };
 
   return (
     <div className="mt-4">
@@ -331,40 +251,52 @@ const RovingData = ({ refreshTrigger }) => {
               <span className="text-red-600 font-bold text-lg">✗</span> : Fail /
               Reject
             </li>
-            {/* <li><span className="text-green-600 font-bold text-lg">✓</span> : Individual Check Pass</li> */}
-            {/* <li><span className="text-red-600 font-bold text-lg">✗</span> : Individual Check Fail / Reject</li> */}
             <li>
               <span className="font-semibold">SPI</span> : Stitches Per Inch
             </li>
             <li>
               <span className="font-semibold">Meas.</span> : Measurement
             </li>
-            {/* <li><span className="font-semibold">Chk'd/Def</span> : Qty Checked / Total Defects for Operator</li> */}
-          </ul>
-          <ul className="list-disc list-inside space-y-1 flex-1 min-w-[250px] mt-2 md:mt-0">
             <li>
               <span className="font-semibold">Chk'd/Def</span> : Quantity
-              Checked / Total Defects for Operator
+              Checked / Total Defects for Operator for that specific inspection
+              event.
             </li>
-            <li>
-              <span className="inline-block w-3 h-3 bg-green-100 border border-green-300 mr-1 align-middle"></span>
-              <span className="font-semibold align-middle">
-                Green Background
-              </span>{" "}
-              : Indicates the specific garment/check passed.
-              {/* <span className="font-semibold align-middle">Green BG</span> : Operator Overall PASS (SPI/Meas. Pass, 0 Defects). */}
+          </ul>
+          <ul className="list-disc list-inside space-y-1 flex-1 min-w-[250px] mt-2 md:mt-0">
+            <li className="mt-2 font-semibold">
+              Cell Background Colors (SPI, Meas., Chk'd/Def):
             </li>
-            {/* <li>
-              <span className="inline-block w-3 h-3 bg-yellow-100 border border-yellow-300 mr-1 align-middle"></span>
-              <span className="font-semibold align-middle">Yellow BG</span> : Operator REJECT (SPI/Meas. Fail OR 1 Minor Defect).
-            </li> */}
-            <li>
-              <span className="inline-block w-3 h-3 bg-red-100 border border-red-300 mr-1 align-middle"></span>
-              <span className="font-semibold align-middle">Red Background</span>{" "}
-              : Indicates the specific garment/check failed or was rejected.
-              {/* <span className="font-semibold align-middle">Red BG</span> : Operator REJECT (Critical Defect OR &gt;1 Minor Defects). */}
+            <ul className="list-disc list-inside ml-4">
+              <li>
+                <span className="inline-block w-3 h-3 bg-green-100 border border-green-300 mr-1 align-middle"></span>
+                <span className="font-semibold align-middle">Green</span> :
+                Overall Roving Status is 'Pass'.
+              </li>
+              <li>
+                <span className="inline-block w-3 h-3 bg-yellow-100 border border-yellow-300 mr-1 align-middle"></span>
+                <span className="font-semibold align-middle">Yellow</span> :
+                Overall Roving Status is 'Reject' (due to SPI/Meas),
+                'Reject-Major' (single), or 'Reject-Minor' (single).
+              </li>
+              <li>
+                <span className="inline-block w-3 h-3 bg-red-100 border border-red-300 mr-1 align-middle"></span>
+                <span className="font-semibold align-middle">Red</span> :
+                Overall Roving Status is 'Reject-Critical', 'Reject-Major'
+                (multiple), or 'Reject-Minor' (multiple - *see note below*).
+              </li>
+              <li>
+                <span className="inline-block w-3 h-3 bg-gray-200 border border-gray-400 mr-1 align-middle"></span>
+                <span className="font-semibold align-middle">Gray</span> :
+                Overall Roving Status is 'Pending', 'Unknown', or not
+                determined.
+              </li>
+            </ul>
+            <li className="mt-1 text-xs text-gray-500">
+              (*Note: 'Reject-Minor' for multiple defects should ideally be red,
+              but current data might show yellow. See console warning for
+              details.)
             </li>
-            {/* <li><span className="font-semibold">BG</span> : Background Color (applies to SPI, Meas., Chk'd/Def cells for an operator)</li> */}
           </ul>
         </div>
       </div>
@@ -372,7 +304,7 @@ const RovingData = ({ refreshTrigger }) => {
       {isLoading ? (
         <div className="text-center p-10 text-gray-500">Loading reports...</div>
       ) : (
-        <div className="overflow-x-auto relative max-h-[600px]">
+        <div className="overflow-x-auto relative max-h-[70vh]">
           {reports.length === 0 ? (
             <div className="text-center p-10 text-gray-500">
               No reports found matching your criteria.
@@ -400,263 +332,268 @@ const RovingData = ({ refreshTrigger }) => {
                     Machine Code
                   </th>
                   <th
-                    colSpan="15"
+                    colSpan={REPETITION_KEYS.length * 3}
                     className="px-2 py-1 text-center text-sm font-medium text-gray-700 border border-gray-500"
                   >
                     Inspection Data
                   </th>
                 </tr>
                 <tr>
-                  {["1st", "2nd", "3rd", "4th", "5th"].map((garmentOrdinal) => (
+                  {REPETITION_KEYS.map((repKey) => (
                     <th
-                      key={garmentOrdinal}
+                      key={repKey}
                       colSpan="3"
                       className="px-2 py-1 text-center text-xs font-medium text-gray-700 border border-gray-500"
                     >
-                      {garmentOrdinal} Inspection
+                      {repKey}
                     </th>
                   ))}
                 </tr>
                 <tr>
-                  {Array(5)
-                    .fill(null)
-                    .map((_, groupIndex) => (
-                      <React.Fragment key={`subgroup-${groupIndex}`}>
-                        <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
-                          SPI
-                        </th>
-                        <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
-                          Meas.
-                        </th>
-                        <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
-                          Chk'd/Def
-                        </th>
-                      </React.Fragment>
-                    ))}
+                  {REPETITION_KEYS.flatMap((repKey) => (
+                    <React.Fragment key={`subgroup-header-${repKey}`}>
+                      <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
+                        SPI
+                      </th>
+                      <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
+                        Meas.
+                      </th>
+                      <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
+                        Chk'd/Def
+                      </th>
+                    </React.Fragment>
+                  ))}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {reports.map((report) =>
-                  report.inlineData?.map((data, index) => {
-                    const allGarmentsDetails =
-                      data.rejectGarments?.[0]?.garments;
-                    const totalDefectsForOperatorRecord =
-                      data.rejectGarments?.[0]?.totalCount || 0;
-                    const inspectionCells = [];
-                    const numGarmentDisplayGroups = 5; // For "1st" to "5th" garment headers
+                {reports.map((operatorSummary, index) => {
+                  const allRepInspectionCells = [];
 
-                    // Helper function to determine cell background color
-                    const getCellBackgroundColor = (status) => {
-                      if (status === "Pass")
-                        return "bg-green-100 hover:bg-green-200";
-                      if (status === "Fail" || status === "Reject")
-                        return "bg-red-100 hover:bg-red-200";
-                      return "hover:bg-gray-50"; // Default for N/A or other statuses
-                      // const overallOperatorStatus = data.overall_roving_status || 'NOT_CALCULATED';
+                  REPETITION_KEYS.forEach((repKey) => {
+                    const inspectionEvent =
+                      operatorSummary.inspectionsByRep[repKey];
 
-                      // Helper function to determine cell background color based on OVERALL operator status
-                      // const getOverallCellBackgroundColor = (statusKey) => {
-                      //   switch (statusKey) {
-                      //     case 'Pass':
-                      //       return 'bg-green-100 hover:bg-green-200';
-                      //     case 'Reject-Critical':
-                      //     case 'Reject-Multiple-Minors':
-                      //       return 'bg-red-100 hover:bg-red-200';
-                      //     case 'Reject-Single-Minor':
-                      //     case 'Reject-General': // Covers SPI/Measurement fail with 0 defects
-                      //       return 'bg-yellow-100 hover:bg-yellow-200';
-                      //     default: // 'Pending', 'NOT_CALCULATED', or unknown
-                      //       return 'bg-gray-100 hover:bg-gray-200';
-                      //   }
-                    };
+                    if (inspectionEvent) {
+                      const { operatorLevelData, repLevelData } =
+                        inspectionEvent;
+                      const totalDefectsForThisRep =
+                        operatorLevelData.rejectGarments?.[0]?.totalCount || 0;
 
-                    const renderResultSymbol = (status) => {
-                      if (status === "Pass") {
-                        return (
-                          <span className="text-green-600 font-bold text-lg">
-                            ✓
-                          </span>
-                        );
-                      }
-                      if (status === "Fail" || status === "Reject") {
-                        return (
-                          <span className="text-red-600 font-bold text-lg">
-                            ✗
-                          </span>
-                        );
-                      }
-                      return <span className="text-gray-500">N/A</span>;
-                    };
-                    const constructTooltipText = (
-                      reportDetails,
-                      operatorInspectionData,
-                      totalDefectsForOp
-                    ) => {
-                      let defectsString = "Defects Found: None";
-                      const defectsList = [];
-                      if (
-                        operatorInspectionData.rejectGarments &&
-                        operatorInspectionData.rejectGarments.length > 0 &&
-                        operatorInspectionData.rejectGarments[0].garments
-                      ) {
-                        operatorInspectionData.rejectGarments[0].garments.forEach(
-                          (garment) => {
-                            garment.defects.forEach((defect) => {
-                              defectsList.push(
-                                `  - ${defect.name} (Qty: ${
-                                  defect.count
-                                }, Op.ID: ${defect.operationId || "N/A"})`
-                              );
-                            });
-                          }
-                        );
-                      }
-                      if (defectsList.length > 0) {
-                        defectsString =
-                          "Defects Found:\n" + defectsList.join("\n");
-                      }
+                      const spiDisplay = operatorLevelData.spi || "N/A";
+                      const measDisplay =
+                        operatorLevelData.measurement || "N/A";
+                      const chkdDefDisplay = `${operatorLevelData.checked_quantity}/${totalDefectsForThisRep}`;
 
-                      return `Inspection Details:
-                      Date: ${reportDetails.inspection_date || "N/A"}
-                      QC ID: ${reportDetails.emp_id || "N/A"}
-                      Line No: ${reportDetails.line_no || "N/A"}
-                      MO No: ${reportDetails.mo_no || "N/A"}
-                      ------------------------------
-                      Operator ID: ${
-                        operatorInspectionData.operator_emp_id || "N/A"
-                      }
-                      Operator Name: ${
-                        operatorInspectionData.operator_kh_name ||
-                        operatorInspectionData.operator_eng_name ||
-                        "N/A"
-                      }
-                      Operation: ${
-                        operatorInspectionData.operation_kh_name ||
-                        operatorInspectionData.operation_ch_name ||
-                        "N/A"
-                      }
-                      Machine Code: ${operatorInspectionData.ma_code || "N/A"}
-                      ------------------------------
-                      Type: ${operatorInspectionData.type || "N/A"} 
-                      Checked Qty: ${
-                        operatorInspectionData.checked_quantity || "N/A"
-                      }
-                      SPI: ${operatorInspectionData.spi || "N/A"} 
-                      Meas: ${operatorInspectionData.measurement || "N/A"} 
-                      Total Defects (Op): ${totalDefectsForOp}
-                      Overall Result (Op): ${
-                        operatorInspectionData.qualityStatus || "N/A"
-                      }
-                      Overall Roving Status: ${
-                        operatorInspectionData.overall_roving_status || "N/A"
-                      }
-                      ------------------------------
-                      ${defectsString}`;
-                    };
+                      // New function to determine cell background based on overall_roving_status
+                      const getCellBackgroundColorForOverallStatus = (
+                        overallStatusKey
+                      ) => {
+                        if (!overallStatusKey)
+                          return "bg-gray-200 hover:bg-gray-300";
 
-                    for (let i = 0; i < numGarmentDisplayGroups; i++) {
-                      if (i < data.checked_quantity) {
-                        // If this display slot corresponds to an actual checked garment
-                        const garmentDetail = allGarmentsDetails?.[i]; // Get the specific garment's details
-
-                        const spiDisplay = data.spi || "N/A";
-                        const measDisplay = data.measurement || "N/A";
-                        let defectCountForSlotDisplay = "N/A";
-                        const chkdDefDisplay = `${data.checked_quantity}/${totalDefectsForOperatorRecord}`;
-                        let resultForSlotDisplay = "N/A";
-
-                        if (data.qualityStatus === "Pass") {
-                          // Overall inspection for the operator passed
-                          defectCountForSlotDisplay = 0; // No defects for any garment if overall is Pass
-
-                          resultForSlotDisplay = "Pass"; // This slot is Pass
-                        } else {
-                          // Overall inspection for the operator is 'Reject'
-                          if (garmentDetail) {
-                            defectCountForSlotDisplay =
-                              garmentDetail.garment_defect_count;
-
-                            resultForSlotDisplay = garmentDetail.status; // 'Pass' or 'Fail' for this specific garment
-                          } else {
-                            // Fallback if garmentDetail is missing (e.g., for older data or if backend data is incomplete)
-                            defectCountForSlotDisplay = "N/A"; // Or data.rejectGarments?.[0]?.totalCount if you want total here
-
-                            resultForSlotDisplay = "N/A"; // Or data.qualityStatus
-                          }
+                        switch (overallStatusKey) {
+                          case "Pending":
+                          case "Unknown":
+                            return "bg-gray-200 hover:bg-gray-300";
+                          case "Reject-Critical":
+                          case "Reject-Major-M":
+                          case "Reject-Minor-M":
+                            return "bg-red-100 hover:bg-red-200";
+                          case "Reject":
+                          case "Reject-Major-s":
+                          case "Reject-Minor-S":
+                            return "bg-yellow-100 hover:bg-yellow-200";
+                          case "Pass":
+                            return "bg-green-100 hover:bg-green-200";
+                          default:
+                            return "bg-gray-200 hover:bg-gray-300";
                         }
-                        const cellBgClass =
-                          getCellBackgroundColor(resultForSlotDisplay);
+                      };
 
-                        const tooltipTitle = constructTooltipText(
-                          report,
-                          data,
-                          totalDefectsForOperatorRecord
-                        );
+                      const renderResultSymbol = (status) => {
+                        if (status === "Pass")
+                          return (
+                            <span className="text-green-600 font-bold text-lg">
+                              ✓
+                            </span>
+                          );
+                        if (status === "Fail" || status === "Reject")
+                          return (
+                            <span className="text-red-600 font-bold text-lg">
+                              ✗
+                            </span>
+                          );
+                        return <span className="text-gray-500">N/A</span>;
+                      };
 
-                        // SPI, Measurement cells display their status (Pass/Reject/N/A) using renderResultSymbol (✓/✗/N/A)
-                        // Chk'd/Def cell displays the ratio.
-                        inspectionCells.push(
-                          <td
-                            key={`spi-${i}`}
-                            title={tooltipTitle}
-                            className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${cellBgClass} transition-colors duration-150 text-center`}
-                          >
-                            {renderResultSymbol(spiDisplay)}
-                          </td>
-                        );
-                        inspectionCells.push(
-                          <td
-                            key={`meas-${i}`}
-                            title={tooltipTitle}
-                            className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${cellBgClass} transition-colors duration-150 text-center`}
-                          >
-                            {renderResultSymbol(measDisplay)}
-                          </td>
-                        );
-                        inspectionCells.push(
-                          <td
-                            key={`chkdef-${i}`}
-                            title={tooltipTitle}
-                            className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${cellBgClass} transition-colors duration-150`}
-                          >
-                            {chkdDefDisplay}
-                          </td>
-                        );
-                      } else {
-                        // This garment group is beyond the actual checked_quantity for this record, fill with N/A
-                        for (let k = 0; k < 5; k++) {
-                          inspectionCells.push(
-                            <td
-                              key={`empty-${i}-${k}`}
-                              className="px-1 py-1 text-xs text-gray-700 border border-gray-300"
-                            >
-                              N/A
-                            </td>
+                      const constructTooltipText = (
+                        currentReportDetails,
+                        currentRepItemDetails,
+                        currentOperatorInspectionData,
+                        currentTotalDefectsForOp
+                      ) => {
+                        let defectsString = "Defects Found: None";
+                        const defectsList = [];
+                        if (
+                          currentOperatorInspectionData.rejectGarments &&
+                          currentOperatorInspectionData.rejectGarments.length >
+                            0 &&
+                          currentOperatorInspectionData.rejectGarments[0]
+                            .garments
+                        ) {
+                          currentOperatorInspectionData.rejectGarments[0].garments.forEach(
+                            (garment, garmentIndex) => {
+                              garment.defects.forEach((defect, defectIndex) => {
+                                defectsList.push(
+                                  `  Garment ${garmentIndex + 1}, Defect ${
+                                    defectIndex + 1
+                                  }: ${defect.name} (Qty: ${defect.count})`
+                                );
+                              });
+                            }
                           );
                         }
-                      }
+                        if (defectsList.length > 0) {
+                          defectsString =
+                            "Defects Found:\n" + defectsList.join("\n");
+                        }
+                        const qcId =
+                          currentRepItemDetails?.emp_id ||
+                          currentReportDetails?.emp_id ||
+                          "N/A";
+                        const qcRepName =
+                          currentRepItemDetails?.inspection_rep_name || "N/A";
+
+                        return `Inspection Details:
+                        Date: ${currentReportDetails.inspection_date || "N/A"}
+                        QC ID: ${qcId}
+                        Inspection Rep: ${qcRepName}
+                        Line No: ${currentReportDetails.line_no || "N/A"}
+                        MO No: ${currentReportDetails.mo_no || "N/A"}
+                        ------------------------------
+                        Operator ID: ${
+                          currentOperatorInspectionData.operator_emp_id || "N/A"
+                        }
+                        Operator Name: ${
+                          currentOperatorInspectionData.operator_kh_name ||
+                          currentOperatorInspectionData.operator_eng_name ||
+                          "N/A"
+                        }
+                        Operation: ${
+                          currentOperatorInspectionData.operation_kh_name ||
+                          currentOperatorInspectionData.operation_ch_name ||
+                          "N/A"
+                        }
+                        Machine Code: ${
+                          currentOperatorInspectionData.ma_code || "N/A"
+                        }
+                        ------------------------------
+                        Type: ${currentOperatorInspectionData.type || "N/A"} 
+                        Checked Qty: ${
+                          currentOperatorInspectionData.checked_quantity ||
+                          "N/A"
+                        }
+                        SPI: ${currentOperatorInspectionData.spi || "N/A"} 
+                        Meas: ${
+                          currentOperatorInspectionData.measurement || "N/A"
+                        } 
+                        Total Defects (Op): ${currentTotalDefectsForOp}
+                        Overall Result (Op): ${
+                          currentOperatorInspectionData.qualityStatus || "N/A"
+                        }
+                        Overall Roving Status: ${
+                          currentOperatorInspectionData.overall_roving_status ||
+                          "N/A"
+                        }
+                        ------------------------------
+                        ${defectsString}`;
+                      };
+
+                      const tooltipTitle = constructTooltipText(
+                        operatorSummary.reportTopLevel,
+                        repLevelData,
+                        operatorLevelData,
+                        totalDefectsForThisRep
+                      );
+
+                      const overallStatusForEvent =
+                        operatorLevelData.overall_roving_status;
+                      const repetitionCellBgClass =
+                        getCellBackgroundColorForOverallStatus(
+                          overallStatusForEvent
+                        );
+
+                      allRepInspectionCells.push(
+                        <td
+                          key={`spi-${repKey}`}
+                          title={tooltipTitle}
+                          onClick={() => showDetailsOnTap(tooltipTitle)}
+                          className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 text-center cursor-pointer`}
+                        >
+                          {renderResultSymbol(spiDisplay)}
+                        </td>,
+                        <td
+                          key={`meas-${repKey}`}
+                          title={tooltipTitle}
+                          onClick={() => showDetailsOnTap(tooltipTitle)}
+                          className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 text-center cursor-pointer`}
+                        >
+                          {renderResultSymbol(measDisplay)}
+                        </td>,
+                        <td
+                          key={`chkdef-${repKey}`}
+                          title={tooltipTitle}
+                          onClick={() => showDetailsOnTap(tooltipTitle)}
+                          className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 cursor-pointer text-center`}
+                        >
+                          {chkdDefDisplay}
+                        </td>
+                      );
+                    } else {
+                      // Render 3 empty cells if no data for this repetition
+                      allRepInspectionCells.push(
+                        <td
+                          key={`empty-spi-${repKey}`}
+                          className="px-1 py-1 text-xs text-gray-400 border border-gray-300 text-center"
+                        >
+                          -
+                        </td>,
+                        <td
+                          key={`empty-meas-${repKey}`}
+                          className="px-1 py-1 text-xs text-gray-400 border border-gray-300 text-center"
+                        >
+                          -
+                        </td>,
+                        <td
+                          key={`empty-chkdef-${repKey}`}
+                          className="px-1 py-1 text-xs text-gray-400 border border-gray-300 text-center"
+                        >
+                          -
+                        </td>
+                      );
                     }
-                    return (
-                      <tr
-                        key={`${report.inline_roving_id}-${index}`}
-                        className="hover:bg-gray-50 transition-colors duration-150"
-                      >
-                        <td className="px-2 py-1 text-xs text-gray-700 border border-gray-300">
-                          {data.operator_emp_id || "N/A"}
-                        </td>
-                        <td className="px-2 py-1 text-xs text-gray-700 border border-gray-300">
-                          {data.operation_kh_name ||
-                            data.operation_ch_name ||
-                            "N/A"}
-                        </td>
-                        <td className="px-2 py-1 text-xs text-gray-700 border border-gray-300">
-                          {data.ma_code || "N/A"}
-                        </td>
-                        {inspectionCells}
-                      </tr>
-                    );
-                  })
-                )}
+                  });
+
+                  return (
+                    <tr
+                      key={`${operatorSummary.operator_emp_id}-${operatorSummary.tg_no}-${index}`}
+                      className="hover:bg-gray-50 transition-colors duration-150"
+                    >
+                      <td className="px-2 py-1 text-xs text-gray-700 border border-gray-300">
+                        {operatorSummary.operator_emp_id || "N/A"}
+                      </td>
+                      <td className="px-2 py-1 text-xs text-gray-700 border border-gray-300">
+                        {operatorSummary.operation_kh_name ||
+                          operatorSummary.operation_ch_name ||
+                          "N/A"}
+                      </td>
+                      <td className="px-2 py-1 text-xs text-gray-700 border border-gray-300">
+                        {operatorSummary.ma_code || "N/A"}
+                      </td>
+                      {allRepInspectionCells}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

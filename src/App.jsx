@@ -30,6 +30,7 @@ import WashingPage from "./pages/Washing";
 import DefectTrack from "./pages/DefectTrack.jsx";
 import RovingPage from "./pages/Roving";
 import EmpData from "./pages/EmpData.jsx";
+import SystemAdmin from "./pages/SystemAdmin.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -341,6 +342,7 @@ function AppContent() {
               <Route path="/washing" element={<WashingPage />} />
               <Route path="/roving" element={<RovingPage />} />
               <Route path="/cutting" element={<CuttingPage />} />
+              <Route path="/sysadmin" element={<SystemAdmin />} />
               <Route path="/inline-emp" element={<EmpData />} />
               <Route path="/opa" element={<OPAPage />} />
               <Route path="/packing" element={<PackingPage />} />

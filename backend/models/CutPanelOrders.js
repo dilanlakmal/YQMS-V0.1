@@ -40,6 +40,7 @@ const CutPanelOrdersSchema = new mongoose.Schema({
   TotalTTLQty: { type: Number },
   TotalBiddingQty: { type: Number },
   TotalBiddingRollQty: { type: Number },
+  TotalOrderQtyStyle: { type: Number },
   MarkerRatio: [MarkerRatioSchema]
 });
 

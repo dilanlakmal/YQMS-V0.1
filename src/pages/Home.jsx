@@ -111,6 +111,13 @@ function Home() {
           image: "assets/Home/bundle.avif",
           title: t("SCC"),
           description: "SCC Inspection Check Point"
+        },
+        {
+          path: "/sysadmin",
+          roles: ["Admin", "System Administration"], // Matches "System Administration" role
+          image: "assets/Home/sysadmin.jpg",
+          title: t("home.systemadmin"),
+          description: "Modify Defect & Measurements"
         }
       ]
     },

@@ -36,6 +36,7 @@ import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
 
 import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
+import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
 import createSewingDefectsModel from "./models/SewingDefects.js";
 import createCuttingMeasurementPointModel from "./models/CuttingMeasurementPoints.js"; // New model import
 import createCuttingFabricDefectModel from "./models/CuttingFabricDefects.js";
@@ -160,6 +161,7 @@ const CuttingFabricDefect = createCuttingFabricDefectModel(ymProdConnection);
 const CuttingIssue = createCuttingIssueModel(ymProdConnection);
 const AQLChart = createAQLChartModel(ymProdConnection);
 const SewingDefects = createSewingDefectsModel(ymProdConnection);
+const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -1436,204 +1438,232 @@ async function syncCutPanelOrders() {
     await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
 
     const query = `
-      SELECT 
-        v.StyleNo,
-        v.TxnDate,
-        v.TxnNo,
-        CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer,
-        v.EngColor AS Color,
-        REPLACE(v.PreparedBy, 'SPREAD ', '') AS SpreadTable,
-        v.TableNo,
-        v.BuyerStyle,
-        v.ChColor,
-        v.ColorCode,
-        v.FabricType,
-        v.Material,
-        v.RollQty,
-        ROUND(v.SpreadYds, 3) AS SpreadYds,
-        v.Unit,
-        ROUND(v.GrossKgs, 3) AS GrossKgs,
-        ROUND(v.NetKgs, 3) AS NetKgs,
-        v.MackerNo,
-        ROUND(v.MackerLength, 3) AS MackerLength,
-        v.SendFactory,
-        v.SendTxnDate,
-        v.SendTxnNo,
-        v.SendTotalQty,
-        v.Ratio1 AS CuttingRatio1,
-        v.Ratio2 AS CuttingRatio2,
-        v.Ratio3 AS CuttingRatio3,
-        v.Ratio4 AS CuttingRatio4,
-        v.Ratio5 AS CuttingRatio5,
-        v.Ratio6 AS CuttingRatio6,
-        v.Ratio7 AS CuttingRatio7,
-        v.Ratio8 AS CuttingRatio8,
-        v.Ratio9 AS CuttingRatio9,
-        v.Ratio10 AS CuttingRatio10,
-        MAX(v.PlanLayer) AS PlanLayer,
-        MAX(v.ActualLayer) AS ActualLayer,
-        MAX(v.PlanPcs) AS TotalPcs,
-        STUFF((
-          SELECT DISTINCT ', ' + CAST(s2.Batch AS VARCHAR)
-          FROM [YMWHSYS2].[dbo].[tbSpreading] s2
-          WHERE s2.StyleNo = v.StyleNo
-            AND s2.PreparedBy = v.PreparedBy
-            AND s2.Batch IS NOT NULL
-          FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos,
-        t.Size1,
-        t.Size2,
-        t.Size3,
-        t.Size4,
-        t.Size5,
-        t.Size6,
-        t.Size7,
-        t.Size8,
-        t.Size9,
-        t.Size10,
-        t.OrderQty1,
-        t.OrderQty2,
-        t.OrderQty3,
-        t.OrderQty4,
-        t.OrderQty5,
-        t.OrderQty6,
-        t.OrderQty7,
-        t.OrderQty8,
-        t.OrderQty9,
-        t.OrderQty10,
-        t.TotalOrderQty,
-        t.TotalTTLRoll,
-        t.TotalTTLQty,
-        t.TotalBiddingQty,
-        t.TotalBiddingRollQty
-      FROM [YMWHSYS2].[dbo].[ViewCuttingDetailReport] v
-      LEFT JOIN [YMWHSYS2].[dbo].[tbSpreading] s
+    WITH AggregatedQty AS (
+    SELECT 
+        StyleNo,
+        SUM(ISNULL(Qty1, 0) + ISNULL(Qty2, 0) + ISNULL(Qty3, 0) + ISNULL(Qty4, 0) +
+            ISNULL(Qty5, 0) + ISNULL(Qty6, 0) + ISNULL(Qty7, 0) + ISNULL(Qty8, 0) +
+            ISNULL(Qty9, 0) + ISNULL(Qty10, 0)) AS TotalOrderQtyStyle
+    FROM 
+        [YMWHSYS2].[dbo].[tbOrderQty]
+    WHERE 
+        Dept = 'YMCUTTING' AND FabricType = 'A'
+    GROUP BY 
+        StyleNo
+),
+OrderAggregates AS (
+    SELECT 
+        StyleNo,
+        EngColor,
+        SUM(TTLRoll) AS TotalTTLRoll,
+        SUM(TTLQty) AS TotalTTLQty,
+        SUM(BiddingQty) AS TotalBiddingQty,
+        SUM(BiddingRollQty) AS TotalBiddingRollQty,
+        COALESCE(SUM(Qty1), 0) AS OrderQty1,
+        COALESCE(SUM(Qty2), 0) AS OrderQty2,
+        COALESCE(SUM(Qty3), 0) AS OrderQty3,
+        COALESCE(SUM(Qty4), 0) AS OrderQty4,
+        COALESCE(SUM(Qty5), 0) AS OrderQty5,
+        COALESCE(SUM(Qty6), 0) AS OrderQty6,
+        COALESCE(SUM(Qty7), 0) AS OrderQty7,
+        COALESCE(SUM(Qty8), 0) AS OrderQty8,
+        COALESCE(SUM(Qty9), 0) AS OrderQty9,
+        COALESCE(SUM(Qty10), 0) AS OrderQty10,
+        COALESCE(SUM(Qty1), 0) + COALESCE(SUM(Qty2), 0) + COALESCE(SUM(Qty3), 0) + 
+        COALESCE(SUM(Qty4), 0) + COALESCE(SUM(Qty5), 0) + COALESCE(SUM(Qty6), 0) + 
+        COALESCE(SUM(Qty7), 0) + COALESCE(SUM(Qty8), 0) + COALESCE(SUM(Qty9), 0) + 
+        COALESCE(SUM(Qty10), 0) AS TotalOrderQty
+    FROM 
+        [YMWHSYS2].[dbo].[ViewCuttingOrderReport]
+    WHERE 
+        StyleNo IS NOT NULL AND EngColor IS NOT NULL
+    GROUP BY 
+        StyleNo, 
+        EngColor
+)
+SELECT 
+    v.StyleNo,
+    v.TxnDate,
+    v.TxnNo,
+    CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer,
+    v.EngColor AS Color,
+    REPLACE(v.PreparedBy, 'SPREAD ', '') AS SpreadTable,
+    v.TableNo,
+    v.BuyerStyle,
+    v.ChColor,
+    v.ColorCode,
+    v.FabricType,
+    v.Material,
+    v.RollQty,
+    ROUND(v.SpreadYds, 3) AS SpreadYds,
+    v.Unit,
+    ROUND(v.GrossKgs, 3) AS GrossKgs,
+    ROUND(v.NetKgs, 3) AS NetKgs,
+    v.AMackerNo AS MackerNo,
+    ROUND(v.MackerLength, 3) AS MackerLength,
+    v.SendFactory,
+    v.SendTxnDate,
+    v.SendTxnNo,
+    v.SendTotalQty,
+    v.Ratio1 AS CuttingRatio1,
+    v.Ratio2 AS CuttingRatio2,
+    v.Ratio3 AS CuttingRatio3,
+    v.Ratio4 AS CuttingRatio4,
+    v.Ratio5 AS CuttingRatio5,
+    v.Ratio6 AS CuttingRatio6,
+    v.Ratio7 AS CuttingRatio7,
+    v.Ratio8 AS CuttingRatio8,
+    v.Ratio9 AS CuttingRatio9,
+    v.Ratio10 AS CuttingRatio10,
+    MAX(v.PlanLayer) AS PlanLayer,
+    MAX(v.ActualLayer) AS ActualLayer,
+    MAX(v.PlanPcs) AS TotalPcs,
+    STUFF((
+        SELECT DISTINCT ', ' + CAST(s2.Batch AS VARCHAR)
+        FROM [YMWHSYS2].[dbo].[tbSpreading] s2
+        WHERE s2.StyleNo = v.StyleNo
+          AND s2.PreparedBy = v.PreparedBy
+          AND s2.Batch IS NOT NULL
+        FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos,
+    t.Size1,
+    t.Size2,
+    t.Size3,
+    t.Size4,
+    t.Size5,
+    t.Size6,
+    t.Size7,
+    t.Size8,
+    t.Size9,
+    t.Size10,
+    t.OrderQty1,
+    t.OrderQty2,
+    t.OrderQty3,
+    t.OrderQty4,
+    t.OrderQty5,
+    t.OrderQty6,
+    t.OrderQty7,
+    t.OrderQty8,
+    t.OrderQty9,
+    t.OrderQty10,
+    t.TotalOrderQty,
+    t.TotalTTLRoll,
+    t.TotalTTLQty,
+    t.TotalBiddingQty,
+    t.TotalBiddingRollQty,
+    agg.TotalOrderQtyStyle
+FROM 
+    [YMWHSYS2].[dbo].[ViewCuttingDetailReport] v
+    LEFT JOIN [YMWHSYS2].[dbo].[tbSpreading] s
         ON v.StyleNo = s.StyleNo
         AND v.PreparedBy = s.PreparedBy
-      LEFT JOIN (
+    LEFT JOIN (
         SELECT DISTINCT
-          t.StyleNo,
-          t.EngColor AS Color,
-          t.Size1,
-          t.Size2,
-          t.Size3,
-          t.Size4,
-          t.Size5,
-          t.Size6,
-          t.Size7,
-          t.Size8,
-          t.Size9,
-          t.Size10,
-          agg.OrderQty1,
-          agg.OrderQty2,
-          agg.OrderQty3,
-          agg.OrderQty4,
-          agg.OrderQty5,
-          agg.OrderQty6,
-          agg.OrderQty7,
-          agg.OrderQty8,
-          agg.OrderQty9,
-          agg.OrderQty10,
-          agg.TotalOrderQty,
-          agg.TotalTTLRoll,
-          agg.TotalTTLQty,
-          agg.TotalBiddingQty,
-          agg.TotalBiddingRollQty
-        FROM [YMWHSYS2].[dbo].[ViewCuttingOrderReport] t
-        LEFT JOIN (
-          SELECT 
-            StyleNo,
-            EngColor,
-            SUM(TTLRoll) AS TotalTTLRoll,
-            SUM(TTLQty) AS TotalTTLQty,
-            SUM(BiddingQty) AS TotalBiddingQty,
-            SUM(BiddingRollQty) AS TotalBiddingRollQty,
-            COALESCE(SUM(Qty1), 0) AS OrderQty1,
-            COALESCE(SUM(Qty2), 0) AS OrderQty2,
-            COALESCE(SUM(Qty3), 0) AS OrderQty3,
-            COALESCE(SUM(Qty4), 0) AS OrderQty4,
-            COALESCE(SUM(Qty5), 0) AS OrderQty5,
-            COALESCE(SUM(Qty6), 0) AS OrderQty6,
-            COALESCE(SUM(Qty7), 0) AS OrderQty7,
-            COALESCE(SUM(Qty8), 0) AS OrderQty8,
-            COALESCE(SUM(Qty9), 0) AS OrderQty9,
-            COALESCE(SUM(Qty10), 0) AS OrderQty10,
-            COALESCE(SUM(Qty1), 0) + COALESCE(SUM(Qty2), 0) + COALESCE(SUM(Qty3), 0) + 
-            COALESCE(SUM(Qty4), 0) + COALESCE(SUM(Qty5), 0) + COALESCE(SUM(Qty6), 0) + 
-            COALESCE(SUM(Qty7), 0) + COALESCE(SUM(Qty8), 0) + COALESCE(SUM(Qty9), 0) + 
-            COALESCE(SUM(Qty10), 0) AS TotalOrderQty
-          FROM [YMWHSYS2].[dbo].[ViewCuttingOrderReport]
-          WHERE StyleNo IS NOT NULL AND EngColor IS NOT NULL
-          GROUP BY StyleNo, EngColor
-        ) agg
-          ON t.StyleNo = agg.StyleNo
-          AND t.EngColor = agg.EngColor
+            t.StyleNo,
+            t.EngColor AS Color,
+            t.Size1,
+            t.Size2,
+            t.Size3,
+            t.Size4,
+            t.Size5,
+            t.Size6,
+            t.Size7,
+            t.Size8,
+            t.Size9,
+            t.Size10,
+            agg.OrderQty1,
+            agg.OrderQty2,
+            agg.OrderQty3,
+            agg.OrderQty4,
+            agg.OrderQty5,
+            agg.OrderQty6,
+            agg.OrderQty7,
+            agg.OrderQty8,
+            agg.OrderQty9,
+            agg.OrderQty10,
+            agg.TotalOrderQty,
+            agg.TotalTTLRoll,
+            agg.TotalTTLQty,
+            agg.TotalBiddingQty,
+            agg.TotalBiddingRollQty
+        FROM 
+            [YMWHSYS2].[dbo].[ViewCuttingOrderReport] t
+            LEFT JOIN OrderAggregates agg
+                ON t.StyleNo = agg.StyleNo
+                AND t.EngColor = agg.EngColor
         WHERE 
-          t.StyleNo IS NOT NULL
-          AND t.EngColor IS NOT NULL
-      ) t
+            t.StyleNo IS NOT NULL
+            AND t.EngColor IS NOT NULL
+    ) t
         ON v.StyleNo = t.StyleNo
         AND v.EngColor = t.Color
-      WHERE v.TableNo IS NOT NULL AND v.TableNo <> '' AND v.TxnDate >= CAST(DATEADD(DAY, -7, GETDATE()) AS DATE)
-      GROUP BY 
-        v.StyleNo,
-        v.TxnDate,
-        v.TxnNo,
-        v.Buyer,
-        v.EngColor,
-        v.PreparedBy,
-        v.TableNo,
-        v.BuyerStyle,
-        v.ChColor,
-        v.ColorCode,
-        v.FabricType,
-        v.Material,
-        v.RollQty,
-        v.SpreadYds,
-        v.Unit,
-        v.GrossKgs,
-        v.NetKgs,
-        v.MackerNo,
-        v.MackerLength,
-        v.SendFactory,
-        v.SendTxnDate,
-        v.SendTxnNo,
-        v.SendTotalQty,
-        v.Ratio1,
-        v.Ratio2,
-        v.Ratio3,
-        v.Ratio4,
-        v.Ratio5,
-        v.Ratio6,
-        v.Ratio7,
-        v.Ratio8,
-        v.Ratio9,
-        v.Ratio10,
-        t.Size1,
-        t.Size2,
-        t.Size3,
-        t.Size4,
-        t.Size5,
-        t.Size6,
-        t.Size7,
-        t.Size8,
-        t.Size9,
-        t.Size10,
-        t.OrderQty1,
-        t.OrderQty2,
-        t.OrderQty3,
-        t.OrderQty4,
-        t.OrderQty5,
-        t.OrderQty6,
-        t.OrderQty7,
-        t.OrderQty8,
-        t.OrderQty9,
-        t.OrderQty10,
-        t.TotalOrderQty,
-        t.TotalTTLRoll,
-        t.TotalTTLQty,
-        t.TotalBiddingQty,
-        t.TotalBiddingRollQty
-      ORDER BY v.TxnDate DESC
+    LEFT JOIN AggregatedQty agg
+        ON v.StyleNo = agg.StyleNo
+WHERE 
+    v.TableNo IS NOT NULL 
+    AND v.TableNo <> '' 
+    AND v.TxnDate >= CAST(DATEADD(DAY, -7, GETDATE()) AS DATE)
+GROUP BY 
+    v.StyleNo,
+    v.TxnDate,
+    v.TxnNo,
+    v.Buyer,
+    v.EngColor,
+    v.PreparedBy,
+    v.TableNo,
+    v.BuyerStyle,
+    v.ChColor,
+    v.ColorCode,
+    v.FabricType,
+    v.Material,
+    v.RollQty,
+    v.SpreadYds,
+    v.Unit,
+    v.GrossKgs,
+    v.NetKgs,
+    v.AMackerNo,
+    v.MackerLength,
+    v.SendFactory,
+    v.SendTxnDate,
+    v.SendTxnNo,
+    v.SendTotalQty,
+    v.Ratio1,
+    v.Ratio2,
+    v.Ratio3,
+    v.Ratio4,
+    v.Ratio5,
+    v.Ratio6,
+    v.Ratio7,
+    v.Ratio8,
+    v.Ratio9,
+    v.Ratio10,
+    t.Size1,
+    t.Size2,
+    t.Size3,
+    t.Size4,
+    t.Size5,
+    t.Size6,
+    t.Size7,
+    t.Size8,
+    t.Size9,
+    t.Size10,
+    t.OrderQty1,
+    t.OrderQty2,
+    t.OrderQty3,
+    t.OrderQty4,
+    t.OrderQty5,
+    t.OrderQty6,
+    t.OrderQty7,
+    t.OrderQty8,
+    t.OrderQty9,
+    t.OrderQty10,
+    t.TotalOrderQty,
+    t.TotalTTLRoll,
+    t.TotalTTLQty,
+    t.TotalBiddingQty,
+    t.TotalBiddingRollQty,
+    agg.TotalOrderQtyStyle
+ORDER BY 
+    v.TxnDate DESC;
     `;
 
     const result = await poolYMWHSYS2.request().query(query);
@@ -1702,6 +1732,7 @@ async function syncCutPanelOrders() {
               TotalTTLQty: row.TotalTTLQty,
               TotalBiddingQty: row.TotalBiddingQty,
               TotalBiddingRollQty: row.TotalBiddingRollQty,
+              TotalOrderQtyStyle: row.TotalOrderQtyStyle,
               MarkerRatio: markerRatio
             }
           },
@@ -1936,33 +1967,16 @@ app.get("/api/cutpanel-orders/aggregated-total-order-qty", async (req, res) => {
       return res.status(400).json({ error: "StyleNo (MO No) is required" });
     }
 
-    const aggregationPipeline = [
-      {
-        $match: { StyleNo: styleNo } // Filter by the specific StyleNo
-      },
-      {
-        $group: {
-          _id: { styleNo: "$StyleNo", color: "$Color" }, // Group by StyleNo and Color
-          // Assuming TotalOrderQty is the same for all records of a given StyleNo+Color.
-          // If not, and you want the sum per StyleNo+Color, use $sum: '$TotalOrderQty' here.
-          // But for the final sum across colors, we need one value per color.
-          uniqueTotalOrderQtyForColor: { $first: "$TotalOrderQty" }
-        }
-      },
-      {
-        $group: {
-          _id: "$_id.styleNo", // Group again by StyleNo (effectively just one group now)
-          aggregatedTotal: { $sum: "$uniqueTotalOrderQtyForColor" } // Sum the unique TotalOrderQty for each color
-        }
-      }
-    ];
+    // Find one document matching the StyleNo and project only TotalOrderQtyStyle
+    const result = await CutPanelOrders.findOne(
+      { StyleNo: styleNo },
+      { TotalOrderQtyStyle: 1 }
+    );
 
-    const result = await CutPanelOrders.aggregate(aggregationPipeline);
-
-    if (result.length > 0) {
-      res.json({ aggregatedTotalOrderQty: result[0].aggregatedTotal });
+    if (result && result.TotalOrderQtyStyle !== undefined) {
+      res.json({ aggregatedTotalOrderQty: result.TotalOrderQtyStyle });
     } else {
-      // If no matching StyleNo, or no orders, return 0 or an appropriate message
+      // If no matching StyleNo or TotalOrderQtyStyle is undefined, return 0
       res.json({ aggregatedTotalOrderQty: 0 });
     }
   } catch (err) {
@@ -1973,6 +1987,51 @@ app.get("/api/cutpanel-orders/aggregated-total-order-qty", async (req, res) => {
     });
   }
 });
+
+// app.get("/api/cutpanel-orders/aggregated-total-order-qty", async (req, res) => {
+//   try {
+//     const { styleNo } = req.query;
+//     if (!styleNo) {
+//       return res.status(400).json({ error: "StyleNo (MO No) is required" });
+//     }
+
+//     const aggregationPipeline = [
+//       {
+//         $match: { StyleNo: styleNo } // Filter by the specific StyleNo
+//       },
+//       {
+//         $group: {
+//           _id: { styleNo: "$StyleNo", color: "$Color" }, // Group by StyleNo and Color
+//           // Assuming TotalOrderQty is the same for all records of a given StyleNo+Color.
+//           // If not, and you want the sum per StyleNo+Color, use $sum: '$TotalOrderQty' here.
+//           // But for the final sum across colors, we need one value per color.
+//           uniqueTotalOrderQtyForColor: { $first: "$TotalOrderQty" }
+//         }
+//       },
+//       {
+//         $group: {
+//           _id: "$_id.styleNo", // Group again by StyleNo (effectively just one group now)
+//           aggregatedTotal: { $sum: "$uniqueTotalOrderQtyForColor" } // Sum the unique TotalOrderQty for each color
+//         }
+//       }
+//     ];
+
+//     const result = await CutPanelOrders.aggregate(aggregationPipeline);
+
+//     if (result.length > 0) {
+//       res.json({ aggregatedTotalOrderQty: result[0].aggregatedTotal });
+//     } else {
+//       // If no matching StyleNo, or no orders, return 0 or an appropriate message
+//       res.json({ aggregatedTotalOrderQty: 0 });
+//     }
+//   } catch (err) {
+//     console.error("Error fetching aggregated total order quantity:", err);
+//     res.status(500).json({
+//       message: "Failed to fetch aggregated total order quantity",
+//       error: err.message
+//     });
+//   }
+// });
 
 /* ------------------------------
    Updated Endpoints for Cutting.jsx
@@ -6918,6 +6977,8 @@ app.get("/api/opa-autocomplete", async (req, res) => {
 /* ------------------------------
    QC Inline Roving New
 ------------------------------ */
+
+//get the each line related working worker count
 app.get("/api/line-summary", async (req, res) => {
   try {
     const lineSummaries = await UserMain.aggregate([
@@ -6938,23 +6999,24 @@ app.get("/api/line-summary", async (req, res) => {
         $project: {
           _id: 0,
           line_no: "$_id",
-          // worker_count: 1
           real_worker_count: "$worker_count"
         }
       },
       { $sort: { line_no: 1 } }
     ]);
+
     const editedCountsDocs = await LineSewingWorker.find(
       {},
       "line_no edited_worker_count"
     ).lean();
+
     const editedCountsMap = new Map(
       editedCountsDocs.map((doc) => [doc.line_no, doc.edited_worker_count])
     );
 
     const mergedSummaries = lineSummaries.map((realSummary) => ({
       ...realSummary,
-      edited_worker_count: editedCountsMap.get(realSummary.line_no) // Can be undefined if no edit
+      edited_worker_count: editedCountsMap.get(realSummary.line_no)
     }));
 
     res.json(mergedSummaries);
@@ -6967,16 +7029,10 @@ app.get("/api/line-summary", async (req, res) => {
   }
 });
 
-// New PUT endpoint to save/update edited line worker counts
+//Edit the line worker count
 app.put("/api/line-sewing-workers/:lineNo", async (req, res) => {
-  // Assuming authenticateUser middleware sets req.user
   const { lineNo } = req.params;
   const { edited_worker_count } = req.body;
-
-  // Placeholder for user details if authentication is not fully set up yet
-  // In a real app, req.user would be populated by an authentication middleware
-  // const user = req.user || { emp_id: 'SYSTEM_USER', eng_name: 'System Edit' };
-  // const { emp_id: updated_by_emp_id, eng_name: updated_by_name } = user;
 
   if (
     typeof edited_worker_count !== "number" ||
@@ -6987,20 +7043,19 @@ app.put("/api/line-sewing-workers/:lineNo", async (req, res) => {
       .status(400)
       .json({ message: "Edited worker count must be a non-negative integer." });
   }
-
   try {
     const now = new Date();
     const realCountResult = await UserMain.aggregate([
       {
         $match: {
-          sect_name: lineNo, // Match the specific line number
+          sect_name: lineNo,
           working_status: "Working",
           job_title: "Sewing Worker"
         }
       },
       {
         $group: {
-          _id: null, // Group all matching documents for this line
+          _id: null,
           count: { $sum: 1 }
         }
       }
@@ -7008,10 +7063,9 @@ app.put("/api/line-sewing-workers/:lineNo", async (req, res) => {
 
     const current_real_worker_count =
       realCountResult.length > 0 ? realCountResult[0].count : 0;
+
     const historyEntry = {
       edited_worker_count,
-      // updated_by_emp_id,
-      // updated_by_name,
       updated_at: now
     };
 
@@ -7021,13 +7075,11 @@ app.put("/api/line-sewing-workers/:lineNo", async (req, res) => {
         $set: {
           real_worker_count: current_real_worker_count,
           edited_worker_count,
-          // updated_by_emp_id,
-          // updated_by_name,
           updated_at: now
         },
-        $push: { history: historyEntry } // Push the new state to history
+        $push: { history: historyEntry }
       },
-      { new: true, upsert: true, runValidators: true } // upsert: true creates if not found
+      { new: true, upsert: true, runValidators: true }
     );
 
     res.json({
@@ -7045,38 +7097,24 @@ app.put("/api/line-sewing-workers/:lineNo", async (req, res) => {
     });
   }
 });
-
-// Updated endpoint to save or update QC Inline Roving data
+//Save the inline Roving data
 app.post("/api/save-qc-inline-roving", async (req, res) => {
   try {
-    // const qcInlineRovingData = req.body;
-
-    // Create a new instance of the QCInlineRoving model with the data from the request body
-    // const newQCInlineRoving = new QCInlineRoving(qcInlineRovingData);
-
-    // Save the new QCInlineRoving document to the database
-    // await newQCInlineRoving.save();
-
-    // res.status(201).json({
-    //   message: "QC Inline Roving data saved successfully",
-    //   data: newQCInlineRoving
-    // });
-
     const {
       inspection_date,
       mo_no,
       line_no,
-      report_name, // Optional: for creating a new report or updating an existing one
-      inspection_rep_item // The actual inspection data for the current round
+      report_name,
+      inspection_rep_item
     } = req.body;
 
-    // Validate essential data
     if (!inspection_date || !mo_no || !line_no || !inspection_rep_item) {
       return res.status(400).json({
         message:
           "Missing required fields: inspection_date, mo_no, line_no, or inspection_rep_item."
       });
     }
+
     if (
       typeof inspection_rep_item !== "object" ||
       inspection_rep_item === null
@@ -7085,6 +7123,7 @@ app.post("/api/save-qc-inline-roving", async (req, res) => {
         .status(400)
         .json({ message: "inspection_rep_item must be a valid object." });
     }
+
     if (
       !inspection_rep_item.inspection_rep_name ||
       !inspection_rep_item.emp_id ||
@@ -7099,7 +7138,6 @@ app.post("/api/save-qc-inline-roving", async (req, res) => {
     let doc = await QCInlineRoving.findOne({ inspection_date, mo_no, line_no });
 
     if (doc) {
-      // Document exists
       const existingRepIndex = doc.inspection_rep.findIndex(
         (rep) =>
           rep.inspection_rep_name === inspection_rep_item.inspection_rep_name
@@ -7108,12 +7146,10 @@ app.post("/api/save-qc-inline-roving", async (req, res) => {
       if (existingRepIndex !== -1) {
         const repToUpdate = doc.inspection_rep[existingRepIndex];
 
-        // Ensure inlineData is an array
         if (!Array.isArray(repToUpdate.inlineData)) {
           repToUpdate.inlineData = [];
         }
 
-        // inspection_rep_item.inlineData from the request is an array with a single element: [singleOperatorInspectionData]
         if (
           inspection_rep_item.inlineData &&
           inspection_rep_item.inlineData.length > 0
@@ -7121,33 +7157,30 @@ app.post("/api/save-qc-inline-roving", async (req, res) => {
           repToUpdate.inlineData.push(inspection_rep_item.inlineData[0]);
         }
 
-        // Update summary fields from the request (frontend calculates these cumulatively)
         repToUpdate.inspection_rep_name =
-          inspection_rep_item.inspection_rep_name; // Should match
-        repToUpdate.emp_id = inspection_rep_item.emp_id; // Inspector for this rep
-        repToUpdate.eng_name = inspection_rep_item.eng_name; // Inspector for this rep
-        repToUpdate.total_operators = inspection_rep_item.total_operators; // Assumed correct from frontend for the line
-        repToUpdate.complete_inspect_operators = repToUpdate.inlineData.length; // Calculated by backend
+          inspection_rep_item.inspection_rep_name;
+        repToUpdate.emp_id = inspection_rep_item.emp_id;
+        repToUpdate.eng_name = inspection_rep_item.eng_name;
+        repToUpdate.complete_inspect_operators = repToUpdate.inlineData.length;
         repToUpdate.Inspect_status =
           repToUpdate.total_operators > 0 &&
           repToUpdate.complete_inspect_operators >= repToUpdate.total_operators
             ? "Completed"
             : "Not Complete";
       } else {
-        // Add new inspection_rep item if array is not full
         if (doc.inspection_rep.length < 5) {
-          const newRepItem = { ...inspection_rep_item }; // Copy from request
+          const newRepItem = { ...inspection_rep_item };
           if (!Array.isArray(newRepItem.inlineData)) {
-            // Ensure inlineData is an array
             newRepItem.inlineData = [];
           }
-          // Backend calculates these for the new rep item
+
           newRepItem.complete_inspect_operators = newRepItem.inlineData.length;
           newRepItem.Inspect_status =
             newRepItem.total_operators > 0 &&
             newRepItem.complete_inspect_operators >= newRepItem.total_operators
               ? "Completed"
               : "Not Complete";
+
           doc.inspection_rep.push(newRepItem);
         } else {
           return res.status(400).json({
@@ -7167,21 +7200,20 @@ app.post("/api/save-qc-inline-roving", async (req, res) => {
         data: doc
       });
     } else {
-      // Document does not exist, create a new one
       const lastDoc = await QCInlineRoving.findOne()
         .sort({ inline_roving_id: -1 })
         .select("inline_roving_id");
+
       const newId =
         lastDoc && typeof lastDoc.inline_roving_id === "number"
           ? lastDoc.inline_roving_id + 1
           : 1;
 
-      const initialRepItem = { ...inspection_rep_item }; // Copy from request
+      const initialRepItem = { ...inspection_rep_item };
       if (!Array.isArray(initialRepItem.inlineData)) {
-        // Ensure inlineData is an array
         initialRepItem.inlineData = [];
       }
-      // Backend calculates these for the initial rep item
+
       initialRepItem.complete_inspect_operators =
         initialRepItem.inlineData.length;
       initialRepItem.Inspect_status =
@@ -7199,8 +7231,9 @@ app.post("/api/save-qc-inline-roving", async (req, res) => {
         inspection_date,
         mo_no,
         line_no,
-        inspection_rep: [initialRepItem] // Start with the current rep
+        inspection_rep: [initialRepItem]
       });
+
       await newQCInlineRovingDoc.save();
       res.status(201).json({
         message:
@@ -7209,71 +7242,63 @@ app.post("/api/save-qc-inline-roving", async (req, res) => {
       });
     }
   } catch (error) {
-    // console.error("Error saving QC Inline Roving data:", error);
     console.error("Error saving/updating QC Inline Roving data:", error);
     res.status(500).json({
-      // message: "Failed to save QC Inline Roving data",
       message: "Failed to save/update QC Inline Roving data",
       error: error.message
     });
   }
 });
 
-// Helper function to get ordinal string (1st, 2nd, 3rd, etc.)
 function getOrdinal(n) {
   if (n <= 0) return String(n);
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0] || "th"); // Added "th" as a final fallback
+  return n + (s[(v - 20) % 10] || s[v] || s[0] || "th");
 }
 
-// Endpoint to get the current inspection time ordinal (1st, 2nd, etc.)
+//Get the inspection Number
 app.get("/api/qc-inline-roving/inspection-time-info", async (req, res) => {
   try {
     const { line_no, inspection_date } = req.query;
-
     if (!line_no || !inspection_date) {
       return res
         .status(400)
         .json({ message: "Line number and inspection date are required." });
     }
-
-    // Validate date format (MM/DD/YYYY) - Adjust if your frontend sends a different format
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(inspection_date)) {
       return res.status(400).json({
         message: "Invalid inspection date format. Expected MM/DD/YYYY."
       });
     }
 
-    // 1. Fetch Target Worker Count from LineSewingWorker
     const lineWorkerInfo = await LineSewingWorker.findOne({ line_no });
+
     if (!lineWorkerInfo) {
       return res.json({ inspectionTimeOrdinal: "N/A (Line not configured)" });
     }
-    // Prioritize edited_worker_count, it's required in the schema so should exist.
+
     const target_worker_count = lineWorkerInfo.edited_worker_count;
 
     if (target_worker_count === 0) {
       return res.json({ inspectionTimeOrdinal: "N/A (Target 0 workers)" });
     }
 
-    // 2. Fetch QC Roving Data for the given line and date
     const rovingRecords = await QCInlineRoving.find({
       line_no: line_no,
-      inspection_date: inspection_date // Assumes inspection_date in DB is MM/DD/YYYY
+      inspection_date: inspection_date
     });
 
     if (rovingRecords.length === 0) {
-      return res.json({ inspectionTimeOrdinal: getOrdinal(1) }); // "1st"
+      return res.json({ inspectionTimeOrdinal: getOrdinal(1) });
     }
 
-    // 3. Process Roving Data to count inspections per operator
     const operatorInspectionCounts = {};
+
     rovingRecords.forEach((record) => {
       record.inlineData.forEach((entry) => {
         const operatorId = entry.operator_emp_id;
         if (operatorId) {
-          // Ensure operatorId is valid
           operatorInspectionCounts[operatorId] =
             (operatorInspectionCounts[operatorId] || 0) + 1;
         }
@@ -7281,18 +7306,20 @@ app.get("/api/qc-inline-roving/inspection-time-info", async (req, res) => {
     });
 
     if (Object.keys(operatorInspectionCounts).length === 0) {
-      return res.json({ inspectionTimeOrdinal: getOrdinal(1) }); // "1st" if records exist but no valid operator data
+      return res.json({ inspectionTimeOrdinal: getOrdinal(1) });
     }
 
-    // 4. Calculate Completed Rounds
     let completed_rounds = 0;
+
     for (let round_num = 1; round_num <= 5; round_num++) {
       let operators_finished_this_round = 0;
+
       for (const operator_id in operatorInspectionCounts) {
         if (operatorInspectionCounts[operator_id] >= round_num) {
           operators_finished_this_round++;
         }
       }
+
       if (operators_finished_this_round >= target_worker_count) {
         completed_rounds = round_num;
       } else {
@@ -7301,6 +7328,7 @@ app.get("/api/qc-inline-roving/inspection-time-info", async (req, res) => {
     }
 
     const current_inspection_time_number = completed_rounds + 1;
+
     const ordinal =
       current_inspection_time_number > 5
         ? `${getOrdinal(5)} (Completed)`
@@ -7316,6 +7344,7 @@ app.get("/api/qc-inline-roving/inspection-time-info", async (req, res) => {
   }
 });
 
+//Get the completed inspect operators
 app.get("/api/inspections-completed", async (req, res) => {
   const { line_no, inspection_date, mo_no, operation_id, inspection_rep_name } =
     req.query;
@@ -7331,8 +7360,9 @@ app.get("/api/inspections-completed", async (req, res) => {
     }
 
     const elemMatchConditions = { inspection_rep_name };
+
     if (operation_id) {
-      elemMatchConditions["inlineData.tg_no"] = operation_id; // Assuming operation_id maps to tg_no
+      elemMatchConditions["inlineData.tg_no"] = operation_id;
     }
 
     findQuery.inspection_rep = { $elemMatch: elemMatchConditions };
@@ -7340,19 +7370,17 @@ app.get("/api/inspections-completed", async (req, res) => {
     const inspection = await QCInlineRoving.findOne(findQuery);
 
     if (!inspection) {
-      // return res.status(404).json({ message: 'Inspection not found' });
       return res.json({ completeInspectOperators: 0 });
     }
 
-    // Find the specific inspection_rep entry that matches the request
     const specificRep = inspection.inspection_rep.find(
       (rep) => rep.inspection_rep_name === inspection_rep_name
     );
 
     if (!specificRep) {
-      // This case should ideally not be reached if $elemMatch worked and data is consistent
       return res.json({ completeInspectOperators: 0 });
     }
+
     const completeInspectOperators =
       specificRep.complete_inspect_operators || 0;
 
@@ -7363,20 +7391,21 @@ app.get("/api/inspections-completed", async (req, res) => {
   }
 });
 
+// Roving data filter function
 app.get("/api/qc-inline-roving-reports/filtered", async (req, res) => {
   try {
     const { inspection_date, qcId, operatorId, lineNo, moNo } = req.query;
+
     let queryConditions = {};
 
     if (inspection_date) {
       if (/^\d{2}\/\d{2}\/\d{4}$/.test(inspection_date)) {
         const parts = inspection_date.split("/");
+
         const month = parseInt(parts[0], 10);
         const day = parseInt(parts[1], 10);
         const year = parseInt(parts[2], 10);
 
-        // Construct a regex to match M/D/YYYY, MM/D/YYYY, M/DD/YYYY, MM/DD/YYYY
-        // e.g., for "05/08/2025", monthRegexPart = "0?5", dayRegexPart = "0?8"
         const monthRegexPart = month < 10 ? `0?${month}` : `${month}`;
         const dayRegexPart = day < 10 ? `0?${day}` : `${day}`;
 
@@ -7406,8 +7435,7 @@ app.get("/api/qc-inline-roving-reports/filtered", async (req, res) => {
     }
 
     if (operatorId) {
-      const orConditions = [{ operator_emp_id: operatorId }]; // Match as string
-      // If operatorId is purely numeric, also try matching as a number
+      const orConditions = [{ operator_emp_id: operatorId }];
       if (/^\d+$/.test(operatorId)) {
         orConditions.push({ operator_emp_id: parseInt(operatorId, 10) });
       }
@@ -7415,6 +7443,7 @@ app.get("/api/qc-inline-roving-reports/filtered", async (req, res) => {
     }
 
     const reports = await QCInlineRoving.find(queryConditions);
+
     res.json(reports);
   } catch (error) {
     console.error("Error fetching filtered QC inline roving reports:", error);
@@ -7425,64 +7454,44 @@ app.get("/api/qc-inline-roving-reports/filtered", async (req, res) => {
   }
 });
 
-// Helper to sanitize inputs for filenames/paths to prevent path traversal and invalid characters
 const sanitize = (input) => {
   if (typeof input !== "string") input = String(input);
-  // Remove potentially harmful characters, allow alphanumeric, hyphens, underscores
   let sane = input.replace(/[^a-zA-Z0-9-_]/g, "_");
-  // Prevent names like "." or ".."
   if (sane === "." || sane === "..") return "_";
   return sane;
 };
 
-// Multer setup for memory storage (we'll write to disk manually)
 const rovingStorage = multer.memoryStorage();
+
 const rovingUpload = multer({
   storage: rovingStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit per file
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedExtensions = /^(jpeg|jpg|png|gif)$/i;
-    const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i; // pjpeg for some older browsers
-
-    // Get extension without dot, and lowercase
+    const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i;
     const fileExt = path.extname(file.originalname).toLowerCase().substring(1);
     const isExtAllowed = allowedExtensions.test(fileExt);
-    // Lowercase mimetype for robust comparison
     const isMimeAllowed = allowedMimeTypes.test(file.mimetype.toLowerCase());
-
     if (isMimeAllowed && isExtAllowed) {
-      cb(null, true); // Accept the file
+      cb(null, true);
     } else {
-      // THIS IS THE CRUCIAL LOG TO CHECK ON YOUR SERVER CONSOLE:
       console.error(
         `File rejected by filter: name='${file.originalname}', mime='${file.mimetype}', ext='${fileExt}'. IsMimeAllowed: ${isMimeAllowed}, IsExtAllowed: ${isExtAllowed}`
       );
-      cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)")); // Reject the file
+      cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)"));
     }
   }
 });
 
-// ... rest of your server.js ...
-
-// Your route handler for image upload
+//Roving image upload
 app.post(
   "/api/roving/upload-roving-image",
   rovingUpload.single("imageFile"),
   async (req, res) => {
     try {
       const { imageType, date, lineNo, moNo, operationId } = req.body;
-      const imageFile = req.file; // This will be undefined if fileFilter rejected the file
-
-      // This log was added in a previous step, it's helpful to see what the route receives
-      // console.log('Backend /upload-roving-image received:', {
-      //     file: imageFile ? { originalname: imageFile.originalname, mimetype: imageFile.mimetype, size: imageFile.size } : 'No file object',
-      //     body: req.body,
-      //     fileValidationError: req.fileValidationError // Multer might attach error here
-      // });
-
+      const imageFile = req.file;
       if (!imageFile) {
-        // If fileFilter called cb(new Error(...)), Multer usually sets req.fileValidationError
-        // or the error from fileFilter is caught in the main catch block.
         const errorMessage =
           req.fileValidationError ||
           (req.multerError && req.multerError.message) ||
@@ -7490,7 +7499,6 @@ app.post(
         return res.status(400).json({ success: false, message: errorMessage });
       }
 
-      // Metadata validation
       if (
         !date ||
         !lineNo ||
@@ -7506,6 +7514,7 @@ app.post(
             "Missing or invalid required metadata: date, lineNo, moNo, operationId must be actual values."
         });
       }
+
       if (
         !imageType ||
         !["spi", "measurement"].includes(imageType.toLowerCase())
@@ -7530,7 +7539,6 @@ app.post(
         "roving",
         upperImageType
       );
-
       await fsPromises.mkdir(targetDir, { recursive: true });
 
       const imagePrefix = `${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
@@ -7544,7 +7552,6 @@ app.post(
         });
       } catch (readDirError) {
         if (readDirError.code !== "ENOENT") {
-          // Ignore if directory doesn't exist yet
           console.error(
             "Error reading directory for indexing:",
             targetDir,
@@ -7552,39 +7559,181 @@ app.post(
           );
         }
       }
+
       const imageIndex = existingImageCount + 1;
-
-      // if (imageIndex > 5) { // Max 5 images per context
-      //      return res.status(400).json({ success: false, message: 'Maximum 5 images allowed for this context.' });
-      // }
-
       const fileExtension = path.extname(imageFile.originalname);
       const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
       const filePathInPublic = path.join(targetDir, newFilename);
-
       await fsPromises.writeFile(filePathInPublic, imageFile.buffer);
-      const publicUrl = `/storage/roving/${upperImageType}/${newFilename}`; // Relative URL for client
-
+      const publicUrl = `/storage/roving/${upperImageType}/${newFilename}`;
       res.json({ success: true, filePath: publicUrl, filename: newFilename });
     } catch (error) {
       console.error("Error uploading roving image:", error);
-      // Check if the error is from Multer's fileFilter specifically
       if (error.message && error.message.startsWith("Error: Images Only!")) {
         return res.status(400).json({ success: false, message: error.message });
       }
-      // Handle other Multer errors (like file size limit)
       if (error instanceof multer.MulterError) {
         return res
           .status(400)
           .json({ success: false, message: `Multer error: ${error.message}` });
       }
-      // Generic server error
       res
         .status(500)
         .json({ success: false, message: "Server error during image upload." });
     }
   }
 );
+
+// Endpoint for get the buyer status
+app.get("/api/buyer-by-mo", (req, res) => {
+  const { moNo } = req.query;
+  if (!moNo) {
+    return res.status(400).json({ message: "MO number is required" });
+  }
+  const buyerName = determineBuyer(moNo);
+  res.json({ buyerName });
+});
+
+/* ------------------------------
+   Defect Buyer Status ENDPOINTS
+------------------------------ */
+
+// Endpoint for /api/defects/all-details
+app.get("/api/defects/all-details", async (req, res) => {
+  try {
+    const defects = await SewingDefects.find({}).lean();
+    const transformedDefects = defects.map((defect) => ({
+      code: defect.code.toString(),
+      name_en: defect.english,
+      name_kh: defect.khmer,
+      name_ch: defect.chinese,
+      categoryEnglish: defect.categoryEnglish,
+      type: defect.type,
+      repair: defect.repair,
+      statusByBuyer: defect.statusByBuyer || []
+    }));
+    res.json(transformedDefects);
+  } catch (error) {
+    console.error("Error fetching all defect details:", error);
+    res.status(500).json({
+      message: "Failed to fetch defect details",
+      error: error.message
+    });
+  }
+});
+
+// Endpoint for /api/buyers
+app.get("/api/buyers", (req, res) => {
+  const buyers = ["Costco", "Aritzia", "Reitmans", "ANF", "MWW"];
+  res.json(buyers);
+});
+
+// New Endpoint for updating buyer statuses in SewingDefects
+app.post("/api/sewing-defects/buyer-statuses", async (req, res) => {
+  try {
+    const statusesPayload = req.body;
+    if (!Array.isArray(statusesPayload)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid payload: Expected an array of statuses." });
+    }
+    const updatesByDefect = statusesPayload.reduce((acc, status) => {
+      const defectCode = status.defectCode;
+      if (!acc[defectCode]) {
+        acc[defectCode] = [];
+      }
+      acc[defectCode].push({
+        buyerName: status.buyerName,
+        defectStatus: Array.isArray(status.defectStatus)
+          ? status.defectStatus
+          : [],
+        isCommon: ["Critical", "Major", "Minor"].includes(status.isCommon)
+          ? status.isCommon
+          : "Minor"
+      });
+      return acc;
+    }, {});
+
+    const bulkOps = [];
+    for (const defectCodeStr in updatesByDefect) {
+      const defectCodeNum = parseInt(defectCodeStr, 10);
+      if (isNaN(defectCodeNum)) {
+        console.warn(
+          `Invalid defectCode received: ${defectCodeStr}, skipping.`
+        );
+        continue;
+      }
+      const newStatusByBuyerArray = updatesByDefect[defectCodeStr];
+      bulkOps.push({
+        updateOne: {
+          filter: { code: defectCodeNum },
+          update: {
+            $set: {
+              statusByBuyer: newStatusByBuyerArray,
+              updatedAt: new Date()
+            }
+          }
+        }
+      });
+    }
+    if (bulkOps.length > 0) {
+      await SewingDefects.bulkWrite(bulkOps);
+    }
+    res.status(200).json({
+      message: "Defect buyer statuses updated successfully in SewingDefects."
+    });
+  } catch (error) {
+    console.error("Error updating defect buyer statuses:", error);
+    res.status(500).json({
+      message: "Failed to update defect buyer statuses",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   End Points - SewingDefects
+------------------------------ */
+app.get("/api/sewing-defects", async (req, res) => {
+  try {
+    // Extract query parameters
+    const { categoryEnglish, type, isCommon } = req.query;
+
+    // Build filter object based on provided query parameters
+    const filter = {};
+    if (categoryEnglish) filter.categoryEnglish = categoryEnglish;
+    if (type) filter.type = type;
+    if (isCommon) filter.isCommon = isCommon;
+
+    // Fetch defects from the database
+    const defects = await SewingDefects.find(filter);
+
+    // Send the response with fetched defects
+    res.json(defects);
+  } catch (error) {
+    // Handle errors
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// DELETE a defect by code
+app.delete("/api/sewing-defects/:defectCode", async (req, res) => {
+  try {
+    const { defectCode } = req.params;
+    const result = await SewingDefects.findOneAndDelete({ code: defectCode });
+
+    if (!result) {
+      return res.status(404).json({ message: "Defect not found" });
+    }
+
+    res.status(200).json({ message: "Defect deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting defect:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to delete defect", error: error.message });
+  }
+});
 
 //Old end points
 
@@ -7688,97 +7837,97 @@ app.post(
 //   }
 // });
 
-// //Dashboard Old Endpoints
-// // Endpoint to fetch QC Inline Roving reports
-// app.get("/api/qc-inline-roving-reports", async (req, res) => {
-//   try {
-//     const reports = await QCInlineRoving.find();
-//     res.json(reports);
-//   } catch (error) {
-//     res.status(500).json({ message: "Error fetching reports", error });
-//   }
-// });
+//Dashboard Old Endpoints
+// Endpoint to fetch QC Inline Roving reports
+app.get("/api/qc-inline-roving-reports", async (req, res) => {
+  try {
+    const reports = await QCInlineRoving.find();
+    res.json(reports);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching reports", error });
+  }
+});
 
-// // New endpoint to fetch filtered QC Inline Roving reports with date handling
-// app.get("/api/qc-inline-roving-reports-filtered", async (req, res) => {
-//   try {
-//     const { startDate, endDate, line_no, mo_no, emp_id } = req.query;
+// New endpoint to fetch filtered QC Inline Roving reports with date handling
+app.get("/api/qc-inline-roving-reports-filtered", async (req, res) => {
+  try {
+    const { startDate, endDate, line_no, mo_no, emp_id } = req.query;
 
-//     let match = {};
+    let match = {};
 
-//     // Date filtering using $expr for string dates
-//     if (startDate || endDate) {
-//       match.$expr = match.$expr || {};
-//       match.$expr.$and = match.$expr.$and || [];
-//       if (startDate) {
-//         const normalizedStartDate = normalizeDateString(startDate);
-//         match.$expr.$and.push({
-//           $gte: [
-//             {
-//               $dateFromString: {
-//                 dateString: "$inspection_date",
-//                 format: "%m/%d/%Y"
-//               }
-//             },
-//             {
-//               $dateFromString: {
-//                 dateString: normalizedStartDate,
-//                 format: "%m/%d/%Y"
-//               }
-//             }
-//           ]
-//         });
-//       }
-//       if (endDate) {
-//         const normalizedEndDate = normalizeDateString(endDate);
-//         match.$expr.$and.push({
-//           $lte: [
-//             {
-//               $dateFromString: {
-//                 dateString: "$inspection_date",
-//                 format: "%m/%d/%Y"
-//               }
-//             },
-//             {
-//               $dateFromString: {
-//                 dateString: normalizedEndDate,
-//                 format: "%m/%d/%Y"
-//               }
-//             }
-//           ]
-//         });
-//       }
-//     }
+    // Date filtering using $expr for string dates
+    if (startDate || endDate) {
+      match.$expr = match.$expr || {};
+      match.$expr.$and = match.$expr.$and || [];
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+    }
 
-//     // Other filters
-//     if (line_no) {
-//       match.line_no = line_no;
-//     }
-//     if (mo_no) {
-//       match.mo_no = mo_no;
-//     }
-//     if (emp_id) {
-//       match.emp_id = emp_id;
-//     }
+    // Other filters
+    if (line_no) {
+      match.line_no = line_no;
+    }
+    if (mo_no) {
+      match.mo_no = mo_no;
+    }
+    if (emp_id) {
+      match.emp_id = emp_id;
+    }
 
-//     const reports = await QCInlineRoving.find(match);
-//     res.json(reports);
-//   } catch (error) {
-//     console.error("Error fetching filtered roving reports:", error);
-//     res.status(500).json({ message: "Error fetching filtered reports", error });
-//   }
-// });
+    const reports = await QCInlineRoving.find(match);
+    res.json(reports);
+  } catch (error) {
+    console.error("Error fetching filtered roving reports:", error);
+    res.status(500).json({ message: "Error fetching filtered reports", error });
+  }
+});
 
-// // Endpoint to fetch distinct MO Nos
-// app.get("/api/qc-inline-roving-mo-nos", async (req, res) => {
-//   try {
-//     const moNos = await QCInlineRoving.distinct("mo_no");
-//     res.json(moNos.filter((mo) => mo)); // Filter out null/empty values
-//   } catch (error) {
-//     console.error("Error fetching MO Nos:", error);
-//     res.status(500).json({ message: "Failed to fetch MO Nos" });
-//   }
-// });
+// Endpoint to fetch distinct MO Nos
+app.get("/api/qc-inline-roving-mo-nos", async (req, res) => {
+  try {
+    const moNos = await QCInlineRoving.distinct("mo_no");
+    res.json(moNos.filter((mo) => mo)); // Filter out null/empty values
+  } catch (error) {
+    console.error("Error fetching MO Nos:", error);
+    res.status(500).json({ message: "Failed to fetch MO Nos" });
+  }
+});
 
 // Endpoint to fetch distinct QC IDs (emp_id)
 app.get("/api/qc-inline-roving-qc-ids", async (req, res) => {

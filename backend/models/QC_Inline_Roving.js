@@ -99,6 +99,7 @@ const qcInlineRovingSchema = new mongoose.Schema(
               required: true,
               default: "NOT_CALCULATED"
             },
+            remark: { type: String, maxLength: 250, default: "" },
             rejectGarments: [
               {
                 totalCount: { type: Number, required: true },

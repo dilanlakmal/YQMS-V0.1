@@ -15,7 +15,23 @@ const sewingDefectsSchema = new mongoose.Schema(
     type: { type: String, required: true },
     isCommon: { type: String, required: true },
     createdAt: { type: Date, required: true },
-    updatedAt: { type: Date, required: true }
+    updatedAt: { type: Date, required: true },
+    statusByBuyer: {
+      type: [
+        {
+          buyerName: { type: String, required: true },
+          defectStatus: [
+            { type: String, enum: ["Critical", "Major", "Minor"] }
+          ],
+          isCommon: {
+            type: String,
+            enum: ["Critical", "Minor", "Major"],
+            default: "Minor"
+          }
+        }
+      ],
+      default: []
+    }
   },
   { collection: "SewingDefects", timestamps: true }
 );

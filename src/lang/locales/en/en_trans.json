@@ -27,7 +27,8 @@
     "printing_QR": "Printing QR",
     "qa_audit_report": "QA Audit Report",
     "download_data": "Download Data",
-    "live_dashboard": "Live Dashboard"
+    "live_dashboard": "Live Dashboard",
+    "systemadmin": "System Administration"
   },
 
   "nav": {
@@ -467,7 +468,9 @@
     "previous": "Previous",
     "next": "Next",
     "preview": "Preview",
-    "finish_inspection": "Finish Inspection"
+    "finish_inspection": "Finish Inspection",
+    "inlineWorkers": "Inline Workers",
+    "defectStatus": "Defect Status"
   },
 
   "cutting": {

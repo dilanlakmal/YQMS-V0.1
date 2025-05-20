@@ -27,7 +27,8 @@
     "printing_QR": "Printing QR",
     "qa_audit_report": "របាយការណ៍សវនកម្ម QA",
     "download_data": "ទាញយកទិន្នន័យ",
-    "live_dashboard": "ផ្ទាំងគ្រប់គ្រងផ្ទាល់"
+    "live_dashboard": "ផ្ទាំងគ្រប់គ្រងផ្ទាល់",
+    "systemadmin": "System Administration"
   },
 
   "nav": {
@@ -466,7 +467,9 @@
     "previous": "ទិន្នន័យពីមុន",
     "next": "ចំនុចបន្ទាប់",
     "preview": "ពិនិត្យមើលជាមុន",
-    "finish_inspection": "បញ្ចប់ការត្រួតពិនិត្យ"
+    "finish_inspection": "បញ្ចប់ការត្រួតពិនិត្យ",
+    "inlineWorkers": "Inline Workers",
+    "defectStatus": "Defect Status"
   },
 
   "cutting": {
@@ -587,14 +590,14 @@
     "addAdditionalPoints": "បន្ថែមចំណុចបន្ថែម",
     "addPoint": "បន្ថែមចំណុច",
     "totalCuttingTables": "ចំនួនតុតុកាត់",
-    "bundleNo": "លេខកញ្ចប់",
+    "bundleNo": "ដុំទី",
     "bundleQty": "ចំនួនកញ្ចប់",
     "use": "ប្រើ",
     "pcs": "ចំនួន",
     "select_bundle_qty": "ជ្រើសរើសចំនួនកញ្ចប់",
     "panelType": "ប្រភេទផ្ទាំង",
     "bundleDetails": "ព័ត៌មានលម្អិតកញ្ចប់",
-    "issues": "កំហុស",
+    "issues": "កំហុសតុកាត់",
     "cuttingIssue": "កំហុសកាត់",
     "remark": "កំណត់សម្គាល់",
     "evidence": "ភស្តុតាង",
@@ -671,7 +674,7 @@
     "topDefectIssues": "បញ្ហាកំហុសកំពូល",
     "failedToFetchTrendData": "បរាជ័យក្នុងការទាញយកទិន្នន័យនិន្នាការ។",
     "failedToFetchTopIssues": "បរាជ័យក្នុងការទាញយកទិន្នន័យបញ្ហាកំពូល។",
-    "save":"រក្សាទុក"
+    "save": "រក្សាទុក"
   },
 
   "common": {
