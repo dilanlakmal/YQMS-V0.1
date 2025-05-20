@@ -670,7 +670,8 @@
     "issuePercentage": "问题百分比",
     "topDefectIssues": "主要疵点问题",
     "failedToFetchTrendData": "获取趋势数据失败。",
-    "failedToFetchTopIssues": "获取主要问题数据失败。"
+    "failedToFetchTopIssues": "获取主要问题数据失败。",
+    "save": "节省"
   },
 
   "common": {

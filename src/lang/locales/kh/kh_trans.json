@@ -670,7 +670,8 @@
     "issuePercentage": "ភាគរយបញ្ហា",
     "topDefectIssues": "បញ្ហាកំហុសកំពូល",
     "failedToFetchTrendData": "បរាជ័យក្នុងការទាញយកទិន្នន័យនិន្នាការ។",
-    "failedToFetchTopIssues": "បរាជ័យក្នុងការទាញយកទិន្នន័យបញ្ហាកំពូល។"
+    "failedToFetchTopIssues": "បរាជ័យក្នុងការទាញយកទិន្នន័យបញ្ហាកំពូល។",
+    "save":"រក្សាទុក"
   },
 
   "common": {

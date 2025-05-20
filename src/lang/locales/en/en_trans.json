@@ -671,7 +671,8 @@
     "issuePercentage": "Issue %",
     "topDefectIssues": "Top Defect Issues",
     "failedToFetchTrendData": "Failed to fetch trend data.",
-    "failedToFetchTopIssues": "Failed to fetch top issues data."
+    "failedToFetchTopIssues": "Failed to fetch top issues data.",
+    "save": "Save"
   },
 
   "common": {
