@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../../../../config';
 import { useTranslation } from 'react-i18next';
 import i18next from 'i18next';
 import Swal from 'sweetalert2';
-import { Loader2, Save, AlertTriangle } from 'lucide-react';
+import { Loader2, Save, AlertTriangle, Trash2 } from 'lucide-react';
 
 const DefectBuyerStatus = () => {
   const { t } = useTranslation();
@@ -110,6 +110,51 @@ const DefectBuyerStatus = () => {
       i18next.off('languageChanged', handleLanguageChanged);
     };
   }, []);
+
+  const handleDeleteDefect = async (defectCode) => {
+    Swal.fire({
+      title: t('defectBuyerStatus.confirmDelete.title', 'Are you sure?'),
+      text: t('defectBuyerStatus.confirmDelete.text', "You won't be able to revert this!"),
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: t('defectBuyerStatus.confirmDelete.confirmButton', 'Yes, delete it!'),
+      cancelButtonText: t('defectBuyerStatus.confirmDelete.cancelButton', 'Cancel'),
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        setIsSaving(true); // Use isSaving state for delete operation too
+        setError(null);
+        try {
+          await axios.delete(`${API_BASE_URL}/api/sewing-defects/${defectCode}`);
+          // Remove the defect from the state
+          setAllDefects(prevDefects => prevDefects.filter(d => d.code !== defectCode));
+          setDefectStatuses(prevStatuses => {
+            const newStatuses = { ...prevStatuses };
+            delete newStatuses[defectCode];
+            return newStatuses;
+          });
+          Swal.fire(
+            t('defectBuyerStatus.deleted.title', 'Deleted!'),
+            t('defectBuyerStatus.deleted.text', 'The defect has been deleted.'),
+            'success'
+          );
+        } catch (err) {
+          console.error('Error deleting defect:', err);
+          setError(
+            t('defectBuyerStatus.errors.deleteDefect', 'Failed to delete defect.')
+          );
+          Swal.fire(
+            t('defectBuyerStatus.errors.deleteFailedTitle', 'Delete Failed'),
+            err.response?.data?.message || t('defectBuyerStatus.errors.deleteDefect', 'Failed to delete defect.'),
+            'error'
+          );
+        } finally {
+          setIsSaving(false);
+        }
+      }
+    });
+  };
 
   const getDefectDisplayName = (defect) => {
     return defect[`name_${currentDisplayLanguage}`] || defect.name_en;
@@ -230,7 +275,7 @@ const DefectBuyerStatus = () => {
 
   return (
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto bg-white shadow-xl rounded-lg p-6">
+      <div className="max-w-8xl mx-auto bg-white shadow-xl rounded-lg p-6">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6 text-center">
           {t('defectBuyerStatus.title', 'Manage Defect Statuses by Buyer')}
         </h1>
@@ -240,23 +285,30 @@ const DefectBuyerStatus = () => {
             <pre className="whitespace-pre-wrap">{error}</pre>
           </div>
         )}
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[70vh]"> 
           <table className="min-w-full divide-y divide-gray-200 border border-gray-300">
-            <thead className="bg-gray-100">
-              <tr className="text-xs font-medium text-gray-600 uppercase tracking-wider">
+            <thead className="bg-gray-100 sticky top-0 z-10">
+              <tr className="text-xs font-medium text-gray-600 uppercase tracking-wider text-center">
                 <th
                   scope="col"
                   rowSpan="2"
-                  className="px-4 py-3 text-left border-r border-gray-300 align-middle"
+                  className="px-4 py-3 text-center border border-gray-300 bg-gray-100"
                 >
                   {t('defectBuyerStatus.defectName', 'Defect Name')}
+                </th>
+                <th
+                  scope="col"
+                  rowSpan="2"
+                  className="px-2 py-3 text-center border border-gray-300 bg-gray-100" // New Actions column header
+                >
+                  {t('defectBuyerStatus.actions', 'Actions')}
                 </th>
                 {allBuyers.map((buyer) => (
                   <th
                     key={buyer}
                     scope="col"
                     colSpan="2"
-                    className="px-4 py-3 text-center border-r border-gray-300"
+                    className="px-4 py-3 text-center border border-gray-300 bg-gray-100"
                   >
                     {buyer}
                   </th>
@@ -267,13 +319,13 @@ const DefectBuyerStatus = () => {
                   <React.Fragment key={`${buyer}-sub`}>
                     <th
                       scope="col"
-                      className="px-2 py-2 text-left border-r border-gray-300"
+                      className="px-2 py-2 text-left border border-gray-300 bg-gray-100"
                     >
                       {t('defectBuyerStatus.classifications', 'Status')}
                     </th>
                     <th
                       scope="col"
-                      className="px-2 py-2 text-left border-r border-gray-300"
+                      className="px-2 py-2 text-left border border-gray-300 bg-gray-100"
                     >
                       {t('defectBuyerStatus.commonStatus', 'Common')}
                     </th>
@@ -285,7 +337,7 @@ const DefectBuyerStatus = () => {
               {allDefects.length === 0 && (
                 <tr>
                   <td
-                    colSpan={1 + allBuyers.length * 2}
+                    colSpan={2 + allBuyers.length * 2}
                     className="px-4 py-10 text-center text-gray-500"
                   >
                     {t(
@@ -298,7 +350,7 @@ const DefectBuyerStatus = () => {
               {allBuyers.length === 0 && allDefects.length > 0 && (
                 <tr>
                   <td
-                    colSpan={1 + allBuyers.length * 2}
+                    colSpan={2 + allBuyers.length * 2}
                     className="px-4 py-10 text-center text-gray-500"
                   >
                     {t(
@@ -310,11 +362,20 @@ const DefectBuyerStatus = () => {
               )}
               {allDefects.map((defect) => (
                 <tr key={defect.code} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 align-top border-r border-gray-300 md:w-auto whitespace-nowrap">
+                  <td className="px-4 py-3 align-top border border-gray-300 md:w-auto whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
                       {getDefectDisplayName(defect)}
                     </div>
                     <div className="text-xs text-gray-500">({defect.code})</div>
+                  </td>
+                   <td className="px-2 py-3 align-top border-r border-gray-300 text-center"> 
+                    <button
+                      onClick={() => handleDeleteDefect(defect.code)}
+                      className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                      disabled={isSaving}
+                    >
+                      <Trash2 size={20} />
+                    </button>
                   </td>
                   {allBuyers.map((buyer) => (
                     <React.Fragment key={`${defect.code}-${buyer}`}>

@@ -23,7 +23,6 @@ import RovingCamera from "../components/inspection/qc_roving/RovingCamera";
 import RovingData from "../components/inspection/qc_roving/RovingData"; 
 import InlineWorkers from "../components/inspection/qc_roving/InlineWorkers";
 import ImageCaptureUpload from "../components/inspection/qc_roving/ImageCaptureupload";
-import DefectBuyerStatus from "../components/inspection/qc_roving/defectBuyserStatus";
 import i18next from 'i18next';
 
 const RovingPage = () => {
@@ -818,20 +817,11 @@ const RovingPage = () => {
               activeTab === "inlineWorkers"
                 ? "bg-blue-600 text-white"
                 : "bg-gray-200 text-gray-700"
-            }`}
+            } rounded-r-lg`}
           >
             {t("qcRoving.inlineWorkers")}
           </button>
-          <button
-            onClick={() => setActiveTab("defectStatus")}
-            className={`px-4 py-2 ${
-              activeTab === "defectStatus"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-700"
-            } rounded-r-lg`}
-          >
-            {t("qcRoving.defectStatus")}
-          </button>
+          
         </div>
 
         {activeTab === 'form' ? (
@@ -1462,8 +1452,6 @@ const RovingPage = () => {
           <RovingData />
         ) : activeTab === "db" ? (
           <CEDatabase />
-        ) :  activeTab === "defectStatus" ? (
-          <DefectBuyerStatus />
         ): (
           <InlineWorkers onWorkerCountUpdated={fetchLineWorkerInfo} />
         )}

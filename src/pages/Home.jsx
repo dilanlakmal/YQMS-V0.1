@@ -127,6 +127,14 @@ function Home() {
           description: "SCC Inspection Check Point.",
           version: '0',
         },
+        {
+          path: "/system-administration",
+          roles: ["Admin", "QC2"],
+          image: "/IMG/system.png",
+          title: t("System Administration"),
+          description: "System Administration Check Point.",
+          version: '0.1',
+        },
       ]
     },
     {
@@ -154,7 +162,7 @@ function Home() {
           image: "/IMG/dyeing.png",
           title: t("home.opa"),
           description: "Scan orders in OPA.",
-          version: '0.1', // Changed to 0.1 as per previous context
+          version: '0.1', 
         },
         {
           path: "/ironing",
@@ -162,7 +170,7 @@ function Home() {
           image: "/IMG/ironing.png",
           title: t("home.ironing"),
           description: "Scan orders for Ironing.",
-          version: '0.1', // Changed to 0.1 as per previous context
+          version: '0.1', 
         },
         {
           path: "/packing",
@@ -170,7 +178,7 @@ function Home() {
           image: "/IMG/packing.webp",
           title: t("home.packing"),
           description: "Scan orders for Packing.",
-          version: '0.1', // Changed to 0.1 as per previous context
+          version: '0.1', 
         }
       ]
     },
