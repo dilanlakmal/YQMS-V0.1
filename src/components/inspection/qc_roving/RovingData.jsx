@@ -12,6 +12,14 @@ const getTodayDateString = () => {
   return `${month}/${day}/${year}`; // MM/DD/YYYY
 };
 
+const REPETITION_KEYS = [
+  "1st Inspection",
+  "2nd Inspection",
+  "3rd Inspection",
+  "4th Inspection",
+  "5th Inspection",
+];
+
 const RovingData = ({ refreshTrigger }) => {
   const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,12 +45,27 @@ const RovingData = ({ refreshTrigger }) => {
       const moNos = new Set();
 
       sourceReports.forEach((report) => {
-        if (report.emp_id) qcIds.add(report.emp_id);
+        // if (report.emp_id) qcIds.add(report.emp_id);
         if (report.line_no) lineNos.add(report.line_no);
         if (report.mo_no) moNos.add(report.mo_no);
-        report.inlineData?.forEach((data) => {
-          if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
-        });
+        // report.inlineData?.forEach((data) => {
+        //   if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
+        // });
+        // Handle new schema with inspection_rep
+        if (report.inspection_rep && Array.isArray(report.inspection_rep)) {
+          report.inspection_rep.forEach(repItem => {
+            if (repItem.emp_id) qcIds.add(repItem.emp_id); // QC ID from inspection_rep
+            repItem.inlineData?.forEach((data) => {
+              if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
+            });
+          });
+        } else if (report.inlineData && Array.isArray(report.inlineData)) {
+          // Handle old schema (legacy)
+          if (report.emp_id) qcIds.add(report.emp_id); // QC ID from top-level report
+          report.inlineData.forEach((data) => {
+            if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
+          });
+        }
       });
 
       setUniqueQcIds(Array.from(qcIds).sort());
@@ -86,21 +109,82 @@ const RovingData = ({ refreshTrigger }) => {
 
         populateUniqueFilterOptions(rawReportsFromApi);
 
-        let reportsForDisplay = rawReportsFromApi;
+        // let reportsForDisplay = rawReportsFromApi;
 
-        if (currentFilters.operatorId) {
-          reportsForDisplay = rawReportsFromApi
-            .map((report) => {
-              const filteredInlineData =
-                report.inlineData?.filter(
-                  (inlineEntry) =>
-                    String(inlineEntry.operator_emp_id) ===
-                    String(currentFilters.operatorId)
-                ) || [];
+        // if (currentFilters.operatorId) {
+          // reportsForDisplay = rawReportsFromApi
+            // .map((report) => {
+              // const filteredInlineData =
+              //   report.inlineData?.filter(
+              //     (inlineEntry) =>
+              //       String(inlineEntry.operator_emp_id) ===
+              //       String(currentFilters.operatorId)
+              //   ) || [];
 
-              return { ...report, inlineData: filteredInlineData };
-            })
-            .filter((report) => report.inlineData && report.inlineData.length > 0);
+              // return { ...report, inlineData: filteredInlineData };
+              // Transform data: Group by operator, then by repetition
+        const processedData = rawReportsFromApi.flatMap((report) => {
+          const operatorInspectionsMap = new Map();
+
+          const processInlineData = (inlineDataArray, repNameForLegacy = null, topLevelEmpIdForLegacy = null) => {
+            inlineDataArray?.forEach((operatorData) => {
+              const operatorKey = `${operatorData.operator_emp_id}_${operatorData.tg_no}`;
+              const currentRepName = repNameForLegacy || (operatorData.inspection_rep_name || "Unknown Rep"); // Fallback if rep name is directly on operatorData
+
+              if (!operatorInspectionsMap.has(operatorKey)) {
+                operatorInspectionsMap.set(operatorKey, {
+                  reportTopLevel: report,
+                  operator_emp_id: operatorData.operator_emp_id,
+                  operator_eng_name: operatorData.operator_eng_name,
+                  operator_kh_name: operatorData.operator_kh_name,
+                  operation_ch_name: operatorData.operation_ch_name,
+                  operation_kh_name: operatorData.operation_kh_name,
+                  ma_code: operatorData.ma_code,
+                  tg_no: operatorData.tg_no,
+                  inspectionsByRep: {}
+                });
+              }
+              const existingEntry = operatorInspectionsMap.get(operatorKey);
+              
+              // For new schema, repLevelData comes from repItem. For legacy, mock it or use report level.
+              const repLevelDataForThisRep = repNameForLegacy 
+                ? { emp_id: topLevelEmpIdForLegacy || report.emp_id, inspection_rep_name: repNameForLegacy } 
+                : (operatorData.repLevelData || { emp_id: report.emp_id, inspection_rep_name: currentRepName }); // Assuming repLevelData might be nested if not legacy
+
+              existingEntry.inspectionsByRep[currentRepName] = {
+                operatorLevelData: operatorData,
+                repLevelData: repLevelDataForThisRep
+              };
+            });
+          };
+
+          if (report.inspection_rep && Array.isArray(report.inspection_rep)) {
+            report.inspection_rep.forEach(repItem => {
+              // Pass repItem itself as repLevelData to be associated with each operatorData under it
+              const augmentedInlineData = repItem.inlineData?.map(opData => ({...opData, repLevelData: repItem, inspection_rep_name: repItem.inspection_rep_name }));
+              processInlineData(augmentedInlineData);
+            });
+          } else if (report.inlineData && Array.isArray(report.inlineData)) { // Legacy
+            processInlineData(report.inlineData, "1st Inspection", report.emp_id); // Assume legacy is "1st Inspection"
+          }
+          return Array.from(operatorInspectionsMap.values());
+        });
+
+        let reportsForDisplay = processedData;
+
+        if (currentFilters.operatorId) { // Filter based on the primary operator_emp_id
+          reportsForDisplay = processedData.filter(
+            (opSummary) => String(opSummary.operator_emp_id) === String(currentFilters.operatorId)
+          );
+        }
+
+        // If QC ID filter is applied, ensure the operator has an inspection by that QC
+        if (currentFilters.qcId) {
+          reportsForDisplay = reportsForDisplay.filter(opSummary => {
+            return Object.values(opSummary.inspectionsByRep).some(
+              inspection => inspection.repLevelData?.emp_id === currentFilters.qcId
+            );
+          });
         }
 
         setReports(reportsForDisplay);
@@ -112,12 +196,12 @@ const RovingData = ({ refreshTrigger }) => {
         });
 
         setReports([]);
-        populateUniqueFilterOptions([]);
+        populateUniqueFilterOptions([]); // Pass empty array to clear options on error
       } finally {
         setIsLoading(false);
       }
     },
-    [populateUniqueFilterOptions]
+    [populateUniqueFilterOptions] // populateUniqueFilterOptions is stable due to useCallback
   );
 
   useEffect(() => {
@@ -167,26 +251,44 @@ const RovingData = ({ refreshTrigger }) => {
             <li>
               <span className="font-semibold">Meas.</span> : Measurement
             </li>
+             <li>
+              <span className="font-semibold">Chk'd/Def</span> : Quantity Checked
+              / Total Defects for Operator for that specific inspection event.
+            </li>
           </ul>
           <ul className="list-disc list-inside space-y-1 flex-1 min-w-[250px] mt-2 md:mt-0">
-            <li>
-              <span className="font-semibold">Chk'd/Def</span> : Quantity Checked
-              / Total Defects for Operator
-            </li>
-            <li>
-              <span className="inline-block w-3 h-3 bg-green-100 border border-green-300 mr-1 align-middle"></span>
-              <span className="font-semibold align-middle">
-                Green Background
-              </span>{" "}
-              : Indicates the specific garment/check passed.
-            </li>
-            <li>
-              <span className="inline-block w-3 h-3 bg-red-100 border border-red-300 mr-1 align-middle"></span>
-              <span className="font-semibold align-middle">
-                Red Background
-              </span>{" "}
-              : Indicates the specific garment/check failed or was rejected.
-            </li>
+           <li className="mt-2 font-semibold">Cell Background Colors (SPI, Meas., Chk'd/Def):</li>
+            <ul className="list-disc list-inside ml-4">
+              <li>
+                <span className="inline-block w-3 h-3 bg-green-100 border border-green-300 mr-1 align-middle"></span>
+                <span className="font-semibold align-middle">
+                  Green
+                </span>{" "}
+                : Overall Roving Status is 'Pass'.
+              </li>
+              <li>
+                <span className="inline-block w-3 h-3 bg-yellow-100 border border-yellow-300 mr-1 align-middle"></span>
+                <span className="font-semibold align-middle">
+                  Yellow
+                </span>{" "}
+                : Overall Roving Status is 'Reject' (due to SPI/Meas), 'Reject-Major' (single), or 'Reject-Minor' (single).
+              </li>
+              <li>
+                <span className="inline-block w-3 h-3 bg-red-100 border border-red-300 mr-1 align-middle"></span>
+                <span className="font-semibold align-middle">
+                  Red
+                </span>{" "}
+                : Overall Roving Status is 'Reject-Critical', 'Reject-Major-' (multiple), or 'Reject-Minor' (multiple - *see note below*).
+              </li>
+              <li>
+                <span className="inline-block w-3 h-3 bg-gray-200 border border-gray-400 mr-1 align-middle"></span>
+                <span className="font-semibold align-middle">
+                  Gray
+                </span>{" "}
+                : Overall Roving Status is 'Pending', 'Unknown', or not determined.
+              </li>
+            </ul>
+            <li className="mt-1 text-xs text-gray-500">(*Note: 'Reject-Minor' for multiple defects should ideally be red, but current data might show yellow. See console warning for details.)</li>
           </ul>
         </div>
       </div>
@@ -194,7 +296,7 @@ const RovingData = ({ refreshTrigger }) => {
       {isLoading ? (
         <div className="text-center p-10 text-gray-500">Loading reports...</div>
       ) : (
-        <div className="overflow-x-auto relative max-h-[600px]">
+        <div className="overflow-x-auto relative max-h-[70vh]">
           {reports.length === 0 ? (
             <div className="text-center p-10 text-gray-500">
               No reports found matching your criteria.
@@ -222,240 +324,192 @@ const RovingData = ({ refreshTrigger }) => {
                     Machine Code
                   </th>
                   <th
-                    colSpan="15"
+                    colSpan={REPETITION_KEYS.length * 3}
                     className="px-2 py-1 text-center text-sm font-medium text-gray-700 border border-gray-500"
                   >
                     Inspection Data
                   </th>
                 </tr>
                 <tr>
-                  {["1st", "2nd", "3rd", "4th", "5th"].map((garmentOrdinal) => (
+                  {REPETITION_KEYS.map((repKey) => (
                     <th
-                      key={garmentOrdinal}
+                      key={repKey}
                       colSpan="3"
                       className="px-2 py-1 text-center text-xs font-medium text-gray-700 border border-gray-500"
                     >
-                      {garmentOrdinal} Inspection
+                      {repKey}
                     </th>
                   ))}
                 </tr>
                 <tr>
-                  {Array(5)
-                    .fill(null)
-                    .map((_, groupIndex) => (
-                      <React.Fragment key={`subgroup-${groupIndex}`}>
-                        <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
-                          SPI
-                        </th>
-                        <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
-                          Meas.
-                        </th>
-                        <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
-                          Chk'd/Def
-                        </th>
-                      </React.Fragment>
-                    ))}
+                  {REPETITION_KEYS.flatMap((repKey) => ( 
+                    <React.Fragment key={`subgroup-header-${repKey}`}>
+                      <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
+                        SPI
+                      </th>
+                      <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
+                        Meas.
+                      </th>
+                      <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
+                        Chk'd/Def
+                      </th>
+                    </React.Fragment>
+                  ))}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {reports.map((report) =>
-                  report.inlineData?.map((data, index) => {
-                    const allGarmentsDetails = data.rejectGarments?.[0]?.garments;
-                    const totalDefectsForOperatorRecord =
-                      data.rejectGarments?.[0]?.totalCount || 0;
-                    const inspectionCells = [];
-                    const numGarmentDisplayGroups = 5;
+                {reports.map((operatorSummary, index) => {
+                  const allRepInspectionCells = [];
 
-                    const getCellBackgroundColor = (status) => {
-                      if (status === "Pass")
-                        return "bg-green-100 hover:bg-green-200";
-                      if (status === "Fail" || status === "Reject")
-                        return "bg-red-100 hover:bg-red-200";
-                      return "hover:bg-gray-50";
-                    };
+                  REPETITION_KEYS.forEach((repKey) => {
+                    const inspectionEvent = operatorSummary.inspectionsByRep[repKey];
 
-                    const renderResultSymbol = (status) => {
-                      if (status === "Pass") {
-                        return (
-                          <span className="text-green-600 font-bold text-lg">
-                            ✓
-                          </span>
-                        );
-                      }
-                      if (status === "Fail" || status === "Reject") {
-                        return (
-                          <span className="text-red-600 font-bold text-lg">
-                            ✗
-                          </span>
-                        );
-                      }
-                      return <span className="text-gray-500">N/A</span>;
-                    };
+                    if (inspectionEvent) {
+                      const { operatorLevelData, repLevelData } = inspectionEvent;
+                      const totalDefectsForThisRep = operatorLevelData.rejectGarments?.[0]?.totalCount || 0;
+                      
+                      const spiDisplay = operatorLevelData.spi || "N/A";
+                      const measDisplay = operatorLevelData.measurement || "N/A";
+                      const chkdDefDisplay = `${operatorLevelData.checked_quantity}/${totalDefectsForThisRep}`;
+                      
+                      // New function to determine cell background based on overall_roving_status
+                      const getCellBackgroundColorForOverallStatus = (overallStatusKey) => {
+                        if (!overallStatusKey) return "bg-gray-200 hover:bg-gray-300";
 
-                    const constructTooltipText = (
-                      reportDetails,
-                      operatorInspectionData,
-                      totalDefectsForOp
-                    ) => {
-                      let defectsString = "Defects Found: None";
-                      const defectsList = [];
-
-                      if (
-                        operatorInspectionData.rejectGarments &&
-                        operatorInspectionData.rejectGarments.length > 0 &&
-                        operatorInspectionData.rejectGarments[0].garments
-                      ) {
-                        operatorInspectionData.rejectGarments[0].garments.forEach(
-                          (garment) => {
-                            garment.defects.forEach((defect) => {
-                              defectsList.push(
-                                `  - ${defect.name} (Qty: ${defect.count}, Op.ID: ${defect.operationId || "N/A"})`
-                              );
-                            });
-                          }
-                        );
-                      }
-
-                      if (defectsList.length > 0) {
-                        defectsString =
-                          "Defects Found:\n" + defectsList.join("\n");
-                      }
-
-                      return `Inspection Details:
-                      Date: ${reportDetails.inspection_date || "N/A"}
-                      QC ID: ${reportDetails.emp_id || "N/A"}
-                      Line No: ${reportDetails.line_no || "N/A"}
-                      MO No: ${reportDetails.mo_no || "N/A"}
-                      ------------------------------
-                      Operator ID: ${
-                        operatorInspectionData.operator_emp_id || "N/A"
-                      }
-                      Operator Name: ${
-                        operatorInspectionData.operator_kh_name ||
-                        operatorInspectionData.operator_eng_name ||
-                        "N/A"
-                      }
-                      Operation: ${
-                        operatorInspectionData.operation_kh_name ||
-                        operatorInspectionData.operation_ch_name ||
-                        "N/A"
-                      }
-                      Machine Code: ${operatorInspectionData.ma_code || "N/A"}
-                      ------------------------------
-                      Type: ${operatorInspectionData.type || "N/A"} 
-                      Checked Qty: ${
-                        operatorInspectionData.checked_quantity || "N/A"
-                      }
-                      SPI: ${operatorInspectionData.spi || "N/A"} 
-                      Meas: ${operatorInspectionData.measurement || "N/A"} 
-                      Total Defects (Op): ${totalDefectsForOp}
-                      Overall Result (Op): ${
-                        operatorInspectionData.qualityStatus || "N/A"
-                      }
-                      Overall Roving Status: ${
-                        operatorInspectionData.overall_roving_status || "N/A"
-                      }
-                      ------------------------------
-                      ${defectsString}`;
-                    };
-
-                    for (let i = 0; i < numGarmentDisplayGroups; i++) {
-                      if (i < data.checked_quantity) {
-                        const garmentDetail = allGarmentsDetails?.[i];
-                        const spiDisplay = data.spi || "N/A";
-                        const measDisplay = data.measurement || "N/A";
-                        let defectCountForSlotDisplay = "N/A";
-                        const chkdDefDisplay = `${data.checked_quantity}/${totalDefectsForOperatorRecord}`;
-                        let resultForSlotDisplay = "N/A";
-
-                        if (data.qualityStatus === "Pass") {
-                          defectCountForSlotDisplay = 0;
-                          resultForSlotDisplay = "Pass";
-                        } else {
-                          if (garmentDetail) {
-                            defectCountForSlotDisplay =
-                              garmentDetail.garment_defect_count;
-                            resultForSlotDisplay = garmentDetail.status;
-                          } else {
-                            defectCountForSlotDisplay = "N/A";
-                            resultForSlotDisplay = "N/A";
-                          }
+                        switch (overallStatusKey) {
+                          case 'Pending':
+                          case 'Unknown':
+                            return "bg-gray-200 hover:bg-gray-300";
+                          case 'Reject-Critical':
+                          case 'Reject-Major-': // This is for >=2 Major, RovingPage colors it red
+                            return "bg-red-100 hover:bg-red-200";
+                          case 'Reject': // This is for SPI/Meas reject, RovingPage colors it yellow
+                          case 'Reject-Major': // This is for 1 Major, RovingPage colors it yellow
+                            return "bg-yellow-100 hover:bg-yellow-200";
+                          case 'Reject-Minor':
+                            // AMBIGUOUS: In RovingPage.jsx, 'Reject-Minor' is generated for:
+                            // 1. >=2 Minor defects (colored RED in RovingPage)
+                            // 2. 1 Minor defect (colored YELLOW in RovingPage)
+                            // Without a change in RovingPage.jsx to send distinct keys,
+                            // we default to yellow here. For correct coloring, RovingPage.jsx
+                            // should send distinct status keys (e.g., 'Reject-Minor-Multiple' and 'Reject-Minor-Single').
+                            console.warn("Ambiguous 'Reject-Minor' status received. Defaulting to yellow. RovingPage.jsx should be updated to send distinct status keys for accurate coloring.");
+                            return "bg-yellow-100 hover:bg-yellow-200"; 
+                          case 'Pass':
+                            return "bg-green-100 hover:bg-green-200";
+                          default:
+                            console.warn(`Unknown overall_roving_status for color coding: ${overallStatusKey}. Defaulting to gray.`);
+                            return "bg-gray-200 hover:bg-gray-300";
                         }
+                      };
 
-                        const cellBgClass = getCellBackgroundColor(
-                          resultForSlotDisplay
-                        );
-                        const tooltipTitle = constructTooltipText(
-                          report,
-                          data,
-                          totalDefectsForOperatorRecord
-                        );
+                      const renderResultSymbol = (status) => {
+                        if (status === "Pass") return <span className="text-green-600 font-bold text-lg">✓</span>;
+                        if (status === "Fail" || status === "Reject") return <span className="text-red-600 font-bold text-lg">✗</span>;
+                        return <span className="text-gray-500">N/A</span>;
+                      };
 
-                        inspectionCells.push(
-                          <td
-                            key={`spi-${i}`}
-                            title={tooltipTitle}
-                            onClick={() => showDetailsOnTap(tooltipTitle)}
-                            className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${cellBgClass} transition-colors duration-150 text-center cursor-pointer`}
-                          >
-                            {renderResultSymbol(spiDisplay)}
-                          </td>
-                        );
-
-                        inspectionCells.push(
-                          <td
-                            key={`meas-${i}`}
-                            title={tooltipTitle}
-                            onClick={() => showDetailsOnTap(tooltipTitle)}
-                            className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${cellBgClass} transition-colors duration-150 text-center cursor-pointer`}
-                          >
-                            {renderResultSymbol(measDisplay)}
-                          </td>
-                        );
-
-                        inspectionCells.push(
-                          <td
-                            key={`chkdef-${i}`}
-                            title={tooltipTitle}
-                            onClick={() => showDetailsOnTap(tooltipTitle)}
-                            className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${cellBgClass} transition-colors duration-150 cursor-pointer`}
-                          >
-                            {chkdDefDisplay}
-                          </td>
-                        );
-                      } else {
-                        for (let k = 0; k < 5; k++) {
-                          inspectionCells.push(
-                            <td
-                              key={`empty-${i}-${k}`}
-                              className="px-1 py-1 text-xs text-gray-700 border border-gray-300"
-                            >
-                              N/A
-                            </td>
+                      const constructTooltipText = (
+                        currentReportDetails,
+                        currentRepItemDetails,
+                        currentOperatorInspectionData,
+                        currentTotalDefectsForOp
+                      ) => {
+                        let defectsString = "Defects Found: None";
+                        const defectsList = [];
+                        if (
+                          currentOperatorInspectionData.rejectGarments &&
+                          currentOperatorInspectionData.rejectGarments.length > 0 &&
+                          currentOperatorInspectionData.rejectGarments[0].garments
+                        ) {
+                          currentOperatorInspectionData.rejectGarments[0].garments.forEach(
+                            (garment) => {
+                              garment.defects.forEach((defect) => {
+                                defectsList.push(
+                                  `  - ${defect.name} (Qty: ${defect.count}, Op.ID: ${defect.operationId || "N/A"})`
+                                );
+                              });
+                            }
                           );
                         }
-                      }
-                    }
+                        if (defectsList.length > 0) {
+                          defectsString = "Defects Found:\n" + defectsList.join("\n");
+                        }
+                        const qcId = currentRepItemDetails?.emp_id || currentReportDetails?.emp_id || "N/A";
+                        const qcRepName = currentRepItemDetails?.inspection_rep_name || "N/A";
 
-                    return (
-                      <tr
-                        key={`${report.inline_roving_id}-${index}`}
-                        className="hover:bg-gray-50 transition-colors duration-150"
-                      >
-                        <td className="px-2 py-1 text-xs text-gray-700 border border-gray-300">
-                          {data.operator_emp_id || "N/A"}
+                        return `Inspection Details:
+                        Date: ${currentReportDetails.inspection_date || "N/A"}
+                        QC ID: ${qcId}
+                        Inspection Rep: ${qcRepName}
+                        Line No: ${currentReportDetails.line_no || "N/A"}
+                        MO No: ${currentReportDetails.mo_no || "N/A"}
+                        ------------------------------
+                        Operator ID: ${currentOperatorInspectionData.operator_emp_id || "N/A"}
+                        Operator Name: ${currentOperatorInspectionData.operator_kh_name || currentOperatorInspectionData.operator_eng_name || "N/A"}
+                        Operation: ${currentOperatorInspectionData.operation_kh_name || currentOperatorInspectionData.operation_ch_name || "N/A"}
+                        Machine Code: ${currentOperatorInspectionData.ma_code || "N/A"}
+                        ------------------------------
+                        Type: ${currentOperatorInspectionData.type || "N/A"} 
+                        Checked Qty: ${currentOperatorInspectionData.checked_quantity || "N/A"}
+                        SPI: ${currentOperatorInspectionData.spi || "N/A"} 
+                        Meas: ${currentOperatorInspectionData.measurement || "N/A"} 
+                        Total Defects (Op): ${currentTotalDefectsForOp}
+                        Overall Result (Op): ${currentOperatorInspectionData.qualityStatus || "N/A"}
+                        Overall Roving Status: ${currentOperatorInspectionData.overall_roving_status || "N/A"}
+                        ------------------------------
+                        ${defectsString}`;
+                      };
+
+                      const tooltipTitle = constructTooltipText(
+                        operatorSummary.reportTopLevel,
+                        repLevelData,
+                        operatorLevelData,
+                        totalDefectsForThisRep
+                      );
+
+                       const overallStatusForEvent = operatorLevelData.overall_roving_status;
+                      const repetitionCellBgClass = getCellBackgroundColorForOverallStatus(overallStatusForEvent);
+
+                      allRepInspectionCells.push(
+                        <td key={`spi-${repKey}`} title={tooltipTitle} onClick={() => showDetailsOnTap(tooltipTitle)}
+                           className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 text-center cursor-pointer`}>
+                          {renderResultSymbol(spiDisplay)}
+                        </td>,
+                        <td key={`meas-${repKey}`} title={tooltipTitle} onClick={() => showDetailsOnTap(tooltipTitle)}
+                           className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 text-center cursor-pointer`}>
+                          {renderResultSymbol(measDisplay)}
+                        </td>,
+                        <td key={`chkdef-${repKey}`} title={tooltipTitle} onClick={() => showDetailsOnTap(tooltipTitle)}
+                            className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 cursor-pointer text-center`}>
+                          {chkdDefDisplay}
                         </td>
-                        <td className="px-2 py-1 text-xs text-gray-700 border border-gray-300">
-                          {data.operation_kh_name || data.operation_ch_name || "N/A"}
-                        </td>
-                        <td className="px-2 py-1 text-xs text-gray-700 border border-gray-300">
-                          {data.ma_code || "N/A"}
-                        </td>
-                        {inspectionCells}
-                      </tr>
-                    );
-                  })
-                )}
+                      );
+                    } else {
+                      // Render 3 empty cells if no data for this repetition
+                      allRepInspectionCells.push(
+                        <td key={`empty-spi-${repKey}`} className="px-1 py-1 text-xs text-gray-400 border border-gray-300 text-center">-</td>,
+                        <td key={`empty-meas-${repKey}`} className="px-1 py-1 text-xs text-gray-400 border border-gray-300 text-center">-</td>,
+                        <td key={`empty-chkdef-${repKey}`} className="px-1 py-1 text-xs text-gray-400 border border-gray-300 text-center">-</td>
+                      );
+                    }
+                  });
+
+                  return (
+                    <tr key={`${operatorSummary.operator_emp_id}-${operatorSummary.tg_no}-${index}`} className="hover:bg-gray-50 transition-colors duration-150">
+                      <td className="px-2 py-1 text-xs text-gray-700 border border-gray-300">
+                        {operatorSummary.operator_emp_id || "N/A"}
+                      </td>
+                      <td className="px-2 py-1 text-xs text-gray-700 border border-gray-300">
+                        {operatorSummary.operation_kh_name || operatorSummary.operation_ch_name || "N/A"}
+                      </td>
+                      <td className="px-2 py-1 text-xs text-gray-700 border border-gray-300">
+                        {operatorSummary.ma_code || "N/A"}
+                      </td>
+                      {allRepInspectionCells}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

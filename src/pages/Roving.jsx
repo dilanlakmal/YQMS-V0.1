@@ -848,7 +848,7 @@ const RovingPage = () => {
                 if (!selectedManualInspectionRep) {
                   return <p className="text-sm text-gray-500">{t("qcRoving.selectInspectionRepForProgress", "Select an inspection repetition to see progress.")}</p>;
                 }
-                if (!lineNo || !moNo || !selectedOperationId) {
+                if (!lineNo || !moNo) {
                   return <p className="text-sm text-gray-500">{t("qcRoving.fillLineMoOpForProgress", "Please select Line, MO, and Operation to see specific progress.")}</p>;
                 }
                 if (lineWorkerDataLoading || lineWorkerDataError) {
