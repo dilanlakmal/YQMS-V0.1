@@ -160,11 +160,18 @@ export default function RoleManagement() {
     "OPA",
     "Ironing",
     "Packing",
-    "QC1",
-    "QC2",
-    "QA",
+    "QC Roving",
+    "Printing",
+    "QC2 Tracking",
+    "QC1 Inspection",
+    "QC2 Inspection",
+    "QA Audit",
+    "Final Inspection",
     "Download Data",
     "Live Dashboard",
+    "Power BI",
+    "QC1 Sunrise",
+    "System Administration",
   ];
 
   return (

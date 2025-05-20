@@ -129,7 +129,7 @@ function Home() {
         },
         {
           path: "/system-administration",
-          roles: ["Admin", "QC2"],
+          roles: ["Admin", "System Administration"],
           image: "/IMG/system.png",
           title: t("System Administration"),
           description: "System Administration Check Point.",
