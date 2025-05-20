@@ -179,7 +179,6 @@ const RovingFilterPlane = ({
   );
 };
 
-
 RovingFilterPlane.propTypes = {
   onFilterChange: PropTypes.func.isRequired,
   initialFilters: PropTypes.shape({

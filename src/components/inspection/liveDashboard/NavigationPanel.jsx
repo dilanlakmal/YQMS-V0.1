@@ -1,26 +1,26 @@
-import React, { useState } from "react";
 import {
-  Menu,
-  ChevronLeft,
-  ChevronDown,
-  ChevronRight,
-  Package,
-  Shirt,
-  Eye,
   BarChart,
-  Clock,
-  TrendingUp,
-  Calendar,
-  FileText,
   Box,
-  Search, // Added Search icon for QC Inline Roving
-  Home, // Add Home icon
-  Scissors,
+  Search, 
+  Home, 
   WashingMachine,
   Monitor,
   CalendarDays,
   CalendarRange,
+  Calendar,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Eye,
+  FileText,
+  Menu,
+  Package,
+  Shirt,
+  TrendingUp
 } from "lucide-react";
+
+import React, { useState } from "react";
 
 const NavigationPanel = ({
   isOpen,
@@ -33,7 +33,14 @@ const NavigationPanel = ({
   const menuItems = [
     { name: "Home", icon: <Home size={18} />, subMenus: [] },
     { name: "QC Inline Roving", icon: <Search size={16} />, subMenus: [] },
-    { name: "Cutting", icon: <Scissors size={16} />, subMenus: [] },
+    {
+      name: "Cutting",
+      icon: <Search size={16} />,
+      subMenus: [
+        { name: "Cutting Reports", icon: <BarChart size={16} /> },
+        { name: "Cutting Trend", icon: <TrendingUp size={16} /> }
+      ]
+    },
     {
       name: "Digital Measurement",
       icon: <Shirt size={16} />,

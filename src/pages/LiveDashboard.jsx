@@ -23,6 +23,7 @@ import WeeklySummary from "../components/inspection/liveDashboard/WeeklySummary"
 import InspectorCard from "../components/inspection/liveDashboard/InspectorCard";
 import RovingReport from "../components/inspection/liveDashboard/RovingReport"; // Added import
 import CuttingReport from "../components/inspection/liveDashboard/CuttingReport";
+import CuttingGarmentTypeTrendAnalysis from "../components/inspection/cutting/report/CuttingGarmentTypeTrendAnalysis";
 import HomeMenu from "../components/inspection/liveDashboard/HomeMenu";
 import QCSunriseDashboard from "../components/inspection/liveDashboard/QCSunriseDashboard";
 import SunriseDailyTrend from "../components/inspection/qc1_sunrise_mongodb/SunriseDailyTrend";
@@ -563,8 +564,10 @@ const LiveDashboard = () => {
         
 
         {activeSection === "QC Inline Roving" && <RovingReport />}
-        {activeSection === "Cutting" && <CuttingReport />}
-        {activeSection === "QC 1 Dashboard" && <QCSunriseDashboard />}
+        {activeSection === "Cutting Reports" && <CuttingReport />}
+        {activeSection === "Cutting Trend" && (
+          <CuttingGarmentTypeTrendAnalysis />
+        )}
         {activeSection === "Buyer Specs" && <DigitalMeasurementBuyerSpec />}
         {activeSection === "Measurement Summary" && <DigitalMeasurement />}
         {activeSection === "Daily Analysis" && <QCSunriseDashboard />}

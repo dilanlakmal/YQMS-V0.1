@@ -87,7 +87,6 @@ const RovingData = ({ refreshTrigger }) => {
   const fetchReports = useCallback(
     async (currentFilters) => {
       setIsLoading(true);
-
       try {
         const queryParams = new URLSearchParams();
         if (currentFilters.date)
@@ -233,7 +232,6 @@ const RovingData = ({ refreshTrigger }) => {
         uniqueLineNos={uniqueLineNos}
         uniqueMoNos={uniqueMoNos}
       />
-
       <div className="mb-4 p-3 bg-gray-100 border border-gray-300 rounded-md text-xs text-gray-700">
         <h4 className="font-semibold text-sm mb-2">Legend:</h4>
         <div className="flex flex-wrap md:flex-nowrap md:space-x-8">

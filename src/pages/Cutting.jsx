@@ -1861,7 +1861,20 @@
 // export default CuttingPage;
 
 import axios from "axios";
-import { Database, Eye, EyeOff, Keyboard } from "lucide-react";
+import {
+  AlertCircle,
+  Box,
+  CheckCircle,
+  Database,
+  Eye,
+  EyeOff,
+  Keyboard,
+  Layers,
+  Percent,
+  Tag,
+  XCircle
+} from "lucide-react"; // Added icons for stats
+
 import React, { useEffect, useRef, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -1870,12 +1883,13 @@ import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
 import NumberPad from "../components/forms/NumberPad";
-import CuttingOrderModify from "../components/inspection/cutting/CuttingOrderModify";
-import CuttingMeasurementPointsModify from "../components/inspection/cutting/CuttingMeasurementPointsModify ";
-import MeasurementTable from "../components/inspection/cutting/MeasurementTable";
+import AQLChart from "../components/inspection/cutting/AQLChart";
+import CuttingInspectionModify from "../components/inspection/cutting/CuttingInspectionModify";
 import CuttingIssues from "../components/inspection/cutting/CuttingIssues";
-
-//import { measurementPoints } from "../constants/cuttingmeasurement";
+import CuttingMeasurementPointsModify from "../components/inspection/cutting/CuttingMeasurementPointsModify";
+import CuttingOrderModify from "../components/inspection/cutting/CuttingOrderModify";
+import MeasurementTable from "../components/inspection/cutting/MeasurementTable";
+import CuttingReportQCView from "../components/inspection/cutting/report/CuttingReportQCView";
 
 const CuttingPage = () => {
   const { t, i18n } = useTranslation();
@@ -1894,6 +1908,13 @@ const CuttingPage = () => {
   const tableNoDropdownRef = useRef(null);
   const [cutPanelData, setCutPanelData] = useState(null);
   const [availableSizes, setAvailableSizes] = useState([]);
+  const [aggregatedTotalOrderQty, setAggregatedTotalOrderQty] = useState(null);
+
+  // New state variables
+  const [inspectionProgress, setInspectionProgress] = useState(null);
+  const [inspectedSizes, setInspectedSizes] = useState([]);
+  const [bundleQtyError, setBundleQtyError] = useState("");
+
   const [planLayerQty, setPlanLayerQty] = useState(0);
   const [totalPlanPcs, setTotalPlanPcs] = useState(0);
   const [actualLayers, setActualLayers] = useState(0);
@@ -1960,12 +1981,8 @@ const CuttingPage = () => {
   });
   const [measurementPoints, setMeasurementPoints] = useState([]);
   const [fabricDefects, setFabricDefects] = useState([]);
+  const [aqlDetails, setAQLDetails] = useState(null);
   const cuttingIssuesRef = useRef(null); // Ref for CuttingIssues component
-  // const [cuttingIssuesData, setCuttingIssuesData] = useState({
-  //   issues: [],
-  //   additionalComments: "",
-  //   additionalImages: []
-  // });
 
   useEffect(() => {
     const userAgent = navigator.userAgent.toLowerCase();
@@ -2007,10 +2024,39 @@ const CuttingPage = () => {
     fetchMoNumbers();
   }, [moNoSearch, t]);
 
+  // Add this useEffect to fetch aggregated total order quantity
+  useEffect(() => {
+    const fetchAggregatedTotalOrderQty = async () => {
+      if (!moNo) {
+        setAggregatedTotalOrderQty(null);
+        return;
+      }
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/api/cutpanel-orders/aggregated-total-order-qty`,
+          {
+            params: { styleNo: moNo },
+            headers: { "Content-Type": "application/json" },
+            withCredentials: true
+          }
+        );
+        setAggregatedTotalOrderQty(response.data.aggregatedTotalOrderQty);
+      } catch (error) {
+        console.error("Error fetching aggregated total order quantity:", error);
+        setAggregatedTotalOrderQty(null); // Or set to 0 or show an error
+        // Optionally, show a user-facing error, but for now, just log it.
+      }
+    };
+
+    fetchAggregatedTotalOrderQty();
+  }, [moNo]); // Re-fetch when moNo changes
+
   useEffect(() => {
     const fetchTableNoOptions = async () => {
       if (!moNo) {
         setTableNoOptions([]);
+        setTableNoSearch(""); // Also clear search if moNo is cleared
+        setTableNo(""); // And the selected tableNo
         return;
       }
       try {
@@ -2035,6 +2081,23 @@ const CuttingPage = () => {
     };
     fetchTableNoOptions();
   }, [moNo, t]);
+
+  // useEffect to reset cutPanelData and other dependent states when moNo or tableNo changes
+  useEffect(() => {
+    if (!moNo || !tableNo) {
+      setCutPanelData(null);
+      setAvailableSizes([]);
+      setPlanLayerQty(0);
+      setTotalPlanPcs(0);
+      setActualLayers(0);
+      // Potentially reset other states that depend on cutPanelData
+    }
+    // If moNo changes but tableNo is not yet selected (or reset),
+    // cutPanelData should also be null.
+    if (!tableNo) {
+      setCutPanelData(null);
+    }
+  }, [moNo, tableNo]);
 
   useEffect(() => {
     const fetchCutPanelData = async () => {
@@ -2077,6 +2140,40 @@ const CuttingPage = () => {
     fetchCutPanelData();
   }, [moNo, tableNo, t]);
 
+  // Fetch inspection progress when moNo, tableNo, and selectedPanel change
+  useEffect(() => {
+    const fetchInspectionProgress = async () => {
+      if (!moNo || !tableNo || !selectedPanel) {
+        setInspectionProgress(null);
+        setInspectedSizes([]);
+        setBundleQtyError("");
+        return;
+      }
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/api/cutting-inspection-progress`,
+          {
+            params: { moNo, tableNo, garmentType: selectedPanel },
+            headers: { "Content-Type": "application/json" },
+            withCredentials: true
+          }
+        );
+        setInspectionProgress(response.data.progress);
+        setInspectedSizes(response.data.inspectedSizes || []);
+      } catch (error) {
+        console.error("Error fetching inspection progress:", error);
+        setInspectionProgress(null);
+        setInspectedSizes([]);
+        Swal.fire({
+          icon: "error",
+          title: t("cutting.error"),
+          text: t("cutting.failedToFetchInspectionProgress")
+        });
+      }
+    };
+    fetchInspectionProgress();
+  }, [moNo, tableNo, selectedPanel, t]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -2101,20 +2198,40 @@ const CuttingPage = () => {
       const layersToUse = actualLayers || planLayerQty;
       const multiplication = parseInt(totalBundleQty) * layersToUse;
       let calculatedBundleQtyCheck;
-      if (multiplication >= 1 && multiplication <= 500)
+      if (multiplication >= 1 && multiplication <= 150)
+        calculatedBundleQtyCheck = 2;
+      else if (multiplication >= 151 && multiplication <= 280)
         calculatedBundleQtyCheck = 3;
+      else if (multiplication >= 281 && multiplication <= 500)
+        calculatedBundleQtyCheck = 4;
       else if (multiplication >= 501 && multiplication <= 1200)
-        calculatedBundleQtyCheck = 5;
+        calculatedBundleQtyCheck = 6;
       else if (multiplication >= 1201 && multiplication <= 3000)
         calculatedBundleQtyCheck = 9;
       else if (multiplication >= 3201 && multiplication <= 10000)
         calculatedBundleQtyCheck = 14;
       else if (multiplication >= 10001 && multiplication <= 35000)
-        calculatedBundleQtyCheck = 20;
+        calculatedBundleQtyCheck = 21;
       else calculatedBundleQtyCheck = "";
       setBundleQtyCheck(calculatedBundleQtyCheck.toString());
       if (!isTotalInspectionQtyManual)
         setTotalInspectionQty(calculatedBundleQtyCheck * 15);
+
+      // Fetch AQL details
+      const fetchAQLDetails = async () => {
+        try {
+          const response = await axios.get(`${API_BASE_URL}/api/aql-details`, {
+            params: { lotSize: multiplication },
+            headers: { "Content-Type": "application/json" },
+            withCredentials: true
+          });
+          setAQLDetails(response.data);
+        } catch (error) {
+          console.error("Error fetching AQL details:", error);
+          setAQLDetails(null);
+        }
+      };
+      fetchAQLDetails();
     } else {
       setBundleQtyCheck("");
       if (!isTotalInspectionQtyManual) setTotalInspectionQty(0);
@@ -2483,6 +2600,9 @@ const CuttingPage = () => {
     setTableData([]);
     setColumnDefects([]);
     setFilters({ panelName: "", side: "", direction: "", lw: "" });
+    setInspectionProgress(null); // Reset progress
+    setInspectedSizes([]); // Reset inspected sizes
+    setBundleQtyError(""); // Reset bundle qty error
   };
 
   const resetMeasurementData = () => {
@@ -2603,13 +2723,22 @@ const CuttingPage = () => {
     });
   };
 
-  // // Handle updates from CuttingIssues
-  // const handleIssuesChange = (issuesData) => {
-  //   setCuttingIssuesData(issuesData);
-  // };
+  // Helper function to determine if a checkbox should be disabled
+  const isPartCheckboxDisabled = (bundleRow, currentPartName) => {
+    // bundleRow.parts is an array of selected part names for this bundle
+    if (
+      bundleRow.parts.length === 1 &&
+      !bundleRow.parts.includes(currentPartName)
+    ) {
+      return true; // Disable if one part is selected AND it's not the current part's checkbox
+    }
+    return false; // Otherwise, enable
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validate required fields
     if (
       !moNo ||
       !tableNo ||
@@ -2627,44 +2756,89 @@ const CuttingPage = () => {
       return;
     }
 
+    // Calculate total parts based on bundleTableData
+    const totalPcsSize = bundleTableData.reduce((acc, bundle) => {
+      const numParts = bundle.parts.length;
+      const tValue = parseInt(bundle.tValue) || 5;
+      const mValue = parseInt(bundle.mValue) || 5;
+      const bValue = parseInt(bundle.bValue) || 5;
+      return acc + numParts * (tValue + mValue + bValue);
+    }, 0);
+
+    const pcsSize = {
+      total: totalPcsSize,
+      top: bundleTableData.reduce(
+        (acc, bundle) =>
+          acc + bundle.parts.length * (parseInt(bundle.tValue) || 5),
+        0
+      ),
+      middle: bundleTableData.reduce(
+        (acc, bundle) =>
+          acc + bundle.parts.length * (parseInt(bundle.mValue) || 5),
+        0
+      ),
+      bottom: bundleTableData.reduce(
+        (acc, bundle) =>
+          acc + bundle.parts.length * (parseInt(bundle.bValue) || 5),
+        0
+      )
+    };
+
+    const totalReject =
+      summary.Top.totalReject +
+      summary.Middle.totalReject +
+      summary.Bottom.totalReject;
+
+    const rejectSize = {
+      total: totalReject,
+      top: summary.Top.totalReject,
+      middle: summary.Middle.totalReject,
+      bottom: summary.Bottom.totalReject
+    };
+
+    // Calculate passSize as pcsSize - rejectSize
+    const passSize = {
+      total: totalPcsSize - totalReject,
+      top: pcsSize.top - summary.Top.totalReject,
+      middle: pcsSize.middle - summary.Middle.totalReject,
+      bottom: pcsSize.bottom - summary.Bottom.totalReject
+    };
+
+    if (!totalPcsSize || !bundleTableData.length) {
+      Swal.fire({
+        icon: "warning",
+        title: t("cutting.invalidData"),
+        text: t("cutting.missingInspectionData")
+      });
+      return;
+    }
+
     let cuttingtype = "";
     if (cuttingByAuto && cuttingByManual) cuttingtype = "Auto & Manual";
     else if (cuttingByAuto) cuttingtype = "Auto";
     else if (cuttingByManual) cuttingtype = "Manual";
     else cuttingtype = "None";
 
-    // Get cutting issues data from CuttingIssues component
     const cuttingIssuesData = cuttingIssuesRef.current.getIssuesData();
 
     const inspectionData = {
       inspectedSize: selectedSize,
       bundleQtyCheckSize: parseInt(bundleQty),
       tolerance,
-      totalPcsSize: totalParts,
-      pcsSize: {
-        total: totalParts,
-        top: summary.Top.totalParts,
-        middle: summary.Middle.totalParts,
-        bottom: summary.Bottom.totalParts
-      },
-      passSize: {
-        total: totalPass,
-        top: summary.Top.totalPass,
-        middle: summary.Middle.totalPass,
-        bottom: summary.Bottom.totalPass
-      },
-      rejectSize: {
-        total: totalReject,
-        top: summary.Top.totalReject,
-        middle: summary.Middle.totalReject,
-        bottom: summary.Bottom.totalReject
-      },
+      totalPcsSize, // Now calculated from bundleTableData
+      pcsSize, // Detailed breakdown by Top, Middle, Bottom
+      passSize,
+      rejectSize,
       rejectGarmentSize: {
-        total: totalReject,
-        top: summary.Top.totalReject,
-        middle: summary.Middle.totalReject,
-        bottom: summary.Bottom.totalReject
+        total:
+          summary.Top.rejectDefects +
+          summary.Middle.rejectDefects +
+          summary.Bottom.rejectDefects,
+        top: summary.Top.rejectDefects,
+        middle: summary.Middle.rejectDefects,
+        bottom: summary.Bottom.rejectDefects
       },
+
       rejectMeasurementSize: {
         total:
           summary.Top.rejectMeasurement +
@@ -2676,13 +2850,23 @@ const CuttingPage = () => {
       },
       passrateSize: {
         total:
-          totalParts > 0
-            ? parseFloat(((totalPass / totalParts) * 100).toFixed(2))
+          totalPcsSize > 0
+            ? parseFloat(((passSize.total / totalPcsSize) * 100).toFixed(2))
             : 0,
-        top: summary.Top.passRate,
-        middle: summary.Middle.passRate,
-        bottom: summary.Bottom.passRate
+        top:
+          pcsSize.top > 0
+            ? parseFloat(((passSize.top / pcsSize.top) * 100).toFixed(2))
+            : 0,
+        middle:
+          pcsSize.middle > 0
+            ? parseFloat(((passSize.middle / pcsSize.middle) * 100).toFixed(2))
+            : 0,
+        bottom:
+          pcsSize.bottom > 0
+            ? parseFloat(((passSize.bottom / pcsSize.bottom) * 100).toFixed(2))
+            : 0
       },
+
       bundleInspectionData: bundleTableData.map((bundle, bundleIndex) => ({
         bundleNo: bundle.bundleNo,
         serialLetter: bundle.serialLetter,
@@ -2720,13 +2904,14 @@ const CuttingPage = () => {
         },
         rejectGarment: {
           total:
-            (summary.Top.bundles[bundleIndex]?.totalReject || 0) +
-            (summary.Middle.bundles[bundleIndex]?.totalReject || 0) +
-            (summary.Bottom.bundles[bundleIndex]?.totalReject || 0),
-          top: summary.Top.bundles[bundleIndex]?.totalReject || 0,
-          middle: summary.Middle.bundles[bundleIndex]?.totalReject || 0,
-          bottom: summary.Bottom.bundles[bundleIndex]?.totalReject || 0
+            (summary.Top.bundles[bundleIndex]?.rejectDefects || 0) +
+            (summary.Middle.bundles[bundleIndex]?.rejectDefects || 0) +
+            (summary.Bottom.bundles[bundleIndex]?.rejectDefects || 0),
+          top: summary.Top.bundles[bundleIndex]?.rejectDefects || 0,
+          middle: summary.Middle.bundles[bundleIndex]?.rejectDefects || 0,
+          bottom: summary.Bottom.bundles[bundleIndex]?.rejectDefects || 0
         },
+
         rejectMeasurement: {
           total:
             (summary.Top.bundles[bundleIndex]?.rejectMeasurement || 0) +
@@ -2785,84 +2970,104 @@ const CuttingPage = () => {
                   ).toFixed(2)
                 )
               : 0
-        }
+        },
+        measurementInsepctionData: bundle.parts.map((partName) => {
+          const partInfo = panelIndexNames.find(
+            (p) => p.panelIndexName === partName
+          );
+          return {
+            partName,
+            partNo: partInfo?.panelIndex || 0,
+            partNameKhmer: partInfo?.panelIndexNameKhmer || "",
+            measurementPointsData: measurementPoints
+              .filter((mp) => mp.panelIndexName === partName)
+              .map((mp) => ({
+                measurementPointName: mp.pointNameEng,
+                measurementPointNameKhmer: mp.pointNameKhmer,
+                panelName: mp.panelName,
+                side: mp.panelSide,
+                direction: mp.panelDirection,
+                property: mp.measurementSide,
+                measurementValues: ["Top", "Middle", "Bottom"].map(
+                  (location) => ({
+                    location,
+                    measurements: (tableData[bundleIndex]?.[location] || [])
+                      .filter(
+                        (row) =>
+                          row.measurementPoint === mp.pointNameEng && row.isUsed
+                      )
+                      .flatMap((row) =>
+                        row.values.map((val, idx) => ({
+                          pcsName: `${location[0]}${idx + 1}`,
+                          valuedecimal: val.decimal,
+                          valuefraction: val.fraction,
+                          status:
+                            val.decimal < tolerance.min ||
+                            val.decimal > tolerance.max
+                              ? "Fail"
+                              : "Pass"
+                        }))
+                      )
+                  })
+                )
+              })),
+            fabricDefects: ["Top", "Middle", "Bottom"].map((location) => {
+              // Determine number of pieces for this location (e.g., T1 to T5)
+              const pcsCount =
+                (tableData[bundleIndex]?.[location] || [])
+                  .filter((row) => row.isUsed)
+                  .reduce((max, row) => Math.max(max, row.values.length), 0) ||
+                5; // Default to 5 if no data
+              const defectData = Array.from(
+                { length: pcsCount },
+                (_, colIdx) => {
+                  // Get defects array for this piece, handling nested structure
+                  const defectsArray =
+                    (columnDefects[bundleIndex]?.[location] || [])[colIdx] ||
+                    [];
+                  // Filter valid defects from the defects array
+                  const validDefects = defectsArray
+                    .flat()
+                    .filter(
+                      (d) =>
+                        d &&
+                        typeof d === "object" &&
+                        d.defectName &&
+                        typeof d.defectName === "string" &&
+                        d.defectName.trim() !== "" &&
+                        d.count != null &&
+                        Number(d.count) > 0
+                    );
+                  return {
+                    pcsName: `${location[0]}${colIdx + 1}`,
+                    totalDefects: validDefects.reduce(
+                      (sum, d) => sum + Number(d.count),
+                      0
+                    ),
+                    defects: validDefects.map((d) => ({
+                      defectName: d.defectName.trim(),
+                      defectQty: Number(d.count)
+                    }))
+                  };
+                }
+              );
+              return {
+                location,
+                defectData
+              };
+            })
+          };
+        })
       })),
+
       cuttingDefects: {
         issues: cuttingIssuesData.issues,
         additionalComments: cuttingIssuesData.additionalComments,
         additionalImages: cuttingIssuesData.additionalImages
       },
-      measurementInsepctionData: bundleTableData.flatMap(
-        (bundle, bundleIndex) =>
-          bundle.parts.map((partName) => {
-            const partInfo = panelIndexNames.find(
-              (p) => p.panelIndexName === partName
-            );
-            return {
-              partName,
-              partNo: partInfo?.panelIndex || 0,
-              partNameKhmer: partInfo?.panelIndexNameKhmer || "",
-              measurementPointsData: measurementPoints
-                .filter((mp) => mp.panelIndexName === partName)
-                .map((mp) => ({
-                  measurementPointName: mp.pointNameEng,
-                  measurementPointNameKhmer: mp.pointNameKhmer,
-                  panelName: mp.panelName,
-                  side: mp.panelSide,
-                  direction: mp.panelDirection,
-                  property: mp.measurementSide,
-                  measurementValues: ["Top", "Middle", "Bottom"].map(
-                    (location) => ({
-                      location,
-                      measurements: (tableData[bundleIndex]?.[location] || [])
-                        .filter(
-                          (row) =>
-                            row.measurementPoint === mp.pointNameEng &&
-                            row.isUsed
-                        )
-                        .flatMap((row) =>
-                          row.values.map((val, idx) => ({
-                            pcsName: `${location[0]}${idx + 1}`,
-                            valuedecimal: val.decimal,
-                            valuefraction: val.fraction,
-                            status:
-                              val.decimal < tolerance.min ||
-                              val.decimal > tolerance.max
-                                ? "Fail"
-                                : "Pass"
-                          }))
-                        )
-                    })
-                  )
-                })),
-              fabricDefects: ["Top", "Middle", "Bottom"].map((location) => ({
-                location,
-                defectData: (
-                  columnDefects[bundleIndex]?.[location] || []
-                ).flatMap((col, colIdx) =>
-                  col
-                    .map((defects, panelIdx) =>
-                      defects.length > 0
-                        ? {
-                            pcsName: `${location[0]}${colIdx + 1}`,
-                            totalDefects: defects.reduce(
-                              (sum, d) => sum + d.count,
-                              0
-                            ),
-                            defects: defects.map((d) => ({
-                              defectName: d.defectName,
-                              defectQty: d.count
-                            }))
-                          }
-                        : null
-                    )
-                    .filter(Boolean)
-                )
-              }))
-            };
-          })
-      ),
-      inspectionTime: new Date().toLocaleTimeString("en-US", { hour12: false })
+      inspectionTime: new Date().toLocaleTimeString("en-US", { hour12: false }),
+      created_at: new Date(), // Add timestamps to inspectionData
+      updated_at: new Date()
     };
 
     const report = {
@@ -2879,6 +3084,10 @@ const CuttingPage = () => {
       color: cutPanelData?.Color || "",
       lotNo: cutPanelData?.LotNos || [],
       orderQty: cutPanelData?.TotalOrderQty || 0,
+      totalOrderQtyStyle:
+        aggregatedTotalOrderQty !== null
+          ? aggregatedTotalOrderQty
+          : cutPanelData?.TotalOrderQty || 0, // <<<--- ADD THIS LINE
       fabricDetails: {
         fabricType: cutPanelData?.FabricType || "",
         material: cutPanelData?.Material || "",
@@ -2891,7 +3100,7 @@ const CuttingPage = () => {
       },
       cuttingTableDetails: {
         spreadTable: cutPanelData?.SpreadTable || "",
-        spreadTableNo: cutPanelData?.SpreadTableNo || "",
+        spreadTableNo: tableNo.replace(/^T\s*/, ""), // Remove leading "T" and spaces,
         planLayers: planLayerQty,
         actualLayers: actualLayers,
         totalPcs: totalPlanPcs,
@@ -2899,30 +3108,40 @@ const CuttingPage = () => {
         mackerLength: cutPanelData?.MackerLength || 0
       },
       mackerRatio:
-        cutPanelData?.MarkerRatio.filter((mr) => mr.cuttingRatio !== null).map(
-          (data, index) => ({
-            index: index + 1,
-            markerSize: data.size,
-            ratio: data.cuttingRatio
-          })
-        ) || [],
+        cutPanelData?.MarkerRatio.filter(
+          (mr) =>
+            mr.cuttingRatio !== null &&
+            mr.cuttingRatio !== 0 &&
+            mr.cuttingRatio !== ""
+        ).map((data, index) => ({
+          index: index + 1,
+          markerSize: data.size,
+          ratio: data.cuttingRatio
+        })) || [],
       totalBundleQty: parseInt(totalBundleQty),
       bundleQtyCheck: parseInt(bundleQtyCheck),
       totalInspectionQty,
       cuttingtype,
       garmentType: selectedPanel,
-      inspectionData
+      inspectionData: [inspectionData] // Wrap in array as schema expects an array
     };
 
     try {
-      await axios.post(`${API_BASE_URL}/api/save-cutting-inspection`, report);
+      const response = await axios.post(
+        `${API_BASE_URL}/api/save-cutting-inspection`,
+        report,
+        {
+          headers: { "Content-Type": "application/json" },
+          withCredentials: true // Add for CORS/auth
+        }
+      );
       Swal.fire({
         icon: "success",
         title: t("cutting.success"),
         text: t("cutting.dataSaved")
       });
 
-      // Reset inspection-specific states while preserving common data
+      // Reset form and refresh inspected sizes
       setSelectedSize("");
       setBundleQty("");
       setBundleTableData([]);
@@ -2959,12 +3178,25 @@ const CuttingPage = () => {
       });
       setActiveMeasurementTab("Top");
       setFilters({ panelName: "", side: "", direction: "", lw: "" });
+      setBundleQtyError("");
+
+      // Refresh inspected sizes
+      const progressResponse = await axios.get(
+        `${API_BASE_URL}/api/cutting-inspection-progress`,
+        {
+          params: { moNo, tableNo, garmentType: selectedPanel },
+          headers: { "Content-Type": "application/json" },
+          withCredentials: true
+        }
+      );
+      setInspectedSizes(progressResponse.data.inspectedSizes || []);
+      setInspectionProgress(progressResponse.data.progress);
     } catch (error) {
       console.error("Error saving Cutting data:", error);
       Swal.fire({
         icon: "error",
         title: t("cutting.error"),
-        text: t("cutting.failedToSaveData")
+        text: error.response?.data?.message || t("cutting.failedToSaveData")
       });
     }
   };
@@ -3165,6 +3397,16 @@ const CuttingPage = () => {
             {t("cutting.data")}
           </button>
           <button
+            onClick={() => setActiveTab("report")}
+            className={`px-4 py-2 ${
+              activeTab === "report"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            {t("cutting.report")}
+          </button>
+          <button
             onClick={() => setActiveTab("Modify")}
             className={`px-4 py-2 ${
               activeTab === "Modify"
@@ -3232,10 +3474,26 @@ const CuttingPage = () => {
                           <li
                             key={index}
                             onClick={() => {
-                              setMoNo(option);
-                              setMoNoSearch(option);
+                              const newMoNo = option;
+                              // Check if MO No actually changed to prevent unnecessary resets
+                              if (moNo !== newMoNo) {
+                                setMoNo(newMoNo);
+                                setTableNo(""); // Reset selected Table No
+                                setTableNoSearch(""); // Reset Table No search input
+                                setTableNoOptions([]); // Clear old table options
+                                setCutPanelData(null); // Reset cut panel data
+                                setAvailableSizes([]); // Reset sizes
+                                setAggregatedTotalOrderQty(null); // Reset aggregated Qty
+                                // Add any other state resets that depend on MO or TableNo
+                              }
+                              setMoNoSearch(newMoNo); // Update search to reflect selection
                               setShowMoNoDropdown(false);
                             }}
+                            // onClick={() => {
+                            //   setMoNo(option);
+                            //   setMoNoSearch(option);
+                            //   setShowMoNoDropdown(false);
+                            // }}
                             className="p-2 hover:bg-blue-100 cursor-pointer"
                           >
                             {option}
@@ -3350,6 +3608,15 @@ const CuttingPage = () => {
                           </td>
                           <td className="border border-gray-300 p-2 text-center text-sm">
                             {cutPanelData.TotalOrderQty}
+                            {/* New aggregated total display */}
+                            {aggregatedTotalOrderQty !== null &&
+                              aggregatedTotalOrderQty !== undefined && (
+                                <div className="mt-1">
+                                  <span className="font-bold text-xs text-green-600">
+                                    Total: {aggregatedTotalOrderQty}
+                                  </span>
+                                </div>
+                              )}
                           </td>
                         </tr>
                       </tbody>
@@ -3516,8 +3783,68 @@ const CuttingPage = () => {
                       </tbody>
                     </table>
                   </div>
+                  {/* Progress Bar and Inspection Stats */}
+                  {selectedPanel && (
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                        {t("cutting.inspectionProgress")}
+                      </h3>
+                      <div className="w-full bg-gray-200 rounded-full h-4">
+                        <div
+                          className="bg-blue-800 h-4 rounded-full"
+                          style={{
+                            width: `${
+                              inspectionProgress && inspectionProgress.total > 0
+                                ? (inspectionProgress.completed /
+                                    inspectionProgress.total) *
+                                  100
+                                : 0
+                            }%`
+                          }}
+                        ></div>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-2">
+                        {inspectionProgress
+                          ? `${inspectionProgress.completed}/${
+                              inspectionProgress.total
+                            } ${t("cutting.completed")}`
+                          : t("cutting.inspectionNotStarted")}
+                      </p>
+                      {inspectionProgress && (
+                        <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-700">
+                          <div className="flex items-center">
+                            <AlertCircle className="w-4 h-4 mr-1 text-blue-600" />
+                            <span>
+                              {t("cutting.totalInspected")}:{" "}
+                              {inspectionProgress.inspected}
+                            </span>
+                          </div>
+                          <div className="flex items-center">
+                            <CheckCircle className="w-4 h-4 mr-1 text-green-600" />
+                            <span>
+                              {t("cutting.pass")}: {inspectionProgress.pass}
+                            </span>
+                          </div>
+                          <div className="flex items-center">
+                            <XCircle className="w-4 h-4 mr-1 text-red-600" />
+                            <span>
+                              {t("cutting.reject")}: {inspectionProgress.reject}
+                            </span>
+                          </div>
+                          <div className="flex items-center">
+                            <Percent className="w-4 h-4 mr-1 text-purple-600" />
+                            <span>
+                              {t("cutting.passRate")}:{" "}
+                              {inspectionProgress.passRate.toFixed(2)}%
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
+
               {cutPanelData && (
                 <div className="mt-6">
                   <hr className="my-4 border-gray-300" />
@@ -3677,6 +4004,41 @@ const CuttingPage = () => {
                   <div className="mt-2 text-sm text-gray-600">
                     {t("cutting.samplingStandard")}
                   </div>
+
+                  {aqlDetails && (
+                    <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg shadow-sm hover:bg-blue-100 transition-colors flex flex-wrap gap-4 text-sm text-gray-800 font-medium">
+                      <div className="flex items-center gap-1">
+                        <Tag className="w-4 h-4 text-blue-600" />
+                        <span>Type: General</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Layers className="w-4 h-4 text-blue-600" />
+                        <span>Level: II</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Tag className="w-4 h-4 text-blue-600" />
+                        <span>
+                          Sample Size Code Letter:{" "}
+                          {aqlDetails.SampleSizeLetterCode}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Box className="w-4 h-4 text-blue-600" />
+                        <span>
+                          AQL Sample Requirement: {aqlDetails.SampleSize}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <CheckCircle className="w-4 h-4 text-blue-600" />
+                        <span>Ac: {aqlDetails.AcceptDefect}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <XCircle className="w-4 h-4 text-blue-600" />
+                        <span>Re: {aqlDetails.RejectDefect}</span>
+                      </div>
+                    </div>
+                  )}
+
                   <hr className="my-4 border-gray-300" />
                   <div className="flex flex-wrap items-center gap-4">
                     <div className="flex-1 min-w-[200px]">
@@ -3716,18 +4078,44 @@ const CuttingPage = () => {
                           setSelectedSize(e.target.value);
                           setBundleQty("");
                           setBundleTableData([]);
+                          setBundleQtyError("");
                         }}
                         className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                        disabled={!tableNo || availableSizes.length === 0}
+                        disabled={
+                          !tableNo ||
+                          availableSizes.length === 0 ||
+                          !selectedPanel ||
+                          (inspectionProgress &&
+                            inspectionProgress.completed ===
+                              inspectionProgress.total)
+                        }
                       >
                         <option value="">{t("cutting.select_size")}</option>
                         {availableSizes.map((size, index) => (
-                          <option key={index} value={size}>
+                          <option
+                            key={index}
+                            value={size}
+                            disabled={
+                              inspectedSizes.includes(size) ||
+                              (inspectionProgress &&
+                                inspectionProgress.completed ===
+                                  inspectionProgress.total)
+                            }
+                            className={
+                              inspectedSizes.includes(size) ||
+                              (inspectionProgress &&
+                                inspectionProgress.completed ===
+                                  inspectionProgress.total)
+                                ? "text-gray-400"
+                                : ""
+                            }
+                          >
                             {size}
                           </option>
                         ))}
                       </select>
                     </div>
+
                     <div className="flex-1 min-w-[200px]">
                       <label className="block text-sm font-medium text-gray-700">
                         {t("cutting.bundleQty")}
@@ -3736,6 +4124,19 @@ const CuttingPage = () => {
                         value={bundleQty}
                         onChange={(e) => {
                           const qty = parseInt(e.target.value) || 0;
+                          // Validate bundleQty against bundleQtyCheck and inspected sizes
+                          const totalInspectedQty = inspectionProgress
+                            ? inspectionProgress.completed
+                            : 0;
+                          const remainingQty =
+                            parseInt(bundleQtyCheck) - totalInspectedQty;
+                          if (qty > remainingQty) {
+                            setBundleQtyError(t("cutting.invalidBundleQty"));
+                            setBundleQty("");
+                            setBundleTableData([]);
+                            return;
+                          }
+                          setBundleQtyError("");
                           setBundleQty(e.target.value);
                           const newBundleTableData = Array.from(
                             { length: qty },
@@ -3818,6 +4219,11 @@ const CuttingPage = () => {
                           </option>
                         ))}
                       </select>
+                      {bundleQtyError && (
+                        <p className="mt-1 text-sm text-red-600">
+                          {bundleQtyError}
+                        </p>
+                      )}
                     </div>
                     <div className="flex-1 min-w-[200px]">
                       <label className="block text-sm font-medium text-gray-700">
@@ -3842,7 +4248,8 @@ const CuttingPage = () => {
                       </select>
                     </div>
                   </div>
-                  {bundleQty && (
+
+                  {bundleQty && !bundleQtyError && (
                     <div className="mt-4">
                       <h2 className="text-sm font-semibold text-gray-700">
                         {t("cutting.bundleDetails")}
@@ -3898,69 +4305,112 @@ const CuttingPage = () => {
 
                                 <td className="border border-gray-300 p-2 text-sm w-auto">
                                   <div className="flex flex-wrap gap-2">
-                                    {panelIndexNames.map((item, i) => (
-                                      <label
-                                        key={i}
-                                        className="flex items-center space-x-1 text-sm"
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={row.parts.includes(
-                                            item.panelIndexName
-                                          )}
-                                          onChange={(e) => {
-                                            const newBundleTableDataState = [
-                                              ...bundleTableData
-                                            ];
-                                            const currentBundleObject =
-                                              newBundleTableDataState[index];
-                                            const partName =
-                                              item.panelIndexName;
+                                    {panelIndexNames.map((item, i) => {
+                                      // Using 'i' for the inner loop index
+                                      const isChecked = row.parts.includes(
+                                        item.panelIndexName
+                                      );
+                                      // 'row' comes from the outer map (bundleTableData.map((row, index) => ...))
+                                      const isDisabled = isPartCheckboxDisabled(
+                                        row,
+                                        item.panelIndexName
+                                      );
 
-                                            let updatedPartsArray;
-                                            if (e.target.checked) {
-                                              updatedPartsArray = [
-                                                ...currentBundleObject.parts,
-                                                partName
+                                      return (
+                                        // Explicit return for the label JSX
+                                        <label
+                                          key={i} // Using 'i' for the key
+                                          className={`flex items-center space-x-1 text-sm ${
+                                            isDisabled
+                                              ? "text-gray-400 cursor-not-allowed"
+                                              : "cursor-pointer"
+                                          }`}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            disabled={isDisabled}
+                                            onChange={(e) => {
+                                              const newBundleTableDataState = [
+                                                ...bundleTableData
                                               ];
-                                            } else {
-                                              updatedPartsArray =
-                                                currentBundleObject.parts.filter(
-                                                  (part) => part !== partName
+                                              // Use 'index' from the outer map to get the correct bundle object
+                                              const currentBundleObject =
+                                                newBundleTableDataState[index];
+                                              const partName =
+                                                item.panelIndexName;
+                                              let updatedPartsArray;
+
+                                              if (e.target.checked) {
+                                                updatedPartsArray = [partName]; // Single selection logic
+                                              } else {
+                                                updatedPartsArray = []; // Clear selection on uncheck
+                                              }
+                                              // Use 'index' from the outer map to update the correct bundle's parts
+                                              newBundleTableDataState[
+                                                index
+                                              ].parts = updatedPartsArray;
+                                              setBundleTableData(
+                                                newBundleTableDataState
+                                              );
+                                            }}
+                                            className={`h-4 w-4 text-blue-600 border-gray-300 rounded ${
+                                              isDisabled
+                                                ? "cursor-not-allowed"
+                                                : "cursor-pointer"
+                                            }`}
+                                          />
+                                          <span>
+                                            {(() => {
+                                              if (i18n.language === "km") {
+                                                return (
+                                                  item.panelIndexNameKhmer ||
+                                                  item.panelIndexName
                                                 );
-                                            }
-                                            newBundleTableDataState[
-                                              index
-                                            ].parts = updatedPartsArray;
-                                            setBundleTableData(
-                                              newBundleTableDataState
-                                            );
-                                          }}
-                                          className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                                        />
-                                        <span>
-                                          {i18n.language === "km"
-                                            ? item.panelIndexNameKhmer ||
-                                              item.panelIndexName
-                                            : item.panelIndexName}
-                                          ({item.panelIndexNameKhmer})
-                                          {/* <br /> ({item.panelIndexNameKhmer}) */}
-                                        </span>
-                                      </label>
-                                    ))}
+                                              } else if (
+                                                i18n.language === "zh" &&
+                                                item.panelIndexNameChinese
+                                              ) {
+                                                return (
+                                                  item.panelIndexNameChinese ||
+                                                  item.panelIndexName
+                                                );
+                                              } else {
+                                                return item.panelIndexName;
+                                              }
+                                            })()}
+                                            {i18n.language !== "km" &&
+                                              item.panelIndexNameKhmer &&
+                                              ` (${item.panelIndexNameKhmer})`}
+                                          </span>
+                                        </label>
+                                      );
+                                    })}
                                   </div>
                                   <div className="mt-2 text-sm">
                                     {row.parts
                                       .map((part) => {
-                                        const item = panelIndexNames.find(
+                                        const partDetail = panelIndexNames.find(
                                           (p) => p.panelIndexName === part
                                         );
-                                        return item
-                                          ? i18n.language === "km"
-                                            ? item.panelIndexNameKhmer ||
-                                              item.panelIndexName
-                                            : item.panelIndexName
-                                          : part;
+                                        if (!partDetail) return part;
+
+                                        if (i18n.language === "km") {
+                                          return (
+                                            partDetail.panelIndexNameKhmer ||
+                                            partDetail.panelIndexName
+                                          );
+                                        } else if (
+                                          i18n.language === "zh" &&
+                                          partDetail.panelIndexNameChinese
+                                        ) {
+                                          return (
+                                            partDetail.panelIndexNameChinese ||
+                                            partDetail.panelIndexName
+                                          );
+                                        } else {
+                                          return partDetail.panelIndexName;
+                                        }
                                       })
                                       .join(", ")}
                                   </div>
@@ -3980,7 +4430,7 @@ const CuttingPage = () => {
                                       className="p-1 border border-gray-300 rounded-lg text-sm"
                                       //disabled={row.parts.length > 0}
                                     >
-                                      {[...Array(5)].map((_, i) => (
+                                      {[...Array(10)].map((_, i) => (
                                         <option key={i + 1} value={i + 1}>
                                           {i + 1}
                                         </option>
@@ -3998,7 +4448,7 @@ const CuttingPage = () => {
                                       className="p-1 border border-gray-300 rounded-lg text-sm"
                                       //disabled={row.parts.length > 0}
                                     >
-                                      {[...Array(5)].map((_, i) => (
+                                      {[...Array(10)].map((_, i) => (
                                         <option key={i + 1} value={i + 1}>
                                           {i + 1}
                                         </option>
@@ -4016,7 +4466,7 @@ const CuttingPage = () => {
                                       className="p-1 border border-gray-300 rounded-lg text-sm"
                                       //disabled={row.parts.length > 0}
                                     >
-                                      {[...Array(5)].map((_, i) => (
+                                      {[...Array(10)].map((_, i) => (
                                         <option key={i + 1} value={i + 1}>
                                           {i + 1}
                                         </option>
@@ -4790,7 +5240,13 @@ const CuttingPage = () => {
             </div>
           </>
         ) : activeTab === "data" ? (
-          <div className="text-gray-600">{t("cutting.dataTabPlaceholder")}</div>
+          <div className="text-gray-600">
+            <CuttingInspectionModify />
+          </div>
+        ) : activeTab === "report" ? (
+          <div className="text-gray-600">
+            <CuttingReportQCView />
+          </div>
         ) : activeTab === "Modify" ? (
           <div className="text-gray-600">
             <CuttingMeasurementPointsModify />
@@ -4800,7 +5256,10 @@ const CuttingPage = () => {
             <CuttingOrderModify />
           </div>
         ) : (
-          <div className="text-gray-600">{t("cutting.dataTabPlaceholder")}</div>
+          // <div className="text-gray-600">{t("cutting.dataTabPlaceholder")}</div>
+          <div className="text-gray-600">
+            <AQLChart />
+          </div>
         )}
       </div>
     </div>
