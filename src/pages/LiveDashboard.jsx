@@ -563,7 +563,7 @@ const LiveDashboard = () => {
         )}
         
 
-        {activeSection === "QC Inline Roving" && <RovingReport />}
+        {activeSection === "Roving Report" && <RovingReport />}
         {activeSection === "Cutting Reports" && <CuttingReport />}
         {activeSection === "Cutting Trend" && (
           <CuttingGarmentTypeTrendAnalysis />

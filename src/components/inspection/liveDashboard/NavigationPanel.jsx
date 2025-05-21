@@ -34,7 +34,7 @@ const NavigationPanel = ({
     { name: "Home", icon: <Home size={18} />, subMenus: [] },
     { name: "QC Inline Roving", icon: <Search size={16} />, subMenus: [
        { name: "Roving Report", icon: <BarChart size={16} /> },
-       { name: "Roving Trend", icon: <BarChart size={16} /> }
+       { name: "Roving Trend", icon: <TrendingUp size={16} /> }
     ] },
     {
       name: "Cutting",

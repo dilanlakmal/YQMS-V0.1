@@ -94,11 +94,22 @@ app.use('/public', express.static(path.join(__dirname, '../public')));
 app.use('/storage', express.static(path.join(__dirname, '..', 'public', 'storage')));
 
 app.use(bodyParser.json());
+const allowedOrigins = ["https://192.167.8.235:3001", "http://localhost:3001", "https://localhost:3001"];
 app.use(
   cors({
-    origin: "*", //["http://localhost:3001", "https://localhost:3001"], // Allow both HTTP and HTTPS, // Update with your frontend URL
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+        return callback(new Error(msg), false);
+      }
+      return callback(null, true);
+    },
+
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
   })
 );
 //"mongodb://localhost:27017/ym_prod"
@@ -4168,6 +4179,7 @@ app.get("/api/cutting-inspections-report", async (req, res) => {
   }
 });
 
+
 // GET Single Cutting Inspection Report Detail
 app.get("/api/cutting-inspection-report-detail/:id", async (req, res) => {
   try {
@@ -4188,90 +4200,6 @@ app.get("/api/cutting-inspection-report-detail/:id", async (req, res) => {
     });
   }
 });
-
-
-// app.post("/api/save-cutting-inspection", async (req, res) => {
-//   try {
-//     const {
-//       inspectionDate,
-//       cutting_emp_id,
-//       cutting_emp_engName,
-//       cutting_emp_khName,
-//       cutting_emp_dept,
-//       cutting_emp_section,
-//       moNo,
-//       lotNo,
-//       buyer,
-//       orderQty,
-//       color,
-//       tableNo,
-//       planLayerQty,
-//       actualLayerQty,
-//       totalPcs,
-//       cuttingtableLetter,
-//       cuttingtableNo,
-//       marker,
-//       markerRatio,
-//       totalBundleQty,
-//       bundleQtyCheck,
-//       totalInspectionQty,
-//       cuttingtype,
-//       garmentType,
-//       inspectionData
-//     } = req.body;
-
-//     const existingDoc = await CuttingInspection.findOne({
-//       inspectionDate,
-//       moNo,
-//       lotNo,
-//       color,
-//       tableNo
-//     });
-
-//     if (existingDoc) {
-//       // Append new inspectionData to existing document
-//       existingDoc.inspectionData.push(inspectionData);
-//       await existingDoc.save();
-//       res.status(200).json({ message: "Data appended successfully" });
-//     } else {
-//       // Create a new document
-//       const newDoc = new CuttingInspection({
-//         inspectionDate,
-//         cutting_emp_id,
-//         cutting_emp_engName,
-//         cutting_emp_khName,
-//         cutting_emp_dept,
-//         cutting_emp_section,
-//         moNo,
-//         lotNo,
-//         buyer,
-//         orderQty,
-//         color,
-//         tableNo,
-//         planLayerQty,
-//         actualLayerQty,
-//         totalPcs,
-//         cuttingtableLetter,
-//         cuttingtableNo,
-//         marker,
-//         markerRatio,
-//         totalBundleQty,
-//         bundleQtyCheck,
-//         totalInspectionQty,
-//         cuttingtype,
-//         garmentType,
-//         inspectionData: [inspectionData]
-//       });
-//       await newDoc.save();
-//       res.status(200).json({ message: "Data saved successfully" });
-//     }
-//   } catch (error) {
-//     console.error("Error saving cutting inspection data:", error);
-//     res
-//       .status(500)
-//       .json({ message: "Failed to save data", error: error.message });
-//   }
-// });
 
 app.get("/api/cutting-inspection-detailed-report", async (req, res) => {
   try {
