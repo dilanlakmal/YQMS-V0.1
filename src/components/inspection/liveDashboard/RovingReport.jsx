@@ -3,11 +3,12 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../config";
-import { PDFDownloadLink } from "@react-pdf/renderer";
+import { PDFDownloadLink,  Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import RovingReportPDFA3 from "./RovingReportPDFA3";
 import RovingReportPDFA4 from "./RovingReportPDFA4";
-import { FileText } from "lucide-react";
+import { Eye } from "lucide-react";
 import RovingReportFilterPane from "./RovingReportFilterPane";
+import RovingReportDetailView from "./RovingReportDetailView";
 
 const RovingReport = () => {
   // Filter states
@@ -20,16 +21,16 @@ const RovingReport = () => {
   const [qcId, setQcId] = useState("");
   const [paperSize, setPaperSize] = useState("A3"); // Default to A3
   const [reportData, setReportData] = useState([]);
+  const [expandedRowKey, setExpandedRowKey] = useState(null);
   const [filteredData, setFilteredData] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [moNos, setMoNos] = useState([]);
   const [buyers, setBuyers] = useState([]); 
   const [operations, setOperations] = useState([]); 
   const [qcIds, setQcIds] = useState([]);
-  const [lineNos] = useState(
-    Array.from({ length: 30 }, (_, i) => (i + 1).toString())
-  );
-  const [lastUpdated, setLastUpdated] = useState(null); // State for last updated timestamp
+  const [lineNos, setLineNos] = useState([]); // Make lineNos stateful
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const RECORDS_PER_PAGE = 20;
 
   // Format date to "MM/DD/YYYY"
   const formatDate = (date) => {
@@ -50,26 +51,6 @@ const RovingReport = () => {
     const minutes = ("0" + date.getMinutes()).slice(-2);
     const seconds = ("0" + date.getSeconds()).slice(-2);
     return `${month}/${day}/${year} ${hours}:${minutes}:${seconds}`;
-  };
-
-  // Fetch dropdown data
-  const fetchDropdownData = async () => {
-    try {
-     const [moResponse, qcResponse, buyerResponse, operationResponse] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/qc-inline-roving-mo-nos`),
-       axios.get(`${API_BASE_URL}/api/qc-inline-roving-qc-ids`),
-        axios.get(`${API_BASE_URL}/api/qc-inline-roving-buyers`), 
-        axios.get(`${API_BASE_URL}/api/qc-inline-roving-operations`) 
-      ]);
-      setMoNos(moResponse.data);
-      setQcIds(qcResponse.data);
-      setBuyers(buyerResponse.data || []); 
-      setOperations(operationResponse.data || []);
-    } catch (error) {
-      console.error("Error fetching dropdown data:", error);
-      setBuyers([]); 
-      setOperations([]);
-    }
   };
 
   // Fetch report data
@@ -101,7 +82,6 @@ const RovingReport = () => {
 
   // Initial data fetch and set up polling
   useEffect(() => {
-    fetchDropdownData();
     fetchReportData(); // Initial fetch
 
     // Set up polling every 10 seconds
@@ -112,35 +92,68 @@ const RovingReport = () => {
     // Clean up the interval on component unmount
     return () => clearInterval(intervalId);
   }, [startDate, endDate, lineNo, moNo, qcId, buyer, operation]); 
+  // The dependency array ensures data is re-fetched whenever filters change.
 
-  // Apply filters and group data
+  // Process fetched reportData and extract dropdown options
   useEffect(() => {
     const applyFilters = () => {
-      // Group by inspection_date, line_no, mo_no, and emp_id
-      const grouped = reportData.reduce((acc, record) => {
-        const key = `${record.inspection_date}-${record.line_no}-${record.mo_no}-${record.emp_id}`;
-        if (!acc[key]) {
-          acc[key] = { ...record, inlineData: [] };
-        }
-        if (Array.isArray(record.inlineData)) {
-          acc[key].inlineData.push(...record.inlineData);
-        }
-        return acc;
-      }, {});
+      // Extract unique values for dropdowns from the fetched data
+      const uniqueLineNos = new Set();
+      const uniqueMoNos = new Set();
+      const uniqueBuyers = new Set();
+      const uniqueQcIds = new Set();
+      const uniqueTgNos = new Set(); // For the Operation filter
 
-      const groupedData = Object.values(grouped);
-      setFilteredData(groupedData);
+      reportData.forEach(report => {
+        if (report.line_no) uniqueLineNos.add(report.line_no);
+        if (report.mo_no) uniqueMoNos.add(report.mo_no);
+        // Assuming buyer_name is at the root level
+        if (report.buyer_name) uniqueBuyers.add(report.buyer_name);
 
-      // Adjust currentPage to stay within bounds
-      if (currentPage >= groupedData.length && groupedData.length > 0) {
-        setCurrentPage(groupedData.length - 1);
-      } else if (groupedData.length === 0) {
+        if (report.inspection_rep && Array.isArray(report.inspection_rep)) {
+          report.inspection_rep.forEach(repEntry => {
+            if (repEntry.emp_id) uniqueQcIds.add(repEntry.emp_id);
+            if (repEntry.inlineData && Array.isArray(repEntry.inlineData)) {
+              repEntry.inlineData.forEach(item => {
+                if (item.tg_no) uniqueTgNos.add(item.tg_no); // Extract TG No.
+              });
+            }
+          });
+        }
+      });
+
+      const processedData = reportData.map(report => {
+        const inspectionRepCount = (report.inspection_rep && Array.isArray(report.inspection_rep))
+          ? report.inspection_rep.length
+          : 0;
+        return {
+          ...report,
+          inspectionRepCount,
+          uniqueKey: `report-${report._id?.$oid || report.inline_roving_id || (typeof report._id === 'string' ? report._id : JSON.stringify(report._id))}`,
+        };
+      });
+
+      // Update dropdown states with extracted unique values
+      setLineNos(Array.from(uniqueLineNos).sort());
+      setMoNos(Array.from(uniqueMoNos).sort());
+      setBuyers(Array.from(uniqueBuyers).sort());
+      setQcIds(Array.from(uniqueQcIds).sort());
+      setOperations(Array.from(uniqueTgNos).sort()); // Set TG Nos for Operations
+      const groupedData = processedData; 
+      setFilteredData(groupedData); 
+
+      const newTotalPages = Math.ceil(groupedData.length / RECORDS_PER_PAGE);
+      if (currentPage >= newTotalPages && newTotalPages > 0) {
+        setCurrentPage(newTotalPages - 1);
+      } else if (newTotalPages === 0 && currentPage !== 0) {
+        setCurrentPage(0);
+      } else if (currentPage < 0 && newTotalPages > 0) { 
         setCurrentPage(0);
       }
     };
 
     applyFilters();
-  }, [reportData, currentPage]); // Recalculate when reportData changes
+  }, [reportData]); // This effect runs whenever reportData changes
 
   const calculateMetrics = (inlineEntry) => {
     const checkedQty = inlineEntry?.checked_quantity || 0;
@@ -212,7 +225,20 @@ const RovingReport = () => {
     let totalMeasurementPass = 0;
     let totalMeasurementReject = 0;
 
-    group.inlineData.forEach((entry) => {
+    const dataToProcess = [];
+    if (group && Array.isArray(group.inspection_rep)) { 
+      group.inspection_rep.forEach(repEntry => {
+        if (repEntry && Array.isArray(repEntry.inlineData)) {
+          dataToProcess.push(...repEntry.inlineData);
+        }
+      });
+    } else if (group && Array.isArray(group.inlineData)) { 
+      dataToProcess.push(...group.inlineData);
+    } else {
+      return { totalCheckedQty: 0, totalDefectsQty: 0, totalRejectGarmentCount: 0, defectRate: "0.00", defectRatio: "0.00", passRate: "0.00", totalSpiPass: 0, totalSpiReject: 0, totalMeasurementPass: 0, totalMeasurementReject: 0 };
+    }
+
+    dataToProcess.forEach((entry) => {
       const metrics = calculateMetrics(entry);
       totalCheckedQty += entry.checked_quantity || 0;
       totalDefectsQty += metrics.totalDefectsQty;
@@ -224,8 +250,7 @@ const RovingReport = () => {
     });
 
     const goodOutput = totalCheckedQty - totalRejectGarmentCount;
-    const defectRate =
-      totalCheckedQty > 0 ? (totalDefectsQty / totalCheckedQty) * 100 : 0;
+    const defectRate = totalCheckedQty > 0 ? (totalDefectsQty / totalCheckedQty) * 100 : 0;
     const defectRatio =
       totalCheckedQty > 0
         ? (totalRejectGarmentCount / totalCheckedQty) * 100
@@ -248,11 +273,13 @@ const RovingReport = () => {
   };
 
   // Pagination
-  const totalPages = filteredData.length;
-  const currentRecord = filteredData[currentPage];
-  const currentGroupMetrics = currentRecord
-    ? calculateGroupMetrics(currentRecord)
-    : {};
+  const totalPages = Math.ceil(filteredData.length / RECORDS_PER_PAGE);
+  // Ensure validCurrentPage is 0 if totalPages is 0, otherwise between 0 and totalPages - 1
+  const validCurrentPage = Math.max(0, Math.min(currentPage, totalPages > 0 ? totalPages - 1 : 0));
+
+  const startIndex = validCurrentPage * RECORDS_PER_PAGE;
+  const endIndex = startIndex + RECORDS_PER_PAGE;
+  const currentRecordsOnPage = filteredData.slice(startIndex, endIndex);
 
   const handleNextPage = () => {
     if (currentPage < totalPages - 1) {
@@ -277,6 +304,14 @@ const RovingReport = () => {
     setQcId("");
   };
 
+   const handleToggleDetailView = (rowKey) => {
+    setExpandedRowKey(prevKey => (prevKey === rowKey ? null : rowKey));
+  };
+
+  const closeDetailView = () => {
+    setExpandedRowKey(null);
+  };
+
   // Helper function to get background color based on value and type
   const getBackgroundColor = (value, type) => {
     const numValue = parseFloat(value);
@@ -291,6 +326,7 @@ const RovingReport = () => {
       return "bg-green-100";
     }
   };
+
 
   return (
     <div className="p-4 bg-gray-100 min-h-screen">
@@ -391,8 +427,8 @@ const RovingReport = () => {
                   <th rowSpan="2" className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-middle">
                     MO No
                   </th>
-                  <th rowSpan="2" className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-middle">
-                    Inspection Rep Name
+                 <th rowSpan="2" className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-middle">
+                    Inspection Count
                   </th>
                   <th rowSpan="2" className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-middle">
                     Checked Qty
@@ -427,60 +463,93 @@ const RovingReport = () => {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
-                    {currentRecord?.inspection_date}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
-                    {currentRecord?.line_no}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
-                    {currentRecord?.mo_no}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
-                    {currentRecord?.eng_name} {/* Inspection Rep Name */}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
-                    {currentGroupMetrics.totalCheckedQty || 0}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
-                    {currentGroupMetrics.totalRejectGarmentCount || 0}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
-                    {currentGroupMetrics.totalDefectsQty || 0}
-                  </td>
-                  <td
-                    className={`px-4 py-2 text-sm text-gray-700 border-r border-gray-200 ${getBackgroundColor(
-                      currentGroupMetrics.defectRate,
-                      "defectRate"
-                    )}`}
-                  >
-                    {currentGroupMetrics.defectRate || 0}
-                  </td>
-                  <td
-                    className={`px-4 py-2 text-sm text-gray-700 border-r border-gray-200 ${getBackgroundColor(
-                      currentGroupMetrics.defectRatio,
-                      "defectRatio"
-                    )}`}
-                  >
-                    {currentGroupMetrics.defectRatio || 0}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-green-700 border-r border-gray-200 bg-green-50">
-                    {currentGroupMetrics.totalSpiPass || 0}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-red-700 border-r border-gray-200 bg-red-50">
-                    {currentGroupMetrics.totalSpiReject || 0}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-green-700 border-r border-gray-200 bg-green-50">
-                    {currentGroupMetrics.totalMeasurementPass || 0}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-red-700 border-r border-gray-200 bg-red-50">
-                    {currentGroupMetrics.totalMeasurementReject || 0}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-700">
-                    {/* Placeholder for View - functionality to be defined */}
-                  </td>
-                </tr>
+                {currentRecordsOnPage.map((record) => {
+                  if (expandedRowKey && record.uniqueKey !== expandedRowKey) {
+                    return null; // Hide other rows when one is expanded
+                  }
+                  const metrics = calculateGroupMetrics(record);
+                  return (
+                    <React.Fragment key={record.uniqueKey}>
+                      <tr>
+                        <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                          {record.inspection_date}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                          {record.line_no}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                          {record.mo_no}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                          {record.inspectionRepCount}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200 text-center">
+                          {metrics.totalCheckedQty || 0}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200 text-center">
+                          {metrics.totalRejectGarmentCount || 0}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200 text-center">
+                          {metrics.totalDefectsQty || 0}
+                        </td>
+                        <td
+                          className={`px-4 py-2 text-sm text-gray-700 border-r border-gray-200 text-center ${getBackgroundColor(
+                            metrics.defectRate,
+                            "defectRate"
+                          )}`}
+                        >
+                          {metrics.defectRate || 0}
+                        </td>
+                        <td
+                          className={`px-4 py-2 text-sm text-gray-700 border-r border-gray-200 text-center ${getBackgroundColor(
+                            metrics.defectRatio,
+                            "defectRatio"
+                          )}`}
+                        >
+                          {metrics.defectRatio || 0}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-green-700 border-r border-gray-200 bg-green-50 text-center">
+                          {metrics.totalSpiPass || 0}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-red-700 border-r border-gray-200 bg-red-50 text-center">
+                          {metrics.totalSpiReject || 0}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-green-700 border-r border-gray-200 bg-green-50 text-center">
+                          {metrics.totalMeasurementPass || 0}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-red-700 border-r border-gray-200 bg-red-50 text-center">
+                          {metrics.totalMeasurementReject || 0}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 text-center">
+                          <button
+                            onClick={() => handleToggleDetailView(record.uniqueKey)}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <Eye size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedRowKey === record.uniqueKey && (
+                        <tr>
+                          <RovingReportDetailView
+                            reportDetail={record}
+                            onClose={closeDetailView}
+                            calculateGroupMetrics={calculateGroupMetrics} 
+                            filters={{
+                              startDate: formatDate(startDate), // Pass formatted dates
+                              endDate: endDate ? formatDate(endDate) : null,
+                              lineNo,
+                              moNo,
+                              buyer,
+                              operation,
+                              qcId,
+                            }}
+                          />
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -500,11 +569,11 @@ const RovingReport = () => {
               Previous
             </button>
             <span className="text-sm text-gray-700">
-              Page {currentPage + 1} of {totalPages}
+             Page {totalPages > 0 ? validCurrentPage + 1 : 0} of {totalPages}
             </span>
             <button
               onClick={handleNextPage}
-              disabled={currentPage === totalPages - 1}
+               disabled={currentPage >= totalPages - 1 || totalPages === 0}
               className={`px-4 py-2 rounded-md ${
                 currentPage === totalPages - 1
                   ? "bg-gray-300 cursor-not-allowed"

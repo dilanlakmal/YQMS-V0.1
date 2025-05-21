@@ -79,7 +79,7 @@ const RovingReportFilterPane = ({
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           >
             <option value="">All Lines</option>
-            {lineNos.map((num) => (
+            {lineNos.map((num) => ( // Now using the state populated from fetched data
               <option key={num} value={num}>
                 {num}
               </option>
@@ -98,7 +98,7 @@ const RovingReportFilterPane = ({
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           >
             <option value="">All Buyers</option>
-            {buyers.map((b) => (
+            {buyers.map((b) => ( // Now using the state populated from fetched data
               <option key={b} value={b}>
                 {b}
               </option>
@@ -117,7 +117,7 @@ const RovingReportFilterPane = ({
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           >
             <option value="">All Operations</option>
-            {operations.map((op) => (
+            {operations.map((op) => ( // Now using the state populated with TG Nos
               <option key={op} value={op}>
                 {op}
               </option>
@@ -130,7 +130,7 @@ const RovingReportFilterPane = ({
           <label className="block text-xs font-medium text-gray-700 mb-1">QC ID</label>
           <select value={qcId} onChange={(e) => setQcId(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" >
             <option value="">All QC IDs</option>
-            {qcIds.map((id) => (<option key={id} value={id}>{id}</option>))}
+            {qcIds.map((id) => (<option key={id} value={id}>{id}</option>))} {/* Now using the state populated from fetched data */}
           </select>
         </div>
 
@@ -139,7 +139,7 @@ const RovingReportFilterPane = ({
           <label className="block text-xs font-medium text-gray-700 mb-1">MO No</label>
           <select value={moNo} onChange={(e) => setMoNo(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" >
             <option value="">All MO Nos</option>
-            {moNos.map((mo) => (<option key={mo} value={mo}>{mo}</option>))}
+            {moNos.map((mo) => (<option key={mo} value={mo}>{mo}</option>))} {/* Now using the state populated from fetched data */}
           </select>
         </div>
 

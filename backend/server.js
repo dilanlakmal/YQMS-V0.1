@@ -9459,6 +9459,35 @@ app.get("/api/qc-inline-roving-mo-nos", async (req, res) => {
   }
 });
 
+// Endpoint to fetch distinct Buyer Names for Roving Report filters
+app.get("/api/qc-inline-roving-buyers", async (req, res) => {
+  try {
+    const buyers = await QCInlineRoving.distinct("buyer_name");
+    res.json(buyers.filter(b => b).sort()); // Filter out null/empty and sort
+  } catch (error) {
+    console.error("Error fetching buyers for Roving Report:", error);
+    res.status(500).json({ message: "Error fetching buyers", error: error.message });
+  }
+});
+
+// Endpoint to fetch distinct Operation Names from inlineData for Roving Report filters
+app.get("/api/qc-inline-roving-operations", async (req, res) => {
+  try {
+    const operations = await QCInlineRoving.aggregate([
+      { $unwind: "$inlineData" },
+      { $match: { "inlineData.operation_name": { $ne: null, $ne: "" } } }, // Ensure operation_name exists and is not empty
+      { $group: { _id: "$inlineData.operation_name" } },
+      { $sort: { _id: 1 } },
+      { $project: { _id: 0, operation_name: "$_id" } }
+    ]);
+    res.json(operations.map(op => op.operation_name));
+  } catch (error)
+ {
+    console.error("Error fetching operations for Roving Report:", error);
+    res.status(500).json({ message: "Error fetching operations", error: error.message });
+  }
+});
+
 // Endpoint to fetch distinct QC IDs (emp_id)
 app.get("/api/qc-inline-roving-qc-ids", async (req, res) => {
   try {
