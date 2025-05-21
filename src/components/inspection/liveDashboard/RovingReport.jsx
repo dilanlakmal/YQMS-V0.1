@@ -409,7 +409,7 @@ const RovingReport = () => {
       ) : (
         <div className="bg-white p-6 rounded-lg shadow-md">
           {/* Title */}
-          <h1 className="text-3xl font-bold text-center text-gray-800 mb-6 bg-gradient-to-r from-blue-500 to-blue-700 text-white py-4 rounded-t-lg">
+          <h1 className="text-3xl font-bold text-center text-gray-800 mb-6 bg-gradient-to-r from-blue-100 to-blue-100 text-gray py-4 rounded-t-lg">
             QC Inline Roving - Summary Report
           </h1>
 
@@ -470,30 +470,30 @@ const RovingReport = () => {
                   const metrics = calculateGroupMetrics(record);
                   return (
                     <React.Fragment key={record.uniqueKey}>
-                      <tr>
-                        <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                      <tr className="hover:bg-blue-100">
+                        <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                           {record.inspection_date}
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                        <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                           {record.line_no}
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                        <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                           {record.mo_no}
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200">
+                        <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
                           {record.inspectionRepCount}
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200 text-center">
+                        <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200 text-center">
                           {metrics.totalCheckedQty || 0}
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200 text-center">
+                        <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200 text-center">
                           {metrics.totalRejectGarmentCount || 0}
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200 text-center">
+                        <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200 text-center">
                           {metrics.totalDefectsQty || 0}
                         </td>
                         <td
-                          className={`px-4 py-2 text-sm text-gray-700 border-r border-gray-200 text-center ${getBackgroundColor(
+                          className={`px-4 py-2 text-sm text-gray-700 border border-gray-200 text-center ${getBackgroundColor(
                             metrics.defectRate,
                             "defectRate"
                           )}`}
@@ -501,26 +501,26 @@ const RovingReport = () => {
                           {metrics.defectRate || 0}
                         </td>
                         <td
-                          className={`px-4 py-2 text-sm text-gray-700 border-r border-gray-200 text-center ${getBackgroundColor(
+                          className={`px-4 py-2 text-sm text-gray-700 border border-gray-200 text-center ${getBackgroundColor(
                             metrics.defectRatio,
                             "defectRatio"
                           )}`}
                         >
                           {metrics.defectRatio || 0}
                         </td>
-                        <td className="px-4 py-2 text-sm text-green-700 border-r border-gray-200 bg-green-50 text-center">
+                        <td className="px-4 py-2 text-sm text-green-700 border border-gray-200 bg-green-50 text-center">
                           {metrics.totalSpiPass || 0}
                         </td>
-                        <td className="px-4 py-2 text-sm text-red-700 border-r border-gray-200 bg-red-50 text-center">
+                        <td className="px-4 py-2 text-sm text-red-700 border border-gray-200 bg-red-50 text-center">
                           {metrics.totalSpiReject || 0}
                         </td>
-                        <td className="px-4 py-2 text-sm text-green-700 border-r border-gray-200 bg-green-50 text-center">
+                        <td className="px-4 py-2 text-sm text-green-700 border border-gray-200 bg-green-50 text-center">
                           {metrics.totalMeasurementPass || 0}
                         </td>
-                        <td className="px-4 py-2 text-sm text-red-700 border-r border-gray-200 bg-red-50 text-center">
+                        <td className="px-4 py-2 text-sm text-red-700 border border-gray-200 bg-red-50 text-center">
                           {metrics.totalMeasurementReject || 0}
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-700 text-center">
+                        <td className="px-4 py-2 text-sm text-gray-700 text-center  border border-gray-200">
                           <button
                             onClick={() => handleToggleDetailView(record.uniqueKey)}
                             className="text-blue-600 hover:text-blue-800"

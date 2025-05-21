@@ -45,12 +45,9 @@ const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, 
   if (!reportDetail) return null;
 
  // Apply filters to inspection_rep entries
-  const filteredRepetitions = reportDetail.inspection_rep && reportDetail.inspection_rep.filter(repEntry => {
+  const repetitionsToDisplay = (reportDetail.inspection_rep || []).filter(repEntry => {
     if (!repEntry) return false;
-    if (filters.qcId && repEntry.emp_id !== filters.qcId) {
-      return false;
-    }
-    return true;
+    return !(filters.qcId && repEntry.emp_id !== filters.qcId);
   });
 
   // Helper to filter inlineData within a repetition
@@ -58,10 +55,7 @@ const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, 
     if (!Array.isArray(inlineDataArray)) return [];
     return inlineDataArray.filter(item => {
       if (!item) return false;
-      if (filters.operation && item.tg_no !== filters.operation) { 
-        return false; 
-      }
-      return true;
+       return !(filters.operation && item.tg_no !== filters.operation);
     });
   };
 
@@ -79,8 +73,8 @@ const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, 
           </button>
         </div>
 
-        {filteredRepetitions && filteredRepetitions.length > 0 ? (
-          filteredRepetitions.map((repEntry, repIdx) => {
+        {repetitionsToDisplay && repetitionsToDisplay.length > 0 ? (
+          repetitionsToDisplay.map((repEntry, repIdx) => {
           // Get filtered inlineData for this specific repetition
           const currentRepFilteredInlineData = getFilteredInlineData(repEntry.inlineData);
 

@@ -147,14 +147,14 @@ const RovingReportFilterPane = ({
         <div className="flex items-end">
           <button
             onClick={onClearFilters}
-            className="w-full px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 text-sm shadow-sm"
+            className="w-full px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm shadow-sm"
           >
             Clear Filters
           </button>
         </div>
       </div>
     </div>
-  );
+  );  
 };
 
 export default RovingReportFilterPane;
