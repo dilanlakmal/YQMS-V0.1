@@ -163,20 +163,20 @@ const RovingPage = () => {
     fetchBuyerByMo();
   }, [moNo]);
 
-  // useEffect(() => {
-  //   if (!authLoading && user) {
-  //     setScannedUserData({
-  //       emp_id: user.emp_id || "N/A_USER_EMP_ID",
-  //       eng_name: user.eng_name || "N/A_USER_ENG_NAME",
-  //       kh_name: user.kh_name || "N/A_USER_KH_NAME", 
-  //       job_title: user.job_title || "N/A_USER_JOB_TITLE", 
-  //       dept_name: user.dept_name || "N/A_USER_DEPT_NAME", 
-  //       sect_name: user.sect_name || "N/A_USER_SECT_NAME", 
-  //     });
-  //   } else if (!authLoading && !user) {
-  //     setScannedUserData(null);
-  //   }
-  // }, [user, authLoading]);
+  useEffect(() => {
+    if (!authLoading && user) {
+      setScannedUserData({
+        emp_id: user.emp_id || "N/A_USER_EMP_ID",
+        eng_name: user.eng_name || "N/A_USER_ENG_NAME",
+        kh_name: user.kh_name || "N/A_USER_KH_NAME", 
+        job_title: user.job_title || "N/A_USER_JOB_TITLE", 
+        dept_name: user.dept_name || "N/A_USER_DEPT_NAME", 
+        sect_name: user.sect_name || "N/A_USER_SECT_NAME", 
+      });
+    } else if (!authLoading && !user) {
+      setScannedUserData(null);
+    }
+  }, [user, authLoading]);
 
   const fetchInspectionsCompleted = useCallback(async () => {
     if (lineNo && currentDate && selectedManualInspectionRep && moNo) {
@@ -491,10 +491,24 @@ const RovingPage = () => {
         ...garment,
         status: hasDefects ? "Fail" : "Pass",
         garment_defect_count: garmentDefectCount,
-        defects: garment.defects.map((defect) => ({
-          ...defect,
-          name: defect.name 
-        }))
+        defects: garment.defects.map((defect) => {
+          const defectMasterEntry = defects.find(d => d.english === defect.name);
+          let buyerSpecificDefectInfo = null;
+
+          if (defectMasterEntry && defectMasterEntry.statusByBuyer) {
+            buyerSpecificDefectInfo = defectMasterEntry.statusByBuyer.find(
+              bs => bs.buyerName === apiDeterminedBuyer
+            );
+          }
+          const finalDefectStatus = (buyerSpecificDefectInfo && Array.isArray(buyerSpecificDefectInfo.defectStatus) && buyerSpecificDefectInfo.defectStatus.length > 0)
+            ? defect.severity
+            : "N/A";
+
+          return {
+            ...defect, 
+            defect_status: finalDefectStatus
+          };
+        })
       };
     });
 
@@ -506,6 +520,10 @@ const RovingPage = () => {
     const qualityStatus = updatedGarments.some((g) => g.status === "Fail")
       ? "Reject"
       : "Pass";
+
+      const rejectedGarmentCountForOperator = updatedGarments.filter(
+      (g) => g.status === "Fail"
+    ).length;
 
      let overallOperatorStatusKey = '';
     const anyCriticalDefectInUpdatedGarments = updatedGarments.some(g =>
@@ -569,6 +587,7 @@ const RovingPage = () => {
       measurement: measurementStatus,
       measurement_images: uploadedMeasurementImagePaths, 
       checked_quantity: garments.length,
+      rejectedGarmentCount: rejectedGarmentCountForOperator,
       inspection_time: inspectionTime,
       remark: remarkText,
       qualityStatus,

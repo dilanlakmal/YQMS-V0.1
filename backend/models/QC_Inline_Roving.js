@@ -34,6 +34,7 @@ const qcInlineRovingSchema = new mongoose.Schema(
             measurement: { type: String, required: true },
             measurement_images: [ {type: String} ], // Path to the Measurement image
             checked_quantity: { type: Number, required: true },
+            rejectedGarmentCount: { type: Number, default: 0 },
             inspection_time: { type: String, required: true }, // Store as string in HH:MM:SS
             qualityStatus: { type: String, required: true },
             overall_roving_status: { type: String, required: true, default: 'NOT_CALCULATED' },
@@ -48,6 +49,7 @@ const qcInlineRovingSchema = new mongoose.Schema(
                         name: { type: String, required: true },
                         count: { type: Number, required: true },
                         repair: { type: String, required: true },
+                        defect_status: { type: String, required: true },
                       },
                     ],
                     status: { type: String, required: true },
