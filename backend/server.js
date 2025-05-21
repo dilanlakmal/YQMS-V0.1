@@ -43,6 +43,10 @@ import createCuttingFabricDefectModel from "./models/CuttingFabricDefects.js";
 import createCuttingIssueModel from "./models/CuttingIssues.js";
 import createAQLChartModel from "./models/AQLChart.js";
 
+import createHTFirstOutputModel from "./models/HTFirstOutput.js";
+import createFUFirstOutputModel from "./models/FUFirstOutput.js";
+import createSCCDailyTestingModel from "./models/SCCDailyTesting.js";
+
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
 
@@ -162,6 +166,10 @@ const CuttingIssue = createCuttingIssueModel(ymProdConnection);
 const AQLChart = createAQLChartModel(ymProdConnection);
 const SewingDefects = createSewingDefectsModel(ymProdConnection);
 const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection);
+
+const HTFirstOutput = createHTFirstOutputModel(ymProdConnection); // Add this
+const FUFirstOutput = createFUFirstOutputModel(ymProdConnection); // Add this
+const SCCDailyTesting = createSCCDailyTestingModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -12152,6 +12160,437 @@ app.delete("/api/delete-measurement-record", async (req, res) => {
       error: "Failed to delete measurement record",
       details: error.message
     });
+  }
+});
+
+/* ------------------------------
+   End Points - SCC HT/FU
+------------------------------ */
+
+// Multer setup for SCC image uploads
+const sccImageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, "public/storage/scc_images");
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    // imageType should be passed in the body: 'referenceSample-HT', 'afterWash-FU', etc.
+    const { imageType, inspectionDate } = req.body;
+    const datePart = inspectionDate
+      ? inspectionDate.replace(/\//g, "-")
+      : new Date().toISOString().split("T")[0];
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    // Filename: imageType-date-uniqueSuffix.extension
+    const filename = `${
+      imageType || "sccimage"
+    }-${datePart}-${uniqueSuffix}${path.extname(file.originalname)}`;
+    cb(null, filename);
+  }
+});
+
+const sccUpload = multer({ storage: sccImageStorage });
+
+app.post("/api/scc/upload-image", sccUpload.single("imageFile"), (req, res) => {
+  if (!req.file) {
+    return res
+      .status(400)
+      .json({ success: false, message: "No file uploaded." });
+  }
+  const filePath = `${API_BASE_URL}/storage/scc_images/${req.file.filename}`;
+  res.json({ success: true, filePath: filePath, filename: req.file.filename });
+});
+
+// Helper function to format date to MM/DD/YYYY
+const formatDateToMMDDYYYY = (dateInput) => {
+  if (!dateInput) return null;
+  const d = new Date(dateInput); // Handles ISO string or Date object
+  const month = d.getMonth() + 1; // No padding
+  const day = d.getDate(); // No padding
+  const year = d.getFullYear();
+  return `${month}/${day}/${year}`;
+};
+
+app.post("/api/scc/ht-first-output", async (req, res) => {
+  try {
+    const { _id, ...dataToSave } = req.body;
+    dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
+
+    // Ensure remarks fields are "NA" if empty
+    dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
+    if (
+      dataToSave.standardSpecification &&
+      dataToSave.standardSpecification.length > 0
+    ) {
+      dataToSave.standardSpecification = dataToSave.standardSpecification.map(
+        (spec) => ({
+          ...spec,
+          remarks: spec.remarks?.trim() || "NA"
+        })
+      );
+    }
+
+    let record;
+    if (_id) {
+      record = await HTFirstOutput.findByIdAndUpdate(_id, dataToSave, {
+        new: true,
+        runValidators: true,
+        upsert: false
+      }); // Make sure upsert is false for explicit update
+      if (!record)
+        return res
+          .status(404)
+          .json({ message: "Record not found for update." });
+    } else {
+      // Check for existing record by moNo, color, and inspectionDate before creating
+      const existing = await HTFirstOutput.findOne({
+        moNo: dataToSave.moNo,
+        color: dataToSave.color,
+        inspectionDate: dataToSave.inspectionDate
+      });
+      if (existing) {
+        // If it exists, update it
+        record = await HTFirstOutput.findByIdAndUpdate(
+          existing._id,
+          dataToSave,
+          { new: true, runValidators: true }
+        );
+      } else {
+        record = new HTFirstOutput(dataToSave);
+        await record.save();
+      }
+    }
+    res
+      .status(201)
+      .json({ message: "HT First Output saved successfully", data: record });
+  } catch (error) {
+    console.error("Error saving HT First Output:", error);
+    if (error.code === 11000) {
+      // Mongoose duplicate key error
+      return res.status(409).json({
+        message:
+          "Duplicate entry. A record with this MO, Color, and Date already exists.",
+        error: error.message,
+        errorCode: "DUPLICATE_KEY"
+      });
+    }
+    res.status(500).json({
+      message: "Failed to save HT First Output",
+      error: error.message,
+      details: error
+    });
+  }
+});
+
+app.get("/api/scc/ht-first-output", async (req, res) => {
+  try {
+    const { moNo, color, inspectionDate } = req.query;
+    if (!moNo || !color || !inspectionDate) {
+      return res
+        .status(400)
+        .json({ message: "MO No, Color, and Inspection Date are required." });
+    }
+    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+    const record = await HTFirstOutput.findOne({
+      moNo,
+      color,
+      inspectionDate: formattedDate
+    });
+    if (!record) {
+      // Return 200 with a specific message for "not found" so frontend can handle it as new record
+      return res
+        .status(200)
+        .json({ message: "HT_RECORD_NOT_FOUND", data: null });
+    }
+    res.json(record); // Existing record data will be in record directly, not record.data
+  } catch (error) {
+    console.error("Error fetching HT First Output:", error);
+    res.status(500).json({
+      message: "Failed to fetch HT First Output",
+      error: error.message
+    });
+  }
+});
+
+// REVISED Endpoints for FUFirstOutput (similar changes as HT)
+app.post("/api/scc/fu-first-output", async (req, res) => {
+  try {
+    const { _id, ...dataToSave } = req.body;
+    dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
+
+    dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
+    if (
+      dataToSave.standardSpecification &&
+      dataToSave.standardSpecification.length > 0
+    ) {
+      dataToSave.standardSpecification = dataToSave.standardSpecification.map(
+        (spec) => ({
+          ...spec,
+          remarks: spec.remarks?.trim() || "NA"
+        })
+      );
+    }
+
+    let record;
+    if (_id) {
+      record = await FUFirstOutput.findByIdAndUpdate(_id, dataToSave, {
+        new: true,
+        runValidators: true,
+        upsert: false
+      });
+      if (!record)
+        return res
+          .status(404)
+          .json({ message: "Record not found for update." });
+    } else {
+      const existing = await FUFirstOutput.findOne({
+        moNo: dataToSave.moNo,
+        color: dataToSave.color,
+        inspectionDate: dataToSave.inspectionDate
+      });
+      if (existing) {
+        record = await FUFirstOutput.findByIdAndUpdate(
+          existing._id,
+          dataToSave,
+          { new: true, runValidators: true }
+        );
+      } else {
+        record = new FUFirstOutput(dataToSave);
+        await record.save();
+      }
+    }
+    res
+      .status(201)
+      .json({ message: "FU First Output saved successfully", data: record });
+  } catch (error) {
+    console.error("Error saving FU First Output:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message:
+          "Duplicate entry. A record with this MO, Color, and Date already exists.",
+        error: error.message,
+        errorCode: "DUPLICATE_KEY"
+      });
+    }
+    res.status(500).json({
+      message: "Failed to save FU First Output",
+      error: error.message,
+      details: error
+    });
+  }
+});
+
+app.get("/api/scc/fu-first-output", async (req, res) => {
+  try {
+    const { moNo, color, inspectionDate } = req.query;
+    if (!moNo || !color || !inspectionDate) {
+      return res
+        .status(400)
+        .json({ message: "MO No, Color, and Inspection Date are required." });
+    }
+    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+    const record = await FUFirstOutput.findOne({
+      moNo,
+      color,
+      inspectionDate: formattedDate
+    });
+    if (!record) {
+      return res
+        .status(200)
+        .json({ message: "FU_RECORD_NOT_FOUND", data: null });
+    }
+    res.json(record);
+  } catch (error) {
+    console.error("Error fetching FU First Output:", error);
+    res.status(500).json({
+      message: "Failed to fetch FU First Output",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   End Points - SCC HT/FU - Daily Testing
+------------------------------ */
+
+app.get("/api/scc/get-first-output-specs", async (req, res) => {
+  try {
+    const { moNo, color, inspectionDate } = req.query;
+    if (!moNo || !color || !inspectionDate) {
+      return res
+        .status(400)
+        .json({ message: "MO No, Color, and Inspection Date are required." });
+    }
+    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+
+    let specs = null;
+    // Try HT First Output
+    const htRecord = await HTFirstOutput.findOne({
+      moNo,
+      color,
+      inspectionDate: formattedDate
+    }).lean();
+    if (htRecord && htRecord.standardSpecification) {
+      const afterHatSpec = htRecord.standardSpecification.find(
+        (s) => s.type === "afterHat" && s.timeSec && s.tempC && s.pressure
+      );
+      const firstSpec = htRecord.standardSpecification.find(
+        (s) => s.type === "first"
+      );
+      if (afterHatSpec) {
+        specs = {
+          tempC: afterHatSpec.tempC,
+          timeSec: afterHatSpec.timeSec,
+          pressure: afterHatSpec.pressure
+        };
+      } else if (firstSpec) {
+        specs = {
+          tempC: firstSpec.tempC,
+          timeSec: firstSpec.timeSec,
+          pressure: firstSpec.pressure
+        };
+      }
+    }
+
+    // If not found in HT, try FU First Output (assuming similar logic might apply or distinct records)
+    if (!specs) {
+      const fuRecord = await FUFirstOutput.findOne({
+        moNo,
+        color,
+        inspectionDate: formattedDate
+      }).lean();
+      if (fuRecord && fuRecord.standardSpecification) {
+        const afterHatSpec = fuRecord.standardSpecification.find(
+          (s) => s.type === "afterHat" && s.timeSec && s.tempC && s.pressure
+        );
+        const firstSpec = fuRecord.standardSpecification.find(
+          (s) => s.type === "first"
+        );
+        if (afterHatSpec) {
+          specs = {
+            tempC: afterHatSpec.tempC,
+            timeSec: afterHatSpec.timeSec,
+            pressure: afterHatSpec.pressure
+          };
+        } else if (firstSpec) {
+          specs = {
+            tempC: firstSpec.tempC,
+            timeSec: firstSpec.timeSec,
+            pressure: firstSpec.pressure
+          };
+        }
+      }
+    }
+
+    if (!specs) {
+      return res.status(200).json({ message: "SPECS_NOT_FOUND", data: null });
+    }
+    res.json({ data: specs });
+  } catch (error) {
+    console.error("Error fetching first output specs:", error);
+    res.status(500).json({
+      message: "Failed to fetch first output specifications",
+      error: error.message
+    });
+  }
+});
+
+// Endpoints for SCCDailyTesting
+app.post("/api/scc/daily-testing", async (req, res) => {
+  try {
+    const { _id, ...dataToSave } = req.body;
+    dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
+    dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
+
+    let record;
+    if (_id) {
+      record = await SCCDailyTesting.findByIdAndUpdate(_id, dataToSave, {
+        new: true,
+        runValidators: true
+      });
+      if (!record)
+        return res
+          .status(404)
+          .json({ message: "Daily Testing record not found for update." });
+    } else {
+      const existing = await SCCDailyTesting.findOne({
+        moNo: dataToSave.moNo,
+        color: dataToSave.color,
+        machineNo: dataToSave.machineNo,
+        inspectionDate: dataToSave.inspectionDate
+      });
+      if (existing) {
+        record = await SCCDailyTesting.findByIdAndUpdate(
+          existing._id,
+          dataToSave,
+          { new: true, runValidators: true }
+        );
+      } else {
+        record = new SCCDailyTesting(dataToSave);
+        await record.save();
+      }
+    }
+    res
+      .status(201)
+      .json({
+        message: "Daily Testing report saved successfully",
+        data: record
+      });
+  } catch (error) {
+    console.error("Error saving Daily Testing report:", error);
+    if (error.code === 11000) {
+      return res
+        .status(409)
+        .json({
+          message:
+            "Duplicate entry. A record with this MO, Color, Machine No, and Date already exists.",
+          error: error.message,
+          errorCode: "DUPLICATE_KEY"
+        });
+    }
+    res
+      .status(500)
+      .json({
+        message: "Failed to save Daily Testing report",
+        error: error.message,
+        details: error
+      });
+  }
+});
+
+app.get("/api/scc/daily-testing", async (req, res) => {
+  try {
+    const { moNo, color, machineNo, inspectionDate } = req.query;
+    if (!moNo || !color || !machineNo || !inspectionDate) {
+      return res
+        .status(400)
+        .json({
+          message: "MO No, Color, Machine No, and Inspection Date are required."
+        });
+    }
+    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+    const record = await SCCDailyTesting.findOne({
+      moNo,
+      color,
+      machineNo,
+      inspectionDate: formattedDate
+    });
+    if (!record) {
+      return res
+        .status(200)
+        .json({ message: "DAILY_TESTING_RECORD_NOT_FOUND", data: null });
+    }
+    res.json(record); // Returns the existing record
+  } catch (error) {
+    console.error("Error fetching Daily Testing report:", error);
+    res
+      .status(500)
+      .json({
+        message: "Failed to fetch Daily Testing report",
+        error: error.message
+      });
   }
 });
 
