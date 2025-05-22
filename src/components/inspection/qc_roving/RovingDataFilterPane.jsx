@@ -78,6 +78,20 @@ const RovingFilterPlane = ({
     onFilterChange(formattedFilters);
   }, [filters, onFilterChange]);
 
+  // Effect to synchronize the internal qcId filter with initialFilters.qcId prop.
+  // This is important if initialFilters.qcId (derived from authUserEmpId in the parent)
+  // loads asynchronously or changes after this component has mounted.
+  useEffect(() => {
+    setFilters(prevInternalFilters => {
+      const qcIdFromProps = initialFilters?.qcId || '';
+      if (prevInternalFilters.qcId !== qcIdFromProps) {
+        // Update the internal state to reflect the (potentially new) default from props.
+        return { ...prevInternalFilters, qcId: qcIdFromProps };
+      }
+      return prevInternalFilters;
+    });
+  }, [initialFilters?.qcId]); // Re-run if the specific prop value changes.
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
@@ -90,7 +104,7 @@ const RovingFilterPlane = ({
   const handleResetFilters = () => {
     const resetValues = {
       date: new Date(),
-      qcId: '',
+      qcId: initialFilters?.qcId || '', // Reset to the default provided by parent (authUserEmpId if set)
       operatorId: '',
       lineNo: '',
       moNo: '',

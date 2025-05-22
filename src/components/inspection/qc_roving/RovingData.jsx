@@ -3,6 +3,7 @@ import axios from "axios";
 import { API_BASE_URL } from "../../../../config"; 
 import Swal from "sweetalert2";
 import RovingFilterPlane from "../qc_roving/RovingDataFilterPane";
+import { useAuth } from "../../authentication/AuthContext";
 
 const getTodayDateString = () => {
   const today = new Date();
@@ -20,7 +21,9 @@ const REPETITION_KEYS = [
   "5th Inspection",
 ];
 
-const RovingData = ({ refreshTrigger, authUserEmpId }) => {
+const RovingData = ({ refreshTrigger }) => {
+  const { user } = useAuth(); 
+  const authUserEmpId = user?.emp_id; 
   const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
    const [columnVisibility, setColumnVisibility] = useState({
@@ -31,7 +34,7 @@ const RovingData = ({ refreshTrigger, authUserEmpId }) => {
 
   const [filters, setFilters] = useState({
     date: getTodayDateString(),
-    qcId: authUserEmpId ? String(authUserEmpId) : "",
+    qcId: authUserEmpId ? String(authUserEmpId) : "", // Default to authUserEmpId if available
     operatorId: "",
     lineNo: "",
     moNo: "",
@@ -87,10 +90,10 @@ const RovingData = ({ refreshTrigger, authUserEmpId }) => {
       );
       setUniqueMoNos(Array.from(moNos).sort());
     } else {
-      setUniqueQcIds([]);
-      setUniqueOperatorIds([]);
-      setUniqueLineNos([]);
-      setUniqueMoNos([]);
+      setUniqueQcIds(authUserEmpId ? [String(authUserEmpId)] : []);
+      setUniqueOperatorIds([]); 
+      setUniqueLineNos([]);   
+      setUniqueMoNos([]); 
     }
   }, [authUserEmpId]);
 
@@ -197,6 +200,17 @@ const RovingData = ({ refreshTrigger, authUserEmpId }) => {
   useEffect(() => {
     fetchReports(filters);
   }, [filters, refreshTrigger, fetchReports]);
+
+  useEffect(() => {
+    setFilters(currentFilters => {
+      const newQcIdFromAuth = authUserEmpId ? String(authUserEmpId) : "";
+      if (currentFilters.qcId !== newQcIdFromAuth) {
+        // This will make authUserEmpId the "current default".
+        return { ...currentFilters, qcId: newQcIdFromAuth };
+      }
+      return currentFilters;
+    });
+  }, [authUserEmpId]);
 
   const handleFilterChange = useCallback((newFilters) => {
     setFilters(newFilters);
