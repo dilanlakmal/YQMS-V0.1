@@ -28,6 +28,13 @@ import i18next from 'i18next';
 const RovingPage = () => {
   const { t } = useTranslation();
   const { user, loading: authLoading } = useAuth();
+  const toOrdinalFormattedString = (n, transFunc) => {
+    if (typeof n !== 'number' || isNaN(n) || n <= 0) return String(n);
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    const suffix = s[(v - 20) % 10] || s[v] || s[0];
+    return `${n}${suffix} ${transFunc('qcRoving.inspectionText', "Inspection")}`;
+  };
   const [inspectionType, setInspectionType] = useState("Normal");
   const [spiStatus, setSpiStatus] = useState("");
   const [measurementStatus, setMeasurementStatus] = useState("");
@@ -61,7 +68,7 @@ const RovingPage = () => {
   const [showMoNoDropdown, setShowMoNoDropdown] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const moNoDropdownRef = useRef(null);
-  const [selectedManualInspectionRep, setSelectedManualInspectionRep] = useState('');
+  const [selectedManualInspectionRep, setSelectedManualInspectionRep] = useState(() => toOrdinalFormattedString(1, t));
   const [inspectionsCompletedForSelectedRep, setInspectionsCompletedForSelectedRep] = useState(0);
   const [lineWorkerData, setLineWorkerData] = useState([]);
   const [lineWorkerDataLoading, setLineWorkerDataLoading] = useState(true);
@@ -314,15 +321,12 @@ const RovingPage = () => {
                     (status) => status.buyerName === apiDeterminedBuyer 
                   );
                   if (buyerStatus) {
-                    // Set initial severity based on isCommon for this buyer
-                    // Ensure isCommon is one of the allowed defectStatus values, or default
                     if (buyerStatus.isCommon && (buyerStatus.defectStatus?.includes(buyerStatus.isCommon))) {
                       return buyerStatus.isCommon;
                     }
-                    // If isCommon is not valid or not in defectStatus, pick the first from defectStatus or default to Minor
                     return buyerStatus.defectStatus?.[0] || "Minor";
                   }
-                  return "Minor"; // Default if no buyer-specific info at all
+                  return "Minor"; 
                 })(),
               },
             ],
@@ -411,7 +415,7 @@ const RovingPage = () => {
     setMeasurementStatus("");
     setSpiFilesToUpload([]);
     setMeasurementFilesToUpload([]);
-    setSelectedManualInspectionRep("");
+    // setSelectedManualInspectionRep("");
     setImageUploaderKey(Date.now());
     setRemarkText("");
   };
@@ -545,18 +549,18 @@ const RovingPage = () => {
     } else if (anyCriticalDefectInUpdatedGarments) {
         overallOperatorStatusKey = 'Reject-Critical';
     } else if (totalMajorDefectsInUpdatedGarments >= 2) {
-        overallOperatorStatusKey = 'Reject-Major-';
+        overallOperatorStatusKey = 'Reject-Major-M';
     } else if (totalMinorDefectsInUpdatedGarments >= 2) {
-        overallOperatorStatusKey = 'Reject-Minor';
+        overallOperatorStatusKey = 'Reject-Minor-M';
     } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
         // This condition is met if not critical, <2 Major, <2 Minor, but SPI/Meas is Reject
         overallOperatorStatusKey = 'Reject';
     } else if (totalMajorDefectsInUpdatedGarments === 1) {
         // This condition is met if SPI/Meas Pass, not critical, <2 Minor, 1 Major
-        overallOperatorStatusKey = 'Reject-Major';
+        overallOperatorStatusKey = 'Reject-Major-S';
     } else if (totalMinorDefectsInUpdatedGarments === 1) {
         // This condition is met if SPI/Meas Pass, not critical, no Major, 1 Minor
-        overallOperatorStatusKey = 'Reject-Minor';
+        overallOperatorStatusKey = 'Reject-Minor-S';
     } else if (spiStatus === 'Pass' && measurementStatus === 'Pass' && totalMajorDefectsInUpdatedGarments === 0 && totalMinorDefectsInUpdatedGarments === 0) {
         overallOperatorStatusKey = 'Pass';
     } else {
@@ -767,13 +771,6 @@ const RovingPage = () => {
     (i + 1).toString()
   );
 
-  const toOrdinalFormattedString = (n, transFunc) => {
-    if (typeof n !== 'number' || isNaN(n) || n <= 0) return String(n);
-    const s = ["th", "st", "nd", "rd"];
-    const v = n % 100;
-    const suffix = s[(v - 20) % 10] || s[v] || s[0];
-    return `${n}${suffix} ${transFunc('qcRoving.inspectionText', "Inspection")}`;
-  };
 
   const inspectionRepOptions = [1, 2, 3, 4, 5].map(num => ({
     value: toOrdinalFormattedString(num, t),
