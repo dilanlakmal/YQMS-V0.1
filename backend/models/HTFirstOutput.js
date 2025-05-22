@@ -8,7 +8,7 @@ const standardSpecificationSchema = new mongoose.Schema(
     tempC: { type: Number, default: null },
     tempOffsetMinus: { type: Number, default: 0 },
     tempOffsetPlus: { type: Number, default: 0 },
-    pressure: { type: String, default: null },
+    pressure: { type: Number, default: null },
     status: { type: String, enum: ["Pass", "Reject"], default: "Pass" },
     remarks: { type: String, default: "NA" } // New remarks field for each spec
   },

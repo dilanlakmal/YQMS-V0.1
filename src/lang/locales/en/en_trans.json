@@ -814,6 +814,37 @@
     "errorUploadingWashImage": "Failed to upload after wash image.",
     "dataSavedSuccess": "Data saved successfully!",
     "errorSubmitting": "Failed to submit data.",
-    "errorSubmittingLog": "Error submitting form:"
+    "errorSubmittingLog": "Error submitting form:",
+    "na": "N/A",
+    "naCap": "N/A",
+    "pending": "Pending",
+    "selectMachine": "Select Machine...",
+    "errorFetchingHtSpecsLog": "Error fetching HT First Output specs:",
+    "noActiveSlot": "No Active Slot"
+  },
+  "sccDailyHTQC": {
+    "title": "Daily Heat Transfer / Fusing Machine Test and Calibration Sheet",
+    "subtitle": "Calibration test need to perform every 2 hours during production and verify by QA.",
+    "newRecord": "New QC record. Fetching base specs if MO/Color is set.",
+    "recordLoaded": "Existing QC record loaded.",
+    "selectMoColor": "Multiple records found for this machine/date. Please select MO and Color.",
+    "errorLoadingRecord": "Error loading QC record.",
+    "errorLoadingRecordMsg": "Failed to load existing QC record data.",
+    "reportSavedSuccess": "Daily HT/FU QC Test saved successfully.",
+    "validation": {
+      "fillBasic": "Please fill Date, Machine No, MO No, and Color.",
+      "allSlotsDone": "All inspection slots seem complete or no active slot for submission.",
+      "fillActiveSlot": "Please fill data for the current active inspection time slot or mark as N/A."
+    },
+    "selectExisting": "Select existing MO/Color for this Machine/Date:",
+    "parameter": "Parameter",
+    "reqValue": "Req.Value",
+    "temperature": "Temperature",
+    "timing": "Timing",
+    "pressure": "Pressure",
+    "stretchScratchTest": "Stretch & Scratch Test",
+    "washingTest": "Washing Test",
+    "inspectionDetails": "Inspection Details",
+    "currentInspectionNo": "Current Inspection Slot:"
   }
 }
