@@ -820,7 +820,8 @@
     "pending": "Pending",
     "selectMachine": "Select Machine...",
     "errorFetchingHtSpecsLog": "Error fetching HT First Output specs:",
-    "noActiveSlot": "No Active Slot"
+    "noActiveSlot": "No Active Slot",
+    "machineNo": "Machine No"
   },
   "sccDailyHTQC": {
     "title": "Daily Heat Transfer / Fusing Machine Test and Calibration Sheet",
@@ -845,6 +846,77 @@
     "stretchScratchTest": "Stretch & Scratch Test",
     "washingTest": "Washing Test",
     "inspectionDetails": "Inspection Details",
-    "currentInspectionNo": "Current Inspection Slot:"
+    "currentInspectionNo": "Current Inspection Slot:",
+    "previousRecords": "Previous Records",
+    "allInspectionsCompleted": "All inspections have been completed.",
+    "currentInspectionSlot": "Current Inspection Slot"
+  },
+  "sccDailyFUQC": {
+    "title": "Fusing Machine Temperature Testing Report",
+    "subtitle": "Note: Must use the thermo-paper for testing the temperature of fusing machine every 2 hours.",
+    "newRecord": "New FU QC record. Fetching base temperature if MO/Color is set.",
+    "recordLoaded": "Existing FU QC record loaded.",
+    "selectMoColor": "Multiple records found for this machine/date. Please select MO and Color.",
+    "errorLoadingRecord": "Error loading FU QC record.",
+    "errorLoadingRecordMsg": "Failed to load existing FU QC record data.",
+    "reportSavedSuccess": "Daily FU QC Test saved successfully.",
+    "validation": {
+      "fillBasic": "Please fill Date, Machine No, MO No, and Color.",
+      "fillBasicPayload": "Essential data missing in submission for FU QC.",
+      "allSlotsDone": "All inspection slots seem complete or no active slot for submission.",
+      "selectResultActiveSlot": "Please select Pass/Reject for the current active inspection slot.",
+      "tempReqMissing": "Required temperature for the current slot is missing. Cannot submit."
+    },
+    "selectExisting": "Select existing MO/Color for this Machine/Date:",
+    "parameter": "Parameter",
+    "reqTemp": "Req. Temp",
+    "temperature": "Temperature",
+    "timeSlot": "Time Slot",
+    "result": "Result",
+    "remarks": "Remarks",
+    "remarksPlaceholder": "Enter any remarks here...",
+    "currentInspectionSlot": "Current Inspection Slot",
+    "previousRecords": "Previous Records",
+    "allInspectionsCompleted": "All FU inspections have been completed for this MO/Color/Date.",
+    "errorFetchingFuSpecsLog": "Error fetching FU base temperature specifications.",
+    "newRecordKey": "New",
+    "selectMoColorKey": "select MO and Color",
+    "actualTemp": "Actual Temp"
+  },
+  "sccHTInspection": {
+    "title": "Heat Transfer Inspection Report",
+    "batchNo": "Batch No.",
+    "inspectionDetails": "Inspection Details",
+    "totalBundle": "Total Bundle",
+    "totalPcs": "Total Pcs",
+    "totalInspectedQty": "Insp. Qty (AQL)",
+    "defectsQty": "Defects Qty",
+    "result": "Result",
+    "aqlInfoTitle": "AQL Sampling Plan Information",
+    "aqlType": "Type",
+    "aqlLevel": "Level",
+    "sampleSizeCode": "Code Letter",
+    "aqlSampleReq": "Sample Size",
+    "enterTotalPcsForAQL": "Enter Total Pcs to view AQL details.",
+    "defectDetailsTitle": "Defect Details",
+    "manageDefectsBtn": "Manage Defects",
+    "noDefectsRecorded": "No defects recorded.",
+    "totalDefects": "Total Defects",
+    "remarks": "Remarks",
+    "remarksPlaceholder": "Enter any remarks here (max 250 chars)...",
+    "defectImageLabel": "Defect Image (Optional)",
+    "reportSavedSuccess": "HT Inspection Report saved successfully.",
+    "errorFetchingDefects": "Error fetching defects list.",
+    "errorFetchingDefectsMsg": "Failed to load defect list. Please try again.",
+    "errorFetchingAQL": "Error fetching AQL details.",
+    "defectBoxTitle": "Manage Defect Details",
+    "selectDefectToAdd": "-- Select Defect to Add --",
+    "noDefectsAdded": "No defects added yet.",
+    "validation": {
+      "fillBasic": "Please fill Date, Machine No., MO No., Color, and Batch No.",
+      "fillBasicPayload": "Essential data missing for HT Inspection submission.",
+      "fillBundlePcs": "Total Bundle and Total Pcs must be greater than 0.",
+      "aqlNotLoaded": "AQL data not loaded. Ensure Total Pcs is valid and AQL details are fetched."
+    }
   }
 }

@@ -21,7 +21,7 @@ const RovingFilterPlane = ({
       const parts = initialFilters.date.split("/");
       if (parts.length === 3) {
         const year = parseInt(parts[2], 10);
-        const month = parseInt(parts[0], 10) - 1; // Month is 0-indexed for Date constructor
+        const month = parseInt(parts[0], 10) - 1;
         const day = parseInt(parts[1], 10);
         if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
           const parsedDate = new Date(year, month, day);
@@ -93,6 +93,20 @@ const RovingFilterPlane = ({
     onFilterChange(formattedFilters);
   }, [filters, onFilterChange]);
 
+  // Effect to synchronize the internal qcId filter with initialFilters.qcId prop.
+  // This is important if initialFilters.qcId (derived from authUserEmpId in the parent)
+  // loads asynchronously or changes after this component has mounted.
+  useEffect(() => {
+    setFilters((prevInternalFilters) => {
+      const qcIdFromProps = initialFilters?.qcId || "";
+      if (prevInternalFilters.qcId !== qcIdFromProps) {
+        // Update the internal state to reflect the (potentially new) default from props.
+        return { ...prevInternalFilters, qcId: qcIdFromProps };
+      }
+      return prevInternalFilters;
+    });
+  }, [initialFilters?.qcId]); // Re-run if the specific prop value changes.
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
@@ -105,7 +119,7 @@ const RovingFilterPlane = ({
   const handleResetFilters = () => {
     const resetValues = {
       date: new Date(),
-      qcId: "",
+      qcId: initialFilters?.qcId || "", // Reset to the default provided by parent (authUserEmpId if set)
       operatorId: "",
       lineNo: "",
       moNo: ""
@@ -223,9 +237,9 @@ const RovingFilterPlane = ({
       <div className="mt-4 flex justify-end space-x-3">
         <button
           onClick={handleResetFilters}
-          className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
+          className="px-4 py-2 bg-blue-400 text-gray-700 rounded-md hover:bg-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 font-semibold"
         >
-          Reset
+          Clear
         </button>
       </div>
     </div>

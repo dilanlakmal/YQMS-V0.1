@@ -47,6 +47,9 @@ import createHTFirstOutputModel from "./models/HTFirstOutput.js";
 import createFUFirstOutputModel from "./models/FUFirstOutput.js";
 import createSCCDailyTestingModel from "./models/SCCDailyTesting.js";
 import createDailyTestingHTFUtModel from "./models/dailyTestingHTFUModel.js";
+import createDailyTestingFUQCModel from "./models/DailyTestingFUQCModel.js";
+import createSCCDefectModel from "./models/SCCDefectModel.js";
+import createHTInspectionReportModel from "./models/HTInspectionReportModel.js";
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
@@ -172,6 +175,9 @@ const HTFirstOutput = createHTFirstOutputModel(ymProdConnection); // Add this
 const FUFirstOutput = createFUFirstOutputModel(ymProdConnection); // Add this
 const SCCDailyTesting = createSCCDailyTestingModel(ymProdConnection);
 const DailyTestingHTFU = createDailyTestingHTFUtModel(ymProdConnection);
+const DailyTestingFUQC = createDailyTestingFUQCModel(ymProdConnection);
+const SCCDefect = createSCCDefectModel(ymProdConnection);
+const HTInspectionReport = createHTInspectionReportModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -12834,6 +12840,440 @@ app.post("/api/scc/daily-htfu-test", async (req, res) => {
       message: "Failed to save Daily HT/FU QC Test",
       error: error.message,
       details: error // Mongoose validation errors might be here
+    });
+  }
+});
+
+/* ------------------------------
+   End Point - SCC FU First Output - Specific Temp
+------------------------------ */
+app.get("/api/scc/fu-first-output-temp", async (req, res) => {
+  try {
+    const { moNo, color, inspectionDate } = req.query;
+    if (!moNo || !color || !inspectionDate) {
+      return res
+        .status(400)
+        .json({ message: "MO No, Color, and Inspection Date are required." });
+    }
+    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+
+    const fuRecord = await FUFirstOutput.findOne({
+      // Assuming FUFirstOutput is your model name
+      moNo,
+      color,
+      inspectionDate: formattedDate
+    }).lean();
+
+    let tempC = null;
+    if (fuRecord && fuRecord.standardSpecification) {
+      // Prioritize 'afterHat' if available, otherwise 'first'
+      const afterHatSpec = fuRecord.standardSpecification.find(
+        (s) =>
+          s.type === "afterHat" && s.tempC !== null && s.tempC !== undefined
+      );
+      const firstSpec = fuRecord.standardSpecification.find(
+        (s) => s.type === "first" && s.tempC !== null && s.tempC !== undefined
+      );
+
+      if (afterHatSpec) {
+        tempC = afterHatSpec.tempC;
+      } else if (firstSpec) {
+        tempC = firstSpec.tempC;
+      }
+    }
+
+    if (tempC === null) {
+      return res
+        .status(200)
+        .json({ message: "FU_TEMP_SPEC_NOT_FOUND", tempC: null });
+    }
+    res.json({ tempC: tempC });
+  } catch (error) {
+    console.error("Error fetching FU first output temperature:", error);
+    res.status(500).json({
+      message: "Failed to fetch FU first output temperature",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   End Points - SCC Daily FU QC Test
+------------------------------ */
+
+// GET Endpoint to fetch existing Daily FUQC Test data or MO list
+app.get("/api/scc/daily-fuqc-test", async (req, res) => {
+  try {
+    const { inspectionDate, machineNo, moNo, color } = req.query;
+    const formattedDate = inspectionDate
+      ? formatDateToMMDDYYYY(inspectionDate)
+      : null;
+
+    if (!formattedDate || !machineNo) {
+      return res
+        .status(400)
+        .json({ message: "Inspection Date and Machine No are required." });
+    }
+
+    if (moNo && color) {
+      const record = await DailyTestingFUQC.findOne({
+        inspectionDate: formattedDate,
+        machineNo,
+        moNo,
+        color
+      });
+      if (!record) {
+        return res
+          .status(200)
+          .json({ message: "DAILY_FUQC_RECORD_NOT_FOUND", data: null });
+      }
+      return res.json({ message: "RECORD_FOUND", data: record });
+    } else {
+      const distinctEntries = await DailyTestingFUQC.aggregate([
+        { $match: { inspectionDate: formattedDate, machineNo } },
+        {
+          $group: {
+            _id: { moNo: "$moNo", color: "$color" },
+            buyer: { $first: "$buyer" },
+            buyerStyle: { $first: "$buyerStyle" },
+            docId: { $first: "$_id" }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            moNo: "$_id.moNo",
+            color: "$_id.color",
+            buyer: "$buyer",
+            buyerStyle: "$buyerStyle",
+            docId: "$docId"
+          }
+        },
+        { $sort: { moNo: 1, color: 1 } } // Optional: sort the list
+      ]);
+
+      if (distinctEntries.length === 0) {
+        return res.status(200).json({
+          message: "NO_RECORDS_FOR_DATE_MACHINE",
+          data: []
+        });
+      }
+      return res.json({
+        message: "MULTIPLE_MO_COLOR_FOUND",
+        data: distinctEntries
+      });
+    }
+  } catch (error) {
+    console.error("Error fetching Daily FUQC Test data:", error);
+    res.status(500).json({
+      message: "Failed to fetch Daily FUQC Test data",
+      error: error.message
+    });
+  }
+});
+
+// POST Endpoint to save/update Daily FUQC Test data
+app.post("/api/scc/daily-fuqc-test", async (req, res) => {
+  try {
+    const {
+      _id,
+      inspectionDate,
+      machineNo,
+      moNo,
+      buyer,
+      buyerStyle,
+      color,
+      emp_id,
+      emp_kh_name,
+      emp_eng_name,
+      emp_dept_name,
+      emp_sect_name,
+      emp_job_title,
+      baseReqTemp,
+      currentInspection, // currentInspection will now include temp_actual, temp_isNA
+      remarks
+    } = req.body;
+
+    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+    if (!formattedDate || !machineNo || !moNo || !color || !currentInspection) {
+      return res
+        .status(400)
+        .json({ message: "Missing required fields for submission." });
+    }
+    // Validate currentInspection structure
+    if (
+      currentInspection.temp_req === undefined || // temp_req can be null, but key should exist
+      currentInspection.temp_actual === undefined || // temp_actual can be null, but key should exist
+      typeof currentInspection.temp_isNA !== "boolean" ||
+      !currentInspection.result
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Invalid currentInspection data structure." });
+    }
+
+    const now = new Date();
+    const inspectionTime = `${String(now.getHours()).padStart(2, "0")}:${String(
+      now.getMinutes()
+    ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+    const query = { inspectionDate: formattedDate, machineNo, moNo, color };
+    let record = await DailyTestingFUQC.findOne(query);
+    const currentRemarks =
+      remarks?.trim() === "" ? "NA" : remarks?.trim() || "NA";
+
+    // Prepare the inspection slot data, ensuring result is 'N/A' if temp_isNA is true
+    const inspectionDataToSave = {
+      ...currentInspection,
+      inspectionTimestamp: new Date()
+    };
+    if (inspectionDataToSave.temp_isNA) {
+      inspectionDataToSave.result = "N/A";
+      inspectionDataToSave.temp_actual = null; // Ensure actual is null if NA
+    }
+
+    if (record) {
+      // Update existing record
+      record.baseReqTemp = baseReqTemp ?? record.baseReqTemp;
+      record.remarks = currentRemarks;
+      record.emp_id = emp_id;
+      record.emp_kh_name = emp_kh_name;
+      record.emp_eng_name = emp_eng_name;
+      record.emp_dept_name = emp_dept_name;
+      record.emp_sect_name = emp_sect_name;
+      record.emp_job_title = emp_job_title;
+      record.inspectionTime = inspectionTime;
+
+      const slotIndex = record.inspections.findIndex(
+        (insp) => insp.timeSlotKey === inspectionDataToSave.timeSlotKey
+      );
+      if (slotIndex > -1) {
+        record.inspections[slotIndex] = {
+          ...record.inspections[slotIndex],
+          ...inspectionDataToSave
+        };
+      } else {
+        record.inspections.push(inspectionDataToSave);
+      }
+      record.inspections.sort(
+        (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
+      );
+    } else {
+      // Create new record
+      record = new DailyTestingFUQC({
+        inspectionDate: formattedDate,
+        machineNo,
+        moNo,
+        buyer,
+        buyerStyle,
+        color,
+        emp_id,
+        emp_kh_name,
+        emp_eng_name,
+        emp_dept_name,
+        emp_sect_name,
+        emp_job_title,
+        inspectionTime,
+        baseReqTemp,
+        remarks: currentRemarks,
+        inspections: [inspectionDataToSave]
+      });
+    }
+
+    await record.save();
+    res
+      .status(201)
+      .json({ message: "Daily FUQC Test saved successfully", data: record });
+  } catch (error) {
+    console.error("Error saving Daily FUQC Test:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message:
+          "A record with this Date, Machine No, MO No, and Color already exists.",
+        error: error.message,
+        errorCode: "DUPLICATE_KEY"
+      });
+    }
+    res.status(500).json({
+      message: "Failed to save Daily FUQC Test",
+      error: error.message,
+      details: error
+    });
+  }
+});
+
+/* ------------------------------
+   End Points - SCC Defects
+------------------------------ */
+
+app.get("/api/scc/defects", async (req, res) => {
+  try {
+    const defects = await SCCDefect.find({}).sort({ no: 1 }).lean(); // Fetch all defects, sorted by 'no'
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching SCC defects:", error);
+    res.status(500).json({ message: "Server error fetching defects" });
+  }
+});
+
+/* ------------------------------
+   End Points - SCC HT Inspection
+------------------------------ */
+
+app.post("/api/scc/ht-inspection-report", async (req, res) => {
+  try {
+    const {
+      _id,
+      inspectionDate,
+      machineNo,
+      moNo,
+      buyer,
+      buyerStyle,
+      color,
+      batchNo,
+      totalBundle,
+      totalPcs,
+      aqlData,
+      defectsQty,
+      result,
+      defects,
+      remarks,
+      // defectImageFile is handled by SCCPage, we expect defectImageUrl here if uploaded
+      defectImageUrl, // Expecting URL from client if image was uploaded/kept
+      emp_id,
+      emp_kh_name,
+      emp_eng_name,
+      emp_dept_name,
+      emp_sect_name,
+      emp_job_title
+    } = req.body;
+
+    // Basic validation (more comprehensive on model)
+    if (
+      !inspectionDate ||
+      !machineNo ||
+      !moNo ||
+      !color ||
+      !batchNo ||
+      !totalPcs ||
+      !aqlData
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Missing required fields for HT Inspection Report." });
+    }
+
+    const now = new Date();
+    const inspectionTime = `${String(now.getHours()).padStart(2, "0")}:${String(
+      now.getMinutes()
+    ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+
+    const reportData = {
+      inspectionDate: new Date(inspectionDate),
+      machineNo,
+      moNo,
+      buyer,
+      buyerStyle,
+      color,
+      batchNo,
+      totalBundle: Number(totalBundle),
+      totalPcs: Number(totalPcs),
+      aqlData,
+      defectsQty: Number(defectsQty),
+      result,
+      defects,
+      remarks: remarks?.trim() || "NA",
+      defectImageUrl: defectImageUrl || null, // Use the URL passed from client
+      emp_id,
+      emp_kh_name,
+      emp_eng_name,
+      emp_dept_name,
+      emp_sect_name,
+      emp_job_title,
+      inspectionTime
+    };
+
+    let savedReport;
+    if (_id) {
+      // Update existing
+      savedReport = await HTInspectionReport.findByIdAndUpdate(
+        _id,
+        reportData,
+        { new: true, runValidators: true }
+      );
+      if (!savedReport)
+        return res
+          .status(404)
+          .json({ message: "Report not found for update." });
+    } else {
+      // Create new
+      // Optional: Check for duplicates before creating, if unique index is not strictly enforced or for better user feedback
+      // const existing = await HTInspectionReport.findOne({ inspectionDate: reportData.inspectionDate, machineNo, moNo, color, batchNo });
+      // if (existing) return res.status(409).json({ message: "Duplicate report found for this date, machine, MO, color, and batch." });
+      savedReport = new HTInspectionReport(reportData);
+      await savedReport.save();
+    }
+
+    res.status(201).json({
+      message: "HT Inspection Report saved successfully.",
+      data: savedReport
+    });
+  } catch (error) {
+    console.error("Error saving HT Inspection Report:", error);
+    if (error.code === 11000) {
+      // Mongoose duplicate key error
+      return res.status(409).json({
+        message: "Duplicate entry. This report might already exist.",
+        error: error.message,
+        errorCode: "DUPLICATE_KEY"
+      });
+    }
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        message: "Validation Error: " + error.message,
+        errors: error.errors
+      });
+    }
+    res.status(500).json({
+      message: "Failed to save HT Inspection Report.",
+      error: error.message,
+      details: error
+    });
+  }
+});
+
+// GET endpoint to load an existing HT Inspection Report (Optional - for editing/viewing later)
+app.get("/api/scc/ht-inspection-report", async (req, res) => {
+  try {
+    const { inspectionDate, machineNo, moNo, color, batchNo } = req.query;
+    if (!inspectionDate || !machineNo || !moNo || !color || !batchNo) {
+      return res.status(400).json({
+        message:
+          "Date, Machine, MO, Color, and Batch No are required to fetch report."
+      });
+    }
+    // Ensure date is handled correctly if coming as string
+    const searchDate = new Date(inspectionDate);
+    // To match just the date part, you might need to query for a date range or format stored date as string
+    // For simplicity, assuming client sends date in a way that matches stored format or you adjust here
+    const report = await HTInspectionReport.findOne({
+      inspectionDate: searchDate, // This might need adjustment based on how dates are stored/queried
+      machineNo,
+      moNo,
+      color,
+      batchNo
+    }).lean();
+
+    if (!report) {
+      return res
+        .status(200)
+        .json({ message: "HT_INSPECTION_REPORT_NOT_FOUND", data: null });
+    }
+    res.json({ message: "REPORT_FOUND", data: report });
+  } catch (error) {
+    console.error("Error fetching HT Inspection Report:", error);
+    res.status(500).json({
+      message: "Failed to fetch HT Inspection Report",
+      error: error.message
     });
   }
 });

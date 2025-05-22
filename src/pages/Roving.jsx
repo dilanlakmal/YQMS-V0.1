@@ -1064,6 +1064,16 @@ import i18next from "i18next";
 const RovingPage = () => {
   const { t } = useTranslation();
   const { user, loading: authLoading } = useAuth();
+  const toOrdinalFormattedString = (n, transFunc) => {
+    if (typeof n !== "number" || isNaN(n) || n <= 0) return String(n);
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    const suffix = s[(v - 20) % 10] || s[v] || s[0];
+    return `${n}${suffix} ${transFunc(
+      "qcRoving.inspectionText",
+      "Inspection"
+    )}`;
+  };
   const [inspectionType, setInspectionType] = useState("Normal");
   const [spiStatus, setSpiStatus] = useState("");
   const [measurementStatus, setMeasurementStatus] = useState("");
@@ -1098,7 +1108,7 @@ const RovingPage = () => {
   const [showPreview, setShowPreview] = useState(false);
   const moNoDropdownRef = useRef(null);
   const [selectedManualInspectionRep, setSelectedManualInspectionRep] =
-    useState("");
+    useState(() => toOrdinalFormattedString(1, t));
   const [
     inspectionsCompletedForSelectedRep,
     setInspectionsCompletedForSelectedRep
@@ -1213,21 +1223,6 @@ const RovingPage = () => {
     };
     fetchBuyerByMo();
   }, [moNo]);
-
-  // useEffect(() => {
-  //   if (!authLoading && user) {
-  //     setScannedUserData({
-  //       emp_id: user.emp_id || "N/A_USER_EMP_ID",
-  //       eng_name: user.eng_name || "N/A_USER_ENG_NAME",
-  //       kh_name: user.kh_name || "N/A_USER_KH_NAME",
-  //       job_title: user.job_title || "N/A_USER_JOB_TITLE",
-  //       dept_name: user.dept_name || "N/A_USER_DEPT_NAME",
-  //       sect_name: user.sect_name || "N/A_USER_SECT_NAME",
-  //     });
-  //   } else if (!authLoading && !user) {
-  //     setScannedUserData(null);
-  //   }
-  // }, [user, authLoading]);
 
   const fetchInspectionsCompleted = useCallback(async () => {
     if (lineNo && currentDate && selectedManualInspectionRep && moNo) {
@@ -1368,18 +1363,15 @@ const RovingPage = () => {
                     (status) => status.buyerName === apiDeterminedBuyer
                   );
                   if (buyerStatus) {
-                    // Set initial severity based on isCommon for this buyer
-                    // Ensure isCommon is one of the allowed defectStatus values, or default
                     if (
                       buyerStatus.isCommon &&
                       buyerStatus.defectStatus?.includes(buyerStatus.isCommon)
                     ) {
                       return buyerStatus.isCommon;
                     }
-                    // If isCommon is not valid or not in defectStatus, pick the first from defectStatus or default to Minor
                     return buyerStatus.defectStatus?.[0] || "Minor";
                   }
-                  return "Minor"; // Default if no buyer-specific info at all
+                  return "Minor";
                 })()
               }
             ],
@@ -1488,7 +1480,7 @@ const RovingPage = () => {
     setMeasurementStatus("");
     setSpiFilesToUpload([]);
     setMeasurementFilesToUpload([]);
-    setSelectedManualInspectionRep("");
+    // setSelectedManualInspectionRep("");
     setImageUploaderKey(Date.now());
     setRemarkText("");
   };
@@ -1613,10 +1605,29 @@ const RovingPage = () => {
         ...garment,
         status: hasDefects ? "Fail" : "Pass",
         garment_defect_count: garmentDefectCount,
-        defects: garment.defects.map((defect) => ({
-          ...defect,
-          name: defect.name
-        }))
+        defects: garment.defects.map((defect) => {
+          const defectMasterEntry = defects.find(
+            (d) => d.english === defect.name
+          );
+          let buyerSpecificDefectInfo = null;
+
+          if (defectMasterEntry && defectMasterEntry.statusByBuyer) {
+            buyerSpecificDefectInfo = defectMasterEntry.statusByBuyer.find(
+              (bs) => bs.buyerName === apiDeterminedBuyer
+            );
+          }
+          const finalDefectStatus =
+            buyerSpecificDefectInfo &&
+            Array.isArray(buyerSpecificDefectInfo.defectStatus) &&
+            buyerSpecificDefectInfo.defectStatus.length > 0
+              ? defect.severity
+              : "N/A";
+
+          return {
+            ...defect,
+            defect_status: finalDefectStatus
+          };
+        })
       };
     });
 
@@ -1628,6 +1639,10 @@ const RovingPage = () => {
     const qualityStatus = updatedGarments.some((g) => g.status === "Fail")
       ? "Reject"
       : "Pass";
+
+    const rejectedGarmentCountForOperator = updatedGarments.filter(
+      (g) => g.status === "Fail"
+    ).length;
 
     let overallOperatorStatusKey = "";
     const anyCriticalDefectInUpdatedGarments = updatedGarments.some((g) =>
@@ -1657,18 +1672,18 @@ const RovingPage = () => {
     } else if (anyCriticalDefectInUpdatedGarments) {
       overallOperatorStatusKey = "Reject-Critical";
     } else if (totalMajorDefectsInUpdatedGarments >= 2) {
-      overallOperatorStatusKey = "Reject-Major-";
+      overallOperatorStatusKey = "Reject-Major-M";
     } else if (totalMinorDefectsInUpdatedGarments >= 2) {
-      overallOperatorStatusKey = "Reject-Minor";
+      overallOperatorStatusKey = "Reject-Minor-M";
     } else if (spiStatus === "Reject" || measurementStatus === "Reject") {
       // This condition is met if not critical, <2 Major, <2 Minor, but SPI/Meas is Reject
       overallOperatorStatusKey = "Reject";
     } else if (totalMajorDefectsInUpdatedGarments === 1) {
       // This condition is met if SPI/Meas Pass, not critical, <2 Minor, 1 Major
-      overallOperatorStatusKey = "Reject-Major";
+      overallOperatorStatusKey = "Reject-Major-S";
     } else if (totalMinorDefectsInUpdatedGarments === 1) {
       // This condition is met if SPI/Meas Pass, not critical, no Major, 1 Minor
-      overallOperatorStatusKey = "Reject-Minor";
+      overallOperatorStatusKey = "Reject-Minor-S";
     } else if (
       spiStatus === "Pass" &&
       measurementStatus === "Pass" &&
@@ -1703,6 +1718,7 @@ const RovingPage = () => {
       measurement: measurementStatus,
       measurement_images: uploadedMeasurementImagePaths,
       checked_quantity: garments.length,
+      rejectedGarmentCount: rejectedGarmentCountForOperator,
       inspection_time: inspectionTime,
       remark: remarkText,
       qualityStatus,
@@ -1934,17 +1950,6 @@ const RovingPage = () => {
   const lineNoOptions = Array.from({ length: 30 }, (_, i) =>
     (i + 1).toString()
   );
-
-  const toOrdinalFormattedString = (n, transFunc) => {
-    if (typeof n !== "number" || isNaN(n) || n <= 0) return String(n);
-    const s = ["th", "st", "nd", "rd"];
-    const v = n % 100;
-    const suffix = s[(v - 20) % 10] || s[v] || s[0];
-    return `${n}${suffix} ${transFunc(
-      "qcRoving.inspectionText",
-      "Inspection"
-    )}`;
-  };
 
   const inspectionRepOptions = [1, 2, 3, 4, 5].map((num) => ({
     value: toOrdinalFormattedString(num, t),
@@ -2773,7 +2778,7 @@ const RovingPage = () => {
                   spiFilesToUpload,
                   measurementFilesToUpload,
                   rovingStatus: overallStatusText,
-                  overallStatusColor: overallStatusColor // <-- Add this line
+                  overallStatusColor: overallStatusColor
                 }}
               />
             )}

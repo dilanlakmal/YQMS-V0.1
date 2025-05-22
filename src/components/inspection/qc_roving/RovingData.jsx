@@ -3,6 +3,7 @@ import axios from "axios";
 import { API_BASE_URL } from "../../../../config";
 import Swal from "sweetalert2";
 import RovingFilterPlane from "../qc_roving/RovingDataFilterPane";
+import { useAuth } from "../../authentication/AuthContext";
 
 const getTodayDateString = () => {
   const today = new Date();
@@ -21,12 +22,19 @@ const REPETITION_KEYS = [
 ];
 
 const RovingData = ({ refreshTrigger }) => {
+  const { user } = useAuth();
+  const authUserEmpId = user?.emp_id;
   const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [columnVisibility, setColumnVisibility] = useState({
+    spi: true,
+    measurement: true,
+    checkedDefect: true
+  });
 
   const [filters, setFilters] = useState({
     date: getTodayDateString(),
-    qcId: "",
+    qcId: authUserEmpId ? String(authUserEmpId) : "", // Default to authUserEmpId if available
     operatorId: "",
     lineNo: "",
     moNo: ""
@@ -37,51 +45,61 @@ const RovingData = ({ refreshTrigger }) => {
   const [uniqueLineNos, setUniqueLineNos] = useState([]);
   const [uniqueMoNos, setUniqueMoNos] = useState([]);
 
-  const populateUniqueFilterOptions = useCallback((sourceReports) => {
-    if (sourceReports && sourceReports.length > 0) {
-      const qcIds = new Set();
-      const operatorIds = new Set();
-      const lineNos = new Set();
-      const moNos = new Set();
+  const populateUniqueFilterOptions = useCallback(
+    (sourceReports) => {
+      if (sourceReports && sourceReports.length > 0) {
+        const qcIds = new Set();
+        const operatorIds = new Set();
+        const lineNos = new Set();
+        const moNos = new Set();
 
-      sourceReports.forEach((report) => {
-        // if (report.emp_id) qcIds.add(report.emp_id);
-        if (report.line_no) lineNos.add(report.line_no);
-        if (report.mo_no) moNos.add(report.mo_no);
-        // report.inlineData?.forEach((data) => {
-        //   if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
-        // });
-        // Handle new schema with inspection_rep
-        if (report.inspection_rep && Array.isArray(report.inspection_rep)) {
-          report.inspection_rep.forEach((repItem) => {
-            if (repItem.emp_id) qcIds.add(repItem.emp_id);
-            repItem.inlineData?.forEach((data) => {
-              if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
-            });
-          });
-        } else if (report.inlineData && Array.isArray(report.inlineData)) {
-          if (report.emp_id) qcIds.add(report.emp_id);
-          report.inlineData.forEach((data) => {
-            if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
-          });
+        // Add authUserEmpId to the set if it exists, ensuring it's always an option
+        if (authUserEmpId) {
+          qcIds.add(String(authUserEmpId));
         }
-      });
 
-      setUniqueQcIds(Array.from(qcIds).sort());
-      setUniqueOperatorIds(Array.from(operatorIds).sort());
-      setUniqueLineNos(
-        Array.from(lineNos).sort((a, b) =>
-          String(a).localeCompare(String(b), undefined, { numeric: true })
-        )
-      );
-      setUniqueMoNos(Array.from(moNos).sort());
-    } else {
-      setUniqueQcIds([]);
-      setUniqueOperatorIds([]);
-      setUniqueLineNos([]);
-      setUniqueMoNos([]);
-    }
-  }, []);
+        sourceReports.forEach((report) => {
+          // if (report.emp_id) qcIds.add(report.emp_id);
+          if (report.line_no) lineNos.add(report.line_no);
+          if (report.mo_no) moNos.add(report.mo_no);
+          // report.inlineData?.forEach((data) => {
+          //   if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
+          // });
+          // Handle new schema with inspection_rep
+          if (report.inspection_rep && Array.isArray(report.inspection_rep)) {
+            report.inspection_rep.forEach((repItem) => {
+              if (repItem.emp_id) qcIds.add(String(repItem.emp_id));
+              repItem.inlineData?.forEach((data) => {
+                if (data.operator_emp_id)
+                  operatorIds.add(String(data.operator_emp_id));
+              });
+            });
+          } else if (report.inlineData && Array.isArray(report.inlineData)) {
+            if (report.emp_id) qcIds.add(String(report.emp_id));
+            report.inlineData.forEach((data) => {
+              if (data.operator_emp_id)
+                operatorIds.add(String(data.operator_emp_id));
+            });
+          }
+        });
+
+        setUniqueQcIds(Array.from(qcIds).sort());
+        setUniqueOperatorIds(Array.from(operatorIds).sort());
+        setUniqueLineNos(
+          Array.from(lineNos).sort((a, b) =>
+            String(a).localeCompare(String(b), undefined, { numeric: true })
+          )
+        );
+        setUniqueMoNos(Array.from(moNos).sort());
+      } else {
+        setUniqueQcIds(authUserEmpId ? [String(authUserEmpId)] : []);
+        setUniqueOperatorIds([]);
+        setUniqueLineNos([]);
+        setUniqueMoNos([]);
+      }
+    },
+    [authUserEmpId]
+  );
 
   const fetchReports = useCallback(
     async (currentFilters) => {
@@ -90,10 +108,7 @@ const RovingData = ({ refreshTrigger }) => {
         const queryParams = new URLSearchParams();
         if (currentFilters.date)
           queryParams.append("inspection_date", currentFilters.date);
-        if (currentFilters.qcId)
-          queryParams.append("qcId", currentFilters.qcId);
-        if (currentFilters.operatorId)
-          queryParams.append("operatorId", currentFilters.operatorId);
+
         if (currentFilters.lineNo)
           queryParams.append("lineNo", currentFilters.lineNo);
         if (currentFilters.moNo)
@@ -215,6 +230,17 @@ const RovingData = ({ refreshTrigger }) => {
     fetchReports(filters);
   }, [filters, refreshTrigger, fetchReports]);
 
+  useEffect(() => {
+    setFilters((currentFilters) => {
+      const newQcIdFromAuth = authUserEmpId ? String(authUserEmpId) : "";
+      if (currentFilters.qcId !== newQcIdFromAuth) {
+        // This will make authUserEmpId the "current default".
+        return { ...currentFilters, qcId: newQcIdFromAuth };
+      }
+      return currentFilters;
+    });
+  }, [authUserEmpId]);
+
   const handleFilterChange = useCallback((newFilters) => {
     setFilters(newFilters);
   }, []);
@@ -229,6 +255,57 @@ const RovingData = ({ refreshTrigger }) => {
       }
     });
   };
+
+  const handleColumnVisibilityChange = (columnName) => {
+    setColumnVisibility((prev) => ({
+      ...prev,
+      [columnName]: !prev[columnName]
+    }));
+  };
+
+  const getVisibleSubColumnCount = () => {
+    let count = 0;
+    if (columnVisibility.spi) count++;
+    if (columnVisibility.measurement) count++;
+    if (columnVisibility.checkedDefect) count++;
+    return count;
+  };
+
+  const handleSelectAllColumns = () => {
+    setColumnVisibility({
+      spi: true,
+      measurement: true,
+      checkedDefect: true
+    });
+  };
+
+  const handleClearAllColumns = () => {
+    setColumnVisibility({
+      spi: false,
+      measurement: false,
+      checkedDefect: false
+    });
+  };
+
+  const visibleSubColumnCount = getVisibleSubColumnCount();
+
+  const renderColumnToggleCheckbox = (columnKey, label) => (
+    <div className="mr-4">
+      <input
+        type="checkbox"
+        id={`toggle-${columnKey}`}
+        checked={columnVisibility[columnKey]}
+        onChange={() => handleColumnVisibilityChange(columnKey)}
+        className="mr-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+      />
+      <label
+        htmlFor={`toggle-${columnKey}`}
+        className="text-xs font-medium text-gray-700"
+      >
+        {label}
+      </label>
+    </div>
+  );
 
   return (
     <div className="mt-4">
@@ -305,13 +382,38 @@ const RovingData = ({ refreshTrigger }) => {
         <div className="text-center p-10 text-gray-500">Loading reports...</div>
       ) : (
         <div className="overflow-x-auto relative max-h-[70vh]">
+          <div className="py-2 px-2 flex items-center justify-end bg-gray-100 border-t border-b border-gray-300 sticky top-0 z-20">
+            {/* <span className="text-xs font-semibold text-gray-700 mr-3">Show Columns:</span> */}
+            <div className="flex items-center">
+              {renderColumnToggleCheckbox("spi", "SPI")}
+              {renderColumnToggleCheckbox("measurement", "Measurement")}
+              {renderColumnToggleCheckbox(
+                "checkedDefect",
+                "Checked Qty/Defect"
+              )}
+            </div>
+            <div className="ml-4">
+              <button
+                onClick={handleSelectAllColumns}
+                className="px-2 py-1 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 mr-2"
+              >
+                Select All
+              </button>
+              <button
+                onClick={handleClearAllColumns}
+                className="px-2 py-1 text-xs font-medium text-white bg-red-500 rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-400"
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
           {reports.length === 0 ? (
             <div className="text-center p-10 text-gray-500">
               No reports found matching your criteria.
             </div>
           ) : (
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-200 sticky top-0 z-10 shadow-md">
+              <thead className="bg-gray-200 sticky top-[36px] z-10 shadow-md">
                 <tr>
                   <th
                     rowSpan="3"
@@ -331,38 +433,49 @@ const RovingData = ({ refreshTrigger }) => {
                   >
                     Machine Code
                   </th>
-                  <th
-                    colSpan={REPETITION_KEYS.length * 3}
-                    className="px-2 py-1 text-center text-sm font-medium text-gray-700 border border-gray-500"
-                  >
-                    Inspection Data
-                  </th>
-                </tr>
-                <tr>
-                  {REPETITION_KEYS.map((repKey) => (
+                  {visibleSubColumnCount > 0 && (
                     <th
-                      key={repKey}
-                      colSpan="3"
-                      className="px-2 py-1 text-center text-xs font-medium text-gray-700 border border-gray-500"
+                      colSpan={REPETITION_KEYS.length * visibleSubColumnCount}
+                      className="px-2 py-1 text-center text-sm font-medium text-gray-700 border border-gray-500"
                     >
-                      {repKey}
+                      Inspection Data
                     </th>
-                  ))}
+                  )}
                 </tr>
+                {visibleSubColumnCount > 0 && (
+                  <tr>
+                    {REPETITION_KEYS.map((repKey) => (
+                      <th
+                        key={repKey}
+                        colSpan={visibleSubColumnCount} // If this row is rendered, visibleSubColumnCount > 0
+                        className="px-2 py-1 text-center text-xs font-medium text-gray-700 border border-gray-500"
+                      >
+                        {repKey}
+                      </th>
+                    ))}
+                  </tr>
+                )}
                 <tr>
-                  {REPETITION_KEYS.flatMap((repKey) => (
-                    <React.Fragment key={`subgroup-header-${repKey}`}>
-                      <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
-                        SPI
-                      </th>
-                      <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
-                        Meas.
-                      </th>
-                      <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
-                        Chk'd/Def
-                      </th>
-                    </React.Fragment>
-                  ))}
+                  {visibleSubColumnCount > 0 &&
+                    REPETITION_KEYS.flatMap((repKey) => (
+                      <React.Fragment key={`subgroup-header-${repKey}`}>
+                        {columnVisibility.spi && (
+                          <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
+                            SPI
+                          </th>
+                        )}
+                        {columnVisibility.measurement && (
+                          <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
+                            Meas.
+                          </th>
+                        )}
+                        {columnVisibility.checkedDefect && (
+                          <th className="px-1 py-1 text-left text-xs font-medium text-gray-700 border border-gray-500 whitespace-nowrap">
+                            Chk'd/Def
+                          </th>
+                        )}
+                      </React.Fragment>
+                    ))}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -523,54 +636,80 @@ const RovingData = ({ refreshTrigger }) => {
                           overallStatusForEvent
                         );
 
-                      allRepInspectionCells.push(
-                        <td
-                          key={`spi-${repKey}`}
-                          title={tooltipTitle}
-                          onClick={() => showDetailsOnTap(tooltipTitle)}
-                          className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 text-center cursor-pointer`}
-                        >
-                          {renderResultSymbol(spiDisplay)}
-                        </td>,
-                        <td
-                          key={`meas-${repKey}`}
-                          title={tooltipTitle}
-                          onClick={() => showDetailsOnTap(tooltipTitle)}
-                          className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 text-center cursor-pointer`}
-                        >
-                          {renderResultSymbol(measDisplay)}
-                        </td>,
-                        <td
-                          key={`chkdef-${repKey}`}
-                          title={tooltipTitle}
-                          onClick={() => showDetailsOnTap(tooltipTitle)}
-                          className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 cursor-pointer text-center`}
-                        >
-                          {chkdDefDisplay}
-                        </td>
-                      );
+                      if (columnVisibility.spi) {
+                        allRepInspectionCells.push(
+                          <td
+                            key={`spi-${repKey}`}
+                            title={tooltipTitle}
+                            onClick={() => showDetailsOnTap(tooltipTitle)}
+                            className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 text-center cursor-pointer`}
+                          >
+                            {renderResultSymbol(spiDisplay)}
+                          </td>
+                        );
+                      }
+                      if (columnVisibility.measurement) {
+                        allRepInspectionCells.push(
+                          <td
+                            key={`meas-${repKey}`}
+                            title={tooltipTitle}
+                            onClick={() => showDetailsOnTap(tooltipTitle)}
+                            className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 text-center cursor-pointer`}
+                          >
+                            {renderResultSymbol(measDisplay)}
+                          </td>
+                        );
+                      }
+                      if (columnVisibility.checkedDefect) {
+                        allRepInspectionCells.push(
+                          <td
+                            key={`chkdef-${repKey}`}
+                            title={tooltipTitle}
+                            onClick={() => showDetailsOnTap(tooltipTitle)}
+                            className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 cursor-pointer text-center`}
+                          >
+                            {chkdDefDisplay}
+                          </td>
+                        );
+                      }
+                      // If all sub-columns for this rep are hidden, you might want a placeholder
+                      if (
+                        !columnVisibility.spi &&
+                        !columnVisibility.measurement &&
+                        !columnVisibility.checkedDefect &&
+                        visibleSubColumnCount === 0
+                      ) {
+                        // This case is handled by colSpan=1 on the repKey header if visibleSubColumnCount is 0
+                      }
                     } else {
                       // Render 3 empty cells if no data for this repetition
-                      allRepInspectionCells.push(
-                        <td
-                          key={`empty-spi-${repKey}`}
-                          className="px-1 py-1 text-xs text-gray-400 border border-gray-300 text-center"
-                        >
-                          -
-                        </td>,
-                        <td
-                          key={`empty-meas-${repKey}`}
-                          className="px-1 py-1 text-xs text-gray-400 border border-gray-300 text-center"
-                        >
-                          -
-                        </td>,
-                        <td
-                          key={`empty-chkdef-${repKey}`}
-                          className="px-1 py-1 text-xs text-gray-400 border border-gray-300 text-center"
-                        >
-                          -
-                        </td>
-                      );
+                      if (columnVisibility.spi)
+                        allRepInspectionCells.push(
+                          <td
+                            key={`empty-spi-${repKey}`}
+                            className="px-1 py-1 text-xs text-gray-400 border border-gray-300 text-center"
+                          >
+                            -
+                          </td>
+                        );
+                      if (columnVisibility.measurement)
+                        allRepInspectionCells.push(
+                          <td
+                            key={`empty-meas-${repKey}`}
+                            className="px-1 py-1 text-xs text-gray-400 border border-gray-300 text-center"
+                          >
+                            -
+                          </td>
+                        );
+                      if (columnVisibility.checkedDefect)
+                        allRepInspectionCells.push(
+                          <td
+                            key={`empty-chkdef-${repKey}`}
+                            className="px-1 py-1 text-xs text-gray-400 border border-gray-300 text-center"
+                          >
+                            -
+                          </td>
+                        );
                     }
                   });
 
