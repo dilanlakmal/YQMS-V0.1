@@ -31,6 +31,8 @@ import RovingPage from "./pages/Roving";
 import DefectTrack from "./pages/DefectTrack.jsx";
 import EmpData from "./pages/EmpData.jsx";
 import SystemAdministrationPage from "./pages/SystemAdministration.jsx";
+import SCCPage from "./pages/SCC.jsx";
+import SystemAdmin from "./pages/SystemAdmin.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -343,12 +345,14 @@ function AppContent() {
               <Route path="/washing" element={<WashingPage />} />
               <Route path="/roving" element={<RovingPage />} />
               <Route path="/cutting" element={<CuttingPage />} />
+              <Route path="/scc" element={<SCCPage />} />
+              <Route path="/sysadmin" element={<SystemAdmin />} />
               <Route path="/inline-emp" element={<EmpData />} />
               <Route path="/opa" element={<OPAPage />} />
               <Route path="/packing" element={<PackingPage />} />
               <Route path="/qc2-inspection" element={<QC2InspectionPage />} />
               <Route path="/download-data" element={<DownloadData />} />
-              <Route path="/system-administration" element={<SystemAdministrationPage />} />
+              {/* <Route path="/system-administration" element={<SystemAdministrationPage />} /> */}
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

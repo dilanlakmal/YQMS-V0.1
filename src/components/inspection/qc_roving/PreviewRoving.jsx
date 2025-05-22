@@ -225,7 +225,6 @@ const PreviewRoving = ({ isOpen, onClose, data }) => {
           </div>
         )}
 
-
         {/* Close Button */}
         <div className="flex justify-end mt-6">
           <button

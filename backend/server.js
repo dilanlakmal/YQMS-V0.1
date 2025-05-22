@@ -35,13 +35,18 @@ import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
 
 import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
 import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
-import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
+import createInlineOrdersModel from "./models/InlineOrders.js"; 
 import createSewingDefectsModel from "./models/SewingDefects.js";
 import createCuttingMeasurementPointModel from "./models/CuttingMeasurementPoints.js"; // New model import
 import createCuttingFabricDefectModel from "./models/CuttingFabricDefects.js";
 import createCuttingIssueModel from "./models/CuttingIssues.js";
 import createCutPanelOrdersModel from "./models/CutPanelOrders.js";
 import createAQLChartModel from "./models/AQLChart.js"; 
+
+import createHTFirstOutputModel from "./models/HTFirstOutput.js";
+import createFUFirstOutputModel from "./models/FUFirstOutput.js";
+import createSCCDailyTestingModel from "./models/SCCDailyTesting.js";
+import createDailyTestingHTFUtModel from "./models/dailyTestingHTFUModel.js";
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron";
@@ -148,12 +153,15 @@ const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New
 const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
 const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection); 
 const SewingDefects = createSewingDefectsModel(ymProdConnection);
-const CuttingMeasurementPoint =
-  createCuttingMeasurementPointModel(ymProdConnection); // New model instance
+const CuttingMeasurementPoint = createCuttingMeasurementPointModel(ymProdConnection); // New model instance
 const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection); // New model instance
 const CuttingFabricDefect = createCuttingFabricDefectModel(ymProdConnection);
 const CuttingIssue = createCuttingIssueModel(ymProdConnection);
 const AQLChart = createAQLChartModel(ymProdConnection);
+const HTFirstOutput = createHTFirstOutputModel(ymProdConnection); 
+const FUFirstOutput = createFUFirstOutputModel(ymProdConnection); 
+const SCCDailyTesting = createSCCDailyTestingModel(ymProdConnection);
+const DailyTestingHTFU = createDailyTestingHTFUtModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -1620,205 +1628,232 @@ async function syncCutPanelOrders() {
     await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
 
     const query = `
-      SELECT 
-        v.StyleNo,
-        v.TxnDate,
-        v.TxnNo,
-        CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer,
-        v.EngColor AS Color,
-        REPLACE(v.PreparedBy, 'SPREAD ', '') AS SpreadTable,
-        v.TableNo,
-        v.BuyerStyle,
-        v.ChColor,
-        v.ColorCode,
-        v.FabricType,
-        v.Material,
-        v.RollQty,
-        ROUND(v.SpreadYds, 3) AS SpreadYds,
-        v.Unit,
-        ROUND(v.GrossKgs, 3) AS GrossKgs,
-        ROUND(v.NetKgs, 3) AS NetKgs,
-        v.MackerNo,
-        ROUND(v.MackerLength, 3) AS MackerLength,
-        v.SendFactory,
-        v.SendTxnDate,
-        v.SendTxnNo,
-        v.SendTotalQty,
-        v.Ratio1 AS CuttingRatio1,
-        v.Ratio2 AS CuttingRatio2,
-        v.Ratio3 AS CuttingRatio3,
-        v.Ratio4 AS CuttingRatio4,
-        v.Ratio5 AS CuttingRatio5,
-        v.Ratio6 AS CuttingRatio6,
-        v.Ratio7 AS CuttingRatio7,
-        v.Ratio8 AS CuttingRatio8,
-        v.Ratio9 AS CuttingRatio9,
-        v.Ratio10 AS CuttingRatio10,
-        MAX(v.PlanLayer) AS PlanLayer,
-        MAX(v.ActualLayer) AS ActualLayer,
-        MAX(v.PlanPcs) AS TotalPcs,
-        STUFF((
-          SELECT DISTINCT ', ' + CAST(s2.Batch AS VARCHAR)
-          FROM [YMWHSYS2].[dbo].[tbSpreading] s2
-          WHERE s2.StyleNo = v.StyleNo
-            AND s2.PreparedBy = v.PreparedBy
-            AND s2.Batch IS NOT NULL
-          FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos,
-        t.Size1,
-        t.Size2,
-        t.Size3,
-        t.Size4,
-        t.Size5,
-        t.Size6,
-        t.Size7,
-        t.Size8,
-        t.Size9,
-        t.Size10,
-        t.OrderQty1,
-        t.OrderQty2,
-        t.OrderQty3,
-        t.OrderQty4,
-        t.OrderQty5,
-        t.OrderQty6,
-        t.OrderQty7,
-        t.OrderQty8,
-        t.OrderQty9,
-        t.OrderQty10,
-        t.TotalOrderQty,
-        t.TotalTTLRoll,
-        t.TotalTTLQty,
-        t.TotalBiddingQty,
-        t.TotalBiddingRollQty
-      FROM [YMWHSYS2].[dbo].[ViewCuttingDetailReport] v
-      LEFT JOIN [YMWHSYS2].[dbo].[tbSpreading] s
+    WITH AggregatedQty AS (
+    SELECT 
+        StyleNo,
+        SUM(ISNULL(Qty1, 0) + ISNULL(Qty2, 0) + ISNULL(Qty3, 0) + ISNULL(Qty4, 0) +
+            ISNULL(Qty5, 0) + ISNULL(Qty6, 0) + ISNULL(Qty7, 0) + ISNULL(Qty8, 0) +
+            ISNULL(Qty9, 0) + ISNULL(Qty10, 0)) AS TotalOrderQtyStyle
+    FROM 
+        [YMWHSYS2].[dbo].[tbOrderQty]
+    WHERE 
+        Dept = 'YMCUTTING' AND FabricType = 'A'
+    GROUP BY 
+        StyleNo
+),
+OrderAggregates AS (
+    SELECT 
+        StyleNo,
+        EngColor,
+        SUM(TTLRoll) AS TotalTTLRoll,
+        SUM(TTLQty) AS TotalTTLQty,
+        SUM(BiddingQty) AS TotalBiddingQty,
+        SUM(BiddingRollQty) AS TotalBiddingRollQty,
+        COALESCE(SUM(Qty1), 0) AS OrderQty1,
+        COALESCE(SUM(Qty2), 0) AS OrderQty2,
+        COALESCE(SUM(Qty3), 0) AS OrderQty3,
+        COALESCE(SUM(Qty4), 0) AS OrderQty4,
+        COALESCE(SUM(Qty5), 0) AS OrderQty5,
+        COALESCE(SUM(Qty6), 0) AS OrderQty6,
+        COALESCE(SUM(Qty7), 0) AS OrderQty7,
+        COALESCE(SUM(Qty8), 0) AS OrderQty8,
+        COALESCE(SUM(Qty9), 0) AS OrderQty9,
+        COALESCE(SUM(Qty10), 0) AS OrderQty10,
+        COALESCE(SUM(Qty1), 0) + COALESCE(SUM(Qty2), 0) + COALESCE(SUM(Qty3), 0) + 
+        COALESCE(SUM(Qty4), 0) + COALESCE(SUM(Qty5), 0) + COALESCE(SUM(Qty6), 0) + 
+        COALESCE(SUM(Qty7), 0) + COALESCE(SUM(Qty8), 0) + COALESCE(SUM(Qty9), 0) + 
+        COALESCE(SUM(Qty10), 0) AS TotalOrderQty
+    FROM 
+        [YMWHSYS2].[dbo].[ViewCuttingOrderReport]
+    WHERE 
+        StyleNo IS NOT NULL AND EngColor IS NOT NULL
+    GROUP BY 
+        StyleNo, 
+        EngColor
+)
+SELECT 
+    v.StyleNo,
+    v.TxnDate,
+    v.TxnNo,
+    CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer,
+    v.EngColor AS Color,
+    REPLACE(v.PreparedBy, 'SPREAD ', '') AS SpreadTable,
+    v.TableNo,
+    v.BuyerStyle,
+    v.ChColor,
+    v.ColorCode,
+    v.FabricType,
+    v.Material,
+    v.RollQty,
+    ROUND(v.SpreadYds, 3) AS SpreadYds,
+    v.Unit,
+    ROUND(v.GrossKgs, 3) AS GrossKgs,
+    ROUND(v.NetKgs, 3) AS NetKgs,
+    v.AMackerNo AS MackerNo,
+    ROUND(v.MackerLength, 3) AS MackerLength,
+    v.SendFactory,
+    v.SendTxnDate,
+    v.SendTxnNo,
+    v.SendTotalQty,
+    v.Ratio1 AS CuttingRatio1,
+    v.Ratio2 AS CuttingRatio2,
+    v.Ratio3 AS CuttingRatio3,
+    v.Ratio4 AS CuttingRatio4,
+    v.Ratio5 AS CuttingRatio5,
+    v.Ratio6 AS CuttingRatio6,
+    v.Ratio7 AS CuttingRatio7,
+    v.Ratio8 AS CuttingRatio8,
+    v.Ratio9 AS CuttingRatio9,
+    v.Ratio10 AS CuttingRatio10,
+    MAX(v.PlanLayer) AS PlanLayer,
+    MAX(v.ActualLayer) AS ActualLayer,
+    MAX(v.PlanPcs) AS TotalPcs,
+    STUFF((
+        SELECT DISTINCT ', ' + CAST(s2.Batch AS VARCHAR)
+        FROM [YMWHSYS2].[dbo].[tbSpreading] s2
+        WHERE s2.StyleNo = v.StyleNo
+          AND s2.PreparedBy = v.PreparedBy
+          AND s2.Batch IS NOT NULL
+        FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos,
+    t.Size1,
+    t.Size2,
+    t.Size3,
+    t.Size4,
+    t.Size5,
+    t.Size6,
+    t.Size7,
+    t.Size8,
+    t.Size9,
+    t.Size10,
+    t.OrderQty1,
+    t.OrderQty2,
+    t.OrderQty3,
+    t.OrderQty4,
+    t.OrderQty5,
+    t.OrderQty6,
+    t.OrderQty7,
+    t.OrderQty8,
+    t.OrderQty9,
+    t.OrderQty10,
+    t.TotalOrderQty,
+    t.TotalTTLRoll,
+    t.TotalTTLQty,
+    t.TotalBiddingQty,
+    t.TotalBiddingRollQty,
+    agg.TotalOrderQtyStyle
+FROM 
+    [YMWHSYS2].[dbo].[ViewCuttingDetailReport] v
+    LEFT JOIN [YMWHSYS2].[dbo].[tbSpreading] s
         ON v.StyleNo = s.StyleNo
         AND v.PreparedBy = s.PreparedBy
-      LEFT JOIN (
+    LEFT JOIN (
         SELECT DISTINCT
-          t.StyleNo,
-          t.EngColor AS Color,
-          t.Size1,
-          t.Size2,
-          t.Size3,
-          t.Size4,
-          t.Size5,
-          t.Size6,
-          t.Size7,
-          t.Size8,
-          t.Size9,
-          t.Size10,
-          agg.OrderQty1,
-          agg.OrderQty2,
-          agg.OrderQty3,
-          agg.OrderQty4,
-          agg.OrderQty5,
-          agg.OrderQty6,
-          agg.OrderQty7,
-          agg.OrderQty8,
-          agg.OrderQty9,
-          agg.OrderQty10,
-          agg.TotalOrderQty,
-          agg.TotalTTLRoll,
-          agg.TotalTTLQty,
-          agg.TotalBiddingQty,
-          agg.TotalBiddingRollQty
-        FROM [YMWHSYS2].[dbo].[ViewCuttingOrderReport] t
-        LEFT JOIN (
-          SELECT 
-            StyleNo,
-            EngColor,
-            SUM(TTLRoll) AS TotalTTLRoll,
-            SUM(TTLQty) AS TotalTTLQty,
-            SUM(BiddingQty) AS TotalBiddingQty,
-            SUM(BiddingRollQty) AS TotalBiddingRollQty,
-            COALESCE(SUM(Qty1), 0) AS OrderQty1,
-            COALESCE(SUM(Qty2), 0) AS OrderQty2,
-            COALESCE(SUM(Qty3), 0) AS OrderQty3,
-            COALESCE(SUM(Qty4), 0) AS OrderQty4,
-            COALESCE(SUM(Qty5), 0) AS OrderQty5,
-            COALESCE(SUM(Qty6), 0) AS OrderQty6,
-            COALESCE(SUM(Qty7), 0) AS OrderQty7,
-            COALESCE(SUM(Qty8), 0) AS OrderQty8,
-            COALESCE(SUM(Qty9), 0) AS OrderQty9,
-            COALESCE(SUM(Qty10), 0) AS OrderQty10,
-            COALESCE(SUM(Qty1), 0) + COALESCE(SUM(Qty2), 0) + COALESCE(SUM(Qty3), 0) + 
-            COALESCE(SUM(Qty4), 0) + COALESCE(SUM(Qty5), 0) + COALESCE(SUM(Qty6), 0) + 
-            COALESCE(SUM(Qty7), 0) + COALESCE(SUM(Qty8), 0) + COALESCE(SUM(Qty9), 0) + 
-            COALESCE(SUM(Qty10), 0) AS TotalOrderQty
-          FROM [YMWHSYS2].[dbo].[ViewCuttingOrderReport]
-          WHERE StyleNo IS NOT NULL AND EngColor IS NOT NULL
-          GROUP BY StyleNo, EngColor
-        ) agg
-          ON t.StyleNo = agg.StyleNo
-          AND t.EngColor = agg.EngColor
+            t.StyleNo,
+            t.EngColor AS Color,
+            t.Size1,
+            t.Size2,
+            t.Size3,
+            t.Size4,
+            t.Size5,
+            t.Size6,
+            t.Size7,
+            t.Size8,
+            t.Size9,
+            t.Size10,
+            agg.OrderQty1,
+            agg.OrderQty2,
+            agg.OrderQty3,
+            agg.OrderQty4,
+            agg.OrderQty5,
+            agg.OrderQty6,
+            agg.OrderQty7,
+            agg.OrderQty8,
+            agg.OrderQty9,
+            agg.OrderQty10,
+            agg.TotalOrderQty,
+            agg.TotalTTLRoll,
+            agg.TotalTTLQty,
+            agg.TotalBiddingQty,
+            agg.TotalBiddingRollQty
+        FROM 
+            [YMWHSYS2].[dbo].[ViewCuttingOrderReport] t
+            LEFT JOIN OrderAggregates agg
+                ON t.StyleNo = agg.StyleNo
+                AND t.EngColor = agg.EngColor
         WHERE 
-          t.StyleNo IS NOT NULL
-          AND t.EngColor IS NOT NULL
-      ) t
+            t.StyleNo IS NOT NULL
+            AND t.EngColor IS NOT NULL
+    ) t
         ON v.StyleNo = t.StyleNo
         AND v.EngColor = t.Color
-      WHERE v.TableNo IS NOT NULL AND v.TableNo <> ''
-        AND v.TxnDate >= CAST(DATEADD(DAY, -7, GETDATE()) AS DATE)
-      GROUP BY 
-        v.StyleNo,
-        v.TxnDate,
-        v.TxnNo,
-        v.Buyer,
-        v.EngColor,
-        v.PreparedBy,
-        v.TableNo,
-        v.BuyerStyle,
-        v.ChColor,
-        v.ColorCode,
-        v.FabricType,
-        v.Material,
-        v.RollQty,
-        v.SpreadYds,
-        v.Unit,
-        v.GrossKgs,
-        v.NetKgs,
-        v.MackerNo,
-        v.MackerLength,
-        v.SendFactory,
-        v.SendTxnDate,
-        v.SendTxnNo,
-        v.SendTotalQty,
-        v.Ratio1,
-        v.Ratio2,
-        v.Ratio3,
-        v.Ratio4,
-        v.Ratio5,
-        v.Ratio6,
-        v.Ratio7,
-        v.Ratio8,
-        v.Ratio9,
-        v.Ratio10,
-        t.Size1,
-        t.Size2,
-        t.Size3,
-        t.Size4,
-        t.Size5,
-        t.Size6,
-        t.Size7,
-        t.Size8,
-        t.Size9,
-        t.Size10,
-        t.OrderQty1,
-        t.OrderQty2,
-        t.OrderQty3,
-        t.OrderQty4,
-        t.OrderQty5,
-        t.OrderQty6,
-        t.OrderQty7,
-        t.OrderQty8,
-        t.OrderQty9,
-        t.OrderQty10,
-        t.TotalOrderQty,
-        t.TotalTTLRoll,
-        t.TotalTTLQty,
-        t.TotalBiddingQty,
-        t.TotalBiddingRollQty
-      ORDER BY v.TxnDate DESC
+    LEFT JOIN AggregatedQty agg
+        ON v.StyleNo = agg.StyleNo
+WHERE 
+    v.TableNo IS NOT NULL 
+    AND v.TableNo <> '' 
+    AND v.TxnDate >= CAST(DATEADD(DAY, -7, GETDATE()) AS DATE)
+GROUP BY 
+    v.StyleNo,
+    v.TxnDate,
+    v.TxnNo,
+    v.Buyer,
+    v.EngColor,
+    v.PreparedBy,
+    v.TableNo,
+    v.BuyerStyle,
+    v.ChColor,
+    v.ColorCode,
+    v.FabricType,
+    v.Material,
+    v.RollQty,
+    v.SpreadYds,
+    v.Unit,
+    v.GrossKgs,
+    v.NetKgs,
+    v.AMackerNo,
+    v.MackerLength,
+    v.SendFactory,
+    v.SendTxnDate,
+    v.SendTxnNo,
+    v.SendTotalQty,
+    v.Ratio1,
+    v.Ratio2,
+    v.Ratio3,
+    v.Ratio4,
+    v.Ratio5,
+    v.Ratio6,
+    v.Ratio7,
+    v.Ratio8,
+    v.Ratio9,
+    v.Ratio10,
+    t.Size1,
+    t.Size2,
+    t.Size3,
+    t.Size4,
+    t.Size5,
+    t.Size6,
+    t.Size7,
+    t.Size8,
+    t.Size9,
+    t.Size10,
+    t.OrderQty1,
+    t.OrderQty2,
+    t.OrderQty3,
+    t.OrderQty4,
+    t.OrderQty5,
+    t.OrderQty6,
+    t.OrderQty7,
+    t.OrderQty8,
+    t.OrderQty9,
+    t.OrderQty10,
+    t.TotalOrderQty,
+    t.TotalTTLRoll,
+    t.TotalTTLQty,
+    t.TotalBiddingQty,
+    t.TotalBiddingRollQty,
+    agg.TotalOrderQtyStyle
+ORDER BY 
+    v.TxnDate DESC;
     `;
 
     const result = await poolYMWHSYS2.request().query(query);
@@ -1876,6 +1911,7 @@ async function syncCutPanelOrders() {
               TotalTTLQty: row.TotalTTLQty,
               TotalBiddingQty: row.TotalBiddingQty,
               TotalBiddingRollQty: row.TotalBiddingRollQty,
+              TotalOrderQtyStyle: row.TotalOrderQtyStyle,
               MarkerRatio: markerRatio
             }
           },
@@ -1931,6 +1967,178 @@ cron.schedule("0 7 * * *", async () => {
     console.error("Scheduled cuttingOrders sync failed:", err);
   }
 });
+
+/* ------------------------------
+   New Endpoints for CutPanelOrders
+------------------------------ */
+
+// Endpoint to Search MO Numbers (StyleNo) from cutpanelorders with partial matching
+app.get("/api/cutpanel-orders-mo-numbers", async (req, res) => {
+  try {
+    const searchTerm = req.query.search;
+    if (!searchTerm) {
+      return res.status(400).json({ error: "Search term is required" });
+    }
+
+    const regexPattern = new RegExp(searchTerm, "i");
+
+    const results = await CutPanelOrders.find({
+      StyleNo: { $regex: regexPattern }
+    })
+      .select("StyleNo")
+      .limit(100)
+      .sort({ StyleNo: 1 })
+      .exec();
+
+    const uniqueMONos = [...new Set(results.map((r) => r.StyleNo))];
+
+    res.json(uniqueMONos);
+  } catch (err) {
+    console.error("Error fetching MO numbers from cutpanelorders:", err);
+    res.status(500).json({
+      message: "Failed to fetch MO numbers from cutpanelorders",
+      error: err.message
+    });
+  }
+});
+
+// Endpoint to Fetch Table Nos for a given MO No (StyleNo)
+app.get("/api/cutpanel-orders-table-nos", async (req, res) => {
+  try {
+    const { styleNo } = req.query;
+    if (!styleNo) {
+      return res.status(400).json({ error: "StyleNo is required" });
+    }
+
+    const results = await CutPanelOrders.find({ StyleNo: styleNo })
+      .select("TableNo")
+      .exec();
+
+    const uniqueTableNos = [...new Set(results.map((r) => r.TableNo))].filter(
+      (table) => table
+    );
+
+    res.json(uniqueTableNos);
+  } catch (err) {
+    console.error("Error fetching Table Nos from cutpanelorders:", err);
+    res.status(500).json({
+      message: "Failed to fetch Table Nos from cutpanelorders",
+      error: err.message
+    });
+  }
+});
+
+// Endpoint to Fetch Cut Panel Order Details for a given MO No (StyleNo) and TableNo
+app.get("/api/cutpanel-orders-details", async (req, res) => {
+  try {
+    const { styleNo, tableNo } = req.query;
+    if (!styleNo || !tableNo) {
+      return res
+        .status(400)
+        .json({ error: "StyleNo and TableNo are required" });
+    }
+
+    const document = await CutPanelOrders.findOne({
+      StyleNo: styleNo,
+      TableNo: tableNo
+    }).exec();
+
+    if (!document) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    res.json(document);
+  } catch (err) {
+    console.error("Error fetching Cut Panel Orders details:", err);
+    res.status(500).json({
+      message: "Failed to fetch Cut Panel Orders details",
+      error: err.message
+    });
+  }
+});
+
+// Endpoint to Fetch Total Order Quantity for unique StyleNo and Color combinations
+app.get("/api/cutpanel-orders-total-order-qty", async (req, res) => {
+  try {
+    const { styleNo } = req.query;
+    if (!styleNo) {
+      return res.status(400).json({ error: "StyleNo is required" });
+    }
+
+    const results = await CutPanelOrders.aggregate([
+      // Match documents for the given StyleNo
+      { $match: { StyleNo: styleNo } },
+      // Group by StyleNo and Color to deduplicate and sum TotalOrderQty
+      {
+        $group: {
+          _id: { StyleNo: "$StyleNo", Color: "$Color" },
+          totalOrderQty: { $sum: "$TotalOrderQty" }
+        }
+      },
+      // Group all results to get the overall sum
+      {
+        $group: {
+          _id: null,
+          overallTotalOrderQty: { $sum: "$totalOrderQty" }
+        }
+      },
+      // Project only the overallTotalOrderQty field
+      {
+        $project: {
+          _id: 0,
+          overallTotalOrderQty: 1
+        }
+      }
+    ]).exec();
+
+    if (results.length === 0) {
+      return res.json({ overallTotalOrderQty: 0 });
+    }
+
+    res.json(results[0]);
+  } catch (err) {
+    console.error(
+      "Error fetching total order quantity from cutpanelorders:",
+      err
+    );
+    res.status(500).json({
+      message: "Failed to fetch total order quantity from cutpanelorders",
+      error: err.message
+    });
+  }
+});
+
+// Endpoint to get aggregated TotalOrderQty for a given StyleNo (MO No)
+// This sums the TotalOrderQty for each unique color associated with the StyleNo.
+app.get("/api/cutpanel-orders/aggregated-total-order-qty", async (req, res) => {
+  try {
+    const { styleNo } = req.query;
+    if (!styleNo) {
+      return res.status(400).json({ error: "StyleNo (MO No) is required" });
+    }
+
+    // Find one document matching the StyleNo and project only TotalOrderQtyStyle
+    const result = await CutPanelOrders.findOne(
+      { StyleNo: styleNo },
+      { TotalOrderQtyStyle: 1 }
+    );
+
+    if (result && result.TotalOrderQtyStyle !== undefined) {
+      res.json({ aggregatedTotalOrderQty: result.TotalOrderQtyStyle });
+    } else {
+      // If no matching StyleNo or TotalOrderQtyStyle is undefined, return 0
+      res.json({ aggregatedTotalOrderQty: 0 });
+    }
+  } catch (err) {
+    console.error("Error fetching aggregated total order quantity:", err);
+    res.status(500).json({
+      message: "Failed to fetch aggregated total order quantity",
+      error: err.message
+    });
+  }
+});
+
+
 
 /* ------------------------------
    Updated Endpoints for Cutting.jsx
@@ -3639,7 +3847,6 @@ app.post("/api/save-qc-data", async (req, res) => {
     });
   }
 });
-
 //-----------------------------USER FUNCTION------------------------------------------------//
 
 /* ------------------------------
@@ -13030,6 +13237,679 @@ app.delete("/api/delete-measurement-record", async (req, res) => {
     res.status(500).json({
       error: "Failed to delete measurement record",
       details: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   End Points - SCC HT/FU
+------------------------------ */
+
+// Multer setup for SCC image uploads
+const sccImageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, "public/storage/scc_images");
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    // imageType should be passed in the body: 'referenceSample-HT', 'afterWash-FU', etc.
+    const { imageType, inspectionDate } = req.body;
+    const datePart = inspectionDate
+      ? inspectionDate.replace(/\//g, "-")
+      : new Date().toISOString().split("T")[0];
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    // Filename: imageType-date-uniqueSuffix.extension
+    const filename = `${
+      imageType || "sccimage"
+    }-${datePart}-${uniqueSuffix}${path.extname(file.originalname)}`;
+    cb(null, filename);
+  }
+});
+
+const sccUpload = multer({ storage: sccImageStorage });
+
+app.post("/api/scc/upload-image", sccUpload.single("imageFile"), (req, res) => {
+  if (!req.file) {
+    return res
+      .status(400)
+      .json({ success: false, message: "No file uploaded." });
+  }
+  const filePath = `${API_BASE_URL}/storage/scc_images/${req.file.filename}`;
+  res.json({ success: true, filePath: filePath, filename: req.file.filename });
+});
+
+// Helper function to format date to MM/DD/YYYY
+const formatDateToMMDDYYYY = (dateInput) => {
+  if (!dateInput) return null;
+  const d = new Date(dateInput); // Handles ISO string or Date object
+  const month = d.getMonth() + 1; // No padding
+  const day = d.getDate(); // No padding
+  const year = d.getFullYear();
+  return `${month}/${day}/${year}`;
+};
+
+app.post("/api/scc/ht-first-output", async (req, res) => {
+  try {
+    const { _id, ...dataToSave } = req.body;
+    dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
+
+    // Ensure remarks fields are "NA" if empty
+    dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
+    if (
+      dataToSave.standardSpecification &&
+      dataToSave.standardSpecification.length > 0
+    ) {
+      dataToSave.standardSpecification = dataToSave.standardSpecification.map(
+        (spec) => ({
+          ...spec,
+          remarks: spec.remarks?.trim() || "NA"
+        })
+      );
+    }
+
+    let record;
+    if (_id) {
+      record = await HTFirstOutput.findByIdAndUpdate(_id, dataToSave, {
+        new: true,
+        runValidators: true,
+        upsert: false
+      }); // Make sure upsert is false for explicit update
+      if (!record)
+        return res
+          .status(404)
+          .json({ message: "Record not found for update." });
+    } else {
+      // Check for existing record by moNo, color, and inspectionDate before creating
+      const existing = await HTFirstOutput.findOne({
+        moNo: dataToSave.moNo,
+        color: dataToSave.color,
+        inspectionDate: dataToSave.inspectionDate
+      });
+      if (existing) {
+        // If it exists, update it
+        record = await HTFirstOutput.findByIdAndUpdate(
+          existing._id,
+          dataToSave,
+          { new: true, runValidators: true }
+        );
+      } else {
+        record = new HTFirstOutput(dataToSave);
+        await record.save();
+      }
+    }
+    res
+      .status(201)
+      .json({ message: "HT First Output saved successfully", data: record });
+  } catch (error) {
+    console.error("Error saving HT First Output:", error);
+    if (error.code === 11000) {
+      // Mongoose duplicate key error
+      return res.status(409).json({
+        message:
+          "Duplicate entry. A record with this MO, Color, and Date already exists.",
+        error: error.message,
+        errorCode: "DUPLICATE_KEY"
+      });
+    }
+    res.status(500).json({
+      message: "Failed to save HT First Output",
+      error: error.message,
+      details: error
+    });
+  }
+});
+
+app.get("/api/scc/ht-first-output", async (req, res) => {
+  try {
+    const { moNo, color, inspectionDate } = req.query;
+    if (!moNo || !color || !inspectionDate) {
+      return res
+        .status(400)
+        .json({ message: "MO No, Color, and Inspection Date are required." });
+    }
+    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+    const record = await HTFirstOutput.findOne({
+      moNo,
+      color,
+      inspectionDate: formattedDate
+    });
+    if (!record) {
+      // Return 200 with a specific message for "not found" so frontend can handle it as new record
+      return res
+        .status(200)
+        .json({ message: "HT_RECORD_NOT_FOUND", data: null });
+    }
+    res.json(record); // Existing record data will be in record directly, not record.data
+  } catch (error) {
+    console.error("Error fetching HT First Output:", error);
+    res.status(500).json({
+      message: "Failed to fetch HT First Output",
+      error: error.message
+    });
+  }
+});
+
+// REVISED Endpoints for FUFirstOutput (similar changes as HT)
+app.post("/api/scc/fu-first-output", async (req, res) => {
+  try {
+    const { _id, ...dataToSave } = req.body;
+    dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
+
+    dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
+    if (
+      dataToSave.standardSpecification &&
+      dataToSave.standardSpecification.length > 0
+    ) {
+      dataToSave.standardSpecification = dataToSave.standardSpecification.map(
+        (spec) => ({
+          ...spec,
+          remarks: spec.remarks?.trim() || "NA"
+        })
+      );
+    }
+
+    let record;
+    if (_id) {
+      record = await FUFirstOutput.findByIdAndUpdate(_id, dataToSave, {
+        new: true,
+        runValidators: true,
+        upsert: false
+      });
+      if (!record)
+        return res
+          .status(404)
+          .json({ message: "Record not found for update." });
+    } else {
+      const existing = await FUFirstOutput.findOne({
+        moNo: dataToSave.moNo,
+        color: dataToSave.color,
+        inspectionDate: dataToSave.inspectionDate
+      });
+      if (existing) {
+        record = await FUFirstOutput.findByIdAndUpdate(
+          existing._id,
+          dataToSave,
+          { new: true, runValidators: true }
+        );
+      } else {
+        record = new FUFirstOutput(dataToSave);
+        await record.save();
+      }
+    }
+    res
+      .status(201)
+      .json({ message: "FU First Output saved successfully", data: record });
+  } catch (error) {
+    console.error("Error saving FU First Output:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message:
+          "Duplicate entry. A record with this MO, Color, and Date already exists.",
+        error: error.message,
+        errorCode: "DUPLICATE_KEY"
+      });
+    }
+    res.status(500).json({
+      message: "Failed to save FU First Output",
+      error: error.message,
+      details: error
+    });
+  }
+});
+
+app.get("/api/scc/fu-first-output", async (req, res) => {
+  try {
+    const { moNo, color, inspectionDate } = req.query;
+    if (!moNo || !color || !inspectionDate) {
+      return res
+        .status(400)
+        .json({ message: "MO No, Color, and Inspection Date are required." });
+    }
+    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+    const record = await FUFirstOutput.findOne({
+      moNo,
+      color,
+      inspectionDate: formattedDate
+    });
+    if (!record) {
+      return res
+        .status(200)
+        .json({ message: "FU_RECORD_NOT_FOUND", data: null });
+    }
+    res.json(record);
+  } catch (error) {
+    console.error("Error fetching FU First Output:", error);
+    res.status(500).json({
+      message: "Failed to fetch FU First Output",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   End Points - SCC HT/FU - Daily Testing
+------------------------------ */
+
+app.get("/api/scc/get-first-output-specs", async (req, res) => {
+  try {
+    const { moNo, color, inspectionDate } = req.query;
+    if (!moNo || !color || !inspectionDate) {
+      return res
+        .status(400)
+        .json({ message: "MO No, Color, and Inspection Date are required." });
+    }
+    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+
+    let specs = null;
+    // Try HT First Output
+    const htRecord = await HTFirstOutput.findOne({
+      moNo,
+      color,
+      inspectionDate: formattedDate
+    }).lean();
+    if (htRecord && htRecord.standardSpecification) {
+      const afterHatSpec = htRecord.standardSpecification.find(
+        (s) => s.type === "afterHat" && s.timeSec && s.tempC && s.pressure
+      );
+      const firstSpec = htRecord.standardSpecification.find(
+        (s) => s.type === "first"
+      );
+      if (afterHatSpec) {
+        specs = {
+          tempC: afterHatSpec.tempC,
+          timeSec: afterHatSpec.timeSec,
+          pressure: afterHatSpec.pressure
+        };
+      } else if (firstSpec) {
+        specs = {
+          tempC: firstSpec.tempC,
+          timeSec: firstSpec.timeSec,
+          pressure: firstSpec.pressure
+        };
+      }
+    }
+
+    // If not found in HT, try FU First Output (assuming similar logic might apply or distinct records)
+    if (!specs) {
+      const fuRecord = await FUFirstOutput.findOne({
+        moNo,
+        color,
+        inspectionDate: formattedDate
+      }).lean();
+      if (fuRecord && fuRecord.standardSpecification) {
+        const afterHatSpec = fuRecord.standardSpecification.find(
+          (s) => s.type === "afterHat" && s.timeSec && s.tempC && s.pressure
+        );
+        const firstSpec = fuRecord.standardSpecification.find(
+          (s) => s.type === "first"
+        );
+        if (afterHatSpec) {
+          specs = {
+            tempC: afterHatSpec.tempC,
+            timeSec: afterHatSpec.timeSec,
+            pressure: afterHatSpec.pressure
+          };
+        } else if (firstSpec) {
+          specs = {
+            tempC: firstSpec.tempC,
+            timeSec: firstSpec.timeSec,
+            pressure: firstSpec.pressure
+          };
+        }
+      }
+    }
+
+    if (!specs) {
+      return res.status(200).json({ message: "SPECS_NOT_FOUND", data: null });
+    }
+    res.json({ data: specs });
+  } catch (error) {
+    console.error("Error fetching first output specs:", error);
+    res.status(500).json({
+      message: "Failed to fetch first output specifications",
+      error: error.message
+    });
+  }
+});
+
+// Endpoints for SCCDailyTesting
+app.post("/api/scc/daily-testing", async (req, res) => {
+  try {
+    const { _id, ...dataToSave } = req.body;
+    dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
+    dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
+
+    let record;
+    if (_id) {
+      record = await SCCDailyTesting.findByIdAndUpdate(_id, dataToSave, {
+        new: true,
+        runValidators: true
+      });
+      if (!record)
+        return res
+          .status(404)
+          .json({ message: "Daily Testing record not found for update." });
+    } else {
+      const existing = await SCCDailyTesting.findOne({
+        moNo: dataToSave.moNo,
+        color: dataToSave.color,
+        machineNo: dataToSave.machineNo,
+        inspectionDate: dataToSave.inspectionDate
+      });
+      if (existing) {
+        record = await SCCDailyTesting.findByIdAndUpdate(
+          existing._id,
+          dataToSave,
+          { new: true, runValidators: true }
+        );
+      } else {
+        record = new SCCDailyTesting(dataToSave);
+        await record.save();
+      }
+    }
+    res.status(201).json({
+      message: "Daily Testing report saved successfully",
+      data: record
+    });
+  } catch (error) {
+    console.error("Error saving Daily Testing report:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message:
+          "Duplicate entry. A record with this MO, Color, Machine No, and Date already exists.",
+        error: error.message,
+        errorCode: "DUPLICATE_KEY"
+      });
+    }
+    res.status(500).json({
+      message: "Failed to save Daily Testing report",
+      error: error.message,
+      details: error
+    });
+  }
+});
+
+app.get("/api/scc/daily-testing", async (req, res) => {
+  try {
+    const { moNo, color, machineNo, inspectionDate } = req.query;
+    if (!moNo || !color || !machineNo || !inspectionDate) {
+      return res.status(400).json({
+        message: "MO No, Color, Machine No, and Inspection Date are required."
+      });
+    }
+    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+    const record = await SCCDailyTesting.findOne({
+      moNo,
+      color,
+      machineNo,
+      inspectionDate: formattedDate
+    });
+    if (!record) {
+      return res
+        .status(200)
+        .json({ message: "DAILY_TESTING_RECORD_NOT_FOUND", data: null });
+    }
+    res.json(record); // Returns the existing record
+  } catch (error) {
+    console.error("Error fetching Daily Testing report:", error);
+    res.status(500).json({
+      message: "Failed to fetch Daily Testing report",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   End Points - SCC Daily HT/FU QC Test
+------------------------------ */
+
+// GET Endpoint to fetch existing Daily HT/FU Test data or MO list
+app.get("/api/scc/daily-htfu-test", async (req, res) => {
+  try {
+    const { inspectionDate, machineNo, moNo, color } = req.query;
+    const formattedDate = inspectionDate
+      ? formatDateToMMDDYYYY(inspectionDate)
+      : null;
+
+    if (!formattedDate || !machineNo) {
+      return res
+        .status(400)
+        .json({ message: "Inspection Date and Machine No are required." });
+    }
+
+    // Scenario 1: Fetch specific record if moNo and color are provided
+    if (moNo && color) {
+      const record = await DailyTestingHTFU.findOne({
+        inspectionDate: formattedDate,
+        machineNo,
+        moNo,
+        color
+      });
+      if (!record) {
+        return res
+          .status(200)
+          .json({ message: "DAILY_HTFU_RECORD_NOT_FOUND", data: null });
+      }
+      return res.json({ message: "RECORD_FOUND", data: record });
+    } else {
+      // Scenario 2: Fetch distinct MO/Color combinations for a given Date/MachineNo
+      const records = await DailyTestingHTFU.find(
+        { inspectionDate: formattedDate, machineNo },
+        "moNo color buyer buyerStyle" // Select only necessary fields
+      ).distinct("moNo"); // Or more complex aggregation if needed to pair MO with Color
+
+      // For simplicity, let's return distinct MOs, client can then pick color
+      // A better approach might be to return {moNo, color, buyer, buyerStyle} tuples
+      const distinctEntries = await DailyTestingHTFU.aggregate([
+        { $match: { inspectionDate: formattedDate, machineNo } },
+        {
+          $group: {
+            _id: { moNo: "$moNo", color: "$color" },
+            buyer: { $first: "$buyer" },
+            buyerStyle: { $first: "$buyerStyle" },
+            // If you need to know if a full record exists to load it directly
+            docId: { $first: "$_id" }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            moNo: "$_id.moNo",
+            color: "$_id.color",
+            buyer: "$buyer",
+            buyerStyle: "$buyerStyle",
+            docId: "$docId"
+          }
+        }
+      ]);
+
+      if (distinctEntries.length === 0) {
+        return res.status(200).json({
+          message: "NO_RECORDS_FOR_DATE_MACHINE",
+          data: []
+        });
+      }
+      // If only one unique MO/Color combo, frontend might auto-load it fully later
+      return res.json({
+        message: "MULTIPLE_MO_COLOR_FOUND",
+        data: distinctEntries // Array of {moNo, color, buyer, buyerStyle, docId}
+      });
+    }
+  } catch (error) {
+    console.error("Error fetching Daily HT/FU Test data:", error);
+    res.status(500).json({
+      message: "Failed to fetch Daily HT/FU Test data",
+      error: error.message
+    });
+  }
+});
+
+// POST Endpoint to save/update Daily HT/FU Test data
+app.post("/api/scc/daily-htfu-test", async (req, res) => {
+  try {
+    const {
+      _id, // ID of the main document if updating
+      inspectionDate,
+      machineNo,
+      moNo,
+      buyer,
+      buyerStyle,
+      color,
+      emp_id,
+      emp_kh_name,
+      emp_eng_name,
+      emp_dept_name,
+      emp_sect_name,
+      emp_job_title, // User details
+      baseReqTemp,
+      baseReqTime,
+      baseReqPressure, // Base specs from first output
+      currentInspection, // The data for the specific slot being submitted
+      stretchTestResult,
+      washingTestResult // Overall tests
+    } = req.body;
+
+    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+    if (!formattedDate || !machineNo || !moNo || !color || !currentInspection) {
+      return res
+        .status(400)
+        .json({ message: "Missing required fields for submission." });
+    }
+
+    const now = new Date();
+    const inspectionTime = `${String(now.getHours()).padStart(2, "0")}:${String(
+      now.getMinutes()
+    ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+
+    const query = { inspectionDate: formattedDate, machineNo, moNo, color };
+    let record = await DailyTestingHTFU.findOne(query);
+
+    if (record) {
+      // Update existing record
+      record.baseReqTemp = baseReqTemp ?? record.baseReqTemp;
+      record.baseReqTime = baseReqTime ?? record.baseReqTime;
+      record.baseReqPressure = baseReqPressure ?? record.baseReqPressure;
+      record.emp_id = emp_id; // Update user details on each submission if needed
+      record.emp_kh_name = emp_kh_name;
+      record.emp_eng_name = emp_eng_name;
+      record.emp_dept_name = emp_dept_name;
+      record.emp_sect_name = emp_sect_name;
+      record.emp_job_title = emp_job_title;
+      record.inspectionTime = inspectionTime;
+
+      // Update or add the specific inspection slot
+      const slotIndex = record.inspections.findIndex(
+        (insp) => insp.timeSlotKey === currentInspection.timeSlotKey
+      );
+      if (slotIndex > -1) {
+        // Update existing slot, ensuring not to overwrite with nulls if not intended
+        record.inspections[slotIndex] = {
+          ...record.inspections[slotIndex], // keep old values not submitted
+          ...currentInspection, // new values for the slot
+          inspectionTimestamp: new Date()
+        };
+      } else {
+        record.inspections.push({
+          ...currentInspection,
+          inspectionTimestamp: new Date()
+        });
+      }
+      // Sort inspections by inspectionNo after modification
+      record.inspections.sort(
+        (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
+      );
+
+      // Update stretch/washing tests only if they are being set and not already "Done"
+      // Or if they are 'Pending' and now being set to 'Pass'/'Reject'
+      if (
+        !record.isStretchWashingTestDone ||
+        record.stretchTestResult === "Pending"
+      ) {
+        if (stretchTestResult && stretchTestResult !== "Pending") {
+          record.stretchTestResult = stretchTestResult;
+        }
+      }
+      if (
+        !record.isStretchWashingTestDone ||
+        record.washingTestResult === "Pending"
+      ) {
+        if (washingTestResult && washingTestResult !== "Pending") {
+          record.washingTestResult = washingTestResult;
+        }
+      }
+      // Mark as done if both are now Pass/Reject
+      if (
+        (record.stretchTestResult === "Pass" ||
+          record.stretchTestResult === "Reject") &&
+        (record.washingTestResult === "Pass" ||
+          record.washingTestResult === "Reject")
+      ) {
+        record.isStretchWashingTestDone = true;
+      }
+    } else {
+      // Create new record
+      record = new DailyTestingHTFU({
+        inspectionDate: formattedDate,
+        machineNo,
+        moNo,
+        buyer,
+        buyerStyle,
+        color,
+        emp_id,
+        emp_kh_name,
+        emp_eng_name,
+        emp_dept_name,
+        emp_sect_name,
+        emp_job_title,
+        inspectionTime,
+        baseReqTemp,
+        baseReqTime,
+        baseReqPressure,
+        inspections: [
+          { ...currentInspection, inspectionTimestamp: new Date() }
+        ],
+        stretchTestResult:
+          stretchTestResult && stretchTestResult !== "Pending"
+            ? stretchTestResult
+            : "Pending",
+        washingTestResult:
+          washingTestResult && washingTestResult !== "Pending"
+            ? washingTestResult
+            : "Pending"
+      });
+      if (
+        (record.stretchTestResult === "Pass" ||
+          record.stretchTestResult === "Reject") &&
+        (record.washingTestResult === "Pass" ||
+          record.washingTestResult === "Reject")
+      ) {
+        record.isStretchWashingTestDone = true;
+      }
+    }
+
+    await record.save();
+    res.status(201).json({
+      message: "Daily HT/FU QC Test saved successfully",
+      data: record
+    });
+  } catch (error) {
+    console.error("Error saving Daily HT/FU QC Test:", error);
+    if (error.code === 11000) {
+      // Duplicate key error
+      return res.status(409).json({
+        message:
+          "A record with this Date, Machine No, MO No, and Color already exists. Submission failed.",
+        error: error.message,
+        errorCode: "DUPLICATE_KEY"
+      });
+    }
+    res.status(500).json({
+      message: "Failed to save Daily HT/FU QC Test",
+      error: error.message,
+      details: error // Mongoose validation errors might be here
     });
   }
 });

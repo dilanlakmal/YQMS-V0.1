@@ -106,6 +106,11 @@ export default function Navbar({ onLogout }) {
           path: "/scc",
           title: t("home.scc"),
           requiredRoles: ["Super Admin", "Admin", "SCC"]
+        },
+        {
+          path: "/sysadmin",
+          title: t("home.systemadmin"),
+          requiredRoles: ["Super Admin", "System Administration"]
         }
       ]
     },

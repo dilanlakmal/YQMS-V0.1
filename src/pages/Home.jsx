@@ -128,11 +128,11 @@ function Home() {
           version: '0',
         },
         {
-          path: "/system-administration",
+          path: "/sysadmin",
           roles: ["Admin", "System Administration"],
           image: "/IMG/system.png",
-          title: t("System Administration"),
-          description: "System Administration Check Point.",
+          title: t("home.systemadmin"),
+          description: "Modify Defect & Measurements.",
           version: '0.1',
         },
       ]

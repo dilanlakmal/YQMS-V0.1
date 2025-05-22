@@ -1459,7 +1459,7 @@ const RovingPage = () => {
                   spiFilesToUpload,
                   measurementFilesToUpload,
                   rovingStatus: overallStatusText,
-                  overallStatusColor: overallStatusColor, // <-- Add this line
+                  overallStatusColor: overallStatusColor,
                 }}
               />
             )}

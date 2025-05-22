@@ -27,7 +27,7 @@
     "qa_audit_report": "质量保证审计报告",
     "download_data": "下载数据",
     "live_dashboard": "实时仪表板",
-    "qc_inline_roving":"Qc 在线粗纱"
+    "systemadmin": "System Administration"
   },
 
   "nav":{
@@ -735,6 +735,56 @@
     "defect_code": "缺陷代码",
     "chinese_name": "中文名",
     "printing_name": "打印姓名"
+  },
+
+  "scc": {
+    "title": "SCC 检验 (HT/FU)",
+    "tabs": {
+      "firstOutputHT": "首次输出 - HT",
+      "firstOutputFU": "首次输出 - FU",
+      "dailyTesting": "每日测试 HT/FU",
+      "dailyHTQC": "每日 HT QC",
+      "dailyFUQC": "每日 FU QC",
+      "htInspection": "HT 检验"
+    },
+    "date": "日期",
+    "moNo": "MO 号",
+    "searchMoNo": "搜索 MO 号...",
+    "buyer": "买方",
+    "buyerStyle": "买方款式",
+    "color": "颜色",
+    "selectColor": "选择颜色...",
+    "standardSpecifications": "标准规格",
+    "parameter": "参数",
+    "first": "首次",
+    "afterHat": "帽子处理后",
+    "method": "方法",
+    "heatTransfer": "热转印",
+    "fusingMethod": "熔合",
+    "timeSec": "时间 (秒)",
+    "tempC": "温度 (°C)",
+    "tempOffset": "温度偏差 (±)",
+    "pressure": "压力",
+    "status": "状态",
+    "pass": "通过",
+    "reject": "拒绝",
+    "specRemarks": "备注",
+    "hatIsRequired": "如果“首次”状态为拒绝，则需要“帽子处理后”的详细信息。",
+    "referenceSample": "参考样品",
+    "afterWash": "洗涤后",
+    "imagePreview": "预览",
+    "removeImage": "移除图片",
+    "noImageSelected": "未选择图片",
+    "capture": "拍摄",
+    "upload": "上传",
+    "mainRemarks": "备注",
+    "remarksPlaceholder": "在此输入备注...",
+    "characters": "字符",
+    "submit": "提交",
+    "update": "更新",
+    "newRecordMessage": "这是一条新记录。请继续输入数据。",
+    "newRecordMessageKey": "新记录",
+    "existingRecordLoadedShort": "现有记录已加载。"
   }
 
   }
