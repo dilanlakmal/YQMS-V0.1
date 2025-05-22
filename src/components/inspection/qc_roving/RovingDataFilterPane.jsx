@@ -17,7 +17,7 @@ const RovingFilterPlane = ({
       const parts = initialFilters.date.split('/');
       if (parts.length === 3) {
         const year = parseInt(parts[2], 10);
-        const month = parseInt(parts[0], 10) - 1; // Month is 0-indexed for Date constructor
+        const month = parseInt(parts[0], 10) - 1; 
         const day = parseInt(parts[1], 10);
        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
           const parsedDate = new Date(year, month, day);

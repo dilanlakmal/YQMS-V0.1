@@ -20,7 +20,7 @@ const REPETITION_KEYS = [
   "5th Inspection",
 ];
 
-const RovingData = ({ refreshTrigger }) => {
+const RovingData = ({ refreshTrigger, authUserEmpId }) => {
   const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
    const [columnVisibility, setColumnVisibility] = useState({
@@ -31,7 +31,7 @@ const RovingData = ({ refreshTrigger }) => {
 
   const [filters, setFilters] = useState({
     date: getTodayDateString(),
-    qcId: "",
+    qcId: authUserEmpId ? String(authUserEmpId) : "",
     operatorId: "",
     lineNo: "",
     moNo: "",
@@ -49,6 +49,11 @@ const RovingData = ({ refreshTrigger }) => {
       const lineNos = new Set();
       const moNos = new Set();
 
+    // Add authUserEmpId to the set if it exists, ensuring it's always an option
+    if (authUserEmpId) {
+      qcIds.add(String(authUserEmpId));
+    }
+
       sourceReports.forEach((report) => {
         // if (report.emp_id) qcIds.add(report.emp_id);
         if (report.line_no) lineNos.add(report.line_no);
@@ -59,16 +64,16 @@ const RovingData = ({ refreshTrigger }) => {
         // Handle new schema with inspection_rep
         if (report.inspection_rep && Array.isArray(report.inspection_rep)) {
           report.inspection_rep.forEach(repItem => {
-            if (repItem.emp_id) qcIds.add(repItem.emp_id); 
+            if (repItem.emp_id) qcIds.add(String(repItem.emp_id)); 
             repItem.inlineData?.forEach((data) => {
-              if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
+              if (data.operator_emp_id) operatorIds.add(String(data.operator_emp_id));
             });
           });
         } else if (report.inlineData && Array.isArray(report.inlineData)) {
          
-          if (report.emp_id) qcIds.add(report.emp_id); 
+          if (report.emp_id) qcIds.add(String(report.emp_id));
           report.inlineData.forEach((data) => {
-            if (data.operator_emp_id) operatorIds.add(data.operator_emp_id);
+            if (data.operator_emp_id) operatorIds.add(String(data.operator_emp_id));
           });
         }
       });
@@ -87,7 +92,7 @@ const RovingData = ({ refreshTrigger }) => {
       setUniqueLineNos([]);
       setUniqueMoNos([]);
     }
-  }, []);
+  }, [authUserEmpId]);
 
   const fetchReports = useCallback(
     async (currentFilters) => {
@@ -96,9 +101,7 @@ const RovingData = ({ refreshTrigger }) => {
         const queryParams = new URLSearchParams();
         if (currentFilters.date)
           queryParams.append("inspection_date", currentFilters.date);
-        if (currentFilters.qcId) queryParams.append("qcId", currentFilters.qcId);
-        if (currentFilters.operatorId)
-          queryParams.append("operatorId", currentFilters.operatorId);
+        
         if (currentFilters.lineNo)
           queryParams.append("lineNo", currentFilters.lineNo);
         if (currentFilters.moNo) queryParams.append("moNo", currentFilters.moNo);
