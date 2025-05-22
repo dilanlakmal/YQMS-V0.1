@@ -170,21 +170,6 @@ const RovingPage = () => {
     fetchBuyerByMo();
   }, [moNo]);
 
-  useEffect(() => {
-    if (!authLoading && user) {
-      setScannedUserData({
-        emp_id: user.emp_id || "N/A_USER_EMP_ID",
-        eng_name: user.eng_name || "N/A_USER_ENG_NAME",
-        kh_name: user.kh_name || "N/A_USER_KH_NAME", 
-        job_title: user.job_title || "N/A_USER_JOB_TITLE", 
-        dept_name: user.dept_name || "N/A_USER_DEPT_NAME", 
-        sect_name: user.sect_name || "N/A_USER_SECT_NAME", 
-      });
-    } else if (!authLoading && !user) {
-      setScannedUserData(null);
-    }
-  }, [user, authLoading]);
-
   const fetchInspectionsCompleted = useCallback(async () => {
     if (lineNo && currentDate && selectedManualInspectionRep && moNo) {
       try {

@@ -74,13 +74,31 @@ const getOverallRovingStatusColor = (status) => {
    return 'bg-gray-100 text-gray-800'; 
 };
 
+const REPETITION_KEYS_FOR_OPERATOR_TABLE = [
+  "1st Inspection",
+  "2nd Inspection",
+  "3rd Inspection",
+  "4th Inspection",
+  "5th Inspection",
+];
+
 const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, filters }) => {
   const [showSpiColumn, setShowSpiColumn] = useState(false);
   const [showMeasurementColumn, setShowMeasurementColumn] = useState(false);
   const [showDefectStatusColumn, setShowDefectStatusColumn] = useState(false);
 
   if (!reportDetail) return null;
+  
+  // Extract unique inspectors from repetitions for the main title
+  const uniqueInspectors = Array.from(
+    new Set(
+      (reportDetail.inspection_rep || [])
+        .filter(rep => rep && rep.emp_id && rep.eng_name)
+        .map(rep => `${rep.eng_name} (${rep.emp_id})`)
+    )
+  ).join(', ');
 
+  const inspectorDisplay = uniqueInspectors ? ` (Inspector(s): ${uniqueInspectors})` : '';
  // Apply filters to inspection_rep entries
   const repetitionsToDisplay = (reportDetail.inspection_rep || []).filter(repEntry => {
     if (!repEntry) return false;
@@ -141,6 +159,47 @@ const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, 
       filteredInlineData: currentRepFilteredInlineData,
     };
   });
+
+  // Data processing for the new operator-centric table
+  const operatorCentricDataMap = new Map();
+  processedRepetitions.forEach(repData => {
+    const repName = repData.inspection_rep_name;
+    if (!REPETITION_KEYS_FOR_OPERATOR_TABLE.includes(repName)) return;
+
+    repData.filteredInlineData.forEach(inlineItem => {
+      if (!inlineItem) return;
+
+      // Apply operatorId filter if present in global filters
+      if (filters.operatorId && String(inlineItem.operator_emp_id) !== String(filters.operatorId)) {
+        return; 
+      }
+
+      const operatorKey = `${inlineItem.operator_emp_id || 'N/A'}-${inlineItem.operation_ch_name || inlineItem.operation_kh_name || 'N/A'}-${inlineItem.ma_code || 'N/A'}`;
+
+      if (!operatorCentricDataMap.has(operatorKey)) {
+        operatorCentricDataMap.set(operatorKey, {
+          operatorId: inlineItem.operator_emp_id || 'N/A',
+          operationName: inlineItem.operation_ch_name || inlineItem.operation_kh_name || 'N/A',
+          machineCode: inlineItem.ma_code || 'N/A',
+          repetitions: REPETITION_KEYS_FOR_OPERATOR_TABLE.reduce((acc, key) => {
+            acc[key] = null; // Initialize
+            return acc;
+          }, {}),
+        });
+      }
+
+      const currentOperatorEntry = operatorCentricDataMap.get(operatorKey);
+      const rejectGarmentCount = inlineItem.rejectGarments?.[0]?.garments?.length || 0;
+
+      currentOperatorEntry.repetitions[repName] = {
+        overallStatus: inlineItem.overall_roving_status || 'N/A',
+        checkedQty: inlineItem.checked_quantity || 0,
+        rejectCount: rejectGarmentCount,
+      };
+    });
+  });
+  const newOperatorTableData = Array.from(operatorCentricDataMap.values());
+  
   
   const handleSelectAllColumns = () => {
     setShowSpiColumn(true);
@@ -163,11 +222,23 @@ const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, 
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-semibold text-blue-700">
             Detailed Report (MO: {reportDetail.mo_no}, Line: {reportDetail.line_no}, Date: {reportDetail.inspection_date})
-
+            {inspectorDisplay}
           </h3>
           <button onClick={onClose} className="text-red-600 hover:text-red-800">
             <XCircle size={28} />
           </button>
+        </div>
+
+        {/* Legend for Operator Summary Table Symbols */}
+        <div className="mb-4 p-3 bg-gray-100 border border-gray-300 rounded-md text-xs text-gray-700">
+          <h4 className="font-semibold text-sm mb-1">Operator Summary Legend:</h4>
+            <ul className="list-none pl-0 flex flex-wrap gap-x-4 gap-y-1">
+            <li><span className="text-green-600 font-bold text-lg inline-block w-5 text-center align-middle">✓</span> : Checked Quantity</li>
+            <li><span className="text-red-600 font-bold text-lg inline-block w-5 text-center align-middle">✗</span> : Reject Garment Count</li>
+            <li><span className="font-bold text-lg inline-block w-5 text-center align-middle">{categorizeDefect('critical').symbol}</span> : Critical Defect</li>
+            <li><span className="font-bold text-lg inline-block w-5 text-center align-middle">{categorizeDefect('major').symbol}</span> : Major Defect</li>
+            <li><span className="font-bold text-lg inline-block w-5 text-center align-middle">{categorizeDefect('minor').symbol}</span> : Minor Defect</li>
+          </ul>
         </div>
 
       {processedRepetitions.length > 0 ? (
@@ -179,7 +250,6 @@ const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, 
                 <thead className="bg-gray-200">
                   <tr>
                     <th className="p-2 border border-gray-300">Inspection No.</th>
-                    <th className="p-2 border border-gray-300">Inspector</th>
                     <th className="p-2 border border-gray-300">Check Qty</th>
                     <th className="p-2 border border-gray-300">Defect Parts</th>
                     <th className="p-2 border border-gray-300">Defect Rate (%)</th>
@@ -189,7 +259,7 @@ const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, 
                     <th className="p-2 border border-gray-300 text-center" colSpan="3">Defects Summary</th>
                   </tr>
                   <tr>
-                    <th className="p-2 border border-gray-300" colSpan="2"></th>
+                    <th className="p-2 border border-gray-300" colSpan="1"></th>
                     <th className="p-2 border border-gray-300" colSpan="4"></th>
                     <th className="p-2 border border-gray-300 text-xs">Pass</th>
                     <th className="p-2 border border-gray-300 text-xs">Reject</th>
@@ -204,7 +274,6 @@ const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, 
                   {processedRepetitions.map(data => (
                     <tr key={`summary-${data.reactKey}`}>
                       <td className="p-2 border border-gray-300">{data.inspection_rep_name}</td>
-                      <td className="p-2 border border-gray-300">{data.eng_name} ({data.emp_id})</td>
                       <td className="p-2 border border-gray-300 text-center">{data.metrics.totalCheckedQty}</td>
                       <td className="p-2 border border-gray-300 text-center">{data.metrics.totalRejectGarmentCount}</td>
                       <td className="p-2 border border-gray-300 text-center">{data.metrics.defectRate}</td>
@@ -228,11 +297,64 @@ const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, 
               </table>
             </div>
 
+             {/* New Operator Inspection Summary Table */}
+            {newOperatorTableData.length > 0 ? (
+              <div className="mb-6 bg-white p-4 rounded shadow">
+                <h5 className="text-md font-semibold text-gray-700 mb-2">Operator Inspection Summary by Repetition</h5>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border border-collapse border-gray-300">
+                    <thead className="bg-gray-200">
+                      <tr>
+                        <th rowSpan="2" className="p-2 border border-gray-300 align-middle">Operator ID</th>
+                        <th rowSpan="2" className="p-2 border border-gray-300 align-middle">Operation</th>
+                        <th rowSpan="2" className="p-2 border border-gray-300 align-middle">Machine Code</th>
+                        <th colSpan={REPETITION_KEYS_FOR_OPERATOR_TABLE.length} className="p-2 border border-gray-300 text-center">Inspection Data</th>
+                      </tr>
+                      <tr>
+                        {REPETITION_KEYS_FOR_OPERATOR_TABLE.map(repKey => (
+                          <th key={`op-table-header-${repKey}`} className="p-2 border border-gray-300 text-center text-xs whitespace-nowrap">{repKey}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {newOperatorTableData.map((rowData, idx) => (
+                        <tr key={`op-row-${rowData.operatorId}-${idx}`}>
+                          <td className="p-2 border border-gray-300 text-xs align-top">{rowData.operatorId}</td>
+                          <td className="p-2 border border-gray-300 text-xs align-top">{rowData.operationName}</td>
+                          <td className="p-2 border border-gray-300 text-xs align-top">{rowData.machineCode}</td>
+                          {REPETITION_KEYS_FOR_OPERATOR_TABLE.map(repKey => {
+                            const repDetail = rowData.repetitions[repKey];
+                            if (repDetail) {
+                              return [
+                                 <td key={`op-data-${repKey}-details`} className={`p-2 border border-gray-300 text-xs text-center ${getOverallRovingStatusColor(repDetail.overallStatus)}`}>
+                                  <div className="font-medium">{repDetail.overallStatus}</div>
+                                  <span className="block text-xs mt-0.5">
+                                    (<span className="text-green-600 font-bold">✓</span>{repDetail.checkedQty}
+                                    <span className="text-red-600 font-bold ml-2">✗</span>{repDetail.rejectCount})
+                                  </span>
+                                </td>
+                              ];
+                            } else {
+                              return [
+                                <td key={`op-empty-${repKey}-details`} className="p-2 border border-gray-300 text-xs text-center">-</td>
+                              ];
+                            }
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              filters.operatorId && <div className="mb-6 p-4 text-sm text-gray-600">No data found for the selected operator in this report.</div>
+            )}
+
             {/* Detailed Roving Data per Repetition */}
             {processedRepetitions.map(data => (
               <div key={`detail-${data.reactKey}`} className="mb-8 border-b-2 border-gray-300 pb-6">
                 <h4 className="text-lg font-semibold text-gray-800 mb-3 bg-gray-100 p-2 rounded">
-                  Inspection No: {data.inspection_rep_name} (Inspector: {data.eng_name} - {data.emp_id})
+                  Inspection No: {data.inspection_rep_name} 
                 </h4>
                 
                 {/* Part 2: Roving data Table for this repetition */}
@@ -272,7 +394,7 @@ const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, 
                           <th className="p-2 border border-gray-300">Operation (CH)</th>
                           <th className="p-2 border border-gray-300">Type</th>
                           <th className="p-2 border border-gray-300">Checked Qty</th>
-                          <th className="p-2 border border-gray-300">Reject Qty</th>
+                          <th className="p-2 border border-gray-300">Defect Parts</th>
                           {showSpiColumn && <th className="p-2 border border-gray-300">SPI</th>}
                           {showMeasurementColumn && <th className="p-2 border border-gray-300">Measurement</th>}{showDefectStatusColumn && <th className="p-2 border border-gray-300">Defect Status</th>}
                           <th className="p-2 border border-gray-300">Overall Roving Status</th>
