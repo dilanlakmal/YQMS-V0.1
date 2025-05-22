@@ -189,8 +189,8 @@ const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, 
                     <th className="p-2 border border-gray-300 text-center" colSpan="3">Defects Summary</th>
                   </tr>
                   <tr>
-                    <th className="p-2 border border-gray-300" colSpan="2"></th> {/* For Inspection No & Inspector */}
-                    <th className="p-2 border border-gray-300" colSpan="4"></th> {/* For Check Qty to Pass Rate */}
+                    <th className="p-2 border border-gray-300" colSpan="2"></th>
+                    <th className="p-2 border border-gray-300" colSpan="4"></th>
                     <th className="p-2 border border-gray-300 text-xs">Pass</th>
                     <th className="p-2 border border-gray-300 text-xs">Reject</th>
                     <th className="p-2 border border-gray-300 text-xs">Pass</th>
@@ -274,8 +274,7 @@ const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, 
                           <th className="p-2 border border-gray-300">Checked Qty</th>
                           <th className="p-2 border border-gray-300">Reject Qty</th>
                           {showSpiColumn && <th className="p-2 border border-gray-300">SPI</th>}
-                          {showMeasurementColumn && <th className="p-2 border border-gray-300">Measurement</th>}
-                          {showDefectStatusColumn && <th className="p-2 border border-gray-300">Defect Status</th>}
+                          {showMeasurementColumn && <th className="p-2 border border-gray-300">Measurement</th>}{showDefectStatusColumn && <th className="p-2 border border-gray-300">Defect Status</th>}
                           <th className="p-2 border border-gray-300">Overall Roving Status</th>
                           <th className="p-2 border border-gray-300">Defects Found</th>
                           <th className="p-2 border border-gray-300">Insp. Time</th>

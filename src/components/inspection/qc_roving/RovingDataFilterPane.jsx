@@ -187,7 +187,7 @@ const RovingFilterPlane = ({
         </div>
       </div>
       <div className="mt-4 flex justify-end space-x-3">
-        <button onClick={handleResetFilters} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">Reset</button>
+        <button onClick={handleResetFilters} className="px-4 py-2 bg-blue-400 text-gray-700 rounded-md hover:bg-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 font-semibold">Clear</button>
       </div>
     </div>
   );
