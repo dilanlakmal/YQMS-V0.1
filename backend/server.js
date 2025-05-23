@@ -14,45 +14,54 @@ import fs from 'fs';
 import fsPromises from 'fs/promises';
 import https from 'https';
 import { Server } from "socket.io"; // Import Socket.io
-import createUserModel from "./models/User.js";
-import createQCDataModel from "./models/qc1_data.js";
-import createRoleModel from "./models/Role.js";
-import createIroningModel from "./models/Ironing.js";
-import createQc2OrderDataModel from "./models/qc2_orderdata.js";
-import createOPAModel from "./models/OPA.js";
-import createPackingModel from "./models/Packing.js";
-import createWashingModel from "./models/Washing.js";
 import axios from 'axios';
-//import createRoleManagmentModel from "./models/RoleManagment.js";
-import createRoleManagmentModel from "./models/RoleManagment.js";
-import createQC2InspectionPassBundle from "./models/qc2_inspection_pass_bundle.js";
-import createQC2DefectPrintModel from "./models/QC2DefectPrint.js";
-import createQC2ReworksModel from "./models/qc2_rework.js";
-import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
-import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
-import createCuttingOrdersModel from "./models/CuttingOrders.js"; // New model import
-import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
-
-import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
-import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
-import createInlineOrdersModel from "./models/InlineOrders.js"; 
-import createSewingDefectsModel from "./models/SewingDefects.js";
-import createCuttingMeasurementPointModel from "./models/CuttingMeasurementPoints.js"; // New model import
-import createCuttingFabricDefectModel from "./models/CuttingFabricDefects.js";
-import createCuttingIssueModel from "./models/CuttingIssues.js";
-import createCutPanelOrdersModel from "./models/CutPanelOrders.js";
-import createAQLChartModel from "./models/AQLChart.js"; 
-
-import createHTFirstOutputModel from "./models/HTFirstOutput.js";
-import createFUFirstOutputModel from "./models/FUFirstOutput.js";
-import createSCCDailyTestingModel from "./models/SCCDailyTesting.js";
-import createDailyTestingHTFUtModel from "./models/dailyTestingHTFUModel.js";
-
-import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron";
 
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "./config.js"; 
+import {ymProdConnection,
+  ymEcoConnection,
+  UserMain,
+  QC1Sunrise,
+  InlineOrders,
+  CuttingOrders,
+  CutPanelOrders,
+  QCData,
+  Role,
+  Ironing,
+  Washing,
+  OPA,
+  Packing,
+  QC2OrderData,
+  RoleManagment,
+  QC2InspectionPassBundle,
+  QC2DefectPrint,
+  QC2Reworks,
+  QCInlineRoving,
+  QC2RepairTracking,
+  CuttingInspection,
+  LineSewingWorker,
+  SewingDefects,
+  CuttingMeasurementPoint,
+  CuttingFabricDefect,
+  CuttingIssue,
+  AQLChart,
+  HTFirstOutput,
+  FUFirstOutput,
+  SCCDailyTesting,
+  DailyTestingHTFU,
+  disconnectMongoDB,
+} from "../backend/Config/mongodb.js";
+
+import {
+  poolYMDataStore,
+  poolYMCE,
+  poolYMWHSYS2,
+  ensurePoolConnected,
+  initializePools,
+  closeSQLPools,
+} from "./Config/sqldb.js";
+
 
 /* ------------------------------
    Connection String
@@ -119,158 +128,12 @@ app.use(
 );
 //"mongodb://localhost:27017/ym_prod"
 
-//-----------------------------DATABASE CONNECTIONS------------------------------------------------/
-
-// const mainUserConnection = mongoose.createConnection("mongodb://yasomi:Yasomi%40YM2025@192.167.1.10:29000/ym_eco_board?authSource=admin");
-const ymProdConnection = mongoose.createConnection("mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin");
-const ymEcoConnection = mongoose.createConnection("mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin");
-
-// Log connection status
-ymProdConnection.on('connected', () => console.log("Connected to ym_prod database"));
-ymProdConnection.on('error', (err) => console.error("ym_prod connection error:", err));
-ymEcoConnection.on('connected', () => console.log("Connected to ym_Eco database"));
-ymEcoConnection.on('error', (err) => console.error("ym_Eco connection error:", err));
-
-// Define model on connections
-// const UserMain = createUserModel(ymProdConnection);
-const UserMain = createUserModel(ymEcoConnection);
-const QCData = createQCDataModel(ymProdConnection);
-const Role = createRoleModel(ymProdConnection);
-const Ironing = createIroningModel(ymProdConnection);
-const Washing = createWashingModel(ymProdConnection);
-const OPA = createOPAModel(ymProdConnection);
-const Packing = createPackingModel(ymProdConnection);
-const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
-const RoleManagment = createRoleManagmentModel(ymProdConnection);
-const QC2InspectionPassBundle = createQC2InspectionPassBundle(ymProdConnection);
-const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
-const QC2Reworks = createQC2ReworksModel(ymProdConnection);
-const QCInlineRoving =createQCInlineRovingModel(ymProdConnection);
-const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
-const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
-const CuttingOrders = createCuttingOrdersModel(ymProdConnection); // New model
-const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New model
-const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
-const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection); 
-const SewingDefects = createSewingDefectsModel(ymProdConnection);
-const CuttingMeasurementPoint = createCuttingMeasurementPointModel(ymProdConnection); // New model instance
-const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection); // New model instance
-const CuttingFabricDefect = createCuttingFabricDefectModel(ymProdConnection);
-const CuttingIssue = createCuttingIssueModel(ymProdConnection);
-const AQLChart = createAQLChartModel(ymProdConnection);
-const HTFirstOutput = createHTFirstOutputModel(ymProdConnection); 
-const FUFirstOutput = createFUFirstOutputModel(ymProdConnection); 
-const SCCDailyTesting = createSCCDailyTestingModel(ymProdConnection);
-const DailyTestingHTFU = createDailyTestingHTFUtModel(ymProdConnection);
-
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   next();
 });
 
-/* ------------------------------
-   YM DataSore SQL
------------------------------- */
-
-// SQL Server Configuration for YMDataStore
-const sqlConfig = {
-  user: "ymdata",
-  password: "Kzw15947",
-  server: "192.167.1.13",
-  port: 1433,
-  database: "YMDataStore",
-  options: {
-    encrypt: false, // Use true if SSL is required
-    trustServerCertificate: true // For self-signed certificates
-  },
-  requestTimeout: 3000000, // Set timeout to 5 minutes (300,000 ms)
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
-  }
-};
-
-/* ------------------------------
-   YMCE_SYSTEM SQL
------------------------------- */
-
-// SQL Server Configuration for YMCE_SYSTEM
-const sqlConfigYMCE = {
-  user: "visitor",
-  password: "visitor",
-  server: "ymws-150",
-  //port: 1433,
-  database: "YMCE_SYSTEM",
-  options: {
-    encrypt: false,
-    trustServerCertificate: true
-  },
-  requestTimeout: 300000,
-  connectionTimeout: 300000, // Increase connection timeout to 300 seconds
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
-  }
-};
-
-/* ------------------------------
-   YMWHSYS2 SQL Configuration
------------------------------- */
-
-const sqlConfigYMWHSYS2 = {
-  user: "user01",
-  password: "user01",
-  server: "YM-WHSYS",
-  database: "YMWHSYS2",
-  options: {
-    encrypt: false,
-    trustServerCertificate: true
-  },
-  requestTimeout: 300000,
-  connectionTimeout: 300000,
-  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
-};
-
-// Create connection pools
-const poolYMDataStore = new sql.ConnectionPool(sqlConfig);
-const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
-const poolYMWHSYS2 = new sql.ConnectionPool(sqlConfigYMWHSYS2);
-
-// Function to connect to a pool with reconnection logic
-async function connectPool(pool, poolName) {
-  let retries = 3;
-  while (retries > 0) {
-    try {
-      await pool.connect();
-      console.log(`Connected to ${poolName} pool at ${pool.config.server}`);
-      return pool;
-    } catch (err) {
-      console.error(`Error connecting to ${poolName} pool:`, err);
-      retries -= 1;
-      if (retries === 0) {
-        throw new Error(`Failed to connect to ${poolName} after 3 attempts`);
-      }
-      console.log(
-        `Retrying ${poolName} connection (${retries} attempts left)...`
-      );
-      await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds before retrying
-    }
-  }
-}
-
-// Function to ensure pool is connected before querying
-async function ensurePoolConnected(pool, poolName) {
-  if (!pool.connected) {
-    console.log(
-      `${poolName} pool is not connected. Attempting to reconnect...`
-    );
-    await connectPool(pool, poolName);
-  }
-  return pool;
-}
 
 // Drop the conflicting St_No_1 index if it exists
 async function dropConflictingIndex() {
@@ -287,19 +150,6 @@ async function dropConflictingIndex() {
   }
 }
 
-// Initialize pools and wait for connections
-async function initializePools() {
-  try {
-    await Promise.all([
-      connectPool(poolYMDataStore, "YMDataStore"),
-      connectPool(poolYMCE, "YMCE_SYSTEM"),
-      connectPool(poolYMWHSYS2, "YMWHSYS2")
-    ]);
-  } catch (err) {
-    console.error("Failed to initialize SQL connection pools:", err);
-    process.exit(1); // Exit if pools cannot be initialized
-  }
-}
 
 /* ------------------------------
    Initialize Pools and Run Initial Syncs
@@ -2262,9 +2112,8 @@ app.get("/api/cutting-orders-sizes", async (req, res) => {
 
 process.on("SIGINT", async () => {
   try {
-    await poolYMDataStore.close();
-    await poolYMCE.close();
-    await poolYMWHSYS2.close();
+     await closeSQLPools();
+     await disconnectMongoDB();
     console.log("SQL connection pools closed.");
   } catch (err) {
     console.error("Error closing SQL connection pools:", err);
