@@ -16,6 +16,7 @@ import LineBarChart from "../components/inspection/liveDashboard/LineBarChart";
 import FilterPane from "../components/inspection/liveDashboard/FilterPane";
 import OrderData from "../components/inspection/liveDashboard/OrderData";
 import WashingLive from "../components/inspection/liveDashboard/WashingLive";
+//import WashingLive from "../components/dashboards/qc2_live/washing/WashingLive";
 import IroningLive from "../components/inspection/liveDashboard/IroningLive";
 import OPALive from "../components/inspection/liveDashboard/OPALive";
 import DailySummary from "../components/inspection/liveDashboard/DailySummary";

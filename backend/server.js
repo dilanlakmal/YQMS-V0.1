@@ -13278,6 +13278,591 @@ app.get("/api/scc/ht-inspection-report", async (req, res) => {
   }
 });
 
+//New Washing
+
+// --- Helper for building date match conditions for MongoDB aggregation ---
+const buildDateMatchAggregation = (
+  startDateQuery,
+  endDateQuery,
+  dateField = "washing_updated_date"
+) => {
+  const dateConditions = [];
+
+  // Check if the date field itself is parseable, otherwise $dateFromString would be null
+  const dateFieldIsParseableCheck = {
+    $ne: [
+      {
+        $dateFromString: {
+          dateString: `$${dateField}`,
+          format: "%m/%d/%Y",
+          onError: null,
+          onNull: null
+        }
+      },
+      null
+    ]
+  };
+
+  if (startDateQuery) {
+    const normalizedStartDate = normalizeDateString(startDateQuery); // Converts YYYY-MM-DD to MM/DD/YYYY
+    if (normalizedStartDate) {
+      dateConditions.push({
+        $gte: [
+          {
+            $dateFromString: {
+              dateString: `$${dateField}`,
+              format: "%m/%d/%Y",
+              onError: null,
+              onNull: null
+            }
+          },
+          {
+            $dateFromString: {
+              dateString: normalizedStartDate,
+              format: "%m/%d/%Y",
+              onError: null,
+              onNull: null
+            }
+          }
+        ]
+      });
+    }
+  }
+  if (endDateQuery) {
+    const normalizedEndDate = normalizeDateString(endDateQuery); // Converts YYYY-MM-DD to MM/DD/YYYY
+    if (normalizedEndDate) {
+      dateConditions.push({
+        $lte: [
+          {
+            $dateFromString: {
+              dateString: `$${dateField}`,
+              format: "%m/%d/%Y",
+              onError: null,
+              onNull: null
+            }
+          },
+          {
+            $dateFromString: {
+              dateString: normalizedEndDate,
+              format: "%m/%d/%Y",
+              onError: null,
+              onNull: null
+            }
+          }
+        ]
+      });
+    }
+  }
+
+  if (dateConditions.length > 0) {
+    return { $expr: { $and: [dateFieldIsParseableCheck, ...dateConditions] } };
+  }
+  // If only date range is applied, still ensure the field is parseable
+  return startDateQuery || endDateQuery
+    ? { $expr: dateFieldIsParseableCheck }
+    : {};
+};
+
+/* ------------------------------
+   QC2 Washing Live Dashboard - Filter Options (Cross-Filtering)
+------------------------------ */
+app.get("/api/washing-filter-options", async (req, res) => {
+  try {
+    const {
+      field,
+      moNo,
+      custStyle,
+      buyer,
+      color,
+      size,
+      empId,
+      startDate,
+      endDate
+    } = req.query;
+    const validFields = [
+      "selectedMono",
+      "custStyle",
+      "buyer",
+      "color",
+      "size",
+      "emp_id_washing"
+    ];
+    if (!validFields.includes(field)) {
+      return res
+        .status(400)
+        .json({ error: "Invalid field for filter options" });
+    }
+
+    let match = {};
+    if (moNo) match.selectedMono = { $regex: new RegExp(moNo.trim(), "i") };
+    if (custStyle)
+      match.custStyle = { $regex: new RegExp(custStyle.trim(), "i") };
+    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") };
+    if (color) match.color = { $regex: new RegExp(color.trim(), "i") };
+    if (size) match.size = { $regex: new RegExp(size.trim(), "i") };
+    if (empId) match.emp_id_washing = { $regex: new RegExp(empId.trim(), "i") };
+
+    const tempMatch = { ...match };
+    if (field === "selectedMono") delete tempMatch.selectedMono;
+    // ... (delete other fields from tempMatch if they are 'field')
+    if (field === "custStyle") delete tempMatch.custStyle;
+    if (field === "buyer") delete tempMatch.buyer;
+    if (field === "color") delete tempMatch.color;
+    if (field === "size") delete tempMatch.size;
+    if (field === "emp_id_washing") delete tempMatch.emp_id_washing;
+
+    const dateMatch = buildDateMatchAggregation(startDate, endDate);
+    const finalMatch = { ...tempMatch, ...dateMatch };
+
+    const pipeline = [
+      { $match: finalMatch },
+      { $group: { _id: `$${field}` } },
+      { $project: { _id: 0, value: "$_id" } },
+      { $sort: { value: 1 } },
+      { $limit: 200 }
+    ];
+
+    const results = await Washing.aggregate(pipeline);
+    const suggestions = results
+      .map((item) => item.value)
+      .filter((val) => val !== null && val !== undefined);
+    res.json(suggestions);
+  } catch (error) {
+    console.error(
+      `Error fetching filter options for ${req.query.field}:`,
+      error
+    );
+    res.status(500).json({ error: "Failed to fetch filter options" });
+  }
+});
+
+/* ------------------------------
+   QC2 Washing Live Dashboard - Autocomplete (Simple, for typing)
+------------------------------ */
+app.get("/api/washing-autocomplete", async (req, res) => {
+  try {
+    const {
+      field,
+      query,
+      moNo,
+      custStyle,
+      buyer,
+      color,
+      size,
+      empId,
+      startDate,
+      endDate
+    } = req.query;
+
+    const validFields = [
+      "selectedMono",
+      "custStyle",
+      "buyer",
+      "color",
+      "size",
+      "emp_id_washing"
+    ];
+    if (!validFields.includes(field)) {
+      return res.status(400).json({ error: "Invalid field" });
+    }
+
+    let baseMatch = {};
+    if (moNo && field !== "selectedMono")
+      baseMatch.selectedMono = { $regex: new RegExp(moNo.trim(), "i") };
+    if (custStyle && field !== "custStyle")
+      baseMatch.custStyle = { $regex: new RegExp(custStyle.trim(), "i") };
+    // ... (add other filters to baseMatch) ...
+    if (buyer && field !== "buyer")
+      baseMatch.buyer = { $regex: new RegExp(buyer.trim(), "i") };
+    if (color && field !== "color")
+      baseMatch.color = { $regex: new RegExp(color.trim(), "i") };
+    if (size && field !== "size")
+      baseMatch.size = { $regex: new RegExp(size.trim(), "i") };
+    if (empId && field !== "emp_id_washing")
+      baseMatch.emp_id_washing = { $regex: new RegExp(empId.trim(), "i") };
+
+    const dateMatch = buildDateMatchAggregation(startDate, endDate);
+    const finalBaseMatch = { ...baseMatch, ...dateMatch };
+
+    const queryMatch = {};
+    if (query) {
+      queryMatch[field] = { $regex: new RegExp(query.trim(), "i") };
+    }
+
+    const pipeline = [
+      { $match: { ...finalBaseMatch, ...queryMatch } },
+      { $group: { _id: `$${field}` } },
+      { $project: { _id: 0, value: "$_id" } },
+      { $sort: { value: 1 } },
+      { $limit: 10 }
+    ];
+
+    const results = await Washing.aggregate(pipeline);
+    const suggestions = results
+      .map((item) => item.value)
+      .filter((val) => val !== null && val !== undefined);
+    res.json(suggestions);
+  } catch (error) {
+    console.error("Error fetching autocomplete suggestions:", error);
+    res.status(500).json({ error: "Failed to fetch suggestions" });
+  }
+});
+
+/* ------------------------------
+   QC2 Washing Live Dashboard - Card Statistics
+------------------------------ */
+app.get("/api/washing-stats", async (req, res) => {
+  try {
+    const { moNo, custStyle, buyer, color, size, empId, startDate, endDate } =
+      req.query;
+
+    let match = {};
+    if (moNo) match.selectedMono = { $regex: new RegExp(moNo.trim(), "i") };
+    if (custStyle)
+      match.custStyle = { $regex: new RegExp(custStyle.trim(), "i") };
+    // ... (add other filters) ...
+    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") };
+    if (color) match.color = { $regex: new RegExp(color.trim(), "i") };
+    if (size) match.size = { $regex: new RegExp(size.trim(), "i") };
+    if (empId) match.emp_id_washing = { $regex: new RegExp(empId.trim(), "i") };
+
+    const dateMatch = buildDateMatchAggregation(startDate, endDate);
+    const finalMatch = { ...match, ...dateMatch };
+
+    const statsPipeline = [
+      { $match: finalMatch },
+      {
+        $group: {
+          _id: null,
+          totalGoodQty: {
+            $sum: {
+              $cond: [
+                { $eq: ["$task_no_washing", 55] },
+                { $ifNull: [{ $toInt: "$passQtyWash" }, 0] },
+                0
+              ]
+            }
+          },
+          totalGoodBundles: {
+            $sum: { $cond: [{ $eq: ["$task_no_washing", 55] }, 1, 0] }
+          },
+          totalRewashQty: {
+            $sum: {
+              $cond: [
+                { $eq: ["$task_no_washing", 86] },
+                { $ifNull: [{ $toInt: "$passQtyWash" }, 0] },
+                0
+              ]
+            }
+          },
+          inspectors: { $addToSet: "$emp_id_washing" }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          totalGoodQty: 1,
+          totalGoodBundles: 1,
+          totalRewashQty: 1,
+          totalInspectors: {
+            $size: {
+              $filter: {
+                input: "$inspectors",
+                as: "item",
+                cond: { $ne: ["$$item", null] }
+              }
+            }
+          }
+        }
+      }
+    ];
+
+    const result = await Washing.aggregate(statsPipeline);
+    if (result.length > 0) {
+      res.json(result[0]);
+    } else {
+      res.json({
+        totalGoodQty: 0,
+        totalGoodBundles: 0,
+        totalRewashQty: 0,
+        totalInspectors: 0
+      });
+    }
+  } catch (error) {
+    console.error("Error fetching washing stats:", error);
+    res.status(500).json({ error: "Failed to fetch washing stats" });
+  }
+});
+
+/* ------------------------------
+   QC2 Washing Live Dashboard - Inspector Summary Table
+------------------------------ */
+app.get("/api/washing-inspector-summary", async (req, res) => {
+  try {
+    const { moNo, custStyle, buyer, color, size, empId, startDate, endDate } =
+      req.query;
+
+    let match = {};
+    if (moNo) match.selectedMono = { $regex: new RegExp(moNo.trim(), "i") };
+    if (custStyle)
+      match.custStyle = { $regex: new RegExp(custStyle.trim(), "i") };
+    // ... (add other filters) ...
+    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") };
+    if (color) match.color = { $regex: new RegExp(color.trim(), "i") };
+    if (size) match.size = { $regex: new RegExp(size.trim(), "i") };
+    if (empId) match.emp_id_washing = { $regex: new RegExp(empId.trim(), "i") };
+
+    const dateMatch = buildDateMatchAggregation(startDate, endDate);
+    const initialMatch = { ...match, ...dateMatch };
+
+    // Add a match to ensure washing_updated_date is parseable before grouping
+    const preGroupMatch = {
+      ...initialMatch,
+      $expr: {
+        // Ensure washing_updated_date is not null and is parseable
+        $and: [
+          ...(initialMatch.$expr ? initialMatch.$expr.$and : []), // Keep existing date range conditions
+          { $ne: ["$washing_updated_date", null] },
+          { $ne: ["$washing_updated_date", ""] },
+          {
+            $ne: [
+              {
+                $dateFromString: {
+                  dateString: "$washing_updated_date",
+                  format: "%m/%d/%Y",
+                  onError: null,
+                  onNull: null
+                }
+              },
+              null
+            ]
+          }
+        ]
+      }
+    };
+    // If initialMatch.$expr was empty, the $and might be problematic, simplify:
+    let finalPreGroupMatch = { ...match };
+    if (startDate || endDate) {
+      finalPreGroupMatch = { ...finalPreGroupMatch, ...dateMatch };
+    }
+    // Add the specific check for washing_updated_date parseability
+    finalPreGroupMatch.$expr = {
+      $and: [
+        ...(finalPreGroupMatch.$expr ? finalPreGroupMatch.$expr.$and : [{}]), // Existing conditions or true
+        { $ne: ["$washing_updated_date", null] },
+        { $ne: ["$washing_updated_date", ""] },
+        {
+          $ne: [
+            {
+              $dateFromString: {
+                dateString: "$washing_updated_date",
+                format: "%m/%d/%Y",
+                onError: null,
+                onNull: null
+              }
+            },
+            null
+          ]
+        }
+      ].filter((c) => Object.keys(c).length > 0) // Filter out empty {}
+    };
+    if (finalPreGroupMatch.$expr.$and.length === 0)
+      delete finalPreGroupMatch.$expr;
+
+    const pipeline = [
+      { $match: finalPreGroupMatch },
+      {
+        $group: {
+          _id: {
+            empId: "$emp_id_washing",
+            empName: "$eng_name_washing",
+            date: "$washing_updated_date" // Group by the original string date
+          },
+          totalBundlesForDate: {
+            $sum: { $cond: [{ $eq: ["$task_no_washing", 55] }, 1, 0] }
+          },
+          washingQtyForDate: {
+            $sum: {
+              $cond: [
+                { $eq: ["$task_no_washing", 55] },
+                { $ifNull: [{ $toInt: "$passQtyWash" }, 0] },
+                0
+              ]
+            }
+          },
+          rewashQtyForDate: {
+            $sum: {
+              $cond: [
+                { $eq: ["$task_no_washing", 86] },
+                { $ifNull: [{ $toInt: "$passQtyWash" }, 0] },
+                0
+              ]
+            }
+          }
+        }
+      },
+      // Sort by date string before grouping by employee to ensure dailyStats are somewhat ordered
+      // However, JS sort on client side is more reliable for final date sorting
+      {
+        $sort: { "_id.date": 1 } // Sorting string dates "M/D/YYYY" can be tricky; "MM/DD/YYYY" is better
+      },
+      {
+        $group: {
+          _id: {
+            empId: "$_id.empId",
+            empName: "$_id.empName"
+          },
+          dailyStats: {
+            $push: {
+              date: "$_id.date",
+              totalBundles: "$totalBundlesForDate",
+              washingQty: "$washingQtyForDate",
+              rewashQty: "$rewashQtyForDate"
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          empId: "$_id.empId",
+          empName: "$_id.empName",
+          dailyStats: 1
+        }
+      },
+      { $match: { empId: { $ne: null } } }, // Ensure empId is not null
+      { $sort: { empId: 1 } }
+    ];
+
+    const results = await Washing.aggregate(pipeline);
+    res.json(results);
+  } catch (error) {
+    console.error("Error fetching inspector summary:", error);
+    res.status(500).json({ error: "Failed to fetch inspector summary" });
+  }
+});
+
+/* ------------------------------
+   QC2 Washing Live Dashboard - Detailed Table Data
+------------------------------ */
+app.get("/api/washing-detailed-data", async (req, res) => {
+  try {
+    const {
+      moNo,
+      custStyle,
+      buyer,
+      color,
+      size,
+      empId,
+      startDate,
+      endDate,
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    let match = {};
+    if (moNo) match.selectedMono = { $regex: new RegExp(moNo.trim(), "i") };
+    if (custStyle)
+      match.custStyle = { $regex: new RegExp(custStyle.trim(), "i") };
+    // ... (add other filters) ...
+    if (buyer) match.buyer = { $regex: new RegExp(buyer.trim(), "i") };
+    if (color) match.color = { $regex: new RegExp(color.trim(), "i") };
+    if (size) match.size = { $regex: new RegExp(size.trim(), "i") };
+    if (empId) match.emp_id_washing = { $regex: new RegExp(empId.trim(), "i") };
+
+    const dateMatch = buildDateMatchAggregation(startDate, endDate);
+    const finalMatch = { ...match, ...dateMatch };
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const dataPipeline = [
+      { $match: finalMatch },
+      {
+        $project: {
+          _id: 1, // Keep original _id for React key if possible, or use washing_bundle_id
+          recordId: "$washing_bundle_id",
+          moNo: "$selectedMono",
+          custStyle: "$custStyle",
+          buyer: "$buyer",
+          color: "$color",
+          size: "$size",
+          empId: "$emp_id_washing",
+          empName: "$eng_name_washing",
+          date: "$washing_updated_date",
+          time: "$washing_update_time",
+          taskNo: "$task_no_washing",
+          bundleQtyFirst: {
+            $cond: [
+              { $eq: ["$task_no_washing", 55] },
+              { $ifNull: ["$totalBundleQty", 0] },
+              0
+            ]
+          },
+          bundleQtyDefective: {
+            $cond: [
+              { $eq: ["$task_no_washing", 86] },
+              { $ifNull: ["$totalBundleQty", 0] },
+              0
+            ]
+          },
+          garmentsFirst: {
+            $cond: [
+              { $eq: ["$task_no_washing", 55] },
+              { $ifNull: [{ $toInt: "$passQtyWash" }, 0] },
+              0
+            ]
+          },
+          garmentsDefective: {
+            $cond: [
+              { $eq: ["$task_no_washing", 86] },
+              { $ifNull: [{ $toInt: "$passQtyWash" }, 0] },
+              0
+            ]
+          },
+          originalTotalBundleQty: { $ifNull: ["$totalBundleQty", 0] },
+          originalPassQtyWash: { $ifNull: [{ $toInt: "$passQtyWash" }, 0] }
+        }
+      },
+      // Sort by actual date, then time. Requires converting washing_updated_date to date for sorting.
+      {
+        $addFields: {
+          sortableDate: {
+            $dateFromString: {
+              dateString: "$date",
+              format: "%m/%d/%Y",
+              onError: null,
+              onNull: null
+            }
+          }
+        }
+      },
+      { $sort: { sortableDate: -1, time: -1 } },
+      { $project: { sortableDate: 0 } } // Remove temporary sort field
+    ];
+
+    const countPipeline = [{ $match: finalMatch }, { $count: "total" }];
+
+    const [tableDataResults, totalResult] = await Promise.all([
+      Washing.aggregate([
+        ...dataPipeline,
+        { $skip: skip },
+        { $limit: limitNum }
+      ]),
+      Washing.aggregate(countPipeline)
+    ]);
+
+    const tableData = tableDataResults || [];
+    const total = totalResult.length > 0 ? totalResult[0].total : 0;
+
+    res.json({ tableData, total });
+  } catch (error) {
+    console.error("Error fetching washing detailed data:", error);
+    res.status(500).json({ error: "Failed to fetch washing detailed data" });
+  }
+});
+
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`HTTPS Server is running on https://localhost:${PORT}`);

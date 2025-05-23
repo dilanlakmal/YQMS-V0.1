@@ -1384,9 +1384,9 @@
 import axios from "axios";
 import {
   CheckSquare,
-  Eye,
+  Eye, // Original icon for HT Inspection
   FileText,
-  ListChecks,
+  ListChecks, // Alternative icon if you prefer
   Settings2,
   ShieldCheck,
   ThermometerSun
@@ -1477,9 +1477,8 @@ const initialHTInspectionReportState = {
   totalPcs: null,
   defects: [],
   remarks: "",
-  defectImageFile: null,
-  defectImageUrl: null
-  // aqlData, defectsQty, result are derived/fetched within the component
+  defectImageFile: null, // For holding the File object before upload
+  defectImageUrl: null // For holding the preview or existing image URL
 };
 
 const SCCPage = () => {
@@ -1509,25 +1508,30 @@ const SCCPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const uploadSccImage = useCallback(
-    async (file, currentData, imageTypeIdentifier) => {
+    async (file, currentDataForImage, imageTypeIdentifierForUpload) => {
       const imageFormData = new FormData();
       imageFormData.append("imageFile", file);
-      // Ensure these fields are present in currentData for the specific form type
-      imageFormData.append("moNo", currentData.moNo || "UNKNOWN_MO");
-      imageFormData.append("color", currentData.color || "UNKNOWN_COLOR");
-      imageFormData.append("imageType", imageTypeIdentifier);
+      imageFormData.append("moNo", currentDataForImage.moNo || "UNKNOWN_MO");
+      imageFormData.append(
+        "color",
+        currentDataForImage.color || "UNKNOWN_COLOR"
+      );
+      imageFormData.append("imageType", imageTypeIdentifierForUpload);
       imageFormData.append(
         "inspectionDate",
-        currentData.inspectionDate instanceof Date
-          ? currentData.inspectionDate.toISOString().split("T")[0]
+        currentDataForImage.inspectionDate instanceof Date
+          ? currentDataForImage.inspectionDate.toISOString().split("T")[0]
           : String(
-              currentData.inspectionDate ||
+              currentDataForImage.inspectionDate ||
                 new Date().toISOString().split("T")[0]
             ).split("T")[0]
       );
-      // For HTInspectionReport, include batchNo if available
-      if (formTypeToSubmit === "HTInspectionReport" && currentData.batchNo) {
-        imageFormData.append("batchNo", currentData.batchNo);
+      // Special handling for HTInspectionReport to include batchNo
+      if (
+        imageTypeIdentifierForUpload.startsWith("htDefect-") &&
+        currentDataForImage.batchNo
+      ) {
+        imageFormData.append("batchNo", currentDataForImage.batchNo);
       }
 
       const imgRes = await axios.post(
@@ -1539,13 +1543,13 @@ const SCCPage = () => {
         throw new Error(
           t(
             "scc.errorUploadingImageGeneric",
-            `Failed to upload ${imageTypeIdentifier} image.`
+            `Failed to upload ${imageTypeIdentifierForUpload} image.`
           )
         );
       }
-      return imgRes.data; // { success: true, filePath: '...', filename: '...' }
+      return imgRes.data;
     },
-    [t] // formTypeToSubmit is not available here, it's an argument to handleFormSubmit
+    [t]
   );
 
   const tabs = useMemo(
@@ -1603,7 +1607,7 @@ const SCCPage = () => {
       {
         id: "htInspection",
         labelKey: "scc.tabs.htInspection",
-        icon: <ListChecks size={16} />, // Changed icon
+        icon: <Eye size={16} />, // Using original Eye icon
         formType: "HTInspectionReport",
         data: htInspectionReportData,
         setter: setHtInspectionReportData,
@@ -1681,7 +1685,7 @@ const SCCPage = () => {
         return;
       }
 
-      // Basic Validation
+      // Basic Validation (Child components should perform detailed validation before calling this)
       if (formTypeToSubmit === "HTInspectionReport") {
         if (
           !currentFormData ||
@@ -1690,13 +1694,14 @@ const SCCPage = () => {
           !currentFormData.moNo ||
           !currentFormData.color ||
           !currentFormData.batchNo ||
-          !currentFormData.totalPcs
+          currentFormData.totalPcs === null ||
+          currentFormData.totalPcs <= 0
         ) {
           Swal.fire(
             t("scc.validationErrorTitle"),
             t(
               "sccHTInspection.validation.fillBasicPayload",
-              "Essential data missing for HT Inspection submission."
+              "Essential data missing or invalid for HT Inspection submission."
             ),
             "warning"
           );
@@ -1742,89 +1747,99 @@ const SCCPage = () => {
         }
       }
 
-      // Form-Specific Validation (child components are expected to do most of this before calling this parent submit)
+      // Form-Specific Validation (Example, more would be in child components)
       let formIsValid = true;
       if (formTypeToSubmit === "HT" || formTypeToSubmit === "FU") {
-        // ... (HT/FU specific validation already in your code)
+        if (
+          !currentFormData.standardSpecification ||
+          currentFormData.standardSpecification.length < 2
+        ) {
+          formIsValid = false; /* ... Swal ... */
+        }
+        // ... other HT/FU validations ...
+        if (
+          formIsValid &&
+          !currentFormData.referenceSampleImageUrl &&
+          !currentFormData.referenceSampleImageFile
+        ) {
+          formIsValid = false; /* ... Swal ... */
+        }
       } else if (formTypeToSubmit === "DailyTesting") {
-        // ... (DailyTesting specific validation already in your code)
+        if (!currentFormData.machineNo) {
+          formIsValid = false; /* ... Swal ... */
+        }
+        // ... other DailyTesting validations ...
       }
-      if (
-        !formIsValid &&
-        formTypeToSubmit !== "DailyHTQC" &&
-        formTypeToSubmit !== "DailyFUQC" &&
-        formTypeToSubmit !== "HTInspectionReport"
-      )
-        return;
+      if (!formIsValid) return; // Halt if form-specific validations fail for non-child-managed forms
 
       setIsSubmitting(true);
       try {
-        let finalImageUrls = {}; // To store URLs of uploaded images
+        let finalImageUrls = {}; // Store URLs of uploaded images or existing ones
 
-        // Image Upload Logic (Centralized)
-        // For HT & FU First Output
+        // --- Image Upload Logic based on formTypeToSubmit ---
+        let imageTypeIdentifier = ""; // Will be set based on formType
         if (formTypeToSubmit === "HT" || formTypeToSubmit === "FU") {
           if (currentFormData.referenceSampleImageFile) {
+            imageTypeIdentifier = `referenceSample-${formTypeToSubmit}`;
             const imgData = await uploadSccImage(
               currentFormData.referenceSampleImageFile,
               currentFormData,
-              `referenceSample-${formTypeToSubmit}`
+              imageTypeIdentifier
             );
             finalImageUrls.referenceSampleImage = imgData.filePath;
           } else {
             finalImageUrls.referenceSampleImage =
-              currentFormData.referenceSampleImageUrl; // Keep existing if no new file
+              currentFormData.referenceSampleImageUrl;
           }
           if (currentFormData.afterWashImageFile) {
+            imageTypeIdentifier = `afterWash-${formTypeToSubmit}`;
             const imgData = await uploadSccImage(
               currentFormData.afterWashImageFile,
               currentFormData,
-              `afterWash-${formTypeToSubmit}`
+              imageTypeIdentifier
             );
             finalImageUrls.afterWashImage = imgData.filePath;
           } else {
             finalImageUrls.afterWashImage = currentFormData.afterWashImageUrl;
           }
-        }
-        // For Daily Testing
-        else if (formTypeToSubmit === "DailyTesting") {
+        } else if (formTypeToSubmit === "DailyTesting") {
           if (currentFormData.afterWashImageFile) {
+            imageTypeIdentifier = "afterWashDaily";
             const imgData = await uploadSccImage(
               currentFormData.afterWashImageFile,
               currentFormData,
-              "afterWashDaily"
+              imageTypeIdentifier
             );
             finalImageUrls.afterWashImage = imgData.filePath;
           } else {
             finalImageUrls.afterWashImage = currentFormData.afterWashImageUrl;
           }
-        }
-        // For HT Inspection Report
-        else if (formTypeToSubmit === "HTInspectionReport") {
+        } else if (formTypeToSubmit === "HTInspectionReport") {
           if (currentFormData.defectImageFile) {
-            // specificPayload is currentFormData here
+            // currentFormData is specificPayload here
+            imageTypeIdentifier = `htDefect-${currentFormData.moNo}-${currentFormData.color}-${currentFormData.batchNo}`;
             const imgData = await uploadSccImage(
               currentFormData.defectImageFile,
               currentFormData,
-              `htDefect-${currentFormData.moNo}-${currentFormData.batchNo}`
+              imageTypeIdentifier
             );
             finalImageUrls.defectImageUrl = imgData.filePath;
           } else {
-            finalImageUrls.defectImageUrl = currentFormData.defectImageUrl; // Keep existing if no new file
+            finalImageUrls.defectImageUrl = currentFormData.defectImageUrl;
           }
         }
 
-        // Construct Payload to Send
+        // --- Construct Payload to Send ---
         if (
           formTypeToSubmit === "DailyHTQC" ||
           formTypeToSubmit === "DailyFUQC"
         ) {
-          payloadToSend = { ...currentFormData }; // currentFormData is specificPayload
+          payloadToSend = { ...currentFormData }; // currentFormData is already the specificPayload from child
         } else if (formTypeToSubmit === "HTInspectionReport") {
           payloadToSend = {
             ...currentFormData, // currentFormData is specificPayload from HTInspectionReport.jsx
-            defectImageUrl: finalImageUrls.defectImageUrl, // Use the potentially uploaded URL
-            defectImageFile: undefined, // Don't send the File object
+            defectImageUrl: finalImageUrls.defectImageUrl,
+            defectImageFile: undefined, // Don't send the File object to the backend for this endpoint
             emp_id: user.emp_id,
             emp_kh_name: user.kh_name || "N/A",
             emp_eng_name: user.eng_name || "N/A",
@@ -1912,28 +1927,21 @@ const SCCPage = () => {
         );
         const updatedRecord = response.data.data;
 
-        // Update state after successful submission
-        // For child-managed forms like DailyHTQC, DailyFUQC, HTInspectionReport,
-        // the primary reset is to initialState. The child component will re-sync if needed.
+        // --- Update State After Successful Submission ---
         if (
           formTypeToSubmit === "DailyHTQC" ||
           formTypeToSubmit === "DailyFUQC" ||
           formTypeToSubmit === "HTInspectionReport"
         ) {
-          currentSetter({
-            ...initialStateForReset // Resets to the defined initial state for that form
-            // If you need to persist some specific data after reset (e.g. _id for update), do it here:
-            // _id: updatedRecord._id,
-            // inspectionDate: new Date(), // Reset date to current always or use updatedRecord.inspectionDate
-          });
+          currentSetter({ ...initialStateForReset });
         } else {
-          // For HT, FU, DailyTesting - more detailed state update
+          // For HT, FU, DailyTesting
           let stateUpdate = {
             ...initialStateForReset,
             _id: updatedRecord._id,
             moNo: updatedRecord.moNo,
             color: updatedRecord.color,
-            buyer: currentFormData.buyer, // Persist from input as backend might not return it
+            buyer: currentFormData.buyer,
             buyerStyle: currentFormData.buyerStyle,
             inspectionDate: new Date(updatedRecord.inspectionDate),
             remarks: updatedRecord.remarks === "NA" ? "" : updatedRecord.remarks
@@ -2014,7 +2022,7 @@ const SCCPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 p-4 sm:p-6">
-      <div className="max-w-5xl lg:max-w-6xl mx-auto bg-white rounded-xl shadow-lg">
+      <div className="max-w-5xl lg:max-w-6xl xl:max-w-7xl mx-auto bg-white rounded-xl shadow-lg">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 pt-6 pb-4 text-center border-b">
           {t("scc.title", "SCC Inspection (HT/FU)")}
         </h1>
@@ -2038,18 +2046,18 @@ const SCCPage = () => {
             </button>
           ))}
         </div>
-        <div className="p-3 sm:p-4 md:p-5">
+        <div className="p-3 sm:p-4 md:p-5 lg:p-6">
           {CurrentFormComponent &&
             activeTabData &&
             !activeTabData.disabled &&
             user && (
               <CurrentFormComponent
                 formType={activeTabData.formType}
-                key={activeTabData.id} // Ensures component remounts on tab change if needed for state reset
+                key={activeTabData.id}
                 formData={activeTabData.data}
                 onFormDataChange={activeTabData.setter}
                 onFormSubmit={handleFormSubmit}
-                isSubmitting={isSubmitting} // Pass the global submitting state
+                isSubmitting={isSubmitting}
               />
             )}
           {activeTabData && activeTabData.disabled && (

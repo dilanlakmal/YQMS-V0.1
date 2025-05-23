@@ -2134,3 +2134,1611 @@ function BundleRegistration() {
 }
 
 export default BundleRegistration;
+
+// import React, { useEffect, useRef, useState, useMemo } from "react";
+// import DatePicker from "react-datepicker";
+// import "react-datepicker/dist/react-datepicker.css";
+// import { useTranslation } from "react-i18next";
+// import {
+//   FaEye,
+//   FaEyeSlash,
+//   FaFilter,
+//   FaMinus,
+//   FaPlus,
+//   FaPrint,
+//   FaQrcode,
+//   FaTimes,
+//   FaUndoAlt,
+//   FaCalendarAlt,
+//   FaBuilding,
+//   FaTshirt,
+//   FaUserTie,
+//   FaGlobeAmericas,
+//   FaIndustry,
+//   FaMapMarkerAlt,
+//   FaPaintBrush,
+//   FaRulerCombined,
+//   FaSortNumericDown,
+//   FaLayerGroup,
+//   FaUserFriends,
+//   FaCheckDouble,
+//   FaInfoCircle,
+//   FaBarcode,
+//   FaBoxOpen,
+//   FaFileInvoiceDollar,
+//   FaCut,
+//   FaToggleOn,
+//   FaToggleOff,
+//   FaCogs // For Auto Print Toggle, FaCog for settings
+// } from "react-icons/fa";
+// import { API_BASE_URL } from "../../config";
+// import { useAuth } from "../components/authentication/AuthContext";
+// import { useFormData } from "../components/context/FormDataContext";
+// import BluetoothComponent from "../components/forms/Bluetooth";
+// import EditModal from "../components/forms/EditBundleData";
+// import MonoSearch from "../components/forms/MonoSearch";
+// import NumLetterPad from "../components/forms/NumLetterPad";
+// import NumberPad from "../components/forms/NumberPad";
+// import QRCodePreview from "../components/forms/QRCodePreview";
+// import ReprintTab from "../components/forms/ReprintTab";
+// import SubConSelection from "../components/forms/SubConSelection";
+
+// const inputBaseClasses =
+//   "w-full px-3 py-2 text-sm md:text-base border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out placeholder-slate-400";
+// const inputReadOnlyClasses = `${inputBaseClasses} bg-slate-100 cursor-pointer`;
+// const labelBaseClasses =
+//   "flex items-center text-xs md:text-sm font-medium text-slate-700 mb-1";
+// const iconBaseClasses = "mr-2 text-indigo-500";
+
+// const getFormattedDate = (date = new Date()) => {
+//   return date.toLocaleDateString("en-GB", {
+//     day: "2-digit",
+//     month: "short",
+//     year: "numeric"
+//   });
+// };
+
+// function BundleRegistration() {
+//   const { t } = useTranslation();
+//   const { user, loading } = useAuth();
+//   const { formData: persistedFormData, updateFormData } = useFormData();
+
+//   const [userBatches, setUserBatches] = useState([]);
+//   const [qrData, setQrData] = useState([]);
+//   const [showQRPreview, setShowQRPreview] = useState(false);
+//   const [showNumberPad, setShowNumberPad] = useState(false);
+//   const [numberPadTarget, setNumberPadTarget] = useState(null);
+//   const [isGenerateDisabled, setIsGenerateDisabled] = useState(false);
+//   const [activeTab, setActiveTab] = useState("registration");
+//   // const [dataRecords, setDataRecords] = useState([]); // Not actively used for display logic, can be removed if not needed elsewhere
+//   const [isPrinting, setIsPrinting] = useState(false);
+//   const [totalBundleQty, setTotalBundleQty] = useState(0);
+//   const [colors, setColors] = useState([]);
+//   const [sizes, setSizes] = useState([]);
+//   const [hasColors, setHasColors] = useState(false);
+//   const [hasSizes, setHasSizes] = useState(false);
+//   const [showBundleQtyOverview, setShowBundleQtyOverview] = useState(false); // For new toggle
+//   const [autoPrintEnabled, setAutoPrintEnabled] = useState(true); // For Auto Print Toggle
+
+//   const [isSubCon, setIsSubCon] = useState(() => {
+//     const savedDepartment = persistedFormData.bundleRegistration?.department;
+//     return savedDepartment === "Sub-con";
+//   });
+
+//   const [subConName, setSubConName] = useState(
+//     () => persistedFormData.bundleRegistration?.subConName || ""
+//   );
+//   const [estimatedTotal, setEstimatedTotal] = useState(null);
+
+//   const bluetoothComponentRef = useRef();
+//   const subConNames = [
+//     "Sunicon",
+//     "Win Sheng",
+//     "Yeewo",
+//     "Jinmyung",
+//     "Elite",
+//     "SYD"
+//   ];
+
+//   const [editModalOpen, setEditModalOpen] = useState(false);
+//   const [editRecordId, setEditRecordId] = useState(null);
+//   const [styleCodeFilter, setStyleCodeFilter] = useState("");
+//   const [packageNoFilter, setPackageNoFilter] = useState("");
+//   const [monoFilter, setMonoFilter] = useState("");
+//   const [colorFilter, setColorFilter] = useState("");
+//   const [sizeFilter, setSizeFilter] = useState("");
+//   const [showFilters, setShowFilters] = useState(false);
+
+//   const [formData, setFormData] = useState(() => {
+//     const savedData = persistedFormData.bundleRegistration;
+//     const today = new Date();
+//     return savedData && user
+//       ? {
+//           ...savedData,
+//           date: savedData.date ? new Date(savedData.date) : today
+//         }
+//       : {
+//           date: today,
+//           department: "",
+//           selectedMono: "",
+//           buyer: "",
+//           orderQty: "",
+//           factoryInfo: "",
+//           custStyle: "",
+//           country: "",
+//           color: "",
+//           size: "",
+//           bundleQty: 1,
+//           lineNo: "",
+//           count: 10,
+//           colorCode: "",
+//           chnColor: "",
+//           colorKey: "",
+//           sizeOrderQty: "",
+//           planCutQty: ""
+//         };
+//   });
+
+//   const [showOrderDetails, setShowOrderDetails] = useState(false);
+//   const memoizedQrData = useMemo(() => qrData, [qrData]);
+
+//   const toggleOrderDetails = () => setShowOrderDetails(!showOrderDetails);
+//   const toggleBundleQtyOverview = () =>
+//     setShowBundleQtyOverview(!showBundleQtyOverview);
+//   const toggleAutoPrint = () => setAutoPrintEnabled(!autoPrintEnabled);
+
+//   useEffect(() => {
+//     updateFormData("bundleRegistration", { ...formData, isSubCon, subConName });
+//   }, [formData, isSubCon, subConName, updateFormData]);
+
+//   useEffect(() => {
+//     let newLineNo = "";
+//     let newIsSubCon = false;
+//     // let newSubConName = ""; // Keep subConName unless department changes away from Sub-con
+
+//     if (formData.department === "Sub-con") {
+//       newLineNo = "SUB";
+//       newIsSubCon = true;
+//       // newSubConName = subConName && isSubCon ? subConName : ""; // This logic was a bit redundant
+//     } else if (formData.department === "Washing") {
+//       newLineNo = "WA";
+//     } else if (formData.department === "QC1 Endline") {
+//       newLineNo =
+//         persistedFormData.bundleRegistration?.department === "QC1 Endline" &&
+//         persistedFormData.bundleRegistration?.lineNo
+//           ? persistedFormData.bundleRegistration.lineNo
+//           : "";
+//     }
+
+//     setIsSubCon(newIsSubCon);
+//     if (!newIsSubCon) {
+//       setSubConName("");
+//     }
+//     // Only update lineNo if it's derived from department logic
+//     if (
+//       formData.department === "Sub-con" ||
+//       formData.department === "Washing"
+//     ) {
+//       setFormData((prev) => ({ ...prev, lineNo: newLineNo }));
+//     } else if (
+//       formData.department === "QC1 Endline" &&
+//       prevFormDataRef.current?.department !== "QC1 Endline"
+//     ) {
+//       setFormData((prev) => ({ ...prev, lineNo: "" })); // Clear lineNo when switching to QC1
+//     }
+//   }, [formData.department]);
+
+//   // Ref to store previous formData to detect changes
+//   const prevFormDataRef = useRef();
+//   useEffect(() => {
+//     prevFormDataRef.current = formData;
+//   });
+
+//   useEffect(() => {
+//     const fetchOrderDetails = async () => {
+//       if (!formData.selectedMono) return;
+//       setShowOrderDetails(false);
+//       try {
+//         const response = await fetch(
+//           `${API_BASE_URL}/api/order-details/${formData.selectedMono}`
+//         );
+//         if (!response.ok)
+//           throw new Error(`HTTP error! status: ${response.status}`);
+//         const data = await response.json();
+
+//         setFormData((prev) => ({
+//           ...prev,
+//           buyer: data.engName,
+//           orderQty: data.totalQty,
+//           factoryInfo: data.factoryname,
+//           custStyle: data.custStyle,
+//           country: data.country,
+//           color: "",
+//           colorCode: "",
+//           chnColor: "",
+//           colorKey: "",
+//           size: "",
+//           sizeOrderQty: "",
+//           planCutQty: "",
+//           totalGarmentsCount: undefined
+//         }));
+
+//         const totalResponse = await fetch(
+//           `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
+//         );
+//         if (!totalResponse.ok)
+//           throw new Error("Failed to fetch total bundle quantity");
+//         const totalData = await totalResponse.json();
+//         setTotalBundleQty(totalData.total);
+
+//         setColors(data.colors && data.colors.length > 0 ? data.colors : []);
+//         setHasColors(data.colors && data.colors.length > 0);
+//         setHasSizes(false);
+//       } catch (error) {
+//         console.error("Error fetching order details:", error);
+//         setColors([]);
+//         setHasColors(false);
+//         setHasSizes(false);
+//       }
+//     };
+//     fetchOrderDetails();
+//   }, [formData.selectedMono]);
+
+//   useEffect(() => {
+//     const fetchSizes = async () => {
+//       if (!formData.selectedMono || !formData.color) {
+//         setSizes([]);
+//         setHasSizes(false);
+//         setFormData((prev) => ({
+//           ...prev,
+//           size: "",
+//           sizeOrderQty: "",
+//           planCutQty: "",
+//           totalGarmentsCount: undefined
+//         }));
+//         return;
+//       }
+//       try {
+//         const response = await fetch(
+//           `${API_BASE_URL}/api/order-sizes/${formData.selectedMono}/${formData.color}`
+//         );
+//         if (!response.ok)
+//           throw new Error(`HTTP error! status: ${response.status}`);
+//         const data = await response.json();
+//         setSizes(data && data.length > 0 ? data : []);
+//         setHasSizes(data && data.length > 0);
+//         if (!(data && data.length > 0)) {
+//           setFormData((prev) => ({
+//             ...prev,
+//             size: "",
+//             sizeOrderQty: "",
+//             planCutQty: "",
+//             totalGarmentsCount: undefined
+//           }));
+//         }
+//       } catch (error) {
+//         console.error("Error fetching sizes:", error);
+//         setSizes([]);
+//         setHasSizes(false);
+//       }
+//     };
+//     fetchSizes();
+//   }, [formData.selectedMono, formData.color]);
+
+//   useEffect(() => {
+//     const fetchTotalGarmentsCount = async () => {
+//       if (formData.selectedMono && formData.color && formData.size) {
+//         try {
+//           const response = await fetch(
+//             `${API_BASE_URL}/api/total-garments-count/${formData.selectedMono}/${formData.color}/${formData.size}`
+//           );
+//           if (!response.ok)
+//             throw new Error(`HTTP error! status: ${response.status}`);
+//           const data = await response.json();
+//           setFormData((prev) => ({
+//             ...prev,
+//             totalGarmentsCount: data.totalCount
+//           }));
+//         } catch (error) {
+//           console.error("Error fetching updated total garments count:", error);
+//           setFormData((prev) => ({ ...prev, totalGarmentsCount: undefined }));
+//         }
+//       } else {
+//         setFormData((prev) => ({ ...prev, totalGarmentsCount: undefined }));
+//       }
+//     };
+//     fetchTotalGarmentsCount();
+//     const interval = setInterval(fetchTotalGarmentsCount, 7000); // Slightly longer interval
+//     return () => clearInterval(interval);
+//   }, [formData.selectedMono, formData.color, formData.size]);
+
+//   useEffect(() => {
+//     const fetchTotalBundleQty = async () => {
+//       if (!formData.selectedMono) return;
+//       try {
+//         const response = await fetch(
+//           `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
+//         );
+//         if (!response.ok)
+//           throw new Error(`HTTP error! status: ${response.status}`);
+//         const data = await response.json();
+//         setTotalBundleQty(data.total);
+//       } catch (error) {
+//         console.error("Error fetching total bundle quantity:", error);
+//       }
+//     };
+//     fetchTotalBundleQty();
+//     const interval = setInterval(fetchTotalBundleQty, 7000);
+//     return () => clearInterval(interval);
+//   }, [formData.selectedMono]);
+
+//   useEffect(() => {
+//     if (
+//       formData.totalGarmentsCount === undefined ||
+//       formData.count === "" ||
+//       formData.bundleQty === ""
+//     ) {
+//       setEstimatedTotal(null);
+//       return;
+//     }
+//     const newEstimatedTotal =
+//       formData.totalGarmentsCount +
+//       parseInt(formData.count || 0) * parseInt(formData.bundleQty || 0);
+//     setEstimatedTotal(newEstimatedTotal);
+//   }, [formData.totalGarmentsCount, formData.count, formData.bundleQty]);
+
+//   useEffect(() => {
+//     const fetchUserBatches = async () => {
+//       if (!user) return;
+//       try {
+//         const response = await fetch(
+//           `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
+//         );
+//         if (!response.ok)
+//           throw new Error(`HTTP error! status: ${response.status}`);
+//         const data = await response.json();
+//         setUserBatches(data);
+//       } catch (error) {
+//         console.error("Error fetching user batches:", error);
+//       }
+//     };
+//     fetchUserBatches();
+//   }, [user, activeTab]); // Re-fetch when activeTab changes to ensure data is fresh if user switches back
+
+//   const handleNumberPadInput = (value) => {
+//     if (numberPadTarget) {
+//       setFormData((prev) => ({ ...prev, [numberPadTarget]: value }));
+//     }
+//   };
+
+//   const handleGenerateQR = async () => {
+//     if (!user || loading) {
+//       alert("User data is not available. Please try again.");
+//       return;
+//     }
+
+//     if (
+//       formData.factoryInfo === "YM" &&
+//       formData.department === "QC1 Endline"
+//     ) {
+//       if (
+//         !/^\d+$/.test(formData.lineNo) ||
+//         parseInt(formData.lineNo) < 1 ||
+//         parseInt(formData.lineNo) > 30
+//       ) {
+//         alert(t("bundle.error_invalid_line_no_ym"));
+//         return;
+//       }
+//     } else if (formData.department === "Washing" && formData.lineNo !== "WA") {
+//       alert(t("bundle.error_invalid_line_no_washing"));
+//       return;
+//     } else if (formData.department === "Sub-con" && formData.lineNo !== "SUB") {
+//       alert(t("bundle.error_invalid_line_no_subcon"));
+//       return;
+//     } else if (
+//       formData.department === "QC1 Endline" &&
+//       formData.factoryInfo !== "YM" &&
+//       !formData.lineNo
+//     ) {
+//       alert(t("bundle.error_line_no_required_qc1"));
+//       return; // General QC1 line no required
+//     }
+
+//     if (
+//       formData.planCutQty > 0 &&
+//       formData.totalGarmentsCount > formData.planCutQty
+//     ) {
+//       alert(t("bundle.error_total_exceeds_plan"));
+//       return;
+//     }
+//     if (formData.planCutQty > 0 && estimatedTotal > formData.planCutQty) {
+//       alert(t("bundle.error_estimated_exceeds_plan"));
+//       return;
+//     }
+
+//     const { date, selectedMono, color, size, lineNo } = formData;
+//     // Validate all required fields before proceeding
+//     if (
+//       !selectedMono ||
+//       !department ||
+//       !color ||
+//       !size ||
+//       !lineNo ||
+//       !count ||
+//       !bundleQty
+//     ) {
+//       alert(t("bundle.error_fill_all_fields")); // Add this translation
+//       return;
+//     }
+
+//     setIsGenerateDisabled(true); // Disable button immediately
+//     try {
+//       const response = await fetch(`${API_BASE_URL}/api/check-bundle-id`, {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({
+//           date: date.toISOString().split("T")[0],
+//           lineNo,
+//           selectedMono,
+//           color,
+//           size
+//         })
+//       });
+//       if (!response.ok) {
+//         const errorData = await response
+//           .json()
+//           .catch(() => ({
+//             message: "Failed to check bundle ID. Server error."
+//           }));
+//         throw new Error(
+//           errorData.message || `HTTP error! status: ${response.status}`
+//         );
+//       }
+//       const { largestNumber } = await response.json();
+//       const bundleQtyNum = parseInt(formData.bundleQty);
+//       const bundleData = [];
+
+//       for (let i = 1; i <= bundleQtyNum; i++) {
+//         const bundleId = `${
+//           date.toISOString().split("T")[0]
+//         }:${lineNo}:${selectedMono}:${color}:${size}:${largestNumber + i}`;
+//         bundleData.push({
+//           bundle_id: bundleId,
+//           date: date.toLocaleDateString("en-CA"),
+//           department: formData.department,
+//           selectedMono,
+//           custStyle: formData.custStyle,
+//           buyer: formData.buyer,
+//           country: formData.country,
+//           orderQty: formData.orderQty,
+//           factory: formData.factoryInfo,
+//           lineNo,
+//           color,
+//           colorCode: formData.colorCode,
+//           chnColor: formData.chnColor,
+//           colorKey: formData.colorKey,
+//           size,
+//           sizeOrderQty: formData.sizeOrderQty,
+//           planCutQty: formData.planCutQty,
+//           count: formData.count,
+//           bundleQty: 1,
+//           sub_con: isSubCon ? "Yes" : "No",
+//           sub_con_factory: isSubCon ? subConName : "",
+//           emp_id: user.emp_id,
+//           eng_name: user.eng_name,
+//           kh_name: user.kh_name,
+//           job_title: user.job_title,
+//           dept_name: user.dept_name,
+//           sect_name: user.sect_name
+//         });
+//       }
+
+//       const saveResponse = await fetch(`${API_BASE_URL}/api/save-bundle-data`, {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({ bundleData })
+//       });
+
+//       if (!saveResponse.ok) {
+//         const errorData = await saveResponse
+//           .json()
+//           .catch(() => ({
+//             message: "Failed to save bundle data. Server error."
+//           }));
+//         throw new Error(
+//           errorData.message ||
+//             `Save bundle data HTTP error! status: ${saveResponse.status}`
+//         );
+//       }
+
+//       const savedData = await saveResponse.json();
+//       setQrData(savedData.data);
+//       // setDataRecords((prevRecords) => [...prevRecords, ...savedData.data]); // Keep if needed
+
+//       // Fetch updates after successful save
+//       const totalMonoBundleResponse = await fetch(
+//         `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
+//       );
+//       const totalMonoBundleData = await totalMonoBundleResponse.json();
+//       setTotalBundleQty(totalMonoBundleData.total);
+
+//       if (user) {
+//         const batchesResponse = await fetch(
+//           `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
+//         );
+//         const batchesData = await batchesResponse.json();
+//         setUserBatches(batchesData);
+//       }
+//       if (formData.selectedMono && formData.color && formData.size) {
+//         const garmentsCountResponse = await fetch(
+//           `${API_BASE_URL}/api/total-garments-count/${formData.selectedMono}/${formData.color}/${formData.size}`
+//         );
+//         const garmentsCountData = await garmentsCountResponse.json();
+//         setFormData((prev) => ({
+//           ...prev,
+//           totalGarmentsCount: garmentsCountData.totalCount
+//         }));
+//       }
+
+//       if (autoPrintEnabled && savedData.data && savedData.data.length > 0) {
+//         await handlePrintQR(savedData.data); // Pass the newly generated QR data for printing
+//       } else {
+//         // If not auto-printing, keep generate disabled until manual print or clear
+//         // setIsGenerateDisabled(true); // Already set
+//       }
+//     } catch (error) {
+//       console.error("Error in handleGenerateQR:", error);
+//       alert(`${t("bundle.error_generating_qr")}: ${error.message}`);
+//       setIsGenerateDisabled(false); // Re-enable on error
+//     }
+//   };
+
+//   // Modified handlePrintQR to optionally accept qr data for auto-print
+//   const handlePrintQR = async (dataToPrint = qrData) => {
+//     if (!bluetoothComponentRef.current) {
+//       alert(t("bundle.error_bluetooth_not_init"));
+//       return;
+//     }
+//     if (!dataToPrint || dataToPrint.length === 0) {
+//       alert(t("bundle.error_no_qr_to_print"));
+//       return;
+//     }
+
+//     setIsPrinting(true);
+//     try {
+//       for (const data of dataToPrint) {
+//         await bluetoothComponentRef.current.printData({
+//           ...data,
+//           bundle_id: data.bundle_random_id || data.bundle_id
+//         });
+//       }
+//       setQrData([]); // Clear QR data after printing
+//       setIsGenerateDisabled(false); // Allow new generation
+
+//       if (user) {
+//         const batchesResponse = await fetch(
+//           `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
+//         );
+//         const batchesData = await batchesResponse.json();
+//         setUserBatches(batchesData);
+//       }
+//     } catch (error) {
+//       alert(`${t("bundle.error_printing")}: ${error.message}`);
+//     } finally {
+//       setIsPrinting(false);
+//     }
+//   };
+
+//   const incrementValue = (field) =>
+//     setFormData((prev) => ({
+//       ...prev,
+//       [field]: parseInt(prev[field] || 0) + 1
+//     }));
+//   const decrementValue = (field) =>
+//     setFormData((prev) => ({
+//       ...prev,
+//       [field]: Math.max(1, parseInt(prev[field] || 1) - 1)
+//     }));
+
+//   const handleEdit = (recordId) => {
+//     const record = userBatches.find((batch) => batch._id === recordId);
+//     if (record) {
+//       setFormData({
+//         id: record._id,
+//         date: new Date(record.date),
+//         department: record.department,
+//         selectedMono: record.selectedMono,
+//         buyer: record.buyer,
+//         orderQty: record.orderQty,
+//         factoryInfo: record.factory,
+//         custStyle: record.custStyle,
+//         country: record.country,
+//         color: record.color,
+//         size: record.size,
+//         bundleQty: record.bundleQty,
+//         lineNo: record.lineNo,
+//         count: record.count,
+//         colorCode: record.colorCode,
+//         chnColor: record.chnColor,
+//         colorKey: record.colorKey,
+//         sizeOrderQty: record.sizeOrderQty,
+//         planCutQty: record.planCutQty
+//       });
+//       setIsSubCon(record.sub_con === "Yes");
+//       setSubConName(record.sub_con_factory || "");
+//       setEditRecordId(recordId);
+//       setEditModalOpen(true);
+//     }
+//   };
+
+//   const clearFilters = () => {
+//     setStyleCodeFilter("");
+//     setPackageNoFilter("");
+//     setMonoFilter("");
+//     setColorFilter("");
+//     setSizeFilter("");
+//   };
+
+//   const filteredBatches = userBatches.filter((batch) => {
+//     const lowerCase = (str) => str?.toLowerCase() || "";
+//     return (
+//       (styleCodeFilter
+//         ? lowerCase(batch.custStyle).includes(lowerCase(styleCodeFilter))
+//         : true) &&
+//       (colorFilter
+//         ? lowerCase(batch.color).includes(lowerCase(colorFilter))
+//         : true) &&
+//       (sizeFilter
+//         ? lowerCase(batch.size).includes(lowerCase(sizeFilter))
+//         : true) &&
+//       (packageNoFilter
+//         ? lowerCase(batch.package_no?.toString()).includes(
+//             lowerCase(packageNoFilter)
+//           )
+//         : true) &&
+//       (monoFilter
+//         ? lowerCase(batch.selectedMono).includes(lowerCase(monoFilter))
+//         : true)
+//     );
+//   });
+
+//   const AppHeader = () => (
+//     <div className="bg-white shadow-md px-4 py-3 md:px-6 md:py-4">
+//       <div className="max-w-7xl mx-auto">
+//         <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-indigo-700">
+//           Yorkmars (Cambodia) Garment MFG Co., LTD{" "}
+//           <span className="font-semibold text-slate-600">| QC 2 System</span>
+//         </h1>
+//         <div className="flex flex-wrap items-center text-xs sm:text-sm text-slate-500 mt-1">
+//           <span className="font-medium">{t("bundle.bundle_registration")}</span>
+//           <span className="mx-1.5 md:mx-2">|</span>
+//           <span>{getFormattedDate()}</span>
+//           {user && !loading && (
+//             <>
+//               <span className="mx-1.5 md:mx-2">|</span>
+//               <span>
+//                 {" "}
+//                 {t("bundle.issued_by")}:{" "}
+//                 <span className="font-medium text-indigo-600">
+//                   {user.emp_id}
+//                 </span>{" "}
+//               </span>
+//             </>
+//           )}
+//         </div>
+//       </div>
+//       <hr className="mt-3 md:mt-4 border-slate-200" />
+//     </div>
+//   );
+
+//   const TabButton = ({ label, tabName, icon }) => (
+//     <button
+//       onClick={() => setActiveTab(tabName)}
+//       className={`flex-1 md:flex-none flex items-center justify-center space-x-2 px-3 py-2.5 md:px-5 md:py-3 text-xs md:text-sm font-medium rounded-t-lg
+//         transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-400
+//         ${
+//           activeTab === tabName
+//             ? "bg-indigo-600 text-white shadow-lg border-b-4 border-indigo-700"
+//             : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-indigo-600 border-b-4 border-transparent"
+//         }`}
+//     >
+//       {icon}
+//       <span>{label}</span>
+//     </button>
+//   );
+
+//   const QtyInfoCard = ({
+//     icon,
+//     label,
+//     value,
+//     unit = "",
+//     bgColorClass = "bg-blue-50",
+//     textColorClass = "text-blue-700",
+//     borderColorClass = "border-blue-200"
+//   }) => {
+//     if (value === undefined || value === null || value === "") return null;
+//     return (
+//       <div
+//         className={`p-3 rounded-lg border ${borderColorClass} ${bgColorClass} ${textColorClass} shadow-sm flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-3`}
+//       >
+//         <div
+//           className={`p-2 rounded-full ${
+//             bgColorClass === "bg-blue-50"
+//               ? "bg-blue-100"
+//               : bgColorClass === "bg-green-50"
+//               ? "bg-green-100"
+//               : "bg-red-100"
+//           }`}
+//         >
+//           {React.isValidElement(icon)
+//             ? React.cloneElement(icon, { size: 18, className: `opacity-80` })
+//             : icon}
+//         </div>
+//         <div className="text-left sm:text-left">
+//           <p className="text-xs font-medium opacity-80">{label}</p>
+//           <p className="text-base font-bold">
+//             {value} {unit}
+//           </p>
+//         </div>
+//       </div>
+//     );
+//   };
+
+//   const isGenerateButtonDisabled =
+//     isGenerateDisabled ||
+//     !formData.selectedMono ||
+//     !formData.department || // Added department validation
+//     !formData.color ||
+//     !formData.size ||
+//     !formData.bundleQty ||
+//     !formData.lineNo ||
+//     !formData.count ||
+//     (formData.planCutQty > 0 &&
+//       estimatedTotal !== null &&
+//       estimatedTotal > formData.planCutQty);
+
+//   const { department, selectedMono, color, size, lineNo, count, bundleQty } =
+//     formData; // For cleaner validation check
+
+//   return (
+//     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
+//       <AppHeader />
+
+//       {/* Common Tab Navigation for both Mobile and Desktop, placed below AppHeader */}
+//       <div className="bg-white shadow-sm sticky top-0 z-20 md:z-10 px-1 md:px-6">
+//         <div className="max-w-7xl mx-auto flex space-x-1 border-b border-slate-200">
+//           <TabButton
+//             label={t(
+//               activeTab === "registration"
+//                 ? "bundle.registration"
+//                 : "bundle.registration_short",
+//               "Reg"
+//             )}
+//             tabName="registration"
+//             icon={<FaQrcode size={14} />}
+//           />
+//           <TabButton
+//             label={t(
+//               activeTab === "data" ? "bundle.data" : "bundle.data_short",
+//               "Data"
+//             )}
+//             tabName="data"
+//             icon={<FaEye size={14} />}
+//           />
+//           <TabButton
+//             label={t(
+//               activeTab === "reprint"
+//                 ? "bundle.reprint"
+//                 : "bundle.reprint_short",
+//               "Reprint"
+//             )}
+//             tabName="reprint"
+//             icon={<FaUndoAlt size={14} />}
+//           />
+//         </div>
+//       </div>
+
+//       {/* Content Area */}
+//       <div className="flex-1 overflow-hidden">
+//         <div className="h-full overflow-y-auto p-3 md:p-6">
+//           <div className="max-w-7xl mx-auto space-y-4 md:space-y-8">
+//             {activeTab === "registration" && (
+//               <div className="bg-white rounded-xl shadow-lg p-4 md:p-6 space-y-4 md:space-y-6">
+//                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-x-6 md:gap-y-4 items-end">
+//                   <div>
+//                     <label htmlFor="mainDate" className={labelBaseClasses}>
+//                       <FaCalendarAlt className={iconBaseClasses} />
+//                       {t("bundle.date")}
+//                     </label>
+//                     <DatePicker
+//                       id="mainDate"
+//                       selected={formData.date}
+//                       onChange={(date) =>
+//                         setFormData((prev) => ({ ...prev, date }))
+//                       }
+//                       className={`${inputBaseClasses} text-xs md:text-sm`}
+//                       dateFormat="yyyy-MM-dd"
+//                     />
+//                   </div>
+//                   <div className="flex items-end space-x-2 col-span-2 md:col-span-1">
+//                     {" "}
+//                     {/* Group Bluetooth and AutoPrint */}
+//                     <BluetoothComponent ref={bluetoothComponentRef} />
+//                     <button
+//                       onClick={toggleAutoPrint}
+//                       title={
+//                         autoPrintEnabled
+//                           ? t("bundle.auto_print_on")
+//                           : t("bundle.auto_print_off")
+//                       }
+//                       className={`p-2 rounded-md transition-colors duration-200 text-xs md:text-sm flex items-center space-x-1
+//                                 ${
+//                                   autoPrintEnabled
+//                                     ? "bg-green-500 text-white hover:bg-green-600"
+//                                     : "bg-slate-300 text-slate-700 hover:bg-slate-400"
+//                                 }`}
+//                     >
+//                       {autoPrintEnabled ? (
+//                         <FaToggleOn size={16} />
+//                       ) : (
+//                         <FaToggleOff size={16} />
+//                       )}
+//                       <span className="hidden sm:inline">
+//                         {t("bundle.auto")}
+//                       </span>
+//                     </button>
+//                   </div>
+//                   <div>
+//                     <label
+//                       htmlFor="mainDepartment"
+//                       className={labelBaseClasses}
+//                     >
+//                       <FaBuilding className={iconBaseClasses} />
+//                       {t("bundle.department")}
+//                     </label>
+//                     <select
+//                       id="mainDepartment"
+//                       value={formData.department}
+//                       onChange={(e) =>
+//                         setFormData((prev) => ({
+//                           ...prev,
+//                           department: e.target.value
+//                         }))
+//                       }
+//                       className={`${inputBaseClasses} text-xs md:text-sm`}
+//                     >
+//                       <option value="">{t("bundle.select_department")}</option>
+//                       <option value="QC1 Endline">
+//                         {t("bundle.qc1_endline")}
+//                       </option>
+//                       <option value="Washing">{t("bundle.washing")}</option>
+//                       <option value="Sub-con">{t("bundle.sub_con")}</option>
+//                     </select>
+//                   </div>
+//                   <div>
+//                     <label
+//                       htmlFor="mainMonoSearch"
+//                       className={labelBaseClasses}
+//                     >
+//                       <FaBarcode className={iconBaseClasses} />
+//                       {t("bundle.search_mono")}
+//                     </label>
+//                     <MonoSearch
+//                       id="mainMonoSearch"
+//                       value={formData.selectedMono}
+//                       onSelect={(mono) =>
+//                         setFormData({ ...formData, selectedMono: mono })
+//                       }
+//                       placeholder={t("bundle.search_mono_placeholder")}
+//                       showSearchIcon={true}
+//                       closeOnOutsideClick={true}
+//                       inputMode="numeric"
+//                     />
+//                     {formData.selectedMono && (
+//                       <div className="mt-1.5 text-xs md:text-sm text-indigo-600">
+//                         <strong>{t("bundle.selected_mono")}:</strong>{" "}
+//                         {formData.selectedMono}
+//                       </div>
+//                     )}
+//                   </div>
+//                 </div>
+
+//                 {formData.selectedMono && (
+//                   <div className="my-3 md:my-4 p-3 md:p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
+//                     <div className="flex justify-between items-center mb-2.5 md:mb-3">
+//                       <h2 className="text-base md:text-lg font-semibold text-indigo-700 flex items-center">
+//                         <FaInfoCircle className="mr-2" />
+//                         {t("bundle.order_details")}
+//                       </h2>
+//                       <button
+//                         onClick={toggleOrderDetails}
+//                         className="text-slate-500 hover:text-indigo-600 p-1 md:p-1.5 rounded-full hover:bg-indigo-100 transition-colors"
+//                       >
+//                         {showOrderDetails ? (
+//                           <FaEyeSlash size={18} />
+//                         ) : (
+//                           <FaEye size={18} />
+//                         )}
+//                       </button>
+//                     </div>
+//                     {showOrderDetails && (
+//                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 md:gap-x-5 gap-y-1.5 md:gap-y-2 text-xs md:text-sm text-slate-700">
+//                         {[
+//                           {
+//                             icon: <FaTshirt className="text-slate-500" />,
+//                             label: t("bundle.customer_style"),
+//                             value: formData.custStyle
+//                           },
+//                           {
+//                             icon: <FaUserTie className="text-slate-500" />,
+//                             label: t("bundle.buyer"),
+//                             value: formData.buyer
+//                           },
+//                           {
+//                             icon: (
+//                               <FaGlobeAmericas className="text-slate-500" />
+//                             ),
+//                             label: t("bundle.country"),
+//                             value: formData.country
+//                           },
+//                           {
+//                             icon: <FaBoxOpen className="text-slate-500" />,
+//                             label: t("bundle.order_qty"),
+//                             value: formData.orderQty
+//                           },
+//                           {
+//                             icon: <FaIndustry className="text-slate-500" />,
+//                             label: t("bundle.factory"),
+//                             value: formData.factoryInfo
+//                           }
+//                         ].map((item) => (
+//                           <div
+//                             key={item.label}
+//                             className="flex items-center py-0.5 md:py-1"
+//                           >
+//                             <span className="w-5 md:w-6 flex-shrink-0">
+//                               {item.icon}
+//                             </span>
+//                             <span className="font-medium w-28 md:w-32 flex-shrink-0">
+//                               {item.label}:
+//                             </span>
+//                             <span className="truncate" title={item.value}>
+//                               {item.value}
+//                             </span>
+//                           </div>
+//                         ))}
+//                       </div>
+//                     )}
+//                   </div>
+//                 )}
+
+//                 {/* Combined Qty Display */}
+//                 <div className="my-3 md:my-4 p-3 md:p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
+//                   <div className="flex justify-between items-center mb-2 md:mb-3">
+//                     <h3 className="text-base md:text-lg font-semibold text-indigo-600">
+//                       {t("bundle.quantity_overview")}
+//                     </h3>
+//                     <button
+//                       onClick={toggleBundleQtyOverview}
+//                       className="text-slate-500 hover:text-indigo-600 p-1 md:p-1.5 rounded-full hover:bg-indigo-100 transition-colors"
+//                     >
+//                       {showBundleQtyOverview ? (
+//                         <FaEyeSlash size={18} />
+//                       ) : (
+//                         <FaEye size={18} />
+//                       )}
+//                     </button>
+//                   </div>
+//                   {showBundleQtyOverview && (
+//                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+//                       <QtyInfoCard
+//                         icon={<FaFileInvoiceDollar />}
+//                         label={t("bundle.size_order_qty")}
+//                         value={formData.sizeOrderQty}
+//                         bgColorClass="bg-sky-50"
+//                         textColorClass="text-sky-700"
+//                         borderColorClass="border-sky-200"
+//                       />
+//                       <QtyInfoCard
+//                         icon={<FaCut />}
+//                         label={t("bundle.plan_cut_qty")}
+//                         value={formData.planCutQty}
+//                         bgColorClass="bg-emerald-50"
+//                         textColorClass="text-emerald-700"
+//                         borderColorClass="border-emerald-200"
+//                       />
+//                       <QtyInfoCard
+//                         icon={<FaCheckDouble />}
+//                         label={t("bundle.total_garment_count")}
+//                         value={formData.totalGarmentsCount}
+//                         bgColorClass={
+//                           formData.totalGarmentsCount > formData.planCutQty &&
+//                           formData.planCutQty > 0
+//                             ? "bg-red-50"
+//                             : "bg-green-50"
+//                         }
+//                         textColorClass={
+//                           formData.totalGarmentsCount > formData.planCutQty &&
+//                           formData.planCutQty > 0
+//                             ? "text-red-700"
+//                             : "text-green-700"
+//                         }
+//                         borderColorClass={
+//                           formData.totalGarmentsCount > formData.planCutQty &&
+//                           formData.planCutQty > 0
+//                             ? "border-red-200"
+//                             : "border-green-200"
+//                         }
+//                       />
+//                     </div>
+//                   )}
+//                 </div>
+
+//                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-x-6 md:gap-y-4">
+//                   <div>
+//                     <label htmlFor="mainLineNo" className={labelBaseClasses}>
+//                       <FaMapMarkerAlt className={iconBaseClasses} />
+//                       {t("bundle.line_no")}
+//                     </label>
+//                     <div className="relative">
+//                       <input
+//                         id="mainLineNo"
+//                         type="text"
+//                         value={formData.lineNo}
+//                         onClick={() => {
+//                           setNumberPadTarget("lineNo");
+//                           setShowNumberPad(true);
+//                         }}
+//                         readOnly
+//                         className={`${inputReadOnlyClasses} text-xs md:text-sm pr-8 md:pr-10`}
+//                       />
+//                       {(formData.department === "Washing" ||
+//                         formData.department === "Sub-con") && (
+//                         <div className="absolute inset-y-0 right-0 flex items-center pr-2 md:pr-3 pointer-events-none">
+//                           <span className="text-slate-500 text-xs md:text-sm">
+//                             {formData.department === "Washing" ? "WA" : "SUB"}
+//                           </span>
+//                         </div>
+//                       )}
+//                     </div>
+//                   </div>
+//                   <div>
+//                     <label htmlFor="mainColor" className={labelBaseClasses}>
+//                       <FaPaintBrush className={iconBaseClasses} />
+//                       {t("bundle.color")}
+//                     </label>
+//                     {hasColors ? (
+//                       <select
+//                         id="mainColor"
+//                         value={formData.color}
+//                         onChange={(e) => {
+//                           const sc = colors.find(
+//                             (c) => c.original === e.target.value
+//                           );
+//                           setFormData((p) => ({
+//                             ...p,
+//                             color: e.target.value,
+//                             colorCode: sc?.code || "",
+//                             chnColor: sc?.chn || "",
+//                             colorKey: sc?.key || "",
+//                             size: "",
+//                             sizeOrderQty: "",
+//                             planCutQty: ""
+//                           }));
+//                         }}
+//                         className={`${inputBaseClasses} text-xs md:text-sm`}
+//                       >
+//                         <option value="">{t("bundle.select_color")}</option>
+//                         {colors.map((c) => (
+//                           <option key={c.original} value={c.original}>
+//                             {c.original}
+//                           </option>
+//                         ))}
+//                       </select>
+//                     ) : (
+//                       <p className="text-xs md:text-sm text-slate-500 py-1.5 md:py-2 px-2 md:px-3 border border-slate-300 rounded-md bg-slate-100 h-[34px] md:h-[42px] flex items-center">
+//                         {t(
+//                           formData.selectedMono
+//                             ? "bundle.no_colors_available"
+//                             : "bundle.select_mono_first"
+//                         )}
+//                       </p>
+//                     )}
+//                   </div>
+//                   <div>
+//                     <label htmlFor="mainSize" className={labelBaseClasses}>
+//                       <FaRulerCombined className={iconBaseClasses} />
+//                       {t("bundle.size")}
+//                     </label>
+//                     {hasColors && formData.color ? (
+//                       hasSizes ? (
+//                         <select
+//                           id="mainSize"
+//                           value={formData.size}
+//                           onChange={(e) => {
+//                             const ss = sizes.find(
+//                               (s) => s.size === e.target.value
+//                             );
+//                             setFormData((p) => ({
+//                               ...p,
+//                               size: e.target.value,
+//                               sizeOrderQty: ss?.orderQty || 0,
+//                               planCutQty: ss?.planCutQty || 0
+//                             }));
+//                           }}
+//                           className={`${inputBaseClasses} text-xs md:text-sm`}
+//                         >
+//                           <option value="">{t("bundle.select_size")}</option>
+//                           {sizes.map((sObj) => (
+//                             <option key={sObj.size} value={sObj.size}>
+//                               {sObj.size}
+//                             </option>
+//                           ))}
+//                         </select>
+//                       ) : (
+//                         <p className="text-xs md:text-sm text-slate-500 py-1.5 md:py-2 px-2 md:px-3 border border-slate-300 rounded-md bg-slate-100 h-[34px] md:h-[42px] flex items-center">
+//                           {t("bundle.no_size_available")}
+//                         </p>
+//                       )
+//                     ) : (
+//                       <p className="text-xs md:text-sm text-slate-500 py-1.5 md:py-2 px-2 md:px-3 border border-slate-300 rounded-md bg-slate-100 h-[34px] md:h-[42px] flex items-center">
+//                         {t(
+//                           formData.color
+//                             ? "bundle.no_size_available"
+//                             : "bundle.select_color_first"
+//                         )}
+//                       </p>
+//                     )}
+//                   </div>
+//                 </div>
+
+//                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-x-6 md:gap-y-4">
+//                   <div>
+//                     <label htmlFor="mainCount" className={labelBaseClasses}>
+//                       <FaSortNumericDown className={iconBaseClasses} />
+//                       {t("bundle.count")}
+//                     </label>
+//                     <div className="flex items-center border border-slate-300 rounded-md shadow-sm">
+//                       <button
+//                         type="button"
+//                         onClick={() => decrementValue("count")}
+//                         className="px-2.5 md:px-3.5 py-2 md:py-2.5 bg-slate-200 hover:bg-slate-300 rounded-l-md transition-colors"
+//                       >
+//                         <FaMinus size={10} />
+//                       </button>
+//                       <input
+//                         id="mainCount"
+//                         type="text"
+//                         value={formData.count}
+//                         onClick={() => {
+//                           setNumberPadTarget("count");
+//                           setShowNumberPad(true);
+//                         }}
+//                         readOnly
+//                         className="w-full px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-base bg-slate-100 text-center focus:outline-none"
+//                       />
+//                       <button
+//                         type="button"
+//                         onClick={() => incrementValue("count")}
+//                         className="px-2.5 md:px-3.5 py-2 md:py-2.5 bg-slate-200 hover:bg-slate-300 rounded-r-md transition-colors"
+//                       >
+//                         <FaPlus size={10} />
+//                       </button>
+//                     </div>
+//                   </div>
+//                   <div>
+//                     <label htmlFor="mainBundleQty" className={labelBaseClasses}>
+//                       <FaLayerGroup className={iconBaseClasses} />
+//                       {t("bundle.bundle_qty")}
+//                     </label>
+//                     <div className="flex items-center border border-slate-300 rounded-md shadow-sm">
+//                       <button
+//                         type="button"
+//                         onClick={() => decrementValue("bundleQty")}
+//                         className="px-2.5 md:px-3.5 py-2 md:py-2.5 bg-slate-200 hover:bg-slate-300 rounded-l-md transition-colors"
+//                       >
+//                         <FaMinus size={10} />
+//                       </button>
+//                       <input
+//                         id="mainBundleQty"
+//                         type="text"
+//                         value={formData.bundleQty}
+//                         onClick={() => {
+//                           setNumberPadTarget("bundleQty");
+//                           setShowNumberPad(true);
+//                         }}
+//                         readOnly
+//                         className="w-full px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-base bg-slate-100 text-center focus:outline-none"
+//                       />
+//                       <button
+//                         type="button"
+//                         onClick={() => incrementValue("bundleQty")}
+//                         className="px-2.5 md:px-3.5 py-2 md:py-2.5 bg-slate-200 hover:bg-slate-300 rounded-r-md transition-colors"
+//                       >
+//                         <FaPlus size={10} />
+//                       </button>
+//                     </div>
+//                     {formData.selectedMono && (
+//                       <p className="mt-1 text-xs md:text-sm text-slate-600">
+//                         {t("bundle.total_registered_bundle_qty")}:{" "}
+//                         {totalBundleQty}
+//                       </p>
+//                     )}
+//                   </div>
+//                 </div>
+
+//                 {formData.department !== "Sub-con" && (
+//                   <SubConSelection
+//                     isSubCon={isSubCon}
+//                     setIsSubCon={setIsSubCon}
+//                     subConName={subConName}
+//                     setSubConName={setSubConName}
+//                     icon={<FaUserFriends className={iconBaseClasses} />}
+//                   />
+//                 )}
+//                 {formData.department === "Sub-con" && (
+//                   <div className="mb-3 md:mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+//                     <label
+//                       htmlFor="mainSubConFactory"
+//                       className="flex items-center text-sm font-medium text-slate-700 mb-1"
+//                     >
+//                       <FaIndustry className={iconBaseClasses} />
+//                       {t("bundle.sub_con_factory")}
+//                     </label>
+//                     <select
+//                       id="mainSubConFactory"
+//                       value={subConName}
+//                       onChange={(e) => setSubConName(e.target.value)}
+//                       className={`${inputBaseClasses} text-xs md:text-sm`}
+//                     >
+//                       <option value="">
+//                         {t("bundle.select_sub_con_factory")}
+//                       </option>
+//                       {subConNames.map((name) => (
+//                         <option key={name} value={name}>
+//                           {name}
+//                         </option>
+//                       ))}
+//                     </select>
+//                   </div>
+//                 )}
+
+//                 {formData.planCutQty > 0 && estimatedTotal !== null && (
+//                   <div
+//                     className={`mt-1.5 text-xs md:text-sm font-medium p-1.5 md:p-2.5 rounded-md border ${
+//                       estimatedTotal > formData.planCutQty
+//                         ? "text-red-700 bg-red-50 border-red-200"
+//                         : "text-emerald-700 bg-emerald-50 border-emerald-200"
+//                     }`}
+//                   >
+//                     {estimatedTotal > formData.planCutQty
+//                       ? `⚠️ ${t("bundle.actual_cut_qty_exceeds", {
+//                           actual: estimatedTotal,
+//                           plan: formData.planCutQty
+//                         })}`
+//                       : `✅ ${t("bundle.actual_cut_qty_within", {
+//                           actual: estimatedTotal,
+//                           plan: formData.planCutQty
+//                         })}`}
+//                   </div>
+//                 )}
+
+//                 <div className="flex flex-col sm:flex-row sm:justify-start items-stretch gap-2 pt-2 md:pt-4 md:space-x-3 border-t border-slate-200">
+//                   <button
+//                     type="button"
+//                     onClick={handleGenerateQR}
+//                     disabled={isGenerateButtonDisabled}
+//                     className={`w-full sm:w-auto px-4 md:px-5 py-2.5 rounded-md flex items-center justify-center text-xs md:text-sm font-semibold transition-colors duration-150 ease-in-out
+//                       ${
+//                         isGenerateButtonDisabled
+//                           ? "bg-slate-300 text-slate-500 cursor-not-allowed"
+//                           : (formData.planCutQty > 0 &&
+//                             estimatedTotal !== null &&
+//                             estimatedTotal > formData.planCutQty
+//                               ? "bg-red-500 hover:bg-red-600"
+//                               : "bg-green-500 hover:bg-green-600") +
+//                             " text-white shadow-sm hover:shadow-md"
+//                       }`}
+//                   >
+//                     <FaQrcode className="mr-1.5 md:mr-2" size={14} />{" "}
+//                     {t("bundle.generate_qr")}
+//                   </button>
+//                   {qrData.length > 0 &&
+//                     !autoPrintEnabled /* Show manual print only if not auto-printing or if auto-print failed */ && (
+//                       <>
+//                         <button
+//                           type="button"
+//                           onClick={() => setShowQRPreview(true)}
+//                           className="w-full sm:w-auto px-4 md:px-5 py-2.5 rounded-md bg-indigo-500 text-white hover:bg-indigo-600 flex items-center justify-center text-xs md:text-sm font-semibold shadow-sm hover:shadow-md transition-colors"
+//                         >
+//                           <FaEye className="mr-1.5 md:mr-2" size={14} />{" "}
+//                           {t("bundle.preview_qr")}
+//                         </button>
+//                         <button
+//                           type="button"
+//                           onClick={() => handlePrintQR()}
+//                           disabled={
+//                             isPrinting
+//                           } /* Pass no args for manual print */
+//                           className={`w-full sm:w-auto px-4 md:px-5 py-2.5 rounded-md flex items-center justify-center text-xs md:text-sm font-semibold shadow-sm hover:shadow-md transition-colors
+//                           ${
+//                             isPrinting
+//                               ? "bg-slate-400 text-slate-600 cursor-not-allowed"
+//                               : "bg-sky-500 hover:bg-sky-600 text-white"
+//                           }`}
+//                         >
+//                           <FaPrint className="mr-1.5 md:mr-2" size={14} />{" "}
+//                           {isPrinting
+//                             ? t("bundle.printing")
+//                             : t("bundle.print_qr")}
+//                         </button>
+//                       </>
+//                     )}
+//                   {qrData.length > 0 &&
+//                     autoPrintEnabled &&
+//                     isPrinting /* Indicate printing if auto print is on and in progress */ && (
+//                       <div className="w-full sm:w-auto px-4 md:px-5 py-2.5 rounded-md flex items-center justify-center text-xs md:text-sm font-semibold bg-sky-100 text-sky-700">
+//                         <FaPrint
+//                           className="mr-1.5 md:mr-2 animate-pulse"
+//                           size={14}
+//                         />{" "}
+//                         {t("bundle.auto_printing")}
+//                       </div>
+//                     )}
+//                 </div>
+//               </div>
+//             )}
+//             {activeTab === "data" && (
+//               <div className="bg-white rounded-xl shadow-xl p-3 md:p-6">
+//                 <div className="flex flex-col md:flex-row justify-between items-center mb-3 md:mb-5 gap-3">
+//                   <h2 className="text-base md:text-xl font-semibold text-slate-700">
+//                     {t("bundle.data_records")}
+//                   </h2>
+//                   <div className="flex items-center space-x-2 md:space-x-3">
+//                     <button
+//                       onClick={() => setShowFilters(!showFilters)}
+//                       className="flex items-center text-xs md:text-sm bg-indigo-500 text-white px-2.5 md:px-3 py-1.5 rounded-md hover:bg-indigo-600 shadow transition-colors"
+//                     >
+//                       <FaFilter className="mr-1 md:mr-1.5" size={10} />{" "}
+//                       {showFilters
+//                         ? t("bundle.hide_filters")
+//                         : t("bundle.show_filters")}
+//                     </button>
+//                     {showFilters && (
+//                       <button
+//                         onClick={clearFilters}
+//                         className="flex items-center text-xs md:text-sm bg-slate-200 hover:bg-slate-300 text-slate-700 px-2.5 md:px-3 py-1.5 rounded-md shadow transition-colors"
+//                       >
+//                         <FaTimes className="mr-1 md:mr-1.5" size={10} />{" "}
+//                         {t("bundle.clear")}
+//                       </button>
+//                     )}
+//                   </div>
+//                 </div>
+//                 {showFilters && (
+//                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3 mb-3 md:mb-5">
+//                     {[
+//                       { ph: "Color", val: colorFilter, set: setColorFilter },
+//                       { ph: "Size", val: sizeFilter, set: setSizeFilter },
+//                       {
+//                         ph: "Style Code",
+//                         val: styleCodeFilter,
+//                         set: setStyleCodeFilter
+//                       },
+//                       {
+//                         ph: "Package No",
+//                         val: packageNoFilter,
+//                         set: setPackageNoFilter
+//                       },
+//                       { ph: "MONo", val: monoFilter, set: setMonoFilter }
+//                     ].map((f) => (
+//                       <input
+//                         key={f.ph}
+//                         type="text"
+//                         placeholder={t(
+//                           `bundle.filter_by_${f.ph
+//                             .toLowerCase()
+//                             .replace(/\s+/g, "_")}`,
+//                           f.ph
+//                         )}
+//                         value={f.val}
+//                         onChange={(e) => f.set(e.target.value)}
+//                         className={`${inputBaseClasses} text-xs md:text-sm`}
+//                       />
+//                     ))}
+//                   </div>
+//                 )}
+//                 <div className="overflow-x-auto rounded-lg border border-slate-200 shadow-md">
+//                   <table className="min-w-full divide-y divide-slate-200">
+//                     <thead className="bg-slate-100">
+//                       <tr>
+//                         {[
+//                           "ID",
+//                           "Pkg No",
+//                           "Date",
+//                           "Modify",
+//                           "Time",
+//                           "Dept",
+//                           "Emp ID",
+//                           "Eng Name",
+//                           "KH Name",
+//                           "MONo",
+//                           "Cust Style",
+//                           "Buyer",
+//                           "Country",
+//                           "Order Qty",
+//                           "Factory",
+//                           "Line No",
+//                           "Color",
+//                           "Color(CH)",
+//                           "Size",
+//                           "Size Qty",
+//                           "Plan Qty",
+//                           "Count",
+//                           "Bundle Qty",
+//                           "SubCon",
+//                           "SubCon Fac."
+//                         ].map((h) => (
+//                           <th
+//                             key={h}
+//                             className="px-3 py-2 md:py-3 text-left text-[9px] md:text-xs font-semibold text-slate-500 uppercase tracking-wider border-r border-slate-200 last:border-r-0 whitespace-nowrap"
+//                           >
+//                             {t(
+//                               `bundle.table_header_desktop_${h
+//                                 .toLowerCase()
+//                                 .replace(/[\s.]+/g, "_")}`,
+//                               h
+//                             )}
+//                           </th>
+//                         ))}
+//                       </tr>
+//                     </thead>
+//                     <tbody className="bg-white divide-y divide-slate-200">
+//                       {filteredBatches.map((batch, index) => (
+//                         <tr
+//                           key={batch._id || index}
+//                           className="hover:bg-slate-50 transition-colors"
+//                         >
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {index + 1}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.package_no}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.updated_date_seperator}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm border-r">
+//                             <button
+//                               onClick={() => handleEdit(batch._id)}
+//                               className="px-1.5 md:px-2.5 py-0.5 md:py-1 text-[9px] md:text-xs font-medium text-indigo-700 bg-indigo-100 border border-indigo-300 rounded-md hover:bg-indigo-200"
+//                             >
+//                               {t("bundle.edit")}
+//                             </button>
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.updated_time_seperator}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.department}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.emp_id}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.eng_name}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.kh_name}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.selectedMono}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.custStyle}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.buyer}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.country}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.orderQty}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.factory}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.lineNo}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.color}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.chnColor}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.size}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.sizeOrderQty}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.planCutQty}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.count}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.bundleQty}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600 border-r">
+//                             {batch.sub_con}
+//                           </td>
+//                           <td className="px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-600">
+//                             {batch.sub_con === "Yes"
+//                               ? batch.sub_con_factory
+//                               : "N/A"}
+//                           </td>
+//                         </tr>
+//                       ))}
+//                     </tbody>
+//                   </table>
+//                 </div>
+//                 <div className="mt-3 md:mt-4 text-xs md:text-sm text-slate-500">
+//                   {t("bundle.showing_records", {
+//                     count: filteredBatches.length,
+//                     total: userBatches.length
+//                   })}
+//                 </div>
+//               </div>
+//             )}
+//             {activeTab === "reprint" && <ReprintTab />}
+//           </div>
+//         </div>
+//       </div>
+
+//       {/* Modals */}
+//       {showNumberPad && (
+//         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center pt-10 md:pt-20 z-50">
+//           <div className="bg-white rounded-xl shadow-2xl max-w-xs sm:max-w-sm w-full mx-4 overflow-hidden">
+//             {numberPadTarget === "bundleQty" ||
+//             numberPadTarget === "count" ||
+//             (formData.factoryInfo === "YM" &&
+//               formData.department === "QC1 Endline" &&
+//               numberPadTarget === "lineNo") ? (
+//               <NumberPad
+//                 onClose={() => setShowNumberPad(false)}
+//                 onInput={handleNumberPadInput}
+//               />
+//             ) : (
+//               <NumLetterPad
+//                 onClose={() => setShowNumberPad(false)}
+//                 onInput={handleNumberPadInput}
+//               />
+//             )}
+//           </div>
+//         </div>
+//       )}
+//       <QRCodePreview
+//         isOpen={showQRPreview}
+//         onClose={() => setShowQRPreview(false)}
+//         qrData={memoizedQrData}
+//         onPrint={() => handlePrintQR()}
+//         mode="production"
+//       />
+//       <EditModal
+//         isOpen={editModalOpen}
+//         onClose={() => setEditModalOpen(false)}
+//         formData={formData}
+//         setFormData={setFormData}
+//         recordId={editRecordId}
+//         setUserBatches={setUserBatches}
+//         setEditModalOpen={setEditModalOpen}
+//       />
+//     </div>
+//   );
+// }
+
+// export default BundleRegistration;
