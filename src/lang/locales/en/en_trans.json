@@ -466,7 +466,41 @@
     "previous": "Previous",
     "next": "Next",
     "preview": "Preview",
-    "finish_inspection": "Finish Inspection"
+    "finish_inspection": "Finish Inspection",
+    "inlineWorkers": "Inline Workers",	
+    "inspection":"Inspection",
+    "pending":"Pending",
+    "rejectCritical":"Reject-Critical",
+    "rejectMajorMultiple":"Reject-Major Multiple",
+    "rejectMinorMultiple":"Reject-Minor Multiple",
+    "unknown":"Unknown",
+    "lineRepProgressTitle": "Line {{lineDisplayValue}} - {{repName}}: Inspection Progress",
+    "na": "N/A",
+    "repProgress":"Select an inspection repetition to see progress.",
+    "fillLineMoOpForProgress":"Please select Line, MO, and Operation to see specific progress.",
+    "loadingWorkerData":"Loading worker data...",
+    "selectLineForProgress":"Select a line to see worker status.",
+    "inspectionsCompleted":"Inspections Completed",
+    "noWorkerDataForLine":"No worker data available for selected line.",
+    "inspectionNo":"Inspection No",
+    "select_inspection_rep":"Select Inspection Rep...",
+    "rovingStatus":"Quality Status",
+    "remark":"Remark (Optional)",
+    "remarkPlaceholder":"Enter any remarks here...",
+    "characters":"characters",
+    "rejectMajor":"Reject-Major",
+    "rejectMinor":"Reject-Minor",
+    "rejectMajorSingle":"Reject-Major Single",
+    "rejectMinorSingle":"Reject-Minor Single"
+  },
+
+  "lineWorkers":{
+    "title":"Inline Worker Summary by Line",
+    "headerLineNo":"Line No",
+    "filterPlaceholderLineNo":"Filter by Line No...",
+    "headerWorkerCount":"Number of Workers",
+    "headerEditedCount":"Edited Count",
+    "noResults":"No line summaries found matching your criteria."
   },
 
   "cutting": {

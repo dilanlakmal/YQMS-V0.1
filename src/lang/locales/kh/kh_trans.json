@@ -467,8 +467,41 @@
     "next": "ចំនុចបន្ទាប់",
     "preview": "ពិនិត្យមើលជាមុន",
     "finish_inspection": "បញ្ចប់ការត្រួតពិនិត្យ",
-    "inlineWorkers": "Inline Workers",
-    "defectStatus": "Defect Status"
+    "inlineWorkers": "កម្មករក្នុងក្រុមដេរ",
+    "defectStatus": "ស្ថានភាពកំហុស",
+    "inspection": "ការត្រួតពិនិត្យ",
+    "pending": "កំពុងរង់ចាំ",
+    "rejectCritical": "បដិសេធ-ធ្ងន់ធ្ងរ",
+    "rejectMajorMultiple": "បដិសេធ-កំហុសធំច្រើន",
+    "rejectMinorMultiple": "បដិសេធ-កំហុសតូចច្រើន",
+    "unknown": "មិនស្គាល់",
+    "rejectMajor": "បដិសេធ-ធំ",
+    "rejectMinor": "បដិសេធ-តូច",
+    "rejectMajorSingle": "បដិសេធ-កំហុសធំមួយ",
+    "rejectMinorSingle": "បដិសេធ-កំហុសតូចមួយ",
+    "lineRepProgressTitle": "ក្រុម {{lineDisplayValue}} - {{repName}}: ដំណើរការត្រួតពិនិត្យ",
+    "na": "មិនមាន",
+    "repProgress": "ជ្រើសរើសការត្រួតពិនិត្យដដែលៗ ដើម្បីមើលដំណើរការ។",
+    "fillLineMoOpForProgress": "សូមជ្រើសរើសក្រុម លេខស្តាយ និងលេខសំគាល់តាមម៉ាស៊ីន ដើម្បីមើលដំណើរការជាក់លាក់។",
+    "loadingWorkerData": "កំពុងផ្ទុកទិន្នន័យកម្មករ...",
+    "selectLineForProgress": "ជ្រើសរើសក្រុម ដើម្បីមើលស្ថានភាពកម្មករ។",
+    "inspectionsCompleted": "ការត្រួតពិនិត្យបានបញ្ចប់",
+    "noWorkerDataForLine": "មិនមានទិន្នន័យកម្មករសម្រាប់ក្រុមដែលបានជ្រើសរើសទេ។",
+    "inspectionNo": "លេខរៀងការត្រួតពិនិត្យ",
+    "select_inspection_rep": "ជ្រើសរើសអ្នកត្រួតពិនិត្យដដែលៗ...",
+    "rovingStatus": "ស្ថានភាពគុណភាព",
+    "remark": "កំណត់ចំណាំ (ស្រេចចិត្ត)",
+    "remarkPlaceholder":"បញ្ចូលកំណត់ចំណាំណាមួយនៅទីនេះ...",
+    "characters":"តួអក្សរ"
+  },
+
+   "lineWorkers":{
+     "title": "សេចក្តីសង្ខេបកម្មករក្នុងក្រុមតាមក្រុមដេរ",
+     "headerLineNo": "ក្រុមដេរ",
+     "filterPlaceholderLineNo": "តម្រងតាមក្រុមដេរ...",
+     "headerWorkerCount": "ចំនួនកម្មករ",
+     "headerEditedCount": "ចំនួនកែសម្រួល",
+     "noResults": "រកមិនឃើញសេចក្តីសង្ខេបក្រុមដែលត្រូវនឹងលក្ខខណ្ឌរបស់អ្នកទេ។"
   },
 
   "cutting": {

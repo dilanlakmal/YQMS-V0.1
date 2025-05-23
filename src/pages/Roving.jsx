@@ -33,7 +33,7 @@ const RovingPage = () => {
     const s = ["th", "st", "nd", "rd"];
     const v = n % 100;
     const suffix = s[(v - 20) % 10] || s[v] || s[0];
-    return `${n}${suffix} ${transFunc('qcRoving.inspectionText', "Inspection")}`;
+    return `${n}${suffix} ${transFunc('qcRoving.inspection', "Inspection")}`;
   };
   const [inspectionType, setInspectionType] = useState("Normal");
   const [spiStatus, setSpiStatus] = useState("");
@@ -701,31 +701,31 @@ const RovingPage = () => {
   );
 
   if (!spiStatus || !measurementStatus) {
-    overallStatusText = t('qcRoving.overallStatus.pending', 'Pending');
+    overallStatusText = t('qcRoving.pending', 'Pending');
     overallStatusColor = 'bg-gray-200 text-gray-700';
    } else if (anyCriticalDefectInOverallGarments) {
-    overallStatusText = t('qcRoving.overallStatus.rejectCritical', 'Reject-Critical');
+    overallStatusText = t('qcRoving.rejectCritical', 'Reject-Critical');
     overallStatusColor = 'bg-red-100 text-red-800';
   } else if (totalMajorDefectsInOverallGarments >= 2) {
-    overallStatusText = t('qcRoving.overallStatus.rejectMajorMultiple', 'Reject-Major-M');
+    overallStatusText = t('qcRoving.rejectMajorMultiple', 'Reject-Major-M');
     overallStatusColor = 'bg-red-100 text-red-800';
   } else if (totalMinorDefectsInOverallGarments >= 2) {
-    overallStatusText = t('qcRoving.overallStatus.rejectMinorMultiple', 'Reject-Minor-M');
+    overallStatusText = t('qcRoving.rejectMinorMultiple', 'Reject-Minor-M');
     overallStatusColor = 'bg-red-100 text-red-800';
   } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
-    overallStatusText = t('qcRoving.overallStatus.rejectSpiMeas', 'Reject');
+    overallStatusText = t('qcRoving.rejectSpiMeas', 'Reject');
     overallStatusColor = 'bg-yellow-100 text-yellow-800';
   } else if (totalMajorDefectsInOverallGarments === 1) {
-    overallStatusText = t('qcRoving.overallStatus.rejectMajorSingle', 'Reject-Major-S');
+    overallStatusText = t('qcRoving.rejectMajorSingle', 'Reject-Major-S');
     overallStatusColor = 'bg-yellow-100 text-yellow-800';
   } else if (totalMinorDefectsInOverallGarments === 1) {
-    overallStatusText = t('qcRoving.overallStatus.rejectMinorSingle', 'Reject-Minor-S');
+    overallStatusText = t('qcRoving.rejectMinorSingle', 'Reject-Minor-S');
     overallStatusColor = 'bg-yellow-100 text-yellow-800';
   } else if (spiStatus === 'Pass' && measurementStatus === 'Pass' && totalMajorDefectsInOverallGarments === 0 && totalMinorDefectsInOverallGarments === 0) {
-    overallStatusText = t('qcRoving.overallStatus.pass', 'Pass');
+    overallStatusText = t('qcRoving.pass', 'Pass');
     overallStatusColor = 'bg-green-100 text-green-800';
   } else {
-    overallStatusText = t('qcRoving.overallStatus.unknown', 'Unknown');
+    overallStatusText = t('qcRoving.unknown', 'Unknown');
     overallStatusColor = 'bg-gray-200 text-gray-700';
   }
 
@@ -837,7 +837,7 @@ const RovingPage = () => {
               {(() => {
                 const numericLineNoFromForm = getNumericLineValue(lineNo); 
                 if (!selectedManualInspectionRep) {
-                  return <p className="text-sm text-gray-500">{t("qcRoving.selectInspectionRepForProgress", "Select an inspection repetition to see progress.")}</p>;
+                  return <p className="text-sm text-gray-500">{t("qcRoving.repProgress", "Select an inspection repetition to see progress.")}</p>;
                 }
                 if (!lineNo || !moNo) {
                   return <p className="text-sm text-gray-500">{t("qcRoving.fillLineMoOpForProgress", "Please select Line, MO, and Operation to see specific progress.")}</p>;
@@ -1214,13 +1214,13 @@ const RovingPage = () => {
                         const currentValidSeverity = availableSeverityOptions.includes(defect.severity) ? defect.severity : initialSeverityForDropdown;
 
                         if (defect.severity === 'Critical') {
-                          defectSeverityText = t('qcRoving.defectStatus.rejectCritical', 'Reject-Critical');
+                          defectSeverityText = t('qcRoving.rejectCritical', 'Reject-Critical');
                           defectSeverityColor = 'bg-red-100 text-red-800';
                        } else if (defect.severity === 'Major') { 
-                          defectSeverityText = t('qcRoving.defectStatus.rejectMajor', 'Reject-Major'); 
+                          defectSeverityText = t('qcRoving.rejectMajor', 'Reject-Major'); 
                           defectSeverityColor = 'bg-orange-500 text-orange-800'; 
                        }  else if (defect.severity === 'Minor') {
-                          defectSeverityText = t('qcRoving.defectStatus.rejectMinor', 'Reject-Minor');
+                          defectSeverityText = t('qcRoving.rejectMinor', 'Reject-Minor');
                           defectSeverityColor = 'bg-yellow-100 text-yellow-800';
                         }
                         return (
