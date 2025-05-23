@@ -83,9 +83,9 @@ const REPETITION_KEYS_FOR_OPERATOR_TABLE = [
 ];
 
 const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, filters }) => {
-  const [showSpiColumn, setShowSpiColumn] = useState(false);
-  const [showMeasurementColumn, setShowMeasurementColumn] = useState(false);
-  const [showDefectStatusColumn, setShowDefectStatusColumn] = useState(false);
+  const [showSpiColumn, setShowSpiColumn] = useState(true);
+  const [showMeasurementColumn, setShowMeasurementColumn] = useState(true);
+  const [showDefectStatusColumn, setShowDefectStatusColumn] = useState(true);
 
   if (!reportDetail) return null;
   
