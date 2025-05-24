@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import DefectBuyerStatus from "../components/inspection/qc_roving/defectBuyserStatus";
+import DefectBuyerStatus from "../components/inspection/qc_roving/DefectBuyserStatus";
 import CuttingMeasurementPointsModify from "../components/inspection/cutting/CuttingMeasurementPointsModify";
 import CuttingOrderModify from "../components/inspection/cutting/CuttingOrderModify";
 

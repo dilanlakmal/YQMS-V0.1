@@ -12224,9 +12224,11 @@ const formatDateToMMDDYYYY = (dateInput) => {
 app.post("/api/scc/ht-first-output", async (req, res) => {
   try {
     const { _id, ...dataToSave } = req.body;
+    // Ensure machineNo is included
+    if (!dataToSave.machineNo) {
+      return res.status(400).json({ message: "Machine No is required." });
+    }
     dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
-
-    // Ensure remarks fields are "NA" if empty
     dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
     if (
       dataToSave.standardSpecification &&
@@ -12235,7 +12237,11 @@ app.post("/api/scc/ht-first-output", async (req, res) => {
       dataToSave.standardSpecification = dataToSave.standardSpecification.map(
         (spec) => ({
           ...spec,
-          remarks: spec.remarks?.trim() || "NA"
+          remarks: spec.remarks?.trim() || "NA",
+          pressure:
+            spec.pressure !== null && spec.pressure !== undefined
+              ? Number(spec.pressure)
+              : null // Ensure pressure is number
         })
       );
     }
@@ -12246,20 +12252,20 @@ app.post("/api/scc/ht-first-output", async (req, res) => {
         new: true,
         runValidators: true,
         upsert: false
-      }); // Make sure upsert is false for explicit update
+      });
       if (!record)
         return res
           .status(404)
           .json({ message: "Record not found for update." });
     } else {
-      // Check for existing record by moNo, color, and inspectionDate before creating
+      // Check for existing record by moNo, color, inspectionDate, AND machineNo
       const existing = await HTFirstOutput.findOne({
         moNo: dataToSave.moNo,
         color: dataToSave.color,
-        inspectionDate: dataToSave.inspectionDate
+        inspectionDate: dataToSave.inspectionDate,
+        machineNo: dataToSave.machineNo // Added machineNo to query
       });
       if (existing) {
-        // If it exists, update it
         record = await HTFirstOutput.findByIdAndUpdate(
           existing._id,
           dataToSave,
@@ -12276,10 +12282,9 @@ app.post("/api/scc/ht-first-output", async (req, res) => {
   } catch (error) {
     console.error("Error saving HT First Output:", error);
     if (error.code === 11000) {
-      // Mongoose duplicate key error
       return res.status(409).json({
         message:
-          "Duplicate entry. A record with this MO, Color, and Date already exists.",
+          "Duplicate entry. A record with this MO, Color, Date, and Machine No already exists.", // Updated message
         error: error.message,
         errorCode: "DUPLICATE_KEY"
       });
@@ -12294,25 +12299,26 @@ app.post("/api/scc/ht-first-output", async (req, res) => {
 
 app.get("/api/scc/ht-first-output", async (req, res) => {
   try {
-    const { moNo, color, inspectionDate } = req.query;
-    if (!moNo || !color || !inspectionDate) {
-      return res
-        .status(400)
-        .json({ message: "MO No, Color, and Inspection Date are required." });
+    const { moNo, color, inspectionDate, machineNo } = req.query; // Added machineNo
+    if (!moNo || !color || !inspectionDate || !machineNo) {
+      // Added machineNo to validation
+      return res.status(400).json({
+        message: "MO No, Color, Inspection Date, and Machine No are required."
+      }); // Updated message
     }
     const formattedDate = formatDateToMMDDYYYY(inspectionDate);
     const record = await HTFirstOutput.findOne({
       moNo,
       color,
-      inspectionDate: formattedDate
+      inspectionDate: formattedDate,
+      machineNo // Added machineNo to query
     });
     if (!record) {
-      // Return 200 with a specific message for "not found" so frontend can handle it as new record
       return res
         .status(200)
         .json({ message: "HT_RECORD_NOT_FOUND", data: null });
     }
-    res.json(record); // Existing record data will be in record directly, not record.data
+    res.json(record); // Backend returns full object, not nested under 'data'
   } catch (error) {
     console.error("Error fetching HT First Output:", error);
     res.status(500).json({
@@ -12326,8 +12332,11 @@ app.get("/api/scc/ht-first-output", async (req, res) => {
 app.post("/api/scc/fu-first-output", async (req, res) => {
   try {
     const { _id, ...dataToSave } = req.body;
+    // Ensure machineNo is included
+    if (!dataToSave.machineNo) {
+      return res.status(400).json({ message: "Machine No is required." });
+    }
     dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
-
     dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
     if (
       dataToSave.standardSpecification &&
@@ -12336,7 +12345,11 @@ app.post("/api/scc/fu-first-output", async (req, res) => {
       dataToSave.standardSpecification = dataToSave.standardSpecification.map(
         (spec) => ({
           ...spec,
-          remarks: spec.remarks?.trim() || "NA"
+          remarks: spec.remarks?.trim() || "NA",
+          pressure:
+            spec.pressure !== null && spec.pressure !== undefined
+              ? Number(spec.pressure)
+              : null // Ensure pressure is number
         })
       );
     }
@@ -12356,7 +12369,8 @@ app.post("/api/scc/fu-first-output", async (req, res) => {
       const existing = await FUFirstOutput.findOne({
         moNo: dataToSave.moNo,
         color: dataToSave.color,
-        inspectionDate: dataToSave.inspectionDate
+        inspectionDate: dataToSave.inspectionDate,
+        machineNo: dataToSave.machineNo // Added machineNo to query
       });
       if (existing) {
         record = await FUFirstOutput.findByIdAndUpdate(
@@ -12377,7 +12391,7 @@ app.post("/api/scc/fu-first-output", async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({
         message:
-          "Duplicate entry. A record with this MO, Color, and Date already exists.",
+          "Duplicate entry. A record with this MO, Color, Date, and Machine No already exists.", // Updated message
         error: error.message,
         errorCode: "DUPLICATE_KEY"
       });
@@ -12392,24 +12406,26 @@ app.post("/api/scc/fu-first-output", async (req, res) => {
 
 app.get("/api/scc/fu-first-output", async (req, res) => {
   try {
-    const { moNo, color, inspectionDate } = req.query;
-    if (!moNo || !color || !inspectionDate) {
-      return res
-        .status(400)
-        .json({ message: "MO No, Color, and Inspection Date are required." });
+    const { moNo, color, inspectionDate, machineNo } = req.query; // Added machineNo
+    if (!moNo || !color || !inspectionDate || !machineNo) {
+      // Added machineNo to validation
+      return res.status(400).json({
+        message: "MO No, Color, Inspection Date, and Machine No are required."
+      }); // Updated message
     }
     const formattedDate = formatDateToMMDDYYYY(inspectionDate);
     const record = await FUFirstOutput.findOne({
       moNo,
       color,
-      inspectionDate: formattedDate
+      inspectionDate: formattedDate,
+      machineNo // Added machineNo to query
     });
     if (!record) {
       return res
         .status(200)
         .json({ message: "FU_RECORD_NOT_FOUND", data: null });
     }
-    res.json(record);
+    res.json(record); // Backend returns full object
   } catch (error) {
     console.error("Error fetching FU First Output:", error);
     res.status(500).json({
@@ -12512,6 +12528,48 @@ app.post("/api/scc/daily-testing", async (req, res) => {
     dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
     dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
 
+    // Ensure pressure in standardSpecifications is a number
+    if (
+      dataToSave.standardSpecifications &&
+      dataToSave.standardSpecifications.pressure !== undefined
+    ) {
+      dataToSave.standardSpecifications.pressure =
+        dataToSave.standardSpecifications.pressure !== null &&
+        dataToSave.standardSpecifications.pressure !== ""
+          ? Number(dataToSave.standardSpecifications.pressure)
+          : null;
+    }
+
+    // Ensure pressures in parameterAdjustmentRecords are numbers
+    if (
+      dataToSave.parameterAdjustmentRecords &&
+      Array.isArray(dataToSave.parameterAdjustmentRecords)
+    ) {
+      dataToSave.parameterAdjustmentRecords =
+        dataToSave.parameterAdjustmentRecords.map((rec) => ({
+          ...rec,
+          adjustedTempC:
+            rec.adjustedTempC !== null && rec.adjustedTempC !== ""
+              ? Number(rec.adjustedTempC)
+              : null,
+          adjustedTimeSec:
+            rec.adjustedTimeSec !== null && rec.adjustedTimeSec !== ""
+              ? Number(rec.adjustedTimeSec)
+              : null,
+          adjustedPressure:
+            rec.adjustedPressure !== null && rec.adjustedPressure !== ""
+              ? Number(rec.adjustedPressure)
+              : null
+        }));
+    } else {
+      // If user chose "No" for adjustment data, it might come as undefined or empty.
+      // The schema defaults to an empty array, so this should be fine.
+      // Or explicitly set to empty array if not provided or not an array.
+      dataToSave.parameterAdjustmentRecords = [];
+    }
+
+    // dataToSave.cycleWashingResults will no longer be present if removed from frontend payload
+
     let record;
     if (_id) {
       record = await SCCDailyTesting.findByIdAndUpdate(_id, dataToSave, {
@@ -12582,7 +12640,8 @@ app.get("/api/scc/daily-testing", async (req, res) => {
         .status(200)
         .json({ message: "DAILY_TESTING_RECORD_NOT_FOUND", data: null });
     }
-    res.json(record); // Returns the existing record
+    // No change needed here for GET, as it returns what's in DB. Frontend handles display.
+    res.json(record);
   } catch (error) {
     console.error("Error fetching Daily Testing report:", error);
     res.status(500).json({
@@ -12591,10 +12650,17 @@ app.get("/api/scc/daily-testing", async (req, res) => {
     });
   }
 });
-
 /* ------------------------------
    End Points - SCC Daily HT/FU QC Test
 ------------------------------ */
+
+// Helper to parse pressure string to number (if needed, but schema now enforces Number)
+const parsePressureToNumber = (pressureStr) => {
+  if (pressureStr === null || pressureStr === undefined || pressureStr === "")
+    return null;
+  const num = parseFloat(pressureStr);
+  return isNaN(num) ? null : num;
+};
 
 // GET Endpoint to fetch existing Daily HT/FU Test data or MO list
 app.get("/api/scc/daily-htfu-test", async (req, res) => {
@@ -12610,14 +12676,14 @@ app.get("/api/scc/daily-htfu-test", async (req, res) => {
         .json({ message: "Inspection Date and Machine No are required." });
     }
 
-    // Scenario 1: Fetch specific record if moNo and color are provided
     if (moNo && color) {
       const record = await DailyTestingHTFU.findOne({
         inspectionDate: formattedDate,
         machineNo,
         moNo,
         color
-      });
+      }).lean(); // Use .lean() for faster queries if not modifying directly
+
       if (!record) {
         return res
           .status(200)
@@ -12625,14 +12691,6 @@ app.get("/api/scc/daily-htfu-test", async (req, res) => {
       }
       return res.json({ message: "RECORD_FOUND", data: record });
     } else {
-      // Scenario 2: Fetch distinct MO/Color combinations for a given Date/MachineNo
-      const records = await DailyTestingHTFU.find(
-        { inspectionDate: formattedDate, machineNo },
-        "moNo color buyer buyerStyle" // Select only necessary fields
-      ).distinct("moNo"); // Or more complex aggregation if needed to pair MO with Color
-
-      // For simplicity, let's return distinct MOs, client can then pick color
-      // A better approach might be to return {moNo, color, buyer, buyerStyle} tuples
       const distinctEntries = await DailyTestingHTFU.aggregate([
         { $match: { inspectionDate: formattedDate, machineNo } },
         {
@@ -12640,7 +12698,6 @@ app.get("/api/scc/daily-htfu-test", async (req, res) => {
             _id: { moNo: "$moNo", color: "$color" },
             buyer: { $first: "$buyer" },
             buyerStyle: { $first: "$buyerStyle" },
-            // If you need to know if a full record exists to load it directly
             docId: { $first: "$_id" }
           }
         },
@@ -12653,19 +12710,18 @@ app.get("/api/scc/daily-htfu-test", async (req, res) => {
             buyerStyle: "$buyerStyle",
             docId: "$docId"
           }
-        }
+        },
+        { $sort: { moNo: 1, color: 1 } }
       ]);
 
       if (distinctEntries.length === 0) {
-        return res.status(200).json({
-          message: "NO_RECORDS_FOR_DATE_MACHINE",
-          data: []
-        });
+        return res
+          .status(200)
+          .json({ message: "NO_RECORDS_FOR_DATE_MACHINE", data: [] });
       }
-      // If only one unique MO/Color combo, frontend might auto-load it fully later
       return res.json({
         message: "MULTIPLE_MO_COLOR_FOUND",
-        data: distinctEntries // Array of {moNo, color, buyer, buyerStyle, docId}
+        data: distinctEntries
       });
     }
   } catch (error) {
@@ -12681,7 +12737,7 @@ app.get("/api/scc/daily-htfu-test", async (req, res) => {
 app.post("/api/scc/daily-htfu-test", async (req, res) => {
   try {
     const {
-      _id, // ID of the main document if updating
+      _id,
       inspectionDate,
       machineNo,
       moNo,
@@ -12693,13 +12749,14 @@ app.post("/api/scc/daily-htfu-test", async (req, res) => {
       emp_eng_name,
       emp_dept_name,
       emp_sect_name,
-      emp_job_title, // User details
+      emp_job_title,
       baseReqTemp,
       baseReqTime,
-      baseReqPressure, // Base specs from first output
-      currentInspection, // The data for the specific slot being submitted
+      baseReqPressure, // Expecting number or null from frontend now due to schema change
+      currentInspection,
       stretchTestResult,
-      washingTestResult // Overall tests
+      stretchTestRejectReasons, // New field
+      washingTestResult
     } = req.body;
 
     const formattedDate = formatDateToMMDDYYYY(inspectionDate);
@@ -12717,12 +12774,25 @@ app.post("/api/scc/daily-htfu-test", async (req, res) => {
     const query = { inspectionDate: formattedDate, machineNo, moNo, color };
     let record = await DailyTestingHTFU.findOne(query);
 
+    // Prepare currentInspection with numeric pressures
+    const processedCurrentInspection = {
+      ...currentInspection,
+      pressure_req: parsePressureToNumber(currentInspection.pressure_req),
+      pressure_actual: parsePressureToNumber(currentInspection.pressure_actual)
+    };
+
     if (record) {
       // Update existing record
-      record.baseReqTemp = baseReqTemp ?? record.baseReqTemp;
-      record.baseReqTime = baseReqTime ?? record.baseReqTime;
-      record.baseReqPressure = baseReqPressure ?? record.baseReqPressure;
-      record.emp_id = emp_id; // Update user details on each submission if needed
+      record.baseReqTemp =
+        baseReqTemp !== undefined ? baseReqTemp : record.baseReqTemp;
+      record.baseReqTime =
+        baseReqTime !== undefined ? baseReqTime : record.baseReqTime;
+      record.baseReqPressure =
+        baseReqPressure !== undefined
+          ? baseReqPressure
+          : record.baseReqPressure; // Expecting number or null
+
+      record.emp_id = emp_id;
       record.emp_kh_name = emp_kh_name;
       record.emp_eng_name = emp_eng_name;
       record.emp_dept_name = emp_dept_name;
@@ -12730,47 +12800,42 @@ app.post("/api/scc/daily-htfu-test", async (req, res) => {
       record.emp_job_title = emp_job_title;
       record.inspectionTime = inspectionTime;
 
-      // Update or add the specific inspection slot
       const slotIndex = record.inspections.findIndex(
-        (insp) => insp.timeSlotKey === currentInspection.timeSlotKey
+        (insp) => insp.timeSlotKey === processedCurrentInspection.timeSlotKey
       );
       if (slotIndex > -1) {
-        // Update existing slot, ensuring not to overwrite with nulls if not intended
         record.inspections[slotIndex] = {
-          ...record.inspections[slotIndex], // keep old values not submitted
-          ...currentInspection, // new values for the slot
+          ...record.inspections[slotIndex],
+          ...processedCurrentInspection,
           inspectionTimestamp: new Date()
         };
       } else {
         record.inspections.push({
-          ...currentInspection,
+          ...processedCurrentInspection,
           inspectionTimestamp: new Date()
         });
       }
-      // Sort inspections by inspectionNo after modification
       record.inspections.sort(
         (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
       );
 
-      // Update stretch/washing tests only if they are being set and not already "Done"
-      // Or if they are 'Pending' and now being set to 'Pass'/'Reject'
-      if (
-        !record.isStretchWashingTestDone ||
-        record.stretchTestResult === "Pending"
-      ) {
-        if (stretchTestResult && stretchTestResult !== "Pending") {
-          record.stretchTestResult = stretchTestResult;
+      if (stretchTestResult && stretchTestResult !== "Pending") {
+        record.stretchTestResult = stretchTestResult;
+        if (stretchTestResult === "Reject") {
+          record.stretchTestRejectReasons = Array.isArray(
+            stretchTestRejectReasons
+          )
+            ? stretchTestRejectReasons
+            : [];
+        } else {
+          record.stretchTestRejectReasons = []; // Clear reasons if not Reject
         }
       }
-      if (
-        !record.isStretchWashingTestDone ||
-        record.washingTestResult === "Pending"
-      ) {
-        if (washingTestResult && washingTestResult !== "Pending") {
-          record.washingTestResult = washingTestResult;
-        }
+
+      if (washingTestResult && washingTestResult !== "Pending") {
+        record.washingTestResult = washingTestResult;
       }
-      // Mark as done if both are now Pass/Reject
+
       if (
         (record.stretchTestResult === "Pass" ||
           record.stretchTestResult === "Reject") &&
@@ -12797,14 +12862,19 @@ app.post("/api/scc/daily-htfu-test", async (req, res) => {
         inspectionTime,
         baseReqTemp,
         baseReqTime,
-        baseReqPressure,
+        baseReqPressure, // Expecting number or null
         inspections: [
-          { ...currentInspection, inspectionTimestamp: new Date() }
+          { ...processedCurrentInspection, inspectionTimestamp: new Date() }
         ],
         stretchTestResult:
           stretchTestResult && stretchTestResult !== "Pending"
             ? stretchTestResult
             : "Pending",
+        stretchTestRejectReasons:
+          stretchTestResult === "Reject" &&
+          Array.isArray(stretchTestRejectReasons)
+            ? stretchTestRejectReasons
+            : [],
         washingTestResult:
           washingTestResult && washingTestResult !== "Pending"
             ? washingTestResult
@@ -12828,7 +12898,6 @@ app.post("/api/scc/daily-htfu-test", async (req, res) => {
   } catch (error) {
     console.error("Error saving Daily HT/FU QC Test:", error);
     if (error.code === 11000) {
-      // Duplicate key error
       return res.status(409).json({
         message:
           "A record with this Date, Machine No, MO No, and Color already exists. Submission failed.",
@@ -12839,7 +12908,7 @@ app.post("/api/scc/daily-htfu-test", async (req, res) => {
     res.status(500).json({
       message: "Failed to save Daily HT/FU QC Test",
       error: error.message,
-      details: error // Mongoose validation errors might be here
+      details: error
     });
   }
 });
@@ -12921,13 +12990,16 @@ app.get("/api/scc/daily-fuqc-test", async (req, res) => {
         machineNo,
         moNo,
         color
-      });
+      }).lean(); // Use .lean() for faster queries
+
       if (!record) {
         return res
           .status(200)
           .json({ message: "DAILY_FUQC_RECORD_NOT_FOUND", data: null });
       }
-      return res.json({ message: "RECORD_FOUND", data: record });
+      // Ensure temp_offset is included if it exists, or default
+      const dataToSend = { ...record, temp_offset: record.temp_offset ?? 5 };
+      return res.json({ message: "RECORD_FOUND", data: dataToSend });
     } else {
       const distinctEntries = await DailyTestingFUQC.aggregate([
         { $match: { inspectionDate: formattedDate, machineNo } },
@@ -12949,14 +13021,13 @@ app.get("/api/scc/daily-fuqc-test", async (req, res) => {
             docId: "$docId"
           }
         },
-        { $sort: { moNo: 1, color: 1 } } // Optional: sort the list
+        { $sort: { moNo: 1, color: 1 } }
       ]);
 
       if (distinctEntries.length === 0) {
-        return res.status(200).json({
-          message: "NO_RECORDS_FOR_DATE_MACHINE",
-          data: []
-        });
+        return res
+          .status(200)
+          .json({ message: "NO_RECORDS_FOR_DATE_MACHINE", data: [] });
       }
       return res.json({
         message: "MULTIPLE_MO_COLOR_FOUND",
@@ -12965,10 +13036,12 @@ app.get("/api/scc/daily-fuqc-test", async (req, res) => {
     }
   } catch (error) {
     console.error("Error fetching Daily FUQC Test data:", error);
-    res.status(500).json({
-      message: "Failed to fetch Daily FUQC Test data",
-      error: error.message
-    });
+    res
+      .status(500)
+      .json({
+        message: "Failed to fetch Daily FUQC Test data",
+        error: error.message
+      });
   }
 });
 
@@ -12990,7 +13063,8 @@ app.post("/api/scc/daily-fuqc-test", async (req, res) => {
       emp_sect_name,
       emp_job_title,
       baseReqTemp,
-      currentInspection, // currentInspection will now include temp_actual, temp_isNA
+      temp_offset, // New field from frontend
+      currentInspection,
       remarks
     } = req.body;
 
@@ -13000,10 +13074,9 @@ app.post("/api/scc/daily-fuqc-test", async (req, res) => {
         .status(400)
         .json({ message: "Missing required fields for submission." });
     }
-    // Validate currentInspection structure
     if (
-      currentInspection.temp_req === undefined || // temp_req can be null, but key should exist
-      currentInspection.temp_actual === undefined || // temp_actual can be null, but key should exist
+      currentInspection.temp_req === undefined ||
+      currentInspection.temp_actual === undefined ||
       typeof currentInspection.temp_isNA !== "boolean" ||
       !currentInspection.result
     ) {
@@ -13021,19 +13094,24 @@ app.post("/api/scc/daily-fuqc-test", async (req, res) => {
     const currentRemarks =
       remarks?.trim() === "" ? "NA" : remarks?.trim() || "NA";
 
-    // Prepare the inspection slot data, ensuring result is 'N/A' if temp_isNA is true
     const inspectionDataToSave = {
       ...currentInspection,
       inspectionTimestamp: new Date()
     };
     if (inspectionDataToSave.temp_isNA) {
       inspectionDataToSave.result = "N/A";
-      inspectionDataToSave.temp_actual = null; // Ensure actual is null if NA
+      inspectionDataToSave.temp_actual = null;
     }
+
+    const effectiveTempOffset =
+      temp_offset !== undefined && temp_offset !== null
+        ? Number(temp_offset)
+        : 5;
 
     if (record) {
       // Update existing record
       record.baseReqTemp = baseReqTemp ?? record.baseReqTemp;
+      record.temp_offset = effectiveTempOffset; // Update temp_offset
       record.remarks = currentRemarks;
       record.emp_id = emp_id;
       record.emp_kh_name = emp_kh_name;
@@ -13074,6 +13152,7 @@ app.post("/api/scc/daily-fuqc-test", async (req, res) => {
         emp_job_title,
         inspectionTime,
         baseReqTemp,
+        temp_offset: effectiveTempOffset, // Save temp_offset
         remarks: currentRemarks,
         inspections: [inspectionDataToSave]
       });
@@ -13093,11 +13172,13 @@ app.post("/api/scc/daily-fuqc-test", async (req, res) => {
         errorCode: "DUPLICATE_KEY"
       });
     }
-    res.status(500).json({
-      message: "Failed to save Daily FUQC Test",
-      error: error.message,
-      details: error
-    });
+    res
+      .status(500)
+      .json({
+        message: "Failed to save Daily FUQC Test",
+        error: error.message,
+        details: error
+      });
   }
 });
 

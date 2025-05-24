@@ -8,9 +8,16 @@ import {
   Minus,
   Plus,
   Search,
-  XCircle
+  XCircle,
+  History
 } from "lucide-react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useTranslation } from "react-i18next";
@@ -26,16 +33,28 @@ const inputFieldClasses = `${inputBaseClasses} ${inputFocusClasses}`;
 const inputFieldReadonlyClasses = `${inputBaseClasses} bg-gray-100 cursor-not-allowed`;
 const labelClasses = "block text-sm font-medium text-gray-700 mb-0.5";
 
+const getCellBGFromResult = (result) => {
+  if (result === "Pass") return "bg-green-100 text-green-700";
+  if (result === "Reject") return "bg-red-100 text-red-700";
+  if (result === "N/A") return "bg-gray-100 text-gray-500 italic";
+  return "bg-white";
+};
+
+const getCellBGForNA = (isNA) => {
+  return isNA ? "bg-gray-200 text-gray-500 italic" : "";
+};
+
 const TIME_SLOTS_CONFIG = [
   { key: "07:00", label: "07.00", inspectionNo: 1 },
   { key: "09:00", label: "09.00", inspectionNo: 2 },
   { key: "12:00", label: "12.00", inspectionNo: 3 },
-  { key: "14:00", label: "2.00", inspectionNo: 4 },
-  { key: "16:00", label: "4.00", inspectionNo: 5 },
-  { key: "18:00", label: "6.00", inspectionNo: 6 }
+  { key: "14:00", label: "2.00 PM", inspectionNo: 4 },
+  { key: "16:00", label: "4.00 PM", inspectionNo: 5 },
+  { key: "18:00", label: "6.00 PM", inspectionNo: 6 }
 ];
 
 const MACHINE_NUMBERS = ["001", "002", "003", "004", "005"];
+const DEFAULT_TEMP_OFFSET = 5;
 
 const initialSlotData = {
   inspectionNo: 0,
@@ -43,7 +62,24 @@ const initialSlotData = {
   temp_req: null,
   temp_actual: null,
   temp_isNA: false,
-  result: "Pending" // "Pending", "Pass", "Reject"
+  result: "Pending",
+  inspectionTimestamp: null
+};
+
+const formatInspectionTimestamp = (timestamp) => {
+  if (!timestamp) return "";
+  try {
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return "";
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true
+    });
+  } catch (e) {
+    return "";
+  }
 };
 
 const DailyFUQC = ({
@@ -68,7 +104,11 @@ const DailyFUQC = ({
     return {
       ...formData,
       slotsDetailed: initialSlots,
-      remarks: formData.remarks || ""
+      remarks: formData.remarks || "",
+      temp_offset:
+        formData.temp_offset !== undefined
+          ? formData.temp_offset
+          : DEFAULT_TEMP_OFFSET
     };
   });
 
@@ -76,63 +116,73 @@ const DailyFUQC = ({
   const [moNoOptions, setMoNoOptions] = useState([]);
   const [showMoNoDropdown, setShowMoNoDropdown] = useState(false);
   const [availableColors, setAvailableColors] = useState([]);
-  const [availableMachineRecords, setAvailableMachineRecords] = useState([]);
-
+  const [availableMachineRecords, setAvailableMachineRecords] = useState([]); // For existing MOs dropdown
   const [orderDetailsLoading, setOrderDetailsLoading] = useState(false);
   const [baseTempLoading, setBaseTempLoading] = useState(false);
-  const [existingQCRecordLoading, setExistingQCRecordLoading] = useState(false);
+  const [existingQCRecordLoading, setExistingQCRecordLoading] = useState(false); // For loading specific MO/Color record
+  const [machineRecordsLoading, setMachineRecordsLoading] = useState(false); // For loading list of MOs for a machine
+
   const [recordStatusMessage, setRecordStatusMessage] = useState("");
   const [currentActiveSlotKey, setCurrentActiveSlotKey] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   const moNoInputRef = useRef(null);
   const moNoDropdownRef = useRef(null);
 
+  const loading =
+    orderDetailsLoading ||
+    baseTempLoading ||
+    existingQCRecordLoading ||
+    machineRecordsLoading ||
+    isSubmitting;
+
+  // Sync localFormData with formData prop from parent
   useEffect(() => {
-    setMoNoSearch(formData.moNo || "");
+    setMoNoSearch(formData.moNo || ""); // Sync search field if parent changes MO
     const newSlotsDetailed = TIME_SLOTS_CONFIG.reduce((acc, slotConf) => {
       const existingInsp = formData.inspections?.find(
         (i) => i.timeSlotKey === slotConf.key
       );
-      if (existingInsp) {
-        acc[slotConf.key] = {
-          ...initialSlotData, // Start with initialSlotData defaults
-          ...existingInsp, // Overlay with existing inspection data
-          temp_req:
-            existingInsp.temp_req !== null
-              ? Number(existingInsp.temp_req)
-              : null,
-          // Ensure temp_actual is also handled
-          temp_actual:
-            existingInsp.temp_actual !== null
-              ? Number(existingInsp.temp_actual)
-              : null
-        };
-      } else {
-        acc[slotConf.key] = {
-          ...initialSlotData,
-          inspectionNo: slotConf.inspectionNo,
-          timeSlotKey: slotConf.key
-        };
-      }
+      acc[slotConf.key] = existingInsp
+        ? {
+            ...initialSlotData,
+            ...existingInsp,
+            temp_req: Number(existingInsp.temp_req),
+            temp_actual:
+              existingInsp.temp_actual !== null
+                ? Number(existingInsp.temp_actual)
+                : null,
+            inspectionTimestamp: existingInsp.inspectionTimestamp || null
+          }
+        : {
+            ...initialSlotData,
+            inspectionNo: slotConf.inspectionNo,
+            timeSlotKey: slotConf.key
+          };
       return acc;
     }, {});
 
     setLocalFormData((prev) => ({
-      ...prev,
-      ...formData,
+      ...prev, // Keep local UI states like showHistory
+      ...formData, // Sync with all data from parent
       slotsDetailed: newSlotsDetailed,
-      remarks: formData.remarks || ""
+      remarks: formData.remarks || "",
+      temp_offset:
+        formData.temp_offset !== undefined
+          ? formData.temp_offset
+          : DEFAULT_TEMP_OFFSET
     }));
   }, [formData]);
 
+  // Function to update parent (SCCPage)
   const updateParentFormData = useCallback(
-    (updatedLocalData) => {
-      const inspectionsArray = Object.values(updatedLocalData.slotsDetailed)
+    (dataToUpdate) => {
+      const inspectionsArray = Object.values(dataToUpdate.slotsDetailed)
         .filter(
           (slot) =>
             slot.result !== "Pending" ||
             slot.temp_isNA ||
-            slot.temp_actual !== null || // Include if actual temp is recorded
+            slot.temp_actual !== null ||
             slot.temp_req !== null
         )
         .map((slot) => ({
@@ -142,46 +192,75 @@ const DailyFUQC = ({
           temp_actual:
             slot.temp_actual !== null ? Number(slot.temp_actual) : null,
           temp_isNA: slot.temp_isNA,
-          result: slot.result
+          result: slot.result,
+          inspectionTimestamp: slot.inspectionTimestamp
         }));
 
       onFormDataChange({
-        _id: updatedLocalData._id,
-        inspectionDate: updatedLocalData.inspectionDate,
-        machineNo: updatedLocalData.machineNo,
-        moNo: updatedLocalData.moNo,
-        buyer: updatedLocalData.buyer,
-        buyerStyle: updatedLocalData.buyerStyle,
-        color: updatedLocalData.color,
-        // This is the overall baseReqTemp for the form
+        _id: dataToUpdate._id,
+        inspectionDate: dataToUpdate.inspectionDate,
+        machineNo: dataToUpdate.machineNo,
+        moNo: dataToUpdate.moNo,
+        buyer: dataToUpdate.buyer,
+        buyerStyle: dataToUpdate.buyerStyle,
+        color: dataToUpdate.color,
         baseReqTemp:
-          updatedLocalData.baseReqTemp !== null
-            ? Number(updatedLocalData.baseReqTemp)
+          dataToUpdate.baseReqTemp !== null
+            ? Number(dataToUpdate.baseReqTemp)
             : null,
+        temp_offset: Number(dataToUpdate.temp_offset),
         inspections: inspectionsArray,
-        remarks: updatedLocalData.remarks
+        remarks: dataToUpdate.remarks
       });
     },
     [onFormDataChange]
   );
 
-  const resetLocalDetailedSlots = (currentLocalData) => {
-    const newSlots = { ...currentLocalData.slotsDetailed };
+  // Reset detailed slots in local state
+  const resetLocalDetailedSlots = (
+    currentLocalData,
+    preserveBaseTemp = false
+  ) => {
+    const newSlots = {};
     TIME_SLOTS_CONFIG.forEach((slot) => {
       newSlots[slot.key] = {
         ...initialSlotData,
         inspectionNo: slot.inspectionNo,
         timeSlotKey: slot.key,
-        // When resetting, if baseReqTemp is available, apply it
-        temp_req: currentLocalData.baseReqTemp,
-        temp_actual: currentLocalData.baseReqTemp // Also default actual to req
+        temp_req: preserveBaseTemp ? currentLocalData.baseReqTemp : null, // Preserve if told to
+        temp_actual: preserveBaseTemp ? currentLocalData.baseReqTemp : null
       };
     });
     return { ...currentLocalData, slotsDetailed: newSlots };
   };
 
+  const clearAndResetFormForNewMo = (prevLocalData) => {
+    let newData = {
+      ...prevLocalData,
+      moNo: "",
+      color: "",
+      buyer: "",
+      buyerStyle: "",
+      _id: null,
+      baseReqTemp: null,
+      remarks: "",
+      inspections: []
+      // temp_offset: DEFAULT_TEMP_OFFSET, // Keep user's temp_offset setting
+    };
+    newData = resetLocalDetailedSlots(newData, false); // Don't preserve base temp for totally new MO
+    setMoNoSearch("");
+    setAvailableColors([]);
+    // availableMachineRecords will be refetched by handleMachineNoChange effect
+    setCurrentActiveSlotKey(TIME_SLOTS_CONFIG[0]?.key || null); // Reset to first slot
+    setRecordStatusMessage(t("sccDailyFUQC.enterNewMo"));
+    setShowHistory(false);
+    updateParentFormData(newData); // Update parent with cleared fields
+    return newData;
+  };
+
   const handleDateChange = (date) => {
     setLocalFormData((prev) => {
+      // When date changes, we assume a completely new context
       let newLocalData = {
         ...prev,
         inspectionDate: date,
@@ -192,19 +271,22 @@ const DailyFUQC = ({
         _id: null,
         baseReqTemp: null,
         remarks: "",
-        inspections: []
+        inspections: [],
+        temp_offset: DEFAULT_TEMP_OFFSET
       };
-      newLocalData = resetLocalDetailedSlots(newLocalData); // This will use newLocalData.baseReqTemp (which is null)
+      newLocalData = resetLocalDetailedSlots(newLocalData);
       setMoNoSearch("");
       setAvailableColors([]);
       setAvailableMachineRecords([]);
       setCurrentActiveSlotKey(null);
       setRecordStatusMessage("");
+      setShowHistory(false);
       updateParentFormData(newLocalData);
       return newLocalData;
     });
   };
 
+  // When Machine No changes, fetch available MOs for that machine and date
   const handleMachineNoChange = (e) => {
     const machineNo = e.target.value;
     setLocalFormData((prev) => {
@@ -218,7 +300,8 @@ const DailyFUQC = ({
         _id: null,
         baseReqTemp: null,
         remarks: "",
-        inspections: []
+        inspections: [],
+        temp_offset: DEFAULT_TEMP_OFFSET
       };
       newLocalData = resetLocalDetailedSlots(newLocalData);
       setMoNoSearch("");
@@ -226,11 +309,13 @@ const DailyFUQC = ({
       setAvailableMachineRecords([]);
       setCurrentActiveSlotKey(null);
       setRecordStatusMessage("");
+      setShowHistory(false);
       updateParentFormData(newLocalData);
       return newLocalData;
     });
   };
 
+  // Fetch MO Numbers for search dropdown
   const fetchMoNumbers = useCallback(async () => {
     if (moNoSearch.trim() === "") {
       setMoNoOptions([]);
@@ -259,10 +344,12 @@ const DailyFUQC = ({
     return () => clearTimeout(delayDebounceFn);
   }, [moNoSearch, fetchMoNumbers, localFormData.moNo]);
 
+  // When user selects an MO from the search dropdown
   const handleMoSelect = (selectedMo) => {
-    setMoNoSearch(selectedMo);
+    setMoNoSearch(selectedMo); // Update the search input for display
     setShowMoNoDropdown(false);
     setLocalFormData((prev) => {
+      // Reset for the newly selected MO, but keep date, machine, temp_offset
       let newLocalData = {
         ...prev,
         moNo: selectedMo,
@@ -274,21 +361,24 @@ const DailyFUQC = ({
         remarks: "",
         inspections: []
       };
-      newLocalData = resetLocalDetailedSlots(newLocalData);
+      newLocalData = resetLocalDetailedSlots(newLocalData, false); // Don't preserve base temp for new MO
       setRecordStatusMessage("");
+      setShowHistory(false);
+      // Order details and specific record will be fetched by other useEffects
       updateParentFormData(newLocalData);
       return newLocalData;
     });
   };
 
+  // Fetch Order Details when MO No. changes (and is valid)
   useEffect(() => {
     const fetchOrderDetails = async () => {
       if (!localFormData.moNo) {
         if (localFormData.buyer || localFormData.buyerStyle) {
-          setLocalFormData((prev) => {
-            const updatedData = { ...prev, buyer: "", buyerStyle: "" };
-            updateParentFormData(updatedData);
-            return updatedData;
+          setLocalFormData((p) => {
+            const ud = { ...p, buyer: "", buyerStyle: "" };
+            updateParentFormData(ud);
+            return ud;
           });
         }
         setAvailableColors([]);
@@ -301,21 +391,32 @@ const DailyFUQC = ({
         );
         const details = response.data;
         setLocalFormData((prev) => {
-          const newLocalData = {
+          const nd = {
             ...prev,
             buyer: details.engName || "N/A",
             buyerStyle: details.custStyle || "N/A"
           };
-          updateParentFormData(newLocalData);
-          return newLocalData;
+          updateParentFormData(nd);
+          return nd;
         });
         setAvailableColors(details.colors || []);
+        // If a color was previously selected for a different MO, it might need reset if not in new availableColors
+        if (
+          localFormData.color &&
+          !details.colors?.find((c) => c.original === localFormData.color)
+        ) {
+          setLocalFormData((prev) => {
+            const nd = { ...prev, color: "" };
+            updateParentFormData(nd);
+            return nd;
+          });
+        }
       } catch (error) {
         console.error(t("scc.errorFetchingOrderDetailsLog"), error);
         setLocalFormData((prev) => {
-          const newLocalData = { ...prev, buyer: "", buyerStyle: "" };
-          updateParentFormData(newLocalData);
-          return newLocalData;
+          const nd = { ...prev, buyer: "", buyerStyle: "", color: "" };
+          updateParentFormData(nd);
+          return nd;
         });
         setAvailableColors([]);
       } finally {
@@ -325,16 +426,17 @@ const DailyFUQC = ({
     if (localFormData.moNo) fetchOrderDetails();
     else {
       if (localFormData.buyer || localFormData.buyerStyle) {
-        setLocalFormData((prev) => {
-          const updatedData = { ...prev, buyer: "", buyerStyle: "" };
-          updateParentFormData(updatedData);
-          return updatedData;
+        setLocalFormData((p) => {
+          const ud = { ...p, buyer: "", buyerStyle: "" };
+          updateParentFormData(ud);
+          return ud;
         });
       }
       setAvailableColors([]);
     }
   }, [localFormData.moNo, t, updateParentFormData]);
 
+  // When color changes, reset subsequent fields and fetch specific record or prepare for new
   const handleColorChange = (e) => {
     const newColor = e.target.value;
     setLocalFormData((prev) => {
@@ -346,17 +448,46 @@ const DailyFUQC = ({
         remarks: "",
         inspections: []
       };
-      newLocalData = resetLocalDetailedSlots(newLocalData);
+      newLocalData = resetLocalDetailedSlots(newLocalData, false); // Don't preserve base temp for new color
       setRecordStatusMessage("");
+      setShowHistory(false);
+      // Specific record will be fetched by useEffect watching for moNo, color, date, machineNo
       updateParentFormData(newLocalData);
       return newLocalData;
     });
   };
 
   const handleRemarksChange = (e) => {
-    const newRemarks = e.target.value;
     setLocalFormData((prev) => {
-      const newLocalData = { ...prev, remarks: newRemarks };
+      const newLocalData = { ...prev, remarks: e.target.value };
+      updateParentFormData(newLocalData);
+      return newLocalData;
+    });
+  };
+
+  const handleTempOffsetChange = (e) => {
+    const offsetValue = e.target.value;
+    const numOffset = offsetValue === "" ? null : Number(offsetValue);
+    setLocalFormData((prev) => {
+      const newLocalData = {
+        ...prev,
+        temp_offset: numOffset === null ? DEFAULT_TEMP_OFFSET : numOffset
+      };
+      if (
+        currentActiveSlotKey &&
+        newLocalData.slotsDetailed[currentActiveSlotKey]
+      ) {
+        const slot = newLocalData.slotsDetailed[currentActiveSlotKey];
+        if (
+          !slot.temp_isNA &&
+          slot.temp_actual !== null &&
+          slot.temp_req !== null
+        ) {
+          const diff = Math.abs(slot.temp_actual - slot.temp_req);
+          slot.result =
+            diff <= (newLocalData.temp_offset || 0) ? "Pass" : "Reject";
+        }
+      }
       updateParentFormData(newLocalData);
       return newLocalData;
     });
@@ -393,35 +524,26 @@ const DailyFUQC = ({
 
         setLocalFormData((prevLocalData) => {
           const updatedSlotsDetailed = { ...prevLocalData.slotsDetailed };
-          const slotKeyToUpdate =
-            activeSlotKeyForUpdate ||
-            (TIME_SLOTS_CONFIG[0] ? TIME_SLOTS_CONFIG[0].key : null);
-
-          if (slotKeyToUpdate && updatedSlotsDetailed[slotKeyToUpdate]) {
-            const slot = updatedSlotsDetailed[slotKeyToUpdate];
-            slot.temp_req = newBaseReqTemp;
+          Object.keys(updatedSlotsDetailed).forEach((slotKey) => {
+            const slot = updatedSlotsDetailed[slotKey];
+            slot.temp_req = newBaseReqTemp; // Update req temp for all slots
             if (!slot.temp_isNA && slot.temp_actual === null) {
-              // Auto-fill actual if not NA and not yet set
+              // If actual is not set and not N/A, default to req
               slot.temp_actual = newBaseReqTemp;
             }
-          }
-          // Also update all other non-submitted slots if this is the first fetch
-          TIME_SLOTS_CONFIG.forEach((config) => {
+            // Re-calculate result for all slots based on new req temp
             if (
-              updatedSlotsDetailed[config.key] &&
-              updatedSlotsDetailed[config.key].result === "Pending"
+              !slot.temp_isNA &&
+              slot.temp_actual !== null &&
+              newBaseReqTemp !== null
             ) {
-              // only for pending slots
-              updatedSlotsDetailed[config.key].temp_req = newBaseReqTemp;
-              if (
-                !updatedSlotsDetailed[config.key].temp_isNA &&
-                updatedSlotsDetailed[config.key].temp_actual === null
-              ) {
-                updatedSlotsDetailed[config.key].temp_actual = newBaseReqTemp;
-              }
+              const diff = Math.abs(slot.temp_actual - newBaseReqTemp);
+              slot.result =
+                diff <= (prevLocalData.temp_offset || 0) ? "Pass" : "Reject";
+            } else if (slot.temp_isNA) {
+              slot.result = "N/A";
             }
           });
-
           const newLocalData = {
             ...prevLocalData,
             baseReqTemp: newBaseReqTemp,
@@ -433,10 +555,9 @@ const DailyFUQC = ({
       } catch (error) {
         console.error(t("sccDailyFUQC.errorFetchingFuSpecsLog"), error);
         setLocalFormData((prevLocalData) => {
-          const newLocalData = { ...prevLocalData, baseReqTemp: null };
-          // Potentially clear temp_req from slots or handle as error display
-          updateParentFormData(newLocalData);
-          return newLocalData;
+          const nd = { ...prevLocalData, baseReqTemp: null };
+          updateParentFormData(nd);
+          return nd;
         });
       } finally {
         setBaseTempLoading(false);
@@ -446,11 +567,8 @@ const DailyFUQC = ({
   );
 
   useEffect(() => {
-    // Auto-fetch base temp when MO/Color/Date are ready, for the current active slot
+    // Fetch base temp if MO, Color, Date are set (could be for new or loading existing)
     if (
-      currentActiveSlotKey &&
-      localFormData.slotsDetailed &&
-      localFormData.slotsDetailed[currentActiveSlotKey] &&
       localFormData.moNo &&
       localFormData.color &&
       localFormData.inspectionDate
@@ -463,15 +581,15 @@ const DailyFUQC = ({
       );
     }
   }, [
-    currentActiveSlotKey,
     localFormData.moNo,
     localFormData.color,
     localFormData.inspectionDate,
-    fetchBaseTemperature
+    fetchBaseTemperature,
+    currentActiveSlotKey
   ]);
 
+  // Effect to auto-set current slot's req and actual based on baseReqTemp and evaluate result
   useEffect(() => {
-    // Apply baseReqTemp to current active slot's temp_req and temp_actual (if applicable)
     if (
       currentActiveSlotKey &&
       localFormData.slotsDetailed &&
@@ -482,57 +600,62 @@ const DailyFUQC = ({
         const currentSlotsDetailed = { ...prevLocalData.slotsDetailed };
         const slotToUpdate = { ...currentSlotsDetailed[currentActiveSlotKey] };
         let hasChanged = false;
-
         if (slotToUpdate.temp_req !== prevLocalData.baseReqTemp) {
           slotToUpdate.temp_req = prevLocalData.baseReqTemp;
           hasChanged = true;
         }
-        // If actual is null and not N/A, default it to req temp
         if (slotToUpdate.temp_actual === null && !slotToUpdate.temp_isNA) {
           slotToUpdate.temp_actual = prevLocalData.baseReqTemp;
           hasChanged = true;
         }
-
+        if (
+          !slotToUpdate.temp_isNA &&
+          slotToUpdate.temp_actual !== null &&
+          slotToUpdate.temp_req !== null
+        ) {
+          const diff = Math.abs(
+            slotToUpdate.temp_actual - slotToUpdate.temp_req
+          );
+          const newResult =
+            diff <= (prevLocalData.temp_offset || 0) ? "Pass" : "Reject";
+          if (slotToUpdate.result !== newResult) {
+            slotToUpdate.result = newResult;
+            hasChanged = true;
+          }
+        }
         if (hasChanged) {
           const newSlotsDetailedState = {
             ...currentSlotsDetailed,
             [currentActiveSlotKey]: slotToUpdate
           };
-          // No updateParentFormData here to prevent loops, parent is updated on explicit actions or submit
           return { ...prevLocalData, slotsDetailed: newSlotsDetailedState };
         }
         return prevLocalData;
       });
     }
-  }, [currentActiveSlotKey, localFormData.baseReqTemp]); // Removed slotsDetailed from deps
+  }, [
+    currentActiveSlotKey,
+    localFormData.baseReqTemp,
+    localFormData.temp_offset
+  ]);
 
+  // Main data fetching logic for the form (existing records or list of MOs)
   const fetchDailyFUQCData = useCallback(
-    async (
-      currentMoNo,
-      currentColor,
-      currentInspectionDate,
-      currentMachineNo
-    ) => {
-      if (!currentInspectionDate || !currentMachineNo) return;
+    async (date, machine, mo, clr) => {
+      if (!date || !machine) return;
       setExistingQCRecordLoading(true);
       setRecordStatusMessage("");
-      let baseTempShouldBeFetched = false;
-      let moForBaseTemp = currentMoNo;
-      let colorForBaseTemp = currentColor;
-      let dateForBaseTemp = currentInspectionDate;
-      let activeSlotForBaseTempUpdate = null; // Determine after fetching
+      setShowHistory(false);
+      setAvailableMachineRecords([]); // Clear previous list of MOs
 
       try {
         const params = {
-          inspectionDate:
-            currentInspectionDate instanceof Date
-              ? currentInspectionDate.toISOString()
-              : currentInspectionDate,
-          machineNo: currentMachineNo
+          inspectionDate: date instanceof Date ? date.toISOString() : date,
+          machineNo: machine
         };
-        if (currentMoNo && currentColor) {
-          params.moNo = currentMoNo;
-          params.color = currentColor;
+        if (mo && clr) {
+          params.moNo = mo;
+          params.color = clr;
         }
 
         const response = await axios.get(
@@ -542,43 +665,44 @@ const DailyFUQC = ({
         const { message, data } = response.data;
 
         if (
-          message === "DAILY_FUQC_RECORD_NOT_FOUND" ||
-          (message === "NO_RECORDS_FOR_DATE_MACHINE" && !params.moNo)
+          message === "DAILY_FUQC_RECORD_NOT_FOUND" &&
+          params.moNo &&
+          params.color
         ) {
-          setRecordStatusMessage(t("sccDailyFUQC.newRecord"));
-          const firstSlotKey = TIME_SLOTS_CONFIG[0]
-            ? TIME_SLOTS_CONFIG[0].key
-            : null;
-          activeSlotForBaseTempUpdate = firstSlotKey;
+          // Specific MO/Color not found
+          setRecordStatusMessage(t("sccDailyFUQC.newRecordForMoColor"));
+          const firstSlotKey = TIME_SLOTS_CONFIG[0]?.key || null;
           setCurrentActiveSlotKey(firstSlotKey);
-
+          // Reset slots, but baseReqTemp might have been fetched by another effect if MO/Color/Date are set
           setLocalFormData((prev) => {
             let newLocalState = {
               ...prev,
               _id: null,
               inspections: [],
-              baseReqTemp: prev.baseReqTemp, // Keep current baseReqTemp if already fetched
-              remarks: ""
-            };
-            // Reset slots, but try to preserve/apply existing baseReqTemp
-            const tempForReset = newLocalState.baseReqTemp;
-            newLocalState = resetLocalDetailedSlots(newLocalState); // This will apply current baseReqTemp if available
-            if (tempForReset !== null) {
-              // re-apply if resetLocalDetailedSlots didn't catch it due to prev state
-              Object.keys(newLocalState.slotsDetailed).forEach((key) => {
-                newLocalState.slotsDetailed[key].temp_req = tempForReset;
-                if (
-                  !newLocalState.slotsDetailed[key].temp_isNA &&
-                  newLocalState.slotsDetailed[key].temp_actual === null
-                ) {
-                  newLocalState.slotsDetailed[key].temp_actual = tempForReset;
-                }
-              });
-            }
+              remarks: "",
+              moNo: mo,
+              color: clr
+            }; // Ensure current mo/color are set
+            newLocalState = resetLocalDetailedSlots(newLocalState, true); // Preserve base temp if available
             return newLocalState;
           });
-          if (params.moNo && params.color) baseTempShouldBeFetched = true; // Fetch if this is a specific new record
+          // Base temp should be fetched if not already via the dedicated useEffect
+          if (!localFormData.baseReqTemp) {
+            fetchBaseTemperature(mo, clr, date, firstSlotKey);
+          }
+        } else if (message === "NO_RECORDS_FOR_DATE_MACHINE" && !params.moNo) {
+          // No records at all for this date/machine
+          setRecordStatusMessage(t("sccDailyFUQC.newRecord"));
+          setCurrentActiveSlotKey(TIME_SLOTS_CONFIG[0]?.key || null);
+          setLocalFormData((prev) =>
+            clearAndResetFormForNewMo({
+              ...prev,
+              inspectionDate: date,
+              machineNo: machine
+            })
+          );
         } else if (message === "RECORD_FOUND" && data) {
+          // Specific record found
           setRecordStatusMessage(t("sccDailyFUQC.recordLoaded"));
           const populatedSlots = TIME_SLOTS_CONFIG.reduce((acc, slotConf) => {
             const existingInsp = (data.inspections || []).find(
@@ -592,18 +716,19 @@ const DailyFUQC = ({
                   temp_actual:
                     existingInsp.temp_actual !== null
                       ? Number(existingInsp.temp_actual)
-                      : null
+                      : null,
+                  inspectionTimestamp: existingInsp.inspectionTimestamp || null
                 }
               : {
                   ...initialSlotData,
                   inspectionNo: slotConf.inspectionNo,
                   timeSlotKey: slotConf.key,
                   temp_req: data.baseReqTemp,
-                  temp_actual: data.baseReqTemp
-                }; // Default new slots with baseReqTemp
+                  temp_actual: data.baseReqTemp,
+                  inspectionTimestamp: null
+                };
             return acc;
           }, {});
-
           const lastSubmittedInspNo =
             (data.inspections || []).length > 0
               ? Math.max(...data.inspections.map((i) => i.inspectionNo))
@@ -612,12 +737,9 @@ const DailyFUQC = ({
           const activeSlotConfig = TIME_SLOTS_CONFIG.find(
             (s) => s.inspectionNo === nextInspNo
           );
-          const newActiveSlotKey = activeSlotConfig
-            ? activeSlotConfig.key
-            : null;
-          activeSlotForBaseTempUpdate = newActiveSlotKey;
-          setCurrentActiveSlotKey(newActiveSlotKey);
-
+          setCurrentActiveSlotKey(
+            activeSlotConfig ? activeSlotConfig.key : null
+          );
           setLocalFormData((prev) => ({
             ...prev,
             _id: data._id,
@@ -627,81 +749,61 @@ const DailyFUQC = ({
             color: data.color,
             baseReqTemp:
               data.baseReqTemp !== null ? Number(data.baseReqTemp) : null,
+            temp_offset:
+              data.temp_offset !== undefined
+                ? data.temp_offset
+                : DEFAULT_TEMP_OFFSET,
             remarks: data.remarks || "",
             inspections: data.inspections || [],
             slotsDetailed: populatedSlots
           }));
           setMoNoSearch(data.moNo || "");
-          moForBaseTemp = data.moNo;
-          colorForBaseTemp = data.color;
-          if (data.baseReqTemp === null && data.moNo && data.color)
-            baseTempShouldBeFetched = true;
+          if (data.baseReqTemp === null && data.moNo && data.color) {
+            fetchBaseTemperature(
+              data.moNo,
+              data.color,
+              date,
+              activeSlotConfig ? activeSlotConfig.key : null
+            );
+          }
         } else if (message === "MULTIPLE_MO_COLOR_FOUND" && data.length > 0) {
-          setRecordStatusMessage(t("sccDailyFUQC.selectMoColor"));
+          // Multiple MOs for date/machine
+          setRecordStatusMessage(
+            t("sccDailyFUQC.selectMoColorMachine", { machineNo: machine })
+          );
           setAvailableMachineRecords(data);
-          setCurrentActiveSlotKey(null);
-          setLocalFormData((prev) => {
-            let newLocalState = {
-              ...prev,
-              moNo: "",
-              color: "",
-              buyer: "",
-              buyerStyle: "",
-              _id: null,
-              baseReqTemp: null,
-              remarks: "",
-              inspections: []
-            };
-            newLocalState = resetLocalDetailedSlots(newLocalState);
-            updateParentFormData(newLocalState); // Update parent since these fields are cleared
-            return newLocalState;
-          });
+          setCurrentActiveSlotKey(null); // No active slot until MO/Color selected from dropdown
+          // Clear MO/Color specific fields but keep date/machine
+          setLocalFormData((prev) => ({
+            ...prev,
+            moNo: "",
+            color: "",
+            buyer: "",
+            buyerStyle: "",
+            _id: null,
+            baseReqTemp: null,
+            remarks: "",
+            inspections: [],
+            slotsDetailed: TIME_SLOTS_CONFIG.reduce((acc, slot) => {
+              acc[slot.key] = {
+                ...initialSlotData,
+                inspectionNo: slot.inspectionNo,
+                timeSlotKey: slot.key
+              };
+              return acc;
+            }, {})
+          }));
           setMoNoSearch("");
         } else {
-          // Fallback for other messages or unexpected structure
+          // Fallback
           setRecordStatusMessage(t("sccDailyFUQC.newRecord"));
-          const firstSlotKey = TIME_SLOTS_CONFIG[0]
-            ? TIME_SLOTS_CONFIG[0].key
-            : null;
-          activeSlotForBaseTempUpdate = firstSlotKey;
-          setCurrentActiveSlotKey(firstSlotKey);
-          setLocalFormData((prev) => {
-            let newLocalState = {
+          setCurrentActiveSlotKey(TIME_SLOTS_CONFIG[0]?.key || null);
+          setLocalFormData((prev) =>
+            clearAndResetFormForNewMo({
               ...prev,
-              _id: null,
-              inspections: [],
-              remarks: "",
-              baseReqTemp: prev.baseReqTemp
-            };
-            const tempForReset = newLocalState.baseReqTemp;
-            newLocalState = resetLocalDetailedSlots(newLocalState);
-            if (tempForReset !== null) {
-              Object.keys(newLocalState.slotsDetailed).forEach((key) => {
-                newLocalState.slotsDetailed[key].temp_req = tempForReset;
-                if (
-                  !newLocalState.slotsDetailed[key].temp_isNA &&
-                  newLocalState.slotsDetailed[key].temp_actual === null
-                ) {
-                  newLocalState.slotsDetailed[key].temp_actual = tempForReset;
-                }
-              });
-            }
-            return newLocalState;
-          });
-          if (params.moNo && params.color) baseTempShouldBeFetched = true;
-        }
-
-        if (
-          baseTempShouldBeFetched &&
-          moForBaseTemp &&
-          colorForBaseTemp &&
-          dateForBaseTemp
-        ) {
-          fetchBaseTemperature(
-            moForBaseTemp,
-            colorForBaseTemp,
-            dateForBaseTemp,
-            activeSlotForBaseTempUpdate
+              inspectionDate: date,
+              machineNo: machine
+            })
           );
         }
       } catch (error) {
@@ -711,39 +813,72 @@ const DailyFUQC = ({
           t("sccDailyFUQC.errorLoadingRecordMsg"),
           "error"
         );
+        setLocalFormData((prev) =>
+          clearAndResetFormForNewMo({
+            ...prev,
+            inspectionDate: date,
+            machineNo: machine
+          })
+        );
       } finally {
         setExistingQCRecordLoading(false);
+        setMachineRecordsLoading(false);
       }
     },
-    [t, fetchBaseTemperature, updateParentFormData]
-  ); // Removed currentActiveSlotKey from deps, it's set inside
+    [t, fetchBaseTemperature, updateParentFormData, localFormData.baseReqTemp]
+  ); // Added localFormData.baseReqTemp as it's used in reset
 
+  // Effect to trigger data fetching when primary keys (date, machine) change
   useEffect(() => {
     if (localFormData.inspectionDate && localFormData.machineNo) {
-      // If moNo and color are also set, fetch specifically for them
-      // Otherwise, fetchDailyFUQCData will handle the case of fetching available MOs or a new record for date/machine
+      // If MO and Color are also set, fetch that specific record.
+      // Otherwise, fetch to see if there are multiple MOs for the date/machine or if it's a new context.
       fetchDailyFUQCData(
-        localFormData.moNo,
-        localFormData.color,
         localFormData.inspectionDate,
-        localFormData.machineNo
+        localFormData.machineNo,
+        localFormData.moNo,
+        localFormData.color
       );
     }
-  }, [
-    localFormData.inspectionDate,
-    localFormData.machineNo,
-    localFormData.moNo,
-    localFormData.color,
-    fetchDailyFUQCData
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localFormData.inspectionDate, localFormData.machineNo]); // Only these should trigger the initial fetch or list of MOs
+
+  // Effect to fetch specific record when MO/Color are selected from the list
+  useEffect(() => {
+    if (
+      localFormData.inspectionDate &&
+      localFormData.machineNo &&
+      localFormData.moNo &&
+      localFormData.color
+    ) {
+      fetchDailyFUQCData(
+        localFormData.inspectionDate,
+        localFormData.machineNo,
+        localFormData.moNo,
+        localFormData.color
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localFormData.moNo, localFormData.color]); // Re-fetch specific record when MO/Color changes
 
   const handleSlotActualTempChange = (slotKey, value) => {
     setLocalFormData((prev) => {
       const newSlotsDetailed = { ...prev.slotsDetailed };
       const slot = { ...newSlotsDetailed[slotKey] };
       if (!slot || slot.temp_isNA) return prev;
-
       slot.temp_actual = value === "" || value === null ? null : Number(value);
+      if (
+        !slot.temp_isNA &&
+        slot.temp_actual !== null &&
+        slot.temp_req !== null
+      ) {
+        const diff = Math.abs(slot.temp_actual - slot.temp_req);
+        slot.result = diff <= (prev.temp_offset || 0) ? "Pass" : "Reject";
+      } else if (slot.temp_isNA) {
+        slot.result = "N/A";
+      } else {
+        slot.result = "Pending";
+      }
       newSlotsDetailed[slotKey] = slot;
       const newLocalData = { ...prev, slotsDetailed: newSlotsDetailed };
       updateParentFormData(newLocalData);
@@ -756,7 +891,6 @@ const DailyFUQC = ({
       const newSlotsDetailed = { ...prev.slotsDetailed };
       const slot = { ...newSlotsDetailed[slotKey] };
       if (!slot || slot.temp_isNA) return prev;
-
       let currentValue = parseFloat(slot.temp_actual);
       if (isNaN(currentValue)) {
         currentValue = parseFloat(slot.temp_req);
@@ -765,7 +899,18 @@ const DailyFUQC = ({
       if (action === "increment") currentValue += 1;
       if (action === "decrement") currentValue -= 1;
       slot.temp_actual = currentValue;
-
+      if (
+        !slot.temp_isNA &&
+        slot.temp_actual !== null &&
+        slot.temp_req !== null
+      ) {
+        const diff = Math.abs(slot.temp_actual - slot.temp_req);
+        slot.result = diff <= (prev.temp_offset || 0) ? "Pass" : "Reject";
+      } else if (slot.temp_isNA) {
+        slot.result = "N/A";
+      } else {
+        slot.result = "Pending";
+      }
       newSlotsDetailed[slotKey] = slot;
       const newLocalData = { ...prev, slotsDetailed: newSlotsDetailed };
       updateParentFormData(newLocalData);
@@ -778,15 +923,19 @@ const DailyFUQC = ({
       const newSlotsDetailed = { ...prev.slotsDetailed };
       const slot = { ...newSlotsDetailed[slotKey] };
       if (!slot) return prev;
-
       slot.temp_isNA = !slot.temp_isNA;
       if (slot.temp_isNA) {
         slot.temp_actual = null;
-        slot.result = "Pending"; // Reset result if temp is N/A
+        slot.result = "N/A";
       } else {
-        // If un-marking N/A, restore actual to req if actual is null
         slot.temp_actual =
           slot.temp_actual === null ? slot.temp_req : slot.temp_actual;
+        if (slot.temp_actual !== null && slot.temp_req !== null) {
+          const diff = Math.abs(slot.temp_actual - slot.temp_req);
+          slot.result = diff <= (prev.temp_offset || 0) ? "Pass" : "Reject";
+        } else {
+          slot.result = "Pending";
+        }
       }
       newSlotsDetailed[slotKey] = slot;
       const newLocalData = { ...prev, slotsDetailed: newSlotsDetailed };
@@ -799,8 +948,7 @@ const DailyFUQC = ({
     setLocalFormData((prev) => {
       const newSlotsDetailed = { ...prev.slotsDetailed };
       const slot = { ...newSlotsDetailed[slotKey] };
-      if (!slot || slot.temp_isNA) return prev; // Cannot set result if temp is N/A
-
+      if (!slot || slot.temp_isNA) return prev;
       slot.result = resultValue;
       newSlotsDetailed[slotKey] = slot;
       const newLocalData = { ...prev, slotsDetailed: newSlotsDetailed };
@@ -809,16 +957,8 @@ const DailyFUQC = ({
     });
   };
 
-  const getCellBGFromResult = (result) => {
-    if (result === "Pass") return "bg-green-100 text-green-700";
-    if (result === "Reject") return "bg-red-100 text-red-700";
-    return "bg-white";
-  };
-  const getCellBGForNA = (isNA) => {
-    return isNA ? "bg-gray-200 text-gray-500" : "";
-  };
-
-  const handleFormActualSubmit = () => {
+  const handleFormActualSubmit = async () => {
+    // Made async for potential re-fetch
     if (
       !localFormData.inspectionDate ||
       !localFormData.machineNo ||
@@ -850,7 +990,6 @@ const DailyFUQC = ({
       return;
     }
     if (activeSlotData.temp_req === null && !baseTempLoading) {
-      // Check if req temp is loaded
       Swal.fire(
         t("scc.validationErrorTitle"),
         t("sccDailyFUQC.validation.tempReqMissing"),
@@ -867,7 +1006,6 @@ const DailyFUQC = ({
       return;
     }
     if (activeSlotData.result === "Pending" && !activeSlotData.temp_isNA) {
-      // Only require result if not N/A
       Swal.fire(
         t("scc.validationErrorTitle"),
         t("sccDailyFUQC.validation.selectResultActiveSlot"),
@@ -888,6 +1026,7 @@ const DailyFUQC = ({
         localFormData.baseReqTemp !== null
           ? Number(localFormData.baseReqTemp)
           : null,
+      temp_offset: Number(localFormData.temp_offset),
       remarks: localFormData.remarks?.trim() || "NA",
       emp_id: user.emp_id,
       emp_kh_name: user.kh_name,
@@ -907,47 +1046,82 @@ const DailyFUQC = ({
             ? Number(activeSlotData.temp_actual)
             : null,
         temp_isNA: activeSlotData.temp_isNA,
-        result: activeSlotData.temp_isNA ? "N/A" : activeSlotData.result // If NA, result is N/A conceptually
+        result: activeSlotData.temp_isNA ? "N/A" : activeSlotData.result,
+        inspectionTimestamp: new Date()
       }
     };
-    onFormSubmit(formType, payloadForParent);
+
+    try {
+      await onFormSubmit(formType, payloadForParent); // onFormSubmit is from SCCPage
+      // After successful submission, SCCPage will reset its formData prop.
+      // The useEffect watching formData in this component will then re-sync localFormData.
+      // To ensure history updates immediately, we can re-trigger the fetch for the current context.
+      if (
+        localFormData.inspectionDate &&
+        localFormData.machineNo &&
+        localFormData.moNo &&
+        localFormData.color
+      ) {
+        fetchDailyFUQCData(
+          localFormData.inspectionDate,
+          localFormData.machineNo,
+          localFormData.moNo,
+          localFormData.color
+        );
+      } else if (localFormData.inspectionDate && localFormData.machineNo) {
+        fetchDailyFUQCData(
+          localFormData.inspectionDate,
+          localFormData.machineNo,
+          null,
+          null
+        ); // Fetch list of MOs if MO was cleared
+      }
+      // setShowHistory(true); // Optionally auto-show history after submit
+    } catch (error) {
+      // Error handling is typically done in onFormSubmit within SCCPage
+      console.error("Submission error caught in DailyFUQC", error);
+    }
   };
 
-  const loading =
-    orderDetailsLoading || baseTempLoading || existingQCRecordLoading;
+  const currentSlotTableTitle = useMemo(() => {
+    if (!currentActiveSlotKey) return t("sccDailyFUQC.noActiveSlot");
+    const slotConfig = TIME_SLOTS_CONFIG.find(
+      (s) => s.key === currentActiveSlotKey
+    );
+    if (!slotConfig) return t("sccDailyFUQC.noActiveSlot");
+    return `${t("sccDailyFUQC.currentInspectionSlot")}: ${slotConfig.label} (#${
+      slotConfig.inspectionNo
+    })`;
+  }, [currentActiveSlotKey, t]);
 
   const renderCurrentSlotTable = () => {
     if (!currentActiveSlotKey) return null;
     const currentSlot = localFormData.slotsDetailed[currentActiveSlotKey];
     if (!currentSlot) return null;
 
-    const slotConfig = TIME_SLOTS_CONFIG.find(
-      (s) => s.key === currentActiveSlotKey
-    );
-
     return (
-      <div className="border border-gray-300 rounded-md shadow-sm bg-white">
-        <h3 className="text-md font-semibold text-gray-700 px-3 py-2 bg-gray-100">
-          {t("sccDailyFUQC.currentInspectionSlot")}: {slotConfig.label} (#
-          {slotConfig.inspectionNo})
-        </h3>
-        <table className="min-w-full divide-y divide-gray-300 text-xs">
+      <div className="border border-gray-300 rounded-lg shadow-sm bg-white overflow-hidden">
+        <table className="min-w-full text-xs divide-y divide-gray-200">
           <thead className="bg-gray-100">
             <tr>
-              <th className="px-3 py-2.5 text-center font-semibold text-gray-800 border-r border-gray-300 w-1/3">
+              <th className="px-3 py-2 text-center font-semibold text-gray-700 border-r w-1/3">
                 {t("sccDailyFUQC.reqTemp")} (°C)
               </th>
-              <th className="px-3 py-2.5 text-center font-semibold text-gray-800 border-r border-gray-300 w-1/3">
-                {slotConfig.label} ({t("sccDailyFUQC.actualTemp")}, °C)
+              <th className="px-3 py-2 text-center font-semibold text-gray-700 border-r w-1/3">
+                {t("sccDailyFUQC.actualTemp")} (°C)
               </th>
-              <th className="px-3 py-2.5 text-center font-semibold text-gray-800 w-1/3">
+              <th className="px-3 py-2 text-center font-semibold text-gray-700 w-1/3">
                 {t("sccDailyFUQC.result")}
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            <tr className="hover:bg-gray-50">
-              <td className="px-3 py-2.5 border border-gray-300 text-center">
+            <tr
+              className={`hover:bg-gray-50 ${getCellBGFromResult(
+                currentSlot.result
+              )}`}
+            >
+              <td className="px-3 py-2 border-r text-center">
                 {currentSlot.temp_req !== null ? (
                   currentSlot.temp_req
                 ) : baseTempLoading ? (
@@ -957,17 +1131,16 @@ const DailyFUQC = ({
                 )}
               </td>
               <td
-                className={`px-1 py-2 border border-gray-300 text-center ${getCellBGForNA(
+                className={`px-1.5 py-1.5 border-r text-center ${getCellBGForNA(
                   currentSlot.temp_isNA
                 )}`}
               >
                 {currentSlot.temp_isNA ? (
-                  <span className="italic text-gray-500">
-                    {t("scc.na", "N/A")}
-                  </span>
+                  <span className="italic text-gray-500">{t("scc.na")}</span>
                 ) : (
                   <input
                     type="number"
+                    inputMode="numeric"
                     value={
                       currentSlot.temp_actual !== null
                         ? currentSlot.temp_actual
@@ -991,64 +1164,58 @@ const DailyFUQC = ({
                     (currentSlot.temp_req !== null || baseTempLoading) && (
                       <>
                         <button
+                          type="button"
                           onClick={() =>
                             handleSlotTempIncrementDecrement(
                               currentActiveSlotKey,
                               "decrement"
                             )
                           }
-                          className="p-1 hover:bg-gray-300 rounded disabled:opacity-50"
-                          type="button"
+                          className="p-1 hover:bg-gray-200 rounded-full disabled:opacity-50"
                           disabled={
                             currentSlot.temp_isNA ||
                             (currentSlot.temp_req === null && !baseTempLoading)
                           }
                         >
-                          {" "}
-                          <Minus size={14} />
+                          <Minus size={12} />
                         </button>
                         <button
+                          type="button"
                           onClick={() =>
                             handleSlotTempIncrementDecrement(
                               currentActiveSlotKey,
                               "increment"
                             )
                           }
-                          className="p-1 hover:bg-gray-300 rounded disabled:opacity-50"
-                          type="button"
+                          className="p-1 hover:bg-gray-200 rounded-full disabled:opacity-50"
                           disabled={
                             currentSlot.temp_isNA ||
                             (currentSlot.temp_req === null && !baseTempLoading)
                           }
                         >
-                          {" "}
-                          <Plus size={14} />
+                          <Plus size={12} />
                         </button>
                       </>
                     )}
                   <button
-                    onClick={() => toggleSlotTempNA(currentActiveSlotKey)}
-                    className="p-1 hover:bg-gray-300 rounded disabled:opacity-50"
                     type="button"
+                    onClick={() => toggleSlotTempNA(currentActiveSlotKey)}
+                    className="p-1 hover:bg-gray-200 rounded-full disabled:opacity-50"
                     disabled={
                       currentSlot.temp_req === null &&
                       !baseTempLoading &&
                       !currentSlot.temp_isNA
-                    } // Disable if no req temp unless already NA
+                    }
                   >
                     {currentSlot.temp_isNA ? (
-                      <EyeOff size={14} className="text-gray-500" />
+                      <EyeOff size={12} className="text-gray-500" />
                     ) : (
-                      <Eye size={14} />
+                      <Eye size={12} />
                     )}
                   </button>
                 </div>
               </td>
-              <td
-                className={`px-1 py-2 border border-gray-300 text-center ${getCellBGFromResult(
-                  currentSlot.result
-                )}`}
-              >
+              <td className={`px-1.5 py-1.5 text-center`}>
                 <select
                   value={currentSlot.result}
                   onChange={(e) =>
@@ -1075,33 +1242,48 @@ const DailyFUQC = ({
   };
 
   const renderPreviousRecordsTable = () => {
-    const submittedInspections = (formData.inspections || [])
+    if (!showHistory) return null;
+
+    const currentSlotConfig = currentActiveSlotKey
+      ? TIME_SLOTS_CONFIG.find((s) => s.key === currentActiveSlotKey)
+      : null;
+    const currentSlotInspectionNo = currentSlotConfig
+      ? currentSlotConfig.inspectionNo
+      : Infinity;
+
+    // Use localFormData.slotsDetailed to show the most up-to-date state before full parent sync might happen
+    const submittedInspections = Object.values(localFormData.slotsDetailed)
+      .filter((slot) => slot.inspectionNo < currentSlotInspectionNo)
       .filter(
-        (insp) =>
-          insp.result !== "Pending" ||
-          insp.temp_isNA ||
-          insp.temp_actual !== null
-      ) // Show if it has a result OR isNA OR has actual_temp
+        (slot) =>
+          slot.result !== "Pending" ||
+          slot.temp_isNA ||
+          slot.temp_actual !== null
+      )
       .sort((a, b) => a.inspectionNo - b.inspectionNo);
 
-    if (submittedInspections.length === 0) return null;
+    if (submittedInspections.length === 0) {
+      return (
+        <p className="text-sm text-gray-500 italic mt-2">
+          {t("sccDailyFUQC.noHistoryToShow")}
+        </p>
+      );
+    }
 
     return (
-      <div className="border border-gray-300 rounded-md shadow-sm bg-white mt-5">
-        <h3 className="text-md font-semibold text-gray-700 px-3 py-2 bg-gray-100">
-          {t("sccDailyFUQC.previousRecords")}
-        </h3>
+      <div className="border border-gray-300 rounded-lg shadow-sm bg-white mt-5 overflow-hidden">
+        {/* Title moved outside if Check History button acts as title */}
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-300 text-xs">
-            <thead className="bg-gray-100">
+          <table className="min-w-full text-xs divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-2.5 text-left font-semibold text-gray-800 border-r border-gray-300 sticky left-0 bg-gray-100 z-10 min-w-[150px]">
+                <th className="px-3 py-2 text-left font-semibold text-gray-600 uppercase tracking-wider border-r sticky left-0 bg-gray-50 z-10 min-w-[120px]">
                   {t("sccDailyFUQC.parameter")}
                 </th>
                 {submittedInspections.map((insp) => (
                   <th
                     key={insp.timeSlotKey}
-                    className="px-3 py-2.5 text-center font-semibold text-gray-800 border-r border-gray-300 min-w-[80px]"
+                    className="px-3 py-2 text-center font-semibold text-gray-600 uppercase tracking-wider border-r min-w-[70px]"
                   >
                     {
                       TIME_SLOTS_CONFIG.find((s) => s.key === insp.timeSlotKey)
@@ -1113,26 +1295,26 @@ const DailyFUQC = ({
             </thead>
             <tbody className="divide-y divide-gray-200">
               <tr className="hover:bg-gray-50">
-                <td className="px-3 py-2.5 border border-gray-300 font-medium text-gray-700 sticky left-0 bg-white z-10">
+                <td className="px-3 py-2 border-r font-medium text-gray-700 sticky left-0 bg-white z-10">
                   {t("sccDailyFUQC.reqTemp")} (°C)
                 </td>
                 {submittedInspections.map((insp) => (
                   <td
                     key={`${insp.timeSlotKey}-req`}
-                    className="px-3 py-2.5 border border-gray-300 text-center"
+                    className="px-3 py-2 border-r text-center"
                   >
                     {insp.temp_req !== null ? insp.temp_req : "N/A"}
                   </td>
                 ))}
               </tr>
               <tr className="hover:bg-gray-50">
-                <td className="px-3 py-2.5 border border-gray-300 font-medium text-gray-700 sticky left-0 bg-white z-10">
+                <td className="px-3 py-2 border-r font-medium text-gray-700 sticky left-0 bg-white z-10">
                   {t("sccDailyFUQC.actualTemp")} (°C)
                 </td>
                 {submittedInspections.map((insp) => (
                   <td
                     key={`${insp.timeSlotKey}-actual`}
-                    className={`px-3 py-2.5 border border-gray-300 text-center ${
+                    className={`px-3 py-2 border-r text-center ${
                       insp.temp_isNA ? "bg-gray-100 text-gray-500 italic" : ""
                     }`}
                   >
@@ -1145,32 +1327,39 @@ const DailyFUQC = ({
                 ))}
               </tr>
               <tr className="hover:bg-gray-50">
-                <td className="px-3 py-2.5 border border-gray-300 font-medium text-gray-700 sticky left-0 bg-white z-10">
+                <td className="px-3 py-2 border-r font-medium text-gray-700 sticky left-0 bg-white z-10">
                   {t("sccDailyFUQC.result")}
                 </td>
                 {submittedInspections.map((insp) => (
                   <td
                     key={`${insp.timeSlotKey}-result`}
-                    className={`px-3 py-2.5 border border-gray-300 text-center ${
+                    className={`px-3 py-2 border-r text-center ${
                       insp.temp_isNA
                         ? "bg-gray-100 text-gray-500 italic"
                         : getCellBGFromResult(insp.result)
                     }`}
                   >
-                    {insp.temp_isNA
-                      ? t("scc.na")
-                      : t(`scc.${insp.result?.toLowerCase() || "pending"}`)}
-                    {!insp.temp_isNA && insp.result === "Pass" && (
-                      <CheckCircle
-                        size={12}
-                        className="inline-block ml-1 text-green-600"
-                      />
-                    )}
-                    {!insp.temp_isNA && insp.result === "Reject" && (
-                      <XCircle
-                        size={12}
-                        className="inline-block ml-1 text-red-600"
-                      />
+                    <div>
+                      {insp.temp_isNA
+                        ? t("scc.na")
+                        : t(`scc.${insp.result?.toLowerCase() || "pending"}`)}
+                      {!insp.temp_isNA && insp.result === "Pass" && (
+                        <CheckCircle
+                          size={12}
+                          className="inline-block ml-1 text-green-600"
+                        />
+                      )}
+                      {!insp.temp_isNA && insp.result === "Reject" && (
+                        <XCircle
+                          size={12}
+                          className="inline-block ml-1 text-red-600"
+                        />
+                      )}
+                    </div>
+                    {insp.inspectionTimestamp && (
+                      <div className="text-gray-500 text-[10px] mt-0.5">
+                        {formatInspectionTimestamp(insp.inspectionTimestamp)}
+                      </div>
                     )}
                   </td>
                 ))}
@@ -1182,11 +1371,8 @@ const DailyFUQC = ({
     );
   };
 
-  if (!user)
-    return <div className="p-6 text-center">{t("scc.loadingUser")}</div>;
-
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-5">
       <h2 className="text-lg font-semibold text-gray-800">
         {t("sccDailyFUQC.title")}
       </h2>
@@ -1195,7 +1381,7 @@ const DailyFUQC = ({
       </p>
 
       {loading && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-[100]">
           <Loader2 className="animate-spin h-12 w-12 text-white" />
         </div>
       )}
@@ -1207,13 +1393,15 @@ const DailyFUQC = ({
             ) ||
             recordStatusMessage.includes(
               t("sccDailyFUQC.selectMoColorKey", "select MO and Color")
+            ) ||
+            recordStatusMessage.includes(
+              t("sccDailyFUQC.selectMoColorMachine", "for machine")
             )
               ? "bg-blue-50 text-blue-700 border-blue-200"
               : "bg-green-50 text-green-700 border-green-200"
           }`}
         >
-          <Info size={18} className="mr-2 flex-shrink-0" />{" "}
-          {recordStatusMessage}
+          <Info size={18} className="mr-2 shrink-0" /> {recordStatusMessage}
         </div>
       )}
 
@@ -1233,6 +1421,7 @@ const DailyFUQC = ({
             className={inputFieldClasses}
             required
             popperPlacement="bottom-start"
+            id="fuqcInspectionDate"
           />
         </div>
         <div>
@@ -1259,7 +1448,7 @@ const DailyFUQC = ({
           <label htmlFor="fuqcMoNoSearch" className={labelClasses}>
             {t("scc.moNo")}
           </label>
-          <div className="relative mt-1">
+          <div className="relative mt-1" ref={moNoDropdownRef}>
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-5 w-5 text-gray-400" />
             </div>
@@ -1272,13 +1461,9 @@ const DailyFUQC = ({
               onFocus={() => setShowMoNoDropdown(true)}
               placeholder={t("scc.searchMoNo")}
               className={`${inputFieldClasses} pl-10`}
-              required
             />
             {showMoNoDropdown && moNoOptions.length > 0 && (
-              <ul
-                ref={moNoDropdownRef}
-                className="absolute z-20 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"
-              >
+              <ul className="absolute z-20 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
                 {moNoOptions.map((mo) => (
                   <li
                     key={mo}
@@ -1291,53 +1476,53 @@ const DailyFUQC = ({
               </ul>
             )}
           </div>
-          {availableMachineRecords.length > 0 && !localFormData.moNo && (
-            <div className="mt-1">
-              <label
-                htmlFor="selectExistingMoFuqc"
-                className={`${labelClasses} text-xs`}
-              >
-                {t("sccDailyFUQC.selectExisting")}
-              </label>
-              <select
-                id="selectExistingMoFuqc"
-                onChange={(e) => {
-                  const selectedVal = e.target.value;
-                  if (selectedVal) {
-                    const [selectedMo, selectedColor] = selectedVal.split("|");
-                    setLocalFormData((prev) => {
-                      let newLocalData = {
-                        ...prev,
-                        moNo: selectedMo,
-                        color: selectedColor,
-                        _id: null,
-                        baseReqTemp: null,
-                        remarks: "",
-                        inspections: []
-                      };
-                      newLocalData = resetLocalDetailedSlots(newLocalData); // This should use the new baseReqTemp which is null here
-                      setMoNoSearch(selectedMo);
-                      // fetchDailyFUQCData will be triggered by moNo/color change from useEffect
-                      return newLocalData;
-                    });
-                  }
-                }}
-                className={inputFieldClasses}
-                defaultValue=""
-              >
-                <option value="">-- {t("scc.select")} --</option>
-                {availableMachineRecords.map((rec) => (
-                  <option
-                    key={`${rec.moNo}-${rec.color}`}
-                    value={`${rec.moNo}|${rec.color}`}
-                  >
-                    {rec.moNo} - {rec.color} (
-                    {rec.buyerStyle || t("scc.naCap", "N/A")})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          {availableMachineRecords.length > 0 &&
+            !localFormData.moNo && ( // Show dropdown if multiple MOs exist and none selected yet
+              <div className="mt-1">
+                <label
+                  htmlFor="selectExistingMoFuqc"
+                  className={`${labelClasses} text-xs`}
+                >
+                  {t("sccDailyFUQC.selectExistingOrSearch")}
+                </label>
+                <select
+                  id="selectExistingMoFuqc"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) {
+                      const [sm, sc] = val.split("|");
+                      setLocalFormData((p) => {
+                        let nd = {
+                          ...p,
+                          moNo: sm,
+                          color: sc,
+                          _id: null,
+                          baseReqTemp: null,
+                          remarks: "",
+                          inspections: []
+                        };
+                        nd = resetLocalDetailedSlots(nd);
+                        setMoNoSearch(sm);
+                        return nd;
+                      });
+                    }
+                  }}
+                  className={inputFieldClasses}
+                  defaultValue=""
+                >
+                  <option value="">-- {t("scc.select")} --</option>
+                  {availableMachineRecords.map((rec) => (
+                    <option
+                      key={`${rec.moNo}-${rec.color}`}
+                      value={`${rec.moNo}|${rec.color}`}
+                    >
+                      {rec.moNo} - {rec.color} (
+                      {rec.buyerStyle || t("scc.naCap")})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
         </div>
       </div>
 
@@ -1383,16 +1568,60 @@ const DailyFUQC = ({
         </div>
       </div>
 
-      {localFormData.moNo && localFormData.color && (
-        <div className="mt-4 space-y-5">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-3 items-end">
+        <div>
+          <label htmlFor="fuqcTempOffset" className={labelClasses}>
+            {t("sccDailyFUQC.tempOffset", "Temp. Offset (±°C)")}
+          </label>
+          <input
+            type="number"
+            id="fuqcTempOffset"
+            name="temp_offset"
+            inputMode="numeric"
+            value={
+              localFormData.temp_offset !== null
+                ? localFormData.temp_offset
+                : ""
+            }
+            onChange={handleTempOffsetChange}
+            className={inputFieldClasses}
+            placeholder="e.g. 5"
+          />
+        </div>
+      </div>
+
+      {(localFormData.moNo && localFormData.color) ||
+      availableMachineRecords.length > 0 ? ( // Show tables section if we have criteria or a list of MOs to pick from
+        <div className="mt-4 space-y-4">
+          <h3 className="text-md font-semibold text-gray-700">
+            {currentSlotTableTitle}
+          </h3>
           {currentActiveSlotKey ? (
             renderCurrentSlotTable()
+          ) : !localFormData.moNo && availableMachineRecords.length > 0 ? (
+            <p className="text-sm italic text-gray-500">
+              {t("sccDailyFUQC.selectMoFromList")}
+            </p>
           ) : (
-            <div className="text-center py-4 text-gray-500">
+            <div className="text-center py-4 text-gray-500 italic">
               {t("sccDailyFUQC.allInspectionsCompleted")}
             </div>
           )}
+
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setShowHistory((prev) => !prev)}
+              className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50"
+            >
+              <History size={14} className="mr-1.5" />{" "}
+              {showHistory
+                ? t("sccDailyFUQC.hideHistory")
+                : t("sccDailyFUQC.checkHistory")}
+            </button>
+          </div>
           {renderPreviousRecordsTable()}
+
           <div className="pt-3">
             <label htmlFor="fuqcRemarks" className={labelClasses}>
               {t("sccDailyFUQC.remarks")} ({t("scc.optional")})
@@ -1400,7 +1629,7 @@ const DailyFUQC = ({
             <textarea
               id="fuqcRemarks"
               name="remarks"
-              rows="3"
+              rows="2"
               value={localFormData.remarks || ""}
               onChange={handleRemarksChange}
               className={inputFieldClasses}
@@ -1408,14 +1637,20 @@ const DailyFUQC = ({
             ></textarea>
           </div>
         </div>
-      )}
+      ) : null}
 
-      <div className="pt-4 flex justify-end">
+      <div className="pt-5 flex justify-end">
         <button
           type="button"
           onClick={handleFormActualSubmit}
-          disabled={isSubmitting || !currentActiveSlotKey || loading}
-          className="inline-flex items-center justify-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400"
+          disabled={
+            isSubmitting ||
+            !currentActiveSlotKey ||
+            loading ||
+            !localFormData.moNo ||
+            !localFormData.color
+          }
+          className="inline-flex items-center justify-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
           {isSubmitting && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
           {currentActiveSlotKey
