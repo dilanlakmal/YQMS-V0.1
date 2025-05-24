@@ -13,11 +13,11 @@ import {
   updateUserProfile,
   getUserDataByToken,
   refreshToken as refreshTokenController, 
-} from '../Controller/UserController/authController.js'; 
+} from '../../Controller/User/authController.js'; 
 
 // Get __dirname equivalent in ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
 
 // Helper function to generate random string (if not in a shared utils file)
 const generateRandomString = (length) => {
@@ -31,22 +31,14 @@ const generateRandomString = (length) => {
 
 // Multer Storage Setup
 const storage = multer.diskStorage({
-  destination: async (req, file, cb) => {
-    // req.userId should be set by authenticateUser middleware if this route is protected
-    // For profile updates, authenticateUser will run before multer's destination
-    const userId = req.userId || 'temp_user_id'; // Fallback if userId not set (e.g. during registration if needed)
-    if (!req.userId && req.path === '/api/user-profile' && req.method === 'PUT') {
-        // This specific check might be redundant if authenticateUser always runs first for this route
-        // console.warn('User ID not defined for profile upload, check middleware order.');
+  destination: (req, file, cb) => {
+    const userId = req.userId; 
+    if (!userId) {
+      return cb(new Error('User ID is not defined'));
     }
-    const dir = path.join(__dirname, '..', '..', 'public', 'storage', 'profiles', userId.toString()); // Ensure userId is a string
-    try {
-      await fsPromises.mkdir(dir, { recursive: true });
-      cb(null, dir);
-    } catch (error) {
-      console.error("Error creating directory for profile upload:", error);
-      cb(error);
-    }
+    const dir = `../public/storage/profiles/${userId}`;
+     fsPromises.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
   },
   filename: (req, file, cb) => {
     const randomString = generateRandomString(32);
@@ -77,14 +69,23 @@ const upload = multer({
 
 // Middleware to authenticate user using JWT
 const authenticateUser = (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Authentication failed: No token provided' });
-    }
-    const token = authHeader.split(' ')[1];
-    const decodedToken = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-    req.userId = decodedToken.userId;
+//   try {
+//     const authHeader = req.headers.authorization;
+//     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+//         return res.status(401).json({ message: 'Authentication failed: No token provided' });
+//     }
+//     const token = authHeader.split(' ')[1];
+//     const decodedToken = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+//     req.userId = decodedToken.userId;
+//     next();
+//   } catch (error) {
+//     res.status(401).json({ message: 'Authentication failed', error: error.message });
+//   }
+// };
+try {
+    const token = req.headers.authorization.split(' ')[1];
+    const decodedToken = jwt.verify(token, 'your_jwt_secret');
+    req.userId = decodedToken.userId; // Set the userId in the request object
     next();
   } catch (error) {
     res.status(401).json({ message: 'Authentication failed', error: error.message });
