@@ -2206,7 +2206,7 @@ const CuttingPage = () => {
         calculatedBundleQtyCheck = 4;
       else if (multiplication >= 501 && multiplication <= 1200)
         calculatedBundleQtyCheck = 6;
-      else if (multiplication >= 1201 && multiplication <= 3000)
+      else if (multiplication >= 1201 && multiplication <= 3200)
         calculatedBundleQtyCheck = 9;
       else if (multiplication >= 3201 && multiplication <= 10000)
         calculatedBundleQtyCheck = 14;

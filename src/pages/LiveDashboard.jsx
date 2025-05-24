@@ -16,9 +16,9 @@ import LineBarChart from "../components/inspection/liveDashboard/LineBarChart";
 import FilterPane from "../components/inspection/liveDashboard/FilterPane";
 import OrderData from "../components/inspection/liveDashboard/OrderData";
 import WashingLive from "../components/inspection/liveDashboard/WashingLive";
-//import WashingLive from "../components/dashboards/qc2_live/washing/WashingLive";
 import IroningLive from "../components/inspection/liveDashboard/IroningLive";
 import OPALive from "../components/inspection/liveDashboard/OPALive";
+import PackingLive from "../components/inspection/liveDashboard/PackingLive";
 import DailySummary from "../components/inspection/liveDashboard/DailySummary";
 import WeeklySummary from "../components/inspection/liveDashboard/WeeklySummary";
 import InspectorCard from "../components/inspection/liveDashboard/InspectorCard";
@@ -456,6 +456,7 @@ const LiveDashboard = () => {
         {activeSection === "Washing" && <WashingLive />}
         {activeSection === "Ironing" && <IroningLive />}
         {activeSection === "OPA" && <OPALive />}
+        {activeSection === "Packing" && <PackingLive />}
         {activeSection === "Live Dashboard" && (
           <>
             {/* Summary Cards (Common for all tabs) */}
