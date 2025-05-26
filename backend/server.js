@@ -2569,93 +2569,302 @@ app.put("/api/update-bundle-data/:id", async (req, res) => {
   }
 });
 
-//For Data tab display records in a table
+// NEW ENDPOINT: Get distinct values for filters
+app.get("/api/bundle-data/distinct-filters", async (req, res) => {
+  try {
+    const distinctMonos = await QC2OrderData.distinct("selectedMono");
+    const distinctBuyers = await QC2OrderData.distinct("buyer");
+    const distinctQcIds = await QC2OrderData.distinct("emp_id"); // Assuming emp_id is QC ID
+    const distinctLineNos = await QC2OrderData.distinct("lineNo");
+
+    res.json({
+      monos: distinctMonos.sort(),
+      buyers: distinctBuyers.sort(),
+      qcIds: distinctQcIds.sort(),
+      lineNos: distinctLineNos.sort((a, b) => {
+        // Custom sort for alphanumeric line numbers
+        const numA = parseInt(a);
+        const numB = parseInt(b);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        if (!isNaN(numA)) return -1; // Numbers first
+        if (!isNaN(numB)) return 1;
+        return a.localeCompare(b); // Then string compare
+      })
+    });
+  } catch (error) {
+    console.error("Error fetching distinct filter values:", error);
+    res.status(500).json({ message: "Failed to fetch distinct filter values" });
+  }
+});
+
+// MODIFIED ENDPOINT: Fetch filtered bundle data with pagination and aggregated stats
+app.get("/api/filtered-bundle-data", async (req, res) => {
+  try {
+    const {
+      date,
+      lineNo,
+      selectedMono,
+      packageNo,
+      buyer,
+      emp_id,
+      page = 1,
+      limit = 15, // Pagination params, default to page 1, 10 items per page
+      sortBy = "updated_date_seperator", // Default sort field
+      sortOrder = "desc" // Default sort order (descending for latest first)
+    } = req.query;
+
+    let matchQuery = {};
+
+    if (date) {
+      const normalizedQueryDate = normalizeDateString(date);
+      if (normalizedQueryDate) {
+        matchQuery.updated_date_seperator = normalizedQueryDate;
+      }
+    }
+    if (lineNo) matchQuery.lineNo = lineNo;
+    if (selectedMono) matchQuery.selectedMono = selectedMono;
+    if (packageNo) {
+      const pkgNo = parseInt(packageNo);
+      if (!isNaN(pkgNo)) matchQuery.package_no = pkgNo;
+    }
+    if (buyer) matchQuery.buyer = buyer;
+    if (emp_id) matchQuery.emp_id = emp_id;
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Determine sort direction
+    const sortDirection = sortOrder === "asc" ? 1 : -1;
+    let sortOptions = {};
+    if (sortBy === "updated_date_seperator") {
+      // For date and time, sort by date then time if dates are equal
+      sortOptions = {
+        updated_date_seperator: sortDirection,
+        updated_time_seperator: sortDirection
+      };
+    } else {
+      sortOptions[sortBy] = sortDirection;
+    }
+
+    // Fetch total count of matching documents for pagination
+    const totalRecords = await QC2OrderData.countDocuments(matchQuery);
+
+    // Fetch paginated and sorted records
+    const records = await QC2OrderData.find(matchQuery)
+      .sort(sortOptions) // Apply sorting
+      .skip(skip) // Apply skip for pagination
+      .limit(limitNum); // Apply limit for pagination
+
+    // Calculate aggregated stats based on ALL filtered records (not just the current page)
+    // This might be resource-intensive if the filtered set is very large.
+    // Consider if stats should also be paginated or if an approximation is okay for large sets.
+    // For now, calculating on the full filtered set.
+    const allFilteredRecordsForStats = await QC2OrderData.find(matchQuery); // Re-query without pagination for stats
+
+    let totalGarmentQty = 0;
+    let uniqueStyles = new Set();
+
+    allFilteredRecordsForStats.forEach((record) => {
+      totalGarmentQty += record.count || 0;
+      if (record.selectedMono) {
+        uniqueStyles.add(record.selectedMono);
+      }
+    });
+
+    const totalBundlesFromStats = allFilteredRecordsForStats.length; // This is the true total bundles for the filter
+    const totalStyles = uniqueStyles.size;
+
+    res.json({
+      records,
+      stats: {
+        totalGarmentQty,
+        totalBundles: totalBundlesFromStats, // Use count from all filtered records for stats
+        totalStyles
+      },
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalRecords / limitNum),
+        totalRecords: totalRecords, // Total records matching the filter
+        limit: limitNum
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching filtered bundle data:", error);
+    res.status(500).json({ message: "Failed to fetch filtered bundle data" });
+  }
+});
+
+// Ensure your existing /api/user-batches is either removed or updated if it's now redundant
+// For simplicity, I'll assume the new /api/filtered-bundle-data replaces the primary need of /api/user-batches for this component.
+// If /api/user-batches is used elsewhere with just emp_id, keep it.
+// Otherwise, you can deprecate it in favor of the more flexible filtered endpoint.
+// For now, I'm keeping it as it might be used by the main BundleRegistration page for other purposes.
 app.get("/api/user-batches", async (req, res) => {
   try {
     const { emp_id } = req.query;
     if (!emp_id) {
       return res.status(400).json({ message: "emp_id is required" });
     }
-    const batches = await QC2OrderData.find({ emp_id });
+    // If you want this to also use the normalized date string for 'date' field
+    // you'd need to adjust how 'date' is stored or queried here too.
+    // For now, assuming it matches as is or 'date' field is not used for filtering here.
+    const batches = await QC2OrderData.find({ emp_id }).sort({
+      updated_date_seperator: -1,
+      updated_time_seperator: -1
+    });
     res.json(batches);
   } catch (error) {
+    console.error("Error fetching user batches:", error);
     res.status(500).json({ message: "Failed to fetch user batches" });
   }
 });
+
+// //For Data tab display records in a table
+// app.get("/api/user-batches", async (req, res) => {
+//   try {
+//     const { emp_id } = req.query;
+//     if (!emp_id) {
+//       return res.status(400).json({ message: "emp_id is required" });
+//     }
+//     const batches = await QC2OrderData.find({ emp_id });
+//     res.json(batches);
+//   } catch (error) {
+//     res.status(500).json({ message: "Failed to fetch user batches" });
+//   }
+// });
 
 /* ------------------------------
    End Points - Reprint - qc2_orderdata
 ------------------------------ */
 
-// Combined search endpoint for MONo, Package No, and Emp ID from qc2_orderdata
-app.get("/api/reprint-search", async (req, res) => {
+// NEW ENDPOINT: Get distinct values for ReprintTab filters from qc2_orderdata
+app.get("/api/reprint-distinct-filters", async (req, res) => {
   try {
-    const { mono, packageNo, empId } = req.query;
+    const distinctMonos = await QC2OrderData.distinct("selectedMono");
+    const distinctPackageNos = await QC2OrderData.distinct("package_no"); // Might be many if not filtered first
+    const distinctEmpIds = await QC2OrderData.distinct("emp_id");
+    const distinctLineNos = await QC2OrderData.distinct("lineNo");
+    const distinctBuyers = await QC2OrderData.distinct("buyer");
 
-    // Build the query dynamically based on provided parameters
-    const query = {};
-    if (mono) {
-      query.selectedMono = { $regex: mono, $options: "i" }; // Case-insensitive partial match
-    }
-    if (packageNo) {
-      const packageNoInt = parseInt(packageNo);
-      if (!isNaN(packageNoInt)) {
-        query.package_no = packageNoInt; // Exact match for integer
-      }
-    }
-    if (empId) {
-      query.emp_id = { $regex: empId, $options: "i" }; // Case-insensitive partial match
-    }
-
-    // Fetch matching records from qc2_orderdata
-    const records = await QC2OrderData.find(query)
-      .sort({ package_no: 1 }) // Sort by package_no ascending
-      .limit(100); // Limit to prevent overload
-
-    res.json(records);
+    res.json({
+      monos: distinctMonos.sort(),
+      packageNos: distinctPackageNos
+        .map(String)
+        .sort((a, b) => parseInt(a) - parseInt(b)), // Ensure string for select, sort numerically
+      empIds: distinctEmpIds.sort(),
+      lineNos: distinctLineNos.sort((a, b) => {
+        const numA = parseInt(a);
+        const numB = parseInt(b);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        if (!isNaN(numA)) return -1;
+        if (!isNaN(numB)) return 1;
+        return a.localeCompare(b);
+      }),
+      buyers: distinctBuyers.sort()
+    });
   } catch (error) {
-    console.error("Error searching qc2_orderdata:", error);
-    res.status(500).json({ error: "Failed to search records" });
+    console.error("Error fetching distinct filter values for reprint:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch distinct filter values for reprint" });
   }
 });
 
-// Fetch colors and sizes for a specific MONo (unchanged)
+// MODIFIED ENDPOINT: /api/reprint-search to support new filters, pagination, and sorting
+app.get("/api/reprint-search", async (req, res) => {
+  try {
+    const {
+      date,
+      lineNo,
+      selectedMono,
+      packageNo,
+      buyer,
+      empId, // Renamed from selectedEmpId to empId for consistency
+      page = 1,
+      limit = 15,
+      sortBy = "updated_date_seperator", // Default sort for latest
+      sortOrder = "desc"
+    } = req.query;
+
+    let matchQuery = {};
+
+    if (date) {
+      const normalizedQueryDate = normalizeDateString(date);
+      if (normalizedQueryDate) {
+        matchQuery.updated_date_seperator = normalizedQueryDate;
+      }
+    }
+    if (lineNo) matchQuery.lineNo = lineNo;
+    if (selectedMono) matchQuery.selectedMono = selectedMono;
+    if (packageNo) {
+      const pkgNo = parseInt(packageNo);
+      if (!isNaN(pkgNo)) matchQuery.package_no = pkgNo;
+    }
+    if (buyer) matchQuery.buyer = buyer;
+    if (empId) matchQuery.emp_id = empId;
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const sortDirection = sortOrder === "asc" ? 1 : -1;
+    let sortOptions = {};
+    if (sortBy === "updated_date_seperator") {
+      sortOptions = {
+        updated_date_seperator: sortDirection,
+        updated_time_seperator: sortDirection
+      };
+    } else {
+      sortOptions[sortBy] = sortDirection;
+    }
+
+    const totalRecords = await QC2OrderData.countDocuments(matchQuery);
+    const records = await QC2OrderData.find(matchQuery)
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limitNum);
+
+    // For reprint, we don't necessarily need global stats like in the other tab,
+    // but we do need pagination info.
+    res.json({
+      records,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalRecords / limitNum),
+        totalRecords,
+        limit: limitNum
+      }
+    });
+  } catch (error) {
+    console.error("Error searching qc2_orderdata for reprint:", error);
+    res.status(500).json({ error: "Failed to search records for reprint" });
+  }
+});
+
+// The /api/reprint-colors-sizes/:mono endpoint might become less relevant
+// if filtering is primarily done via the new filter pane.
+// However, it could still be used if you want to populate color/size dropdowns
+// AFTER a MONo is selected in the filter pane for further refinement,
+// though the main table will already be filtered by MONo.
+// For now, I'll keep it, but its usage in the frontend might change.
 app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
   try {
     const mono = req.params.mono;
+    // This fetches distinct color/size combinations for a given MONO from qc2_orderdata
     const result = await QC2OrderData.aggregate([
       { $match: { selectedMono: mono } },
-      {
-        $group: {
-          _id: {
-            color: "$color",
-            size: "$size"
-          },
-          colorCode: { $first: "$colorCode" },
-          chnColor: { $first: "$chnColor" },
-          package_no: { $first: "$package_no" }
-        }
-      },
-      {
-        $group: {
-          _id: "$_id.color",
-          sizes: { $push: "$_id.size" },
-          colorCode: { $first: "$colorCode" },
-          chnColor: { $first: "$chnColor" }
-        }
-      }
+      { $group: { _id: { color: "$color", size: "$size" } } },
+      { $group: { _id: "$_id.color", sizes: { $addToSet: "$_id.size" } } }, // Use $addToSet for unique sizes
+      { $project: { color: "$_id", sizes: 1, _id: 0 } },
+      { $sort: { color: 1 } } // Sort colors
     ]);
-
-    const colors = result.map((c) => ({
-      color: c._id,
-      sizes: c.sizes,
-      colorCode: c.colorCode,
-      chnColor: c.chnColor
-    }));
-
-    res.json(colors);
+    // Further sort sizes within each color if needed client-side or here
+    result.forEach((item) => item.sizes.sort());
+    res.json(result);
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch colors/sizes" });
+    console.error("Error fetching colors/sizes for reprint:", error);
+    res.status(500).json({ error: "Failed to fetch colors/sizes for reprint" });
   }
 });
 
@@ -12224,26 +12433,33 @@ const formatDateToMMDDYYYY = (dateInput) => {
 app.post("/api/scc/ht-first-output", async (req, res) => {
   try {
     const { _id, ...dataToSave } = req.body;
-    // Ensure machineNo is included
     if (!dataToSave.machineNo) {
       return res.status(400).json({ message: "Machine No is required." });
     }
     dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
     dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
+
+    // Frontend now sends standardSpecification as an array of 1 or 2 objects
+    // Each object should already have tempOffsetPlus and tempOffsetMinus calculated by SCCPage
     if (
       dataToSave.standardSpecification &&
       dataToSave.standardSpecification.length > 0
     ) {
       dataToSave.standardSpecification = dataToSave.standardSpecification.map(
         (spec) => ({
-          ...spec,
+          ...spec, // type, method, timeSec, tempC, tempOffsetPlus, tempOffsetMinus, status
           remarks: spec.remarks?.trim() || "NA",
           pressure:
             spec.pressure !== null && spec.pressure !== undefined
               ? Number(spec.pressure)
-              : null // Ensure pressure is number
+              : null
         })
       );
+    } else {
+      // It's required to have at least one spec
+      return res
+        .status(400)
+        .json({ message: "Standard Specification is required." });
     }
 
     let record;
@@ -12258,12 +12474,11 @@ app.post("/api/scc/ht-first-output", async (req, res) => {
           .status(404)
           .json({ message: "Record not found for update." });
     } else {
-      // Check for existing record by moNo, color, inspectionDate, AND machineNo
       const existing = await HTFirstOutput.findOne({
         moNo: dataToSave.moNo,
         color: dataToSave.color,
         inspectionDate: dataToSave.inspectionDate,
-        machineNo: dataToSave.machineNo // Added machineNo to query
+        machineNo: dataToSave.machineNo
       });
       if (existing) {
         record = await HTFirstOutput.findByIdAndUpdate(
@@ -12284,13 +12499,93 @@ app.post("/api/scc/ht-first-output", async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({
         message:
-          "Duplicate entry. A record with this MO, Color, Date, and Machine No already exists.", // Updated message
+          "Duplicate entry. A record with this MO, Color, Date, and Machine No already exists.",
         error: error.message,
         errorCode: "DUPLICATE_KEY"
       });
     }
     res.status(500).json({
       message: "Failed to save HT First Output",
+      error: error.message,
+      details: error
+    });
+  }
+});
+
+// POST /api/scc/fu-first-output - Apply analogous changes as above for HTFirstOutput
+app.post("/api/scc/fu-first-output", async (req, res) => {
+  try {
+    const { _id, ...dataToSave } = req.body;
+    if (!dataToSave.machineNo) {
+      return res.status(400).json({ message: "Machine No is required." });
+    }
+    dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
+    dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
+
+    if (
+      dataToSave.standardSpecification &&
+      dataToSave.standardSpecification.length > 0
+    ) {
+      dataToSave.standardSpecification = dataToSave.standardSpecification.map(
+        (spec) => ({
+          ...spec,
+          remarks: spec.remarks?.trim() || "NA",
+          pressure:
+            spec.pressure !== null && spec.pressure !== undefined
+              ? Number(spec.pressure)
+              : null
+        })
+      );
+    } else {
+      return res
+        .status(400)
+        .json({ message: "Standard Specification is required." });
+    }
+
+    let record;
+    if (_id) {
+      record = await FUFirstOutput.findByIdAndUpdate(_id, dataToSave, {
+        new: true,
+        runValidators: true,
+        upsert: false
+      });
+      if (!record)
+        return res
+          .status(404)
+          .json({ message: "Record not found for update." });
+    } else {
+      const existing = await FUFirstOutput.findOne({
+        moNo: dataToSave.moNo,
+        color: dataToSave.color,
+        inspectionDate: dataToSave.inspectionDate,
+        machineNo: dataToSave.machineNo
+      });
+      if (existing) {
+        record = await FUFirstOutput.findByIdAndUpdate(
+          existing._id,
+          dataToSave,
+          { new: true, runValidators: true }
+        );
+      } else {
+        record = new FUFirstOutput(dataToSave);
+        await record.save();
+      }
+    }
+    res
+      .status(201)
+      .json({ message: "FU First Output saved successfully", data: record });
+  } catch (error) {
+    console.error("Error saving FU First Output:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message:
+          "Duplicate entry. A record with this MO, Color, Date, and Machine No already exists.",
+        error: error.message,
+        errorCode: "DUPLICATE_KEY"
+      });
+    }
+    res.status(500).json({
+      message: "Failed to save FU First Output",
       error: error.message,
       details: error
     });
@@ -12328,82 +12623,6 @@ app.get("/api/scc/ht-first-output", async (req, res) => {
   }
 });
 
-// REVISED Endpoints for FUFirstOutput (similar changes as HT)
-app.post("/api/scc/fu-first-output", async (req, res) => {
-  try {
-    const { _id, ...dataToSave } = req.body;
-    // Ensure machineNo is included
-    if (!dataToSave.machineNo) {
-      return res.status(400).json({ message: "Machine No is required." });
-    }
-    dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
-    dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
-    if (
-      dataToSave.standardSpecification &&
-      dataToSave.standardSpecification.length > 0
-    ) {
-      dataToSave.standardSpecification = dataToSave.standardSpecification.map(
-        (spec) => ({
-          ...spec,
-          remarks: spec.remarks?.trim() || "NA",
-          pressure:
-            spec.pressure !== null && spec.pressure !== undefined
-              ? Number(spec.pressure)
-              : null // Ensure pressure is number
-        })
-      );
-    }
-
-    let record;
-    if (_id) {
-      record = await FUFirstOutput.findByIdAndUpdate(_id, dataToSave, {
-        new: true,
-        runValidators: true,
-        upsert: false
-      });
-      if (!record)
-        return res
-          .status(404)
-          .json({ message: "Record not found for update." });
-    } else {
-      const existing = await FUFirstOutput.findOne({
-        moNo: dataToSave.moNo,
-        color: dataToSave.color,
-        inspectionDate: dataToSave.inspectionDate,
-        machineNo: dataToSave.machineNo // Added machineNo to query
-      });
-      if (existing) {
-        record = await FUFirstOutput.findByIdAndUpdate(
-          existing._id,
-          dataToSave,
-          { new: true, runValidators: true }
-        );
-      } else {
-        record = new FUFirstOutput(dataToSave);
-        await record.save();
-      }
-    }
-    res
-      .status(201)
-      .json({ message: "FU First Output saved successfully", data: record });
-  } catch (error) {
-    console.error("Error saving FU First Output:", error);
-    if (error.code === 11000) {
-      return res.status(409).json({
-        message:
-          "Duplicate entry. A record with this MO, Color, Date, and Machine No already exists.", // Updated message
-        error: error.message,
-        errorCode: "DUPLICATE_KEY"
-      });
-    }
-    res.status(500).json({
-      message: "Failed to save FU First Output",
-      error: error.message,
-      details: error
-    });
-  }
-});
-
 app.get("/api/scc/fu-first-output", async (req, res) => {
   try {
     const { moNo, color, inspectionDate, machineNo } = req.query; // Added machineNo
@@ -12435,10 +12654,7 @@ app.get("/api/scc/fu-first-output", async (req, res) => {
   }
 });
 
-/* ------------------------------
-   End Points - SCC HT/FU - Daily Testing
------------------------------- */
-
+// 2. `GET /api/scc/get-first-output-specs` (Updated)
 app.get("/api/scc/get-first-output-specs", async (req, res) => {
   try {
     const { moNo, color, inspectionDate } = req.query;
@@ -12450,62 +12666,83 @@ app.get("/api/scc/get-first-output-specs", async (req, res) => {
     const formattedDate = formatDateToMMDDYYYY(inspectionDate);
 
     let specs = null;
+    const processRecord = (record) => {
+      if (record && record.standardSpecification) {
+        const secondHeatSpec = record.standardSpecification.find(
+          (s) =>
+            s.type === "2nd heat" &&
+            s.status === "Pass" &&
+            s.timeSec &&
+            s.tempC &&
+            s.pressure !== null
+        );
+        const firstSpec = record.standardSpecification.find(
+          (s) =>
+            s.type === "first" &&
+            s.status === "Pass" &&
+            s.timeSec &&
+            s.tempC &&
+            s.pressure !== null
+        );
+
+        // Prioritize 2nd heat spec if it's 'Pass' and valid
+        if (secondHeatSpec) {
+          return {
+            tempC: secondHeatSpec.tempC,
+            timeSec: secondHeatSpec.timeSec,
+            pressure: secondHeatSpec.pressure
+          };
+        } else if (firstSpec) {
+          // Fallback to first spec if it's 'Pass' and valid
+          return {
+            tempC: firstSpec.tempC,
+            timeSec: firstSpec.timeSec,
+            pressure: firstSpec.pressure
+          };
+        }
+        // If no 'Pass' specs, try any '2nd heat' then any 'first'
+        const anySecondHeatSpec = record.standardSpecification.find(
+          (s) =>
+            s.type === "2nd heat" && s.timeSec && s.tempC && s.pressure !== null
+        );
+        if (anySecondHeatSpec) {
+          return {
+            tempC: anySecondHeatSpec.tempC,
+            timeSec: anySecondHeatSpec.timeSec,
+            pressure: anySecondHeatSpec.pressure
+          };
+        }
+        const anyFirstSpec = record.standardSpecification.find(
+          (s) =>
+            s.type === "first" && s.timeSec && s.tempC && s.pressure !== null
+        );
+        if (anyFirstSpec) {
+          return {
+            tempC: anyFirstSpec.tempC,
+            timeSec: anyFirstSpec.timeSec,
+            pressure: anyFirstSpec.pressure
+          };
+        }
+      }
+      return null;
+    };
+
     // Try HT First Output
     const htRecord = await HTFirstOutput.findOne({
       moNo,
       color,
       inspectionDate: formattedDate
     }).lean();
-    if (htRecord && htRecord.standardSpecification) {
-      const afterHatSpec = htRecord.standardSpecification.find(
-        (s) => s.type === "afterHat" && s.timeSec && s.tempC && s.pressure
-      );
-      const firstSpec = htRecord.standardSpecification.find(
-        (s) => s.type === "first"
-      );
-      if (afterHatSpec) {
-        specs = {
-          tempC: afterHatSpec.tempC,
-          timeSec: afterHatSpec.timeSec,
-          pressure: afterHatSpec.pressure
-        };
-      } else if (firstSpec) {
-        specs = {
-          tempC: firstSpec.tempC,
-          timeSec: firstSpec.timeSec,
-          pressure: firstSpec.pressure
-        };
-      }
-    }
+    specs = processRecord(htRecord);
 
-    // If not found in HT, try FU First Output (assuming similar logic might apply or distinct records)
+    // If not found in HT, try FU First Output
     if (!specs) {
       const fuRecord = await FUFirstOutput.findOne({
         moNo,
         color,
         inspectionDate: formattedDate
       }).lean();
-      if (fuRecord && fuRecord.standardSpecification) {
-        const afterHatSpec = fuRecord.standardSpecification.find(
-          (s) => s.type === "afterHat" && s.timeSec && s.tempC && s.pressure
-        );
-        const firstSpec = fuRecord.standardSpecification.find(
-          (s) => s.type === "first"
-        );
-        if (afterHatSpec) {
-          specs = {
-            tempC: afterHatSpec.tempC,
-            timeSec: afterHatSpec.timeSec,
-            pressure: afterHatSpec.pressure
-          };
-        } else if (firstSpec) {
-          specs = {
-            tempC: firstSpec.tempC,
-            timeSec: firstSpec.timeSec,
-            pressure: firstSpec.pressure
-          };
-        }
-      }
+      specs = processRecord(fuRecord);
     }
 
     if (!specs) {
@@ -12520,6 +12757,10 @@ app.get("/api/scc/get-first-output-specs", async (req, res) => {
     });
   }
 });
+
+/* ------------------------------
+   End Points - SCC HT/FU - Daily Testing
+------------------------------ */
 
 // Endpoints for SCCDailyTesting
 app.post("/api/scc/daily-testing", async (req, res) => {
@@ -12662,256 +12903,900 @@ const parsePressureToNumber = (pressureStr) => {
   return isNaN(num) ? null : num;
 };
 
-// GET Endpoint to fetch existing Daily HT/FU Test data or MO list
-app.get("/api/scc/daily-htfu-test", async (req, res) => {
-  try {
-    const { inspectionDate, machineNo, moNo, color } = req.query;
-    const formattedDate = inspectionDate
-      ? formatDateToMMDDYYYY(inspectionDate)
-      : null;
+// Helper function to escape special characters for regex
+function escapeRegex(string) {
+  if (typeof string !== "string") {
+    return "";
+  }
+  return string.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+}
 
-    if (!formattedDate || !machineNo) {
-      return res
-        .status(400)
-        .json({ message: "Inspection Date and Machine No are required." });
+// 1. GET /api/scc/ht-first-output/search-active-mos?term=<searchTerm>
+//    Searches ht_first_outputs for MOs based on a search term.
+app.get("/api/scc/ht-first-output/search-active-mos", async (req, res) => {
+  try {
+    const { term } = req.query;
+
+    // Uncomment for debugging
+    // console.log("[SERVER] /search-active-mos - Received term:", term);
+
+    if (!term || typeof term !== "string" || term.trim() === "") {
+      // console.log("[SERVER] /search-active-mos - No valid term, returning [].");
+      return res.json([]);
     }
 
-    if (moNo && color) {
-      const record = await DailyTestingHTFU.findOne({
-        inspectionDate: formattedDate,
-        machineNo,
-        moNo,
-        color
-      }).lean(); // Use .lean() for faster queries if not modifying directly
+    const trimmedTerm = term.trim();
+    if (trimmedTerm === "") {
+      return res.json([]);
+    }
+    const escapedTerm = escapeRegex(trimmedTerm); // Escape the trimmed term
 
-      if (!record) {
-        return res
-          .status(200)
-          .json({ message: "DAILY_HTFU_RECORD_NOT_FOUND", data: null });
-      }
-      return res.json({ message: "RECORD_FOUND", data: record });
-    } else {
-      const distinctEntries = await DailyTestingHTFU.aggregate([
-        { $match: { inspectionDate: formattedDate, machineNo } },
-        {
-          $group: {
-            _id: { moNo: "$moNo", color: "$color" },
-            buyer: { $first: "$buyer" },
-            buyerStyle: { $first: "$buyerStyle" },
-            docId: { $first: "$_id" }
-          }
-        },
-        {
-          $project: {
-            _id: 0,
-            moNo: "$_id.moNo",
-            color: "$_id.color",
-            buyer: "$buyer",
-            buyerStyle: "$buyerStyle",
-            docId: "$docId"
-          }
-        },
-        { $sort: { moNo: 1, color: 1 } }
-      ]);
+    // Ensure HTFirstOutput is correctly defined and connected
+    if (!HTFirstOutput || typeof HTFirstOutput.aggregate !== "function") {
+      console.error(
+        "[SERVER] HTFirstOutput model is not correctly defined or initialized."
+      );
+      return res.status(500).json({ message: "Server configuration error." });
+    }
 
-      if (distinctEntries.length === 0) {
-        return res
-          .status(200)
-          .json({ message: "NO_RECORDS_FOR_DATE_MACHINE", data: [] });
+    const mos = await HTFirstOutput.aggregate([
+      {
+        $match: {
+          // Changed from `^${escapedTerm}` (starts with) to `escapedTerm` (contains)
+          moNo: { $regex: escapedTerm, $options: "i" }
+        }
+      },
+      {
+        // Sorting helps $first pick a consistent (e.g., latest) buyer/style if multiple entries exist for an MO
+        $sort: { moNo: 1, createdAt: -1 }
+      },
+      {
+        $group: {
+          _id: "$moNo", // Group by MO number to get distinct MOs
+          moNo: { $first: "$moNo" },
+          buyer: { $first: "$buyer" },
+          buyerStyle: { $first: "$buyerStyle" }
+        }
+      },
+      {
+        $project: {
+          _id: 0, // Exclude the default _id from group stage
+          moNo: 1,
+          buyer: { $ifNull: ["$buyer", ""] }, // Ensure buyer is always a string
+          buyerStyle: { $ifNull: ["$buyerStyle", ""] } // Ensure buyerStyle is always a string
+        }
+      },
+      { $limit: 15 } // Limit results for performance, increased slightly
+    ]);
+
+    // Uncomment for debugging
+    // console.log("[SERVER] /search-active-mos - Found MOs:", mos.length, JSON.stringify(mos));
+    res.json(mos);
+  } catch (error) {
+    console.error(
+      "[SERVER] Error searching active MOs from HTFirstOutput:",
+      error
+    );
+    res
+      .status(500)
+      .json({ message: "Failed to search MOs", error: error.message });
+  }
+});
+
+// 2. GET /api/scc/ht-first-output/mo-details-for-registration?moNo=<moNo>
+//    Fetches buyer, buyerStyle, and distinct colors for a given MO from ht_first_outputs.
+app.get(
+  "/api/scc/ht-first-output/mo-details-for-registration",
+  async (req, res) => {
+    try {
+      const { moNo } = req.query;
+      if (!moNo) {
+        return res.status(400).json({ message: "MO No is required." });
       }
-      return res.json({
-        message: "MULTIPLE_MO_COLOR_FOUND",
-        data: distinctEntries
+
+      const sampleRecord = await HTFirstOutput.findOne({ moNo })
+        .sort({ inspectionDate: -1, createdAt: -1 }) // Get the latest overall record for buyer/style consistency
+        .lean();
+
+      if (!sampleRecord) {
+        return res
+          .status(404)
+          .json({ message: "MO not found in HT First Output records." });
+      }
+
+      // Fetch distinct colors for the MO across all its records.
+      const distinctColors = await HTFirstOutput.distinct("color", { moNo });
+
+      res.json({
+        buyer: sampleRecord.buyer || "",
+        buyerStyle: sampleRecord.buyerStyle || "",
+        colors: distinctColors.sort() || [] // Sort colors alphabetically
+      });
+    } catch (error) {
+      console.error("Error fetching MO details for registration:", error);
+      res.status(500).json({
+        message: "Failed to fetch MO details",
+        error: error.message
       });
     }
+  }
+);
+
+// 3. GET /api/scc/ht-first-output/specs-for-registration?moNo=<moNo>&color=<color>
+//    Fetches the standard specs (Temp, Time, Pressure) for a given MO/Color from ht_first_outputs.
+app.get("/api/scc/ht-first-output/specs-for-registration", async (req, res) => {
+  try {
+    const { moNo, color } = req.query;
+    console.log(
+      `[SPECS_ENDPOINT] Request received. MO: "${moNo}", Color: "${color}"`
+    );
+
+    if (!moNo || !color || moNo.trim() === "" || color.trim() === "") {
+      console.log(
+        "[SPECS_ENDPOINT] Validation Error: MO No and Color are required and cannot be empty."
+      );
+      return res
+        .status(400)
+        .json({ message: "MO No and Color are required and cannot be empty." });
+    }
+
+    const trimmedMoNo = moNo.trim();
+    const trimmedColor = color.trim();
+
+    console.log(
+      `[SPECS_ENDPOINT] Searching HTFirstOutput for MO: "${trimmedMoNo}", Color: "${trimmedColor}"`
+    );
+    const record = await HTFirstOutput.findOne({
+      moNo: trimmedMoNo,
+      color: trimmedColor
+    })
+      .sort({ inspectionDate: -1, createdAt: -1 }) // Get the latest based on date, then creation
+      .lean();
+
+    if (!record) {
+      console.log(
+        `[SPECS_ENDPOINT] No HTFirstOutput record found for MO: "${trimmedMoNo}", Color: "${trimmedColor}".`
+      );
+      return res.status(200).json({
+        // Send 200 with message, client handles it
+        message: "SPECS_NOT_FOUND_NO_RECORD",
+        reqTemp: null,
+        reqTime: null,
+        reqPressure: null
+      });
+    }
+    // For brevity, you might not want to log the full record if it's large.
+    // console.log(`[SPECS_ENDPOINT] Found record for MO: "${trimmedMoNo}", Color: "${trimmedColor}". Record _id: ${record._id}`);
+
+    if (
+      !record.standardSpecification ||
+      record.standardSpecification.length === 0
+    ) {
+      console.log(
+        `[SPECS_ENDPOINT] Record found, but 'standardSpecification' array is missing or empty for MO: "${trimmedMoNo}", Color: "${trimmedColor}".`
+      );
+      return res.status(200).json({
+        message: "SPECS_NOT_FOUND_STANDARD_SPEC_ARRAY_EMPTY",
+        reqTemp: null,
+        reqTime: null,
+        reqPressure: null
+      });
+    }
+    // console.log(`[SPECS_ENDPOINT] 'standardSpecification' array:`, JSON.stringify(record.standardSpecification, null, 2));
+
+    // Primary target: 'first' type spec with all values non-null
+    let firstSpec = record.standardSpecification.find(
+      (s) =>
+        s.type === "first" &&
+        s.tempC != null &&
+        s.timeSec != null &&
+        s.pressure != null
+    );
+
+    if (firstSpec) {
+      console.log(
+        `[SPECS_ENDPOINT] Found 'first' spec with all values for MO: "${trimmedMoNo}", Color: "${trimmedColor}":`,
+        firstSpec
+      );
+      return res.json({
+        reqTemp: firstSpec.tempC,
+        reqTime: firstSpec.timeSec,
+        reqPressure: firstSpec.pressure
+      });
+    }
+
+    // Fallback: If no complete 'first' spec, try to find any 'first' spec
+    console.log(
+      `[SPECS_ENDPOINT] No 'first' spec with all values. Looking for any 'first' spec for MO: "${trimmedMoNo}", Color: "${trimmedColor}".`
+    );
+    firstSpec = record.standardSpecification.find((s) => s.type === "first");
+
+    if (firstSpec) {
+      console.log(
+        `[SPECS_ENDPOINT] Found 'first' spec (values might be partial/null) for MO: "${trimmedMoNo}", Color: "${trimmedColor}":`,
+        firstSpec
+      );
+      return res.json({
+        reqTemp: firstSpec.tempC !== undefined ? firstSpec.tempC : null,
+        reqTime: firstSpec.timeSec !== undefined ? firstSpec.timeSec : null,
+        reqPressure:
+          firstSpec.pressure !== undefined ? firstSpec.pressure : null
+      });
+    }
+
+    // If no 'first' spec of any kind is found
+    console.log(
+      `[SPECS_ENDPOINT] No 'first' type spec found at all for MO: "${trimmedMoNo}", Color: "${trimmedColor}".`
+    );
+    return res.status(200).json({
+      message: "SPECS_NOT_FOUND_NO_FIRST_TYPE",
+      reqTemp: null,
+      reqTime: null,
+      reqPressure: null
+    });
   } catch (error) {
-    console.error("Error fetching Daily HT/FU Test data:", error);
+    console.error(
+      `[SPECS_ENDPOINT] Critical error fetching specs for MO: "${req.query.moNo}", Color: "${req.query.color}":`,
+      error
+    );
     res.status(500).json({
-      message: "Failed to fetch Daily HT/FU Test data",
+      message: "Failed to fetch specifications due to server error",
       error: error.message
     });
   }
 });
 
-// POST Endpoint to save/update Daily HT/FU Test data
-app.post("/api/scc/daily-htfu-test", async (req, res) => {
+// 4. POST /api/scc/daily-htfu/register-machine
+//    Registers a machine for daily testing. Creates a new document in daily_testing_ht_fus.
+app.post("/api/scc/daily-htfu/register-machine", async (req, res) => {
   try {
     const {
-      _id,
       inspectionDate,
       machineNo,
       moNo,
       buyer,
       buyerStyle,
       color,
+      baseReqTemp, // These now come from the frontend state, populated by endpoint 3
+      baseReqTime,
+      baseReqPressure,
+      emp_id,
+      emp_kh_name,
+      emp_eng_name,
+      emp_dept_name,
+      emp_sect_name,
+      emp_job_title
+    } = req.body;
+
+    const formattedDate = inspectionDate; // Already formatted by frontend's formatDateForAPI
+
+    if (!formattedDate || !machineNo || !moNo || !color) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Missing required fields: Inspection Date, Machine No, MO No, and Color."
+      });
+    }
+    // It's acceptable for baseReqTemp, baseReqTime, baseReqPressure to be null if not found
+
+    const now = new Date();
+    const registrationTime = `${String(now.getHours()).padStart(
+      2,
+      "0"
+    )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+      now.getSeconds()
+    ).padStart(2, "0")}`;
+
+    const existingRegistration = await DailyTestingHTFU.findOne({
+      inspectionDate: formattedDate,
+      machineNo,
+      moNo,
+      color
+    });
+
+    if (existingRegistration) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This Machine-MO-Color combination is already registered for this date.",
+        data: existingRegistration
+      });
+    }
+
+    const newRegistration = new DailyTestingHTFU({
+      inspectionDate: formattedDate,
+      machineNo,
+      moNo,
+      buyer,
+      buyerStyle,
+      color,
+      baseReqTemp: baseReqTemp !== undefined ? baseReqTemp : null,
+      baseReqTime: baseReqTime !== undefined ? baseReqTime : null,
+      baseReqPressure: baseReqPressure !== undefined ? baseReqPressure : null,
       emp_id,
       emp_kh_name,
       emp_eng_name,
       emp_dept_name,
       emp_sect_name,
       emp_job_title,
-      baseReqTemp,
-      baseReqTime,
-      baseReqPressure, // Expecting number or null from frontend now due to schema change
-      currentInspection,
-      stretchTestResult,
-      stretchTestRejectReasons, // New field
-      washingTestResult
-    } = req.body;
+      inspectionTime: registrationTime,
+      inspections: [],
+      stretchTestResult: "Pending",
+      washingTestResult: "Pending",
+      isStretchWashingTestDone: false
+    });
 
-    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
-    if (!formattedDate || !machineNo || !moNo || !color || !currentInspection) {
-      return res
-        .status(400)
-        .json({ message: "Missing required fields for submission." });
-    }
-
-    const now = new Date();
-    const inspectionTime = `${String(now.getHours()).padStart(2, "0")}:${String(
-      now.getMinutes()
-    ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-
-    const query = { inspectionDate: formattedDate, machineNo, moNo, color };
-    let record = await DailyTestingHTFU.findOne(query);
-
-    // Prepare currentInspection with numeric pressures
-    const processedCurrentInspection = {
-      ...currentInspection,
-      pressure_req: parsePressureToNumber(currentInspection.pressure_req),
-      pressure_actual: parsePressureToNumber(currentInspection.pressure_actual)
-    };
-
-    if (record) {
-      // Update existing record
-      record.baseReqTemp =
-        baseReqTemp !== undefined ? baseReqTemp : record.baseReqTemp;
-      record.baseReqTime =
-        baseReqTime !== undefined ? baseReqTime : record.baseReqTime;
-      record.baseReqPressure =
-        baseReqPressure !== undefined
-          ? baseReqPressure
-          : record.baseReqPressure; // Expecting number or null
-
-      record.emp_id = emp_id;
-      record.emp_kh_name = emp_kh_name;
-      record.emp_eng_name = emp_eng_name;
-      record.emp_dept_name = emp_dept_name;
-      record.emp_sect_name = emp_sect_name;
-      record.emp_job_title = emp_job_title;
-      record.inspectionTime = inspectionTime;
-
-      const slotIndex = record.inspections.findIndex(
-        (insp) => insp.timeSlotKey === processedCurrentInspection.timeSlotKey
-      );
-      if (slotIndex > -1) {
-        record.inspections[slotIndex] = {
-          ...record.inspections[slotIndex],
-          ...processedCurrentInspection,
-          inspectionTimestamp: new Date()
-        };
-      } else {
-        record.inspections.push({
-          ...processedCurrentInspection,
-          inspectionTimestamp: new Date()
-        });
-      }
-      record.inspections.sort(
-        (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
-      );
-
-      if (stretchTestResult && stretchTestResult !== "Pending") {
-        record.stretchTestResult = stretchTestResult;
-        if (stretchTestResult === "Reject") {
-          record.stretchTestRejectReasons = Array.isArray(
-            stretchTestRejectReasons
-          )
-            ? stretchTestRejectReasons
-            : [];
-        } else {
-          record.stretchTestRejectReasons = []; // Clear reasons if not Reject
-        }
-      }
-
-      if (washingTestResult && washingTestResult !== "Pending") {
-        record.washingTestResult = washingTestResult;
-      }
-
-      if (
-        (record.stretchTestResult === "Pass" ||
-          record.stretchTestResult === "Reject") &&
-        (record.washingTestResult === "Pass" ||
-          record.washingTestResult === "Reject")
-      ) {
-        record.isStretchWashingTestDone = true;
-      }
-    } else {
-      // Create new record
-      record = new DailyTestingHTFU({
-        inspectionDate: formattedDate,
-        machineNo,
-        moNo,
-        buyer,
-        buyerStyle,
-        color,
-        emp_id,
-        emp_kh_name,
-        emp_eng_name,
-        emp_dept_name,
-        emp_sect_name,
-        emp_job_title,
-        inspectionTime,
-        baseReqTemp,
-        baseReqTime,
-        baseReqPressure, // Expecting number or null
-        inspections: [
-          { ...processedCurrentInspection, inspectionTimestamp: new Date() }
-        ],
-        stretchTestResult:
-          stretchTestResult && stretchTestResult !== "Pending"
-            ? stretchTestResult
-            : "Pending",
-        stretchTestRejectReasons:
-          stretchTestResult === "Reject" &&
-          Array.isArray(stretchTestRejectReasons)
-            ? stretchTestRejectReasons
-            : [],
-        washingTestResult:
-          washingTestResult && washingTestResult !== "Pending"
-            ? washingTestResult
-            : "Pending"
-      });
-      if (
-        (record.stretchTestResult === "Pass" ||
-          record.stretchTestResult === "Reject") &&
-        (record.washingTestResult === "Pass" ||
-          record.washingTestResult === "Reject")
-      ) {
-        record.isStretchWashingTestDone = true;
-      }
-    }
-
-    await record.save();
+    await newRegistration.save();
     res.status(201).json({
-      message: "Daily HT/FU QC Test saved successfully",
-      data: record
+      success: true,
+      message: "Machine registered successfully for daily HT/FU QC.",
+      data: newRegistration
     });
   } catch (error) {
-    console.error("Error saving Daily HT/FU QC Test:", error);
+    console.error("Error registering machine for Daily HT/FU QC:", error);
     if (error.code === 11000) {
       return res.status(409).json({
+        success: false,
         message:
-          "A record with this Date, Machine No, MO No, and Color already exists. Submission failed.",
-        error: error.message,
-        errorCode: "DUPLICATE_KEY"
+          "Duplicate entry. This registration might already exist (unique index violation).",
+        error: error.message
       });
     }
     res.status(500).json({
-      message: "Failed to save Daily HT/FU QC Test",
-      error: error.message,
-      details: error
+      success: false,
+      message: "Failed to register machine",
+      error: error.message
     });
   }
 });
+
+// 5. GET /api/scc/daily-htfu/by-date?inspectionDate=<date>
+//    Fetches all DailyTestingHTFU records for a given inspection date.
+app.get("/api/scc/daily-htfu/by-date", async (req, res) => {
+  try {
+    const { inspectionDate } = req.query;
+    if (!inspectionDate) {
+      return res.status(400).json({ message: "Inspection Date is required." });
+    }
+    const formattedDate = inspectionDate; // Expecting MM/DD/YYYY from frontend
+
+    const records = await DailyTestingHTFU.find({
+      inspectionDate: formattedDate
+    })
+      .sort({ machineNo: 1 }) // Consider `collation` for proper numeric sort if machineNo can be "1", "10", "2"
+      .lean();
+
+    res.json(records || []);
+  } catch (error) {
+    console.error("Error fetching Daily HT/FU records by date:", error);
+    res.status(500).json({
+      message: "Failed to fetch daily records",
+      error: error.message
+    });
+  }
+});
+
+// 6. POST /api/scc/daily-htfu/submit-slot-inspection
+//    Submits inspection data for a specific time slot for ONE machine.
+app.post("/api/scc/daily-htfu/submit-slot-inspection", async (req, res) => {
+  try {
+    const {
+      inspectionDate,
+      timeSlotKey,
+      inspectionNo,
+      dailyTestingDocId,
+      temp_req, // This will be machineDoc.baseReqTemp from frontend
+      temp_actual,
+      temp_isNA,
+      temp_isUserModified,
+      time_req, // machineDoc.baseReqTime
+      time_actual,
+      time_isNA,
+      time_isUserModified,
+      pressure_req, // machineDoc.baseReqPressure
+      pressure_actual,
+      pressure_isNA,
+      pressure_isUserModified,
+      emp_id
+    } = req.body;
+
+    // Validate required fields for a single submission
+    if (
+      !inspectionDate ||
+      !timeSlotKey ||
+      !inspectionNo || // Ensure inspectionNo is a valid number
+      !dailyTestingDocId ||
+      (temp_actual === undefined && !temp_isNA) || // actual is required if not N/A
+      (time_actual === undefined && !time_isNA) ||
+      (pressure_actual === undefined && !pressure_isNA)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Missing or invalid required fields for slot inspection submission."
+      });
+    }
+
+    const formattedDate = inspectionDate; // Already formatted
+
+    const record = await DailyTestingHTFU.findById(dailyTestingDocId);
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        message: `Daily testing record not found for ID: ${dailyTestingDocId}`
+      });
+    }
+
+    if (record.inspectionDate !== formattedDate) {
+      return res.status(400).json({
+        success: false,
+        message: `Date mismatch for record ID: ${dailyTestingDocId}. Expected ${formattedDate}, found ${record.inspectionDate}`
+      });
+    }
+
+    const slotData = {
+      inspectionNo: Number(inspectionNo),
+      timeSlotKey,
+      temp_req: temp_req !== undefined ? temp_req : null,
+      temp_actual: temp_isNA
+        ? null
+        : temp_actual !== undefined
+        ? temp_actual
+        : null,
+      temp_isNA: !!temp_isNA,
+      temp_isUserModified: !!temp_isUserModified,
+      time_req: time_req !== undefined ? time_req : null,
+      time_actual: time_isNA
+        ? null
+        : time_actual !== undefined
+        ? time_actual
+        : null,
+      time_isNA: !!time_isNA,
+      time_isUserModified: !!time_isUserModified,
+      pressure_req: pressure_req !== undefined ? pressure_req : null,
+      pressure_actual: pressure_isNA
+        ? null
+        : pressure_actual !== undefined
+        ? pressure_actual
+        : null,
+      pressure_isNA: !!pressure_isNA,
+      pressure_isUserModified: !!pressure_isUserModified,
+      inspectionTimestamp: new Date()
+    };
+
+    const existingSlotIndex = record.inspections.findIndex(
+      (insp) => insp.timeSlotKey === timeSlotKey
+    );
+
+    if (existingSlotIndex > -1) {
+      // If you want to allow updates, replace the item:
+      // record.inspections[existingSlotIndex] = slotData;
+      // For now, prevent re-submission as per original logic:
+      return res.status(409).json({
+        success: false,
+        message: `Slot ${timeSlotKey} has already been submitted for this record. Updates are not currently supported via this endpoint.`
+      });
+    } else {
+      record.inspections.push(slotData);
+    }
+
+    record.inspections.sort(
+      (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
+    );
+
+    // Update general record info
+    record.emp_id = emp_id;
+    const now = new Date();
+    record.inspectionTime = `${String(now.getHours()).padStart(
+      2,
+      "0"
+    )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+      now.getSeconds()
+    ).padStart(2, "0")}`;
+
+    await record.save();
+
+    res.status(201).json({
+      success: true,
+      message: `Inspection for slot ${timeSlotKey} submitted successfully.`,
+      data: record // Return the updated document
+    });
+  } catch (error) {
+    console.error("Error submitting slot inspection:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to submit slot inspection",
+      error: error.message
+    });
+  }
+});
+
+// // 2. GET /api/scc/ht-first-output/mo-details-for-registration?moNo=<moNo>
+// //    Fetches buyer, buyerStyle, and distinct colors for a given MO from ht_first_outputs.
+// app.get(
+//   "/api/scc/ht-first-output/mo-details-for-registration",
+//   async (req, res) => {
+//     try {
+//       const { moNo } = req.query;
+//       if (!moNo) {
+//         return res.status(400).json({ message: "MO No is required." });
+//       }
+
+//       // Find one record to get buyer/buyerStyle (assuming they are consistent for an MO)
+//       // and then find all distinct colors for that MO.
+//       const sampleRecord = await HTFirstOutput.findOne({ moNo })
+//         .sort({ createdAt: -1 })
+//         .lean();
+
+//       if (!sampleRecord) {
+//         return res
+//           .status(404)
+//           .json({ message: "MO not found in HT First Output records." });
+//       }
+
+//       const distinctColors = await HTFirstOutput.distinct("color", { moNo });
+
+//       res.json({
+//         buyer: sampleRecord.buyer || "",
+//         buyerStyle: sampleRecord.buyerStyle || "",
+//         colors: distinctColors || []
+//       });
+//     } catch (error) {
+//       console.error("Error fetching MO details for registration:", error);
+//       res.status(500).json({
+//         message: "Failed to fetch MO details",
+//         error: error.message
+//       });
+//     }
+//   }
+// );
+
+// // 3. GET /api/scc/ht-first-output/specs-for-registration?moNo=<moNo>&color=<color>
+// //    Fetches the standard specs (Temp, Time, Pressure) for a given MO/Color from ht_first_outputs.
+// //    This uses similar logic to your existing `/api/scc/get-first-output-specs` but targets HTFirstOutput directly
+// //    and prioritizes based on '2nd heat' then 'first', and 'Pass' status.
+// app.get("/api/scc/ht-first-output/specs-for-registration", async (req, res) => {
+//   try {
+//     const { moNo, color } = req.query;
+//     if (!moNo || !color) {
+//       return res.status(400).json({ message: "MO No and Color are required." });
+//     }
+
+//     // Find the latest HTFirstOutput record for this MO & Color
+//     // The `inspectionDate` is not used here as we want the general spec for MO/Color.
+//     // If specs can change by date for the same MO/Color in HTFirstOutput, you'd need to pass date.
+//     const record = await HTFirstOutput.findOne({
+//       moNo,
+//       color
+//     })
+//       .sort({ inspectionDate: -1, createdAt: -1 })
+//       .lean(); // Get the latest based on date, then creation
+
+//     if (
+//       !record ||
+//       !record.standardSpecification ||
+//       record.standardSpecification.length === 0
+//     ) {
+//       return res.status(200).json({
+//         message: "SPECS_NOT_FOUND",
+//         reqTemp: null,
+//         reqTime: null,
+//         reqPressure: null
+//       });
+//     }
+
+//     let specToUse = null;
+//     const specs = record.standardSpecification;
+
+//     // Priority: 1. '2nd heat' Pass, 2. 'first' Pass, 3. '2nd heat' Any, 4. 'first' Any
+//     const secondHeatPass = specs.find(
+//       (s) =>
+//         s.type === "2nd heat" &&
+//         s.status === "Pass" &&
+//         s.tempC != null &&
+//         s.timeSec != null &&
+//         s.pressure != null
+//     );
+//     const firstPass = specs.find(
+//       (s) =>
+//         s.type === "first" &&
+//         s.status === "Pass" &&
+//         s.tempC != null &&
+//         s.timeSec != null &&
+//         s.pressure != null
+//     );
+//     const secondHeatAny = specs.find(
+//       (s) =>
+//         s.type === "2nd heat" &&
+//         s.tempC != null &&
+//         s.timeSec != null &&
+//         s.pressure != null
+//     );
+//     const firstAny = specs.find(
+//       (s) =>
+//         s.type === "first" &&
+//         s.tempC != null &&
+//         s.timeSec != null &&
+//         s.pressure != null
+//     );
+
+//     if (secondHeatPass) specToUse = secondHeatPass;
+//     else if (firstPass) specToUse = firstPass;
+//     else if (secondHeatAny) specToUse = secondHeatAny;
+//     else if (firstAny) specToUse = firstAny;
+
+//     if (!specToUse) {
+//       return res.status(200).json({
+//         message: "VALID_SPECS_NOT_FOUND",
+//         reqTemp: null,
+//         reqTime: null,
+//         reqPressure: null
+//       });
+//     }
+
+//     res.json({
+//       reqTemp: specToUse.tempC,
+//       reqTime: specToUse.timeSec,
+//       reqPressure: specToUse.pressure
+//     });
+//   } catch (error) {
+//     console.error("Error fetching specs for registration:", error);
+//     res.status(500).json({
+//       message: "Failed to fetch specifications",
+//       error: error.message
+//     });
+//   }
+// });
+
+// // 4. POST /api/scc/daily-htfu/register-machine
+// //    Registers a machine for daily testing. Creates a new document in daily_testing_ht_fus.
+// app.post("/api/scc/daily-htfu/register-machine", async (req, res) => {
+//   try {
+//     const {
+//       inspectionDate, // MM/DD/YYYY from frontend
+//       machineNo,
+//       moNo,
+//       buyer,
+//       buyerStyle,
+//       color,
+//       baseReqTemp,
+//       baseReqTime,
+//       baseReqPressure,
+//       emp_id,
+//       emp_kh_name,
+//       emp_eng_name,
+//       emp_dept_name,
+//       emp_sect_name,
+//       emp_job_title
+//     } = req.body;
+
+//     const formattedDate = inspectionDate; // Already formatted by frontend's formatDateForAPI
+
+//     if (!formattedDate || !machineNo || !moNo || !color) {
+//       // baseReq can be null
+//       return res.status(400).json({
+//         success: false,
+//         message: "Missing required fields for machine registration."
+//       });
+//     }
+
+//     const now = new Date();
+//     const registrationTime = `${String(now.getHours()).padStart(
+//       2,
+//       "0"
+//     )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+//       now.getSeconds()
+//     ).padStart(2, "0")}`;
+
+//     // Check if already registered for this date, machine, MO, color
+//     const existingRegistration = await DailyTestingHTFU.findOne({
+//       inspectionDate: formattedDate,
+//       machineNo,
+//       moNo,
+//       color
+//     });
+
+//     if (existingRegistration) {
+//       return res.status(409).json({
+//         success: false,
+//         message:
+//           "This Machine-MO-Color combination is already registered for this date.",
+//         data: existingRegistration
+//       });
+//     }
+
+//     const newRegistration = new DailyTestingHTFU({
+//       inspectionDate: formattedDate,
+//       machineNo,
+//       moNo,
+//       buyer,
+//       buyerStyle,
+//       color,
+//       baseReqTemp,
+//       baseReqTime,
+//       baseReqPressure,
+//       emp_id,
+//       emp_kh_name,
+//       emp_eng_name,
+//       emp_dept_name,
+//       emp_sect_name,
+//       emp_job_title,
+//       inspectionTime: registrationTime, // Using inspectionTime for initial registration time
+//       inspections: [], // Initially empty
+//       stretchTestResult: "Pending", // Default values
+//       washingTestResult: "Pending",
+//       isStretchWashingTestDone: false
+//     });
+
+//     await newRegistration.save();
+//     res.status(201).json({
+//       success: true,
+//       message: "Machine registered successfully for daily HT/FU QC.",
+//       data: newRegistration
+//     });
+//   } catch (error) {
+//     console.error("Error registering machine for Daily HT/FU QC:", error);
+//     if (error.code === 11000) {
+//       // Should be caught by the explicit check above, but as a fallback
+//       return res.status(409).json({
+//         success: false,
+//         message: "Duplicate entry. This registration might already exist.",
+//         error: error.message
+//       });
+//     }
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to register machine",
+//       error: error.message
+//     });
+//   }
+// });
+
+// // 5. GET /api/scc/daily-htfu/by-date?inspectionDate=<date>
+// //    Fetches all DailyTestingHTFU records for a given inspection date.
+// app.get("/api/scc/daily-htfu/by-date", async (req, res) => {
+//   try {
+//     const { inspectionDate } = req.query;
+//     if (!inspectionDate) {
+//       return res.status(400).json({ message: "Inspection Date is required." });
+//     }
+//     const formattedDate = inspectionDate; // Expecting MM/DD/YYYY from frontend
+
+//     const records = await DailyTestingHTFU.find({
+//       inspectionDate: formattedDate
+//     })
+//       .sort({ machineNo: 1 })
+//       .lean(); // Sort by machineNo numerically if possible, or handle on frontend
+
+//     res.json(records || []); // Return empty array if no records
+//   } catch (error) {
+//     console.error("Error fetching Daily HT/FU records by date:", error);
+//     res.status(500).json({
+//       message: "Failed to fetch daily records",
+//       error: error.message
+//     });
+//   }
+// });
+
+// // 6. POST /api/scc/daily-htfu/submit-slot-inspections
+// //    Submits inspection data for a specific time slot for multiple machines.
+// app.post("/api/scc/daily-htfu/submit-slot-inspection", async (req, res) => {
+//   try {
+//     const {
+//       inspectionDate, // MM/DD/YYYY from frontend
+//       timeSlotKey,
+//       inspectionNo, // The # of the inspection (1 for 07:00, 2 for 09:00, etc.)
+//       // Single submission object, not an array
+//       dailyTestingDocId,
+//       temp_req,
+//       temp_actual,
+//       temp_isNA,
+//       temp_isUserModified,
+//       time_req,
+//       time_actual,
+//       time_isNA,
+//       time_isUserModified,
+//       pressure_req,
+//       pressure_actual,
+//       pressure_isNA,
+//       pressure_isUserModified,
+//       emp_id
+//       // ... other emp details can be added if needed for the record's main emp fields
+//     } = req.body;
+
+//     if (
+//       !inspectionDate ||
+//       !timeSlotKey ||
+//       !inspectionNo ||
+//       !dailyTestingDocId ||
+//       temp_actual === undefined ||
+//       time_actual === undefined ||
+//       pressure_actual === undefined // Check if actuals are present
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Missing required fields for slot inspection submission."
+//       });
+//     }
+
+//     const formattedDate = inspectionDate; // Already formatted
+
+//     const record = await DailyTestingHTFU.findById(dailyTestingDocId);
+//     if (!record) {
+//       return res.status(404).json({
+//         success: false,
+//         message: `Record not found for ID: ${dailyTestingDocId}`
+//       });
+//     }
+
+//     if (record.inspectionDate !== formattedDate) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Date mismatch for record ID: ${dailyTestingDocId}. Expected ${formattedDate}, found ${record.inspectionDate}`
+//       });
+//     }
+
+//     const slotData = {
+//       inspectionNo,
+//       timeSlotKey,
+//       temp_req,
+//       temp_actual,
+//       temp_isNA,
+//       temp_isUserModified,
+//       time_req,
+//       time_actual,
+//       time_isNA,
+//       time_isUserModified,
+//       pressure_req,
+//       pressure_actual,
+//       pressure_isNA,
+//       pressure_isUserModified,
+//       inspectionTimestamp: new Date()
+//     };
+
+//     const existingSlotIndex = record.inspections.findIndex(
+//       (insp) => insp.timeSlotKey === timeSlotKey
+//     );
+
+//     if (existingSlotIndex > -1) {
+//       // Logic for updating an existing slot if allowed, or return error
+//       // For now, let's assume if it exists, it's an attempt to re-submit, which might be blocked or handled differently
+//       return res.status(409).json({
+//         success: false,
+//         message: `Slot ${timeSlotKey} already submitted for this record. Updates not currently supported via this endpoint.`
+//       });
+//     } else {
+//       record.inspections.push(slotData);
+//     }
+
+//     record.inspections.sort(
+//       (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
+//     );
+
+//     record.emp_id = emp_id; // Update who last submitted for this record
+//     record.inspectionTime = `${String(new Date().getHours()).padStart(
+//       2,
+//       "0"
+//     )}:${String(new Date().getMinutes()).padStart(2, "0")}:${String(
+//       new Date().getSeconds()
+//     ).padStart(2, "0")}`;
+
+//     await record.save();
+
+//     res.status(201).json({
+//       success: true,
+//       message: `Inspection for slot ${timeSlotKey} submitted successfully.`,
+//       data: record // Return the updated record
+//     });
+//   } catch (error) {
+//     console.error("Error submitting slot inspection:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to submit slot inspection",
+//       error: error.message
+//     });
+//   }
+// });
 
 /* ------------------------------
    End Point - SCC FU First Output - Specific Temp
@@ -13036,12 +13921,10 @@ app.get("/api/scc/daily-fuqc-test", async (req, res) => {
     }
   } catch (error) {
     console.error("Error fetching Daily FUQC Test data:", error);
-    res
-      .status(500)
-      .json({
-        message: "Failed to fetch Daily FUQC Test data",
-        error: error.message
-      });
+    res.status(500).json({
+      message: "Failed to fetch Daily FUQC Test data",
+      error: error.message
+    });
   }
 });
 
@@ -13172,13 +14055,11 @@ app.post("/api/scc/daily-fuqc-test", async (req, res) => {
         errorCode: "DUPLICATE_KEY"
       });
     }
-    res
-      .status(500)
-      .json({
-        message: "Failed to save Daily FUQC Test",
-        error: error.message,
-        details: error
-      });
+    res.status(500).json({
+      message: "Failed to save Daily FUQC Test",
+      error: error.message,
+      details: error
+    });
   }
 });
 
