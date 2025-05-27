@@ -8,7 +8,7 @@ import {
   saveSccDailyTesting,
   getSccDailyTesting,
   getDailyHtFuTest,
-  saveDailyHtFuTest
+  saveDailyHtFuTest,
 } from '../../Controller/SCC/sccController.js';
 
 const router = express.Router();
