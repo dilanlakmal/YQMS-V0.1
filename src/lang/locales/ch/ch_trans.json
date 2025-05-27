@@ -165,7 +165,7 @@
     "filter_by_package_no_placeholder": "按包号筛选",
     "filter_by_mono_placeholder_ends": "按工单号筛选 (结尾匹配)",
     "showing_records": "显示 {{count}} 条，共 {{total}} 条记录",
-    "showing_records_paginated":"Showing Records"
+    "showing_records_paginated": "Showing Records"
   },
 
   "defIm": {
@@ -803,29 +803,73 @@
     "newRecordMessageKey": "新记录",
     "existingRecordLoadedShort": "现有记录已加载。"
   },
+
   "sccDailyHTQC": {
-    "title": "每日热转印/熔接机测试与校准表",
-    "subtitle": "校准测试需在生产期间每2小时进行一次，并由QA验证。",
-    "newRecord": "新QC记录。如果已设置MO/Color，正在获取基本规格。",
-    "recordLoaded": "已加载现有QC记录。",
-    "selectMoColor": "为此机器/日期找到多条记录。请选择MO和颜色。",
-    "errorLoadingRecord": "加载QC记录时出错。",
-    "errorLoadingRecordMsg": "无法加载现有QC记录数据。",
-    "reportSavedSuccess": "每日HT/FU QC测试已成功保存。",
-    "validation": {
-      "fillBasic": "请填写日期、机器编号、MO编号和颜色。",
-      "allSlotsDone": "所有检查时段似乎已完成，或没有可提交的活跃时段。",
-      "fillActiveSlot": "请填写当前活跃检查时段的数据，或标记为N/A。"
-    },
-    "selectExisting": "为此机器/日期选择现有的MO/颜色：",
-    "parameter": "参数",
-    "reqValue": "要求值",
+    "mainTitle": "每日热转印与熔合机：测试与校准记录",
+    "mainSubtitle": "在生产期间，必须每两小时进行计划的校准测试，并需QA验证。",
+    "settingsTitle": "操作设置与公差",
+    "totalMachines": "总机器数量",
+    "tempTolerance": "温度公差 (°C)",
+    "timeTolerance": "时间公差 (秒)",
+    "pressureTolerance": "压力公差 (Bar)",
+    "registerMachineTitle": "登记机器以进行计划检查",
+    "reqTempShort": "标准温度",
+    "reqTimeShort": "标准时间",
+    "reqPressureShort": "标准压力",
+    "register": "登记",
+    "inspectionDataTitle": "每小时检查数据录入",
+    "timeSlot": "计划时间段",
+    "selectTimeSlot": "-- 选择检查时间 --",
+    "noMachinesRegisteredOrFiltered": "当前日期没有登记的机器，或没有符合筛选条件的机器。",
+    "parameter": "测试参数",
+    "reqValue": "标准值",
+    "actualValue": "实际值",
     "temperature": "温度",
     "timing": "时间",
     "pressure": "压力",
-    "stretchScratchTest": "拉伸与划痕测试",
-    "washingTest": "洗涤测试",
-    "inspectionDetails": "检查详情",
-    "currentInspectionNo": "当前检查时段："
+    "submitted": "已记录",
+    "pleaseSelectTimeSlot": "请选择一个检查时间段以查看或输入数据。",
+    "errorFetchingSpecs": "未能获取所选MO/颜色的标准规格。",
+    "machineRegisteredSuccess": "机器已成功登记进行每日检查。",
+    "slotInspectionSubmittedSuccess": "所选时间段的检查数据已成功提交。",
+    "validation": {
+      "fillMachineMoColor": "登记需要机器编号、MO号（已搜索并选择）和颜色。",
+      "selectTimeSlot": "提交检查数据前必须选择一个时间段。",
+      "fillAllActualsOrNA": "提交前请确保所有实际值都已输入或明确标记为不适用。",
+      "selectStretchResult": "请选择拉伸和刮擦测试的结果。",
+      "selectStretchRejectReason": "如果拉伸和刮擦测试不合格，请选择原因。",
+      "selectWashingResult": "请选择洗水测试的结果。"
+    },
+    "testResultsTitle": "测试结果 (拉伸、刮擦和洗水)",
+    "stretchScratchTest": "拉伸与刮擦测试",
+    "washingTest": "洗水测试",
+    "reasons": "原因",
+    "submitStretchTest": "提交拉伸/刮擦测试",
+    "submitWashingTest": "提交洗水测试",
+    "resultSubmitted": "结果已记录",
+    "stretchTestSubmittedSuccess": "拉伸与刮擦测试结果已成功提交。",
+    "washingTestSubmittedSuccess": "洗水测试结果已成功提交。"
+  },
+
+  "sccElasticReport": {
+    "mainTitle": "每日松紧带检查报告",
+    "registerMachineTitle": "登记松紧带检查机器",
+    "inspectionDataTitle": "松紧带检查数据",
+    "checkedQty": "检查数量",
+    "qualityIssue": "质量问题",
+    "measurement": "测量",
+    "defects": "疵点",
+    "result": "结果",
+    "remarks": "备注",
+    "remarksPlaceholderShort": "备注...",
+    "pleaseSelectTimeSlot": "请选择时间段以查看或输入数据。",
+    "noMachinesRegisteredOrFiltered": "此日期没有登记的机器或没有匹配的筛选结果。",
+    "validation": {
+      "fillMachineMoColor": "请选择机器编号，搜索/选择MO号，并选择颜色进行登记。",
+      "selectTimeSlot": "提交前请选择时间段。",
+      "fillCheckedQty": "必须输入检查数量且大于0。"
+    },
+    "machineRegisteredSuccess": "松紧带报告机器登记成功。",
+    "slotInspectionSubmittedSuccess": "该时间段的松紧带检查已成功提交。"
   }
 }

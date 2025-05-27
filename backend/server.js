@@ -50,6 +50,7 @@ import createDailyTestingHTFUtModel from "./models/dailyTestingHTFUModel.js";
 import createDailyTestingFUQCModel from "./models/DailyTestingFUQCModel.js";
 import createSCCDefectModel from "./models/SCCDefectModel.js";
 import createHTInspectionReportModel from "./models/HTInspectionReportModel.js";
+import createElasticReportModel from "./models/ElasticReport.js";
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
@@ -171,13 +172,14 @@ const AQLChart = createAQLChartModel(ymProdConnection);
 const SewingDefects = createSewingDefectsModel(ymProdConnection);
 const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection);
 
-const HTFirstOutput = createHTFirstOutputModel(ymProdConnection); // Add this
-const FUFirstOutput = createFUFirstOutputModel(ymProdConnection); // Add this
+const HTFirstOutput = createHTFirstOutputModel(ymProdConnection);
+const FUFirstOutput = createFUFirstOutputModel(ymProdConnection);
 const SCCDailyTesting = createSCCDailyTestingModel(ymProdConnection);
 const DailyTestingHTFU = createDailyTestingHTFUtModel(ymProdConnection);
 const DailyTestingFUQC = createDailyTestingFUQCModel(ymProdConnection);
 const SCCDefect = createSCCDefectModel(ymProdConnection);
 const HTInspectionReport = createHTInspectionReportModel(ymProdConnection);
+const ElasticReport = createElasticReportModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -12891,6 +12893,140 @@ app.get("/api/scc/daily-testing", async (req, res) => {
     });
   }
 });
+
+// 7. PUT /api/scc/daily-htfu/update-test-result/:docId
+//    Updates stretch or washing test results for a specific DailyTestingHTFU document.
+app.put("/api/scc/daily-htfu/update-test-result/:docId", async (req, res) => {
+  try {
+    const { docId } = req.params;
+    const {
+      stretchTestResult,
+      stretchTestRejectReasons,
+      washingTestResult,
+      emp_id // Employee performing the update
+    } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(docId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Document ID." });
+    }
+
+    const record = await DailyTestingHTFU.findById(docId);
+    if (!record) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Daily testing record not found." });
+    }
+
+    const updateFields = {};
+    let updated = false;
+
+    if (stretchTestResult !== undefined) {
+      if (
+        !["Pass", "Reject", "Pending", ""].includes(stretchTestResult) &&
+        stretchTestResult !== null
+      ) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "Invalid Stretch Test Result value."
+          });
+      }
+      updateFields.stretchTestResult =
+        stretchTestResult === "" ? "Pending" : stretchTestResult; // Treat empty as Pending
+      if (stretchTestResult === "Reject") {
+        updateFields.stretchTestRejectReasons = Array.isArray(
+          stretchTestRejectReasons
+        )
+          ? stretchTestRejectReasons
+          : [];
+      } else {
+        updateFields.stretchTestRejectReasons = []; // Clear reasons if not 'Reject'
+      }
+      updated = true;
+    }
+
+    if (washingTestResult !== undefined) {
+      if (
+        !["Pass", "Reject", "Pending", ""].includes(washingTestResult) &&
+        washingTestResult !== null
+      ) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "Invalid Washing Test Result value."
+          });
+      }
+      updateFields.washingTestResult =
+        washingTestResult === "" ? "Pending" : washingTestResult; // Treat empty as Pending
+      updated = true;
+    }
+
+    // Mark that at least one of these tests has been actioned if not already done.
+    // This can be more sophisticated if needed.
+    if (updated && !record.isStretchWashingTestDone) {
+      if (stretchTestResult && stretchTestResult !== "Pending")
+        updateFields.isStretchWashingTestDone = true;
+      if (washingTestResult && washingTestResult !== "Pending")
+        updateFields.isStretchWashingTestDone = true;
+    }
+
+    if (!updated) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "No valid test result fields provided for update."
+        });
+    }
+
+    // Update who last modified this record (optional, good for auditing)
+    if (emp_id) {
+      updateFields.emp_id = emp_id; // Overwrites previous emp_id, consider an audit trail if needed
+      const now = new Date();
+      updateFields.inspectionTime = `${String(now.getHours()).padStart(
+        2,
+        "0"
+      )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+        now.getSeconds()
+      ).padStart(2, "0")}`;
+    }
+
+    const updatedRecord = await DailyTestingHTFU.findByIdAndUpdate(
+      docId,
+      { $set: updateFields },
+      { new: true, runValidators: true } // Return the updated document and run schema validators
+    );
+
+    if (!updatedRecord) {
+      // Should not happen if findById found the record, but as a safeguard
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message:
+            "Failed to update record, record not found after update attempt."
+        });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Test result updated successfully.",
+      data: updatedRecord
+    });
+  } catch (error) {
+    console.error("Error updating test result:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update test result",
+      error: error.message
+    });
+  }
+});
+
 /* ------------------------------
    End Points - SCC Daily HT/FU QC Test
 ------------------------------ */
@@ -13027,9 +13163,6 @@ app.get(
 app.get("/api/scc/ht-first-output/specs-for-registration", async (req, res) => {
   try {
     const { moNo, color } = req.query;
-    console.log(
-      `[SPECS_ENDPOINT] Request received. MO: "${moNo}", Color: "${color}"`
-    );
 
     if (!moNo || !color || moNo.trim() === "" || color.trim() === "") {
       console.log(
@@ -13043,9 +13176,6 @@ app.get("/api/scc/ht-first-output/specs-for-registration", async (req, res) => {
     const trimmedMoNo = moNo.trim();
     const trimmedColor = color.trim();
 
-    console.log(
-      `[SPECS_ENDPOINT] Searching HTFirstOutput for MO: "${trimmedMoNo}", Color: "${trimmedColor}"`
-    );
     const record = await HTFirstOutput.findOne({
       moNo: trimmedMoNo,
       color: trimmedColor
@@ -13054,9 +13184,6 @@ app.get("/api/scc/ht-first-output/specs-for-registration", async (req, res) => {
       .lean();
 
     if (!record) {
-      console.log(
-        `[SPECS_ENDPOINT] No HTFirstOutput record found for MO: "${trimmedMoNo}", Color: "${trimmedColor}".`
-      );
       return res.status(200).json({
         // Send 200 with message, client handles it
         message: "SPECS_NOT_FOUND_NO_RECORD",
@@ -13065,16 +13192,11 @@ app.get("/api/scc/ht-first-output/specs-for-registration", async (req, res) => {
         reqPressure: null
       });
     }
-    // For brevity, you might not want to log the full record if it's large.
-    // console.log(`[SPECS_ENDPOINT] Found record for MO: "${trimmedMoNo}", Color: "${trimmedColor}". Record _id: ${record._id}`);
 
     if (
       !record.standardSpecification ||
       record.standardSpecification.length === 0
     ) {
-      console.log(
-        `[SPECS_ENDPOINT] Record found, but 'standardSpecification' array is missing or empty for MO: "${trimmedMoNo}", Color: "${trimmedColor}".`
-      );
       return res.status(200).json({
         message: "SPECS_NOT_FOUND_STANDARD_SPEC_ARRAY_EMPTY",
         reqTemp: null,
@@ -13082,7 +13204,6 @@ app.get("/api/scc/ht-first-output/specs-for-registration", async (req, res) => {
         reqPressure: null
       });
     }
-    // console.log(`[SPECS_ENDPOINT] 'standardSpecification' array:`, JSON.stringify(record.standardSpecification, null, 2));
 
     // Primary target: 'first' type spec with all values non-null
     let firstSpec = record.standardSpecification.find(
@@ -13094,10 +13215,6 @@ app.get("/api/scc/ht-first-output/specs-for-registration", async (req, res) => {
     );
 
     if (firstSpec) {
-      console.log(
-        `[SPECS_ENDPOINT] Found 'first' spec with all values for MO: "${trimmedMoNo}", Color: "${trimmedColor}":`,
-        firstSpec
-      );
       return res.json({
         reqTemp: firstSpec.tempC,
         reqTime: firstSpec.timeSec,
@@ -13106,16 +13223,10 @@ app.get("/api/scc/ht-first-output/specs-for-registration", async (req, res) => {
     }
 
     // Fallback: If no complete 'first' spec, try to find any 'first' spec
-    console.log(
-      `[SPECS_ENDPOINT] No 'first' spec with all values. Looking for any 'first' spec for MO: "${trimmedMoNo}", Color: "${trimmedColor}".`
-    );
+
     firstSpec = record.standardSpecification.find((s) => s.type === "first");
 
     if (firstSpec) {
-      console.log(
-        `[SPECS_ENDPOINT] Found 'first' spec (values might be partial/null) for MO: "${trimmedMoNo}", Color: "${trimmedColor}":`,
-        firstSpec
-      );
       return res.json({
         reqTemp: firstSpec.tempC !== undefined ? firstSpec.tempC : null,
         reqTime: firstSpec.timeSec !== undefined ? firstSpec.timeSec : null,
@@ -13125,9 +13236,7 @@ app.get("/api/scc/ht-first-output/specs-for-registration", async (req, res) => {
     }
 
     // If no 'first' spec of any kind is found
-    console.log(
-      `[SPECS_ENDPOINT] No 'first' type spec found at all for MO: "${trimmedMoNo}", Color: "${trimmedColor}".`
-    );
+
     return res.status(200).json({
       message: "SPECS_NOT_FOUND_NO_FIRST_TYPE",
       reqTemp: null,
@@ -13411,654 +13520,361 @@ app.post("/api/scc/daily-htfu/submit-slot-inspection", async (req, res) => {
   }
 });
 
-// // 2. GET /api/scc/ht-first-output/mo-details-for-registration?moNo=<moNo>
-// //    Fetches buyer, buyerStyle, and distinct colors for a given MO from ht_first_outputs.
-// app.get(
-//   "/api/scc/ht-first-output/mo-details-for-registration",
-//   async (req, res) => {
-//     try {
-//       const { moNo } = req.query;
-//       if (!moNo) {
-//         return res.status(400).json({ message: "MO No is required." });
-//       }
-
-//       // Find one record to get buyer/buyerStyle (assuming they are consistent for an MO)
-//       // and then find all distinct colors for that MO.
-//       const sampleRecord = await HTFirstOutput.findOne({ moNo })
-//         .sort({ createdAt: -1 })
-//         .lean();
-
-//       if (!sampleRecord) {
-//         return res
-//           .status(404)
-//           .json({ message: "MO not found in HT First Output records." });
-//       }
-
-//       const distinctColors = await HTFirstOutput.distinct("color", { moNo });
-
-//       res.json({
-//         buyer: sampleRecord.buyer || "",
-//         buyerStyle: sampleRecord.buyerStyle || "",
-//         colors: distinctColors || []
-//       });
-//     } catch (error) {
-//       console.error("Error fetching MO details for registration:", error);
-//       res.status(500).json({
-//         message: "Failed to fetch MO details",
-//         error: error.message
-//       });
-//     }
-//   }
-// );
-
-// // 3. GET /api/scc/ht-first-output/specs-for-registration?moNo=<moNo>&color=<color>
-// //    Fetches the standard specs (Temp, Time, Pressure) for a given MO/Color from ht_first_outputs.
-// //    This uses similar logic to your existing `/api/scc/get-first-output-specs` but targets HTFirstOutput directly
-// //    and prioritizes based on '2nd heat' then 'first', and 'Pass' status.
-// app.get("/api/scc/ht-first-output/specs-for-registration", async (req, res) => {
-//   try {
-//     const { moNo, color } = req.query;
-//     if (!moNo || !color) {
-//       return res.status(400).json({ message: "MO No and Color are required." });
-//     }
-
-//     // Find the latest HTFirstOutput record for this MO & Color
-//     // The `inspectionDate` is not used here as we want the general spec for MO/Color.
-//     // If specs can change by date for the same MO/Color in HTFirstOutput, you'd need to pass date.
-//     const record = await HTFirstOutput.findOne({
-//       moNo,
-//       color
-//     })
-//       .sort({ inspectionDate: -1, createdAt: -1 })
-//       .lean(); // Get the latest based on date, then creation
-
-//     if (
-//       !record ||
-//       !record.standardSpecification ||
-//       record.standardSpecification.length === 0
-//     ) {
-//       return res.status(200).json({
-//         message: "SPECS_NOT_FOUND",
-//         reqTemp: null,
-//         reqTime: null,
-//         reqPressure: null
-//       });
-//     }
-
-//     let specToUse = null;
-//     const specs = record.standardSpecification;
-
-//     // Priority: 1. '2nd heat' Pass, 2. 'first' Pass, 3. '2nd heat' Any, 4. 'first' Any
-//     const secondHeatPass = specs.find(
-//       (s) =>
-//         s.type === "2nd heat" &&
-//         s.status === "Pass" &&
-//         s.tempC != null &&
-//         s.timeSec != null &&
-//         s.pressure != null
-//     );
-//     const firstPass = specs.find(
-//       (s) =>
-//         s.type === "first" &&
-//         s.status === "Pass" &&
-//         s.tempC != null &&
-//         s.timeSec != null &&
-//         s.pressure != null
-//     );
-//     const secondHeatAny = specs.find(
-//       (s) =>
-//         s.type === "2nd heat" &&
-//         s.tempC != null &&
-//         s.timeSec != null &&
-//         s.pressure != null
-//     );
-//     const firstAny = specs.find(
-//       (s) =>
-//         s.type === "first" &&
-//         s.tempC != null &&
-//         s.timeSec != null &&
-//         s.pressure != null
-//     );
-
-//     if (secondHeatPass) specToUse = secondHeatPass;
-//     else if (firstPass) specToUse = firstPass;
-//     else if (secondHeatAny) specToUse = secondHeatAny;
-//     else if (firstAny) specToUse = firstAny;
-
-//     if (!specToUse) {
-//       return res.status(200).json({
-//         message: "VALID_SPECS_NOT_FOUND",
-//         reqTemp: null,
-//         reqTime: null,
-//         reqPressure: null
-//       });
-//     }
-
-//     res.json({
-//       reqTemp: specToUse.tempC,
-//       reqTime: specToUse.timeSec,
-//       reqPressure: specToUse.pressure
-//     });
-//   } catch (error) {
-//     console.error("Error fetching specs for registration:", error);
-//     res.status(500).json({
-//       message: "Failed to fetch specifications",
-//       error: error.message
-//     });
-//   }
-// });
-
-// // 4. POST /api/scc/daily-htfu/register-machine
-// //    Registers a machine for daily testing. Creates a new document in daily_testing_ht_fus.
-// app.post("/api/scc/daily-htfu/register-machine", async (req, res) => {
-//   try {
-//     const {
-//       inspectionDate, // MM/DD/YYYY from frontend
-//       machineNo,
-//       moNo,
-//       buyer,
-//       buyerStyle,
-//       color,
-//       baseReqTemp,
-//       baseReqTime,
-//       baseReqPressure,
-//       emp_id,
-//       emp_kh_name,
-//       emp_eng_name,
-//       emp_dept_name,
-//       emp_sect_name,
-//       emp_job_title
-//     } = req.body;
-
-//     const formattedDate = inspectionDate; // Already formatted by frontend's formatDateForAPI
-
-//     if (!formattedDate || !machineNo || !moNo || !color) {
-//       // baseReq can be null
-//       return res.status(400).json({
-//         success: false,
-//         message: "Missing required fields for machine registration."
-//       });
-//     }
-
-//     const now = new Date();
-//     const registrationTime = `${String(now.getHours()).padStart(
-//       2,
-//       "0"
-//     )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
-//       now.getSeconds()
-//     ).padStart(2, "0")}`;
-
-//     // Check if already registered for this date, machine, MO, color
-//     const existingRegistration = await DailyTestingHTFU.findOne({
-//       inspectionDate: formattedDate,
-//       machineNo,
-//       moNo,
-//       color
-//     });
-
-//     if (existingRegistration) {
-//       return res.status(409).json({
-//         success: false,
-//         message:
-//           "This Machine-MO-Color combination is already registered for this date.",
-//         data: existingRegistration
-//       });
-//     }
-
-//     const newRegistration = new DailyTestingHTFU({
-//       inspectionDate: formattedDate,
-//       machineNo,
-//       moNo,
-//       buyer,
-//       buyerStyle,
-//       color,
-//       baseReqTemp,
-//       baseReqTime,
-//       baseReqPressure,
-//       emp_id,
-//       emp_kh_name,
-//       emp_eng_name,
-//       emp_dept_name,
-//       emp_sect_name,
-//       emp_job_title,
-//       inspectionTime: registrationTime, // Using inspectionTime for initial registration time
-//       inspections: [], // Initially empty
-//       stretchTestResult: "Pending", // Default values
-//       washingTestResult: "Pending",
-//       isStretchWashingTestDone: false
-//     });
-
-//     await newRegistration.save();
-//     res.status(201).json({
-//       success: true,
-//       message: "Machine registered successfully for daily HT/FU QC.",
-//       data: newRegistration
-//     });
-//   } catch (error) {
-//     console.error("Error registering machine for Daily HT/FU QC:", error);
-//     if (error.code === 11000) {
-//       // Should be caught by the explicit check above, but as a fallback
-//       return res.status(409).json({
-//         success: false,
-//         message: "Duplicate entry. This registration might already exist.",
-//         error: error.message
-//       });
-//     }
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to register machine",
-//       error: error.message
-//     });
-//   }
-// });
-
-// // 5. GET /api/scc/daily-htfu/by-date?inspectionDate=<date>
-// //    Fetches all DailyTestingHTFU records for a given inspection date.
-// app.get("/api/scc/daily-htfu/by-date", async (req, res) => {
-//   try {
-//     const { inspectionDate } = req.query;
-//     if (!inspectionDate) {
-//       return res.status(400).json({ message: "Inspection Date is required." });
-//     }
-//     const formattedDate = inspectionDate; // Expecting MM/DD/YYYY from frontend
-
-//     const records = await DailyTestingHTFU.find({
-//       inspectionDate: formattedDate
-//     })
-//       .sort({ machineNo: 1 })
-//       .lean(); // Sort by machineNo numerically if possible, or handle on frontend
-
-//     res.json(records || []); // Return empty array if no records
-//   } catch (error) {
-//     console.error("Error fetching Daily HT/FU records by date:", error);
-//     res.status(500).json({
-//       message: "Failed to fetch daily records",
-//       error: error.message
-//     });
-//   }
-// });
-
-// // 6. POST /api/scc/daily-htfu/submit-slot-inspections
-// //    Submits inspection data for a specific time slot for multiple machines.
-// app.post("/api/scc/daily-htfu/submit-slot-inspection", async (req, res) => {
-//   try {
-//     const {
-//       inspectionDate, // MM/DD/YYYY from frontend
-//       timeSlotKey,
-//       inspectionNo, // The # of the inspection (1 for 07:00, 2 for 09:00, etc.)
-//       // Single submission object, not an array
-//       dailyTestingDocId,
-//       temp_req,
-//       temp_actual,
-//       temp_isNA,
-//       temp_isUserModified,
-//       time_req,
-//       time_actual,
-//       time_isNA,
-//       time_isUserModified,
-//       pressure_req,
-//       pressure_actual,
-//       pressure_isNA,
-//       pressure_isUserModified,
-//       emp_id
-//       // ... other emp details can be added if needed for the record's main emp fields
-//     } = req.body;
-
-//     if (
-//       !inspectionDate ||
-//       !timeSlotKey ||
-//       !inspectionNo ||
-//       !dailyTestingDocId ||
-//       temp_actual === undefined ||
-//       time_actual === undefined ||
-//       pressure_actual === undefined // Check if actuals are present
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Missing required fields for slot inspection submission."
-//       });
-//     }
-
-//     const formattedDate = inspectionDate; // Already formatted
-
-//     const record = await DailyTestingHTFU.findById(dailyTestingDocId);
-//     if (!record) {
-//       return res.status(404).json({
-//         success: false,
-//         message: `Record not found for ID: ${dailyTestingDocId}`
-//       });
-//     }
-
-//     if (record.inspectionDate !== formattedDate) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Date mismatch for record ID: ${dailyTestingDocId}. Expected ${formattedDate}, found ${record.inspectionDate}`
-//       });
-//     }
-
-//     const slotData = {
-//       inspectionNo,
-//       timeSlotKey,
-//       temp_req,
-//       temp_actual,
-//       temp_isNA,
-//       temp_isUserModified,
-//       time_req,
-//       time_actual,
-//       time_isNA,
-//       time_isUserModified,
-//       pressure_req,
-//       pressure_actual,
-//       pressure_isNA,
-//       pressure_isUserModified,
-//       inspectionTimestamp: new Date()
-//     };
-
-//     const existingSlotIndex = record.inspections.findIndex(
-//       (insp) => insp.timeSlotKey === timeSlotKey
-//     );
-
-//     if (existingSlotIndex > -1) {
-//       // Logic for updating an existing slot if allowed, or return error
-//       // For now, let's assume if it exists, it's an attempt to re-submit, which might be blocked or handled differently
-//       return res.status(409).json({
-//         success: false,
-//         message: `Slot ${timeSlotKey} already submitted for this record. Updates not currently supported via this endpoint.`
-//       });
-//     } else {
-//       record.inspections.push(slotData);
-//     }
-
-//     record.inspections.sort(
-//       (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
-//     );
-
-//     record.emp_id = emp_id; // Update who last submitted for this record
-//     record.inspectionTime = `${String(new Date().getHours()).padStart(
-//       2,
-//       "0"
-//     )}:${String(new Date().getMinutes()).padStart(2, "0")}:${String(
-//       new Date().getSeconds()
-//     ).padStart(2, "0")}`;
-
-//     await record.save();
-
-//     res.status(201).json({
-//       success: true,
-//       message: `Inspection for slot ${timeSlotKey} submitted successfully.`,
-//       data: record // Return the updated record
-//     });
-//   } catch (error) {
-//     console.error("Error submitting slot inspection:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to submit slot inspection",
-//       error: error.message
-//     });
-//   }
-// });
-
 /* ------------------------------
    End Point - SCC FU First Output - Specific Temp
 ------------------------------ */
-app.get("/api/scc/fu-first-output-temp", async (req, res) => {
+
+// 1. Search Active MOs for FUQC Registration (from fu_first_outputs)
+app.get("/api/scc/fu-first-output/search-active-mos", async (req, res) => {
   try {
-    const { moNo, color, inspectionDate } = req.query;
-    if (!moNo || !color || !inspectionDate) {
-      return res
-        .status(400)
-        .json({ message: "MO No, Color, and Inspection Date are required." });
-    }
-    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+    const { term } = req.query;
+    if (!term || typeof term !== "string" || term.trim() === "")
+      return res.json([]);
+    const trimmedTerm = term.trim();
+    if (trimmedTerm === "") return res.json([]);
+    const escapedTerm = escapeRegex(trimmedTerm);
 
-    const fuRecord = await FUFirstOutput.findOne({
-      // Assuming FUFirstOutput is your model name
-      moNo,
-      color,
-      inspectionDate: formattedDate
-    }).lean();
-
-    let tempC = null;
-    if (fuRecord && fuRecord.standardSpecification) {
-      // Prioritize 'afterHat' if available, otherwise 'first'
-      const afterHatSpec = fuRecord.standardSpecification.find(
-        (s) =>
-          s.type === "afterHat" && s.tempC !== null && s.tempC !== undefined
+    if (!FUFirstOutput || typeof FUFirstOutput.aggregate !== "function") {
+      console.error(
+        "[SERVER FUQC] FUFirstOutput model is not correctly defined."
       );
-      const firstSpec = fuRecord.standardSpecification.find(
-        (s) => s.type === "first" && s.tempC !== null && s.tempC !== undefined
-      );
-
-      if (afterHatSpec) {
-        tempC = afterHatSpec.tempC;
-      } else if (firstSpec) {
-        tempC = firstSpec.tempC;
-      }
+      return res.status(500).json({ message: "Server configuration error." });
     }
 
-    if (tempC === null) {
-      return res
-        .status(200)
-        .json({ message: "FU_TEMP_SPEC_NOT_FOUND", tempC: null });
-    }
-    res.json({ tempC: tempC });
+    const mos = await FUFirstOutput.aggregate([
+      { $match: { moNo: { $regex: escapedTerm, $options: "i" } } },
+      { $sort: { moNo: 1, createdAt: -1 } },
+      {
+        $group: {
+          _id: "$moNo",
+          moNo: { $first: "$moNo" },
+          buyer: { $first: "$buyer" },
+          buyerStyle: { $first: "$buyerStyle" }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          moNo: 1,
+          buyer: { $ifNull: ["$buyer", ""] },
+          buyerStyle: { $ifNull: ["$buyerStyle", ""] }
+        }
+      },
+      { $limit: 15 }
+    ]);
+    res.json(mos);
   } catch (error) {
-    console.error("Error fetching FU first output temperature:", error);
-    res.status(500).json({
-      message: "Failed to fetch FU first output temperature",
-      error: error.message
-    });
+    console.error("[SERVER FUQC] Error searching active FU MOs:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to search FU MOs", error: error.message });
   }
 });
 
-/* ------------------------------
-   End Points - SCC Daily FU QC Test
------------------------------- */
+// 2. Get MO Details for FUQC Registration (from fu_first_outputs)
+app.get(
+  "/api/scc/fu-first-output/mo-details-for-registration",
+  async (req, res) => {
+    try {
+      const { moNo } = req.query;
+      if (!moNo) return res.status(400).json({ message: "MO No is required." });
 
-// GET Endpoint to fetch existing Daily FUQC Test data or MO list
-app.get("/api/scc/daily-fuqc-test", async (req, res) => {
-  try {
-    const { inspectionDate, machineNo, moNo, color } = req.query;
-    const formattedDate = inspectionDate
-      ? formatDateToMMDDYYYY(inspectionDate)
-      : null;
-
-    if (!formattedDate || !machineNo) {
-      return res
-        .status(400)
-        .json({ message: "Inspection Date and Machine No are required." });
-    }
-
-    if (moNo && color) {
-      const record = await DailyTestingFUQC.findOne({
-        inspectionDate: formattedDate,
-        machineNo,
-        moNo,
-        color
-      }).lean(); // Use .lean() for faster queries
-
-      if (!record) {
+      const sampleRecord = await FUFirstOutput.findOne({ moNo })
+        .sort({ inspectionDate: -1, createdAt: -1 })
+        .lean();
+      if (!sampleRecord)
         return res
-          .status(200)
-          .json({ message: "DAILY_FUQC_RECORD_NOT_FOUND", data: null });
-      }
-      // Ensure temp_offset is included if it exists, or default
-      const dataToSend = { ...record, temp_offset: record.temp_offset ?? 5 };
-      return res.json({ message: "RECORD_FOUND", data: dataToSend });
-    } else {
-      const distinctEntries = await DailyTestingFUQC.aggregate([
-        { $match: { inspectionDate: formattedDate, machineNo } },
-        {
-          $group: {
-            _id: { moNo: "$moNo", color: "$color" },
-            buyer: { $first: "$buyer" },
-            buyerStyle: { $first: "$buyerStyle" },
-            docId: { $first: "$_id" }
-          }
-        },
-        {
-          $project: {
-            _id: 0,
-            moNo: "$_id.moNo",
-            color: "$_id.color",
-            buyer: "$buyer",
-            buyerStyle: "$buyerStyle",
-            docId: "$docId"
-          }
-        },
-        { $sort: { moNo: 1, color: 1 } }
-      ]);
+          .status(404)
+          .json({ message: "MO not found in Fusing First Output records." });
 
-      if (distinctEntries.length === 0) {
-        return res
-          .status(200)
-          .json({ message: "NO_RECORDS_FOR_DATE_MACHINE", data: [] });
-      }
-      return res.json({
-        message: "MULTIPLE_MO_COLOR_FOUND",
-        data: distinctEntries
+      const distinctColors = await FUFirstOutput.distinct("color", { moNo });
+      res.json({
+        buyer: sampleRecord.buyer || "",
+        buyerStyle: sampleRecord.buyerStyle || "",
+        colors: distinctColors.sort() || []
+      });
+    } catch (error) {
+      console.error(
+        "[SERVER FUQC] Error fetching FU MO details for registration:",
+        error
+      );
+      res.status(500).json({
+        message: "Failed to fetch FU MO details",
+        error: error.message
       });
     }
+  }
+);
+
+// 3. Get Specs (Temp only) for FUQC Registration (from fu_first_outputs)
+app.get("/api/scc/fu-first-output/specs-for-registration", async (req, res) => {
+  try {
+    const { moNo, color } = req.query;
+    if (!moNo || !color || moNo.trim() === "" || color.trim() === "") {
+      return res.status(400).json({ message: "MO No and Color are required." });
+    }
+    const record = await FUFirstOutput.findOne({
+      moNo: moNo.trim(),
+      color: color.trim()
+    })
+      .sort({ inspectionDate: -1, createdAt: -1 })
+      .lean();
+
+    if (
+      !record ||
+      !record.standardSpecification ||
+      record.standardSpecification.length === 0
+    ) {
+      return res
+        .status(200)
+        .json({ message: "FU_SPECS_NOT_FOUND", reqTemp: null });
+    }
+    const firstSpec = record.standardSpecification.find(
+      (s) => s.type === "first" && s.tempC != null
+    );
+
+    if (!firstSpec) {
+      const anyFirstSpec = record.standardSpecification.find(
+        (s) => s.type === "first"
+      );
+      if (anyFirstSpec) {
+        return res.json({
+          reqTemp: anyFirstSpec.tempC !== undefined ? anyFirstSpec.tempC : null
+        });
+      }
+      return res
+        .status(200)
+        .json({ message: "FU_FIRST_TYPE_SPEC_INCOMPLETE", reqTemp: null });
+    }
+    res.json({ reqTemp: firstSpec.tempC });
   } catch (error) {
-    console.error("Error fetching Daily FUQC Test data:", error);
+    console.error(
+      "[SERVER FUQC] Error fetching FU specs for registration:",
+      error
+    );
     res.status(500).json({
-      message: "Failed to fetch Daily FUQC Test data",
+      message: "Failed to fetch FU specifications",
       error: error.message
     });
   }
 });
 
-// POST Endpoint to save/update Daily FUQC Test data
-app.post("/api/scc/daily-fuqc-test", async (req, res) => {
+// 4. Register Machine for Daily FUQC
+app.post("/api/scc/daily-fuqc/register-machine", async (req, res) => {
   try {
     const {
-      _id,
       inspectionDate,
       machineNo,
       moNo,
       buyer,
       buyerStyle,
       color,
+      baseReqTemp, // Only baseReqTemp for FUQC
+      emp_id,
+      emp_kh_name,
+      emp_eng_name,
+      emp_dept_name,
+      emp_sect_name,
+      emp_job_title
+    } = req.body;
+
+    const formattedDate = inspectionDate; // Assuming MM/DD/YYYY from frontend
+    if (!formattedDate || !machineNo || !moNo || !color) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields for FUQC machine registration."
+      });
+    }
+    const now = new Date();
+    const registrationTime = `${String(now.getHours()).padStart(
+      2,
+      "0"
+    )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+      now.getSeconds()
+    ).padStart(2, "0")}`;
+
+    const existingRegistration = await DailyTestingFUQC.findOne({
+      inspectionDate: formattedDate,
+      machineNo,
+      moNo,
+      color
+    });
+    if (existingRegistration) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This Machine-MO-Color is already registered for FUQC on this date.",
+        data: existingRegistration
+      });
+    }
+
+    const newRegistration = new DailyTestingFUQC({
+      inspectionDate: formattedDate,
+      machineNo,
+      moNo,
+      buyer,
+      buyerStyle,
+      color,
+      baseReqTemp: baseReqTemp !== undefined ? baseReqTemp : null,
+      temp_offset: 5, // Default offset, can be made configurable later if needed
       emp_id,
       emp_kh_name,
       emp_eng_name,
       emp_dept_name,
       emp_sect_name,
       emp_job_title,
-      baseReqTemp,
-      temp_offset, // New field from frontend
-      currentInspection,
-      remarks
+      inspectionTime: registrationTime,
+      inspections: [],
+      remarks: "NA"
+    });
+    await newRegistration.save();
+    res.status(201).json({
+      success: true,
+      message: "Machine registered successfully for Daily FUQC.",
+      data: newRegistration
+    });
+  } catch (error) {
+    console.error(
+      "[SERVER FUQC] Error registering machine for Daily FUQC:",
+      error
+    );
+    if (error.code === 11000)
+      return res.status(409).json({
+        success: false,
+        message: "Duplicate FUQC registration.",
+        error: error.message
+      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to register machine for FUQC",
+      error: error.message
+    });
+  }
+});
+
+// 5. Get Daily FUQC Records by Date
+app.get("/api/scc/daily-fuqc/by-date", async (req, res) => {
+  try {
+    const { inspectionDate } = req.query;
+    if (!inspectionDate)
+      return res.status(400).json({ message: "Inspection Date is required." });
+    const records = await DailyTestingFUQC.find({
+      inspectionDate: inspectionDate
+    })
+      .sort({ machineNo: 1 })
+      .lean();
+    res.json(records || []);
+  } catch (error) {
+    console.error(
+      "[SERVER FUQC] Error fetching Daily FUQC records by date:",
+      error
+    );
+    res.status(500).json({
+      message: "Failed to fetch daily FUQC records",
+      error: error.message
+    });
+  }
+});
+
+// 6. Submit Slot Inspection for Daily FUQC
+app.post("/api/scc/daily-fuqc/submit-slot-inspection", async (req, res) => {
+  try {
+    const {
+      inspectionDate,
+      timeSlotKey,
+      inspectionNo,
+      dailyFUQCDocId, // Changed key
+      temp_req,
+      temp_actual,
+      temp_isNA,
+      temp_isUserModified,
+      emp_id
     } = req.body;
 
-    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
-    if (!formattedDate || !machineNo || !moNo || !color || !currentInspection) {
-      return res
-        .status(400)
-        .json({ message: "Missing required fields for submission." });
-    }
     if (
-      currentInspection.temp_req === undefined ||
-      currentInspection.temp_actual === undefined ||
-      typeof currentInspection.temp_isNA !== "boolean" ||
-      !currentInspection.result
+      !inspectionDate ||
+      !timeSlotKey ||
+      !inspectionNo ||
+      !dailyFUQCDocId ||
+      (temp_actual === undefined && !temp_isNA)
     ) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields for FUQC slot submission."
+      });
+    }
+    const record = await DailyTestingFUQC.findById(dailyFUQCDocId);
+    if (!record)
+      return res.status(404).json({
+        success: false,
+        message: `FUQC Record not found: ${dailyFUQCDocId}`
+      });
+    if (record.inspectionDate !== inspectionDate)
       return res
         .status(400)
-        .json({ message: "Invalid currentInspection data structure." });
+        .json({ success: false, message: "Date mismatch for FUQC record." });
+
+    // Determine result based on actual, req, and offset stored in the record
+    let result = "Pending";
+    if (temp_isNA) {
+      result = "N/A";
+    } else if (temp_actual !== null && temp_req !== null) {
+      const diff = Math.abs(Number(temp_actual) - Number(temp_req));
+      result = diff <= (record.temp_offset || 0) ? "Pass" : "Reject";
     }
 
-    const now = new Date();
-    const inspectionTime = `${String(now.getHours()).padStart(2, "0")}:${String(
-      now.getMinutes()
-    ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-    const query = { inspectionDate: formattedDate, machineNo, moNo, color };
-    let record = await DailyTestingFUQC.findOne(query);
-    const currentRemarks =
-      remarks?.trim() === "" ? "NA" : remarks?.trim() || "NA";
-
-    const inspectionDataToSave = {
-      ...currentInspection,
+    const slotData = {
+      inspectionNo: Number(inspectionNo),
+      timeSlotKey,
+      temp_req: temp_req !== undefined ? temp_req : null,
+      temp_actual: temp_isNA
+        ? null
+        : temp_actual !== undefined
+        ? temp_actual
+        : null,
+      temp_isNA: !!temp_isNA,
+      // temp_isUserModified: !!temp_isUserModified, // Schema for FUQC slot does not have this
+      result: result, // Calculated result
       inspectionTimestamp: new Date()
     };
-    if (inspectionDataToSave.temp_isNA) {
-      inspectionDataToSave.result = "N/A";
-      inspectionDataToSave.temp_actual = null;
-    }
 
-    const effectiveTempOffset =
-      temp_offset !== undefined && temp_offset !== null
-        ? Number(temp_offset)
-        : 5;
-
-    if (record) {
-      // Update existing record
-      record.baseReqTemp = baseReqTemp ?? record.baseReqTemp;
-      record.temp_offset = effectiveTempOffset; // Update temp_offset
-      record.remarks = currentRemarks;
-      record.emp_id = emp_id;
-      record.emp_kh_name = emp_kh_name;
-      record.emp_eng_name = emp_eng_name;
-      record.emp_dept_name = emp_dept_name;
-      record.emp_sect_name = emp_sect_name;
-      record.emp_job_title = emp_job_title;
-      record.inspectionTime = inspectionTime;
-
-      const slotIndex = record.inspections.findIndex(
-        (insp) => insp.timeSlotKey === inspectionDataToSave.timeSlotKey
-      );
-      if (slotIndex > -1) {
-        record.inspections[slotIndex] = {
-          ...record.inspections[slotIndex],
-          ...inspectionDataToSave
-        };
-      } else {
-        record.inspections.push(inspectionDataToSave);
-      }
-      record.inspections.sort(
-        (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
-      );
-    } else {
-      // Create new record
-      record = new DailyTestingFUQC({
-        inspectionDate: formattedDate,
-        machineNo,
-        moNo,
-        buyer,
-        buyerStyle,
-        color,
-        emp_id,
-        emp_kh_name,
-        emp_eng_name,
-        emp_dept_name,
-        emp_sect_name,
-        emp_job_title,
-        inspectionTime,
-        baseReqTemp,
-        temp_offset: effectiveTempOffset, // Save temp_offset
-        remarks: currentRemarks,
-        inspections: [inspectionDataToSave]
-      });
-    }
-
-    await record.save();
-    res
-      .status(201)
-      .json({ message: "Daily FUQC Test saved successfully", data: record });
-  } catch (error) {
-    console.error("Error saving Daily FUQC Test:", error);
-    if (error.code === 11000) {
+    const existingSlotIndex = record.inspections.findIndex(
+      (insp) => insp.timeSlotKey === timeSlotKey
+    );
+    if (existingSlotIndex > -1) {
       return res.status(409).json({
-        message:
-          "A record with this Date, Machine No, MO No, and Color already exists.",
-        error: error.message,
-        errorCode: "DUPLICATE_KEY"
+        success: false,
+        message: `Slot ${timeSlotKey} already submitted for this FUQC record.`
       });
+    } else {
+      record.inspections.push(slotData);
     }
+    record.inspections.sort(
+      (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
+    );
+    record.emp_id = emp_id;
+    const now = new Date();
+    record.inspectionTime = `${String(now.getHours()).padStart(
+      2,
+      "0"
+    )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+      now.getSeconds()
+    ).padStart(2, "0")}`;
+    await record.save();
+    res.status(201).json({
+      success: true,
+      message: `FUQC Inspection for slot ${timeSlotKey} submitted.`,
+      data: record
+    });
+  } catch (error) {
+    console.error(
+      "[SERVER FUQC] Error submitting FUQC slot inspection:",
+      error
+    );
     res.status(500).json({
-      message: "Failed to save Daily FUQC Test",
-      error: error.message,
-      details: error
+      success: false,
+      message: "Failed to submit FUQC slot inspection",
+      error: error.message
     });
   }
 });
@@ -14081,6 +13897,128 @@ app.get("/api/scc/defects", async (req, res) => {
    End Points - SCC HT Inspection
 ------------------------------ */
 
+// app.post("/api/scc/ht-inspection-report", async (req, res) => {
+//   try {
+//     const {
+//       _id,
+//       inspectionDate,
+//       machineNo,
+//       moNo,
+//       buyer,
+//       buyerStyle,
+//       color,
+//       batchNo,
+//       totalBundle,
+//       totalPcs,
+//       aqlData,
+//       defectsQty,
+//       result,
+//       defects,
+//       remarks,
+//       // defectImageFile is handled by SCCPage, we expect defectImageUrl here if uploaded
+//       defectImageUrl, // Expecting URL from client if image was uploaded/kept
+//       emp_id,
+//       emp_kh_name,
+//       emp_eng_name,
+//       emp_dept_name,
+//       emp_sect_name,
+//       emp_job_title
+//     } = req.body;
+
+//     // Basic validation (more comprehensive on model)
+//     if (
+//       !inspectionDate ||
+//       !machineNo ||
+//       !moNo ||
+//       !color ||
+//       !batchNo ||
+//       !totalPcs ||
+//       !aqlData
+//     ) {
+//       return res
+//         .status(400)
+//         .json({ message: "Missing required fields for HT Inspection Report." });
+//     }
+
+//     const now = new Date();
+//     const inspectionTime = `${String(now.getHours()).padStart(2, "0")}:${String(
+//       now.getMinutes()
+//     ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+
+//     const reportData = {
+//       inspectionDate: new Date(inspectionDate),
+//       machineNo,
+//       moNo,
+//       buyer,
+//       buyerStyle,
+//       color,
+//       batchNo,
+//       totalBundle: Number(totalBundle),
+//       totalPcs: Number(totalPcs),
+//       aqlData,
+//       defectsQty: Number(defectsQty),
+//       result,
+//       defects,
+//       remarks: remarks?.trim() || "NA",
+//       defectImageUrl: defectImageUrl || null, // Use the URL passed from client
+//       emp_id,
+//       emp_kh_name,
+//       emp_eng_name,
+//       emp_dept_name,
+//       emp_sect_name,
+//       emp_job_title,
+//       inspectionTime
+//     };
+
+//     let savedReport;
+//     if (_id) {
+//       // Update existing
+//       savedReport = await HTInspectionReport.findByIdAndUpdate(
+//         _id,
+//         reportData,
+//         { new: true, runValidators: true }
+//       );
+//       if (!savedReport)
+//         return res
+//           .status(404)
+//           .json({ message: "Report not found for update." });
+//     } else {
+//       // Create new
+//       // Optional: Check for duplicates before creating, if unique index is not strictly enforced or for better user feedback
+//       // const existing = await HTInspectionReport.findOne({ inspectionDate: reportData.inspectionDate, machineNo, moNo, color, batchNo });
+//       // if (existing) return res.status(409).json({ message: "Duplicate report found for this date, machine, MO, color, and batch." });
+//       savedReport = new HTInspectionReport(reportData);
+//       await savedReport.save();
+//     }
+
+//     res.status(201).json({
+//       message: "HT Inspection Report saved successfully.",
+//       data: savedReport
+//     });
+//   } catch (error) {
+//     console.error("Error saving HT Inspection Report:", error);
+//     if (error.code === 11000) {
+//       // Mongoose duplicate key error
+//       return res.status(409).json({
+//         message: "Duplicate entry. This report might already exist.",
+//         error: error.message,
+//         errorCode: "DUPLICATE_KEY"
+//       });
+//     }
+//     if (error.name === "ValidationError") {
+//       return res.status(400).json({
+//         message: "Validation Error: " + error.message,
+//         errors: error.errors
+//       });
+//     }
+//     res.status(500).json({
+//       message: "Failed to save HT Inspection Report.",
+//       error: error.message,
+//       details: error
+//     });
+//   }
+// });
+
 app.post("/api/scc/ht-inspection-report", async (req, res) => {
   try {
     const {
@@ -14092,6 +14030,8 @@ app.post("/api/scc/ht-inspection-report", async (req, res) => {
       buyerStyle,
       color,
       batchNo,
+      tableNo, // New field
+      actualLayers, // New field
       totalBundle,
       totalPcs,
       aqlData,
@@ -14099,8 +14039,7 @@ app.post("/api/scc/ht-inspection-report", async (req, res) => {
       result,
       defects,
       remarks,
-      // defectImageFile is handled by SCCPage, we expect defectImageUrl here if uploaded
-      defectImageUrl, // Expecting URL from client if image was uploaded/kept
+      defectImageUrl,
       emp_id,
       emp_kh_name,
       emp_eng_name,
@@ -14116,12 +14055,16 @@ app.post("/api/scc/ht-inspection-report", async (req, res) => {
       !moNo ||
       !color ||
       !batchNo ||
+      !tableNo || // Validate new field
+      actualLayers === undefined ||
+      actualLayers === null || // Validate new field (can be 0 if allowed, but usually >0)
       !totalPcs ||
       !aqlData
     ) {
-      return res
-        .status(400)
-        .json({ message: "Missing required fields for HT Inspection Report." });
+      return res.status(400).json({
+        message:
+          "Missing required fields for HT Inspection Report, including Table No and Actual Layers."
+      });
     }
 
     const now = new Date();
@@ -14137,6 +14080,8 @@ app.post("/api/scc/ht-inspection-report", async (req, res) => {
       buyerStyle,
       color,
       batchNo,
+      tableNo, // Save new field
+      actualLayers: Number(actualLayers), // Save new field as number
       totalBundle: Number(totalBundle),
       totalPcs: Number(totalPcs),
       aqlData,
@@ -14144,7 +14089,7 @@ app.post("/api/scc/ht-inspection-report", async (req, res) => {
       result,
       defects,
       remarks: remarks?.trim() || "NA",
-      defectImageUrl: defectImageUrl || null, // Use the URL passed from client
+      defectImageUrl: defectImageUrl || null,
       emp_id,
       emp_kh_name,
       emp_eng_name,
@@ -14156,7 +14101,6 @@ app.post("/api/scc/ht-inspection-report", async (req, res) => {
 
     let savedReport;
     if (_id) {
-      // Update existing
       savedReport = await HTInspectionReport.findByIdAndUpdate(
         _id,
         reportData,
@@ -14167,10 +14111,6 @@ app.post("/api/scc/ht-inspection-report", async (req, res) => {
           .status(404)
           .json({ message: "Report not found for update." });
     } else {
-      // Create new
-      // Optional: Check for duplicates before creating, if unique index is not strictly enforced or for better user feedback
-      // const existing = await HTInspectionReport.findOne({ inspectionDate: reportData.inspectionDate, machineNo, moNo, color, batchNo });
-      // if (existing) return res.status(409).json({ message: "Duplicate report found for this date, machine, MO, color, and batch." });
       savedReport = new HTInspectionReport(reportData);
       await savedReport.save();
     }
@@ -14182,7 +14122,6 @@ app.post("/api/scc/ht-inspection-report", async (req, res) => {
   } catch (error) {
     console.error("Error saving HT Inspection Report:", error);
     if (error.code === 11000) {
-      // Mongoose duplicate key error
       return res.status(409).json({
         message: "Duplicate entry. This report might already exist.",
         error: error.message,
@@ -14235,6 +14174,226 @@ app.get("/api/scc/ht-inspection-report", async (req, res) => {
     console.error("Error fetching HT Inspection Report:", error);
     res.status(500).json({
       message: "Failed to fetch HT Inspection Report",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   End Points - SCC Elastic Report
+------------------------------ */
+
+// 1. POST /api/scc/elastic-report/register-machine
+//    Registers a machine for the Elastic Checking Report.
+app.post("/api/scc/elastic-report/register-machine", async (req, res) => {
+  try {
+    const {
+      inspectionDate, // Expecting YYYY-MM-DD
+      machineNo,
+      moNo,
+      buyer,
+      buyerStyle,
+      color,
+      emp_id,
+      emp_kh_name,
+      emp_eng_name
+    } = req.body;
+
+    if (!inspectionDate || !machineNo || !moNo || !color) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Missing required fields: Inspection Date, Machine No, MO No, and Color."
+      });
+    }
+
+    const now = new Date();
+    const registrationTime = `${String(now.getHours()).padStart(
+      2,
+      "0"
+    )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+      now.getSeconds()
+    ).padStart(2, "0")}`;
+
+    const existingRegistration = await ElasticReport.findOne({
+      inspectionDate,
+      machineNo,
+      moNo,
+      color
+    });
+
+    if (existingRegistration) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This Machine-MO-Color combination is already registered for this date for Elastic Report.",
+        data: existingRegistration
+      });
+    }
+
+    const newRegistration = new ElasticReport({
+      inspectionDate,
+      machineNo,
+      moNo,
+      buyer,
+      buyerStyle,
+      color,
+      registeredBy_emp_id: emp_id,
+      registeredBy_emp_kh_name: emp_kh_name,
+      registeredBy_emp_eng_name: emp_eng_name,
+      registrationTime,
+      inspections: [] // Initialize with empty inspections array
+    });
+
+    await newRegistration.save();
+    res.status(201).json({
+      success: true,
+      message: "Machine registered successfully for Elastic Report.",
+      data: newRegistration
+    });
+  } catch (error) {
+    console.error("Error registering machine for Elastic Report:", error);
+    if (error.code === 11000) {
+      // Handle MongoDB duplicate key error
+      return res.status(409).json({
+        success: false,
+        message:
+          "Duplicate entry. This registration might already exist (unique index violation).",
+        error: error.message
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to register machine for Elastic Report",
+      error: error.message
+    });
+  }
+});
+
+// 2. GET /api/scc/elastic-report/by-date?inspectionDate=<date>
+//    Fetches all ElasticReport records for a given inspection date.
+app.get("/api/scc/elastic-report/by-date", async (req, res) => {
+  try {
+    const { inspectionDate } = req.query; // Expecting YYYY-MM-DD
+    if (!inspectionDate) {
+      return res.status(400).json({ message: "Inspection Date is required." });
+    }
+
+    const records = await ElasticReport.find({ inspectionDate })
+      .sort({ machineNo: 1 }) // Sort by machine number
+      .lean(); // Use .lean() for faster queries if you don't need Mongoose model instances
+
+    res.json(records || []);
+  } catch (error) {
+    console.error("Error fetching Elastic Report records by date:", error);
+    res.status(500).json({
+      message: "Failed to fetch Elastic Report daily records",
+      error: error.message
+    });
+  }
+});
+
+// 3. POST /api/scc/elastic-report/submit-slot-inspection
+//    Submits inspection data for a specific time slot for ONE machine in Elastic Report.
+app.post("/api/scc/elastic-report/submit-slot-inspection", async (req, res) => {
+  try {
+    const {
+      inspectionDate, // Expecting YYYY-MM-DD
+      timeSlotKey,
+      inspectionNo,
+      elasticReportDocId, // _id of the parent ElasticReport document
+      checkedQty,
+      qualityIssue,
+      measurement,
+      defects,
+      result,
+      remarks,
+      emp_id,
+      isUserModified
+    } = req.body;
+
+    // Basic validation
+    if (
+      !inspectionDate ||
+      !timeSlotKey ||
+      inspectionNo === undefined ||
+      !elasticReportDocId ||
+      checkedQty === undefined ||
+      checkedQty === null ||
+      !qualityIssue ||
+      !measurement ||
+      !defects ||
+      !result
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Missing or invalid required fields for Elastic slot inspection submission."
+      });
+    }
+
+    const reportDoc = await ElasticReport.findById(elasticReportDocId);
+    if (!reportDoc) {
+      return res.status(404).json({
+        success: false,
+        message: `Elastic Report document not found for ID: ${elasticReportDocId}`
+      });
+    }
+
+    if (reportDoc.inspectionDate !== inspectionDate) {
+      return res.status(400).json({
+        success: false,
+        message: `Date mismatch for Elastic Report ID: ${elasticReportDocId}. Expected ${inspectionDate}, found ${reportDoc.inspectionDate}`
+      });
+    }
+
+    const slotData = {
+      inspectionNo: Number(inspectionNo),
+      timeSlotKey,
+      checkedQty: Number(checkedQty),
+      qualityIssue,
+      measurement,
+      defects,
+      result,
+      remarks: remarks || "",
+      emp_id,
+      isUserModified: !!isUserModified,
+      inspectionTimestamp: new Date()
+    };
+
+    const existingSlotIndex = reportDoc.inspections.findIndex(
+      (insp) => insp.timeSlotKey === timeSlotKey
+    );
+
+    if (existingSlotIndex > -1) {
+      // Update existing slot
+      reportDoc.inspections[existingSlotIndex] = {
+        ...reportDoc.inspections[existingSlotIndex],
+        ...slotData
+      };
+    } else {
+      // Add new slot
+      reportDoc.inspections.push(slotData);
+    }
+
+    // Ensure inspections are sorted
+    reportDoc.inspections.sort(
+      (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
+    );
+
+    await reportDoc.save();
+
+    res.status(200).json({
+      // 200 for update, 201 for new usually, but 200 is fine for upsert-like logic
+      success: true,
+      message: `Elastic inspection for slot ${timeSlotKey} submitted/updated successfully.`,
+      data: reportDoc
+    });
+  } catch (error) {
+    console.error("Error submitting Elastic slot inspection:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to submit Elastic slot inspection",
       error: error.message
     });
   }

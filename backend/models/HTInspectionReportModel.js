@@ -2,12 +2,15 @@ import mongoose from "mongoose";
 
 const defectDetailSchema = new mongoose.Schema(
   {
-    no: { type: Number, required: true }, // From sccdefects collection
-    defectNameEng: { type: String, required: true }, // Storing for easier display if needed
+    no: { type: Number, required: true },
+    defectNameEng: { type: String, required: true },
     count: { type: Number, required: true, min: 1 }
   },
   { _id: false }
 );
+
+// Define MAX_REMARKS_LENGTH if not already globally available
+const MAX_REMARKS_LENGTH = 250;
 
 const htInspectionReportSchema = new mongoose.Schema(
   {
@@ -17,33 +20,34 @@ const htInspectionReportSchema = new mongoose.Schema(
     buyer: { type: String },
     buyerStyle: { type: String },
     color: { type: String, required: true },
-    batchNo: { type: String, required: true, match: /^[0-9]{3}$/ }, // Validate 3 digits
+    batchNo: { type: String, required: true, match: /^[0-9]{3}$/ },
+
+    // New fields for Table No and Layers
+    tableNo: { type: String, required: true }, // From CutPanelOrders
+    actualLayers: { type: Number, required: true, min: 1 }, // From CutPanelOrders or user input
 
     totalBundle: { type: Number, required: true, min: 1 },
-    totalPcs: { type: Number, required: true, min: 1 }, // This is Lot Size for AQL
+    totalPcs: { type: Number, required: true, min: 1 }, // Lot Size, can be auto-calculated then edited
 
     aqlData: {
-      // Storing the AQL parameters used for this inspection
       type: { type: String, required: true, default: "General" },
       level: { type: String, required: true, default: "II" },
       sampleSizeLetterCode: { type: String, required: true },
-      sampleSize: { type: Number, required: true }, // Total Inspected Qty
+      sampleSize: { type: Number, required: true },
       acceptDefect: { type: Number, required: true },
       rejectDefect: { type: Number, required: true }
     },
 
-    defectsQty: { type: Number, required: true, default: 0 }, // Sum of counts from defects array
+    defectsQty: { type: Number, required: true, default: 0 },
     result: {
       type: String,
       enum: ["Pass", "Reject", "Pending"],
       required: true
     },
-    defects: [defectDetailSchema], // Array of recorded defects
+    defects: [defectDetailSchema],
 
-    remarks: { type: String, default: "NA", maxlength: 250 },
-    defectImageUrl: { type: String, default: null }, // URL of the uploaded image
-    // Storing filename if needed for deletion or management, otherwise URL is often enough
-    // defectImageFilename: { type: String, default: null },
+    remarks: { type: String, default: "NA", maxlength: MAX_REMARKS_LENGTH }, // Ensure MAX_REMARKS_LENGTH is defined or use a number
+    defectImageUrl: { type: String, default: null },
 
     emp_id: { type: String, required: true },
     emp_kh_name: { type: String },
@@ -51,22 +55,20 @@ const htInspectionReportSchema = new mongoose.Schema(
     emp_dept_name: { type: String },
     emp_sect_name: { type: String },
     emp_job_title: { type: String },
-    inspectionTime: { type: String } // HH:MM:SS of submission
+    inspectionTime: { type: String }
   },
   {
     timestamps: true,
     collection: "ht_inspection_reports"
-    // Consider a unique compound index if one report per date/machine/mo/color/batch is desired
-    // index: { inspectionDate: 1, machineNo: 1, moNo: 1, color: 1, batchNo: 1, unique: true }
+    // Consider unique index:
+    // index: { inspectionDate: 1, machineNo: 1, moNo: 1, color: 1, batchNo: 1, tableNo: 1, unique: true }
   }
 );
 
-// Pre-save hook to ensure remarks is "NA" if empty
 htInspectionReportSchema.pre("save", function (next) {
   if (this.remarks && this.remarks.trim() === "") {
     this.remarks = "NA";
   }
-  // Calculate defectsQty automatically if not already set (though frontend should do it)
   if (this.isNew || this.isModified("defects")) {
     this.defectsQty = this.defects.reduce(
       (sum, defect) => sum + defect.count,
