@@ -151,6 +151,17 @@ function BundleRegistration() {
         const response = await fetch(
           `${API_BASE_URL}/api/order-details/${formData.selectedMono}`
         );
+
+        if (!response.ok) {
+          // Attempt to get a more specific error message if the server sends one (e.g., as JSON)
+          let errorData;
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.indexOf("application/json") !== -1) {
+            errorData = await response.json(); // Try to parse error response if it's JSON
+          }
+          const errorMessage = errorData?.error || response.statusText || `Request failed with status ${response.status}`;
+          throw new Error(`Failed to fetch order details for ${formData.selectedMono}: ${errorMessage}`);
+        }
         const data = await response.json();
         setFormData((prev) => ({
           ...prev,
@@ -184,10 +195,25 @@ function BundleRegistration() {
           setHasSizes(false);
         }
       } catch (error) {
-        console.error("Error fetching order details:", error);
+        console.error("Error fetching order details:", error.message); 
         setColors([]);
         setHasColors(false);
         setHasSizes(false);
+        setFormData(prev => ({
+          ...prev,
+          buyer: "",
+          orderQty: "",
+          factoryInfo: "",
+          custStyle: "",
+          country: "",
+          color: "",
+          colorCode: "",
+          chnColor: "",
+          colorKey: "",
+          size: "",
+          sizeOrderQty: "",
+          planCutQty: ""
+        }));
       }
     };
     fetchOrderDetails();

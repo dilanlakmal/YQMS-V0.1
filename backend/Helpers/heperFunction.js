@@ -1,3 +1,5 @@
+import { QC2OrderData } from "../Config/mongodb.js";
+
 export const normalizeDateString = (dateStr) => {
   if (!dateStr) return null;
   try {
@@ -40,3 +42,40 @@ export const getResult = (bundleQtyCheck, totalReject) => {
   if (bundleQtyCheck === 20) return totalReject > 7 ? "Fail" : "Pass";
   return "N/A";
 };
+
+export const formatDateToMMDDYYYY = (dateInput) => {
+   if (!dateInput) return null;
+  const d = new Date(dateInput); // Handles ISO string or Date object
+  const month = d.getMonth() + 1; // No padding
+  const day = d.getDate(); // No padding
+  const year = d.getFullYear();
+  return `${month}/${day}/${year}`;
+};
+
+export const generateRandomId = async () => {
+  let randomId;
+  let isUnique = false;
+
+  while (!isUnique) {
+    randomId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+    const existing = await QC2OrderData.findOne({ bundle_random_id: randomId });
+    if (!existing) isUnique = true;
+  }
+
+  return randomId;
+};
+
+// Helper function to sanitize input for filenames
+export const sanitize = (input) => {
+  if (typeof input !== "string") input = String(input);
+  let sane = input.replace(/[^a-zA-Z0-9-_]/g, "_");
+  if (sane === "." || sane === "..") return "_";
+  return sane;
+};
+
+export const getOrdinal = (n) => {
+  if (n <= 0) return String(n);
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0] || "th");
+}

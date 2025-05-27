@@ -31,7 +31,17 @@ import cuttingIssueRoutes from "./routes/Cutting/cuttingIssueRoutes.js";
 import cuttingMesurmentRoutes from "./routes/Cutting/cuttingMeasurementRoutes.js";
 import cuttingOrderRoutes from "./routes/Cutting/cuttingOrderRoutes.js";
 import cuttingTrendRoutes from "./routes/Cutting/cuttingTrendRoutes.js";
-
+import sccRoutes from "./routes/SCC/sccRoutes.js";
+import sccImageUploadRoutes from "./routes/SCC/sccImageUploadRoutes.js";
+import bundleRoutes from "./routes/Bundle/bundleRoutes.js";
+import washingRoutes from "./routes/Washing/washingRoutes.js";
+import opaRoutes from "./routes/OPA/opaRoutes.js";
+import ironingRoutes from "./routes/Ironing/ironingRoutes.js";
+import packingRoutes from "./routes/Packing/packingRoutes.js";
+import qcInlineImageUploadRoutes from "./routes/QCInlineRoving/qcInlineImageUploadRoutes.js";
+import qcInlineRovingRoutes from "./routes/QCInlineRoving/qcInlineRovingRoutes.js";
+import qcInlineWorkerRoutes from "./routes/QCInlineRoving/qcInlineWorkerRoutes.js";
+	
 
 
 // Import the API_BASE_URL from our config file
@@ -47,7 +57,6 @@ import {ymProdConnection,
   Ironing,
   Washing,
   OPA,
-  Packing,
   QC2OrderData,
   RoleManagment,
   QC2InspectionPassBundle,
@@ -55,12 +64,8 @@ import {ymProdConnection,
   QC2Reworks,
   QCInlineRoving,
   QC2RepairTracking,
-  LineSewingWorker,
   SewingDefects,
   AQLChart,
-  HTFirstOutput,
-  FUFirstOutput,
-  SCCDailyTesting,
   DailyTestingHTFU,
   disconnectMongoDB,
 } from "../backend/Config/mongodb.js";
@@ -167,6 +172,17 @@ app.use(cuttingIssueRoutes);
 app.use(cuttingMesurmentRoutes);
 app.use(cuttingOrderRoutes);
 app.use(cuttingTrendRoutes);
+app.use(sccRoutes);
+app.use(sccImageUploadRoutes);
+app.use(bundleRoutes);
+app.use(washingRoutes);
+app.use(opaRoutes);
+app.use(ironingRoutes);
+app.use(packingRoutes);
+app.use(qcInlineImageUploadRoutes);
+app.use(qcInlineRovingRoutes);
+app.use(qcInlineWorkerRoutes);
+
 
 // Drop the conflicting St_No_1 index if it exists
 async function dropConflictingIndex() {
@@ -558,231 +574,231 @@ app.delete("/api/sewing-defects/:defectCode", async (req, res) => {
 // };
 
 // Update the MONo search endpoint to handle partial matching
-app.get("/api/search-mono", async (req, res) => {
-  try {
-    const term = req.query.term; // Changed from 'digits' to 'term'
-    if (!term) {
-      return res.status(400).json({ error: "Search term is required" });
-    }
+// app.get("/api/search-mono", async (req, res) => {
+//   try {
+//     const term = req.query.term; // Changed from 'digits' to 'term'
+//     if (!term) {
+//       return res.status(400).json({ error: "Search term is required" });
+//     }
 
-    const collection = ymEcoConnection.db.collection("dt_orders");
+//     const collection = ymEcoConnection.db.collection("dt_orders");
 
-    // Use a case-insensitive regex to match the term anywhere in Order_No
-    const regexPattern = new RegExp(term, "i");
+//     // Use a case-insensitive regex to match the term anywhere in Order_No
+//     const regexPattern = new RegExp(term, "i");
 
-    const results = await collection
-      .find({
-        Order_No: { $regex: regexPattern }
-      })
-      .project({ Order_No: 1, _id: 0 }) // Only return Order_No field
-      .limit(100) // Limit results to prevent overwhelming the UI
-      .toArray();
+//     const results = await collection
+//       .find({
+//         Order_No: { $regex: regexPattern }
+//       })
+//       .project({ Order_No: 1, _id: 0 }) // Only return Order_No field
+//       .limit(100) // Limit results to prevent overwhelming the UI
+//       .toArray();
 
-    // Extract unique Order_No values
-    const uniqueMONos = [...new Set(results.map((r) => r.Order_No))];
+//     // Extract unique Order_No values
+//     const uniqueMONos = [...new Set(results.map((r) => r.Order_No))];
 
-    res.json(uniqueMONos);
-  } catch (error) {
-    console.error("Error searching MONo:", error);
-    res.status(500).json({ error: "Failed to search MONo" });
-  }
-});
+//     res.json(uniqueMONos);
+//   } catch (error) {
+//     console.error("Error searching MONo:", error);
+//     res.status(500).json({ error: "Failed to search MONo" });
+//   }
+// });
 
 // Update /api/order-details endpoint
-app.get("/api/order-details/:mono", async (req, res) => {
-  try {
-    const collection = ymEcoConnection.db.collection("dt_orders");
-    const order = await collection.findOne({
-      Order_No: req.params.mono,
-    });
+// app.get("/api/order-details/:mono", async (req, res) => {
+//   try {
+//     const collection = ymEcoConnection.db.collection("dt_orders");
+//     const order = await collection.findOne({
+//       Order_No: req.params.mono,
+//     });
 
-    if (!order) return res.status(404).json({ error: "Order not found" });
+//     if (!order) return res.status(404).json({ error: "Order not found" });
 
-    const colorMap = new Map();
-    order.OrderColors.forEach((colorObj) => {
-      const colorKey = colorObj.Color.toLowerCase().trim();
-      const originalColor = colorObj.Color.trim();
+//     const colorMap = new Map();
+//     order.OrderColors.forEach((colorObj) => {
+//       const colorKey = colorObj.Color.toLowerCase().trim();
+//       const originalColor = colorObj.Color.trim();
 
-      if (!colorMap.has(colorKey)) {
-        colorMap.set(colorKey, {
-          originalColor,
-          colorCode: colorObj.ColorCode,
-          chnColor: colorObj.ChnColor,
-          colorKey: colorObj.ColorKey,
-          sizes: new Map(),
-        });
-      }
+//       if (!colorMap.has(colorKey)) {
+//         colorMap.set(colorKey, {
+//           originalColor,
+//           colorCode: colorObj.ColorCode,
+//           chnColor: colorObj.ChnColor,
+//           colorKey: colorObj.ColorKey,
+//           sizes: new Map(),
+//         });
+//       }
 
-      colorObj.OrderQty.forEach((sizeEntry) => {
-        const sizeName = Object.keys(sizeEntry)[0];
-        const quantity = sizeEntry[sizeName];
-        const cleanSize = sizeName.split(";")[0].trim();
+//       colorObj.OrderQty.forEach((sizeEntry) => {
+//         const sizeName = Object.keys(sizeEntry)[0];
+//         const quantity = sizeEntry[sizeName];
+//         const cleanSize = sizeName.split(";")[0].trim();
 
-        if (quantity > 0) {
-          colorMap.get(colorKey).sizes.set(cleanSize, {
-            orderQty: quantity,
-            planCutQty: colorObj.CutQty?.[sizeName]?.PlanCutQty || 0,
-          });
-        }
-      });
-    });
+//         if (quantity > 0) {
+//           colorMap.get(colorKey).sizes.set(cleanSize, {
+//             orderQty: quantity,
+//             planCutQty: colorObj.CutQty?.[sizeName]?.PlanCutQty || 0,
+//           });
+//         }
+//       });
+//     });
 
-    const response = {
-      engName: order.EngName,
-      totalQty: order.TotalQty,
-      factoryname: order.Factory || "N/A",
-      custStyle: order.CustStyle || "N/A",
-      country: order.Country || "N/A",
-      colors: Array.from(colorMap.values()).map((c) => ({
-        original: c.originalColor,
-        code: c.colorCode,
-        chn: c.chnColor,
-        key: c.colorKey,
-      })),
-      colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
-        acc[curr.originalColor.toLowerCase()] = {
-          sizes: Array.from(curr.sizes.keys()),
-          details: Array.from(curr.sizes.entries()).map(([size, data]) => ({
-            size,
-            orderQty: data.orderQty,
-            planCutQty: data.planCutQty,
-          })),
-        };
-        return acc;
-      }, {}),
-    };
+//     const response = {
+//       engName: order.EngName,
+//       totalQty: order.TotalQty,
+//       factoryname: order.Factory || "N/A",
+//       custStyle: order.CustStyle || "N/A",
+//       country: order.Country || "N/A",
+//       colors: Array.from(colorMap.values()).map((c) => ({
+//         original: c.originalColor,
+//         code: c.colorCode,
+//         chn: c.chnColor,
+//         key: c.colorKey,
+//       })),
+//       colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
+//         acc[curr.originalColor.toLowerCase()] = {
+//           sizes: Array.from(curr.sizes.keys()),
+//           details: Array.from(curr.sizes.entries()).map(([size, data]) => ({
+//             size,
+//             orderQty: data.orderQty,
+//             planCutQty: data.planCutQty,
+//           })),
+//         };
+//         return acc;
+//       }, {}),
+//     };
 
-    res.json(response);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch order details" });
-  }
-});
+//     res.json(response);
+//   } catch (error) {
+//     res.status(500).json({ error: "Failed to fetch order details" });
+//   }
+// });
 
 // Update /api/order-sizes endpoint
-app.get("/api/order-sizes/:mono/:color", async (req, res) => {
-  try {
-    const collection = ymEcoConnection.db.collection("dt_orders");
-    const order = await collection.findOne({ Order_No: req.params.mono });
-    if (!order) return res.status(404).json({ error: "Order not found" });
-    const colorObj = order.OrderColors.find(
-      (c) => c.Color.toLowerCase() === req.params.color.toLowerCase().trim()
-    );
-    if (!colorObj) return res.json([]);
-    const sizesWithDetails = colorObj.OrderQty.filter(
-      (entry) => entry[Object.keys(entry)[0]] > 0
-    )
-      .map((entry) => {
-        const sizeName = Object.keys(entry)[0];
-        const cleanSize = sizeName.split(";")[0].trim();
-        return {
-          size: cleanSize,
-          orderQty: entry[sizeName],
-          planCutQty: colorObj.CutQty?.[sizeName]?.PlanCutQty || 0,
-        };
-      })
-      .filter((v, i, a) => a.findIndex((t) => t.size === v.size) === i);
+// app.get("/api/order-sizes/:mono/:color", async (req, res) => {
+//   try {
+//     const collection = ymEcoConnection.db.collection("dt_orders");
+//     const order = await collection.findOne({ Order_No: req.params.mono });
+//     if (!order) return res.status(404).json({ error: "Order not found" });
+//     const colorObj = order.OrderColors.find(
+//       (c) => c.Color.toLowerCase() === req.params.color.toLowerCase().trim()
+//     );
+//     if (!colorObj) return res.json([]);
+//     const sizesWithDetails = colorObj.OrderQty.filter(
+//       (entry) => entry[Object.keys(entry)[0]] > 0
+//     )
+//       .map((entry) => {
+//         const sizeName = Object.keys(entry)[0];
+//         const cleanSize = sizeName.split(";")[0].trim();
+//         return {
+//           size: cleanSize,
+//           orderQty: entry[sizeName],
+//           planCutQty: colorObj.CutQty?.[sizeName]?.PlanCutQty || 0,
+//         };
+//       })
+//       .filter((v, i, a) => a.findIndex((t) => t.size === v.size) === i);
 
-    res.json(sizesWithDetails);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch sizes" });
-  }
-});
+//     res.json(sizesWithDetails);
+//   } catch (error) {
+//     res.status(500).json({ error: "Failed to fetch sizes" });
+//   }
+// });
 
 // Bundle Qty Endpoint
-app.get("/api/total-bundle-qty/:mono", async (req, res) => {
-  try {
-    const mono = req.params.mono;
-    const total = await QC2OrderData.aggregate([
-      { $match: { selectedMono: mono } }, // Match documents with the given MONo
-      {
-        $group: {
-          _id: null, // Group all matched documents
-          total: { $sum: "$totalBundleQty" }, // Correct sum using field reference with $
-        },
-      },
-    ]);
-    res.json({ total: total[0]?.total || 0 }); // Return the summed total or 0 if no documents
-  } catch (error) {
-    console.error("Error fetching total bundle quantity:", error);
-    res.status(500).json({ error: "Failed to fetch total bundle quantity" });
-  }
-});
+// app.get("/api/total-bundle-qty/:mono", async (req, res) => {
+//   try {
+//     const mono = req.params.mono;
+//     const total = await QC2OrderData.aggregate([
+//       { $match: { selectedMono: mono } }, // Match documents with the given MONo
+//       {
+//         $group: {
+//           _id: null, // Group all matched documents
+//           total: { $sum: "$totalBundleQty" }, // Correct sum using field reference with $
+//         },
+//       },
+//     ]);
+//     res.json({ total: total[0]?.total || 0 }); // Return the summed total or 0 if no documents
+//   } catch (error) {
+//     console.error("Error fetching total bundle quantity:", error);
+//     res.status(500).json({ error: "Failed to fetch total bundle quantity" });
+//   }
+// });
 
 // Endpoint to get total garments count for a specific MONo, Color, and Size
-app.get("/api/total-garments-count/:mono/:color/:size", async (req, res) => {
-  try {
-    const { mono, color, size } = req.params;
+// app.get("/api/total-garments-count/:mono/:color/:size", async (req, res) => {
+//   try {
+//     const { mono, color, size } = req.params;
 
-    const totalCount = await QC2OrderData.aggregate([
-      { $match: { selectedMono: mono, color: color, size: size } },
-      {
-        $group: {
-          _id: null,
-          totalCount: { $sum: "$count" }, // Sum the count field
-        },
-      },
-    ]);
+//     const totalCount = await QC2OrderData.aggregate([
+//       { $match: { selectedMono: mono, color: color, size: size } },
+//       {
+//         $group: {
+//           _id: null,
+//           totalCount: { $sum: "$count" }, // Sum the count field
+//         },
+//       },
+//     ]);
 
-    res.json({ totalCount: totalCount[0]?.totalCount || 0 }); // Return total count or 0
-  } catch (error) {
-    console.error("Error fetching total garments count:", error);
-    res.status(500).json({ error: "Failed to fetch total garments count" });
-  }
-});
+//     res.json({ totalCount: totalCount[0]?.totalCount || 0 }); // Return total count or 0
+//   } catch (error) {
+//     console.error("Error fetching total garments count:", error);
+//     res.status(500).json({ error: "Failed to fetch total garments count" });
+//   }
+// });
 
 // Endpoint to fetch available colors for a selected order
-app.get("/api/colors", async (req, res) => {
-  try {
-    const { styleNo } = req.query;
-    if (!styleNo) {
-      return res.status(400).json({ error: "styleNo is required" });
-    }
+// app.get("/api/colors", async (req, res) => {
+//   try {
+//     const { styleNo } = req.query;
+//     if (!styleNo) {
+//       return res.status(400).json({ error: "styleNo is required" });
+//     }
 
-    const collection = ymEcoConnection.db.collection("dt_orders");
-    const order = await collection.findOne({ Order_No: styleNo });
+//     const collection = ymEcoConnection.db.collection("dt_orders");
+//     const order = await collection.findOne({ Order_No: styleNo });
 
-    if (!order) {
-      return res.status(404).json({ error: "Order not found" });
-    }
+//     if (!order) {
+//       return res.status(404).json({ error: "Order not found" });
+//     }
 
-    const colors = order.OrderColors.map(colorObj => colorObj.Color.trim());
-    res.json({ colors });
-  } catch (error) {
-    console.error("Error fetching colors:", error);
-    res.status(500).json({ error: "Failed to fetch colors" });
-  }
-});
+//     const colors = order.OrderColors.map(colorObj => colorObj.Color.trim());
+//     res.json({ colors });
+//   } catch (error) {
+//     console.error("Error fetching colors:", error);
+//     res.status(500).json({ error: "Failed to fetch colors" });
+//   }
+// });
 
 // Endpoint to fetch available sizes for a selected order
-app.get("/api/sizes", async (req, res) => {
-  try {
-    const { styleNo } = req.query;
-    if (!styleNo) {
-      return res.status(400).json({ error: "styleNo is required" });
-    }
+// app.get("/api/sizes", async (req, res) => {
+//   try {
+//     const { styleNo } = req.query;
+//     if (!styleNo) {
+//       return res.status(400).json({ error: "styleNo is required" });
+//     }
 
-    const collection = ymEcoConnection.db.collection("dt_orders");
-    const order = await collection.findOne({ Order_No: styleNo });
+//     const collection = ymEcoConnection.db.collection("dt_orders");
+//     const order = await collection.findOne({ Order_No: styleNo });
 
-    if (!order) {
-      return res.status(404).json({ error: "Order not found" });
-    }
+//     if (!order) {
+//       return res.status(404).json({ error: "Order not found" });
+//     }
 
-    const sizes = new Set();
-    order.OrderColors.forEach(colorObj => {
-      colorObj.OrderQty.forEach(sizeEntry => {
-        const sizeName = Object.keys(sizeEntry)[0];
-        const cleanSize = sizeName.split(";")[0].trim();
-        sizes.add(cleanSize);
-      });
-    });
+//     const sizes = new Set();
+//     order.OrderColors.forEach(colorObj => {
+//       colorObj.OrderQty.forEach(sizeEntry => {
+//         const sizeName = Object.keys(sizeEntry)[0];
+//         const cleanSize = sizeName.split(";")[0].trim();
+//         sizes.add(cleanSize);
+//       });
+//     });
 
-    res.json({ sizes: Array.from(sizes) });
-  } catch (error) {
-    console.error("Error fetching sizes:", error);
-    res.status(500).json({ error: "Failed to fetch sizes" });
-  }
-});
+//     res.json({ sizes: Array.from(sizes) });
+//   } catch (error) {
+//     console.error("Error fetching sizes:", error);
+//     res.status(500).json({ error: "Failed to fetch sizes" });
+//   }
+// });
 
 
 // This endpoint is unused
@@ -828,126 +844,126 @@ async function fetchOrderDetails(mono) {
 ------------------------------ */
 
 // Generate a random ID for the bundle
-const generateRandomId = async () => {
-  let randomId;
-  let isUnique = false;
+// const generateRandomId = async () => {
+//   let randomId;
+//   let isUnique = false;
 
-  while (!isUnique) {
-    randomId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
-    const existing = await QC2OrderData.findOne({ bundle_random_id: randomId });
-    if (!existing) isUnique = true;
-  }
+//   while (!isUnique) {
+//     randomId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+//     const existing = await QC2OrderData.findOne({ bundle_random_id: randomId });
+//     if (!existing) isUnique = true;
+//   }
 
-  return randomId;
-};
+//   return randomId;
+// };
 
 
 // Save bundle data to MongoDB
-app.post("/api/save-bundle-data", async (req, res) => {
-  try {
-    const { bundleData } = req.body;
-    const savedRecords = [];
+// app.post("/api/save-bundle-data", async (req, res) => {
+//   try {
+//     const { bundleData } = req.body;
+//     const savedRecords = [];
 
-    // Save each bundle record
-    for (const bundle of bundleData) {
+//     // Save each bundle record
+//     for (const bundle of bundleData) {
 
-      const packageCount = await QC2OrderData.countDocuments({
-        selectedMono: bundle.selectedMono,
-        //color: bundle.color,
-        //size: bundle.size,
-      });
+//       const packageCount = await QC2OrderData.countDocuments({
+//         selectedMono: bundle.selectedMono,
+//         //color: bundle.color,
+//         //size: bundle.size,
+//       });
 
-      const randomId = await generateRandomId();
+//       const randomId = await generateRandomId();
 
-      const now = new Date();
+//       const now = new Date();
 
-      // Format timestamps
-      const updated_date_seperator = now.toLocaleDateString("en-US", {
-        month: "2-digit",
-        day: "2-digit",
-        year: "numeric",
-      });
+//       // Format timestamps
+//       const updated_date_seperator = now.toLocaleDateString("en-US", {
+//         month: "2-digit",
+//         day: "2-digit",
+//         year: "numeric",
+//       });
 
-      const updated_time_seperator = now.toLocaleTimeString("en-US", {
-        hour12: false,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
+//       const updated_time_seperator = now.toLocaleTimeString("en-US", {
+//         hour12: false,
+//         hour: "2-digit",
+//         minute: "2-digit",
+//         second: "2-digit",
+//       });
 
-      const newBundle = new QC2OrderData({
-        ...bundle,
-        package_no: packageCount + 1,
-        bundle_random_id: randomId,
-        factory: bundle.factory || "N/A", // Handle null factory
-        custStyle: bundle.custStyle || "N/A", // Handle null custStyle
-        country: bundle.country || "N/A", // Handle null country
-        department: bundle.department,
-        sub_con: bundle.sub_con || "No",
-        sub_con_factory:
-          bundle.sub_con === "Yes" ? bundle.sub_con_factory || "" : "N/A",
-        updated_date_seperator,
-        updated_time_seperator,
-        // Ensure user fields are included
-        emp_id: bundle.emp_id,
-        eng_name: bundle.eng_name,
-        kh_name: bundle.kh_name || "",
-        job_title: bundle.job_title || "",
-        dept_name: bundle.dept_name,
-        sect_name: bundle.sect_name || "",
-      });
-      await newBundle.save();
-      savedRecords.push(newBundle);
-    }
-    // const savedRecords = await QC2OrderData.insertMany(bundleData);
+//       const newBundle = new QC2OrderData({
+//         ...bundle,
+//         package_no: packageCount + 1,
+//         bundle_random_id: randomId,
+//         factory: bundle.factory || "N/A", // Handle null factory
+//         custStyle: bundle.custStyle || "N/A", // Handle null custStyle
+//         country: bundle.country || "N/A", // Handle null country
+//         department: bundle.department,
+//         sub_con: bundle.sub_con || "No",
+//         sub_con_factory:
+//           bundle.sub_con === "Yes" ? bundle.sub_con_factory || "" : "N/A",
+//         updated_date_seperator,
+//         updated_time_seperator,
+//         // Ensure user fields are included
+//         emp_id: bundle.emp_id,
+//         eng_name: bundle.eng_name,
+//         kh_name: bundle.kh_name || "",
+//         job_title: bundle.job_title || "",
+//         dept_name: bundle.dept_name,
+//         sect_name: bundle.sect_name || "",
+//       });
+//       await newBundle.save();
+//       savedRecords.push(newBundle);
+//     }
+//     // const savedRecords = await QC2OrderData.insertMany(bundleData);
 
-    res.status(201).json({
-      message: "Bundle data saved successfully",
-      data: savedRecords,
-    });
-  } catch (error) {
-    console.error("Error saving bundle data:", error);
-    res.status(500).json({
-      message: "Failed to save bundle data",
-      error: error.message,
-    });
-  }
-});
+//     res.status(201).json({
+//       message: "Bundle data saved successfully",
+//       data: savedRecords,
+//     });
+//   } catch (error) {
+//     console.error("Error saving bundle data:", error);
+//     res.status(500).json({
+//       message: "Failed to save bundle data",
+//       error: error.message,
+//     });
+//   }
+// });
 
 /* ------------------------------
    Bundle Registration Data Edit
 ------------------------------ */
 
-app.put('/api/update-bundle-data/:id', async (req, res) => {
-  const { id } = req.params;
-  const updateData = req.body;
+// app.put('/api/update-bundle-data/:id', async (req, res) => {
+//   const { id } = req.params;
+//   const updateData = req.body;
 
-  try {
-    const updatedOrder = await QC2OrderData.findByIdAndUpdate(id, updateData, { new: true });
-    if (!updatedOrder) {
-      return res.status(404).send({ message: 'Order not found' });
-    }
-    res.send(updatedOrder);
-  } catch (error) {
-    console.error('Error updating order:', error);
-    res.status(500).send({ message: 'Internal Server Error' });
-  }
-});
+//   try {
+//     const updatedOrder = await QC2OrderData.findByIdAndUpdate(id, updateData, { new: true });
+//     if (!updatedOrder) {
+//       return res.status(404).send({ message: 'Order not found' });
+//     }
+//     res.send(updatedOrder);
+//   } catch (error) {
+//     console.error('Error updating order:', error);
+//     res.status(500).send({ message: 'Internal Server Error' });
+//   }
+// });
 
 
 //For Data tab display records in a table
-app.get("/api/user-batches", async (req, res) => {
-  try {
-    const { emp_id } = req.query;
-    if (!emp_id) {
-      return res.status(400).json({ message: "emp_id is required" });
-    }
-    const batches = await QC2OrderData.find({ emp_id });
-    res.json(batches);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch user batches" });
-  }
-});
+// app.get("/api/user-batches", async (req, res) => {
+//   try {
+//     const { emp_id } = req.query;
+//     if (!emp_id) {
+//       return res.status(400).json({ message: "emp_id is required" });
+//     }
+//     const batches = await QC2OrderData.find({ emp_id });
+//     res.json(batches);
+//   } catch (error) {
+//     res.status(500).json({ message: "Failed to fetch user batches" });
+//   }
+// });
 
 /* ------------------------------
    End Points - Reprint - qc2_orderdata
@@ -1030,593 +1046,593 @@ app.get("/api/reprint-colors-sizes/:mono", async (req, res) => {
 ------------------------------ */
 
 // New Endpoint to Get Bundle by Random ID
-app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
-  try {
-    const bundle = await QC2OrderData.findOne({
-      bundle_random_id: req.params.randomId,
-    });
+// app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
+//   try {
+//     const bundle = await QC2OrderData.findOne({
+//       bundle_random_id: req.params.randomId,
+//     });
 
-    if (!bundle) {
-      return res.status(404).json({ error: "Bundle not found" });
-    }
+//     if (!bundle) {
+//       return res.status(404).json({ error: "Bundle not found" });
+//     }
 
-    res.json(bundle);
-  } catch (error) {
-    console.error("Error fetching bundle:", error);
-    res.status(500).json({ error: "Failed to fetch bundle" });
-  }
-});
+//     res.json(bundle);
+//   } catch (error) {
+//     console.error("Error fetching bundle:", error);
+//     res.status(500).json({ error: "Failed to fetch bundle" });
+//   }
+// });
 
 // Check if bundle_id already exists and get the largest number
-app.post("/api/check-bundle-id", async (req, res) => {
-  try {
-    const { date, lineNo, selectedMono, color, size } = req.body;
+// app.post("/api/check-bundle-id", async (req, res) => {
+//   try {
+//     const { date, lineNo, selectedMono, color, size } = req.body;
 
-    // Find all bundle IDs matching the criteria
-    const existingBundles = await QC2OrderData.find({
-      bundle_id: {
-        $regex: `^${date}:${lineNo}:${selectedMono}:${color}:${size}`,
-      },
-    });
+//     // Find all bundle IDs matching the criteria
+//     const existingBundles = await QC2OrderData.find({
+//       bundle_id: {
+//         $regex: `^${date}:${lineNo}:${selectedMono}:${color}:${size}`,
+//       },
+//     });
 
-    // Extract the largest number from the bundle IDs
-    let largestNumber = 0;
-    existingBundles.forEach((bundle) => {
-      const parts = bundle.bundle_id.split(":");
-      const number = parseInt(parts[parts.length - 1]);
-      if (number > largestNumber) {
-        largestNumber = number;
-      }
-    });
+//     // Extract the largest number from the bundle IDs
+//     let largestNumber = 0;
+//     existingBundles.forEach((bundle) => {
+//       const parts = bundle.bundle_id.split(":");
+//       const number = parseInt(parts[parts.length - 1]);
+//       if (number > largestNumber) {
+//         largestNumber = number;
+//       }
+//     });
 
-    res.status(200).json({ largestNumber });
-  } catch (error) {
-    console.error("Error checking bundle ID:", error);
-    res.status(500).json({
-      message: "Failed to check bundle ID",
-      error: error.message,
-    });
-  }
-});
+//     res.status(200).json({ largestNumber });
+//   } catch (error) {
+//     console.error("Error checking bundle ID:", error);
+//     res.status(500).json({
+//       message: "Failed to check bundle ID",
+//       error: error.message,
+//     });
+//   }
+// });
 
 // Check if ironing record exists
-app.get("/api/check-ironing-exists/:bundleId", async (req, res) => {
-  try {
-    const record = await Ironing.findOne({
-      ironing_bundle_id: req.params.bundleId,
-    });
-    res.json({ exists: !!record });
-  } catch (error) {
-    res.status(500).json({ error: "Error checking record" });
-  }
-});
+// app.get("/api/check-ironing-exists/:bundleId", async (req, res) => {
+//   try {
+//     const record = await Ironing.findOne({
+//       ironing_bundle_id: req.params.bundleId,
+//     });
+//     res.json({ exists: !!record });
+//   } catch (error) {
+//     res.status(500).json({ error: "Error checking record" });
+//   }
+// });
 
 // New endpoint to get the last ironing record ID for a specific emp_id
-app.get("/api/last-ironing-record-id/:emp_id", async (req, res) => {
-  try {
-    const { emp_id } = req.params;
-    const lastRecord = await Ironing.findOne(
-      { emp_id_ironing: emp_id }, // Filter by emp_id_ironing
-      {},
-      { sort: { ironing_record_id: -1 } } // Sort descending to get the highest ID
-    );
-    const lastRecordId = lastRecord ? lastRecord.ironing_record_id : 0; // Start at 0 if no records exist
-    res.json({ lastRecordId });
-  } catch (error) {
-    console.error("Error fetching last ironing record ID:", error);
-    res.status(500).json({ error: "Failed to fetch last ironing record ID" });
-  }
-});
+// app.get("/api/last-ironing-record-id/:emp_id", async (req, res) => {
+//   try {
+//     const { emp_id } = req.params;
+//     const lastRecord = await Ironing.findOne(
+//       { emp_id_ironing: emp_id }, // Filter by emp_id_ironing
+//       {},
+//       { sort: { ironing_record_id: -1 } } // Sort descending to get the highest ID
+//     );
+//     const lastRecordId = lastRecord ? lastRecord.ironing_record_id : 0; // Start at 0 if no records exist
+//     res.json({ lastRecordId });
+//   } catch (error) {
+//     console.error("Error fetching last ironing record ID:", error);
+//     res.status(500).json({ error: "Failed to fetch last ironing record ID" });
+//   }
+// });
 
 // Modified endpoint to fetch defect card data with logging
-app.get("/api/check-defect-card/:defectPrintId", async (req, res) => {
-  try {
-    const { defectPrintId } = req.params;
-    //console.log(`Searching for defect_print_id: "${defectPrintId}"`); // Debug log
+// app.get("/api/check-defect-card/:defectPrintId", async (req, res) => {
+//   try {
+//     const { defectPrintId } = req.params;
+//     //console.log(`Searching for defect_print_id: "${defectPrintId}"`); // Debug log
 
-    const defectRecord = await QC2InspectionPassBundle.findOne({
-      "printArray.defect_print_id": defectPrintId,
-      "printArray.isCompleted": false,
-    });
-    if (!defectRecord) {
-      console.log(
-        `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
-      );
-      return res.status(404).json({ message: "Defect card not found" });
-    }
+//     const defectRecord = await QC2InspectionPassBundle.findOne({
+//       "printArray.defect_print_id": defectPrintId,
+//       "printArray.isCompleted": false,
+//     });
+//     if (!defectRecord) {
+//       console.log(
+//         `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
+//       );
+//       return res.status(404).json({ message: "Defect card not found" });
+//     }
 
-    const printData = defectRecord.printArray.find(
-      (item) => item.defect_print_id === defectPrintId
-    );
-    if (!printData) {
-      console.log(
-        `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
-      );
-      return res
-        .status(404)
-        .json({ message: "Defect print ID not found in printArray" });
-    }
+//     const printData = defectRecord.printArray.find(
+//       (item) => item.defect_print_id === defectPrintId
+//     );
+//     if (!printData) {
+//       console.log(
+//         `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
+//       );
+//       return res
+//         .status(404)
+//         .json({ message: "Defect print ID not found in printArray" });
+//     }
 
-    const formattedData = {
-      defect_print_id: printData.defect_print_id,
-      totalRejectGarmentCount: printData.totalRejectGarmentCount,
-      package_no: defectRecord.package_no, // Include package_no
-      moNo: defectRecord.moNo,
-      selectedMono: defectRecord.moNo,
-      custStyle: defectRecord.custStyle,
-      buyer: defectRecord.buyer,
-      color: defectRecord.color,
-      size: defectRecord.size,
-      factory: defectRecord.factory,
-      country: defectRecord.country,
-      lineNo: defectRecord.lineNo,
-      department: defectRecord.department,
-      count: defectRecord.checkedQty,
-      emp_id_inspection: defectRecord.emp_id_inspection,
-      inspection_date: defectRecord.inspection_date,
-      inspection_time: defectRecord.inspection_time,
-      sub_con: defectRecord.sub_con,
-      sub_con_factory: defectRecord.sub_con_factory,
-      bundle_id: defectRecord.bundle_id,
-      bundle_random_id: defectRecord.bundle_random_id,
-    };
+//     const formattedData = {
+//       defect_print_id: printData.defect_print_id,
+//       totalRejectGarmentCount: printData.totalRejectGarmentCount,
+//       package_no: defectRecord.package_no, // Include package_no
+//       moNo: defectRecord.moNo,
+//       selectedMono: defectRecord.moNo,
+//       custStyle: defectRecord.custStyle,
+//       buyer: defectRecord.buyer,
+//       color: defectRecord.color,
+//       size: defectRecord.size,
+//       factory: defectRecord.factory,
+//       country: defectRecord.country,
+//       lineNo: defectRecord.lineNo,
+//       department: defectRecord.department,
+//       count: defectRecord.checkedQty,
+//       emp_id_inspection: defectRecord.emp_id_inspection,
+//       inspection_date: defectRecord.inspection_date,
+//       inspection_time: defectRecord.inspection_time,
+//       sub_con: defectRecord.sub_con,
+//       sub_con_factory: defectRecord.sub_con_factory,
+//       bundle_id: defectRecord.bundle_id,
+//       bundle_random_id: defectRecord.bundle_random_id,
+//     };
 
-    res.json(formattedData);
-  } catch (error) {
-    console.error("Error checking defect card:", error);
-    res.status(500).json({ message: error.message });
-  }
-});
+//     res.json(formattedData);
+//   } catch (error) {
+//     console.error("Error checking defect card:", error);
+//     res.status(500).json({ message: error.message });
+//   }
+// });
 
 // Save ironing record
-app.post("/api/save-ironing", async (req, res) => {
-  try {
-    const newRecord = new Ironing(req.body);
-    await newRecord.save();
-    res.status(201).json({ message: "Record saved successfully" });
-  } catch (error) {
-    if (error.code === 11000) {
-      res.status(400).json({ error: "Duplicate record found" });
-    } else {
-      res.status(500).json({ error: "Failed to save record" });
-    }
-  }
-});
+// app.post("/api/save-ironing", async (req, res) => {
+//   try {
+//     const newRecord = new Ironing(req.body);
+//     await newRecord.save();
+//     res.status(201).json({ message: "Record saved successfully" });
+//   } catch (error) {
+//     if (error.code === 11000) {
+//       res.status(400).json({ error: "Duplicate record found" });
+//     } else {
+//       res.status(500).json({ error: "Failed to save record" });
+//     }
+//   }
+// });
 
 // For Data tab display records in a table
-app.get("/api/ironing-records", async (req, res) => {
-  try {
-    const records = await Ironing.find();
-    res.json(records);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch ironing records" });
-  }
-});
+// app.get("/api/ironing-records", async (req, res) => {
+//   try {
+//     const records = await Ironing.find();
+//     res.json(records);
+//   } catch (error) {
+//     res.status(500).json({ message: "Failed to fetch ironing records" });
+//   }
+// });
 
 /* ------------------------------
    End Points - Washing
 ------------------------------ */
 
-app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
-  try {
-    const bundle = await QC2OrderData.findOne({
-      bundle_random_id: req.params.randomId,
-    });
-    if (!bundle) {
-      return res.status(404).json({ error: "Bundle not found" });
-    }
-    res.json(bundle);
-  } catch (error) {
-    console.error("Error fetching bundle:", error);
-    res.status(500).json({ error: "Failed to fetch bundle" });
-  }
-});
+// app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
+//   try {
+//     const bundle = await QC2OrderData.findOne({
+//       bundle_random_id: req.params.randomId,
+//     });
+//     if (!bundle) {
+//       return res.status(404).json({ error: "Bundle not found" });
+//     }
+//     res.json(bundle);
+//   } catch (error) {
+//     console.error("Error fetching bundle:", error);
+//     res.status(500).json({ error: "Failed to fetch bundle" });
+//   }
+// });
 
-app.get("/api/check-washing-exists/:bundleId", async (req, res) => {
-  try {
-    const record = await Washing.findOne({
-      washing_bundle_id: req.params.bundleId,
-    });
-    res.json({ exists: !!record });
-  } catch (error) {
-    res.status(500).json({ error: "Error checking record" });
-  }
-});
+// app.get("/api/check-washing-exists/:bundleId", async (req, res) => {
+//   try {
+//     const record = await Washing.findOne({
+//       washing_bundle_id: req.params.bundleId,
+//     });
+//     res.json({ exists: !!record });
+//   } catch (error) {
+//     res.status(500).json({ error: "Error checking record" });
+//   }
+// });
 
-app.get("/api/check-defect-card-washing/:defectPrintId", async (req, res) => {
-  try {
-    const { defectPrintId } = req.params;
-    const defectRecord = await QC2InspectionPassBundle.findOne({
-      "printArray.defect_print_id": defectPrintId,
-      "printArray.isCompleted": false,
-    });
-    if (!defectRecord) {
-      console.log(
-        `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
-      );
-      return res.status(404).json({ message: "Defect card not found" });
-    }
-    const printData = defectRecord.printArray.find(
-      (item) => item.defect_print_id === defectPrintId
-    );
-    if (!printData) {
-      console.log(
-        `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
-      );
-      return res
-        .status(404)
-        .json({ message: "Defect print ID not found in printArray" });
-    }
-    const formattedData = {
-      defect_print_id: printData.defect_print_id,
-      totalRejectGarmentCount: printData.totalRejectGarmentCount,
-      package_no: defectRecord.package_no,
-      moNo: defectRecord.moNo,
-      selectedMono: defectRecord.moNo,
-      custStyle: defectRecord.custStyle,
-      buyer: defectRecord.buyer,
-      color: defectRecord.color,
-      size: defectRecord.size,
-      factory: defectRecord.factory,
-      country: defectRecord.country,
-      lineNo: defectRecord.lineNo,
-      department: defectRecord.department,
-      count: defectRecord.checkedQty,
-      emp_id_inspection: defectRecord.emp_id_inspection,
-      inspection_date: defectRecord.inspection_date,
-      inspection_time: defectRecord.inspection_time,
-      sub_con: defectRecord.sub_con,
-      sub_con_factory: defectRecord.sub_con_factory,
-      bundle_id: defectRecord.bundle_id,
-      bundle_random_id: defectRecord.bundle_random_id,
-    };
-    res.json(formattedData);
-  } catch (error) {
-    console.error("Error checking defect card for washing:", error);
-    res.status(500).json({ message: error.message });
-  }
-});
+// app.get("/api/check-defect-card-washing/:defectPrintId", async (req, res) => {
+//   try {
+//     const { defectPrintId } = req.params;
+//     const defectRecord = await QC2InspectionPassBundle.findOne({
+//       "printArray.defect_print_id": defectPrintId,
+//       "printArray.isCompleted": false,
+//     });
+//     if (!defectRecord) {
+//       console.log(
+//         `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
+//       );
+//       return res.status(404).json({ message: "Defect card not found" });
+//     }
+//     const printData = defectRecord.printArray.find(
+//       (item) => item.defect_print_id === defectPrintId
+//     );
+//     if (!printData) {
+//       console.log(
+//         `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
+//       );
+//       return res
+//         .status(404)
+//         .json({ message: "Defect print ID not found in printArray" });
+//     }
+//     const formattedData = {
+//       defect_print_id: printData.defect_print_id,
+//       totalRejectGarmentCount: printData.totalRejectGarmentCount,
+//       package_no: defectRecord.package_no,
+//       moNo: defectRecord.moNo,
+//       selectedMono: defectRecord.moNo,
+//       custStyle: defectRecord.custStyle,
+//       buyer: defectRecord.buyer,
+//       color: defectRecord.color,
+//       size: defectRecord.size,
+//       factory: defectRecord.factory,
+//       country: defectRecord.country,
+//       lineNo: defectRecord.lineNo,
+//       department: defectRecord.department,
+//       count: defectRecord.checkedQty,
+//       emp_id_inspection: defectRecord.emp_id_inspection,
+//       inspection_date: defectRecord.inspection_date,
+//       inspection_time: defectRecord.inspection_time,
+//       sub_con: defectRecord.sub_con,
+//       sub_con_factory: defectRecord.sub_con_factory,
+//       bundle_id: defectRecord.bundle_id,
+//       bundle_random_id: defectRecord.bundle_random_id,
+//     };
+//     res.json(formattedData);
+//   } catch (error) {
+//     console.error("Error checking defect card for washing:", error);
+//     res.status(500).json({ message: error.message });
+//   }
+// });
 
-app.get("/api/last-washing-record-id/:emp_id", async (req, res) => {
-  try {
-    const { emp_id } = req.params;
-    const lastRecord = await Washing.findOne(
-      { emp_id_washing: emp_id },
-      {},
-      { sort: { washing_record_id: -1 } }
-    );
-    const lastRecordId = lastRecord ? lastRecord.washing_record_id : 0;
-    res.json({ lastRecordId });
-  } catch (error) {
-    console.error("Error fetching last washing record ID:", error);
-    res.status(500).json({ error: "Failed to fetch last washing record ID" });
-  }
-});
+// app.get("/api/last-washing-record-id/:emp_id", async (req, res) => {
+//   try {
+//     const { emp_id } = req.params;
+//     const lastRecord = await Washing.findOne(
+//       { emp_id_washing: emp_id },
+//       {},
+//       { sort: { washing_record_id: -1 } }
+//     );
+//     const lastRecordId = lastRecord ? lastRecord.washing_record_id : 0;
+//     res.json({ lastRecordId });
+//   } catch (error) {
+//     console.error("Error fetching last washing record ID:", error);
+//     res.status(500).json({ error: "Failed to fetch last washing record ID" });
+//   }
+// });
 
-app.post("/api/save-washing", async (req, res) => {
-  try {
-    const newRecord = new Washing(req.body);
-    await newRecord.save();
-    res.status(201).json({ message: "Record saved successfully" });
-  } catch (error) {
-    if (error.code === 11000) {
-      res.status(400).json({ error: "Duplicate record found" });
-    } else {
-      res.status(500).json({ error: "Failed to save record" });
-    }
-  }
-});
+// app.post("/api/save-washing", async (req, res) => {
+//   try {
+//     const newRecord = new Washing(req.body);
+//     await newRecord.save();
+//     res.status(201).json({ message: "Record saved successfully" });
+//   } catch (error) {
+//     if (error.code === 11000) {
+//       res.status(400).json({ error: "Duplicate record found" });
+//     } else {
+//       res.status(500).json({ error: "Failed to save record" });
+//     }
+//   }
+// });
 
-app.get("/api/washing-records", async (req, res) => {
-  try {
-    const records = await Washing.find();
-    res.json(records);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch washing records" });
-  }
-});
+// app.get("/api/washing-records", async (req, res) => {
+//   try {
+//     const records = await Washing.find();
+//     res.json(records);
+//   } catch (error) {
+//     res.status(500).json({ message: "Failed to fetch washing records" });
+//   }
+// });
 
 /* ------------------------------
    End Points - OPA
 ------------------------------ */
 
-app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
-  try {
-    const bundle = await QC2OrderData.findOne({
-      bundle_random_id: req.params.randomId,
-    });
-    if (!bundle) {
-      return res.status(404).json({ error: "Bundle not found" });
-    }
-    res.json(bundle);
-  } catch (error) {
-    console.error("Error fetching bundle:", error);
-    res.status(500).json({ error: "Failed to fetch bundle" });
-  }
-});
+// app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
+//   try {
+//     const bundle = await QC2OrderData.findOne({
+//       bundle_random_id: req.params.randomId,
+//     });
+//     if (!bundle) {
+//       return res.status(404).json({ error: "Bundle not found" });
+//     }
+//     res.json(bundle);
+//   } catch (error) {
+//     console.error("Error fetching bundle:", error);
+//     res.status(500).json({ error: "Failed to fetch bundle" });
+//   }
+// });
 
-app.get("/api/check-opa-exists/:bundleId", async (req, res) => {
-  try {
-    const record = await OPA.findOne({
-      opa_bundle_id: req.params.bundleId,
-    });
-    res.json({ exists: !!record });
-  } catch (error) {
-    res.status(500).json({ error: "Error checking record" });
-  }
-});
+// app.get("/api/check-opa-exists/:bundleId", async (req, res) => {
+//   try {
+//     const record = await OPA.findOne({
+//       opa_bundle_id: req.params.bundleId,
+//     });
+//     res.json({ exists: !!record });
+//   } catch (error) {
+//     res.status(500).json({ error: "Error checking record" });
+//   }
+// });
 
-app.get("/api/check-defect-card-opa/:defectPrintId", async (req, res) => {
-  try {
-    const { defectPrintId } = req.params;
-    const defectRecord = await QC2InspectionPassBundle.findOne({
-      "printArray.defect_print_id": defectPrintId,
-      "printArray.isCompleted": false,
-    });
-    if (!defectRecord) {
-      console.log(
-        `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
-      );
-      return res.status(404).json({ message: "Defect card not found" });
-    }
-    const printData = defectRecord.printArray.find(
-      (item) => item.defect_print_id === defectPrintId
-    );
-    if (!printData) {
-      console.log(
-        `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
-      );
-      return res
-        .status(404)
-        .json({ message: "Defect print ID not found in printArray" });
-    }
-    const formattedData = {
-      defect_print_id: printData.defect_print_id,
-      totalRejectGarmentCount: printData.totalRejectGarmentCount,
-      package_no: defectRecord.package_no,
-      moNo: defectRecord.moNo,
-      selectedMono: defectRecord.moNo,
-      custStyle: defectRecord.custStyle,
-      buyer: defectRecord.buyer,
-      color: defectRecord.color,
-      size: defectRecord.size,
-      factory: defectRecord.factory,
-      country: defectRecord.country,
-      lineNo: defectRecord.lineNo,
-      department: defectRecord.department,
-      count: defectRecord.checkedQty,
-      emp_id_inspection: defectRecord.emp_id_inspection,
-      inspection_date: defectRecord.inspection_date,
-      inspection_time: defectRecord.inspection_time,
-      sub_con: defectRecord.sub_con,
-      sub_con_factory: defectRecord.sub_con_factory,
-      bundle_id: defectRecord.bundle_id,
-      bundle_random_id: defectRecord.bundle_random_id,
-    };
-    res.json(formattedData);
-  } catch (error) {
-    console.error("Error checking defect card for OPA:", error);
-    res.status(500).json({ message: error.message });
-  }
-});
+// app.get("/api/check-defect-card-opa/:defectPrintId", async (req, res) => {
+//   try {
+//     const { defectPrintId } = req.params;
+//     const defectRecord = await QC2InspectionPassBundle.findOne({
+//       "printArray.defect_print_id": defectPrintId,
+//       "printArray.isCompleted": false,
+//     });
+//     if (!defectRecord) {
+//       console.log(
+//         `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
+//       );
+//       return res.status(404).json({ message: "Defect card not found" });
+//     }
+//     const printData = defectRecord.printArray.find(
+//       (item) => item.defect_print_id === defectPrintId
+//     );
+//     if (!printData) {
+//       console.log(
+//         `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
+//       );
+//       return res
+//         .status(404)
+//         .json({ message: "Defect print ID not found in printArray" });
+//     }
+//     const formattedData = {
+//       defect_print_id: printData.defect_print_id,
+//       totalRejectGarmentCount: printData.totalRejectGarmentCount,
+//       package_no: defectRecord.package_no,
+//       moNo: defectRecord.moNo,
+//       selectedMono: defectRecord.moNo,
+//       custStyle: defectRecord.custStyle,
+//       buyer: defectRecord.buyer,
+//       color: defectRecord.color,
+//       size: defectRecord.size,
+//       factory: defectRecord.factory,
+//       country: defectRecord.country,
+//       lineNo: defectRecord.lineNo,
+//       department: defectRecord.department,
+//       count: defectRecord.checkedQty,
+//       emp_id_inspection: defectRecord.emp_id_inspection,
+//       inspection_date: defectRecord.inspection_date,
+//       inspection_time: defectRecord.inspection_time,
+//       sub_con: defectRecord.sub_con,
+//       sub_con_factory: defectRecord.sub_con_factory,
+//       bundle_id: defectRecord.bundle_id,
+//       bundle_random_id: defectRecord.bundle_random_id,
+//     };
+//     res.json(formattedData);
+//   } catch (error) {
+//     console.error("Error checking defect card for OPA:", error);
+//     res.status(500).json({ message: error.message });
+//   }
+// });
 
-app.get("/api/last-opa-record-id/:emp_id", async (req, res) => {
-  try {
-    const { emp_id } = req.params;
-    const lastRecord = await OPA.findOne(
-      { emp_id_opa: emp_id },
-      {},
-      { sort: { opa_record_id: -1 } }
-    );
-    const lastRecordId = lastRecord ? lastRecord.opa_record_id : 0;
-    res.json({ lastRecordId });
-  } catch (error) {
-    console.error("Error fetching last OPA record ID:", error);
-    res.status(500).json({ error: "Failed to fetch last OPA record ID" });
-  }
-});
+// app.get("/api/last-opa-record-id/:emp_id", async (req, res) => {
+//   try {
+//     const { emp_id } = req.params;
+//     const lastRecord = await OPA.findOne(
+//       { emp_id_opa: emp_id },
+//       {},
+//       { sort: { opa_record_id: -1 } }
+//     );
+//     const lastRecordId = lastRecord ? lastRecord.opa_record_id : 0;
+//     res.json({ lastRecordId });
+//   } catch (error) {
+//     console.error("Error fetching last OPA record ID:", error);
+//     res.status(500).json({ error: "Failed to fetch last OPA record ID" });
+//   }
+// });
 
-app.post("/api/save-opa", async (req, res) => {
-  try {
-    const newRecord = new OPA(req.body);
-    await newRecord.save();
-    res.status(201).json({ message: "Record saved successfully" });
-  } catch (error) {
-    if (error.code === 11000) {
-      res.status(400).json({ error: "Duplicate record found" });
-    } else {
-      res.status(500).json({ error: "Failed to save record" });
-    }
-  }
-});
+// app.post("/api/save-opa", async (req, res) => {
+//   try {
+//     const newRecord = new OPA(req.body);
+//     await newRecord.save();
+//     res.status(201).json({ message: "Record saved successfully" });
+//   } catch (error) {
+//     if (error.code === 11000) {
+//       res.status(400).json({ error: "Duplicate record found" });
+//     } else {
+//       res.status(500).json({ error: "Failed to save record" });
+//     }
+//   }
+// });
 
-app.get("/api/opa-records", async (req, res) => {
-  try {
-    const records = await OPA.find();
-    res.json(records);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch OPA records" });
-  }
-});
+// app.get("/api/opa-records", async (req, res) => {
+//   try {
+//     const records = await OPA.find();
+//     res.json(records);
+//   } catch (error) {
+//     res.status(500).json({ message: "Failed to fetch OPA records" });
+//   }
+// });
 
 // /* ------------------------------
 //    End Points - Packing
 // ------------------------------ */
 
 // New Endpoint to Get Bundle by Random ID (from qc2_inspection_pass_bundle for order cards)
-app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
-  try {
-    const randomId = req.params.randomId.trim(); // Trim to avoid whitespace issues
-    // console.log("Searching for bundle_random_id:", randomId);
+// app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
+//   try {
+//     const randomId = req.params.randomId.trim(); // Trim to avoid whitespace issues
+//     // console.log("Searching for bundle_random_id:", randomId);
 
-    // First, check qc2_inspection_pass_bundle for order card
-    const bundle = await QC2InspectionPassBundle.findOne({
-      bundle_random_id: randomId,
-      "printArray.isCompleted": false, // Ensure bundle is not completed
-    });
+//     // First, check qc2_inspection_pass_bundle for order card
+//     const bundle = await QC2InspectionPassBundle.findOne({
+//       bundle_random_id: randomId,
+//       "printArray.isCompleted": false, // Ensure bundle is not completed
+//     });
 
-    if (!bundle) {
-      return res
-        .status(404)
-        .json({ error: "This bundle has not been inspected yet" });
-    }
+//     if (!bundle) {
+//       return res
+//         .status(404)
+//         .json({ error: "This bundle has not been inspected yet" });
+//     }
 
-    // Use the first printArray entry (assuming one bundle_random_id per document for simplicity)
-    const printData = bundle.printArray.find(
-      (item) => item.isCompleted === false
-    );
-    if (!printData) {
-      return res
-        .status(404)
-        .json({ error: "No active print data found for this bundle" });
-    }
+//     // Use the first printArray entry (assuming one bundle_random_id per document for simplicity)
+//     const printData = bundle.printArray.find(
+//       (item) => item.isCompleted === false
+//     );
+//     if (!printData) {
+//       return res
+//         .status(404)
+//         .json({ error: "No active print data found for this bundle" });
+//     }
 
-    const formattedData = {
-      bundle_id: bundle.bundle_id,
-      bundle_random_id: bundle.bundle_random_id,
-      package_no: bundle.package_no, // Include package_no
-      moNo: bundle.moNo,
-      selectedMono: bundle.moNo,
-      custStyle: bundle.custStyle,
-      buyer: bundle.buyer,
-      color: bundle.color,
-      size: bundle.size,
-      factory: bundle.factory || "N/A",
-      country: bundle.country || "N/A",
-      lineNo: bundle.lineNo,
-      department: bundle.department,
-      count: bundle.totalPass, // Use totalPass as checkedQty for order cards
-      totalBundleQty: 1, // Set hardcoded as 1 for order card
-      emp_id_inspection: bundle.emp_id_inspection,
-      inspection_date: bundle.inspection_date,
-      inspection_time: bundle.inspection_time,
-      sub_con: bundle.sub_con,
-      sub_con_factory: bundle.sub_con_factory,
-    };
+//     const formattedData = {
+//       bundle_id: bundle.bundle_id,
+//       bundle_random_id: bundle.bundle_random_id,
+//       package_no: bundle.package_no, // Include package_no
+//       moNo: bundle.moNo,
+//       selectedMono: bundle.moNo,
+//       custStyle: bundle.custStyle,
+//       buyer: bundle.buyer,
+//       color: bundle.color,
+//       size: bundle.size,
+//       factory: bundle.factory || "N/A",
+//       country: bundle.country || "N/A",
+//       lineNo: bundle.lineNo,
+//       department: bundle.department,
+//       count: bundle.totalPass, // Use totalPass as checkedQty for order cards
+//       totalBundleQty: 1, // Set hardcoded as 1 for order card
+//       emp_id_inspection: bundle.emp_id_inspection,
+//       inspection_date: bundle.inspection_date,
+//       inspection_time: bundle.inspection_time,
+//       sub_con: bundle.sub_con,
+//       sub_con_factory: bundle.sub_con_factory,
+//     };
 
-    res.json(formattedData);
-  } catch (error) {
-    console.error("Error fetching bundle:", error);
-    res.status(500).json({ error: "Failed to fetch bundle" });
-  }
-});
+//     res.json(formattedData);
+//   } catch (error) {
+//     console.error("Error fetching bundle:", error);
+//     res.status(500).json({ error: "Failed to fetch bundle" });
+//   }
+// });
 
 // Check if Packing record exists (updated for task_no 62)
-app.get("/api/check-packing-exists/:bundleId", async (req, res) => {
-  try {
-    const record = await Packing.findOne({
-      packing_bundle_id: req.params.bundleId, // No change needed here, but ensure it matches task_no 62 in Packing.jsx
-    });
-    res.json({ exists: !!record });
-  } catch (error) {
-    res.status(500).json({ error: "Error checking record" });
-  }
-});
+// app.get("/api/check-packing-exists/:bundleId", async (req, res) => {
+//   try {
+//     const record = await Packing.findOne({
+//       packing_bundle_id: req.params.bundleId, // No change needed here, but ensure it matches task_no 62 in Packing.jsx
+//     });
+//     res.json({ exists: !!record });
+//   } catch (error) {
+//     res.status(500).json({ error: "Error checking record" });
+//   }
+// });
 
 // New endpoint to get the last Packing record ID for a specific emp_id (no change needed)
-app.get("/api/last-packing-record-id/:emp_id", async (req, res) => {
-  try {
-    const { emp_id } = req.params;
-    const lastRecord = await Packing.findOne(
-      { emp_id_packing: emp_id }, // Filter by emp_id_packing
-      {},
-      { sort: { packing_record_id: -1 } } // Sort descending to get the highest ID
-    );
-    const lastRecordId = lastRecord ? lastRecord.packing_record_id : 0; // Start at 0 if no records exist
-    res.json({ lastRecordId });
-  } catch (error) {
-    console.error("Error fetching last Packing record ID:", error);
-    res.status(500).json({ error: "Failed to fetch last Packing record ID" });
-  }
-});
+// app.get("/api/last-packing-record-id/:emp_id", async (req, res) => {
+//   try {
+//     const { emp_id } = req.params;
+//     const lastRecord = await Packing.findOne(
+//       { emp_id_packing: emp_id }, // Filter by emp_id_packing
+//       {},
+//       { sort: { packing_record_id: -1 } } // Sort descending to get the highest ID
+//     );
+//     const lastRecordId = lastRecord ? lastRecord.packing_record_id : 0; // Start at 0 if no records exist
+//     res.json({ lastRecordId });
+//   } catch (error) {
+//     console.error("Error fetching last Packing record ID:", error);
+//     res.status(500).json({ error: "Failed to fetch last Packing record ID" });
+//   }
+// });
 
 // Modified endpoint to fetch defect card data from qc2_inspection_pass_bundle with defect_print_id (updated for task_no 62)
-app.get("/api/check-defect-card/:defectPrintId", async (req, res) => {
-  try {
-    const { defectPrintId } = req.params;
-    // console.log(`Searching for defect_print_id: "${defectPrintId}"`); // Debug log
+// app.get("/api/check-defect-card/:defectPrintId", async (req, res) => {
+//   try {
+//     const { defectPrintId } = req.params;
+//     // console.log(`Searching for defect_print_id: "${defectPrintId}"`); // Debug log
 
-    const defectRecord = await QC2InspectionPassBundle.findOne({
-      "printArray.defect_print_id": defectPrintId,
-      "printArray.isCompleted": false,
-    });
+//     const defectRecord = await QC2InspectionPassBundle.findOne({
+//       "printArray.defect_print_id": defectPrintId,
+//       "printArray.isCompleted": false,
+//     });
 
-    if (!defectRecord) {
-      console.log(
-        `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
-      );
-      return res.status(404).json({ message: "Defect card not found" });
-    }
+//     if (!defectRecord) {
+//       console.log(
+//         `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
+//       );
+//       return res.status(404).json({ message: "Defect card not found" });
+//     }
 
-    const printData = defectRecord.printArray.find(
-      (item) => item.defect_print_id === defectPrintId
-    );
-    if (!printData) {
-      console.log(
-        `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
-      );
-      return res
-        .status(404)
-        .json({ message: "Defect print ID not found in printArray" });
-    }
+//     const printData = defectRecord.printArray.find(
+//       (item) => item.defect_print_id === defectPrintId
+//     );
+//     if (!printData) {
+//       console.log(
+//         `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
+//       );
+//       return res
+//         .status(404)
+//         .json({ message: "Defect print ID not found in printArray" });
+//     }
 
-    const formattedData = {
-      defect_print_id: printData.defect_print_id,
-      totalRejectGarmentCount: printData.totalRejectGarmentCount,
-      totalRejectGarment_Var: printData.totalRejectGarment_Var, // Use totalRejectGarment_Var for defect cards
-      package_no: defectRecord.package_no, // Include package_no
-      moNo: defectRecord.moNo,
-      selectedMono: defectRecord.moNo,
-      custStyle: defectRecord.custStyle,
-      buyer: defectRecord.buyer,
-      color: defectRecord.color,
-      size: defectRecord.size,
-      factory: defectRecord.factory,
-      country: defectRecord.country,
-      lineNo: defectRecord.lineNo,
-      department: defectRecord.department,
-      count: printData.totalRejectGarment_Var, // Use totalRejectGarment_Var as count for defect cards
-      totalBundleQty: 1, // Set hardcoded as 1 for defect card
-      emp_id_inspection: defectRecord.emp_id_inspection,
-      inspection_date: defectRecord.inspection_date,
-      inspection_time: defectRecord.inspection_time,
-      sub_con: defectRecord.sub_con,
-      sub_con_factory: defectRecord.sub_con_factory,
-      bundle_id: defectRecord.bundle_id,
-      bundle_random_id: defectRecord.bundle_random_id,
-    };
+//     const formattedData = {
+//       defect_print_id: printData.defect_print_id,
+//       totalRejectGarmentCount: printData.totalRejectGarmentCount,
+//       totalRejectGarment_Var: printData.totalRejectGarment_Var, // Use totalRejectGarment_Var for defect cards
+//       package_no: defectRecord.package_no, // Include package_no
+//       moNo: defectRecord.moNo,
+//       selectedMono: defectRecord.moNo,
+//       custStyle: defectRecord.custStyle,
+//       buyer: defectRecord.buyer,
+//       color: defectRecord.color,
+//       size: defectRecord.size,
+//       factory: defectRecord.factory,
+//       country: defectRecord.country,
+//       lineNo: defectRecord.lineNo,
+//       department: defectRecord.department,
+//       count: printData.totalRejectGarment_Var, // Use totalRejectGarment_Var as count for defect cards
+//       totalBundleQty: 1, // Set hardcoded as 1 for defect card
+//       emp_id_inspection: defectRecord.emp_id_inspection,
+//       inspection_date: defectRecord.inspection_date,
+//       inspection_time: defectRecord.inspection_time,
+//       sub_con: defectRecord.sub_con,
+//       sub_con_factory: defectRecord.sub_con_factory,
+//       bundle_id: defectRecord.bundle_id,
+//       bundle_random_id: defectRecord.bundle_random_id,
+//     };
 
-    res.json(formattedData);
-  } catch (error) {
-    console.error("Error checking defect card:", error);
-    res.status(500).json({ message: error.message });
-  }
-});
+//     res.json(formattedData);
+//   } catch (error) {
+//     console.error("Error checking defect card:", error);
+//     res.status(500).json({ message: error.message });
+//   }
+// });
 
 // Save Packing record (no change needed, but ensure task_no is 62 in Packing.jsx)
-app.post("/api/save-packing", async (req, res) => {
-  try {
-    const newRecord = new Packing(req.body);
-    await newRecord.save();
-    res.status(201).json({ message: "Record saved successfully" });
-  } catch (error) {
-    if (error.code === 11000) {
-      res.status(400).json({ error: "Duplicate record found" });
-    } else {
-      res.status(500).json({ error: "Failed to save record" });
-    }
-  }
-});
+// app.post("/api/save-packing", async (req, res) => {
+//   try {
+//     const newRecord = new Packing(req.body);
+//     await newRecord.save();
+//     res.status(201).json({ message: "Record saved successfully" });
+//   } catch (error) {
+//     if (error.code === 11000) {
+//       res.status(400).json({ error: "Duplicate record found" });
+//     } else {
+//       res.status(500).json({ error: "Failed to save record" });
+//     }
+//   }
+// });
 
 //For Data tab display records in a table (no change needed)
-app.get("/api/packing-records", async (req, res) => {
-  try {
-    const records = await Packing.find();
-    res.json(records);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch Packing records" });
-  }
-});
+// app.get("/api/packing-records", async (req, res) => {
+//   try {
+//     const records = await Packing.find();
+//     res.json(records);
+//   } catch (error) {
+//     res.status(500).json({ message: "Failed to fetch Packing records" });
+//   }
+// });
 
 /* ------------------------------
   PUT Endpoints - Update QC2 Order Data
@@ -5502,195 +5518,195 @@ app.get("/api/opa-autocomplete", async (req, res) => {
 // ------------------------
 // Multer Storage Setup for QC Inline Roving
 // ------------------------
-const qcStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, "../public/storage/qcinline");
-    // Create directory if it doesn't exist
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const { date, type, emp_id } = req.body;
-    // Validate the inputs to prevent 'undefined' in the filename
-    const currentDate = date || new Date().toISOString().split("T")[0]; // Fallback to current date if not provided
-    const imageType = type || "spi-measurement"; // Fallback to 'unknown' if type is not provided
-    const userEmpId = emp_id || "emp"; // Fallback to 'guest' if emp_id is not provided
-    const randomId = Math.random().toString(36).substring(2, 15);
-    const fileName = `${currentDate}-${imageType}-${userEmpId}-${randomId}.jpg`;
-    cb(null, fileName);
-  }
-});
+// const qcStorage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     const uploadPath = path.join(__dirname, "../public/storage/qcinline");
+//     // Create directory if it doesn't exist
+//     if (!fs.existsSync(uploadPath)) {
+//       fs.mkdirSync(uploadPath, { recursive: true });
+//     }
+//     cb(null, uploadPath);
+//   },
+//   filename: (req, file, cb) => {
+//     const { date, type, emp_id } = req.body;
+//     // Validate the inputs to prevent 'undefined' in the filename
+//     const currentDate = date || new Date().toISOString().split("T")[0]; // Fallback to current date if not provided
+//     const imageType = type || "spi-measurement"; // Fallback to 'unknown' if type is not provided
+//     const userEmpId = emp_id || "emp"; // Fallback to 'guest' if emp_id is not provided
+//     const randomId = Math.random().toString(36).substring(2, 15);
+//     const fileName = `${currentDate}-${imageType}-${userEmpId}-${randomId}.jpg`;
+//     cb(null, fileName);
+//   }
+// });
 
-const qcUpload = multer({
-  storage: qcStorage,
-  limits: { fileSize: 5000000 }, // Limit file size to 5MB
-  fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png|gif/;
-    const extname = filetypes.test(
-      path.extname(file.originalname).toLowerCase()
-    );
-    const mimetype = filetypes.test(file.mimetype);
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb("Error: Images Only (jpeg, jpg, png, gif)!");
-    }
-  }
-}).single("image");
+// const qcUpload = multer({
+//   storage: qcStorage,
+//   limits: { fileSize: 5000000 }, // Limit file size to 5MB
+//   fileFilter: (req, file, cb) => {
+//     const filetypes = /jpeg|jpg|png|gif/;
+//     const extname = filetypes.test(
+//       path.extname(file.originalname).toLowerCase()
+//     );
+//     const mimetype = filetypes.test(file.mimetype);
+//     if (mimetype && extname) {
+//       return cb(null, true);
+//     } else {
+//       cb("Error: Images Only (jpeg, jpg, png, gif)!");
+//     }
+//   }
+// }).single("image");
 
 // Serve static files (for accessing uploaded images)
 app.use("/storage", express.static(path.join(__dirname, "../public/storage")));
 
 // Endpoint to upload images for QC Inline Roving
-app.post("/api/upload-qc-image", qcUpload, (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: "No image uploaded" });
-    }
-    const imagePath = `/storage/qcinline/${req.file.filename}`;
-    res.status(200).json({ imagePath });
-  } catch (error) {
-    console.error("Error uploading image:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to upload image", error: error.message });
-  }
-});
+// app.post("/api/upload-qc-image", qcUpload, (req, res) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ message: "No image uploaded" });
+//     }
+//     const imagePath = `/storage/qcinline/${req.file.filename}`;
+//     res.status(200).json({ imagePath });
+//   } catch (error) {
+//     console.error("Error uploading image:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to upload image", error: error.message });
+//   }
+// });
 
 
 
 // Endpoint to fetch QC Inline Roving reports
-app.get("/api/qc-inline-roving-reports", async (req, res) => {
-  try {
-    const reports = await QCInlineRoving.find();
-    res.json(reports);
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching reports", error });
-  }
-});
+// app.get("/api/qc-inline-roving-reports", async (req, res) => {
+//   try {
+//     const reports = await QCInlineRoving.find();
+//     res.json(reports);
+//   } catch (error) {
+//     res.status(500).json({ message: "Error fetching reports", error });
+//   }
+// });
 
 // New endpoint to fetch filtered QC Inline Roving reports with date handling
-app.get("/api/qc-inline-roving-reports-filtered", async (req, res) => {
-  try {
-    const { startDate, endDate, line_no, mo_no, emp_id } = req.query;
+// app.get("/api/qc-inline-roving-reports-filtered", async (req, res) => {
+//   try {
+//     const { startDate, endDate, line_no, mo_no, emp_id } = req.query;
 
-    let match = {};
+//     let match = {};
 
-    // Date filtering using $expr for string dates
-    if (startDate || endDate) {
-      match.$expr = match.$expr || {};
-      match.$expr.$and = match.$expr.$and || [];
-      if (startDate) {
-        const normalizedStartDate = normalizeDateString(startDate);
-        match.$expr.$and.push({
-          $gte: [
-            {
-              $dateFromString: {
-                dateString: "$inspection_date",
-                format: "%m/%d/%Y"
-              }
-            },
-            {
-              $dateFromString: {
-                dateString: normalizedStartDate,
-                format: "%m/%d/%Y"
-              }
-            }
-          ]
-        });
-      }
-      if (endDate) {
-        const normalizedEndDate = normalizeDateString(endDate);
-        match.$expr.$and.push({
-          $lte: [
-            {
-              $dateFromString: {
-                dateString: "$inspection_date",
-                format: "%m/%d/%Y"
-              }
-            },
-            {
-              $dateFromString: {
-                dateString: normalizedEndDate,
-                format: "%m/%d/%Y"
-              }
-            }
-          ]
-        });
-      }
-    }
+//     // Date filtering using $expr for string dates
+//     if (startDate || endDate) {
+//       match.$expr = match.$expr || {};
+//       match.$expr.$and = match.$expr.$and || [];
+//       if (startDate) {
+//         const normalizedStartDate = normalizeDateString(startDate);
+//         match.$expr.$and.push({
+//           $gte: [
+//             {
+//               $dateFromString: {
+//                 dateString: "$inspection_date",
+//                 format: "%m/%d/%Y"
+//               }
+//             },
+//             {
+//               $dateFromString: {
+//                 dateString: normalizedStartDate,
+//                 format: "%m/%d/%Y"
+//               }
+//             }
+//           ]
+//         });
+//       }
+//       if (endDate) {
+//         const normalizedEndDate = normalizeDateString(endDate);
+//         match.$expr.$and.push({
+//           $lte: [
+//             {
+//               $dateFromString: {
+//                 dateString: "$inspection_date",
+//                 format: "%m/%d/%Y"
+//               }
+//             },
+//             {
+//               $dateFromString: {
+//                 dateString: normalizedEndDate,
+//                 format: "%m/%d/%Y"
+//               }
+//             }
+//           ]
+//         });
+//       }
+//     }
 
-    // Other filters
-    if (line_no) {
-      match.line_no = line_no;
-    }
-    if (mo_no) {
-      match.mo_no = mo_no;
-    }
-    if (emp_id) {
-      match.emp_id = emp_id;
-    }
+//     // Other filters
+//     if (line_no) {
+//       match.line_no = line_no;
+//     }
+//     if (mo_no) {
+//       match.mo_no = mo_no;
+//     }
+//     if (emp_id) {
+//       match.emp_id = emp_id;
+//     }
 
-    const reports = await QCInlineRoving.find(match);
-    res.json(reports);
-  } catch (error) {
-    console.error("Error fetching filtered roving reports:", error);
-    res.status(500).json({ message: "Error fetching filtered reports", error });
-  }
-});
+//     const reports = await QCInlineRoving.find(match);
+//     res.json(reports);
+//   } catch (error) {
+//     console.error("Error fetching filtered roving reports:", error);
+//     res.status(500).json({ message: "Error fetching filtered reports", error });
+//   }
+// });
 
 // Endpoint to fetch distinct MO Nos
-app.get("/api/qc-inline-roving-mo-nos", async (req, res) => {
-  try {
-    const moNos = await QCInlineRoving.distinct("mo_no");
-    res.json(moNos.filter((mo) => mo)); // Filter out null/empty values
-  } catch (error) {
-    console.error("Error fetching MO Nos:", error);
-    res.status(500).json({ message: "Failed to fetch MO Nos" });
-  }
-});
+// app.get("/api/qc-inline-roving-mo-nos", async (req, res) => {
+//   try {
+//     const moNos = await QCInlineRoving.distinct("mo_no");
+//     res.json(moNos.filter((mo) => mo)); // Filter out null/empty values
+//   } catch (error) {
+//     console.error("Error fetching MO Nos:", error);
+//     res.status(500).json({ message: "Failed to fetch MO Nos" });
+//   }
+// });
 
 // Endpoint to fetch distinct Buyer Names for Roving Report filters
-app.get("/api/qc-inline-roving-buyers", async (req, res) => {
-  try {
-    const buyers = await QCInlineRoving.distinct("buyer_name");
-    res.json(buyers.filter(b => b).sort()); // Filter out null/empty and sort
-  } catch (error) {
-    console.error("Error fetching buyers for Roving Report:", error);
-    res.status(500).json({ message: "Error fetching buyers", error: error.message });
-  }
-});
+// app.get("/api/qc-inline-roving-buyers", async (req, res) => {
+//   try {
+//     const buyers = await QCInlineRoving.distinct("buyer_name");
+//     res.json(buyers.filter(b => b).sort()); // Filter out null/empty and sort
+//   } catch (error) {
+//     console.error("Error fetching buyers for Roving Report:", error);
+//     res.status(500).json({ message: "Error fetching buyers", error: error.message });
+//   }
+// });
 
 // Endpoint to fetch distinct Operation Names from inlineData for Roving Report filters
-app.get("/api/qc-inline-roving-operations", async (req, res) => {
-  try {
-    const operations = await QCInlineRoving.aggregate([
-      { $unwind: "$inlineData" },
-      { $match: { "inlineData.operation_name": { $ne: null, $ne: "" } } }, // Ensure operation_name exists and is not empty
-      { $group: { _id: "$inlineData.operation_name" } },
-      { $sort: { _id: 1 } },
-      { $project: { _id: 0, operation_name: "$_id" } }
-    ]);
-    res.json(operations.map(op => op.operation_name));
-  } catch (error)
- {
-    console.error("Error fetching operations for Roving Report:", error);
-    res.status(500).json({ message: "Error fetching operations", error: error.message });
-  }
-});
+// app.get("/api/qc-inline-roving-operations", async (req, res) => {
+//   try {
+//     const operations = await QCInlineRoving.aggregate([
+//       { $unwind: "$inlineData" },
+//       { $match: { "inlineData.operation_name": { $ne: null, $ne: "" } } }, // Ensure operation_name exists and is not empty
+//       { $group: { _id: "$inlineData.operation_name" } },
+//       { $sort: { _id: 1 } },
+//       { $project: { _id: 0, operation_name: "$_id" } }
+//     ]);
+//     res.json(operations.map(op => op.operation_name));
+//   } catch (error)
+//  {
+//     console.error("Error fetching operations for Roving Report:", error);
+//     res.status(500).json({ message: "Error fetching operations", error: error.message });
+//   }
+// });
 
 // Endpoint to fetch distinct QC IDs (emp_id)
-app.get("/api/qc-inline-roving-qc-ids", async (req, res) => {
-  try {
-    const qcIds = await QCInlineRoving.distinct("emp_id");
-    res.json(qcIds.filter((id) => id)); // Filter out null/empty values
-  } catch (error) {
-    console.error("Error fetching QC IDs:", error);
-    res.status(500).json({ message: "Failed to fetch QC IDs" });
-  }
-});
+// app.get("/api/qc-inline-roving-qc-ids", async (req, res) => {
+//   try {
+//     const qcIds = await QCInlineRoving.distinct("emp_id");
+//     res.json(qcIds.filter((id) => id)); // Filter out null/empty values
+//   } catch (error) {
+//     console.error("Error fetching QC IDs:", error);
+//     res.status(500).json({ message: "Failed to fetch QC IDs" });
+//   }
+// });
 
 
 /* ------------------------------
@@ -5698,404 +5714,404 @@ app.get("/api/qc-inline-roving-qc-ids", async (req, res) => {
 ------------------------------ */
 
 //get the each line related working worker count
-app.get("/api/line-summary", async (req, res) => {
-  try {
-    const lineSummaries = await UserMain.aggregate([
-      {
-        $match: {
-          sect_name: { $ne: null, $ne: "" },
-          working_status: "Working",
-          job_title: "Sewing Worker",
-        },
-      },
-      {
-        $group: {
-          _id: "$sect_name",
-          worker_count: { $sum: 1 },
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          line_no: "$_id",
-          real_worker_count: "$worker_count",
-        },
-      },
-      { $sort: { line_no: 1 } },
-    ]);
+// app.get("/api/line-summary", async (req, res) => {
+//   try {
+//     const lineSummaries = await UserMain.aggregate([
+//       {
+//         $match: {
+//           sect_name: { $ne: null, $ne: "" },
+//           working_status: "Working",
+//           job_title: "Sewing Worker",
+//         },
+//       },
+//       {
+//         $group: {
+//           _id: "$sect_name",
+//           worker_count: { $sum: 1 },
+//         },
+//       },
+//       {
+//         $project: {
+//           _id: 0,
+//           line_no: "$_id",
+//           real_worker_count: "$worker_count",
+//         },
+//       },
+//       { $sort: { line_no: 1 } },
+//     ]);
 
-    const editedCountsDocs = await LineSewingWorker.find(
-      {},
-      "line_no edited_worker_count"
-    ).lean();
+//     const editedCountsDocs = await LineSewingWorker.find(
+//       {},
+//       "line_no edited_worker_count"
+//     ).lean();
 
-    const editedCountsMap = new Map(
-      editedCountsDocs.map((doc) => [doc.line_no, doc.edited_worker_count])
-    );
+//     const editedCountsMap = new Map(
+//       editedCountsDocs.map((doc) => [doc.line_no, doc.edited_worker_count])
+//     );
 
-    const mergedSummaries = lineSummaries.map((realSummary) => ({
-      ...realSummary,
-      edited_worker_count: editedCountsMap.get(realSummary.line_no),
-    }));
+//     const mergedSummaries = lineSummaries.map((realSummary) => ({
+//       ...realSummary,
+//       edited_worker_count: editedCountsMap.get(realSummary.line_no),
+//     }));
 
-    res.json(mergedSummaries);
-  } catch (error) {
-    console.error("Error fetching line summary:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to fetch line summary data.", error: error.message });
-  }
-});
+//     res.json(mergedSummaries);
+//   } catch (error) {
+//     console.error("Error fetching line summary:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to fetch line summary data.", error: error.message });
+//   }
+// });
 
 //Edit the line worker count
-app.put("/api/line-sewing-workers/:lineNo", async (req, res) => {
-  const { lineNo } = req.params;
-  const { edited_worker_count } = req.body;
+// app.put("/api/line-sewing-workers/:lineNo", async (req, res) => {
+//   const { lineNo } = req.params;
+//   const { edited_worker_count } = req.body;
 
-  if (
-    typeof edited_worker_count !== "number" ||
-    edited_worker_count < 0 ||
-    !Number.isInteger(edited_worker_count)
-  ) {
-    return res
-      .status(400)
-      .json({ message: "Edited worker count must be a non-negative integer." });
-  }
-  try {
-    const now = new Date();
-    const realCountResult = await UserMain.aggregate([
-      {
-        $match: {
-          sect_name: lineNo,
-          working_status: "Working",
-          job_title: "Sewing Worker",
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          count: { $sum: 1 },
-        },
-      },
-    ]);
+//   if (
+//     typeof edited_worker_count !== "number" ||
+//     edited_worker_count < 0 ||
+//     !Number.isInteger(edited_worker_count)
+//   ) {
+//     return res
+//       .status(400)
+//       .json({ message: "Edited worker count must be a non-negative integer." });
+//   }
+//   try {
+//     const now = new Date();
+//     const realCountResult = await UserMain.aggregate([
+//       {
+//         $match: {
+//           sect_name: lineNo,
+//           working_status: "Working",
+//           job_title: "Sewing Worker",
+//         },
+//       },
+//       {
+//         $group: {
+//           _id: null,
+//           count: { $sum: 1 },
+//         },
+//       },
+//     ]);
 
-    const current_real_worker_count =
-      realCountResult.length > 0 ? realCountResult[0].count : 0;
+//     const current_real_worker_count =
+//       realCountResult.length > 0 ? realCountResult[0].count : 0;
 
-    const historyEntry = {
-      edited_worker_count,
-      updated_at: now,
-    };
+//     const historyEntry = {
+//       edited_worker_count,
+//       updated_at: now,
+//     };
 
-    const updatedLineWorker = await LineSewingWorker.findOneAndUpdate(
-      { line_no: lineNo },
-      {
-        $set: {
-          real_worker_count: current_real_worker_count,
-          edited_worker_count,
-          updated_at: now,
-        },
-        $push: { history: historyEntry },
-      },
-      { new: true, upsert: true, runValidators: true }
-    );
+//     const updatedLineWorker = await LineSewingWorker.findOneAndUpdate(
+//       { line_no: lineNo },
+//       {
+//         $set: {
+//           real_worker_count: current_real_worker_count,
+//           edited_worker_count,
+//           updated_at: now,
+//         },
+//         $push: { history: historyEntry },
+//       },
+//       { new: true, upsert: true, runValidators: true }
+//     );
 
-    res.json({
-      message: "Line worker count updated successfully.",
-      data: updatedLineWorker,
-    });
-  } catch (error) {
-    console.error(`Error updating line worker count for line ${lineNo}:`, error);
-    res
-      .status(500)
-      .json({ message: "Failed to update line worker count.", error: error.message });
-  }
-});
+//     res.json({
+//       message: "Line worker count updated successfully.",
+//       data: updatedLineWorker,
+//     });
+//   } catch (error) {
+//     console.error(`Error updating line worker count for line ${lineNo}:`, error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to update line worker count.", error: error.message });
+//   }
+// });
 //Save the inline Roving data
-app.post("/api/save-qc-inline-roving", async (req, res) => {
-  try {
-    const {
-      inspection_date,
-      mo_no,
-      line_no,
-      report_name,
-      inspection_rep_item,
-    } = req.body;
+// app.post("/api/save-qc-inline-roving", async (req, res) => {
+//   try {
+//     const {
+//       inspection_date,
+//       mo_no,
+//       line_no,
+//       report_name,
+//       inspection_rep_item,
+//     } = req.body;
 
-    if (!inspection_date || !mo_no || !line_no || !inspection_rep_item) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Missing required fields: inspection_date, mo_no, line_no, or inspection_rep_item.",
-        });
-    }
+//     if (!inspection_date || !mo_no || !line_no || !inspection_rep_item) {
+//       return res
+//         .status(400)
+//         .json({
+//           message:
+//             "Missing required fields: inspection_date, mo_no, line_no, or inspection_rep_item.",
+//         });
+//     }
 
-    if (typeof inspection_rep_item !== "object" || inspection_rep_item === null) {
-      return res
-        .status(400)
-        .json({ message: "inspection_rep_item must be a valid object." });
-    }
+//     if (typeof inspection_rep_item !== "object" || inspection_rep_item === null) {
+//       return res
+//         .status(400)
+//         .json({ message: "inspection_rep_item must be a valid object." });
+//     }
 
-    if (
-      !inspection_rep_item.inspection_rep_name ||
-      !inspection_rep_item.emp_id ||
-      !inspection_rep_item.eng_name
-    ) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "inspection_rep_item is missing required fields like inspection_rep_name, emp_id, or eng_name.",
-        });
-    }
+//     if (
+//       !inspection_rep_item.inspection_rep_name ||
+//       !inspection_rep_item.emp_id ||
+//       !inspection_rep_item.eng_name
+//     ) {
+//       return res
+//         .status(400)
+//         .json({
+//           message:
+//             "inspection_rep_item is missing required fields like inspection_rep_name, emp_id, or eng_name.",
+//         });
+//     }
 
-    let doc = await QCInlineRoving.findOne({ inspection_date, mo_no, line_no });
+//     let doc = await QCInlineRoving.findOne({ inspection_date, mo_no, line_no });
 
-    if (doc) {
-      const existingRepIndex = doc.inspection_rep.findIndex(
-        (rep) => rep.inspection_rep_name === inspection_rep_item.inspection_rep_name
-      );
+//     if (doc) {
+//       const existingRepIndex = doc.inspection_rep.findIndex(
+//         (rep) => rep.inspection_rep_name === inspection_rep_item.inspection_rep_name
+//       );
 
-      if (existingRepIndex !== -1) {
-        const repToUpdate = doc.inspection_rep[existingRepIndex];
+//       if (existingRepIndex !== -1) {
+//         const repToUpdate = doc.inspection_rep[existingRepIndex];
 
-        if (!Array.isArray(repToUpdate.inlineData)) {
-          repToUpdate.inlineData = [];
-        }
+//         if (!Array.isArray(repToUpdate.inlineData)) {
+//           repToUpdate.inlineData = [];
+//         }
 
-        if (inspection_rep_item.inlineData && inspection_rep_item.inlineData.length > 0) {
-          repToUpdate.inlineData.push(inspection_rep_item.inlineData[0]);
-        }
+//         if (inspection_rep_item.inlineData && inspection_rep_item.inlineData.length > 0) {
+//           repToUpdate.inlineData.push(inspection_rep_item.inlineData[0]);
+//         }
 
-        repToUpdate.inspection_rep_name = inspection_rep_item.inspection_rep_name;
-        repToUpdate.emp_id = inspection_rep_item.emp_id;
-        repToUpdate.eng_name = inspection_rep_item.eng_name;
-        repToUpdate.complete_inspect_operators = repToUpdate.inlineData.length;
-        repToUpdate.Inspect_status =
-          repToUpdate.total_operators > 0 &&
-          repToUpdate.complete_inspect_operators >= repToUpdate.total_operators
-            ? "Completed"
-            : "Not Complete";
-      } else {
-        if (doc.inspection_rep.length < 5) {
-          const newRepItem = { ...inspection_rep_item };
-          if (!Array.isArray(newRepItem.inlineData)) {
-            newRepItem.inlineData = [];
-          }
+//         repToUpdate.inspection_rep_name = inspection_rep_item.inspection_rep_name;
+//         repToUpdate.emp_id = inspection_rep_item.emp_id;
+//         repToUpdate.eng_name = inspection_rep_item.eng_name;
+//         repToUpdate.complete_inspect_operators = repToUpdate.inlineData.length;
+//         repToUpdate.Inspect_status =
+//           repToUpdate.total_operators > 0 &&
+//           repToUpdate.complete_inspect_operators >= repToUpdate.total_operators
+//             ? "Completed"
+//             : "Not Complete";
+//       } else {
+//         if (doc.inspection_rep.length < 5) {
+//           const newRepItem = { ...inspection_rep_item };
+//           if (!Array.isArray(newRepItem.inlineData)) {
+//             newRepItem.inlineData = [];
+//           }
 
-          newRepItem.complete_inspect_operators = newRepItem.inlineData.length;
-          newRepItem.Inspect_status =
-            newRepItem.total_operators > 0 &&
-            newRepItem.complete_inspect_operators >= newRepItem.total_operators
-              ? "Completed"
-              : "Not Complete";
+//           newRepItem.complete_inspect_operators = newRepItem.inlineData.length;
+//           newRepItem.Inspect_status =
+//             newRepItem.total_operators > 0 &&
+//             newRepItem.complete_inspect_operators >= newRepItem.total_operators
+//               ? "Completed"
+//               : "Not Complete";
 
-          doc.inspection_rep.push(newRepItem);
-        } else {
-          return res
-            .status(400)
-            .json({
-              message:
-                "Maximum number of 5 inspection reports already recorded for this combination.",
-            });
-        }
-      }
+//           doc.inspection_rep.push(newRepItem);
+//         } else {
+//           return res
+//             .status(400)
+//             .json({
+//               message:
+//                 "Maximum number of 5 inspection reports already recorded for this combination.",
+//             });
+//         }
+//       }
 
-      if (report_name && doc.report_name !== report_name) {
-        doc.report_name = report_name;
-      }
+//       if (report_name && doc.report_name !== report_name) {
+//         doc.report_name = report_name;
+//       }
 
-      await doc.save();
-      res.status(200).json({
-        message: "QC Inline Roving data updated successfully.",
-        data: doc,
-      });
-    } else {
-      const lastDoc = await QCInlineRoving.findOne()
-        .sort({ inline_roving_id: -1 })
-        .select("inline_roving_id");
+//       await doc.save();
+//       res.status(200).json({
+//         message: "QC Inline Roving data updated successfully.",
+//         data: doc,
+//       });
+//     } else {
+//       const lastDoc = await QCInlineRoving.findOne()
+//         .sort({ inline_roving_id: -1 })
+//         .select("inline_roving_id");
 
-      const newId =
-        lastDoc && typeof lastDoc.inline_roving_id === "number"
-          ? lastDoc.inline_roving_id + 1
-          : 1;
+//       const newId =
+//         lastDoc && typeof lastDoc.inline_roving_id === "number"
+//           ? lastDoc.inline_roving_id + 1
+//           : 1;
 
-      const initialRepItem = { ...inspection_rep_item };
-      if (!Array.isArray(initialRepItem.inlineData)) {
-        initialRepItem.inlineData = [];
-      }
+//       const initialRepItem = { ...inspection_rep_item };
+//       if (!Array.isArray(initialRepItem.inlineData)) {
+//         initialRepItem.inlineData = [];
+//       }
 
-      initialRepItem.complete_inspect_operators = initialRepItem.inlineData.length;
-      initialRepItem.Inspect_status =
-        initialRepItem.total_operators > 0 &&
-        initialRepItem.complete_inspect_operators >= initialRepItem.total_operators
-          ? "Completed"
-          : "Not Complete";
+//       initialRepItem.complete_inspect_operators = initialRepItem.inlineData.length;
+//       initialRepItem.Inspect_status =
+//         initialRepItem.total_operators > 0 &&
+//         initialRepItem.complete_inspect_operators >= initialRepItem.total_operators
+//           ? "Completed"
+//           : "Not Complete";
 
-      const newQCInlineRovingDoc = new QCInlineRoving({
-        inline_roving_id: newId,
-        report_name:
-          report_name || `Report for ${inspection_date} - ${line_no} - ${mo_no}`,
-        inspection_date,
-        mo_no,
-        line_no,
-        inspection_rep: [initialRepItem],
-      });
+//       const newQCInlineRovingDoc = new QCInlineRoving({
+//         inline_roving_id: newId,
+//         report_name:
+//           report_name || `Report for ${inspection_date} - ${line_no} - ${mo_no}`,
+//         inspection_date,
+//         mo_no,
+//         line_no,
+//         inspection_rep: [initialRepItem],
+//       });
 
-      await newQCInlineRovingDoc.save();
-      res.status(201).json({
-        message: "QC Inline Roving data saved successfully (new record created).",
-        data: newQCInlineRovingDoc,
-      });
-    }
-  } catch (error) {
-    console.error("Error saving/updating QC Inline Roving data:", error);
-    res.status(500).json({
-      message: "Failed to save/update QC Inline Roving data",
-      error: error.message,
-    });
-  }
-});
+//       await newQCInlineRovingDoc.save();
+//       res.status(201).json({
+//         message: "QC Inline Roving data saved successfully (new record created).",
+//         data: newQCInlineRovingDoc,
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Error saving/updating QC Inline Roving data:", error);
+//     res.status(500).json({
+//       message: "Failed to save/update QC Inline Roving data",
+//       error: error.message,
+//     });
+//   }
+// });
 
-function getOrdinal(n) {
-  if (n <= 0) return String(n);
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0] || "th");
-}
+// function getOrdinal(n) {
+//   if (n <= 0) return String(n);
+//   const s = ["th", "st", "nd", "rd"];
+//   const v = n % 100;
+//   return n + (s[(v - 20) % 10] || s[v] || s[0] || "th");
+// }
 
 //Get the inspection Number
-app.get("/api/qc-inline-roving/inspection-time-info", async (req, res) => {
-  try {
-    const { line_no, inspection_date } = req.query;
-    if (!line_no || !inspection_date) {
-      return res
-        .status(400)
-        .json({ message: "Line number and inspection date are required." });
-    }
-    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(inspection_date)) {
-      return res
-        .status(400)
-        .json({ message: "Invalid inspection date format. Expected MM/DD/YYYY." });
-    }
+// app.get("/api/qc-inline-roving/inspection-time-info", async (req, res) => {
+//   try {
+//     const { line_no, inspection_date } = req.query;
+//     if (!line_no || !inspection_date) {
+//       return res
+//         .status(400)
+//         .json({ message: "Line number and inspection date are required." });
+//     }
+//     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(inspection_date)) {
+//       return res
+//         .status(400)
+//         .json({ message: "Invalid inspection date format. Expected MM/DD/YYYY." });
+//     }
 
-    const lineWorkerInfo = await LineSewingWorker.findOne({ line_no });
+//     const lineWorkerInfo = await LineSewingWorker.findOne({ line_no });
 
-    if (!lineWorkerInfo) {
-      return res.json({ inspectionTimeOrdinal: "N/A (Line not configured)" });
-    }
+//     if (!lineWorkerInfo) {
+//       return res.json({ inspectionTimeOrdinal: "N/A (Line not configured)" });
+//     }
 
-    const target_worker_count = lineWorkerInfo.edited_worker_count;
+//     const target_worker_count = lineWorkerInfo.edited_worker_count;
 
-    if (target_worker_count === 0) {
-      return res.json({ inspectionTimeOrdinal: "N/A (Target 0 workers)" });
-    }
+//     if (target_worker_count === 0) {
+//       return res.json({ inspectionTimeOrdinal: "N/A (Target 0 workers)" });
+//     }
 
-    const rovingRecords = await QCInlineRoving.find({
-      line_no: line_no,
-      inspection_date: inspection_date,
-    });
+//     const rovingRecords = await QCInlineRoving.find({
+//       line_no: line_no,
+//       inspection_date: inspection_date,
+//     });
 
-    if (rovingRecords.length === 0) {
-      return res.json({ inspectionTimeOrdinal: getOrdinal(1) });
-    }
+//     if (rovingRecords.length === 0) {
+//       return res.json({ inspectionTimeOrdinal: getOrdinal(1) });
+//     }
 
-    const operatorInspectionCounts = {};
+//     const operatorInspectionCounts = {};
 
-    rovingRecords.forEach((record) => {
-      record.inlineData.forEach((entry) => {
-        const operatorId = entry.operator_emp_id;
-        if (operatorId) {
-          operatorInspectionCounts[operatorId] =
-            (operatorInspectionCounts[operatorId] || 0) + 1;
-        }
-      });
-    });
+//     rovingRecords.forEach((record) => {
+//       record.inlineData.forEach((entry) => {
+//         const operatorId = entry.operator_emp_id;
+//         if (operatorId) {
+//           operatorInspectionCounts[operatorId] =
+//             (operatorInspectionCounts[operatorId] || 0) + 1;
+//         }
+//       });
+//     });
 
-    if (Object.keys(operatorInspectionCounts).length === 0) {
-      return res.json({ inspectionTimeOrdinal: getOrdinal(1) });
-    }
+//     if (Object.keys(operatorInspectionCounts).length === 0) {
+//       return res.json({ inspectionTimeOrdinal: getOrdinal(1) });
+//     }
 
-    let completed_rounds = 0;
+//     let completed_rounds = 0;
 
-    for (let round_num = 1; round_num <= 5; round_num++) {
-      let operators_finished_this_round = 0;
+//     for (let round_num = 1; round_num <= 5; round_num++) {
+//       let operators_finished_this_round = 0;
 
-      for (const operator_id in operatorInspectionCounts) {
-        if (operatorInspectionCounts[operator_id] >= round_num) {
-          operators_finished_this_round++;
-        }
-      }
+//       for (const operator_id in operatorInspectionCounts) {
+//         if (operatorInspectionCounts[operator_id] >= round_num) {
+//           operators_finished_this_round++;
+//         }
+//       }
 
-      if (operators_finished_this_round >= target_worker_count) {
-        completed_rounds = round_num;
-      } else {
-        break;
-      }
-    }
+//       if (operators_finished_this_round >= target_worker_count) {
+//         completed_rounds = round_num;
+//       } else {
+//         break;
+//       }
+//     }
 
-    const current_inspection_time_number = completed_rounds + 1;
+//     const current_inspection_time_number = completed_rounds + 1;
 
-    const ordinal =
-      current_inspection_time_number > 5
-        ? `${getOrdinal(5)} (Completed)`
-        : getOrdinal(current_inspection_time_number);
+//     const ordinal =
+//       current_inspection_time_number > 5
+//         ? `${getOrdinal(5)} (Completed)`
+//         : getOrdinal(current_inspection_time_number);
 
-    res.json({ inspectionTimeOrdinal: ordinal });
-  } catch (error) {
-    console.error("Error fetching inspection time info:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to fetch inspection time info.", error: error.message });
-  }
-});
+//     res.json({ inspectionTimeOrdinal: ordinal });
+//   } catch (error) {
+//     console.error("Error fetching inspection time info:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to fetch inspection time info.", error: error.message });
+//   }
+// });
 
 //Get the completed inspect operators
-app.get("/api/inspections-completed", async (req, res) => {
-  const { line_no, inspection_date, mo_no, operation_id, inspection_rep_name } =
-    req.query;
+// app.get("/api/inspections-completed", async (req, res) => {
+//   const { line_no, inspection_date, mo_no, operation_id, inspection_rep_name } =
+//     req.query;
 
-  try {
-    const findQuery = {
-      line_no,
-      inspection_date,
-    };
+//   try {
+//     const findQuery = {
+//       line_no,
+//       inspection_date,
+//     };
 
-    if (mo_no) {
-      findQuery.mo_no = mo_no;
-    }
+//     if (mo_no) {
+//       findQuery.mo_no = mo_no;
+//     }
 
-    const elemMatchConditions = { inspection_rep_name };
+//     const elemMatchConditions = { inspection_rep_name };
 
-    if (operation_id) {
-      elemMatchConditions["inlineData.tg_no"] = operation_id;
-    }
+//     if (operation_id) {
+//       elemMatchConditions["inlineData.tg_no"] = operation_id;
+//     }
 
-    findQuery.inspection_rep = { $elemMatch: elemMatchConditions };
+//     findQuery.inspection_rep = { $elemMatch: elemMatchConditions };
 
-    const inspection = await QCInlineRoving.findOne(findQuery);
+//     const inspection = await QCInlineRoving.findOne(findQuery);
 
-    if (!inspection) {
-      return res.json({ completeInspectOperators: 0 });
-    }
+//     if (!inspection) {
+//       return res.json({ completeInspectOperators: 0 });
+//     }
 
-    const specificRep = inspection.inspection_rep.find(
-      (rep) => rep.inspection_rep_name === inspection_rep_name
-    );
+//     const specificRep = inspection.inspection_rep.find(
+//       (rep) => rep.inspection_rep_name === inspection_rep_name
+//     );
 
-    if (!specificRep) {
-      return res.json({ completeInspectOperators: 0 });
-    }
+//     if (!specificRep) {
+//       return res.json({ completeInspectOperators: 0 });
+//     }
 
-    const completeInspectOperators = specificRep.complete_inspect_operators || 0;
+//     const completeInspectOperators = specificRep.complete_inspect_operators || 0;
 
-    res.json({ completeInspectOperators });
-  } catch (error) {
-    console.error("Error fetching inspections completed:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+//     res.json({ completeInspectOperators });
+//   } catch (error) {
+//     console.error("Error fetching inspections completed:", error);
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// });
 
 // Roving data filter function
 app.get("/api/qc-inline-roving-reports/filtered", async (req, res) => {
@@ -6275,14 +6291,14 @@ app.post("/api/roving/upload-roving-image",rovingUpload.single("imageFile"),asyn
 );
 
 // Endpoint for get the buyer status
-app.get("/api/buyer-by-mo", (req, res) => {
-  const { moNo } = req.query;
-  if (!moNo) {
-    return res.status(400).json({ message: "MO number is required" });
-  }
-  const buyerName = determineBuyer(moNo);
-  res.json({ buyerName });
-});
+// app.get("/api/buyer-by-mo", (req, res) => {
+//   const { moNo } = req.query;
+//   if (!moNo) {
+//     return res.status(400).json({ message: "MO number is required" });
+//   }
+//   const buyerName = determineBuyer(moNo);
+//   res.json({ buyerName });
+// });
 
 /* ------------------------------
    QC1 Sunrise Dashboard ENDPOINTS
@@ -8335,506 +8351,506 @@ app.delete("/api/delete-measurement-record", async (req, res) => {
 ------------------------------ */
 
 // Multer setup for SCC image uploads
-const sccImageStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, "public/storage/scc_images");
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    // imageType should be passed in the body: 'referenceSample-HT', 'afterWash-FU', etc.
-    const { imageType, inspectionDate } = req.body;
-    const datePart = inspectionDate
-      ? inspectionDate.replace(/\//g, "-")
-      : new Date().toISOString().split("T")[0];
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    // Filename: imageType-date-uniqueSuffix.extension
-    const filename = `${
-      imageType || "sccimage"
-    }-${datePart}-${uniqueSuffix}${path.extname(file.originalname)}`;
-    cb(null, filename);
-  }
-});
+// const sccImageStorage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     const dir = path.join(__dirname, "public/storage/scc_images");
+//     if (!fs.existsSync(dir)) {
+//       fs.mkdirSync(dir, { recursive: true });
+//     }
+//     cb(null, dir);
+//   },
+//   filename: (req, file, cb) => {
+//     // imageType should be passed in the body: 'referenceSample-HT', 'afterWash-FU', etc.
+//     const { imageType, inspectionDate } = req.body;
+//     const datePart = inspectionDate
+//       ? inspectionDate.replace(/\//g, "-")
+//       : new Date().toISOString().split("T")[0];
+//     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+//     // Filename: imageType-date-uniqueSuffix.extension
+//     const filename = `${
+//       imageType || "sccimage"
+//     }-${datePart}-${uniqueSuffix}${path.extname(file.originalname)}`;
+//     cb(null, filename);
+//   }
+// });
 
-const sccUpload = multer({ storage: sccImageStorage });
+// const sccUpload = multer({ storage: sccImageStorage });
 
-app.post("/api/scc/upload-image", sccUpload.single("imageFile"), (req, res) => {
-  if (!req.file) {
-    return res
-      .status(400)
-      .json({ success: false, message: "No file uploaded." });
-  }
-  const filePath = `${API_BASE_URL}/storage/scc_images/${req.file.filename}`;
-  res.json({ success: true, filePath: filePath, filename: req.file.filename });
-});
+// app.post("/api/scc/upload-image", sccUpload.single("imageFile"), (req, res) => {
+//   if (!req.file) {
+//     return res
+//       .status(400)
+//       .json({ success: false, message: "No file uploaded." });
+//   }
+//   const filePath = `${API_BASE_URL}/storage/scc_images/${req.file.filename}`;
+//   res.json({ success: true, filePath: filePath, filename: req.file.filename });
+// });
 
 // Helper function to format date to MM/DD/YYYY
-const formatDateToMMDDYYYY = (dateInput) => {
-  if (!dateInput) return null;
-  const d = new Date(dateInput); // Handles ISO string or Date object
-  const month = d.getMonth() + 1; // No padding
-  const day = d.getDate(); // No padding
-  const year = d.getFullYear();
-  return `${month}/${day}/${year}`;
-};
+// const formatDateToMMDDYYYY = (dateInput) => {
+//   if (!dateInput) return null;
+//   const d = new Date(dateInput); // Handles ISO string or Date object
+//   const month = d.getMonth() + 1; // No padding
+//   const day = d.getDate(); // No padding
+//   const year = d.getFullYear();
+//   return `${month}/${day}/${year}`;
+// };
 
-app.post("/api/scc/ht-first-output", async (req, res) => {
-  try {
-    const { _id, ...dataToSave } = req.body;
-    dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
+// app.post("/api/scc/ht-first-output", async (req, res) => {
+//   try {
+//     const { _id, ...dataToSave } = req.body;
+//     dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
 
-    // Ensure remarks fields are "NA" if empty
-    dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
-    if (
-      dataToSave.standardSpecification &&
-      dataToSave.standardSpecification.length > 0
-    ) {
-      dataToSave.standardSpecification = dataToSave.standardSpecification.map(
-        (spec) => ({
-          ...spec,
-          remarks: spec.remarks?.trim() || "NA"
-        })
-      );
-    }
+//     // Ensure remarks fields are "NA" if empty
+//     dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
+//     if (
+//       dataToSave.standardSpecification &&
+//       dataToSave.standardSpecification.length > 0
+//     ) {
+//       dataToSave.standardSpecification = dataToSave.standardSpecification.map(
+//         (spec) => ({
+//           ...spec,
+//           remarks: spec.remarks?.trim() || "NA"
+//         })
+//       );
+//     }
 
-    let record;
-    if (_id) {
-      record = await HTFirstOutput.findByIdAndUpdate(_id, dataToSave, {
-        new: true,
-        runValidators: true,
-        upsert: false
-      }); // Make sure upsert is false for explicit update
-      if (!record)
-        return res
-          .status(404)
-          .json({ message: "Record not found for update." });
-    } else {
-      // Check for existing record by moNo, color, and inspectionDate before creating
-      const existing = await HTFirstOutput.findOne({
-        moNo: dataToSave.moNo,
-        color: dataToSave.color,
-        inspectionDate: dataToSave.inspectionDate
-      });
-      if (existing) {
-        // If it exists, update it
-        record = await HTFirstOutput.findByIdAndUpdate(
-          existing._id,
-          dataToSave,
-          { new: true, runValidators: true }
-        );
-      } else {
-        record = new HTFirstOutput(dataToSave);
-        await record.save();
-      }
-    }
-    res
-      .status(201)
-      .json({ message: "HT First Output saved successfully", data: record });
-  } catch (error) {
-    console.error("Error saving HT First Output:", error);
-    if (error.code === 11000) {
-      // Mongoose duplicate key error
-      return res.status(409).json({
-        message:
-          "Duplicate entry. A record with this MO, Color, and Date already exists.",
-        error: error.message,
-        errorCode: "DUPLICATE_KEY"
-      });
-    }
-    res.status(500).json({
-      message: "Failed to save HT First Output",
-      error: error.message,
-      details: error
-    });
-  }
-});
+//     let record;
+//     if (_id) {
+//       record = await HTFirstOutput.findByIdAndUpdate(_id, dataToSave, {
+//         new: true,
+//         runValidators: true,
+//         upsert: false
+//       }); // Make sure upsert is false for explicit update
+//       if (!record)
+//         return res
+//           .status(404)
+//           .json({ message: "Record not found for update." });
+//     } else {
+//       // Check for existing record by moNo, color, and inspectionDate before creating
+//       const existing = await HTFirstOutput.findOne({
+//         moNo: dataToSave.moNo,
+//         color: dataToSave.color,
+//         inspectionDate: dataToSave.inspectionDate
+//       });
+//       if (existing) {
+//         // If it exists, update it
+//         record = await HTFirstOutput.findByIdAndUpdate(
+//           existing._id,
+//           dataToSave,
+//           { new: true, runValidators: true }
+//         );
+//       } else {
+//         record = new HTFirstOutput(dataToSave);
+//         await record.save();
+//       }
+//     }
+//     res
+//       .status(201)
+//       .json({ message: "HT First Output saved successfully", data: record });
+//   } catch (error) {
+//     console.error("Error saving HT First Output:", error);
+//     if (error.code === 11000) {
+//       // Mongoose duplicate key error
+//       return res.status(409).json({
+//         message:
+//           "Duplicate entry. A record with this MO, Color, and Date already exists.",
+//         error: error.message,
+//         errorCode: "DUPLICATE_KEY"
+//       });
+//     }
+//     res.status(500).json({
+//       message: "Failed to save HT First Output",
+//       error: error.message,
+//       details: error
+//     });
+//   }
+// });
 
-app.get("/api/scc/ht-first-output", async (req, res) => {
-  try {
-    const { moNo, color, inspectionDate } = req.query;
-    if (!moNo || !color || !inspectionDate) {
-      return res
-        .status(400)
-        .json({ message: "MO No, Color, and Inspection Date are required." });
-    }
-    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
-    const record = await HTFirstOutput.findOne({
-      moNo,
-      color,
-      inspectionDate: formattedDate
-    });
-    if (!record) {
-      // Return 200 with a specific message for "not found" so frontend can handle it as new record
-      return res
-        .status(200)
-        .json({ message: "HT_RECORD_NOT_FOUND", data: null });
-    }
-    res.json(record); // Existing record data will be in record directly, not record.data
-  } catch (error) {
-    console.error("Error fetching HT First Output:", error);
-    res.status(500).json({
-      message: "Failed to fetch HT First Output",
-      error: error.message
-    });
-  }
-});
+// app.get("/api/scc/ht-first-output", async (req, res) => {
+//   try {
+//     const { moNo, color, inspectionDate } = req.query;
+//     if (!moNo || !color || !inspectionDate) {
+//       return res
+//         .status(400)
+//         .json({ message: "MO No, Color, and Inspection Date are required." });
+//     }
+//     const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+//     const record = await HTFirstOutput.findOne({
+//       moNo,
+//       color,
+//       inspectionDate: formattedDate
+//     });
+//     if (!record) {
+//       // Return 200 with a specific message for "not found" so frontend can handle it as new record
+//       return res
+//         .status(200)
+//         .json({ message: "HT_RECORD_NOT_FOUND", data: null });
+//     }
+//     res.json(record); // Existing record data will be in record directly, not record.data
+//   } catch (error) {
+//     console.error("Error fetching HT First Output:", error);
+//     res.status(500).json({
+//       message: "Failed to fetch HT First Output",
+//       error: error.message
+//     });
+//   }
+// });
 
 // REVISED Endpoints for FUFirstOutput (similar changes as HT)
-app.post("/api/scc/fu-first-output", async (req, res) => {
-  try {
-    const { _id, ...dataToSave } = req.body;
-    dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
+// app.post("/api/scc/fu-first-output", async (req, res) => {
+//   try {
+//     const { _id, ...dataToSave } = req.body;
+//     dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
 
-    dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
-    if (
-      dataToSave.standardSpecification &&
-      dataToSave.standardSpecification.length > 0
-    ) {
-      dataToSave.standardSpecification = dataToSave.standardSpecification.map(
-        (spec) => ({
-          ...spec,
-          remarks: spec.remarks?.trim() || "NA"
-        })
-      );
-    }
+//     dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
+//     if (
+//       dataToSave.standardSpecification &&
+//       dataToSave.standardSpecification.length > 0
+//     ) {
+//       dataToSave.standardSpecification = dataToSave.standardSpecification.map(
+//         (spec) => ({
+//           ...spec,
+//           remarks: spec.remarks?.trim() || "NA"
+//         })
+//       );
+//     }
 
-    let record;
-    if (_id) {
-      record = await FUFirstOutput.findByIdAndUpdate(_id, dataToSave, {
-        new: true,
-        runValidators: true,
-        upsert: false
-      });
-      if (!record)
-        return res
-          .status(404)
-          .json({ message: "Record not found for update." });
-    } else {
-      const existing = await FUFirstOutput.findOne({
-        moNo: dataToSave.moNo,
-        color: dataToSave.color,
-        inspectionDate: dataToSave.inspectionDate
-      });
-      if (existing) {
-        record = await FUFirstOutput.findByIdAndUpdate(
-          existing._id,
-          dataToSave,
-          { new: true, runValidators: true }
-        );
-      } else {
-        record = new FUFirstOutput(dataToSave);
-        await record.save();
-      }
-    }
-    res
-      .status(201)
-      .json({ message: "FU First Output saved successfully", data: record });
-  } catch (error) {
-    console.error("Error saving FU First Output:", error);
-    if (error.code === 11000) {
-      return res.status(409).json({
-        message:
-          "Duplicate entry. A record with this MO, Color, and Date already exists.",
-        error: error.message,
-        errorCode: "DUPLICATE_KEY"
-      });
-    }
-    res.status(500).json({
-      message: "Failed to save FU First Output",
-      error: error.message,
-      details: error
-    });
-  }
-});
+//     let record;
+//     if (_id) {
+//       record = await FUFirstOutput.findByIdAndUpdate(_id, dataToSave, {
+//         new: true,
+//         runValidators: true,
+//         upsert: false
+//       });
+//       if (!record)
+//         return res
+//           .status(404)
+//           .json({ message: "Record not found for update." });
+//     } else {
+//       const existing = await FUFirstOutput.findOne({
+//         moNo: dataToSave.moNo,
+//         color: dataToSave.color,
+//         inspectionDate: dataToSave.inspectionDate
+//       });
+//       if (existing) {
+//         record = await FUFirstOutput.findByIdAndUpdate(
+//           existing._id,
+//           dataToSave,
+//           { new: true, runValidators: true }
+//         );
+//       } else {
+//         record = new FUFirstOutput(dataToSave);
+//         await record.save();
+//       }
+//     }
+//     res
+//       .status(201)
+//       .json({ message: "FU First Output saved successfully", data: record });
+//   } catch (error) {
+//     console.error("Error saving FU First Output:", error);
+//     if (error.code === 11000) {
+//       return res.status(409).json({
+//         message:
+//           "Duplicate entry. A record with this MO, Color, and Date already exists.",
+//         error: error.message,
+//         errorCode: "DUPLICATE_KEY"
+//       });
+//     }
+//     res.status(500).json({
+//       message: "Failed to save FU First Output",
+//       error: error.message,
+//       details: error
+//     });
+//   }
+// });
 
-app.get("/api/scc/fu-first-output", async (req, res) => {
-  try {
-    const { moNo, color, inspectionDate } = req.query;
-    if (!moNo || !color || !inspectionDate) {
-      return res
-        .status(400)
-        .json({ message: "MO No, Color, and Inspection Date are required." });
-    }
-    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
-    const record = await FUFirstOutput.findOne({
-      moNo,
-      color,
-      inspectionDate: formattedDate
-    });
-    if (!record) {
-      return res
-        .status(200)
-        .json({ message: "FU_RECORD_NOT_FOUND", data: null });
-    }
-    res.json(record);
-  } catch (error) {
-    console.error("Error fetching FU First Output:", error);
-    res.status(500).json({
-      message: "Failed to fetch FU First Output",
-      error: error.message
-    });
-  }
-});
+// app.get("/api/scc/fu-first-output", async (req, res) => {
+//   try {
+//     const { moNo, color, inspectionDate } = req.query;
+//     if (!moNo || !color || !inspectionDate) {
+//       return res
+//         .status(400)
+//         .json({ message: "MO No, Color, and Inspection Date are required." });
+//     }
+//     const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+//     const record = await FUFirstOutput.findOne({
+//       moNo,
+//       color,
+//       inspectionDate: formattedDate
+//     });
+//     if (!record) {
+//       return res
+//         .status(200)
+//         .json({ message: "FU_RECORD_NOT_FOUND", data: null });
+//     }
+//     res.json(record);
+//   } catch (error) {
+//     console.error("Error fetching FU First Output:", error);
+//     res.status(500).json({
+//       message: "Failed to fetch FU First Output",
+//       error: error.message
+//     });
+//   }
+// });
 
 /* ------------------------------
    End Points - SCC HT/FU - Daily Testing
 ------------------------------ */
 
-app.get("/api/scc/get-first-output-specs", async (req, res) => {
-  try {
-    const { moNo, color, inspectionDate } = req.query;
-    if (!moNo || !color || !inspectionDate) {
-      return res
-        .status(400)
-        .json({ message: "MO No, Color, and Inspection Date are required." });
-    }
-    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+// app.get("/api/scc/get-first-output-specs", async (req, res) => {
+//   try {
+//     const { moNo, color, inspectionDate } = req.query;
+//     if (!moNo || !color || !inspectionDate) {
+//       return res
+//         .status(400)
+//         .json({ message: "MO No, Color, and Inspection Date are required." });
+//     }
+//     const formattedDate = formatDateToMMDDYYYY(inspectionDate);
 
-    let specs = null;
-    // Try HT First Output
-    const htRecord = await HTFirstOutput.findOne({
-      moNo,
-      color,
-      inspectionDate: formattedDate
-    }).lean();
-    if (htRecord && htRecord.standardSpecification) {
-      const afterHatSpec = htRecord.standardSpecification.find(
-        (s) => s.type === "afterHat" && s.timeSec && s.tempC && s.pressure
-      );
-      const firstSpec = htRecord.standardSpecification.find(
-        (s) => s.type === "first"
-      );
-      if (afterHatSpec) {
-        specs = {
-          tempC: afterHatSpec.tempC,
-          timeSec: afterHatSpec.timeSec,
-          pressure: afterHatSpec.pressure
-        };
-      } else if (firstSpec) {
-        specs = {
-          tempC: firstSpec.tempC,
-          timeSec: firstSpec.timeSec,
-          pressure: firstSpec.pressure
-        };
-      }
-    }
+//     let specs = null;
+//     // Try HT First Output
+//     const htRecord = await HTFirstOutput.findOne({
+//       moNo,
+//       color,
+//       inspectionDate: formattedDate
+//     }).lean();
+//     if (htRecord && htRecord.standardSpecification) {
+//       const afterHatSpec = htRecord.standardSpecification.find(
+//         (s) => s.type === "afterHat" && s.timeSec && s.tempC && s.pressure
+//       );
+//       const firstSpec = htRecord.standardSpecification.find(
+//         (s) => s.type === "first"
+//       );
+//       if (afterHatSpec) {
+//         specs = {
+//           tempC: afterHatSpec.tempC,
+//           timeSec: afterHatSpec.timeSec,
+//           pressure: afterHatSpec.pressure
+//         };
+//       } else if (firstSpec) {
+//         specs = {
+//           tempC: firstSpec.tempC,
+//           timeSec: firstSpec.timeSec,
+//           pressure: firstSpec.pressure
+//         };
+//       }
+//     }
 
-    // If not found in HT, try FU First Output (assuming similar logic might apply or distinct records)
-    if (!specs) {
-      const fuRecord = await FUFirstOutput.findOne({
-        moNo,
-        color,
-        inspectionDate: formattedDate
-      }).lean();
-      if (fuRecord && fuRecord.standardSpecification) {
-        const afterHatSpec = fuRecord.standardSpecification.find(
-          (s) => s.type === "afterHat" && s.timeSec && s.tempC && s.pressure
-        );
-        const firstSpec = fuRecord.standardSpecification.find(
-          (s) => s.type === "first"
-        );
-        if (afterHatSpec) {
-          specs = {
-            tempC: afterHatSpec.tempC,
-            timeSec: afterHatSpec.timeSec,
-            pressure: afterHatSpec.pressure
-          };
-        } else if (firstSpec) {
-          specs = {
-            tempC: firstSpec.tempC,
-            timeSec: firstSpec.timeSec,
-            pressure: firstSpec.pressure
-          };
-        }
-      }
-    }
+//     // If not found in HT, try FU First Output (assuming similar logic might apply or distinct records)
+//     if (!specs) {
+//       const fuRecord = await FUFirstOutput.findOne({
+//         moNo,
+//         color,
+//         inspectionDate: formattedDate
+//       }).lean();
+//       if (fuRecord && fuRecord.standardSpecification) {
+//         const afterHatSpec = fuRecord.standardSpecification.find(
+//           (s) => s.type === "afterHat" && s.timeSec && s.tempC && s.pressure
+//         );
+//         const firstSpec = fuRecord.standardSpecification.find(
+//           (s) => s.type === "first"
+//         );
+//         if (afterHatSpec) {
+//           specs = {
+//             tempC: afterHatSpec.tempC,
+//             timeSec: afterHatSpec.timeSec,
+//             pressure: afterHatSpec.pressure
+//           };
+//         } else if (firstSpec) {
+//           specs = {
+//             tempC: firstSpec.tempC,
+//             timeSec: firstSpec.timeSec,
+//             pressure: firstSpec.pressure
+//           };
+//         }
+//       }
+//     }
 
-    if (!specs) {
-      return res.status(200).json({ message: "SPECS_NOT_FOUND", data: null });
-    }
-    res.json({ data: specs });
-  } catch (error) {
-    console.error("Error fetching first output specs:", error);
-    res.status(500).json({
-      message: "Failed to fetch first output specifications",
-      error: error.message
-    });
-  }
-});
+//     if (!specs) {
+//       return res.status(200).json({ message: "SPECS_NOT_FOUND", data: null });
+//     }
+//     res.json({ data: specs });
+//   } catch (error) {
+//     console.error("Error fetching first output specs:", error);
+//     res.status(500).json({
+//       message: "Failed to fetch first output specifications",
+//       error: error.message
+//     });
+//   }
+// });
 
 // Endpoints for SCCDailyTesting
-app.post("/api/scc/daily-testing", async (req, res) => {
-  try {
-    const { _id, ...dataToSave } = req.body;
-    dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
-    dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
+// app.post("/api/scc/daily-testing", async (req, res) => {
+//   try {
+//     const { _id, ...dataToSave } = req.body;
+//     dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
+//     dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
 
-    let record;
-    if (_id) {
-      record = await SCCDailyTesting.findByIdAndUpdate(_id, dataToSave, {
-        new: true,
-        runValidators: true
-      });
-      if (!record)
-        return res
-          .status(404)
-          .json({ message: "Daily Testing record not found for update." });
-    } else {
-      const existing = await SCCDailyTesting.findOne({
-        moNo: dataToSave.moNo,
-        color: dataToSave.color,
-        machineNo: dataToSave.machineNo,
-        inspectionDate: dataToSave.inspectionDate
-      });
-      if (existing) {
-        record = await SCCDailyTesting.findByIdAndUpdate(
-          existing._id,
-          dataToSave,
-          { new: true, runValidators: true }
-        );
-      } else {
-        record = new SCCDailyTesting(dataToSave);
-        await record.save();
-      }
-    }
-    res.status(201).json({
-      message: "Daily Testing report saved successfully",
-      data: record
-    });
-  } catch (error) {
-    console.error("Error saving Daily Testing report:", error);
-    if (error.code === 11000) {
-      return res.status(409).json({
-        message:
-          "Duplicate entry. A record with this MO, Color, Machine No, and Date already exists.",
-        error: error.message,
-        errorCode: "DUPLICATE_KEY"
-      });
-    }
-    res.status(500).json({
-      message: "Failed to save Daily Testing report",
-      error: error.message,
-      details: error
-    });
-  }
-});
+//     let record;
+//     if (_id) {
+//       record = await SCCDailyTesting.findByIdAndUpdate(_id, dataToSave, {
+//         new: true,
+//         runValidators: true
+//       });
+//       if (!record)
+//         return res
+//           .status(404)
+//           .json({ message: "Daily Testing record not found for update." });
+//     } else {
+//       const existing = await SCCDailyTesting.findOne({
+//         moNo: dataToSave.moNo,
+//         color: dataToSave.color,
+//         machineNo: dataToSave.machineNo,
+//         inspectionDate: dataToSave.inspectionDate
+//       });
+//       if (existing) {
+//         record = await SCCDailyTesting.findByIdAndUpdate(
+//           existing._id,
+//           dataToSave,
+//           { new: true, runValidators: true }
+//         );
+//       } else {
+//         record = new SCCDailyTesting(dataToSave);
+//         await record.save();
+//       }
+//     }
+//     res.status(201).json({
+//       message: "Daily Testing report saved successfully",
+//       data: record
+//     });
+//   } catch (error) {
+//     console.error("Error saving Daily Testing report:", error);
+//     if (error.code === 11000) {
+//       return res.status(409).json({
+//         message:
+//           "Duplicate entry. A record with this MO, Color, Machine No, and Date already exists.",
+//         error: error.message,
+//         errorCode: "DUPLICATE_KEY"
+//       });
+//     }
+//     res.status(500).json({
+//       message: "Failed to save Daily Testing report",
+//       error: error.message,
+//       details: error
+//     });
+//   }
+// });
 
-app.get("/api/scc/daily-testing", async (req, res) => {
-  try {
-    const { moNo, color, machineNo, inspectionDate } = req.query;
-    if (!moNo || !color || !machineNo || !inspectionDate) {
-      return res.status(400).json({
-        message: "MO No, Color, Machine No, and Inspection Date are required."
-      });
-    }
-    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
-    const record = await SCCDailyTesting.findOne({
-      moNo,
-      color,
-      machineNo,
-      inspectionDate: formattedDate
-    });
-    if (!record) {
-      return res
-        .status(200)
-        .json({ message: "DAILY_TESTING_RECORD_NOT_FOUND", data: null });
-    }
-    res.json(record); // Returns the existing record
-  } catch (error) {
-    console.error("Error fetching Daily Testing report:", error);
-    res.status(500).json({
-      message: "Failed to fetch Daily Testing report",
-      error: error.message
-    });
-  }
-});
+// app.get("/api/scc/daily-testing", async (req, res) => {
+//   try {
+//     const { moNo, color, machineNo, inspectionDate } = req.query;
+//     if (!moNo || !color || !machineNo || !inspectionDate) {
+//       return res.status(400).json({
+//         message: "MO No, Color, Machine No, and Inspection Date are required."
+//       });
+//     }
+//     const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+//     const record = await SCCDailyTesting.findOne({
+//       moNo,
+//       color,
+//       machineNo,
+//       inspectionDate: formattedDate
+//     });
+//     if (!record) {
+//       return res
+//         .status(200)
+//         .json({ message: "DAILY_TESTING_RECORD_NOT_FOUND", data: null });
+//     }
+//     res.json(record); // Returns the existing record
+//   } catch (error) {
+//     console.error("Error fetching Daily Testing report:", error);
+//     res.status(500).json({
+//       message: "Failed to fetch Daily Testing report",
+//       error: error.message
+//     });
+//   }
+// });
 
 /* ------------------------------
    End Points - SCC Daily HT/FU QC Test
 ------------------------------ */
 
 // GET Endpoint to fetch existing Daily HT/FU Test data or MO list
-app.get("/api/scc/daily-htfu-test", async (req, res) => {
-  try {
-    const { inspectionDate, machineNo, moNo, color } = req.query;
-    const formattedDate = inspectionDate
-      ? formatDateToMMDDYYYY(inspectionDate)
-      : null;
+// app.get("/api/scc/daily-htfu-test", async (req, res) => {
+//   try {
+//     const { inspectionDate, machineNo, moNo, color } = req.query;
+//     const formattedDate = inspectionDate
+//       ? formatDateToMMDDYYYY(inspectionDate)
+//       : null;
 
-    if (!formattedDate || !machineNo) {
-      return res
-        .status(400)
-        .json({ message: "Inspection Date and Machine No are required." });
-    }
+//     if (!formattedDate || !machineNo) {
+//       return res
+//         .status(400)
+//         .json({ message: "Inspection Date and Machine No are required." });
+//     }
 
-    // Scenario 1: Fetch specific record if moNo and color are provided
-    if (moNo && color) {
-      const record = await DailyTestingHTFU.findOne({
-        inspectionDate: formattedDate,
-        machineNo,
-        moNo,
-        color
-      });
-      if (!record) {
-        return res
-          .status(200)
-          .json({ message: "DAILY_HTFU_RECORD_NOT_FOUND", data: null });
-      }
-      return res.json({ message: "RECORD_FOUND", data: record });
-    } else {
-      // Scenario 2: Fetch distinct MO/Color combinations for a given Date/MachineNo
-      const records = await DailyTestingHTFU.find(
-        { inspectionDate: formattedDate, machineNo },
-        "moNo color buyer buyerStyle" // Select only necessary fields
-      ).distinct("moNo"); // Or more complex aggregation if needed to pair MO with Color
+//     // Scenario 1: Fetch specific record if moNo and color are provided
+//     if (moNo && color) {
+//       const record = await DailyTestingHTFU.findOne({
+//         inspectionDate: formattedDate,
+//         machineNo,
+//         moNo,
+//         color
+//       });
+//       if (!record) {
+//         return res
+//           .status(200)
+//           .json({ message: "DAILY_HTFU_RECORD_NOT_FOUND", data: null });
+//       }
+//       return res.json({ message: "RECORD_FOUND", data: record });
+//     } else {
+//       // Scenario 2: Fetch distinct MO/Color combinations for a given Date/MachineNo
+//       const records = await DailyTestingHTFU.find(
+//         { inspectionDate: formattedDate, machineNo },
+//         "moNo color buyer buyerStyle" // Select only necessary fields
+//       ).distinct("moNo"); // Or more complex aggregation if needed to pair MO with Color
 
-      // For simplicity, let's return distinct MOs, client can then pick color
-      // A better approach might be to return {moNo, color, buyer, buyerStyle} tuples
-      const distinctEntries = await DailyTestingHTFU.aggregate([
-        { $match: { inspectionDate: formattedDate, machineNo } },
-        {
-          $group: {
-            _id: { moNo: "$moNo", color: "$color" },
-            buyer: { $first: "$buyer" },
-            buyerStyle: { $first: "$buyerStyle" },
-            // If you need to know if a full record exists to load it directly
-            docId: { $first: "$_id" }
-          }
-        },
-        {
-          $project: {
-            _id: 0,
-            moNo: "$_id.moNo",
-            color: "$_id.color",
-            buyer: "$buyer",
-            buyerStyle: "$buyerStyle",
-            docId: "$docId"
-          }
-        }
-      ]);
+//       // For simplicity, let's return distinct MOs, client can then pick color
+//       // A better approach might be to return {moNo, color, buyer, buyerStyle} tuples
+//       const distinctEntries = await DailyTestingHTFU.aggregate([
+//         { $match: { inspectionDate: formattedDate, machineNo } },
+//         {
+//           $group: {
+//             _id: { moNo: "$moNo", color: "$color" },
+//             buyer: { $first: "$buyer" },
+//             buyerStyle: { $first: "$buyerStyle" },
+//             // If you need to know if a full record exists to load it directly
+//             docId: { $first: "$_id" }
+//           }
+//         },
+//         {
+//           $project: {
+//             _id: 0,
+//             moNo: "$_id.moNo",
+//             color: "$_id.color",
+//             buyer: "$buyer",
+//             buyerStyle: "$buyerStyle",
+//             docId: "$docId"
+//           }
+//         }
+//       ]);
 
-      if (distinctEntries.length === 0) {
-        return res.status(200).json({
-          message: "NO_RECORDS_FOR_DATE_MACHINE",
-          data: []
-        });
-      }
-      // If only one unique MO/Color combo, frontend might auto-load it fully later
-      return res.json({
-        message: "MULTIPLE_MO_COLOR_FOUND",
-        data: distinctEntries // Array of {moNo, color, buyer, buyerStyle, docId}
-      });
-    }
-  } catch (error) {
-    console.error("Error fetching Daily HT/FU Test data:", error);
-    res.status(500).json({
-      message: "Failed to fetch Daily HT/FU Test data",
-      error: error.message
-    });
-  }
-});
+//       if (distinctEntries.length === 0) {
+//         return res.status(200).json({
+//           message: "NO_RECORDS_FOR_DATE_MACHINE",
+//           data: []
+//         });
+//       }
+//       // If only one unique MO/Color combo, frontend might auto-load it fully later
+//       return res.json({
+//         message: "MULTIPLE_MO_COLOR_FOUND",
+//         data: distinctEntries // Array of {moNo, color, buyer, buyerStyle, docId}
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Error fetching Daily HT/FU Test data:", error);
+//     res.status(500).json({
+//       message: "Failed to fetch Daily HT/FU Test data",
+//       error: error.message
+//     });
+//   }
+// });
 
 // POST Endpoint to save/update Daily HT/FU Test data
 app.post("/api/scc/daily-htfu-test", async (req, res) => {

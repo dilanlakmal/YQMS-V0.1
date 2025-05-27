@@ -537,15 +537,15 @@ const RovingPage = () => {
         overallOperatorStatusKey = 'Reject-Major-M';
     } else if (totalMinorDefectsInUpdatedGarments >= 2) {
         overallOperatorStatusKey = 'Reject-Minor-M';
-    } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
-        // This condition is met if not critical, <2 Major, <2 Minor, but SPI/Meas is Reject
-        overallOperatorStatusKey = 'Reject';
     } else if (totalMajorDefectsInUpdatedGarments === 1) {
         // This condition is met if SPI/Meas Pass, not critical, <2 Minor, 1 Major
         overallOperatorStatusKey = 'Reject-Major-S';
     } else if (totalMinorDefectsInUpdatedGarments === 1) {
         // This condition is met if SPI/Meas Pass, not critical, no Major, 1 Minor
         overallOperatorStatusKey = 'Reject-Minor-S';
+    } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
+        // This condition is met if not critical, <2 Major, <2 Minor, but SPI/Meas is Reject
+        overallOperatorStatusKey = 'Reject';
     } else if (spiStatus === 'Pass' && measurementStatus === 'Pass' && totalMajorDefectsInUpdatedGarments === 0 && totalMinorDefectsInUpdatedGarments === 0) {
         overallOperatorStatusKey = 'Pass';
     } else {
@@ -712,14 +712,14 @@ const RovingPage = () => {
   } else if (totalMinorDefectsInOverallGarments >= 2) {
     overallStatusText = t('qcRoving.rejectMinorMultiple', 'Reject-Minor-M');
     overallStatusColor = 'bg-red-100 text-red-800';
-  } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
-    overallStatusText = t('qcRoving.rejectSpiMeas', 'Reject');
-    overallStatusColor = 'bg-yellow-100 text-yellow-800';
   } else if (totalMajorDefectsInOverallGarments === 1) {
     overallStatusText = t('qcRoving.rejectMajorSingle', 'Reject-Major-S');
     overallStatusColor = 'bg-yellow-100 text-yellow-800';
   } else if (totalMinorDefectsInOverallGarments === 1) {
     overallStatusText = t('qcRoving.rejectMinorSingle', 'Reject-Minor-S');
+    overallStatusColor = 'bg-yellow-100 text-yellow-800';
+  } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
+    overallStatusText = t('qcRoving.rejectSpiMeas', 'Reject');
     overallStatusColor = 'bg-yellow-100 text-yellow-800';
   } else if (spiStatus === 'Pass' && measurementStatus === 'Pass' && totalMajorDefectsInOverallGarments === 0 && totalMinorDefectsInOverallGarments === 0) {
     overallStatusText = t('qcRoving.pass', 'Pass');
