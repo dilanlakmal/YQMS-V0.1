@@ -15,7 +15,7 @@ import {
 
 const router = express.Router();
 
-router.get('/api/search-user', searchUser);
+router.get('/api/search-users', searchUser);
 router.get('/api/user-details', getUserDetails);
 router.get('/api/job-titles', getJobTitles);
 router.get('/api/users-by-job-title', getUsersByJobTitle);
