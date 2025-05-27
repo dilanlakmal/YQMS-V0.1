@@ -34,6 +34,23 @@ export const normalizeDateString = (dateStr) => {
   }
 };
 
+// const normalizeDateString = (dateStr) => {
+//   if (!dateStr) return null;
+//   try {
+//     const [month, day, year] = dateStr.split("/").map((part) => part.trim());
+//     if (!month || !day || !year || isNaN(month) || isNaN(day) || isNaN(year)) {
+//       throw new Error("Invalid date format");
+//     }
+//     // Add leading zeros to month and day
+//     const normalizedMonth = ("0" + parseInt(month, 10)).slice(-2);
+//     const normalizedDay = ("0" + parseInt(day, 10)).slice(-2);
+//     return `${normalizedMonth}/${normalizedDay}/${year}`;
+//   } catch (error) {
+//     console.error(`Invalid date string: ${dateStr}`, error);
+//     return null;
+//   }
+// };
+
 
 export const getResult = (bundleQtyCheck, totalReject) => {
   if (bundleQtyCheck === 5) return totalReject > 1 ? "Fail" : "Pass";
@@ -79,3 +96,15 @@ export const getOrdinal = (n) => {
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0] || "th");
 }
+
+export const formatDate = (date) => {
+  const d = new Date(date);
+  return `${(d.getMonth() + 1).toString().padStart(2, "0")}/${d
+    .getDate()
+    .toString()
+    .padStart(2, "0")}/${d.getFullYear()}`;
+};
+
+export const escapeRegExp = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // Escapes . * + ? ^ $ { } ( ) | [ ] \
+};
