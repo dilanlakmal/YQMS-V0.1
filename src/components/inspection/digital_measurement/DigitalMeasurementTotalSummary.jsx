@@ -1,395 +1,3 @@
-// Old code without Statistical Summary
-
-// import React, { useState, useEffect, useRef } from "react";
-// import {
-//   FaCalculator,
-//   FaCheckCircle,
-//   FaTimesCircle,
-//   FaPercentage,
-//   FaFlag
-// } from "react-icons/fa";
-
-// const DigitalMeasurementTotalSummary = ({
-//   summaryData,
-//   records,
-//   sizeSpec,
-//   decimalToFraction
-// }) => {
-//   // State for maximum title height
-//   const [maxTitleHeight, setMaxTitleHeight] = useState(0);
-//   // Refs to store title divs
-//   const titleRefs = useRef([]);
-
-//   // Compute summary by measurement point (ignoring size)
-//   const computeMeasurementPointSummary = () => {
-//     const summary = [];
-
-//     sizeSpec.forEach((spec, index) => {
-//       const measurementPoint = spec.EnglishRemark;
-//       let totalCount = 0;
-//       let totalPass = 0;
-
-//       // Process all records for this measurement point
-//       records.forEach((record) => {
-//         const size = record.size || "N/A";
-//         const actualValue = record.actual[index]?.value || 0;
-//         if (actualValue === 0) return; // Skip zero values
-
-//         // Get buyer spec and tolerances for this size
-//         const buyerSpec =
-//           spec.Specs.find((s) => Object.keys(s)[0] === size)?.[size]?.decimal ||
-//           0;
-//         const tolMinus = spec.ToleranceMinus?.decimal ?? 0;
-//         const tolPlus = spec.TolerancePlus?.decimal ?? 0;
-
-//         totalCount++;
-
-//         const lower = buyerSpec + tolMinus;
-//         const upper = buyerSpec + tolPlus;
-//         if (actualValue >= lower && actualValue <= upper) {
-//           totalPass++;
-//         }
-//       });
-
-//       if (totalCount === 0) return; // Skip if no measurements
-
-//       const totalFail = totalCount - totalPass;
-//       const passRate =
-//         totalCount > 0 ? ((totalPass / totalCount) * 100).toFixed(2) : "0.00";
-//       const status = parseFloat(passRate) > 98 ? "Pass" : "Fail";
-
-//       summary.push({
-//         measurementPoint,
-//         totalCount,
-//         totalPass,
-//         totalFail,
-//         passRate,
-//         status
-//       });
-//     });
-
-//     // Sort by status: Fail first, then Pass
-//     return summary.sort((a, b) => {
-//       if (a.status === "Fail" && b.status === "Pass") return -1;
-//       if (a.status === "Pass" && b.status === "Fail") return 1;
-//       return a.measurementPoint.localeCompare(b.measurementPoint);
-//     });
-//   };
-
-//   // Compute summary by size and measurement point
-//   const computeSummaryBySize = () => {
-//     const summary = [];
-//     const sizePointCounts = {};
-
-//     // Group records by size
-//     const recordsBySize = {};
-//     records.forEach((record) => {
-//       const size = record.size || "N/A";
-//       if (!recordsBySize[size]) {
-//         recordsBySize[size] = [];
-//       }
-//       recordsBySize[size].push(record);
-//       sizePointCounts[size] = 0;
-//     });
-
-//     // For each size and measurement point, compute aggregates
-//     Object.keys(recordsBySize).forEach((size) => {
-//       sizeSpec.forEach((spec, index) => {
-//         const measurementPoint = spec.EnglishRemark;
-//         const tolMinus = spec.ToleranceMinus?.decimal ?? 0;
-//         const tolPlus = spec.TolerancePlus?.decimal ?? 0;
-//         const buyerSpec =
-//           spec.Specs.find((s) => Object.keys(s)[0] === size)?.[size]?.decimal ||
-//           0;
-
-//         let totalCount = 0;
-//         let totalPass = 0;
-//         const actualValues = [];
-
-//         // Process records for this size
-//         recordsBySize[size].forEach((record) => {
-//           const actualValue = record.actual[index]?.value || 0;
-//           if (actualValue === 0) return;
-
-//           totalCount++;
-//           actualValues.push(actualValue);
-
-//           const lower = buyerSpec + tolMinus;
-//           const upper = buyerSpec + tolPlus;
-//           if (actualValue >= lower && actualValue <= upper) {
-//             totalPass++;
-//           }
-//         });
-
-//         if (totalCount === 0) return;
-
-//         sizePointCounts[size] += 1;
-
-//         const totalFail = totalCount - totalPass;
-//         const passRate =
-//           totalCount > 0 ? ((totalPass / totalCount) * 100).toFixed(2) : "0.00";
-
-//         // Compute Mean
-//         const mean =
-//           actualValues.length > 0
-//             ? actualValues.reduce((sum, val) => sum + val, 0) /
-//               actualValues.length
-//             : 0;
-
-//         // Compute Standard Deviation
-//         const variance =
-//           actualValues.length > 0
-//             ? actualValues.reduce(
-//                 (sum, val) => sum + Math.pow(val - mean, 2),
-//                 0
-//               ) / actualValues.length
-//             : 0;
-//         const stdDev = Math.sqrt(variance);
-
-//         // Compute Diff (buyerSpec - mean)
-//         const diff = buyerSpec - mean;
-
-//         // Compute Diff % ((buyerSpec - mean) / buyerSpec * 100)
-//         const diffPercent =
-//           buyerSpec !== 0 ? ((buyerSpec - mean) / buyerSpec) * 100 : 0;
-
-//         summary.push({
-//           size,
-//           measurementPoint,
-//           buyerSpec,
-//           tolMinus,
-//           tolPlus,
-//           totalCount,
-//           totalPass,
-//           totalFail,
-//           mean,
-//           stdDev,
-//           diff,
-//           diffPercent,
-//           passRate
-//         });
-//       });
-//     });
-
-//     // Sort by size, then measurementPoint
-//     return {
-//       summary: summary.sort((a, b) => {
-//         if (a.size === b.size) {
-//           return a.measurementPoint.localeCompare(b.measurementPoint);
-//         }
-//         return a.size.localeCompare(b.size);
-//       }),
-//       sizePointCounts
-//     };
-//   };
-
-//   const { summary: sizeBasedSummary, sizePointCounts } = computeSummaryBySize();
-//   const measurementPointSummary = computeMeasurementPointSummary();
-
-//   // Calculate maximum title height
-//   useEffect(() => {
-//     const heights = titleRefs.current.map((ref) =>
-//       ref ? ref.getBoundingClientRect().height : 0
-//     );
-//     const maxHeight = Math.max(...heights);
-//     setMaxTitleHeight(maxHeight);
-//   }, [measurementPointSummary]);
-
-//   return (
-//     <div className="mb-6">
-//       <h2 className="text-lg font-semibold mb-4">
-//         Overall Measurement Point Summary
-//       </h2>
-//       {/* Card Visuals */}
-//       {measurementPointSummary.length > 0 ? (
-//         <div className="grid grid-cols-3 lg:grid-cols-7 gap-4 mb-6">
-//           {measurementPointSummary.map((point, index) => {
-//             const isPass = parseFloat(point.passRate) > 98;
-//             return (
-//               <div
-//                 key={index}
-//                 className="bg-white rounded-lg shadow-md flex flex-col h-full text-center"
-//               >
-//                 {/* Measurement Point Title */}
-//                 <div
-//                   ref={(el) => (titleRefs.current[index] = el)}
-//                   className="bg-gray-100 p-2 rounded-t-lg"
-//                   style={{
-//                     minHeight: maxTitleHeight ? `${maxTitleHeight}px` : "auto"
-//                   }}
-//                 >
-//                   <h3 className="text-sm font-semibold">
-//                     {point.measurementPoint}
-//                   </h3>
-//                 </div>
-//                 {/* Total Count, Total Pass, Total Fail */}
-//                 <div className="p-2 text-sm flex-1">
-//                   <div className="flex items-center justify-center mb-1">
-//                     <FaCalculator className="mr-2 text-gray-600" />
-//                     <span>Total Count: {point.totalCount}</span>
-//                   </div>
-//                   <div className="flex items-center justify-center mb-1">
-//                     <FaCheckCircle className="mr-2 text-green-600" />
-//                     <span>Total Pass: {point.totalPass}</span>
-//                   </div>
-//                   <div className="flex items-center justify-center">
-//                     <FaTimesCircle className="mr-2 text-red-600" />
-//                     <span>Total Fail: {point.totalFail}</span>
-//                   </div>
-//                 </div>
-//                 {/* Pass Rate */}
-//                 <div
-//                   className={`p-2 text-md ${
-//                     isPass ? "bg-green-100" : "bg-red-100"
-//                   }`}
-//                 >
-//                   <div className="flex items-center justify-center">
-//                     <FaPercentage className="mr-2 text-gray-600" />
-//                     <span
-//                       className={`px-3 py-1 rounded-full border-2 ${
-//                         isPass
-//                           ? "bg-green-100 border-green-800 text-green-800"
-//                           : "bg-red-100 border-red-800 text-red-800"
-//                       }`}
-//                     >
-//                       Pass Rate: {point.passRate}%
-//                     </span>
-//                   </div>
-//                 </div>
-//                 {/* Status */}
-//                 <div
-//                   className={`p-2 ${
-//                     isPass ? "bg-green-100" : "bg-red-100"
-//                   } rounded-b-lg`}
-//                 >
-//                   <div className="flex items-center justify-center">
-//                     <FaFlag
-//                       className={`mr-2 ${
-//                         isPass ? "text-green-600" : "text-red-600"
-//                       }`}
-//                     />
-//                     <span
-//                       className={
-//                         isPass
-//                           ? "text-green-800 font-bold"
-//                           : "text-red-800 font-bold"
-//                       }
-//                     >
-//                       Status: {point.status}
-//                     </span>
-//                   </div>
-//                 </div>
-//               </div>
-//             );
-//           })}
-//         </div>
-//       ) : (
-//         <p className="text-center text-gray-500 mb-4">
-//           No measurement points available for cards
-//         </p>
-//       )}
-//       {/* Table */}
-//       <div className="overflow-x-auto">
-//         <table className="w-full bg-white rounded border table-auto">
-//           <thead>
-//             <tr className="bg-gray-200 text-sm">
-//               <th className="p-2 border">Size</th>
-//               <th className="p-2 border">Measurement Point</th>
-//               <th className="p-2 border">Buyer Spec</th>
-//               <th className="p-2 border">Tol-</th>
-//               <th className="p-2 border">Tol+</th>
-//               <th className="p-2 border">Total Count</th>
-//               <th className="p-2 border">Total Pass</th>
-//               <th className="p-2 border">Total Fail</th>
-//               <th className="p-2 border">Mean</th>
-//               <th className="p-2 border">Std. Dev</th>
-//               <th className="p-2 border">Diff</th>
-//               <th className="p-2 border">Diff %</th>
-//               <th className="p-2 border">Pass Rate</th>
-//             </tr>
-//           </thead>
-//           <tbody>
-//             {sizeBasedSummary.length > 0 ? (
-//               sizeBasedSummary.map((point, index) => {
-//                 const isFirstSizeRow =
-//                   index === 0 ||
-//                   point.size !== sizeBasedSummary[index - 1].size;
-//                 const isDiffWithinTolerance =
-//                   point.diff >= point.tolMinus && point.diff <= point.tolPlus;
-//                 const diffBgColor = isDiffWithinTolerance
-//                   ? "bg-green-100"
-//                   : "bg-red-100";
-
-//                 return (
-//                   <tr
-//                     key={index}
-//                     className={`text-center text-sm ${
-//                       isFirstSizeRow ? "border-t-4 border-gray-600" : ""
-//                     }`}
-//                   >
-//                     {isFirstSizeRow ? (
-//                       <td
-//                         className="p-2 border align-middle"
-//                         rowSpan={sizePointCounts[point.size] || 1}
-//                       >
-//                         {point.size}
-//                       </td>
-//                     ) : null}
-//                     <td className="p-2 border text-left">
-//                       {point.measurementPoint}
-//                     </td>
-//                     <td className="p-2 border">
-//                       {decimalToFraction(point.buyerSpec)}
-//                     </td>
-//                     <td className="p-2 border">
-//                       {decimalToFraction(point.tolMinus)}
-//                     </td>
-//                     <td className="p-2 border">
-//                       {decimalToFraction(point.tolPlus)}
-//                     </td>
-//                     <td className="p-2 border">{point.totalCount}</td>
-//                     <td className="p-2 border">{point.totalPass}</td>
-//                     <td className="p-2 border">{point.totalFail}</td>
-//                     <td className="p-2 border bg-gray-100">
-//                       {point.mean.toFixed(2)}
-//                     </td>
-//                     <td className="p-2 border bg-gray-100">
-//                       {point.stdDev.toFixed(2)}
-//                     </td>
-//                     <td className={`p-2 border ${diffBgColor} font-bold`}>
-//                       {point.diff.toFixed(4)}
-//                     </td>
-//                     <td className={`p-2 border ${diffBgColor} font-bold`}>
-//                       {point.diffPercent.toFixed(2)}%
-//                     </td>
-//                     <td
-//                       className={`p-2 border ${
-//                         parseFloat(point.passRate) > 98
-//                           ? "bg-green-100"
-//                           : "bg-red-100"
-//                       } font-bold`}
-//                     >
-//                       {point.passRate}%
-//                     </td>
-//                   </tr>
-//                 );
-//               })
-//             ) : (
-//               <tr>
-//                 <td colSpan="13" className="p-4 text-center text-gray-500">
-//                   No measurement points available
-//                 </td>
-//               </tr>
-//             )}
-//           </tbody>
-//         </table>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default DigitalMeasurementTotalSummary;
-
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   FaCalculator,
@@ -400,177 +8,183 @@ import {
 } from "react-icons/fa";
 import jStat from "jstat";
 
-const DistributionCurve = React.memo(
-  ({ actualValues, totalCount, buyerSpec, tolMinus, tolPlus, mean, cpk }) => {
-    const canvasRef = useRef(null);
+const DistributionCurveComponent = ({
+  actualValues,
+  totalCount,
+  buyerSpec,
+  tolMinus,
+  tolPlus,
+  mean,
+  cpk
+}) => {
+  const canvasRef = useRef(null);
 
-    useEffect(() => {
-      if (!actualValues.length || totalCount === 0) return;
+  useEffect(() => {
+    if (!actualValues.length || totalCount === 0) return;
 
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-      // Adjust canvas size based on number of data points
-      const isSmallData = actualValues.length <= 2;
-      const canvasWidth = isSmallData ? 150 : 200;
-      const canvasHeight = isSmallData ? 90 : 120;
+    // Adjust canvas size based on number of data points
+    const isSmallData = actualValues.length <= 2;
+    const canvasWidth = isSmallData ? 150 : 200;
+    const canvasHeight = isSmallData ? 90 : 120;
 
-      // Set canvas resolution to prevent blurriness
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = canvasWidth * dpr;
-      canvas.height = canvasHeight * dpr;
-      canvas.style.width = `${canvasWidth}px`;
-      canvas.style.height = `${canvasHeight}px`;
+    // Set canvas resolution to prevent blurriness
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvasWidth * dpr;
+    canvas.height = canvasHeight * dpr;
+    canvas.style.width = `${canvasWidth}px`;
+    canvas.style.height = `${canvasHeight}px`;
 
-      const ctx = canvas.getContext("2d");
-      ctx.scale(dpr, dpr);
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
 
-      // Clear canvas
-      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    // Clear canvas
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-      // Compute standard deviation
-      const variance =
-        actualValues.length > 0
-          ? actualValues.reduce(
-              (sum, val) => sum + Math.pow(val - mean, 2),
-              0
-            ) / actualValues.length
-          : 0;
-      const stdDev = Math.sqrt(variance);
+    // Compute standard deviation
+    const variance =
+      actualValues.length > 0
+        ? actualValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
+          actualValues.length
+        : 0;
+    const stdDev = Math.sqrt(variance);
 
-      // Skip if stdDev is 0 or invalid
-      if (stdDev === 0 || isNaN(stdDev)) return;
+    // Skip if stdDev is 0 or invalid
+    if (stdDev === 0 || isNaN(stdDev)) return;
 
-      // Define x-axis range (mean ± 3*stdDev)
-      const xMin = mean - 3 * stdDev;
-      const xMax = mean + 3 * stdDev;
-      const xRange = xMax - xMin;
+    // Define x-axis range (mean ± 3*stdDev)
+    const xMin = mean - 3 * stdDev;
+    const xMax = mean + 3 * stdDev;
+    const xRange = xMax - xMin;
 
-      // Compute PDF (normal or t-distribution)
-      const isNormal = totalCount > 30;
-      const df = totalCount - 1; // Degrees of freedom for t-distribution
-      const points = [];
-      const step = xRange / 100;
-      let maxY = 0;
+    // Compute PDF (normal or t-distribution)
+    const isNormal = totalCount > 30;
+    const df = totalCount - 1; // Degrees of freedom for t-distribution
+    const points = [];
+    const step = xRange / 100;
+    let maxY = 0;
 
-      for (let x = xMin; x <= xMax; x += step) {
-        let y;
-        if (isNormal) {
-          // Normal distribution PDF
-          y = jStat.normal.pdf(x, mean, stdDev);
-        } else {
-          // t-distribution PDF (standardized)
-          const t = (x - mean) / stdDev;
-          y = jStat.studentt.pdf(t, df) / stdDev;
-        }
-        points.push({ x, y });
-        maxY = Math.max(maxY, y);
+    for (let x = xMin; x <= xMax; x += step) {
+      let y;
+      if (isNormal) {
+        // Normal distribution PDF
+        y = jStat.normal.pdf(x, mean, stdDev);
+      } else {
+        // t-distribution PDF (standardized)
+        const t = (x - mean) / stdDev;
+        y = jStat.studentt.pdf(t, df) / stdDev;
       }
+      points.push({ x, y });
+      maxY = Math.max(maxY, y);
+    }
 
-      // Scale points to canvas (reserve space for labels and X-axis)
-      const scaleX = canvasWidth / xRange;
-      const scaleY = ((canvasHeight - 20) / maxY) * 0.8; // 20px for labels, 20% margin
+    // Scale points to canvas (reserve space for labels and X-axis)
+    const scaleX = canvasWidth / xRange;
+    const scaleY = ((canvasHeight - 20) / maxY) * 0.8; // 20px for labels, 20% margin
 
-      // Draw curve
+    // Draw curve
+    ctx.beginPath();
+    ctx.strokeStyle = "blue";
+    ctx.lineWidth = 2;
+    points.forEach((point, i) => {
+      const canvasX = (point.x - xMin) * scaleX;
+      const canvasY = canvasHeight - 20 - point.y * scaleY; // Offset for X-axis
+      if (i === 0) {
+        ctx.moveTo(canvasX, canvasY);
+      } else {
+        ctx.lineTo(canvasX, canvasY);
+      }
+    });
+    ctx.stroke();
+
+    // Draw X-axis
+    ctx.beginPath();
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 1;
+    ctx.moveTo(0, canvasHeight - 15);
+    ctx.lineTo(canvasWidth, canvasHeight - 15);
+    ctx.stroke();
+
+    // Draw vertical grid lines and labels
+    const drawLine = (value, color, label, dashed = false) => {
+      if (isNaN(value) || value < xMin || value > xMax) return;
+      const canvasX = ((value - xMin) / xRange) * canvasWidth;
       ctx.beginPath();
-      ctx.strokeStyle = "blue";
-      ctx.lineWidth = 2;
-      points.forEach((point, i) => {
-        const canvasX = (point.x - xMin) * scaleX;
-        const canvasY = canvasHeight - 20 - point.y * scaleY; // Offset for X-axis
-        if (i === 0) {
-          ctx.moveTo(canvasX, canvasY);
-        } else {
-          ctx.lineTo(canvasX, canvasY);
-        }
-      });
-      ctx.stroke();
-
-      // Draw X-axis
-      ctx.beginPath();
-      ctx.strokeStyle = "black";
+      ctx.strokeStyle = color;
       ctx.lineWidth = 1;
-      ctx.moveTo(0, canvasHeight - 15);
-      ctx.lineTo(canvasWidth, canvasHeight - 15);
+      if (dashed) {
+        ctx.setLineDash([5, 5]);
+      }
+      ctx.moveTo(canvasX, 0);
+      ctx.lineTo(canvasX, canvasHeight - 15);
       ctx.stroke();
+      ctx.setLineDash([]);
 
-      // Draw vertical grid lines and labels
-      const drawLine = (value, color, label, dashed = false) => {
-        if (isNaN(value) || value < xMin || value > xMax) return;
-        const canvasX = ((value - xMin) / xRange) * canvasWidth;
-        ctx.beginPath();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
-        if (dashed) {
-          ctx.setLineDash([5, 5]);
-        }
-        ctx.moveTo(canvasX, 0);
-        ctx.lineTo(canvasX, canvasHeight - 15);
-        ctx.stroke();
-        ctx.setLineDash([]);
+      // Draw label with smaller font
+      ctx.font = "8px Arial";
+      ctx.fillStyle = color;
+      ctx.textAlign = "center";
+      ctx.fillText(label, canvasX, canvasHeight - 5);
+    };
 
-        // Draw label with smaller font
-        ctx.font = "8px Arial";
-        ctx.fillStyle = color;
-        ctx.textAlign = "center";
-        ctx.fillText(label, canvasX, canvasHeight - 5);
-      };
+    drawLine(buyerSpec + tolMinus, "red", "LL", true); // Lower Limit
+    drawLine(buyerSpec, "black", "S"); // Buyer Spec
+    drawLine(buyerSpec + tolPlus, "red", "UL", true); // Upper Limit
+    drawLine(mean, "green", "M"); // Mean
+  }, [actualValues, totalCount, buyerSpec, tolMinus, tolPlus, mean]);
 
-      drawLine(buyerSpec + tolMinus, "red", "LL", true); // Lower Limit
-      drawLine(buyerSpec, "black", "S"); // Buyer Spec
-      drawLine(buyerSpec + tolPlus, "red", "UL", true); // Upper Limit
-      drawLine(mean, "green", "M"); // Mean
-    }, [actualValues, totalCount, buyerSpec, tolMinus, tolPlus, mean]);
+  // Determine Cpk background color
+  const cpkBgColor =
+    cpk === null
+      ? "bg-gray-100"
+      : cpk === Infinity
+      ? "bg-blue-100"
+      : cpk >= 1.33
+      ? "bg-green-300"
+      : cpk >= 1.0
+      ? "bg-green-100"
+      : cpk >= 0.5
+      ? "bg-yellow-100"
+      : "bg-red-100";
 
-    // Determine Cpk background color
-    const cpkBgColor =
-      cpk === null
-        ? "bg-gray-100"
-        : cpk === Infinity
-        ? "bg-blue-100"
-        : cpk >= 1.33
-        ? "bg-green-300"
-        : cpk >= 1.0
-        ? "bg-green-100"
-        : cpk >= 0.5
-        ? "bg-yellow-100"
-        : "bg-red-100";
-
-    return actualValues.length && totalCount > 0 ? (
-      <div className="relative flex flex-col items-center">
-        <div className="absolute top-0 right-0 h-8 w-24 bg-gray-50 flex items-center justify-center">
-          <div
-            className={`text-xs px-2 py-1 border border-gray-500 rounded ${cpkBgColor} flex items-center justify-center h-full`}
-          >
-            Cpk ={" "}
-            {cpk === Infinity ? "Inf" : cpk !== null ? cpk.toFixed(2) : "N/A"}
-          </div>
+  return actualValues.length && totalCount > 0 ? (
+    <div className="relative flex flex-col items-center">
+      <div className="absolute top-0 right-0 h-8 w-24 bg-gray-50 flex items-center justify-center">
+        <div
+          className={`text-xs px-2 py-1 border border-gray-500 rounded ${cpkBgColor} flex items-center justify-center h-full`}
+        >
+          Cpk ={" "}
+          {cpk === Infinity ? "Inf" : cpk !== null ? cpk.toFixed(2) : "N/A"}
         </div>
-        <div className="flex justify-center">
-          <canvas ref={canvasRef} className="w-auto h-auto" />
-        </div>
-
-        <div className="text-xs mt-2 text-center flex flex-wrap justify-center gap-2">
-          <span className="inline-flex items-center px-2 py-1 border border-red-500 text-red-500 rounded">
-            LL = {(buyerSpec + tolMinus).toFixed(4)}
-          </span>
-          <span className="inline-flex items-center px-2 py-1 border border-black text-black rounded">
-            S = {buyerSpec.toFixed(4)}
-          </span>
-          <span className="inline-flex items-center px-2 py-1 border border-red-500 text-red-500 rounded">
-            UL = {(buyerSpec + tolPlus).toFixed(4)}
-          </span>
-          <span className="inline-flex items-center px-2 py-1 border border-green-500 text-green-500 rounded">
-            M = {mean.toFixed(4)}
-          </span>
-        </div>
-        <div className="w-full border-t border-dashed border-gray-400 my-1"></div>
       </div>
-    ) : (
-      <span>-</span>
-    );
-  }
-);
+      <div className="flex justify-center">
+        <canvas ref={canvasRef} className="w-auto h-auto" />
+      </div>
+
+      <div className="text-xs mt-2 text-center flex flex-wrap justify-center gap-2">
+        <span className="inline-flex items-center px-2 py-1 border border-red-500 text-red-500 rounded">
+          LL = {(buyerSpec + tolMinus).toFixed(4)}
+        </span>
+        <span className="inline-flex items-center px-2 py-1 border border-black text-black rounded">
+          S = {buyerSpec.toFixed(4)}
+        </span>
+        <span className="inline-flex items-center px-2 py-1 border border-red-500 text-red-500 rounded">
+          UL = {(buyerSpec + tolPlus).toFixed(4)}
+        </span>
+        <span className="inline-flex items-center px-2 py-1 border border-green-500 text-green-500 rounded">
+          M = {mean.toFixed(4)}
+        </span>
+      </div>
+      <div className="w-full border-t border-dashed border-gray-400 my-1"></div>
+    </div>
+  ) : (
+    <span>-</span>
+  );
+};
+DistributionCurveComponent.displayName = "DistributionCurve"; // Explicitly set displayName
+const DistributionCurve = React.memo(DistributionCurveComponent);
 
 const DigitalMeasurementTotalSummary = ({
   summaryData,
@@ -987,10 +601,10 @@ const DigitalMeasurementTotalSummary = ({
               <th className="p-2 border">Diff</th>
               <th className="p-2 border">Diff %</th>
               <th className="p-2 border">Pass Rate</th>
-              <th className="p-2 border">Cpk</th>
+              {/* <th className="p-2 border">Cpk</th>
               <th className="p-2 border">Cp</th>
               <th className="p-2 border">CV (%)</th>
-              <th className="p-2 border">Stability</th>
+              <th className="p-2 border">Stability</th> */}
             </tr>
           </thead>
           <tbody>
@@ -1068,7 +682,7 @@ const DigitalMeasurementTotalSummary = ({
                     >
                       {point.passRate}%
                     </td>
-                    <td className={`p-2 border ${cpkBgColor}`}>
+                    {/* <td className={`p-2 border ${cpkBgColor}`}>
                       {point.cpk === Infinity
                         ? "Inf"
                         : point.cpk !== null
@@ -1087,7 +701,7 @@ const DigitalMeasurementTotalSummary = ({
                     </td>
                     <td className={`p-2 border ${cpkBgColor}`}>
                       {point.stabilityStatus}
-                    </td>
+                    </td> */}
                   </tr>
                 );
               })
@@ -1101,64 +715,64 @@ const DigitalMeasurementTotalSummary = ({
           </tbody>
         </table>
       </div>
-      <div className="overflow-x-auto">
-        <h2 className="text-sm font-semibold mb-2">Statistical Analysis</h2>
-        <p className="text-sm text-gray-600 mb-2">
-          LL = Lower Limit, S = Buyer Spec, UL = Upper Limit, M = Mean
-        </p>
-        <div className="w-full border-t border-dashed border-gray-400 mb-4"></div>
-        <table className="w-full bg-white rounded border table-auto">
-          <thead>
-            <tr className="bg-gray-200 text-sm">
-              <th className="p-2 border min-w-24 max-w-32 whitespace-normal break-words">
-                Measurement Point
-              </th>
-              {sizes.map((size) => (
-                <th key={size} className="p-2 border min-w-48">
-                  {size}
+      {/* <div className="overflow-x-auto">
+          <h2 className="text-sm font-semibold mb-2">Statistical Analysis</h2>
+          <p className="text-sm text-gray-600 mb-2">
+            LL = Lower Limit, S = Buyer Spec, UL = Upper Limit, M = Mean
+          </p>
+          <div className="w-full border-t border-dashed border-gray-400 mb-4"></div>
+          <table className="w-full bg-white rounded border table-auto">
+            <thead>
+              <tr className="bg-gray-200 text-sm">
+                <th className="p-2 border min-w-24 max-w-32 whitespace-normal break-words">
+                  Measurement Point
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {matrix.length > 0 ? (
-              matrix.map((row, rowIndex) => (
-                <tr key={rowIndex} className="text-sm">
-                  <td className="p-2 border text-left min-w-24 max-w-32 whitespace-normal break-words">
-                    {row.measurementPoint}
-                  </td>
-                  {sizes.map((size) => (
-                    <td key={size} className="p-2 border min-w-48">
-                      {row.data[size].totalCount > 0 ? (
-                        <DistributionCurve
-                          actualValues={row.data[size].actualValues}
-                          totalCount={row.data[size].totalCount}
-                          buyerSpec={row.data[size].buyerSpec}
-                          tolMinus={row.data[size].tolMinus}
-                          tolPlus={row.data[size].tolPlus}
-                          mean={row.data[size].mean}
-                          cpk={row.data[size].cpk}
-                        />
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={sizes.length + 1}
-                  className="p-4 text-center text-gray-500"
-                >
-                  No distribution data available
-                </td>
+                {sizes.map((size) => (
+                  <th key={size} className="p-2 border min-w-48">
+                    {size}
+                  </th>
+                ))}
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {matrix.length > 0 ? (
+                matrix.map((row, rowIndex) => (
+                  <tr key={rowIndex} className="text-sm">
+                    <td className="p-2 border text-left min-w-24 max-w-32 whitespace-normal break-words">
+                      {row.measurementPoint}
+                    </td>
+                    {sizes.map((size) => (
+                      <td key={size} className="p-2 border min-w-48">
+                        {row.data[size].totalCount > 0 ? (
+                          <DistributionCurve
+                            actualValues={row.data[size].actualValues}
+                            totalCount={row.data[size].totalCount}
+                            buyerSpec={row.data[size].buyerSpec}
+                            tolMinus={row.data[size].tolMinus}
+                            tolPlus={row.data[size].tolPlus}
+                            mean={row.data[size].mean}
+                            cpk={row.data[size].cpk}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan={sizes.length + 1}
+                    className="p-4 text-center text-gray-500"
+                  >
+                    No distribution data available
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div> */}
     </div>
   );
 };

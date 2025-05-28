@@ -274,7 +274,7 @@ const SCCDefectsModifyAdd = () => {
   return (
     <div className="p-4 sm:p-6 bg-white rounded-xl shadow-lg">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 pb-4 border-b border-gray-200 gap-3">
-        <h1 className="text-lg sm:text-2xl font-semibold text-gray-800">
+        <h1 className="text-lg sm:text-xl font-semibold text-gray-800">
           {t("sccDefects.manageTitle", "Manage Heat Transfer Defects")}
         </h1>
         <button

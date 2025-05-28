@@ -9328,27 +9328,64 @@ app.get("/api/cutting-measurement-max-panel-index", async (req, res) => {
 // Endpoint to save a new measurement point
 app.post("/api/save-measurement-point", async (req, res) => {
   try {
-    const measurementPoint = req.body;
+    const measurementPoint = req.body; // This will include moNo, which can be "Common" or a specific MO
     // Find the maximum 'no' in the collection
-    const maxNo = await CuttingMeasurementPoint.findOne()
+    const maxNoDoc = await CuttingMeasurementPoint.findOne() // Changed variable name
       .sort({ no: -1 })
-      .select("no");
-    const newNo = maxNo ? maxNo.no + 1 : 1;
+      .select("no")
+      .lean(); // Use lean for performance if only 'no' is needed
+    const newNo = maxNoDoc ? maxNoDoc.no + 1 : 1;
     // Create new document
     const newDoc = new CuttingMeasurementPoint({
       ...measurementPoint,
-      no: newNo
+      no: newNo // Assign the new auto-incremented 'no'
     });
     await newDoc.save();
-    res.status(200).json({ message: "Measurement point saved successfully" });
+    res
+      .status(200)
+      .json({ message: "Measurement point saved successfully", point: newDoc }); // Send back the new point
   } catch (error) {
     console.error("Error saving measurement point:", error);
+    if (error.code === 11000) {
+      // Handle duplicate key errors more gracefully
+      // You might need to check which field caused the duplicate error
+      // For now, a generic message. Your schema should have unique indexes defined.
+      return res.status(409).json({
+        message:
+          "Failed to save: Duplicate entry for a unique field (e.g., MO + Panel + Point Name + Index).",
+        error: error.message
+      });
+    }
     res.status(500).json({
       message: "Failed to save measurement point",
       error: error.message
     });
   }
 });
+
+// app.post("/api/save-measurement-point", async (req, res) => {
+//   try {
+//     const measurementPoint = req.body;
+//     // Find the maximum 'no' in the collection
+//     const maxNo = await CuttingMeasurementPoint.findOne()
+//       .sort({ no: -1 })
+//       .select("no");
+//     const newNo = maxNo ? maxNo.no + 1 : 1;
+//     // Create new document
+//     const newDoc = new CuttingMeasurementPoint({
+//       ...measurementPoint,
+//       no: newNo
+//     });
+//     await newDoc.save();
+//     res.status(200).json({ message: "Measurement point saved successfully" });
+//   } catch (error) {
+//     console.error("Error saving measurement point:", error);
+//     res.status(500).json({
+//       message: "Failed to save measurement point",
+//       error: error.message
+//     });
+//   }
+// });
 
 /* ------------------------------
    Cutting Measurement Points Edit ENDPOINTS
@@ -9544,6 +9581,35 @@ app.put("/api/update-measurement-point/:id", async (req, res) => {
     console.error("Error updating measurement point:", error);
     res.status(500).json({
       message: "Failed to update measurement point",
+      error: error.message
+    });
+  }
+});
+
+// ** NEW: Endpoint to delete a measurement point by _id **
+app.delete("/api/delete-measurement-point/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid measurement point ID format." });
+    }
+
+    const deletedPoint = await CuttingMeasurementPoint.findByIdAndDelete(id);
+
+    if (!deletedPoint) {
+      return res.status(404).json({ message: "Measurement point not found." });
+    }
+
+    res
+      .status(200)
+      .json({ message: "Measurement point deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting measurement point:", error);
+    res.status(500).json({
+      message: "Failed to delete measurement point.",
       error: error.message
     });
   }
@@ -10766,6 +10832,129 @@ app.get("/api/cutting/trend/top-defect-issues", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch top defect issues" });
   }
 });
+
+/* ------------------------------
+   Cutting Inspection Management ENDPOINTS
+------------------------------ */
+
+// GET Full Cutting Inspection Document for Management (similar to modify, but might be simpler)
+app.get("/api/cutting-inspection-details-for-manage", async (req, res) => {
+  try {
+    const { moNo, tableNo } = req.query;
+    if (!moNo || !tableNo) {
+      return res
+        .status(400)
+        .json({ message: "MO Number and Table Number are required" });
+    }
+    // You might want to add color if moNo + tableNo is not unique enough
+    const inspectionDoc = await CuttingInspection.findOne({
+      moNo,
+      tableNo
+    }).lean(); // Use lean for read-only
+
+    if (!inspectionDoc) {
+      return res.status(404).json({ message: "Inspection document not found" });
+    }
+    res.json(inspectionDoc);
+  } catch (error) {
+    console.error("Error fetching inspection details for management:", error);
+    res.status(500).json({
+      message: "Failed to fetch inspection details for management",
+      error: error.message
+    });
+  }
+});
+
+// DELETE Entire Cutting Inspection Record by document _id
+app.delete("/api/cutting-inspection-record/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid Record ID format." });
+    }
+
+    const deletedRecord = await CuttingInspection.findByIdAndDelete(id);
+
+    if (!deletedRecord) {
+      return res
+        .status(404)
+        .json({ message: "Cutting inspection record not found." });
+    }
+    res
+      .status(200)
+      .json({ message: "Cutting inspection record deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting cutting inspection record:", error);
+    res
+      .status(500)
+      .json({
+        message: "Failed to delete cutting inspection record.",
+        error: error.message
+      });
+  }
+});
+
+// DELETE Specific Inspected Size from a Cutting Inspection Record
+app.delete(
+  "/api/cutting-inspection-record/:id/size/:inspectedSize",
+  async (req, res) => {
+    try {
+      const { id, inspectedSize } = req.params;
+
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ message: "Invalid Record ID format." });
+      }
+      if (!inspectedSize) {
+        return res
+          .status(400)
+          .json({ message: "Inspected size to delete is required." });
+      }
+
+      const record = await CuttingInspection.findById(id);
+      if (!record) {
+        return res
+          .status(404)
+          .json({ message: "Cutting inspection record not found." });
+      }
+
+      const initialLength = record.inspectionData.length;
+      record.inspectionData = record.inspectionData.filter(
+        (dataItem) => dataItem.inspectedSize !== inspectedSize
+      );
+
+      if (record.inspectionData.length === initialLength) {
+        return res
+          .status(404)
+          .json({
+            message: `Inspected size '${inspectedSize}' not found in this record.`
+          });
+      }
+
+      // If all sizes are deleted, consider if the parent document should also be deleted or kept empty.
+      // For now, we'll just remove the size. If inspectionData becomes empty, the parent still exists.
+      // You might want to add logic here: if (record.inspectionData.length === 0) { await CuttingInspection.findByIdAndDelete(id); ... }
+
+      record.updated_at = new Date();
+      record.markModified("inspectionData"); // Important for Mongoose to detect array changes
+      await record.save();
+
+      res
+        .status(200)
+        .json({
+          message: `Inspection data for size '${inspectedSize}' deleted successfully.`,
+          data: record
+        });
+    } catch (error) {
+      console.error(`Error deleting inspected size '${inspectedSize}':`, error);
+      res
+        .status(500)
+        .json({
+          message: `Failed to delete inspection data for size '${inspectedSize}'.`,
+          error: error.message
+        });
+    }
+  }
+);
 
 /* ------------------------------
    AQL ENDPOINTS
@@ -14070,11 +14259,9 @@ app.post("/api/scc/defects", async (req, res) => {
 
     // Validate required fields (Chinese name is optional)
     if (no === undefined || no === null || !defectNameEng || !defectNameKhmer) {
-      return res
-        .status(400)
-        .json({
-          message: "Defect No, English Name, and Khmer Name are required."
-        });
+      return res.status(400).json({
+        message: "Defect No, English Name, and Khmer Name are required."
+      });
     }
     if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
       return res
@@ -14092,11 +14279,9 @@ app.post("/api/scc/defects", async (req, res) => {
     // Check for duplicate English name (optional, but good for data integrity)
     const existingDefectByName = await SCCDefect.findOne({ defectNameEng });
     if (existingDefectByName) {
-      return res
-        .status(409)
-        .json({
-          message: `Defect name (English) '${defectNameEng}' already exists.`
-        });
+      return res.status(409).json({
+        message: `Defect name (English) '${defectNameEng}' already exists.`
+      });
     }
 
     const newSccDefect = new SCCDefect({
@@ -14113,11 +14298,9 @@ app.post("/api/scc/defects", async (req, res) => {
     console.error("Error adding SCC defect:", error);
     if (error.code === 11000) {
       // Mongoose duplicate key error (if unique index is on more than just 'no')
-      return res
-        .status(409)
-        .json({
-          message: "Duplicate entry. Defect No or Name might already exist."
-        });
+      return res.status(409).json({
+        message: "Duplicate entry. Defect No or Name might already exist."
+      });
     }
     res
       .status(500)
@@ -14133,12 +14316,10 @@ app.put("/api/scc/defects/:id", async (req, res) => {
 
     // Validate required fields (Chinese name is optional)
     if (no === undefined || no === null || !defectNameEng || !defectNameKhmer) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Defect No, English Name, and Khmer Name are required for update."
-        });
+      return res.status(400).json({
+        message:
+          "Defect No, English Name, and Khmer Name are required for update."
+      });
     }
     if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
       return res
@@ -14156,11 +14337,9 @@ app.put("/api/scc/defects/:id", async (req, res) => {
       _id: { $ne: id }
     });
     if (existingDefectByNo) {
-      return res
-        .status(409)
-        .json({
-          message: `Defect No '${no}' already exists for another defect.`
-        });
+      return res.status(409).json({
+        message: `Defect No '${no}' already exists for another defect.`
+      });
     }
     // Check for duplicate English name (excluding the current document)
     const existingDefectByName = await SCCDefect.findOne({
@@ -14168,11 +14347,9 @@ app.put("/api/scc/defects/:id", async (req, res) => {
       _id: { $ne: id }
     });
     if (existingDefectByName) {
-      return res
-        .status(409)
-        .json({
-          message: `Defect name (English) '${defectNameEng}' already exists for another defect.`
-        });
+      return res.status(409).json({
+        message: `Defect name (English) '${defectNameEng}' already exists for another defect.`
+      });
     }
 
     const updatedSccDefect = await SCCDefect.findByIdAndUpdate(
@@ -14190,12 +14367,10 @@ app.put("/api/scc/defects/:id", async (req, res) => {
     if (!updatedSccDefect) {
       return res.status(404).json({ message: "SCC Defect not found." });
     }
-    res
-      .status(200)
-      .json({
-        message: "SCC defect updated successfully",
-        defect: updatedSccDefect
-      });
+    res.status(200).json({
+      message: "SCC defect updated successfully",
+      defect: updatedSccDefect
+    });
   } catch (error) {
     console.error("Error updating SCC defect:", error);
     if (error.code === 11000) {

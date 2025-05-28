@@ -729,7 +729,71 @@
     "deleted": "Deleted!",
     "defectDeletedSuccess": "Defect has been deleted.",
     "failedToDeleteDefect": "Failed to delete defect.",
-    "fillRequiredDefectFields": "Please fill all required defect fields (Code, English Name, Khmer Name)."
+    "fillRequiredDefectFields": "Please fill all required defect fields (Code, English Name, Khmer Name).",
+    "moNoType": "MO No. Type",
+    "moTypeAdditional": "Additional (Specific MO)",
+    "moTypeCommon": "Common (All MOs for Panel)",
+    "moTypeCommonFixed": "Fixed as Common",
+    "searchOrSelectMoForAdditional": "Please search and select an MO for additional points, or choose 'Common' type.",
+    "fillMoPanelPoints": "Please select MO Type, MO (if Additional), Panel, and add at least one measurement point.",
+    "typeOrSelect": "Type or Select",
+    "saveAllPoints": "Save All Points",
+    "deleteThisPoint": "Delete this measurement point",
+    "confirmDeleteMeasurementPointMsg": "Do you really want to delete this measurement point? This action cannot be undone.",
+    "measurementPointDeletedSuccess": "The measurement point has been deleted.",
+    "failedToDeleteMeasurementPoint": "Failed to delete the measurement point.",
+    "saveChanges": "Save",
+    "pointsFound": "Measurement points found for this Garment Type.",
+    "editModeOffMsg": "Edit mode is off. You can only view the data.",
+    "editModeOnMsg": "Edit mode is on. You can modify the data.",
+    "cancelEdit": "Cancel Edit",
+    "search_mono_placeholder": "Search MO No...",
+    "modifyMeasurementPointsTitle": "Modify / Delete Cutting Measurement Points",
+    "noPointsFoundTitle": "No Measurement Points Found",
+    "noPointsFoundMsg": "No measurement points found for this Garment Type. Please add points to proceed."
+  },
+
+  "cuttingReport": {
+    "manageTitle": "Manage Cutting Inspection Reports",
+    "search_table_placeholder": "Search Table No...",
+    "loadingRecord": "Loading inspection record...",
+    "recordDetailsTitle": "Inspection Record Details",
+    "table": {
+      "inspectionDate": "Insp. Date",
+      "qcId": "QC ID",
+      "garmentType": "Garment Type",
+      "moNo": "MO No.",
+      "tableNo": "Table No.",
+      "color": "Color",
+      "buyer": "Buyer",
+      "lotNoCount": "Lot Nos",
+      "totalBundleQty": "Total Bundles",
+      "bundleQtyCheck": "Bundles Checked",
+      "totalInspectionQty": "Total Insp. Qty",
+      "cuttingType": "Cutting Type",
+      "inspectionDetailsSummary": "Insp. Details"
+    },
+    "sizesChecked": "Sizes Checked",
+    "sizeLabel": "Size",
+    "bundles": "bundles",
+    "deleteOptionsTitle": "Delete Options",
+    "option1Title": "Option 1: Delete Entire Record",
+    "deleteEntireButton": "Delete Entire Inspection Record",
+    "option2Title": "Option 2: Delete Specific Inspected Sizes",
+    "deleteThisSizeData": "Delete data for this size",
+    "confirmDeleteEntireTitle": "Delete Entire Record?",
+    "confirmDeleteEntireMsg": "This will permanently delete the entire inspection record and cannot be undone. Are you sure?",
+    "recordDeletedSuccess": "The entire inspection record has been successfully deleted.",
+    "failedToDeleteRecord": "Failed to delete the entire inspection record.",
+    "confirmDeleteSizeTitle": "Delete This Size?",
+    "confirmDeleteSizeMsg": "This will delete all inspection data for size '{size}' from this record. Are you sure?",
+    "sizeDataDeletedSuccess": "Inspection data for size {size} deleted successfully.",
+    "failedToDeleteSizeData": "Failed to delete data for size {size}.",
+    "noRecordFoundTitle": "No Record Found",
+    "noRecordFoundForMoTable": "No inspection record found for the selected MO No. and Table No. Please verify your selection.",
+    "noRecordFoundForSelection": "No inspection record found for the current selection.",
+    "failedToFetchRecord": "Failed to fetch the inspection record.",
+    "noTableFoundForMo": "No tables found for this MO and search."
   },
 
   "common": {
@@ -757,30 +821,6 @@
     "totalSamplesShort": "Total",
     "applyFilters": "Apply",
     "clearFilters": "Clear"
-  },
-
-  "cuttingReport": {
-    "title": "Cutting Inspection Report",
-    "filters": "Filters",
-    "startDate": "Start Date",
-    "endDate": "End Date",
-    "moNo": "MO No",
-    "lotNo": "Lot No",
-    "selectLotNo": "Select Lot No",
-    "buyer": "Buyer",
-    "selectBuyer": "Select Buyer",
-    "color": "Color",
-    "selectColor": "Select Color",
-    "tableNo": "Table No",
-    "selectTableNo": "Select Table No",
-    "orderQty": "Order Quantity",
-    "totalPcs": "Total Pieces",
-    "passPcs": "Pass Pieces",
-    "rejectPcs": "Reject Pieces",
-    "measurementDefects": "Measurement Defects",
-    "physicalDefects": "Physical Defects",
-    "passRate": "Pass Rate",
-    "result": "Result"
   },
 
   "editGar": {
@@ -886,7 +926,8 @@
     "result": "Result",
     "remarksPlaceholderShort": "Enter remarks here...",
     "select": "Select Machine No",
-    "selectStatus": "Select Status"
+    "selectStatus": "Select Status",
+    "actions": "Action"
   },
 
   "sccdaily": {
@@ -1123,5 +1164,17 @@
     "deletedSuccess": "Heat Transfer Defect has been deleted.",
     "failedToDelete": "Failed to delete Heat Transfer defect.",
     "failedToFetch": "Failed to fetch Heat Transfer defects."
+  },
+  "systemAdmin": {
+    "title": "System Administration",
+    "subtitle": "Manage system configurations and master data.",
+    "rovingDefects": "Roving Defects",
+    "cuttingPoints": "Cutting Modify Points",
+    "cuttingAdding": "Cutting - Add Points",
+    "cuttingFabricDefects": "Cutting Fabric Defects",
+    "sccHeatTransferDefects": "HT Defects",
+    "manageCuttingReports": "Manage Cutting Reports",
+    "qc2Defects": "QC2 Defects",
+    "contentComingSoon": "This section is under development. Content will be available soon."
   }
 }

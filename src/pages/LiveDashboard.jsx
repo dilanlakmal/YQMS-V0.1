@@ -28,6 +28,7 @@ import CuttingGarmentTypeTrendAnalysis from "../components/inspection/cutting/re
 import HomeMenu from "../components/inspection/liveDashboard/HomeMenu";
 import QCSunriseDashboard from "../components/inspection/liveDashboard/QCSunriseDashboard";
 import DigitalMeasurement from "../components/inspection/liveDashboard/DigitalMeasurement";
+import DigitalMeasurementCPK from "../components/inspection/liveDashboard/DigitalMeasurement-CPK";
 import DigitalMeasurementBuyerSpec from "../components/inspection/digital_measurement/DigitalMeasurementBuyerSpec";
 
 const LiveDashboard = () => {
@@ -450,6 +451,10 @@ const LiveDashboard = () => {
         )}
         {activeSection === "Buyer Specs" && <DigitalMeasurementBuyerSpec />}
         {activeSection === "Measurement Summary" && <DigitalMeasurement />}
+        {activeSection === "Measurement Summary - CPK" && (
+          <DigitalMeasurementCPK />
+        )}
+
         {activeSection === "Daily Analysis" && <QCSunriseDashboard />}
         {activeSection === "Order Data" && <OrderData />}
 

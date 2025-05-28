@@ -12,13 +12,19 @@ import {
   Trash2,
   Loader2,
   Info,
-  AlertTriangle
-} from "lucide-react";
+  AlertTriangle,
+  FileText,
+  Settings
+} from "lucide-react"; // Added icons
 
 const CuttingOrderModify = () => {
   const { t, i18n } = useTranslation();
-  const [moNo, setMoNo] = useState("");
-  const [moNoSearch, setMoNoSearch] = useState("");
+
+  // ** NEW STATE for MO Type selection **
+  const [moType, setMoType] = useState("Additional"); // "Additional" or "Common"
+
+  const [moNo, setMoNo] = useState(""); // This will hold the selected/typed MO or "Common"
+  const [moNoSearch, setMoNoSearch] = useState(""); // Only for "Additional" type
   const [moNoOptions, setMoNoOptions] = useState([]);
   const [showMoNoDropdown, setShowMoNoDropdown] = useState(false);
   const moNoDropdownRef = useRef(null);
@@ -28,18 +34,37 @@ const CuttingOrderModify = () => {
   const [panelIndexNames, setPanelIndexNames] = useState([]);
   const [additionalPoints, setAdditionalPoints] = useState([]);
 
-  const [isLoading, setIsLoading] = useState(false); // Simplified to a single boolean for general data fetching
-  const [isFetchingMo, setIsFetchingMo] = useState(false); // Specific for MO search
-  const [isFetchingMaxIndex, setIsFetchingMaxIndex] = useState(false); // Specific for max panel index
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingMo, setIsFetchingMo] = useState(false);
+  const [isFetchingMaxIndex, setIsFetchingMaxIndex] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const inputBaseStyle = "block w-full text-sm rounded-md shadow-sm";
   const inputNormalStyle = `${inputBaseStyle} border-gray-300 focus:border-indigo-500 focus:ring-indigo-500`;
   const inputDisabledStyle = `${inputBaseStyle} bg-gray-100 border-gray-300 cursor-not-allowed text-gray-500`;
 
+  // ** Effect to set moNo based on moType **
+  useEffect(() => {
+    if (moType === "Common") {
+      setMoNo("Common");
+      setMoNoSearch("Common"); // Reflect in search bar for clarity, though it will be disabled
+      setTableNos([]); // Common points don't have specific table numbers
+      setShowMoNoDropdown(false);
+    } else {
+      // If switching back to Additional from Common, clear moNo and moNoSearch
+      // to allow user to search for a new MO.
+      // Only clear if moNo was "Common" to avoid clearing a previously selected MO.
+      if (moNo === "Common") {
+        setMoNo("");
+        setMoNoSearch("");
+      }
+    }
+  }, [moType, moNo]); // Added moNo to dependencies for the clearing logic
+
   useEffect(() => {
     const fetchMoNumbers = async () => {
-      if (moNoSearch.trim() === "") {
+      if (moType !== "Additional" || moNoSearch.trim() === "") {
+        // Only fetch if type is Additional
         setMoNoOptions([]);
         setShowMoNoDropdown(false);
         return;
@@ -62,11 +87,12 @@ const CuttingOrderModify = () => {
     };
     const debounceFetch = setTimeout(fetchMoNumbers, 300);
     return () => clearTimeout(debounceFetch);
-  }, [moNoSearch]);
+  }, [moNoSearch, moType]); // Added moType
 
   useEffect(() => {
     const fetchTableNos = async () => {
-      if (!moNo) {
+      if (moType !== "Additional" || !moNo || moNo === "Common") {
+        // Don't fetch for "Common"
         setTableNos([]);
         return;
       }
@@ -84,8 +110,11 @@ const CuttingOrderModify = () => {
         setIsLoading(false);
       }
     };
-    fetchTableNos();
-  }, [moNo]);
+    if (moType === "Additional") {
+      // Only fetch if "Additional"
+      fetchTableNos();
+    }
+  }, [moNo, moType]); // Added moType
 
   useEffect(() => {
     const fetchGarmentTypes = async () => {
@@ -113,9 +142,15 @@ const CuttingOrderModify = () => {
       }
       setIsLoading(true);
       try {
+        // For panel index names, "Common" MO or specific MO might share panel structures.
+        // The endpoint should ideally handle if moNo is "Common" or a specific one.
+        // For now, let's assume the existing endpoint works by just passing the panel.
+        // If common panel indexes are different, this endpoint might need adjustment or a new one.
+        const moForPanelIndex = moType === "Common" || !moNo ? "Common" : moNo; // Use "Common" or actual MO
+
         const response = await axios.get(
-          `${API_BASE_URL}/api/cutting-measurement-panel-index-names`,
-          { params: { panel: selectedGarmentType } }
+          `${API_BASE_URL}/api/cutting-measurement-panel-index-names-by-mo`, // Using the endpoint that can handle 'Common'
+          { params: { panel: selectedGarmentType, moNo: moForPanelIndex } } // Pass moNo (or "Common")
         );
         setPanelIndexNames(response.data);
       } catch (error) {
@@ -126,7 +161,7 @@ const CuttingOrderModify = () => {
       }
     };
     fetchPanelIndexNames();
-  }, [selectedGarmentType]);
+  }, [selectedGarmentType, moType, moNo]); // Added moType and moNo
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -151,9 +186,10 @@ const CuttingOrderModify = () => {
     let newPanelIndex = 1;
     if (selectedGarmentType) {
       try {
+        const moForMaxIndex = moType === "Common" || !moNo ? "Common" : moNo; // Use "Common" or actual MO
         const response = await axios.get(
-          `${API_BASE_URL}/api/cutting-measurement-max-panel-index`,
-          { params: { panel: selectedGarmentType } }
+          `${API_BASE_URL}/api/cutting-measurement-max-panel-index`, // This endpoint might need to understand moNo="Common"
+          { params: { panel: selectedGarmentType, moNo: moForMaxIndex } } // Send MO type implicitly or explicitly
         );
         newPanelIndex = (response.data.maxPanelIndex || 0) + 1;
       } catch (error) {
@@ -200,7 +236,6 @@ const CuttingOrderModify = () => {
             } else {
               updatedPoint.panelIndexNameKhmer = "";
               updatedPoint.panelIndexNameChinese = "";
-              // Keep existing panelIndex or let user set it if it's a truly new name
             }
           } else if (field === "panelIndex") {
             updatedPoint.panelIndex = value === "" ? null : Number(value);
@@ -214,7 +249,6 @@ const CuttingOrderModify = () => {
               updatedPoint.panelIndexNameChinese =
                 matchingName.panelIndexNameChinese || "";
             }
-            // If no matching name, don't clear a potentially custom typed panelIndexName
           }
           return updatedPoint;
         }
@@ -228,7 +262,9 @@ const CuttingOrderModify = () => {
   };
 
   const handleSave = async () => {
-    if (!moNo || !selectedGarmentType || additionalPoints.length === 0) {
+    const currentMoNo = moType === "Common" ? "Common" : moNo; // Determine MO No to save
+
+    if (!currentMoNo || !selectedGarmentType || additionalPoints.length === 0) {
       Swal.fire({
         icon: "warning",
         title: t("cutting.missingInformation"),
@@ -269,7 +305,8 @@ const CuttingOrderModify = () => {
 
       const savePromises = additionalPoints.map((point) =>
         axios.post(`${API_BASE_URL}/api/save-measurement-point`, {
-          moNo,
+          // Existing endpoint should work
+          moNo: currentMoNo, // Use currentMoNo (either "Common" or selected MO)
           panel: selectedGarmentType,
           panelKhmer,
           panelChinese,
@@ -299,6 +336,7 @@ const CuttingOrderModify = () => {
       setSelectedGarmentType("");
       setAdditionalPoints([]);
       setTableNos([]);
+      setMoType("Additional"); // Reset moType
     } catch (error) {
       console.error("Error saving data:", error);
       Swal.fire({
@@ -318,6 +356,8 @@ const CuttingOrderModify = () => {
     "Neck",
     "Pocket",
     "Collar",
+    "Cuff",
+    "Placket",
     "Waistband",
     "Other",
     "NA"
@@ -335,18 +375,48 @@ const CuttingOrderModify = () => {
         )}
       </h1>
 
+      {/* MO Type Selection */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {t("cutting.moNoType", "MO No. Type")}
+        </label>
+        <div className="flex items-center space-x-4">
+          {["Additional", "Common"].map((type) => (
+            <label
+              key={type}
+              className="flex items-center space-x-2 cursor-pointer"
+            >
+              <input
+                type="radio"
+                name="moType"
+                value={type}
+                checked={moType === type}
+                onChange={(e) => setMoType(e.target.value)}
+                className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+              />
+              <span className="text-sm text-gray-700">
+                {t(`cutting.moType${type}`, type)}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-8 items-end">
-        <div className="space-y-1">
+        {/* MO No Search (Conditional) */}
+        <div className={`space-y-1 ${moType === "Common" ? "opacity-50" : ""}`}>
           <label
             htmlFor="moNoSearchInputCOM"
             className="block text-sm font-medium text-gray-700"
           >
-            {t("cutting.moNo")}
+            {t("cutting.moNo")}{" "}
+            {moType === "Common" &&
+              `(${t("cutting.moTypeCommonFixed", "Fixed as Common")})`}
           </label>
           <div className="relative" ref={moNoDropdownRef}>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                {isFetchingMo ? (
+                {isFetchingMo && moType === "Additional" ? (
                   <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
                 ) : (
                   <Search className="h-4 w-4 text-gray-400" />
@@ -355,18 +425,26 @@ const CuttingOrderModify = () => {
               <input
                 id="moNoSearchInputCOM"
                 type="text"
-                value={moNoSearch}
-                onChange={(e) => setMoNoSearch(e.target.value)}
+                value={moType === "Common" ? "Common" : moNoSearch}
+                onChange={(e) => {
+                  if (moType === "Additional") setMoNoSearch(e.target.value);
+                }}
                 onFocus={() =>
-                  moNoOptions.length > 0 && setShowMoNoDropdown(true)
+                  moType === "Additional" &&
+                  moNoOptions.length > 0 &&
+                  setShowMoNoDropdown(true)
                 }
-                placeholder={t(
-                  "cutting.search_mono_placeholder",
-                  "Search MO..."
-                )}
-                className={`${inputNormalStyle} pl-10 py-2.5`}
+                placeholder={
+                  moType === "Additional"
+                    ? t("cutting.search_mono_placeholder", "Search MO...")
+                    : ""
+                }
+                className={`${
+                  moType === "Common" ? inputDisabledStyle : inputNormalStyle
+                } pl-10 py-2.5`}
+                disabled={moType === "Common"}
               />
-              {moNoSearch && (
+              {moNoSearch && moType === "Additional" && (
                 <button
                   type="button"
                   onClick={() => {
@@ -384,27 +462,30 @@ const CuttingOrderModify = () => {
                 </button>
               )}
             </div>
-            {showMoNoDropdown && moNoOptions.length > 0 && (
-              <ul className="absolute z-20 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-60 overflow-y-auto shadow-lg">
-                {moNoOptions.map((option, index) => (
-                  <li
-                    key={index}
-                    onClick={() => {
-                      setMoNo(option);
-                      setMoNoSearch(option);
-                      setShowMoNoDropdown(false);
-                      setSelectedGarmentType("");
-                      setAdditionalPoints([]);
-                    }}
-                    className="px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer"
-                  >
-                    {option}
-                  </li>
-                ))}
-              </ul>
-            )}
+            {showMoNoDropdown &&
+              moType === "Additional" &&
+              moNoOptions.length > 0 && (
+                <ul className="absolute z-20 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-60 overflow-y-auto shadow-lg">
+                  {moNoOptions.map((option, index) => (
+                    <li
+                      key={index}
+                      onClick={() => {
+                        setMoNo(option);
+                        setMoNoSearch(option);
+                        setShowMoNoDropdown(false);
+                        setSelectedGarmentType("");
+                        setAdditionalPoints([]);
+                      }}
+                      className="px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer"
+                    >
+                      {option}
+                    </li>
+                  ))}
+                </ul>
+              )}
             {showMoNoDropdown &&
               !isFetchingMo &&
+              moType === "Additional" &&
               moNoSearch &&
               moNoOptions.length === 0 && (
                 <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 p-3 text-sm text-gray-500 shadow-lg">
@@ -416,6 +497,7 @@ const CuttingOrderModify = () => {
           </div>
         </div>
 
+        {/* Panel Selection */}
         <div className="space-y-1">
           <label
             htmlFor="garmentTypeSelectCOM"
@@ -428,9 +510,15 @@ const CuttingOrderModify = () => {
               id="garmentTypeSelectCOM"
               value={selectedGarmentType}
               onChange={handleGarmentTypeChange}
-              disabled={!moNo || garmentTypes.length === 0 || isLoading}
+              disabled={
+                (moType === "Additional" && !moNo) ||
+                garmentTypes.length === 0 ||
+                isLoading
+              } // Disable if additional and no MO selected
               className={`${
-                !moNo || garmentTypes.length === 0 || isLoading
+                (moType === "Additional" && !moNo) ||
+                garmentTypes.length === 0 ||
+                isLoading
                   ? inputDisabledStyle
                   : inputNormalStyle
               } appearance-none py-2.5 pl-3 pr-10`}
@@ -459,7 +547,7 @@ const CuttingOrderModify = () => {
         </div>
       </div>
 
-      {moNo && tableNos.length > 0 && !isLoading && (
+      {moType === "Additional" && moNo && tableNos.length > 0 && !isLoading && (
         <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
           <h3 className="text-sm font-semibold text-indigo-700 mb-1">
             {t("cutting.tableNo")}
@@ -473,319 +561,324 @@ const CuttingOrderModify = () => {
           <p className="text-sm text-indigo-600 font-bold">{tableNos.length}</p>
         </div>
       )}
-      {moNo && tableNos.length === 0 && !isLoading && (
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-300 rounded-lg text-center">
-          <Info size={24} className="mx-auto text-yellow-600 mb-2" />
-          <p className="text-sm text-yellow-700">
-            {t(
-              "cutting.noTableNosForMo",
-              "No cutting tables found for the selected MO."
-            )}
-          </p>
-        </div>
-      )}
-
-      {selectedGarmentType && moNo && (
-        <div className="mt-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between mb-4 pb-3 border-b border-gray-200 gap-3">
-            <h2 className="text-lg font-semibold text-gray-800">
-              {t("cutting.addAdditionalPoints")}
-            </h2>
-            <button
-              onClick={handleAddPoint}
-              disabled={isFetchingMaxIndex || isLoading}
-              className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors disabled:bg-indigo-300"
-            >
-              {isFetchingMaxIndex ? (
-                <Loader2 size={18} className="animate-spin mr-2" />
-              ) : (
-                <PlusCircle size={18} className="mr-2" />
+      {moType === "Additional" &&
+        moNo &&
+        tableNos.length === 0 &&
+        !isLoading && (
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-300 rounded-lg text-center">
+            <Info size={24} className="mx-auto text-yellow-600 mb-2" />
+            <p className="text-sm text-yellow-700">
+              {t(
+                "cutting.noTableNosForMo",
+                "No cutting tables found for the selected MO."
               )}
-              {t("cutting.addPoint")}
-            </button>
+            </p>
           </div>
+        )}
 
-          {additionalPoints.length === 0 && (
-            <div className="text-center py-8 px-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-              <Info size={40} className="mx-auto text-gray-400 mb-3" />
-              <p className="text-gray-600 font-medium">
-                {t("cutting.noPointsAddedYet")}
-              </p>
-              <p className="text-xs text-gray-500">
-                {t("cutting.clickAddPoint")}
-              </p>
-            </div>
-          )}
-
-          {additionalPoints.length > 0 && (
-            <div className="overflow-x-auto shadow-md rounded-lg max-h-[60vh]">
-              <table className="min-w-full w-max border-collapse">
-                <thead className="sticky top-0 z-10 bg-gray-100 text-xs uppercase text-gray-700">
-                  <tr>
-                    {[
-                      "panelIndexName",
-                      "panelIndex",
-                      "panelIndexNameKhmer",
-                      "panelIndexNameChinese",
-                      "panelName",
-                      "side",
-                      "direction",
-                      "lw",
-                      "measurementPoint",
-                      "measurementPointKhmer",
-                      "pointNameChinese",
-                      "action"
-                    ].map((headerKey) => (
-                      <th
-                        key={headerKey}
-                        scope="col"
-                        className="px-3 py-3 border-b border-r border-gray-300 whitespace-nowrap"
-                      >
-                        {t(`cutting.${headerKey}`)}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {additionalPoints.map((point, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
-                        <input
-                          type="text"
-                          value={point.panelIndexName}
-                          onChange={(e) =>
-                            handlePointChange(
-                              index,
-                              "panelIndexName",
-                              e.target.value
-                            )
-                          }
-                          list={`panel-index-options-${index}`}
-                          placeholder={t(
-                            "cutting.typeOrSelect",
-                            "Type or Select"
-                          )}
-                          className={`${inputNormalStyle} text-xs py-1.5`}
-                        />
-                        <datalist id={`panel-index-options-${index}`}>
-                          {panelIndexNames.map((item, i) => (
-                            <option key={i} value={item.panelIndexName} />
-                          ))}
-                        </datalist>
-                      </td>
-                      <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
-                        <input
-                          type="number"
-                          value={point.panelIndex || ""}
-                          onChange={(e) =>
-                            handlePointChange(
-                              index,
-                              "panelIndex",
-                              e.target.value
-                            )
-                          }
-                          className={`${inputNormalStyle} text-xs py-1.5 w-20 text-center`}
-                        />
-                      </td>
-                      <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
-                        <input
-                          type="text"
-                          value={point.panelIndexNameKhmer}
-                          onChange={(e) =>
-                            handlePointChange(
-                              index,
-                              "panelIndexNameKhmer",
-                              e.target.value
-                            )
-                          }
-                          className={`${inputNormalStyle} text-xs py-1.5`}
-                        />
-                      </td>
-                      <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
-                        <input
-                          type="text"
-                          value={point.panelIndexNameChinese}
-                          onChange={(e) =>
-                            handlePointChange(
-                              index,
-                              "panelIndexNameChinese",
-                              e.target.value
-                            )
-                          }
-                          className={`${inputNormalStyle} text-xs py-1.5`}
-                        />
-                      </td>
-                      <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
-                        <select
-                          value={point.panelName}
-                          onChange={(e) =>
-                            handlePointChange(
-                              index,
-                              "panelName",
-                              e.target.value
-                            )
-                          }
-                          className={`${inputNormalStyle} text-xs py-1.5`}
-                        >
-                          {panelNameOptions.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
-                        <select
-                          value={point.panelSide}
-                          onChange={(e) =>
-                            handlePointChange(
-                              index,
-                              "panelSide",
-                              e.target.value
-                            )
-                          }
-                          className={`${inputNormalStyle} text-xs py-1.5`}
-                        >
-                          {panelSideOptions.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
-                        <select
-                          value={point.panelDirection}
-                          onChange={(e) =>
-                            handlePointChange(
-                              index,
-                              "panelDirection",
-                              e.target.value
-                            )
-                          }
-                          className={`${inputNormalStyle} text-xs py-1.5`}
-                        >
-                          {panelDirectionOptions.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
-                        <select
-                          value={point.measurementSide}
-                          onChange={(e) =>
-                            handlePointChange(
-                              index,
-                              "measurementSide",
-                              e.target.value
-                            )
-                          }
-                          className={`${inputNormalStyle} text-xs py-1.5`}
-                        >
-                          {measurementSideOptions.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
-                        <input
-                          type="text"
-                          value={point.measurementPointEng}
-                          onChange={(e) =>
-                            handlePointChange(
-                              index,
-                              "measurementPointEng",
-                              e.target.value
-                            )
-                          }
-                          className={`${inputNormalStyle} text-xs py-1.5`}
-                        />
-                      </td>
-                      <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
-                        <input
-                          type="text"
-                          value={point.measurementPointKhmer}
-                          onChange={(e) =>
-                            handlePointChange(
-                              index,
-                              "measurementPointKhmer",
-                              e.target.value
-                            )
-                          }
-                          className={`${inputNormalStyle} text-xs py-1.5`}
-                        />
-                      </td>
-                      <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
-                        <input
-                          type="text"
-                          value={point.pointNameChinese}
-                          onChange={(e) =>
-                            handlePointChange(
-                              index,
-                              "pointNameChinese",
-                              e.target.value
-                            )
-                          }
-                          className={`${inputNormalStyle} text-xs py-1.5`}
-                        />
-                      </td>
-                      <td className="px-3 py-2 border-gray-300 text-center">
-                        <button
-                          onClick={() => handleRemovePoint(index)}
-                          title={t("cutting.removePoint", "Remove Point")}
-                          className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 transition-colors"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {additionalPoints.length > 0 && (
-            <div className="mt-6 flex justify-end">
+      {selectedGarmentType &&
+        (moType === "Common" || (moType === "Additional" && moNo)) && ( // Show Add Points if panel and a valid MO context (Common or specific MO)
+          <div className="mt-8">
+            <div className="flex flex-col sm:flex-row items-center justify-between mb-4 pb-3 border-b border-gray-200 gap-3">
+              <h2 className="text-lg font-semibold text-gray-800">
+                {t("cutting.addAdditionalPoints")} (
+                {moType === "Common" ? "Common" : moNo})
+              </h2>
               <button
-                onClick={handleSave}
-                disabled={isSaving || isLoading}
-                className="flex items-center px-6 py-2.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400"
+                onClick={handleAddPoint}
+                disabled={isFetchingMaxIndex || isLoading}
+                className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors disabled:bg-indigo-300"
               >
-                {isSaving ? (
+                {isFetchingMaxIndex ? (
                   <Loader2 size={18} className="animate-spin mr-2" />
                 ) : (
-                  <Save size={18} className="mr-2" />
+                  <PlusCircle size={18} className="mr-2" />
                 )}
-                {isSaving
-                  ? t("cutting.saving", "Saving...")
-                  : t("cutting.saveAllPoints", "Save All Points")}
+                {t("cutting.addPoint")}
               </button>
             </div>
-          )}
-        </div>
-      )}
-      {!selectedGarmentType && moNo && !isLoading && (
-        <div className="mt-8 text-center py-10 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-          <AlertTriangle size={40} className="mx-auto text-yellow-500 mb-3" />
-          <p className="font-medium">
-            {t(
-              "cutting.selectPanelPrompt",
-              "Please select a Panel/Garment Type."
+
+            {additionalPoints.length === 0 && (
+              <div className="text-center py-8 px-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                <Info size={40} className="mx-auto text-gray-400 mb-3" />
+                <p className="text-gray-600 font-medium">
+                  {t("cutting.noPointsAddedYet")}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {t("cutting.clickAddPoint")}
+                </p>
+              </div>
             )}
-          </p>
-          <p className="text-xs">
-            {t(
-              "cutting.selectPanelToAddPoints",
-              "Once a panel is selected, you can add new measurement points for it."
+
+            {additionalPoints.length > 0 && (
+              <div className="overflow-x-auto shadow-md rounded-lg max-h-[60vh]">
+                <table className="min-w-full w-max border-collapse">
+                  <thead className="sticky top-0 z-10 bg-gray-100 text-xs uppercase text-gray-700">
+                    <tr>
+                      {[
+                        "panelIndexName",
+                        "panelIndex",
+                        "panelIndexNameKhmer",
+                        "panelIndexNameChinese",
+                        "panelName",
+                        "side",
+                        "direction",
+                        "lw",
+                        "measurementPoint",
+                        "measurementPointKhmer",
+                        "pointNameChinese",
+                        "action"
+                      ].map((headerKey) => (
+                        <th
+                          key={headerKey}
+                          scope="col"
+                          className="px-3 py-3 border-b border-r border-gray-300 whitespace-nowrap"
+                        >
+                          {t(`cutting.${headerKey}`)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {additionalPoints.map((point, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
+                          <input
+                            type="text"
+                            value={point.panelIndexName}
+                            onChange={(e) =>
+                              handlePointChange(
+                                index,
+                                "panelIndexName",
+                                e.target.value
+                              )
+                            }
+                            list={`panel-index-options-${index}`}
+                            placeholder={t("cutting.typeOrSelect")}
+                            className={`${inputNormalStyle} text-xs py-1.5`}
+                          />
+                          <datalist id={`panel-index-options-${index}`}>
+                            {panelIndexNames.map((item, i) => (
+                              <option key={i} value={item.panelIndexName} />
+                            ))}
+                          </datalist>
+                        </td>
+                        <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
+                          <input
+                            type="number"
+                            value={point.panelIndex || ""}
+                            onChange={(e) =>
+                              handlePointChange(
+                                index,
+                                "panelIndex",
+                                e.target.value
+                              )
+                            }
+                            className={`${inputNormalStyle} text-xs py-1.5 w-20 text-center`}
+                          />
+                        </td>
+                        <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
+                          <input
+                            type="text"
+                            value={point.panelIndexNameKhmer}
+                            onChange={(e) =>
+                              handlePointChange(
+                                index,
+                                "panelIndexNameKhmer",
+                                e.target.value
+                              )
+                            }
+                            className={`${inputNormalStyle} text-xs py-1.5`}
+                          />
+                        </td>
+                        <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
+                          <input
+                            type="text"
+                            value={point.panelIndexNameChinese}
+                            onChange={(e) =>
+                              handlePointChange(
+                                index,
+                                "panelIndexNameChinese",
+                                e.target.value
+                              )
+                            }
+                            className={`${inputNormalStyle} text-xs py-1.5`}
+                          />
+                        </td>
+                        <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
+                          <select
+                            value={point.panelName}
+                            onChange={(e) =>
+                              handlePointChange(
+                                index,
+                                "panelName",
+                                e.target.value
+                              )
+                            }
+                            className={`${inputNormalStyle} text-xs py-1.5`}
+                          >
+                            {panelNameOptions.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
+                          <select
+                            value={point.panelSide}
+                            onChange={(e) =>
+                              handlePointChange(
+                                index,
+                                "panelSide",
+                                e.target.value
+                              )
+                            }
+                            className={`${inputNormalStyle} text-xs py-1.5`}
+                          >
+                            {panelSideOptions.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
+                          <select
+                            value={point.panelDirection}
+                            onChange={(e) =>
+                              handlePointChange(
+                                index,
+                                "panelDirection",
+                                e.target.value
+                              )
+                            }
+                            className={`${inputNormalStyle} text-xs py-1.5`}
+                          >
+                            {panelDirectionOptions.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
+                          <select
+                            value={point.measurementSide}
+                            onChange={(e) =>
+                              handlePointChange(
+                                index,
+                                "measurementSide",
+                                e.target.value
+                              )
+                            }
+                            className={`${inputNormalStyle} text-xs py-1.5`}
+                          >
+                            {measurementSideOptions.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
+                          <input
+                            type="text"
+                            value={point.measurementPointEng}
+                            onChange={(e) =>
+                              handlePointChange(
+                                index,
+                                "measurementPointEng",
+                                e.target.value
+                              )
+                            }
+                            className={`${inputNormalStyle} text-xs py-1.5`}
+                          />
+                        </td>
+                        <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
+                          <input
+                            type="text"
+                            value={point.measurementPointKhmer}
+                            onChange={(e) =>
+                              handlePointChange(
+                                index,
+                                "measurementPointKhmer",
+                                e.target.value
+                              )
+                            }
+                            className={`${inputNormalStyle} text-xs py-1.5`}
+                          />
+                        </td>
+                        <td className="px-3 py-2 border-r border-gray-300 whitespace-nowrap">
+                          <input
+                            type="text"
+                            value={point.pointNameChinese}
+                            onChange={(e) =>
+                              handlePointChange(
+                                index,
+                                "pointNameChinese",
+                                e.target.value
+                              )
+                            }
+                            className={`${inputNormalStyle} text-xs py-1.5`}
+                          />
+                        </td>
+                        <td className="px-3 py-2 border-gray-300 text-center">
+                          <button
+                            onClick={() => handleRemovePoint(index)}
+                            title={t("cutting.removePoint")}
+                            className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </p>
-        </div>
-      )}
+
+            {additionalPoints.length > 0 && (
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving || isLoading}
+                  className="flex items-center px-6 py-2.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400"
+                >
+                  {isSaving ? (
+                    <Loader2 size={18} className="animate-spin mr-2" />
+                  ) : (
+                    <Save size={18} className="mr-2" />
+                  )}
+                  {isSaving ? t("cutting.saving") : t("cutting.saveAllPoints")}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      {moType === "Additional" &&
+        !moNo &&
+        !isLoading && ( // Show prompt if additional is selected but no MO
+          <div className="mt-8 text-center py-10 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+            <Search size={40} className="mx-auto text-gray-400 mb-3" />
+            <p className="font-medium">
+              {t(
+                "cutting.searchOrSelectMoForAdditional",
+                "Please search and select an MO for additional points."
+              )}
+            </p>
+          </div>
+        )}
+      {selectedGarmentType === "" &&
+        (moType === "Common" || (moType === "Additional" && moNo)) &&
+        !isLoading && (
+          <div className="mt-8 text-center py-10 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+            <AlertTriangle size={40} className="mx-auto text-yellow-500 mb-3" />
+            <p className="font-medium">{t("cutting.selectPanelPrompt")}</p>
+            <p className="text-xs">{t("cutting.selectPanelToAddPoints")}</p>
+          </div>
+        )}
     </div>
   );
 };
