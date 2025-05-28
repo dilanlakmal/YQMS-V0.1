@@ -771,7 +771,8 @@
       "bundleQtyCheck": "Bundles Checked",
       "totalInspectionQty": "Total Insp. Qty",
       "cuttingType": "Cutting Type",
-      "inspectionDetailsSummary": "Insp. Details"
+      "inspectionDetailsSummary": "Insp. Details",
+      "orderQty": "Order Qty"
     },
     "sizesChecked": "Sizes Checked",
     "sizeLabel": "Size",
@@ -793,7 +794,20 @@
     "noRecordFoundForMoTable": "No inspection record found for the selected MO No. and Table No. Please verify your selection.",
     "noRecordFoundForSelection": "No inspection record found for the current selection.",
     "failedToFetchRecord": "Failed to fetch the inspection record.",
-    "noTableFoundForMo": "No tables found for this MO and search."
+    "noTableFoundForMo": "No tables found for this MO and search.",
+    "modifyButton": "Modify Record",
+    "deleteButton": "Delete Options",
+    "modifyGeneralInfoTitle": "Modify General Information",
+    "saveGeneralInfo": "Save General Info",
+    "generalInfoUpdatedSuccess": "General inspection information updated successfully.",
+    "failedToUpdateGeneralInfo": "Failed to update general information.",
+    "noRecordSelectedForModify": "No record selected or loaded for modification.",
+    "otherSectionsPlaceholder": "Further modifications for Macker Ratio, Size-specific data, and Defects will be implemented here.",
+    "autoCalculated": "Auto",
+    "validation": {
+      "totalBundleQtyTooHigh": "The entered 'Total Bundle Qty' results in calculations exceeding limits. Please adjust."
+    },
+    "pleaseSelectMoAndTable": "Please select an MO and Table No to manage."
   },
 
   "common": {

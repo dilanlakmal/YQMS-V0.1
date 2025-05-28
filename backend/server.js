@@ -10837,6 +10837,36 @@ app.get("/api/cutting/trend/top-defect-issues", async (req, res) => {
    Cutting Inspection Management ENDPOINTS
 ------------------------------ */
 
+// GET Full Cutting Inspection Document for Management/Modification
+app.get("/api/cutting-inspection-full-details", async (req, res) => {
+  try {
+    const { moNo, tableNo, color } = req.query; // Color might be needed if moNo+tableNo isn't unique
+    if (!moNo || !tableNo) {
+      return res
+        .status(400)
+        .json({ message: "MO Number and Table Number are required" });
+    }
+
+    let query = { moNo, tableNo };
+    // If your records are uniquely identified by moNo, tableNo, AND color, add color to the query:
+    // if (color) query.color = color;
+    // For now, assuming moNo + tableNo is sufficient to find a unique parent record.
+
+    const inspectionDoc = await CuttingInspection.findOne(query).lean();
+
+    if (!inspectionDoc) {
+      return res.status(404).json({ message: "Inspection document not found" });
+    }
+    res.json(inspectionDoc);
+  } catch (error) {
+    console.error("Error fetching full inspection details:", error);
+    res.status(500).json({
+      message: "Failed to fetch full inspection details",
+      error: error.message
+    });
+  }
+});
+
 // GET Full Cutting Inspection Document for Management (similar to modify, but might be simpler)
 app.get("/api/cutting-inspection-details-for-manage", async (req, res) => {
   try {
@@ -10885,12 +10915,10 @@ app.delete("/api/cutting-inspection-record/:id", async (req, res) => {
       .json({ message: "Cutting inspection record deleted successfully." });
   } catch (error) {
     console.error("Error deleting cutting inspection record:", error);
-    res
-      .status(500)
-      .json({
-        message: "Failed to delete cutting inspection record.",
-        error: error.message
-      });
+    res.status(500).json({
+      message: "Failed to delete cutting inspection record.",
+      error: error.message
+    });
   }
 });
 
@@ -10923,11 +10951,9 @@ app.delete(
       );
 
       if (record.inspectionData.length === initialLength) {
-        return res
-          .status(404)
-          .json({
-            message: `Inspected size '${inspectedSize}' not found in this record.`
-          });
+        return res.status(404).json({
+          message: `Inspected size '${inspectedSize}' not found in this record.`
+        });
       }
 
       // If all sizes are deleted, consider if the parent document should also be deleted or kept empty.
@@ -10938,23 +10964,69 @@ app.delete(
       record.markModified("inspectionData"); // Important for Mongoose to detect array changes
       await record.save();
 
-      res
-        .status(200)
-        .json({
-          message: `Inspection data for size '${inspectedSize}' deleted successfully.`,
-          data: record
-        });
+      res.status(200).json({
+        message: `Inspection data for size '${inspectedSize}' deleted successfully.`,
+        data: record
+      });
     } catch (error) {
       console.error(`Error deleting inspected size '${inspectedSize}':`, error);
-      res
-        .status(500)
-        .json({
-          message: `Failed to delete inspection data for size '${inspectedSize}'.`,
-          error: error.message
-        });
+      res.status(500).json({
+        message: `Failed to delete inspection data for size '${inspectedSize}'.`,
+        error: error.message
+      });
     }
   }
 );
+
+// PUT to update general information of a CuttingInspection document
+app.put("/api/cutting-inspection-general-update/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      inspectionDate, // Expecting 'M/D/YYYY' or 'MM/DD/YYYY' string from client
+      orderQty,
+      totalBundleQty,
+      bundleQtyCheck, // These are calculated on client, but we save them
+      totalInspectionQty // These are calculated on client, but we save them
+      // Add other general fields here if they become editable later
+    } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid Record ID format." });
+    }
+
+    const recordToUpdate = await CuttingInspection.findById(id);
+    if (!recordToUpdate) {
+      return res.status(404).json({ message: "Inspection record not found." });
+    }
+
+    // Update fields
+    if (inspectionDate !== undefined)
+      recordToUpdate.inspectionDate = inspectionDate; // Store as string 'M/D/YYYY'
+    if (orderQty !== undefined) recordToUpdate.orderQty = Number(orderQty);
+    if (totalBundleQty !== undefined)
+      recordToUpdate.totalBundleQty = Number(totalBundleQty);
+    if (bundleQtyCheck !== undefined)
+      recordToUpdate.bundleQtyCheck = Number(bundleQtyCheck);
+    if (totalInspectionQty !== undefined)
+      recordToUpdate.totalInspectionQty = Number(totalInspectionQty);
+
+    recordToUpdate.updated_at = new Date();
+
+    const updatedRecord = await recordToUpdate.save();
+
+    res.status(200).json({
+      message: "General inspection information updated successfully.",
+      data: updatedRecord
+    });
+  } catch (error) {
+    console.error("Error updating general inspection information:", error);
+    res.status(500).json({
+      message: "Failed to update general inspection information.",
+      error: error.message
+    });
+  }
+});
 
 /* ------------------------------
    AQL ENDPOINTS
