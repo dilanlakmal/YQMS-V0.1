@@ -10,6 +10,9 @@ import {
   getInspectionNumber,
   getCompletedInspectOperators,
   getBuyerStatus,
+  getFilterQCInlineRoving,
+  searchMoNumbers,
+  getInlineOrderDetails,
 } from '../../Controller/QCInlineRoving/qcInlineRovingController.js';
 
 
@@ -25,5 +28,8 @@ router.post('/api/save-qc-inline-roving', saveQCInlineRovingData );
 router.get('/api/qc-inline-roving/inspection-time-info',  getInspectionNumber );
 router.get('/api/inspections-completed',  getCompletedInspectOperators );
 router.get('/api/buyer-by-mo',  getBuyerStatus );
+router.get('/api/qc-inline-roving-reports/filtered',  getFilterQCInlineRoving );
+router.get('/api/inline-orders-mo-numbers',  searchMoNumbers );
+router.get('/api/inline-orders-details',  getInlineOrderDetails );
 
 export default router;

@@ -431,3 +431,128 @@ export const getBuyerStatus = async (req, res) => {
       const buyerName = determineBuyer(moNo);
       res.json({ buyerName });
 };
+
+/* ------------------------------
+   QC Inline Roving New
+------------------------------ */
+
+// Roving data filter function
+export const getFilterQCInlineRoving = async (req, res) => {
+  try {
+      const { inspection_date, qcId, operatorId, lineNo, moNo } = req.query;
+  
+      let queryConditions = {};
+  
+      if (inspection_date) {
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(inspection_date)) {
+          const parts = inspection_date.split("/");
+  
+          const month = parseInt(parts[0], 10);
+          const day = parseInt(parts[1], 10);
+          const year = parseInt(parts[2], 10);
+  
+          const monthRegexPart = month < 10 ? `0?${month}` : `${month}`;
+          const dayRegexPart = day < 10 ? `0?${day}` : `${day}`;
+  
+          const dateRegex = new RegExp(`^${monthRegexPart}\\/${dayRegexPart}\\/${year}$`);
+          queryConditions.inspection_date = { $regex: dateRegex };
+        } else {
+          console.warn(
+            "Received date for filtering is not in MM/DD/YYYY format:",
+            inspection_date,
+            "- Date filter will not be applied effectively."
+          );
+        }
+      }
+  
+      if (qcId) {
+        queryConditions.emp_id = qcId;
+      }
+  
+      if (lineNo) {
+        queryConditions.line_no = lineNo;
+      }
+  
+      if (moNo) {
+        queryConditions.mo_no = moNo;
+      }
+  
+      if (operatorId) {
+        const orConditions = [{ operator_emp_id: operatorId }];
+        if (/^\d+$/.test(operatorId)) {
+          orConditions.push({ operator_emp_id: parseInt(operatorId, 10) });
+        }
+        queryConditions.inlineData = { $elemMatch: { $or: orConditions } };
+      }
+  
+      const reports = await QCInlineRoving.find(queryConditions);
+  
+      res.json(reports);
+    } catch (error) {
+      console.error("Error fetching filtered QC inline roving reports:", error);
+      res
+        .status(500)
+        .json({ message: "Failed to fetch filtered reports", error: error.message });
+    }
+};
+
+// Updated Endpoint to Search MO Numbers (St_No) from inline_orders in MongoDB with partial matching
+export const searchMoNumbers = async (req, res) => {
+  try {
+    const searchTerm = req.query.search; // Get the search term from query params
+    if (!searchTerm) {
+      return res.status(400).json({ error: "Search term is required" });
+    }
+
+    // Use a case-insensitive regex to match the term anywhere in St_No
+    const regexPattern = new RegExp(searchTerm, "i");
+    const { InlineOrders } = await import("../../Config/mongodb.js");
+
+    // Query the inline_orders collection
+    const results = await InlineOrders.find({
+      St_No: { $regex: regexPattern }
+    })
+      .select("St_No") // Only return the St_No field (equivalent to .project({ St_No: 1, _id: 0 }))
+      .limit(100) // Limit results to prevent overwhelming the UI
+      .sort({ St_No: 1 }) // Sort alphabetically
+      .exec();
+
+    // Extract unique St_No values
+    const uniqueMONos = [...new Set(results.map((r) => r.St_No))];
+
+    res.json(uniqueMONos);
+  } catch (err) {
+    console.error("Error fetching MO numbers from inline_orders:", err);
+    res.status(500).json({
+      message: "Failed to fetch MO numbers from inline_orders",
+      error: err.message
+    });
+  }
+};
+
+// New Endpoint to Fetch Inline Order Details for a given MO No (St_No)
+export const getInlineOrderDetails = async (req, res) => {
+  try {
+    const stNo = req.query.stNo;
+    if (!stNo) {
+      return res.status(400).json({ error: "St_No is required" });
+    }
+
+    const { InlineOrders } = await import("../../Config/mongodb.js");
+
+    // Find the document where St_No matches
+    const document = await InlineOrders.findOne({ St_No: stNo }).exec();
+
+    if (!document) {
+      return res.status(404).json({ error: "MO No not found" });
+    }
+
+    res.json(document);
+  } catch (err) {
+    console.error("Error fetching Inline Order details:", err);
+    res.status(500).json({
+      message: "Failed to fetch Inline Order details",
+      error: err.message
+    });
+  }
+};

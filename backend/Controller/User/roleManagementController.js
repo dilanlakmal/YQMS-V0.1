@@ -229,3 +229,92 @@ export const deleteSuperAdmin = async (req, res) => {
     res.status(500).json({ message: "Failed to remove super admin" });
   }
 };
+
+// Update user roles
+export const updateUserRoles = async (req, res) => {
+  try {
+    const { emp_id, currentRoles, newRoles, userData } = req.body;
+
+    // Find roles to remove (in currentRoles but not in newRoles)
+    const rolesToRemove = currentRoles.filter(
+      (role) => !newRoles.includes(role)
+    );
+
+    // Find roles to add (in newRoles but not in currentRoles)
+    const rolesToAdd = newRoles.filter((role) => !currentRoles.includes(role));
+
+    // Remove user from roles
+    for (const role of rolesToRemove) {
+      const roleDoc = await RoleManagment.findOne({ role });
+      if (roleDoc) {
+        // Remove user from users array
+        roleDoc.users = roleDoc.users.filter((u) => u.emp_id !== emp_id);
+
+        // Check if there are any other users with the same job title
+        const otherUsersWithSameTitle = roleDoc.users.some(
+          (u) => u.job_title === userData.job_title
+        );
+        if (!otherUsersWithSameTitle) {
+          roleDoc.jobTitles = roleDoc.jobTitles.filter(
+            (t) => t !== userData.job_title
+          );
+        }
+
+        await roleDoc.save();
+      }
+    }
+
+    // Add user to new roles
+    for (const role of rolesToAdd) {
+      const roleDoc = await RoleManagment.findOne({ role });
+      if (roleDoc) {
+        // Add job title if not exists
+        if (!roleDoc.jobTitles.includes(userData.job_title)) {
+          roleDoc.jobTitles.push(userData.job_title);
+        }
+
+        // Add user if not exists
+        if (!roleDoc.users.some((u) => u.emp_id === emp_id)) {
+          roleDoc.users.push(userData);
+        }
+
+        await roleDoc.save();
+      }
+    }
+
+    res.json({
+      success: true,
+      message: "User roles updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating user roles:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update user roles",
+    });
+  }
+};
+
+// Get user roles
+export const getUserRole = async (req, res) => {
+  try {
+      const { empId } = req.params;
+      const roles = [];
+  
+      // Find all roles where this user exists
+      const userRoles = await RoleManagment.find({
+        "users.emp_id": empId,
+      });
+  
+      userRoles.forEach((role) => {
+        if (!["Super Admin", "Admin"].includes(role.role)) {
+          roles.push(role.role);
+        }
+      });
+  
+      res.json({ roles });
+    } catch (error) {
+      console.error("Error fetching user roles:", error);
+      res.status(500).json({ message: "Failed to fetch user roles" });
+    }
+};

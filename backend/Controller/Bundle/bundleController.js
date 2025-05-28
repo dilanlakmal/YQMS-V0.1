@@ -368,3 +368,128 @@ export const checkBundleIdExists = async (req, res) => {
         });
       }
 };
+
+/* ------------------------------
+  PUT Endpoints - Update QC2 Order Data
+------------------------------ */
+export const updateQC2OrderData = async (req, res) => {
+  try {
+    const { bundleId } = req.params;
+    const { inspectionType, process, data } = req.body;
+
+    if (!["first", "defect"].includes(inspectionType)) {
+      return res.status(400).json({ error: "Invalid inspection type" });
+    }
+
+    const updateField =
+      inspectionType === "first" ? "inspectionFirst" : "inspectionDefect";
+    const updateOperation = {
+      $push: {
+        [updateField]: {
+          process,
+          ...data
+        }
+      }
+    };
+
+    // For defect scans, ensure defect_print_id is provided
+    if (inspectionType === "defect" && !data.defect_print_id) {
+      return res
+        .status(400)
+        .json({ error: "defect_print_id is required for defect scans" });
+    }
+
+    const updatedRecord = await QC2OrderData.findOneAndUpdate(
+      { bundle_id: bundleId },
+      updateOperation,
+      { new: true, upsert: true }
+    );
+
+    if (!updatedRecord) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+
+    res.json({ message: "Record updated successfully", data: updatedRecord });
+  } catch (error) {
+    console.error("Error updating qc2_orderdata:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to update record", details: error.message });
+  }
+};
+
+/* ------------------------------
+   End Points - Reprint - qc2_orderdata
+------------------------------ */
+
+// Combined search endpoint for MONo, Package No, and Emp ID from qc2_orderdata
+export const searchQC2OrderData = async (req, res) => {
+  try {
+      const { mono, packageNo, empId } = req.query;
+  
+      // Build the query dynamically based on provided parameters
+      const query = {};
+      if (mono) {
+        query.selectedMono = { $regex: mono, $options: "i" }; // Case-insensitive partial match
+      }
+      if (packageNo) {
+        const packageNoInt = parseInt(packageNo);
+        if (!isNaN(packageNoInt)) {
+          query.package_no = packageNoInt; // Exact match for integer
+        }
+      }
+      if (empId) {
+        query.emp_id = { $regex: empId, $options: "i" }; // Case-insensitive partial match
+      }
+  
+      // Fetch matching records from qc2_orderdata
+      const records = await QC2OrderData.find(query)
+        .sort({ package_no: 1 }) // Sort by package_no ascending
+        .limit(100); // Limit to prevent overload
+  
+      res.json(records);
+    } catch (error) {
+      console.error("Error searching qc2_orderdata:", error);
+      res.status(500).json({ error: "Failed to search records" });
+    }
+};
+
+// Fetch colors and sizes for a specific MONo (unchanged)
+export const fetchColorsAndSizes = async (req, res) => {
+  try {
+      const mono = req.params.mono;
+      const result = await QC2OrderData.aggregate([
+        { $match: { selectedMono: mono } },
+        {
+          $group: {
+            _id: {
+              color: "$color",
+              size: "$size",
+            },
+            colorCode: { $first: "$colorCode" },
+            chnColor: { $first: "$chnColor" },
+            package_no: { $first: "$package_no" },
+          },
+        },
+        {
+          $group: {
+            _id: "$_id.color",
+            sizes: { $push: "$_id.size" },
+            colorCode: { $first: "$colorCode" },
+            chnColor: { $first: "$chnColor" },
+          },
+        },
+      ]);
+  
+      const colors = result.map((c) => ({
+        color: c._id,
+        sizes: c.sizes,
+        colorCode: c.colorCode,
+        chnColor: c.chnColor,
+      }));
+  
+      res.json(colors);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch colors/sizes" });
+    }
+};

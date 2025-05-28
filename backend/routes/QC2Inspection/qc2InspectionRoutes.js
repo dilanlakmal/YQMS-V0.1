@@ -8,6 +8,7 @@ import {
   fetchAllDefectPrintRecords,
   getDefectPrintRecordsByDefectId,
   getQC2InspectionData,
+  editInspectionData,
 } from '../../Controller/QC2Inspection/qc2InspectionController.js';
 
 const router = express.Router();
@@ -20,7 +21,7 @@ router.get('/api/qc2-defect-print/search', searchDefectPrintRecords);
 router.get('/api/qc2-defect-print', fetchAllDefectPrintRecords);
 router.get('/api/qc2-defect-print/filter-options', getQC2InspectionData);
 router.get('/api/qc2-defect-print/:defect_id', getDefectPrintRecordsByDefectId);
-
+router.put('/api/qc2-inspection-pass-bundle/:id', editInspectionData);
 
 
 export default router;

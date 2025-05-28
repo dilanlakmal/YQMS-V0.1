@@ -11,6 +11,7 @@ import {
   getUsersPaginated,
   getSections,
   getUserByEmpId,
+  getUserByEmpIdForInspector,
 } from '../../Controller/User/userController.js';
 
 const router = express.Router();
@@ -27,5 +28,6 @@ router.delete('/users/:id', deleteUser);
 router.get('/api/users-paginated', getUsersPaginated);
 router.get('/api/sections', getSections);
 router.get('/api/user-by-emp-id', getUserByEmpId);
+router.get('/api/users/:emp_id', getUserByEmpIdForInspector);
 
 export default router;

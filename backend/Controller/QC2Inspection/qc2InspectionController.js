@@ -519,3 +519,32 @@ export const getDefectPrintRecordsByDefectId = async (req, res) => {
       }
 };
 
+/* ------------------------------
+   QC2 - Inspection Pass Bundle, Reworks
+------------------------------ */
+
+// Edit the Inspection Data
+export const editInspectionData = async (req, res) => {
+  const { id } = req.params;
+    const updateData = req.body;
+  
+    try {
+      // console.log(`Received request to update record with ID: ${id}`);
+      // console.log(`Update Data: ${JSON.stringify(updateData)}`);
+      const updatedRecord = await QC2InspectionPassBundle.findByIdAndUpdate(
+        id,
+        updateData,
+        { new: true }
+      );
+      if (!updatedRecord) {
+        // console.log(`Record with ID: ${id} not found`);
+        return res.status(404).send({ message: "Record not found" });
+      }
+      // console.log(`Record with ID: ${id} updated successfully`);
+      res.send(updatedRecord);
+    } catch (error) {
+      console.error("Error updating record:", error);
+      res.status(500).send({ message: "Internal Server Error" });
+    }
+};
+

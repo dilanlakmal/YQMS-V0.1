@@ -11,6 +11,9 @@ import {
   editBundleData,
   getUserBatchers,
   checkBundleIdExists,
+  updateQC2OrderData,
+  searchQC2OrderData,
+  fetchColorsAndSizes,
 } from '../../Controller/Bundle/bundleController.js';
 
 const router = express.Router();
@@ -26,5 +29,9 @@ router.post('/api/save-bundle-data', saveBundleData);
 router.put('/api/update-bundle-data/:id', editBundleData);
 router.get('/api/user-batches', getUserBatchers);
 router.post('/api/check-bundle-id', checkBundleIdExists);
+router.put('/api/update-qc2-orderdata/:bundleId', updateQC2OrderData);
+router.get('/api/reprint-search', searchQC2OrderData);
+router.get('/api/reprint-colors-sizes/:mono', fetchColorsAndSizes);
+
 
 export default router;

@@ -189,3 +189,33 @@ export const getCutpanelOrderMoNo = async (req, res) => {
         });
       }
   };
+
+  // Endpoint to get aggregated TotalOrderQty for a given StyleNo (MO No)
+// This sums the TotalOrderQty for each unique color associated with the StyleNo.
+export const getCutpanelOrderAggreTotalQtyPerMo = async (req, res) => {
+  try {
+      const { styleNo } = req.query;
+      if (!styleNo) {
+        return res.status(400).json({ error: "StyleNo (MO No) is required" });
+      }
+  
+      // Find one document matching the StyleNo and project only TotalOrderQtyStyle
+      const result = await CutPanelOrders.findOne(
+        { StyleNo: styleNo },
+        { TotalOrderQtyStyle: 1 }
+      );
+  
+      if (result && result.TotalOrderQtyStyle !== undefined) {
+        res.json({ aggregatedTotalOrderQty: result.TotalOrderQtyStyle });
+      } else {
+        // If no matching StyleNo or TotalOrderQtyStyle is undefined, return 0
+        res.json({ aggregatedTotalOrderQty: 0 });
+      }
+    } catch (err) {
+      console.error("Error fetching aggregated total order quantity:", err);
+      res.status(500).json({
+        message: "Failed to fetch aggregated total order quantity",
+        error: err.message
+      });
+    }
+};
