@@ -4,7 +4,7 @@ import {
   deleteSewingDefect,
   getAllDefectDetails,
   getAllBuyers,
-  updateBuyerStatuses
+  updateBuyerStatuses,
 } from '../../Controller/Defects/sewingDefectController.js';
 
 const router = express.Router();
