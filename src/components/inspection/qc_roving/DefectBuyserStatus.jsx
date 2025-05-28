@@ -299,8 +299,11 @@ const DefectBuyerStatus = () => {
   return (
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
       <div className="max-w-8xl mx-auto bg-white shadow-xl rounded-lg p-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6 text-center">
-          {t("defectBuyerStatus.title", "Manage Defect Statuses by Buyer")}
+        <h1 className="text-lg md:text-xl font-bold text-gray-800 mb-6 text-center">
+          {t(
+            "defectBuyerStatus.title",
+            "Manage Critical/Major/Minor Defects by Buyer"
+          )}
         </h1>
         {error && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md flex items-center">

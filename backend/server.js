@@ -76,11 +76,13 @@ const PORT = 5001;
 const privateKey = fs.readFileSync(
   "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.14.32-key.pem",
   //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175-key.pem",
+  //"/usr/local/share/ca-certificates/yorkmars.key",
   "utf8"
 );
 const certificate = fs.readFileSync(
   "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.14.32.pem",
   //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175.pem",
+  //"/usr/local/share/ca-certificates/yorkmars.crt",
   "utf8"
 );
 
@@ -9563,6 +9565,154 @@ app.get("/api/cutting-fabric-defects", async (req, res) => {
   }
 });
 
+// POST - Add a new cutting fabric defect
+app.post("/api/cutting-fabric-defects", async (req, res) => {
+  try {
+    const { defectCode, defectNameEng, defectNameKhmer, defectNameChinese } =
+      req.body;
+
+    // Chinese name is optional, so only validate the mandatory fields
+    if (!defectCode || !defectNameEng || !defectNameKhmer) {
+      return res.status(400).json({
+        message: "Defect Code, English Name, and Khmer Name are required."
+      });
+    }
+
+    const existingDefectByCode = await CuttingFabricDefect.findOne({
+      defectCode
+    });
+    if (existingDefectByCode) {
+      return res
+        .status(409)
+        .json({ message: `Defect code '${defectCode}' already exists.` });
+    }
+    const existingDefectByName = await CuttingFabricDefect.findOne({
+      defectNameEng
+    });
+    if (existingDefectByName) {
+      return res.status(409).json({
+        message: `Defect name (English) '${defectNameEng}' already exists.`
+      });
+    }
+
+    const newDefect = new CuttingFabricDefect({
+      defectCode,
+      defectName: defectNameEng,
+      defectNameEng,
+      defectNameKhmer,
+      defectNameChinese: defectNameChinese || "" // Save empty string if not provided
+    });
+    await newDefect.save();
+    res.status(201).json({
+      message: "Cutting fabric defect added successfully",
+      defect: newDefect
+    });
+  } catch (error) {
+    console.error("Error adding cutting fabric defect:", error);
+    if (error.code === 11000) {
+      return res
+        .status(409)
+        .json({ message: "Duplicate defect code or name." });
+    }
+    res
+      .status(500)
+      .json({ message: "Failed to add defect", error: error.message });
+  }
+});
+
+// PUT - Update an existing cutting fabric defect by ID
+app.put("/api/cutting-fabric-defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { defectCode, defectNameEng, defectNameKhmer, defectNameChinese } =
+      req.body;
+
+    // Chinese name is optional
+    if (!defectCode || !defectNameEng || !defectNameKhmer) {
+      return res.status(400).json({
+        message:
+          "Defect Code, English Name, and Khmer Name are required for update."
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid defect ID format." });
+    }
+
+    const existingDefectByCode = await CuttingFabricDefect.findOne({
+      defectCode,
+      _id: { $ne: id }
+    });
+    if (existingDefectByCode) {
+      return res.status(409).json({
+        message: `Defect code '${defectCode}' already exists for another defect.`
+      });
+    }
+    const existingDefectByName = await CuttingFabricDefect.findOne({
+      defectNameEng,
+      _id: { $ne: id }
+    });
+    if (existingDefectByName) {
+      return res.status(409).json({
+        message: `Defect name (English) '${defectNameEng}' already exists for another defect.`
+      });
+    }
+
+    const updatedDefect = await CuttingFabricDefect.findByIdAndUpdate(
+      id,
+      {
+        defectCode,
+        defectName: defectNameEng,
+        defectNameEng,
+        defectNameKhmer,
+        defectNameChinese: defectNameChinese || "", // Save empty string if not provided
+        updated_at: Date.now()
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedDefect) {
+      return res.status(404).json({ message: "Defect not found." });
+    }
+    res.status(200).json({
+      message: "Cutting fabric defect updated successfully",
+      defect: updatedDefect
+    });
+  } catch (error) {
+    console.error("Error updating cutting fabric defect:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Update failed due to duplicate defect code or name."
+      });
+    }
+    res
+      .status(500)
+      .json({ message: "Failed to update defect", error: error.message });
+  }
+});
+
+// DELETE - Delete a cutting fabric defect by ID (remains the same)
+app.delete("/api/cutting-fabric-defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid defect ID format." });
+    }
+    const deletedDefect = await CuttingFabricDefect.findByIdAndDelete(id);
+    if (!deletedDefect) {
+      return res.status(404).json({ message: "Defect not found." });
+    }
+    res
+      .status(200)
+      .json({ message: "Cutting fabric defect deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting cutting fabric defect:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to delete defect", error: error.message });
+  }
+});
+
 /* ------------------------------
   Cutting Issues ENDPOINTS
 ------------------------------ */
@@ -9584,22 +9734,31 @@ app.get("/api/cutting-issues", async (req, res) => {
 // Multer configuration for cutting images
 const cutting_storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const dir = path.join(__dirname, "public/storage/cutting/");
-    try {
-      // Create directory synchronously if it doesn't exist
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      cb(null, dir);
-    } catch (error) {
-      console.error("Error creating directory:", error);
-      cb(error);
-    }
+    cb(null, "public/storage/cutting/");
   },
   filename: (req, file, cb) => {
     cb(null, `cutting-${Date.now()}${path.extname(file.originalname)}`);
   }
 });
+
+// const cutting_storage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     const dir = path.join(__dirname, "public/storage/cutting/");
+//     try {
+//       // Create directory synchronously if it doesn't exist
+//       if (!fs.existsSync(dir)) {
+//         fs.mkdirSync(dir, { recursive: true });
+//       }
+//       cb(null, dir);
+//     } catch (error) {
+//       console.error("Error creating directory:", error);
+//       cb(error);
+//     }
+//   },
+//   filename: (req, file, cb) => {
+//     cb(null, `cutting-${Date.now()}${path.extname(file.originalname)}`);
+//   }
+// });
 
 // File filter for JPEG/PNG only
 const fileFilter = (req, file, cb) => {
@@ -12389,11 +12548,7 @@ app.delete("/api/delete-measurement-record", async (req, res) => {
 // Multer setup for SCC image uploads
 const sccImageStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const dir = path.join(__dirname, "public/storage/scc_images");
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    cb(null, dir);
+    cb(null, "public/storage/scc_images");
   },
   filename: (req, file, cb) => {
     // imageType should be passed in the body: 'referenceSample-HT', 'afterWash-FU', etc.
@@ -12409,6 +12564,29 @@ const sccImageStorage = multer.diskStorage({
     cb(null, filename);
   }
 });
+
+// const sccImageStorage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     const dir = path.join(__dirname, "public/storage/scc_images");
+//     if (!fs.existsSync(dir)) {
+//       fs.mkdirSync(dir, { recursive: true });
+//     }
+//     cb(null, dir);
+//   },
+//   filename: (req, file, cb) => {
+//     // imageType should be passed in the body: 'referenceSample-HT', 'afterWash-FU', etc.
+//     const { imageType, inspectionDate } = req.body;
+//     const datePart = inspectionDate
+//       ? inspectionDate.replace(/\//g, "-")
+//       : new Date().toISOString().split("T")[0];
+//     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+//     // Filename: imageType-date-uniqueSuffix.extension
+//     const filename = `${
+//       imageType || "sccimage"
+//     }-${datePart}-${uniqueSuffix}${path.extname(file.originalname)}`;
+//     cb(null, filename);
+//   }
+// });
 
 const sccUpload = multer({ storage: sccImageStorage });
 
@@ -12927,12 +13105,10 @@ app.put("/api/scc/daily-htfu/update-test-result/:docId", async (req, res) => {
         !["Pass", "Reject", "Pending", ""].includes(stretchTestResult) &&
         stretchTestResult !== null
       ) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "Invalid Stretch Test Result value."
-          });
+        return res.status(400).json({
+          success: false,
+          message: "Invalid Stretch Test Result value."
+        });
       }
       updateFields.stretchTestResult =
         stretchTestResult === "" ? "Pending" : stretchTestResult; // Treat empty as Pending
@@ -12953,12 +13129,10 @@ app.put("/api/scc/daily-htfu/update-test-result/:docId", async (req, res) => {
         !["Pass", "Reject", "Pending", ""].includes(washingTestResult) &&
         washingTestResult !== null
       ) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "Invalid Washing Test Result value."
-          });
+        return res.status(400).json({
+          success: false,
+          message: "Invalid Washing Test Result value."
+        });
       }
       updateFields.washingTestResult =
         washingTestResult === "" ? "Pending" : washingTestResult; // Treat empty as Pending
@@ -12975,12 +13149,10 @@ app.put("/api/scc/daily-htfu/update-test-result/:docId", async (req, res) => {
     }
 
     if (!updated) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "No valid test result fields provided for update."
-        });
+      return res.status(400).json({
+        success: false,
+        message: "No valid test result fields provided for update."
+      });
     }
 
     // Update who last modified this record (optional, good for auditing)
@@ -13003,13 +13175,11 @@ app.put("/api/scc/daily-htfu/update-test-result/:docId", async (req, res) => {
 
     if (!updatedRecord) {
       // Should not happen if findById found the record, but as a safeguard
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message:
-            "Failed to update record, record not found after update attempt."
-        });
+      return res.status(404).json({
+        success: false,
+        message:
+          "Failed to update record, record not found after update attempt."
+      });
     }
 
     res.status(200).json({
@@ -13893,132 +14063,179 @@ app.get("/api/scc/defects", async (req, res) => {
   }
 });
 
+// POST - Add a new SCC defect
+app.post("/api/scc/defects", async (req, res) => {
+  try {
+    const { no, defectNameEng, defectNameKhmer, defectNameChinese } = req.body;
+
+    // Validate required fields (Chinese name is optional)
+    if (no === undefined || no === null || !defectNameEng || !defectNameKhmer) {
+      return res
+        .status(400)
+        .json({
+          message: "Defect No, English Name, and Khmer Name are required."
+        });
+    }
+    if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Defect No must be a positive number." });
+    }
+
+    // Check for duplicate 'no'
+    const existingDefectByNo = await SCCDefect.findOne({ no: Number(no) });
+    if (existingDefectByNo) {
+      return res
+        .status(409)
+        .json({ message: `Defect No '${no}' already exists.` });
+    }
+    // Check for duplicate English name (optional, but good for data integrity)
+    const existingDefectByName = await SCCDefect.findOne({ defectNameEng });
+    if (existingDefectByName) {
+      return res
+        .status(409)
+        .json({
+          message: `Defect name (English) '${defectNameEng}' already exists.`
+        });
+    }
+
+    const newSccDefect = new SCCDefect({
+      no: Number(no),
+      defectNameEng,
+      defectNameKhmer,
+      defectNameChinese: defectNameChinese || "" // Save empty string if not provided
+    });
+    await newSccDefect.save();
+    res
+      .status(201)
+      .json({ message: "SCC defect added successfully", defect: newSccDefect });
+  } catch (error) {
+    console.error("Error adding SCC defect:", error);
+    if (error.code === 11000) {
+      // Mongoose duplicate key error (if unique index is on more than just 'no')
+      return res
+        .status(409)
+        .json({
+          message: "Duplicate entry. Defect No or Name might already exist."
+        });
+    }
+    res
+      .status(500)
+      .json({ message: "Failed to add SCC defect", error: error.message });
+  }
+});
+
+// PUT - Update an existing SCC defect by ID
+app.put("/api/scc/defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { no, defectNameEng, defectNameKhmer, defectNameChinese } = req.body;
+
+    // Validate required fields (Chinese name is optional)
+    if (no === undefined || no === null || !defectNameEng || !defectNameKhmer) {
+      return res
+        .status(400)
+        .json({
+          message:
+            "Defect No, English Name, and Khmer Name are required for update."
+        });
+    }
+    if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Defect No must be a positive number." });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid defect ID format." });
+    }
+
+    // Check for duplicate 'no' (excluding the current document being updated)
+    const existingDefectByNo = await SCCDefect.findOne({
+      no: Number(no),
+      _id: { $ne: id }
+    });
+    if (existingDefectByNo) {
+      return res
+        .status(409)
+        .json({
+          message: `Defect No '${no}' already exists for another defect.`
+        });
+    }
+    // Check for duplicate English name (excluding the current document)
+    const existingDefectByName = await SCCDefect.findOne({
+      defectNameEng,
+      _id: { $ne: id }
+    });
+    if (existingDefectByName) {
+      return res
+        .status(409)
+        .json({
+          message: `Defect name (English) '${defectNameEng}' already exists for another defect.`
+        });
+    }
+
+    const updatedSccDefect = await SCCDefect.findByIdAndUpdate(
+      id,
+      {
+        no: Number(no),
+        defectNameEng,
+        defectNameKhmer,
+        defectNameChinese: defectNameChinese || "" // Save empty string if not provided
+        // timestamps: true in schema will automatically update updated_at
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedSccDefect) {
+      return res.status(404).json({ message: "SCC Defect not found." });
+    }
+    res
+      .status(200)
+      .json({
+        message: "SCC defect updated successfully",
+        defect: updatedSccDefect
+      });
+  } catch (error) {
+    console.error("Error updating SCC defect:", error);
+    if (error.code === 11000) {
+      return res
+        .status(409)
+        .json({ message: "Update failed due to duplicate Defect No or Name." });
+    }
+    res
+      .status(500)
+      .json({ message: "Failed to update SCC defect", error: error.message });
+  }
+});
+
+// DELETE - Delete an SCC defect by ID
+app.delete("/api/scc/defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid defect ID format." });
+    }
+
+    const deletedSccDefect = await SCCDefect.findByIdAndDelete(id);
+    if (!deletedSccDefect) {
+      return res.status(404).json({ message: "SCC Defect not found." });
+    }
+    res.status(200).json({ message: "SCC defect deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting SCC defect:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to delete SCC defect", error: error.message });
+  }
+});
+
 /* ------------------------------
    End Points - SCC HT Inspection
 ------------------------------ */
 
-// app.post("/api/scc/ht-inspection-report", async (req, res) => {
-//   try {
-//     const {
-//       _id,
-//       inspectionDate,
-//       machineNo,
-//       moNo,
-//       buyer,
-//       buyerStyle,
-//       color,
-//       batchNo,
-//       totalBundle,
-//       totalPcs,
-//       aqlData,
-//       defectsQty,
-//       result,
-//       defects,
-//       remarks,
-//       // defectImageFile is handled by SCCPage, we expect defectImageUrl here if uploaded
-//       defectImageUrl, // Expecting URL from client if image was uploaded/kept
-//       emp_id,
-//       emp_kh_name,
-//       emp_eng_name,
-//       emp_dept_name,
-//       emp_sect_name,
-//       emp_job_title
-//     } = req.body;
-
-//     // Basic validation (more comprehensive on model)
-//     if (
-//       !inspectionDate ||
-//       !machineNo ||
-//       !moNo ||
-//       !color ||
-//       !batchNo ||
-//       !totalPcs ||
-//       !aqlData
-//     ) {
-//       return res
-//         .status(400)
-//         .json({ message: "Missing required fields for HT Inspection Report." });
-//     }
-
-//     const now = new Date();
-//     const inspectionTime = `${String(now.getHours()).padStart(2, "0")}:${String(
-//       now.getMinutes()
-//     ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-
-//     const reportData = {
-//       inspectionDate: new Date(inspectionDate),
-//       machineNo,
-//       moNo,
-//       buyer,
-//       buyerStyle,
-//       color,
-//       batchNo,
-//       totalBundle: Number(totalBundle),
-//       totalPcs: Number(totalPcs),
-//       aqlData,
-//       defectsQty: Number(defectsQty),
-//       result,
-//       defects,
-//       remarks: remarks?.trim() || "NA",
-//       defectImageUrl: defectImageUrl || null, // Use the URL passed from client
-//       emp_id,
-//       emp_kh_name,
-//       emp_eng_name,
-//       emp_dept_name,
-//       emp_sect_name,
-//       emp_job_title,
-//       inspectionTime
-//     };
-
-//     let savedReport;
-//     if (_id) {
-//       // Update existing
-//       savedReport = await HTInspectionReport.findByIdAndUpdate(
-//         _id,
-//         reportData,
-//         { new: true, runValidators: true }
-//       );
-//       if (!savedReport)
-//         return res
-//           .status(404)
-//           .json({ message: "Report not found for update." });
-//     } else {
-//       // Create new
-//       // Optional: Check for duplicates before creating, if unique index is not strictly enforced or for better user feedback
-//       // const existing = await HTInspectionReport.findOne({ inspectionDate: reportData.inspectionDate, machineNo, moNo, color, batchNo });
-//       // if (existing) return res.status(409).json({ message: "Duplicate report found for this date, machine, MO, color, and batch." });
-//       savedReport = new HTInspectionReport(reportData);
-//       await savedReport.save();
-//     }
-
-//     res.status(201).json({
-//       message: "HT Inspection Report saved successfully.",
-//       data: savedReport
-//     });
-//   } catch (error) {
-//     console.error("Error saving HT Inspection Report:", error);
-//     if (error.code === 11000) {
-//       // Mongoose duplicate key error
-//       return res.status(409).json({
-//         message: "Duplicate entry. This report might already exist.",
-//         error: error.message,
-//         errorCode: "DUPLICATE_KEY"
-//       });
-//     }
-//     if (error.name === "ValidationError") {
-//       return res.status(400).json({
-//         message: "Validation Error: " + error.message,
-//         errors: error.errors
-//       });
-//     }
-//     res.status(500).json({
-//       message: "Failed to save HT Inspection Report.",
-//       error: error.message,
-//       details: error
-//     });
-//   }
-// });
-
+// 1. POST /api/scc/ht-inspection-report
 app.post("/api/scc/ht-inspection-report", async (req, res) => {
   try {
     const {

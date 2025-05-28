@@ -9,7 +9,7 @@ const sccDefectSchema = new mongoose.Schema(
   },
   {
     collection: "sccdefects", // Explicitly set collection name
-    timestamps: false // No need for createdAt/updatedAt for this static-like data
+    timestamps: true
   }
 );
 
