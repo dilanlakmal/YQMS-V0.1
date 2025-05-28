@@ -48,6 +48,7 @@ import QC2DashboardRoutes from "./routes/LiveDashboard/qc2DashboardRoutes.js";
 import processDashbiardRoutes from "./routes/LiveDashboard/processDashboardRoutes.js";
 import qc1SunriseRoutes from "./routes/QC1Sunrise/qc1SunriseRoutes.js"; 
 import aqlRoutes from "./routes/AQL/aqlRoutes.js";
+import sewingDefectRoutes from "./routes/Defects/sewingDefectRoutes.js";
 
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "./config.js"; 
@@ -62,7 +63,6 @@ import {ymProdConnection,
   RoleManagment,
   QC2InspectionPassBundle,
   QCInlineRoving,
-  SewingDefects,
   DailyTestingHTFU,
   disconnectMongoDB,
 } from "../backend/Config/mongodb.js";
@@ -185,6 +185,7 @@ app.use(QC2DashboardRoutes);
 app.use(processDashbiardRoutes);
 app.use(qc1SunriseRoutes);
 app.use(aqlRoutes);
+app.use(sewingDefectRoutes);
 
 // Drop the conflicting St_No_1 index if it exists
 async function dropConflictingIndex() {
@@ -523,45 +524,6 @@ app.get("/api/health", (req, res) => {
 /* ------------------------------
    End Points - SewingDefects
 ------------------------------ */
-app.get('/api/sewing-defects', async (req, res) => {
-  try {
-    // Extract query parameters
-    const { categoryEnglish, type, isCommon } = req.query;
-
-    // Build filter object based on provided query parameters
-    const filter = {};
-    if (categoryEnglish) filter.categoryEnglish = categoryEnglish;
-    if (type) filter.type = type;
-    if (isCommon) filter.isCommon = isCommon;
-
-    // Fetch defects from the database
-    const defects = await SewingDefects.find(filter);
-
-    // Send the response with fetched defects
-    res.json(defects);
-  } catch (error) {
-    // Handle errors
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// DELETE a defect by code
-app.delete("/api/sewing-defects/:defectCode", async (req, res) => {
-  try {
-    const { defectCode } = req.params;
-    const result = await SewingDefects.findOneAndDelete({ code: defectCode });
-
-    if (!result) {
-      return res.status(404).json({ message: "Defect not found" });
-    }
-
-    res.status(200).json({ message: "Defect deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting defect:", error);
-    res.status(500).json({ message: "Failed to delete defect", error: error.message });
-  }
-});
-
 
 /* ------------------------------
    End Points - dt_orders
@@ -1344,76 +1306,77 @@ app.post("/api/roving/upload-roving-image",rovingUpload.single("imageFile"),asyn
 ------------------------------ */
 
 // Endpoint for /api/defects/all-details
-app.get("/api/defects/all-details", async (req, res) => {
-  try {
-    const defects = await SewingDefects.find({}).lean();
-    const transformedDefects = defects.map(defect => ({
-      code: defect.code.toString(),
-      name_en: defect.english,
-      name_kh: defect.khmer,
-      name_ch: defect.chinese,
-      categoryEnglish: defect.categoryEnglish,
-      type: defect.type,
-      repair: defect.repair,
-      statusByBuyer: defect.statusByBuyer || [],
-    }));
-    res.json(transformedDefects);
-  } catch (error) {
-    console.error("Error fetching all defect details:", error);
-    res.status(500).json({ message: "Failed to fetch defect details", error: error.message });
-  }
-});
+// app.get("/api/defects/all-details", async (req, res) => {
+//   try {
+//     const defects = await SewingDefects.find({}).lean();
+//     const transformedDefects = defects.map(defect => ({
+//       code: defect.code.toString(),
+//       name_en: defect.english,
+//       name_kh: defect.khmer,
+//       name_ch: defect.chinese,
+//       categoryEnglish: defect.categoryEnglish,
+//       type: defect.type,
+//       repair: defect.repair,
+//       statusByBuyer: defect.statusByBuyer || [],
+//     }));
+//     res.json(transformedDefects);
+//   } catch (error) {
+//     console.error("Error fetching all defect details:", error);
+//     res.status(500).json({ message: "Failed to fetch defect details", error: error.message });
+//   }
+// });
 
 // Endpoint for /api/buyers
-app.get("/api/buyers", (req, res) => {
-  const buyers = ["Costco", "Aritzia", "Reitmans", "ANF", "MWW"];
-  res.json(buyers);
-});
+// app.get("/api/buyers", (req, res) => {
+//   const buyers = ["Costco", "Aritzia", "Reitmans", "ANF", "MWW"];
+//   res.json(buyers);
+// });
+
 
 // New Endpoint for updating buyer statuses in SewingDefects
-app.post("/api/sewing-defects/buyer-statuses", async (req, res) => {
-  try {
-    const statusesPayload = req.body; 
-    if (!Array.isArray(statusesPayload)) {
-      return res.status(400).json({ message: "Invalid payload: Expected an array of statuses." });
-    }
-    const updatesByDefect = statusesPayload.reduce((acc, status) => {
-      const defectCode = status.defectCode; 
-      if (!acc[defectCode]) {
-        acc[defectCode] = [];
-      }
-   acc[defectCode].push({
-        buyerName: status.buyerName,
-        defectStatus: Array.isArray(status.defectStatus) ? status.defectStatus : [], 
-        isCommon: ["Critical", "Major", "Minor"].includes(status.isCommon) ? status.isCommon : "Minor",
-      });
-      return acc;
-    }, {});
+// app.post("/api/sewing-defects/buyer-statuses", async (req, res) => {
+//   try {
+//     const statusesPayload = req.body; 
+//     if (!Array.isArray(statusesPayload)) {
+//       return res.status(400).json({ message: "Invalid payload: Expected an array of statuses." });
+//     }
+//     const updatesByDefect = statusesPayload.reduce((acc, status) => {
+//       const defectCode = status.defectCode; 
+//       if (!acc[defectCode]) {
+//         acc[defectCode] = [];
+//       }
+//    acc[defectCode].push({
+//         buyerName: status.buyerName,
+//         defectStatus: Array.isArray(status.defectStatus) ? status.defectStatus : [], 
+//         isCommon: ["Critical", "Major", "Minor"].includes(status.isCommon) ? status.isCommon : "Minor",
+//       });
+//       return acc;
+//     }, {});
 
-    const bulkOps = [];
-    for (const defectCodeStr in updatesByDefect) {
-      const defectCodeNum = parseInt(defectCodeStr, 10); 
-      if (isNaN(defectCodeNum)) {
-          console.warn(`Invalid defectCode received: ${defectCodeStr}, skipping.`);
-          continue; 
-      }
-      const newStatusByBuyerArray = updatesByDefect[defectCodeStr];
-      bulkOps.push({
-        updateOne: {
-          filter: { code: defectCodeNum }, 
-          update: { $set: { statusByBuyer: newStatusByBuyerArray, updatedAt: new Date() } },
-        },
-      });
-    }
-    if (bulkOps.length > 0) {
-      await SewingDefects.bulkWrite(bulkOps);
-    }
-    res.status(200).json({ message: "Defect buyer statuses updated successfully in SewingDefects." });
-  } catch (error) {
-    console.error("Error updating defect buyer statuses:", error);
-    res.status(500).json({ message: "Failed to update defect buyer statuses", error: error.message });
-  }
-});
+//     const bulkOps = [];
+//     for (const defectCodeStr in updatesByDefect) {
+//       const defectCodeNum = parseInt(defectCodeStr, 10); 
+//       if (isNaN(defectCodeNum)) {
+//           console.warn(`Invalid defectCode received: ${defectCodeStr}, skipping.`);
+//           continue; 
+//       }
+//       const newStatusByBuyerArray = updatesByDefect[defectCodeStr];
+//       bulkOps.push({
+//         updateOne: {
+//           filter: { code: defectCodeNum }, 
+//           update: { $set: { statusByBuyer: newStatusByBuyerArray, updatedAt: new Date() } },
+//         },
+//       });
+//     }
+//     if (bulkOps.length > 0) {
+//       await SewingDefects.bulkWrite(bulkOps);
+//     }
+//     res.status(200).json({ message: "Defect buyer statuses updated successfully in SewingDefects." });
+//   } catch (error) {
+//     console.error("Error updating defect buyer statuses:", error);
+//     res.status(500).json({ message: "Failed to update defect buyer statuses", error: error.message });
+//   }
+// });
 
 // /* ------------------------------
 //    User Management ENDPOINTS
