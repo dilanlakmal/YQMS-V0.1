@@ -147,7 +147,6 @@ const ImageCaptureUpload = ({
           <Upload size={16} className="mr-1" /> 
         </button>
         <input type="file" accept="image/*" multiple onChange={handleFileChange} ref={fileInputRef} style={{ display: 'none' }} />
-        
         <span className="text-xs text-gray-600 ml-auto">
           ({imageFiles.length}/{maxImages})
         </span>
@@ -159,7 +158,7 @@ const ImageCaptureUpload = ({
       {previewUrls.length > 0 && (
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-2">
           {previewUrls.map((url, index) => (
-            <div key={index} className="relative group border rounded-md overflow-hidden shadow">
+           <div key={index} className="relative group border rounded-md shadow">
               <img 
                 
                 src={url} 
@@ -168,7 +167,7 @@ const ImageCaptureUpload = ({
                 onClick={() => openImagePreview(url)}
               />
               <button type="button" onClick={() => handleDeleteImage(index)}
-                className="absolute top-0.5 right-0.5 bg-red-600 text-white p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                className="absolute top-[-18px] right-[-18px] bg-red-600 text-white p-0.5 rounded-full hover:bg-red-700"
                 aria-label={t('qcRoving.buttons.deleteImage')}>
                 <XCircle size={14} />
               </button>
