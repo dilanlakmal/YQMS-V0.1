@@ -1,4 +1,7 @@
-import { QC2OrderData } from "../Config/mongodb.js";
+import { 
+  QC2OrderData,
+  ymEcoConnection
+ } from "../Config/mongodb.js";
 
 export const normalizeDateString = (dateStr) => {
   if (!dateStr) return null;
@@ -108,3 +111,41 @@ export const formatDate = (date) => {
 export const escapeRegExp = (string) => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // Escapes . * + ? ^ $ { } ( ) | [ ] \
 };
+
+// This endpoint is unused
+export async function fetchOrderDetails(mono) {
+  const collection = ymEcoConnection.db.collection("dt_orders");
+  const order = await collection.findOne({ Order_No: mono });
+
+  const colorMap = new Map();
+  order.OrderColors.forEach((c) => {
+    const key = c.Color.toLowerCase().trim();
+    if (!colorMap.has(key)) {
+      colorMap.set(key, {
+        originalColor: c.Color.trim(),
+        sizes: new Map(),
+      });
+    }
+
+    c.OrderQty.forEach((q) => {
+      if (q.Quantity > 0) {
+        const sizeParts = q.Size.split(";");
+        const cleanSize = sizeParts[0].trim();
+        const sizeKey = cleanSize.toLowerCase();
+        if (!colorMap.get(key).sizes.has(sizeKey)) {
+          colorMap.get(key).sizes.set(sizeKey, cleanSize);
+        }
+      }
+    });
+  });
+
+  return {
+    engName: order.EngName,
+    totalQty: order.TotalQty,
+    colors: Array.from(colorMap.values()).map((c) => c.originalColor),
+    colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
+      acc[curr.originalColor.toLowerCase()] = Array.from(curr.sizes.values());
+      return acc;
+    }, {}),
+  };
+}

@@ -400,7 +400,8 @@ import {
 } from "react-icons/fa";
 import jStat from "jstat";
 
-const DistributionCurveComponent = ({ actualValues, totalCount, buyerSpec, tolMinus, tolPlus, mean, cpk }) => {
+const DistributionCurve = React.memo(
+  ({ actualValues, totalCount, buyerSpec, tolMinus, tolPlus, mean, cpk }) => {
     const canvasRef = useRef(null);
 
     useEffect(() => {
@@ -568,9 +569,8 @@ const DistributionCurveComponent = ({ actualValues, totalCount, buyerSpec, tolMi
     ) : (
       <span>-</span>
     );
-};
-DistributionCurveComponent.displayName = 'DistributionCurve'; // Explicitly set displayName
-const DistributionCurve = React.memo(DistributionCurveComponent);
+  }
+);
 
 const DigitalMeasurementTotalSummary = ({
   summaryData,
@@ -987,10 +987,10 @@ const DigitalMeasurementTotalSummary = ({
               <th className="p-2 border">Diff</th>
               <th className="p-2 border">Diff %</th>
               <th className="p-2 border">Pass Rate</th>
-              {/* <th className="p-2 border">Cpk</th>
+              <th className="p-2 border">Cpk</th>
               <th className="p-2 border">Cp</th>
               <th className="p-2 border">CV (%)</th>
-              <th className="p-2 border">Stability</th> */}
+              <th className="p-2 border">Stability</th>
             </tr>
           </thead>
           <tbody>
@@ -1068,7 +1068,7 @@ const DigitalMeasurementTotalSummary = ({
                     >
                       {point.passRate}%
                     </td>
-                    {/* <td className={`p-2 border ${cpkBgColor}`}>
+                    <td className={`p-2 border ${cpkBgColor}`}>
                       {point.cpk === Infinity
                         ? "Inf"
                         : point.cpk !== null
@@ -1087,7 +1087,7 @@ const DigitalMeasurementTotalSummary = ({
                     </td>
                     <td className={`p-2 border ${cpkBgColor}`}>
                       {point.stabilityStatus}
-                    </td> */}
+                    </td>
                   </tr>
                 );
               })
@@ -1101,64 +1101,64 @@ const DigitalMeasurementTotalSummary = ({
           </tbody>
         </table>
       </div>
-        {/* <div className="overflow-x-auto">
-          <h2 className="text-sm font-semibold mb-2">Statistical Analysis</h2>
-          <p className="text-sm text-gray-600 mb-2">
-            LL = Lower Limit, S = Buyer Spec, UL = Upper Limit, M = Mean
-          </p>
-          <div className="w-full border-t border-dashed border-gray-400 mb-4"></div>
-          <table className="w-full bg-white rounded border table-auto">
-            <thead>
-              <tr className="bg-gray-200 text-sm">
-                <th className="p-2 border min-w-24 max-w-32 whitespace-normal break-words">
-                  Measurement Point
+      <div className="overflow-x-auto">
+        <h2 className="text-sm font-semibold mb-2">Statistical Analysis</h2>
+        <p className="text-sm text-gray-600 mb-2">
+          LL = Lower Limit, S = Buyer Spec, UL = Upper Limit, M = Mean
+        </p>
+        <div className="w-full border-t border-dashed border-gray-400 mb-4"></div>
+        <table className="w-full bg-white rounded border table-auto">
+          <thead>
+            <tr className="bg-gray-200 text-sm">
+              <th className="p-2 border min-w-24 max-w-32 whitespace-normal break-words">
+                Measurement Point
+              </th>
+              {sizes.map((size) => (
+                <th key={size} className="p-2 border min-w-48">
+                  {size}
                 </th>
-                {sizes.map((size) => (
-                  <th key={size} className="p-2 border min-w-48">
-                    {size}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {matrix.length > 0 ? (
-                matrix.map((row, rowIndex) => (
-                  <tr key={rowIndex} className="text-sm">
-                    <td className="p-2 border text-left min-w-24 max-w-32 whitespace-normal break-words">
-                      {row.measurementPoint}
-                    </td>
-                    {sizes.map((size) => (
-                      <td key={size} className="p-2 border min-w-48">
-                        {row.data[size].totalCount > 0 ? (
-                          <DistributionCurve
-                            actualValues={row.data[size].actualValues}
-                            totalCount={row.data[size].totalCount}
-                            buyerSpec={row.data[size].buyerSpec}
-                            tolMinus={row.data[size].tolMinus}
-                            tolPlus={row.data[size].tolPlus}
-                            mean={row.data[size].mean}
-                            cpk={row.data[size].cpk}
-                          />
-                        ) : (
-                          "-"
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={sizes.length + 1}
-                    className="p-4 text-center text-gray-500"
-                  >
-                    No distribution data available
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.length > 0 ? (
+              matrix.map((row, rowIndex) => (
+                <tr key={rowIndex} className="text-sm">
+                  <td className="p-2 border text-left min-w-24 max-w-32 whitespace-normal break-words">
+                    {row.measurementPoint}
                   </td>
+                  {sizes.map((size) => (
+                    <td key={size} className="p-2 border min-w-48">
+                      {row.data[size].totalCount > 0 ? (
+                        <DistributionCurve
+                          actualValues={row.data[size].actualValues}
+                          totalCount={row.data[size].totalCount}
+                          buyerSpec={row.data[size].buyerSpec}
+                          tolMinus={row.data[size].tolMinus}
+                          tolPlus={row.data[size].tolPlus}
+                          mean={row.data[size].mean}
+                          cpk={row.data[size].cpk}
+                        />
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                  ))}
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div> */}
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan={sizes.length + 1}
+                  className="p-4 text-center text-gray-500"
+                >
+                  No distribution data available
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

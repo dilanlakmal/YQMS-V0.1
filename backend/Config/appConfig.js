@@ -12,10 +12,17 @@ export const __dirname = path.dirname(path.resolve(__filename, '..'));
 
 export const app = express();
 export const PORT = process.env.PORT || 5000;
+// config.js
+import dotenv from "dotenv";
+dotenv.config();
+
+export const API_BASE_URL =
+  // process.env.API_BASE_URL || "https://192.167.7.252:5000";
+  process.env.API_BASE_URL || "https://192.167.8.235:5000";
 
 const options = {
-  key: fs.readFileSync(path.resolve(__dirname, '192.167.8.235-key.pem')),
-  cert: fs.readFileSync(path.resolve(__dirname, '192.167.8.235.pem'))
+   key: fs.readFileSync(path.resolve(path.dirname(__filename), '192.167.8.235-key.pem')),
+  cert: fs.readFileSync(path.resolve(path.dirname(__filename), '192.167.8.235.pem'))
 };
 
 export const server = https.createServer(options, app);
@@ -65,3 +72,4 @@ io.on("connection", (socket) => {
     // console.log("A client disconnected via appConfig:", socket.id);
   });
 });
+

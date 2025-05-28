@@ -49,7 +49,8 @@ const NavigationPanel = ({
       icon: <Shirt size={16} />,
       subMenus: [
         { name: "Buyer Specs", icon: <BarChart size={16} /> },
-        { name: "Measurement Summary", icon: <TrendingUp size={16} /> }
+        { name: "Measurement Summary", icon: <TrendingUp size={16} /> },
+        { name: "Measurement Summary - CPK", icon: <TrendingUp size={16} /> }
       ]
     },    
 { name: "QC 1 Dashboard", 

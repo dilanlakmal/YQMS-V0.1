@@ -32,6 +32,7 @@ import SunriseYearlyTrend from "../components/inspection/qc1_sunrise_mongodb/Sun
 import SunriseWeeklyTrend from "../components/inspection/qc1_sunrise_mongodb/SunriseWeeklyTrend";
 import { useTranslation } from "react-i18next";
 import DigitalMeasurement from "../components/inspection/liveDashboard/DigitalMeasurement";
+import DigitalMeasurementCPK from "../components/inspection/liveDashboard/DigitalMeasurement-CPK";
 import DigitalMeasurementBuyerSpec from "../components/inspection/digital_measurement/DigitalMeasurementBuyerSpec";
 
 const LiveDashboard = () => {
@@ -570,6 +571,7 @@ const LiveDashboard = () => {
         )}
         {activeSection === "Buyer Specs" && <DigitalMeasurementBuyerSpec />}
         {activeSection === "Measurement Summary" && <DigitalMeasurement />}
+        {activeSection === "Measurement Summary - CPK" && <DigitalMeasurementCPK />}
         {activeSection === "Daily Analysis" && <QCSunriseDashboard />}
         {activeSection === "Order Data" && <OrderData />}
 
