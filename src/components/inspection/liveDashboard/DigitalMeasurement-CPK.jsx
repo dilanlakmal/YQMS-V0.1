@@ -5,7 +5,7 @@ import { Modal } from "antd";
 import { FaClock } from "react-icons/fa";
 import DigitalMeasurementFilterPane from "../digital_measurement/DigitalMeasurementFilterPane";
 import DigialMeasurementSummaryCards from "../digital_measurement/DigialMeasurementSummaryCards";
-import DigitalMeasurementTotalSummary from "../digital_measurement/DigitalMeasurementTotalSummary";
+import DigitalMeasurementTotalSummaryCPK from "../digital_measurement/DigitalMeasurementTotalSummary-CPK";
 import { API_BASE_URL } from "../../../../config";
 
 const DigitalMeasurementCPK = () => {
@@ -441,7 +441,7 @@ const DigitalMeasurementCPK = () => {
         <div>
           {selectedMono && measurementDetails ? (
             <>
-              <DigitalMeasurementTotalSummary
+              <DigitalMeasurementTotalSummaryCPK
                 summaryData={measurementDetails.measurementPointSummary || []}
                 records={measurementDetails.records || []}
                 sizeSpec={measurementDetails.sizeSpec || []}
