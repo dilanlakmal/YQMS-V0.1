@@ -6,6 +6,6 @@ import { cuttingUpload } from '../../Middleware/Cutting/fileUploadMiddleware.js'
 
 const router = express.Router();
 
-router.get('/api/upload-cutting-image', cuttingUpload.single('imageFile'), uploadImage);
+router.post('/api/upload-cutting-image', cuttingUpload.single('image'), uploadImage);
 
 export default router;

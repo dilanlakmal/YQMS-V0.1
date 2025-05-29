@@ -403,4 +403,6 @@ const CuttingIssues = forwardRef(({ moNo, selectedPanel }, ref) => {
   );
 });
 
+CuttingIssues.displayName = "CuttingIssues";
+
 export default CuttingIssues;
