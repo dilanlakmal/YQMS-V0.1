@@ -18,6 +18,7 @@ const ImageCaptureUpload = ({
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState('');
   const initialRenderForContext = useRef(true);
@@ -115,6 +116,7 @@ const ImageCaptureUpload = ({
     });
   };
   const triggerFileUpload = () => fileInputRef.current?.click();
+  const triggerCameraCapture = () => cameraInputRef.current?.click();
 
   const openImagePreview = (url) => {
     setPreviewImageUrl(url);
@@ -146,7 +148,12 @@ const ImageCaptureUpload = ({
           className="flex items-center px-3 py-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-xs">
           <Upload size={16} className="mr-1" /> 
         </button>
-        <input type="file" accept="image/*" multiple onChange={handleFileChange} ref={fileInputRef} style={{ display: 'none' }} />
+         <input type="file" accept="image/*" multiple onChange={handleFileChange} ref={fileInputRef} style={{ display: 'none' }} />
+        <button type="button" onClick={triggerCameraCapture} disabled={!canSelectFiles}
+          className="flex items-center px-3 py-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-xs">
+          <Camera size={16} className="mr-1" /> 
+        </button>
+        <input type="file" accept="image/*" capture="environment" onChange={handleFileChange} ref={cameraInputRef} style={{ display: 'none' }} />
         <span className="text-xs text-gray-600 ml-auto">
           ({imageFiles.length}/{maxImages})
         </span>
