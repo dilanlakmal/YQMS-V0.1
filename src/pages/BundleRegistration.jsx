@@ -2285,7 +2285,7 @@ function BundleRegistration() {
       newLineNo = "SUB";
     } else if (formData.department === "Washing") {
       newLineNo = "WA";
-    } else if (formData.department === "QC1 Endline") {
+    } else if (formData.department === "Production") {
       if (formData.lineNo === "WA" || formData.lineNo === "SUB") {
         newLineNo = "";
       }
@@ -2556,7 +2556,7 @@ function BundleRegistration() {
   const validateLineNo = useCallback(() => {
     if (
       formData.factoryInfo === "YM" &&
-      formData.department === "QC1 Endline"
+      formData.department === "Production"
     ) {
       if (formData.lineNo === "") return false;
       const lineNoNum = parseInt(formData.lineNo);
@@ -2576,8 +2576,8 @@ function BundleRegistration() {
     }
     if (!validateLineNo()) {
       alert(
-        formData.factoryInfo === "YM" && formData.department === "QC1 Endline"
-          ? "Invalid Line No. It must be a number between 1 and 30 for YM factory and QC1 Endline."
+        formData.factoryInfo === "YM" && formData.department === "Production"
+          ? "Invalid Line No. It must be a number between 1 and 30 for YM factory and Production."
           : "Invalid or missing Line No for the selected department."
       );
       return;
@@ -2935,7 +2935,7 @@ function BundleRegistration() {
             {numberPadTarget === "bundleQty" ||
             numberPadTarget === "count" ||
             (formData.factoryInfo === "YM" &&
-              formData.department === "QC1 Endline" &&
+              formData.department === "Production" &&
               numberPadTarget === "lineNo") ? (
               <NumberPad
                 onClose={() => setShowNumberPad(false)}

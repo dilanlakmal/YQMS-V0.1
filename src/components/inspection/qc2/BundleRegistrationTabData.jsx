@@ -68,6 +68,9 @@ function BundleRegistrationTabData({
             ? ""
             : parseInt(value, 10) || (name === "bundleQty" ? 1 : 10)
       }));
+       } else if (name === "lineNo") {
+      // Always convert lineNo to uppercase
+      setFormData((prev) => ({ ...prev, [name]: value.toUpperCase() }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -194,7 +197,7 @@ function BundleRegistrationTabData({
             }`}
           >
             <option value="">{t("bundle.select_department")}</option>
-            <option value="QC1 Endline">{t("bundle.qc1_endline")}</option>
+            <option value="Production">{t("bundle.production")}</option>
             <option value="Washing">{t("bundle.washing")}</option>
             <option value="Sub-con">{t("bundle.sub_con")}</option>
           </select>
@@ -322,45 +325,60 @@ function BundleRegistrationTabData({
             {t("bundle.line_no")}
           </label>
           <div className="relative">
-            {isMobileDevice && formData.department === "QC1 Endline" ? (
-              <input
-                type="number"
-                name="lineNo"
-                value={formData.lineNo}
-                onChange={handleInputChange}
-                className={mobileInputClass}
-                placeholder="1-30"
-              />
-            ) : isMobileDevice &&
-              (formData.department === "Sub-con" ||
-                (formData.department === "Washing" &&
-                  formData.lineNo !== "WA")) ? (
-              <input
-                type="text"
-                name="lineNo"
-                value={formData.lineNo}
-                onChange={handleInputChange}
-                className={mobileInputClass}
-                readOnly={
-                  formData.department === "Washing" && formData.lineNo === "WA"
-                }
-              />
+            {isMobileDevice ? (
+              // Mobile-specific LineNo input
+              formData.department === "Production" ? (
+                <input
+                  type="number" // Numeric keypad for Production
+                  name="lineNo"
+                  value={formData.lineNo}
+                  onChange={handleInputChange}
+                  className={mobileInputClass}
+                  placeholder={formData.factoryInfo === "YM" ? "1-30" : t("bundle.line_no_placeholder_production", "Line (e.g., 1-30)")}
+                  inputMode="numeric" // Suggest numeric keypad
+                />
+              ) : formData.department === "Washing" ? (
+                <input
+                  type="text" // Display auto-set "WA"
+                  name="lineNo"
+                  value={formData.lineNo} // Should be "WA" from parent logic
+                  readOnly // "WA" is fixed for Washing department
+                  className={`${mobileInputClass} bg-slate-200 cursor-default`}
+                />
+              ) : formData.department === "Sub-con" ? (
+                <input
+                  type="text" // Alphanumeric keypad for Sub-con, user can edit (default "SUB")
+                  name="lineNo"
+                  value={formData.lineNo}
+                  onChange={handleInputChange}
+                  className={mobileInputClass}
+                  placeholder={t("bundle.line_no_placeholder_subcon", "Line (e.g., SUB)")}
+                />
+              ) : (
+                // For other departments on mobile, or if department is not set
+                <input
+                  type="text" // Alphanumeric keypad
+                  name="lineNo"
+                  value={formData.lineNo}
+                  onChange={handleInputChange}
+                  className={mobileInputClass}
+                  placeholder={t("bundle.line_no_placeholder_general", "Enter Line No")}
+                />
+              )
             ) : (
               <input
                 type="text"
                 value={formData.lineNo}
                 onClick={() => {
-                  if (!isMobileDevice) {
-                    setNumberPadTarget("lineNo");
-                    setShowNumberPad(true);
-                  }
+                  setNumberPadTarget("lineNo");
+                  setShowNumberPad(true);
                 }}
-                readOnly={!isMobileDevice}
+                 readOnly
                 className={`${
-                  forMobile ? mobileInputClass : laptopReadOnlyInputClass
-                } ${!isMobileDevice ? "cursor-pointer" : ""} bg-slate-100`}
+                  laptopReadOnlyInputClass
+                } cursor-pointer bg-slate-100`}
                 placeholder={
-                  formData.department === "QC1 Endline" &&
+                  formData.department === "Production" &&
                   formData.factoryInfo === "YM"
                     ? "1-30"
                     : ""
@@ -372,7 +390,7 @@ function BundleRegistrationTabData({
                 <span className="text-gray-500 text-sm">WA</span>
               </div>
             )}
-            {formData.department === "Sub-con" && formData.lineNo === "SUB" && (
+            {(formData.department === "Sub-con" && formData.lineNo === "SUB") && (
               <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                 <span className="text-gray-500 text-sm">SUB</span>
               </div>
@@ -620,7 +638,7 @@ function BundleRegistrationTabData({
           isMobile={forMobile}
         />
       )}
-      {formData.department === "Sub-con" && (
+      {/* {formData.department === "Sub-con" && (
         <div className={`${forMobile ? "" : "mt-1"}`}>
           <label
             className={`block font-medium text-gray-700 mb-1 ${
@@ -644,7 +662,7 @@ function BundleRegistrationTabData({
             ))}
           </select>
         </div>
-      )}
+      )} */}
       {formData.planCutQty !== undefined && estimatedTotal !== null && (
         <div
           className={`font-medium p-2 rounded-md ${

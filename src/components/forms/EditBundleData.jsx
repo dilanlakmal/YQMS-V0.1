@@ -231,7 +231,7 @@ const EditModal = ({ isOpen, onClose, formData, setFormData, setUserBatches, set
               disabled
             >
               <option value="">{t("bundle.select_department")}</option>
-              <option value="QC1 Endline">{t("bundle.qc1_endline")}</option>
+              <option value="Production">{t("bundle.production")}</option>
               <option value="Washing">{t("home.washing")}</option>
               <option value="OPA">{t("home.opa")}</option>
               <option value="Sub-con">{t("bundle.sub_con")}</option>

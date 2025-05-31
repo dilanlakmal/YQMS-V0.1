@@ -7,20 +7,28 @@ function NumLetterPad({ onClose, onInput }) {
   const [inputValue, setInputValue] = useState("");
 
   const handleInputClick = (value) => {
-    setInputValue((prev) => prev + value);
+    const newValue = inputValue + value;
+    setInputValue(newValue);
+    onInput(newValue);
   };
 
   const handleBackspace = () => {
-    setInputValue((prev) => prev.slice(0, -1));
+    const newValue = inputValue.slice(0, -1);
+    setInputValue(newValue);
+    onInput(newValue);
   };
 
   const handleSubmit = () => {
-    onInput(inputValue);
+   if (inputValue === "") {
+        onInput("");
+    }
     // Don't close the keypad when Enter is pressed
   };
   
   const handleDone = () => {
-    onInput(inputValue);
+    if (inputValue === "") {
+        onInput("");
+    }
     onClose();
   };
 

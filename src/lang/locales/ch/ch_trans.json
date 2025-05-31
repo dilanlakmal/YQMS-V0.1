@@ -104,7 +104,7 @@
     "date": "日期",
     "department": "部门",
     "select_department": "选择部门",
-    "qc1_endline": "QC1 尾查",
+    "production": "生产",
     "washing": "洗水",
     "sub_con": "分包",
     "search_mono": "搜索工单号",
