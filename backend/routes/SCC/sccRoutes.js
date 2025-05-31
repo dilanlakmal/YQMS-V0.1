@@ -13,7 +13,7 @@ import {
 
 const router = express.Router();
 
-router.post('/api/scc/ht-first-outpu', saveHtFirstOutput);
+router.post('/api/scc/ht-first-output', saveHtFirstOutput);
 router.get('/api/scc/ht-first-output', getHtFirstOutput);
 router.post('/api/scc/fu-first-output', saveFuFirstOutput);
 router.get('/api/scc/fu-first-output', getFuFirstOutput);
