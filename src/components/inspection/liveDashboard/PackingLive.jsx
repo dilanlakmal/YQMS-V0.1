@@ -1,74 +1,3 @@
-// import React, { useState, useEffect } from "react";
-// import axios from "axios";
-// import { API_BASE_URL } from "../../../../config";
-// import DataTableWOI from "./DataTableWOI";
-// import FilterPaneWOI from "./FilterPaneWOI";
-
-// const IroningLive = () => {
-//   const [tableData, setTableData] = useState([]);
-//   const [totalRecords, setTotalRecords] = useState(0);
-//   const [page, setPage] = useState(1);
-//   const limit = 50;
-
-//   const [filters, setFilters] = useState({
-//     moNo: "",
-//     custStyle: "",
-//     buyer: "",
-//     color: "",
-//     size: "",
-//     empId: ""
-//   });
-
-//   // Fetch ironing data
-//   const fetchIroningData = async (filters = {}, currentPage = page) => {
-//     try {
-//       const response = await axios.get(`${API_BASE_URL}/api/ironing-summary`, {
-//         params: { ...filters, page: currentPage, limit }
-//       });
-//       setTableData(response.data.tableData);
-//       setTotalRecords(response.data.total);
-//     } catch (error) {
-//       console.error("Error fetching ironing data:", error);
-//     }
-//   };
-
-//   // Handle pagination
-//   const handlePageChange = async (newPage) => {
-//     setPage(newPage);
-//     await fetchIroningData(filters, newPage);
-//   };
-
-//   // Initial fetch and auto-refresh
-//   useEffect(() => {
-//     fetchIroningData();
-
-//     const intervalId = setInterval(() => fetchIroningData(filters), 5000);
-//     return () => clearInterval(intervalId);
-//   }, [filters]);
-
-//   return (
-//     <div className="p-6 bg-gray-100 min-h-screen">
-//       <FilterPaneWOI
-//         module="ironing"
-//         empIdField="emp_id_ironing"
-//         filters={filters}
-//         setFilters={setFilters}
-//         fetchData={fetchIroningData}
-//         setPage={setPage}
-//       />
-//       <DataTableWOI
-//         tableData={tableData}
-//         totalRecords={totalRecords}
-//         page={page}
-//         limit={limit}
-//         handlePageChange={handlePageChange}
-//       />
-//     </div>
-//   );
-// };
-
-// export default IroningLive;
-
 import axios from "axios";
 import {
   BarElement,
@@ -92,13 +21,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter as FilterIcon,
+  Package as PackageIcon,
   RotateCcw,
   Search as SearchIcon,
-  Shirt,
   TrendingDown,
-  TrendingUp,
   X
-} from "lucide-react"; // Added Shirt for Ironing
+} from "lucide-react"; // PackageIcon for Packing
 import React, {
   useCallback,
   useEffect,
@@ -125,16 +53,16 @@ ChartJS.register(
   ChartDataLabels
 );
 
-const normalizeDateStringForAPI_Ironing = (date) => {
+const normalizeDateStringForAPI_Packing = (date) => {
   if (!date) return null;
   try {
     return formatDateFn(new Date(date), "MM/dd/yyyy");
   } catch (e) {
-    console.error("Error normalizing date for API (Ironing):", date, e);
+    console.error("Error normalizing date for API (Packing):", date, e);
     return String(date);
   }
 };
-const formatDisplayDate_Ironing = (dateString) => {
+const formatDisplayDate_Packing = (dateString) => {
   if (!dateString) return "N/A";
   try {
     return formatDateFn(new Date(dateString), "MM/dd/yyyy");
@@ -142,20 +70,59 @@ const formatDisplayDate_Ironing = (dateString) => {
     return String(dateString);
   }
 };
-const LoadingSpinner_Ironing = () => (
+const LoadingSpinner_Packing = () => (
   <div className="flex justify-center items-center h-32">
     {" "}
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-500"></div>{" "}
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>{" "}
   </div>
-);
+); // Green for Packing
 
-const SummaryStatCard_Ironing = ({
+const SummaryStatCard_Packing = ({
+  title,
+  value1,
+  label1,
+  value2,
+  label2,
+  icon
+}) => {
+  const IconComponent = icon || PackageIcon;
+  return (
+    <div className="bg-white p-5 shadow-xl rounded-xl border border-gray-200 flex flex-col justify-between min-h-[160px] hover:shadow-2xl transition-shadow duration-300">
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+            {title}
+          </h3>
+          <div className="p-2 bg-green-100 text-green-600 rounded-lg">
+            {" "}
+            <IconComponent size={20} />{" "}
+          </div>
+        </div>
+        {label1 && <p className="text-gray-600 text-xs mt-1">{label1}</p>}
+        <p className="text-3xl font-bold text-gray-800">
+          {value1.toLocaleString()}
+        </p>
+        {label2 && (
+          <p className="text-gray-600 text-xs mt-2 pt-2 border-t border-gray-100">
+            {label2}
+          </p>
+        )}
+        {value2 !== undefined && (
+          <p className="text-2xl font-semibold text-gray-700 mt-1">
+            {value2.toLocaleString()}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+const SummaryStatCardSimple_Packing = ({
   title,
   currentValue,
   previousDayValue,
   icon
 }) => {
-  const IconComponent = icon || Shirt; // Default to Shirt icon for Ironing
+  const IconComponent = icon || PackageIcon;
   const prevValue = previousDayValue || 0;
   const currValue = currentValue || 0;
   let percentageChange = 0;
@@ -182,7 +149,7 @@ const SummaryStatCard_Ironing = ({
           <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">
             {title}
           </h3>{" "}
-          <div className="p-2 bg-pink-100 text-pink-600 rounded-lg">
+          <div className="p-2 bg-green-100 text-green-600 rounded-lg">
             {" "}
             <IconComponent size={20} />{" "}
           </div>{" "}
@@ -212,7 +179,7 @@ const SummaryStatCard_Ironing = ({
   );
 };
 
-const InspectorColumnToggleButton_Ironing = ({ label, isActive, onClick }) => (
+const InspectorColumnToggleButton_Packing = ({ label, isActive, onClick }) => (
   <button
     onClick={onClick}
     className={`flex items-center px-2 py-1 md:px-3 md:py-1.5 text-[10px] md:text-xs text-white rounded-md shadow-sm transition-colors duration-150
@@ -231,7 +198,7 @@ const InspectorColumnToggleButton_Ironing = ({ label, isActive, onClick }) => (
   </button>
 );
 
-const IroningLive = () => {
+const PackingLive = () => {
   const [isFilterVisible, setIsFilterVisible] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingFilters, setIsLoadingFilters] = useState(false);
@@ -258,14 +225,16 @@ const IroningLive = () => {
     qcIds: []
   });
   const [summaryData, setSummaryData] = useState({
-    totalIroningQty: 0,
-    totalBundles: 0,
-    totalRecheckIroningQty: 0
+    totalPackingQty: 0,
+    totalOrderCardBundles: 0,
+    totalDefectCards: 0,
+    totalDefectCardQty: 0
   });
   const [previousDaySummary, setPreviousDaySummary] = useState({
-    totalIroningQty: 0,
-    totalBundles: 0,
-    totalRecheckIroningQty: 0
+    totalPackingQty: 0,
+    totalOrderCardBundles: 0,
+    totalDefectCards: 0,
+    totalDefectCardQty: 0
   });
   const [inspectorSummary, setInspectorSummary] = useState([]);
   const [detailedRecords, setDetailedRecords] = useState([]);
@@ -277,12 +246,13 @@ const IroningLive = () => {
   });
 
   const [hourlyChartData, setHourlyChartData] = useState([]);
-  const [chartDataType, setChartDataType] = useState("ironing");
+  const [chartDataType, setChartDataType] = useState("packingQty"); // 'packingQty', 'orderBundles', 'defectCards', 'defectQty'
 
   const [visibleCols, setVisibleCols] = useState({
-    totalIroningQty: true,
-    totalBundles: true,
-    totalRecheckIroningQty: true
+    totalPackingQty: true,
+    totalOrderCardBundles: true,
+    totalDefectCards: true,
+    totalDefectCardQty: true
   });
 
   const currentFiltersRef = useRef({});
@@ -314,11 +284,11 @@ const IroningLive = () => {
   const buildFilterQueryParams = useCallback((filtersToBuild) => {
     const queryParams = {};
     if (filtersToBuild.startDate)
-      queryParams.startDate = normalizeDateStringForAPI_Ironing(
+      queryParams.startDate = normalizeDateStringForAPI_Packing(
         filtersToBuild.startDate
       );
     if (filtersToBuild.endDate)
-      queryParams.endDate = normalizeDateStringForAPI_Ironing(
+      queryParams.endDate = normalizeDateStringForAPI_Packing(
         filtersToBuild.endDate
       );
     if (filtersToBuild.moNo) queryParams.moNo = filtersToBuild.moNo.value;
@@ -339,12 +309,12 @@ const IroningLive = () => {
       try {
         const queryParamsForFilters = buildFilterQueryParams(currentFilters);
         const response = await axios.get(
-          `${API_BASE_URL}/api/ironing/filters`,
+          `${API_BASE_URL}/api/packing/filters`,
           { params: queryParamsForFilters }
         );
         setFilterOptions(response.data);
       } catch (error) {
-        console.error("Error fetching Ironing filter options:", error);
+        console.error("Error fetching Packing filter options:", error);
         setFilterOptions({
           moNos: [],
           packageNos: [],
@@ -367,12 +337,12 @@ const IroningLive = () => {
       try {
         const queryParams = buildFilterQueryParams(filters);
         const response = await axios.get(
-          `${API_BASE_URL}/api/ironing/hourly-summary`,
+          `${API_BASE_URL}/api/packing/hourly-summary`,
           { params: queryParams }
         );
         setHourlyChartData(response.data || []);
       } catch (error) {
-        console.error("Error fetching hourly Ironing chart data:", error);
+        console.error("Error fetching hourly Packing chart data:", error);
         setHourlyChartData([]);
       } finally {
         setIsLoadingHourlyChart(false);
@@ -398,7 +368,7 @@ const IroningLive = () => {
           limit: pagination.limit
         };
         const mainDataPromise = axios.get(
-          `${API_BASE_URL}/api/ironing/dashboard-data`,
+          `${API_BASE_URL}/api/packing/dashboard-data`,
           { params: queryParams }
         );
 
@@ -411,16 +381,18 @@ const IroningLive = () => {
         const data = mainDataResponse.data;
         setSummaryData(
           data.overallSummary || {
-            totalIroningQty: 0,
-            totalBundles: 0,
-            totalRecheckIroningQty: 0
+            totalPackingQty: 0,
+            totalOrderCardBundles: 0,
+            totalDefectCards: 0,
+            totalDefectCardQty: 0
           }
         );
         setPreviousDaySummary(
           data.previousDaySummary || {
-            totalIroningQty: 0,
-            totalBundles: 0,
-            totalRecheckIroningQty: 0
+            totalPackingQty: 0,
+            totalOrderCardBundles: 0,
+            totalDefectCards: 0,
+            totalDefectCardQty: 0
           }
         );
         setInspectorSummary(data.inspectorSummaryData || []);
@@ -436,11 +408,11 @@ const IroningLive = () => {
 
         const displayableFilters = {};
         if (filters.startDate)
-          displayableFilters["Start Date"] = normalizeDateStringForAPI_Ironing(
+          displayableFilters["Start Date"] = normalizeDateStringForAPI_Packing(
             filters.startDate
           );
         if (filters.endDate)
-          displayableFilters["End Date"] = normalizeDateStringForAPI_Ironing(
+          displayableFilters["End Date"] = normalizeDateStringForAPI_Packing(
             filters.endDate
           );
         if (filters.moNo) displayableFilters["MO No"] = filters.moNo.label;
@@ -452,19 +424,21 @@ const IroningLive = () => {
         if (filters.color) displayableFilters["Color"] = filters.color.label;
         if (filters.size) displayableFilters["Size"] = filters.size.label;
         if (filters.qcId)
-          displayableFilters["QC ID (Ironing)"] = filters.qcId.label;
+          displayableFilters["QC ID (Packing)"] = filters.qcId.label;
         setAppliedFiltersForDisplay(displayableFilters);
       } catch (error) {
-        console.error("Error fetching Ironing dashboard data:", error);
+        console.error("Error fetching Packing dashboard data:", error);
         setSummaryData({
-          totalIroningQty: 0,
-          totalBundles: 0,
-          totalRecheckIroningQty: 0
+          totalPackingQty: 0,
+          totalOrderCardBundles: 0,
+          totalDefectCards: 0,
+          totalDefectCardQty: 0
         });
         setPreviousDaySummary({
-          totalIroningQty: 0,
-          totalBundles: 0,
-          totalRecheckIroningQty: 0
+          totalPackingQty: 0,
+          totalOrderCardBundles: 0,
+          totalDefectCards: 0,
+          totalDefectCardQty: 0
         });
         setInspectorSummary([]);
         setDetailedRecords([]);
@@ -519,15 +493,16 @@ const IroningLive = () => {
     setVisibleCols((prev) => ({ ...prev, [colName]: !prev[colName] }));
   const handleAddAllCols = () =>
     setVisibleCols({
-      totalIroningQty: true,
-      totalBundles: true,
-      totalRecheckIroningQty: true
+      totalPackingQty: true,
+      totalOrderCardBundles: true,
+      totalDefectCards: true,
+      totalDefectCardQty: true
     });
   const handleClearSomeCols = () =>
     setVisibleCols((prev) => ({
       ...prev,
-      totalBundles: false,
-      totalRecheckIroningQty: false
+      totalDefectCards: false,
+      totalDefectCardQty: false
     }));
 
   const inspectorTableData = useMemo(() => {
@@ -541,12 +516,13 @@ const IroningLive = () => {
           dates: {}
         };
       }
-      const displayDate = formatDisplayDate_Ironing(item.date);
+      const displayDate = formatDisplayDate_Packing(item.date);
       allDatesSet.add(displayDate);
       dataByInspector[item.emp_id].dates[displayDate] = {
-        totalIroningQty: item.dailyIroningQty,
-        totalBundles: item.dailyBundles,
-        totalRecheckIroningQty: item.dailyRecheckIroningQty
+        totalPackingQty: item.dailyTotalPackingQty,
+        totalOrderCardBundles: item.dailyOrderCardBundles,
+        totalDefectCards: item.dailyDefectCards,
+        totalDefectCardQty: item.dailyDefectCardQty
       };
     });
     const sortedDates = Array.from(allDatesSet).sort(
@@ -636,7 +612,7 @@ const IroningLive = () => {
       placeholder: "Select Size..."
     },
     {
-      label: "QC ID (Ironing)",
+      label: "QC ID (Packing)",
       state: qcId,
       setState: setQcId,
       options: filterOptions.qcIds,
@@ -645,7 +621,7 @@ const IroningLive = () => {
     }
   ];
 
-  const formatHourLabel_Ironing = (hourStr) => {
+  const formatHourLabel_Packing = (hourStr) => {
     if (!hourStr) return "";
     try {
       const date = parse(hourStr, "HH", new Date());
@@ -655,26 +631,55 @@ const IroningLive = () => {
     }
   };
 
-  const hourlyBarChartOptions_Ironing = {
+  const getChartTitleAndData = () => {
+    switch (chartDataType) {
+      case "packingQty":
+        return {
+          title: "Total Packing Qty",
+          dataKey: "totalPackingQty",
+          changeKey: "packingQtyChange"
+        };
+      case "orderBundles":
+        return {
+          title: "Total Order Bundles",
+          dataKey: "totalOrderCardBundles",
+          changeKey: "orderCardBundlesChange"
+        };
+      case "defectCards":
+        return {
+          title: "Total Defect Cards",
+          dataKey: "totalDefectCards",
+          changeKey: "defectCardsChange"
+        };
+      case "defectQty":
+        return {
+          title: "Total Defect Card Qty",
+          dataKey: "totalDefectCardQty",
+          changeKey: "defectCardQtyChange"
+        };
+      default:
+        return {
+          title: "Total Packing Qty",
+          dataKey: "totalPackingQty",
+          changeKey: "packingQtyChange"
+        };
+    }
+  };
+  const currentChartInfo = getChartTitleAndData();
+
+  const hourlyBarChartOptions_Packing = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
-      title: {
-        display: true,
-        text: `Hourly ${
-          chartDataType === "ironing" ? "Ironing Qty" : "Bundle Count"
-        }`
-      },
+      title: { display: true, text: `Hourly ${currentChartInfo.title}` },
       datalabels: {
         anchor: "end",
         align: "end",
         formatter: (value, context) => {
           const item = hourlyChartData[context.dataIndex];
-          const change =
-            chartDataType === "ironing"
-              ? parseFloat(item.ironingQtyChange)
-              : parseFloat(item.bundleQtyChange);
+          if (!item) return value.toLocaleString();
+          const change = parseFloat(item[currentChartInfo.changeKey]);
           let changeStr = "";
           if (change > 0) changeStr = ` ▲${change.toFixed(1)}%`;
           else if (change < 0) changeStr = ` ▼${Math.abs(change).toFixed(1)}%`;
@@ -682,10 +687,8 @@ const IroningLive = () => {
         },
         color: (context) => {
           const item = hourlyChartData[context.dataIndex];
-          const change =
-            chartDataType === "ironing"
-              ? parseFloat(item.ironingQtyChange)
-              : parseFloat(item.bundleQtyChange);
+          if (!item) return "#6B7280";
+          const change = parseFloat(item[currentChartInfo.changeKey]);
           return change < 0 ? "#EF4444" : change > 0 ? "#22C55E" : "#6B7280";
         },
         font: { size: 10 }
@@ -703,23 +706,14 @@ const IroningLive = () => {
     }
   };
 
-  const preparedHourlyChartData_Ironing = {
-    labels: hourlyChartData.map((d) => formatHourLabel_Ironing(d.hour)),
+  const preparedHourlyChartData_Packing = {
+    labels: hourlyChartData.map((d) => formatHourLabel_Packing(d.hour)),
     datasets: [
       {
-        label:
-          chartDataType === "ironing" ? "Total Ironing Qty" : "Total Bundles",
-        data: hourlyChartData.map((d) =>
-          chartDataType === "ironing" ? d.totalIroningQty : d.totalBundles
-        ),
-        backgroundColor:
-          chartDataType === "ironing"
-            ? "rgba(236, 72, 153, 0.6)"
-            : "rgba(168, 85, 247, 0.6)",
-        borderColor:
-          chartDataType === "ironing"
-            ? "rgba(236, 72, 153, 1)"
-            : "rgba(168, 85, 247, 1)",
+        label: currentChartInfo.title,
+        data: hourlyChartData.map((d) => d[currentChartInfo.dataKey] || 0),
+        backgroundColor: "rgba(34, 197, 94, 0.6)", // Green for Packing
+        borderColor: "rgba(34, 197, 94, 1)",
         borderWidth: 1
       }
     ]
@@ -728,7 +722,7 @@ const IroningLive = () => {
   if (isLoading && !detailedRecords.length) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <LoadingSpinner_Ironing />
+        <LoadingSpinner_Packing />
       </div>
     );
   }
@@ -739,13 +733,13 @@ const IroningLive = () => {
         {" "}
         <h1 className="text-lg md:text-2xl font-semibold text-gray-800 text-center">
           {" "}
-          Yorkmars (Cambodia) Garment MFG Co., LTD | Ironing Live Dashboard{" "}
+          Yorkmars (Cambodia) Garment MFG Co., LTD | Packing Live Dashboard{" "}
         </h1>{" "}
       </header>
 
       <button
         onClick={() => setIsFilterVisible(!isFilterVisible)}
-        className="mb-4 px-3 py-1.5 md:px-4 md:py-2 bg-pink-600 text-white rounded-md hover:bg-pink-700 flex items-center text-xs md:text-sm shadow-md"
+        className="mb-4 px-3 py-1.5 md:px-4 md:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center text-xs md:text-sm shadow-md"
       >
         {" "}
         <FilterIcon size={16} className="mr-1 md:mr-2" />{" "}
@@ -822,36 +816,38 @@ const IroningLive = () => {
 
       {isLoading && detailedRecords.length > 0 && (
         <div className="fixed top-0 left-0 w-full h-full flex justify-center items-center bg-gray-500 bg-opacity-50 z-50">
-          <LoadingSpinner_Ironing />
+          <LoadingSpinner_Packing />
         </div>
       )}
 
       {(!isLoading || detailedRecords.length > 0) && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5 mb-4 md:mb-8">
-            <SummaryStatCard_Ironing
-              title="Total Ironing Qty"
-              currentValue={summaryData.totalIroningQty}
-              previousDayValue={previousDaySummary.totalIroningQty}
-              icon={TrendingUp}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-5 mb-4 md:mb-8">
+            <SummaryStatCardSimple_Packing
+              title="Total Packing Qty"
+              currentValue={summaryData.totalPackingQty}
+              previousDayValue={previousDaySummary.totalPackingQty}
+              icon={PackageIcon}
             />
-            <SummaryStatCard_Ironing
-              title="Total Bundles"
-              currentValue={summaryData.totalBundles}
-              previousDayValue={previousDaySummary.totalBundles}
-              icon={TrendingUp}
+            <SummaryStatCardSimple_Packing
+              title="Total Order Bundles"
+              currentValue={summaryData.totalOrderCardBundles}
+              previousDayValue={previousDaySummary.totalOrderCardBundles}
+              icon={PackageIcon}
             />
-            <SummaryStatCard_Ironing
-              title="Total Re-Check Ironing Qty"
-              currentValue={summaryData.totalRecheckIroningQty}
-              previousDayValue={previousDaySummary.totalRecheckIroningQty}
+            <SummaryStatCard_Packing
+              title="Defect Card Info"
+              value1={summaryData.totalDefectCards}
+              label1="Total Defect Cards (Count)"
+              value2={summaryData.totalDefectCardQty}
+              label2="Defect Card Qty (Sum)"
               icon={TrendingDown}
             />
           </div>
 
           <div className="mb-4 md:mb-8 p-3 md:p-4 bg-white shadow-xl rounded-xl border border-gray-200">
             <h2 className="text-base md:text-xl font-semibold text-gray-700 mb-2">
-              Ironing Qty Summary by Inspector
+              Packing Qty Summary by Inspector
             </h2>
             {Object.keys(appliedFiltersForDisplay).length > 0 && (
               <div className="mb-2 md:mb-3 text-[10px] md:text-xs text-gray-500 italic">
@@ -873,23 +869,28 @@ const IroningLive = () => {
                 onClick={handleClearSomeCols}
                 className="px-2 py-1 md:px-3 md:py-1.5 text-[10px] md:text-xs text-white rounded-md shadow-sm bg-orange-500 hover:bg-orange-600"
               >
-                Clear Some
+                Clear Defect Info
               </button>
               <div className="flex gap-1 md:gap-2 ml-auto">
-                <InspectorColumnToggleButton_Ironing
-                  label="Ironing Qty"
-                  isActive={visibleCols.totalIroningQty}
-                  onClick={() => handleColToggle("totalIroningQty")}
+                <InspectorColumnToggleButton_Packing
+                  label="Total Pack Qty"
+                  isActive={visibleCols.totalPackingQty}
+                  onClick={() => handleColToggle("totalPackingQty")}
                 />
-                <InspectorColumnToggleButton_Ironing
-                  label="Bundles"
-                  isActive={visibleCols.totalBundles}
-                  onClick={() => handleColToggle("totalBundles")}
+                <InspectorColumnToggleButton_Packing
+                  label="Order Bundles"
+                  isActive={visibleCols.totalOrderCardBundles}
+                  onClick={() => handleColToggle("totalOrderCardBundles")}
                 />
-                <InspectorColumnToggleButton_Ironing
-                  label="Re-Check"
-                  isActive={visibleCols.totalRecheckIroningQty}
-                  onClick={() => handleColToggle("totalRecheckIroningQty")}
+                <InspectorColumnToggleButton_Packing
+                  label="Defect Cards"
+                  isActive={visibleCols.totalDefectCards}
+                  onClick={() => handleColToggle("totalDefectCards")}
+                />
+                <InspectorColumnToggleButton_Packing
+                  label="Defect Qty"
+                  isActive={visibleCols.totalDefectCardQty}
+                  onClick={() => handleColToggle("totalDefectCardQty")}
                 />
               </div>
             </div>
@@ -910,25 +911,30 @@ const IroningLive = () => {
                           Object.values(visibleCols).filter((v) => v).length ||
                           1
                         }
-                        className="px-1 py-2 md:px-1 md:py-3 text-center font-semibold border-r min-w-[120px] md:min-w-[150px]"
+                        className="px-1 py-2 md:px-1 md:py-3 text-center font-semibold border-r min-w-[200px] md:min-w-[240px]"
                       >
                         {date}
                         {Object.values(visibleCols).filter((v) => v).length >
                           0 && (
-                          <div className="flex justify-around mt-0.5 md:mt-1 text-[9px] md:text-[10px] font-normal normal-case text-gray-500">
-                            {visibleCols.totalIroningQty && (
-                              <span className="w-1/3 text-center px-0.5">
-                                Iron
+                          <div className="grid grid-cols-4 mt-0.5 md:mt-1 text-[9px] md:text-[10px] font-normal normal-case text-gray-500">
+                            {visibleCols.totalPackingQty && (
+                              <span className="text-center px-0.5">
+                                Total Qty
                               </span>
                             )}
-                            {visibleCols.totalBundles && (
-                              <span className="w-1/3 text-center px-0.5">
-                                Bundle
+                            {visibleCols.totalOrderCardBundles && (
+                              <span className="text-center px-0.5">
+                                Order Bdl
                               </span>
                             )}
-                            {visibleCols.totalRecheckIroningQty && (
-                              <span className="w-1/3 text-center px-0.5">
-                                Re-Chk
+                            {visibleCols.totalDefectCards && (
+                              <span className="text-center px-0.5">
+                                Def Cards
+                              </span>
+                            )}
+                            {visibleCols.totalDefectCardQty && (
+                              <span className="text-center px-0.5">
+                                Def Qty
                               </span>
                             )}
                           </div>
@@ -942,10 +948,10 @@ const IroningLive = () => {
                     inspectorTableData.data.map((inspector) => (
                       <tr
                         key={inspector.emp_id}
-                        className="hover:bg-pink-50 transition-colors duration-150"
+                        className="hover:bg-green-50 transition-colors duration-150"
                       >
                         <td
-                          className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r sticky left-0 bg-white hover:bg-pink-50 z-10"
+                          className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r sticky left-0 bg-white hover:bg-green-50 z-10"
                           style={{
                             width: "var(--emp-id-width, 80px)",
                             minWidth: "var(--emp-id-width, 80px)"
@@ -954,7 +960,7 @@ const IroningLive = () => {
                           {inspector.emp_id}
                         </td>
                         <td
-                          className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r sticky left-[calc(var(--emp-id-width,80px)+1px)] md:left-[calc(var(--emp-id-width-md,100px)+1px)] bg-white hover:bg-pink-50 z-10"
+                          className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r sticky left-[calc(var(--emp-id-width,80px)+1px)] md:left-[calc(var(--emp-id-width-md,100px)+1px)] bg-white hover:bg-green-50 z-10"
                           style={{
                             width: "var(--emp-name-width, 120px)",
                             minWidth: "var(--emp-name-width, 120px)"
@@ -969,19 +975,24 @@ const IroningLive = () => {
                           ).some((v) => v);
                           return hasVisibleCols ? (
                             <React.Fragment key={`${inspector.emp_id}-${date}`}>
-                              {visibleCols.totalIroningQty && (
+                              {visibleCols.totalPackingQty && (
                                 <td className="px-1 py-1.5 md:px-1 md:py-2 text-center border-r">
-                                  {dayData.totalIroningQty || 0}
+                                  {dayData.totalPackingQty || 0}
                                 </td>
                               )}
-                              {visibleCols.totalBundles && (
+                              {visibleCols.totalOrderCardBundles && (
                                 <td className="px-1 py-1.5 md:px-1 md:py-2 text-center border-r">
-                                  {dayData.totalBundles || 0}
+                                  {dayData.totalOrderCardBundles || 0}
                                 </td>
                               )}
-                              {visibleCols.totalRecheckIroningQty && (
+                              {visibleCols.totalDefectCards && (
                                 <td className="px-1 py-1.5 md:px-1 md:py-2 text-center border-r">
-                                  {dayData.totalRecheckIroningQty || 0}
+                                  {dayData.totalDefectCards || 0}
+                                </td>
+                              )}
+                              {visibleCols.totalDefectCardQty && (
+                                <td className="px-1 py-1.5 md:px-1 md:py-2 text-center border-r">
+                                  {dayData.totalDefectCardQty || 0}
                                 </td>
                               )}
                             </React.Fragment>
@@ -1019,50 +1030,70 @@ const IroningLive = () => {
           <div className="mb-4 md:mb-8 p-3 md:p-4 bg-white shadow-xl rounded-xl border border-gray-200">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-base md:text-xl font-semibold text-gray-700">
-                Hourly Performance (Ironing)
+                Hourly Performance (Packing)
               </h2>
-              <div className="flex space-x-1">
+              <div className="flex flex-wrap gap-1">
                 <button
-                  onClick={() => setChartDataType("ironing")}
+                  onClick={() => setChartDataType("packingQty")}
                   className={`px-2 py-1 text-xs rounded-md ${
-                    chartDataType === "ironing"
-                      ? "bg-pink-500 text-white"
+                    chartDataType === "packingQty"
+                      ? "bg-green-500 text-white"
                       : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                   }`}
                 >
-                  Ironing Qty
+                  Total Qty
                 </button>
                 <button
-                  onClick={() => setChartDataType("bundle")}
+                  onClick={() => setChartDataType("orderBundles")}
                   className={`px-2 py-1 text-xs rounded-md ${
-                    chartDataType === "bundle"
-                      ? "bg-purple-500 text-white"
+                    chartDataType === "orderBundles"
+                      ? "bg-green-500 text-white"
                       : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                   }`}
                 >
-                  Bundle Count
+                  Order Bundles
+                </button>
+                <button
+                  onClick={() => setChartDataType("defectCards")}
+                  className={`px-2 py-1 text-xs rounded-md ${
+                    chartDataType === "defectCards"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  Defect Cards
+                </button>
+                <button
+                  onClick={() => setChartDataType("defectQty")}
+                  className={`px-2 py-1 text-xs rounded-md ${
+                    chartDataType === "defectQty"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  Defect Qty
                 </button>
               </div>
             </div>
             {isLoadingHourlyChart ? (
-              <LoadingSpinner_Ironing />
+              <LoadingSpinner_Packing />
             ) : hourlyChartData.length > 0 ? (
               <div className="h-[300px] md:h-[400px]">
                 <Bar
-                  options={hourlyBarChartOptions_Ironing}
-                  data={preparedHourlyChartData_Ironing}
+                  options={hourlyBarChartOptions_Packing}
+                  data={preparedHourlyChartData_Packing}
                 />
               </div>
             ) : (
               <p className="text-center text-gray-500 py-8">
-                No hourly Ironing data available for selected filters.
+                No hourly Packing data available for selected filters.
               </p>
             )}
           </div>
 
           <div className="p-3 md:p-4 bg-white shadow-xl rounded-xl border border-gray-200">
             <h2 className="text-base md:text-xl font-semibold text-gray-700 mb-3 md:mb-4">
-              Detailed Ironing Records
+              Detailed Packing Records
             </h2>
             <div className="overflow-x-auto max-h-[500px] md:max-h-[600px] custom-scrollbar text-[11px] md:text-sm">
               <table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-md overflow-hidden">
@@ -1075,14 +1106,13 @@ const IroningLive = () => {
                       "Dept.",
                       "MO No",
                       "Pkg No",
+                      "Card Type",
                       "Cust. Style",
                       "Buyer",
                       "Color",
                       "Size",
                       "Insp. Time",
-                      "Iron Qty",
-                      "Bundles",
-                      "Re-Chk Qty"
+                      "Packed Qty"
                     ].map((h, idx) => (
                       <th
                         key={h}
@@ -1102,27 +1132,30 @@ const IroningLive = () => {
                     detailedRecords.map((record, index) => (
                       <tr
                         key={index}
-                        className="hover:bg-pink-50 transition-colors duration-150"
+                        className="hover:bg-green-50 transition-colors duration-150"
                       >
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r sticky left-0 bg-white hover:bg-pink-50 z-0">
-                          {formatDisplayDate_Ironing(
-                            record.ironing_updated_date
+                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r sticky left-0 bg-white hover:bg-green-50 z-0">
+                          {formatDisplayDate_Packing(
+                            record.packing_updated_date
                           )}
                         </td>
                         <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
-                          {record.emp_id_ironing}
+                          {record.emp_id_packing}
                         </td>
                         <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
-                          {record.eng_name_ironing || "N/A"}
+                          {record.eng_name_packing || "N/A"}
                         </td>
                         <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
-                          {record.dept_name_ironing || "N/A"}
+                          {record.dept_name_packing || "N/A"}
                         </td>
                         <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
                           {record.selectedMono || "N/A"}
                         </td>
                         <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
                           {record.package_no}
+                        </td>
+                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
+                          {record.cardType}
                         </td>
                         <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
                           {record.custStyle || "N/A"}
@@ -1137,26 +1170,20 @@ const IroningLive = () => {
                           {record.size || "N/A"}
                         </td>
                         <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
-                          {record.ironing_update_time || "N/A"}
+                          {record.packing_update_time || "N/A"}
                         </td>
                         <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r text-center">
-                          {record.ironingQty || 0}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r text-center">
-                          {1}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r text-center">
-                          {record.recheckIroningQty || 0}
+                          {record.passQtyPack || 0}
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
                       <td
-                        colSpan={14}
+                        colSpan={13}
                         className="text-center py-4 text-gray-500"
                       >
-                        No detailed Ironing records available for selected
+                        No detailed Packing records available for selected
                         filters.
                       </td>
                     </tr>
@@ -1215,4 +1242,4 @@ const IroningLive = () => {
   );
 };
 
-export default IroningLive;
+export default PackingLive;

@@ -16,6 +16,11 @@ function NumLetterPad({ onClose, onInput }) {
 
   const handleSubmit = () => {
     onInput(inputValue);
+    // Don't close the keypad when Enter is pressed
+  };
+  
+  const handleDone = () => {
+    onInput(inputValue);
     onClose();
   };
 
@@ -38,6 +43,11 @@ function NumLetterPad({ onClose, onInput }) {
             value={inputValue}
             readOnly
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-right text-2xl font-medium"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && inputValue) {
+                handleSubmit();
+              }
+            }}
           />
         </div>
 
@@ -83,7 +93,23 @@ function NumLetterPad({ onClose, onInput }) {
                 {symbol}
               </button>
             ))}
-            <div className="col-span-4"></div>
+            <button
+              onClick={() => handleInputClick(" ")}
+              className="col-span-2 p-2 bg-gray-100 rounded hover:bg-gray-200 active:bg-gray-300 text-sm"
+            >
+              Space
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!inputValue}
+              className={`col-span-2 p-2 rounded text-sm ${
+                inputValue
+                  ? "bg-green-500 hover:bg-green-600 text-white"
+                  : "bg-gray-300 cursor-not-allowed text-gray-500"
+              }`}
+            >
+              Enter
+            </button>
             <button
               onClick={handleBackspace}
               className="col-span-2 p-2 bg-red-100 text-red-600 rounded hover:bg-red-200 active:bg-red-300 text-sm"
@@ -91,7 +117,7 @@ function NumLetterPad({ onClose, onInput }) {
               ← {t("set.delete")}
             </button>
             <button
-              onClick={handleSubmit}
+              onClick={handleDone}
               disabled={!inputValue}
               className={`col-span-2 p-2 text-white rounded text-sm ${
                 inputValue

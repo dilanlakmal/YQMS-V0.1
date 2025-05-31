@@ -31,7 +31,7 @@ const cuttingInspectionSchema = new mongoose.Schema({
     planLayers: { type: Number },
     actualLayers: { type: Number },
     totalPcs: { type: Number },
-    mackerNo: { type: String, required: true },
+    mackerNo: { type: String },
     mackerLength: { type: Number }
   },
   mackerRatio: [

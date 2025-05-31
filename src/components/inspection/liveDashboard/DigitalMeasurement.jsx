@@ -6,6 +6,7 @@ import { FaClock } from "react-icons/fa";
 import DigitalMeasurementFilterPane from "../digital_measurement/DigitalMeasurementFilterPane";
 import DigialMeasurementSummaryCards from "../digital_measurement/DigialMeasurementSummaryCards";
 import DigitalMeasurementTotalSummary from "../digital_measurement/DigitalMeasurementTotalSummary";
+import DigitalMeasurementTotalSummaryCPK from "../digital_measurement/DigitalMeasurementTotalSummary-CPK";
 import { API_BASE_URL } from "../../../../config";
 
 const DigitalMeasurement = () => {
@@ -447,6 +448,12 @@ const DigitalMeasurement = () => {
                 sizeSpec={measurementDetails.sizeSpec || []}
                 decimalToFraction={decimalToFraction}
               />
+              {/* <DigitalMeasurementTotalSummaryCPK
+                summaryData={measurementDetails.measurementPointSummary || []}
+                records={measurementDetails.records || []}
+                sizeSpec={measurementDetails.sizeSpec || []}
+                decimalToFraction={decimalToFraction}
+              /> */}
               <h2 className="text-lg font-semibold mb-4">
                 Inspected Summary for MO No: {selectedMono}
               </h2>
