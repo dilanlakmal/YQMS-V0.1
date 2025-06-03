@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useMemo, } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css"; // Base styles needed
 import { useTranslation } from "react-i18next";
@@ -101,11 +101,15 @@ function BundleRegistrationRecordData({ handleEdit }) {
   const [totalRecords, setTotalRecords] = useState(0);
   const recordsPerPage = 15;
 
+  // State for the new hourly summary table
+  const [hourlyData, setHourlyData] = useState({});
+  const [hourlyLoading, setHourlyLoading] = useState(false);
+
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
         const response = await fetch(
-          `${API_BASE_URL}/api/bundle-data/distinct-filters`
+          `${API_BASE_URL}/api/qc2-order/distinct-filters`
         );
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -201,6 +205,64 @@ function BundleRegistrationRecordData({ handleEdit }) {
     selectedQcId
   ]); // Removed fetchFilteredData
 
+  // Define time slots for the hourly summary table
+  const timeSlots = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => {
+      const startHour = 6 + i;
+      const endHour = startHour + 1;
+      return {
+        key: String(startHour).padStart(2, "0"), // "06", "07", ... "17"
+        label: `${startHour}-${endHour}`,
+      };
+    });
+  }, []);
+
+  // Derive active time slots based on hourlyData content
+  const activeTimeSlots = useMemo(() => {
+    if (!hourlyData || Object.keys(hourlyData).length === 0) {
+      return []; // No data, so no active slots
+    }
+    return timeSlots.filter(slot => {
+      const dataForSlot = hourlyData[slot.key];
+      // A slot is active if data exists for it AND either bundles or garments are > 0
+      return dataForSlot && (dataForSlot.totalBundles > 0 || dataForSlot.totalGarments > 0);
+    });
+  }, [hourlyData, timeSlots]);
+
+  // Fetch hourly data when selectedDate changes
+  useEffect(() => {
+    const fetchHourlySummary = async () => {
+      if (!selectedDate) {
+        setHourlyData({});
+        return;
+      }
+      setHourlyLoading(true);
+      try {
+        // Format selectedDate to its local "YYYY-MM-DD" representation
+        const year = selectedDate.getFullYear();
+        const month = (selectedDate.getMonth() + 1).toString().padStart(2, '0');
+        const day = selectedDate.getDate().toString().padStart(2, '0');
+        const dateString = `${month}/${day}/${year}`;
+
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc2-order/hourly-summary?date=${dateString}`
+        );
+        if (!response.ok) {
+          throw new Error(`Failed to fetch hourly summary: ${response.status}`);
+        }
+        const data = await response.json();
+        setHourlyData(data);
+      } catch (error) {
+        console.error("Error fetching hourly summary:", error);
+        setHourlyData({}); // Reset on error
+      } finally {
+        setHourlyLoading(false);
+      }
+    };
+
+    fetchHourlySummary();
+  }, [selectedDate]);
+
   const clearFilters = () => {
     setSelectedDate(new Date());
     setSelectedLineNo(null);
@@ -228,6 +290,7 @@ function BundleRegistrationRecordData({ handleEdit }) {
   const headers = [
     "record_id",
     "package_no",
+    "task_no_order",
     "date",
     "modify",
     "time",
@@ -575,11 +638,81 @@ function BundleRegistrationRecordData({ handleEdit }) {
         />
       </div>
 
+       {/* Hourly Production Summary Table */}
+      <div className="bg-white rounded-xl shadow-xl p-0 md:p-4 mb-6">
+        <h3 className="text-md md:text-lg font-semibold text-gray-700 mb-3 px-4 md:px-0 pt-4 md:pt-0">
+          {t("bundle.hourly_summary_title", "Hourly Production Summary")}
+        </h3>
+        <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm relative">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-slate-200">
+              <tr>
+                <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap sticky left-0 bg-slate-200 z-10">
+                  {/* Empty header for the first column */}
+                </th>
+               {activeTimeSlots.map((slot) => (
+                  <th
+                    key={slot.key}
+                    className="px-3 md:px-5 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap"
+                  >
+                    {slot.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {hourlyLoading ? (
+                <tr>
+                  <td
+                    colSpan={timeSlots.length + 1}
+                    className="text-center py-6 text-gray-500"
+                  >
+                    {t("bundle.loading_hourly_data", "Loading hourly data...")}
+                  </td>
+                </tr>
+                ) : activeTimeSlots.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={timeSlots.length + 1} // Message spans all potential columns
+                    className="text-center py-6 text-gray-500 px-3 md:px-5"
+                  >
+                    {t("bundle.no_hourly_production_data", "No production activity to display for these hours.")}
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  <tr>
+                    <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap font-medium sticky left-0 bg-white z-5">
+                      {t("bundle.hourly_total_bundles", "Total Bundles")}
+                    </td>
+                    {activeTimeSlots.map((slot) => (
+                      <td key={slot.key} className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap text-center border">
+                        {hourlyData[slot.key]?.totalBundles?.toLocaleString() || 0}
+                      </td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap font-medium sticky left-0 bg-white z-5">
+                      {t("bundle.hourly_total_garments", "Total Garments")}
+                    </td>
+                    {activeTimeSlots.map((slot) => (
+                      <td key={slot.key} className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap text-center border">
+                        {hourlyData[slot.key]?.totalGarments?.toLocaleString() || 0}
+                      </td>
+                    ))}
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="bg-white rounded-xl shadow-xl p-0 md:p-4">
         <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm relative">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-slate-200 sticky top-0 z-10">
-              {" "}
+              
               {/* Sticky header with z-index */}
               <tr>
                 {headers.map((headerKey) => (
@@ -626,6 +759,9 @@ function BundleRegistrationRecordData({ handleEdit }) {
                     </td>
                     <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
                       {batch.package_no}
+                    </td>
+                    <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                      {batch.task_no_order}
                     </td>
                     <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
                       {batch.updated_date_seperator}

@@ -1,9 +1,36 @@
 import sql from "mssql";
 
 // SQL Server Configurations (Consider moving credentials to .env)
-const sqlConfigYMDataStore = { user: process.env.SQL_YMDS_USER || "ymdata", password: process.env.SQL_YMDS_PASSWORD || "Kzw15947", server: process.env.SQL_YMDS_SERVER || "192.167.1.13", port: parseInt(process.env.SQL_YMDS_PORT) || 1433, database: process.env.SQL_YMDS_DB || "YMDataStore", options: { encrypt: false, trustServerCertificate: true }, requestTimeout: 3000000, pool: { max: 10, min: 0, idleTimeoutMillis: 30000 } };
-const sqlConfigYMCE = { user: process.env.SQL_YMCE_USER || "visitor", password: process.env.SQL_YMCE_PASSWORD || "visitor", server: process.env.SQL_YMCE_SERVER || "ymws-150", database: process.env.SQL_YMCE_DB || "YMCE_SYSTEM", options: { encrypt: false, trustServerCertificate: true }, requestTimeout: 300000, connectionTimeout: 300000, pool: { max: 10, min: 0, idleTimeoutMillis: 30000 } };
-const sqlConfigYMWHSYS2 = { user: process.env.SQL_YMWH_USER || "user01", password: process.env.SQL_YMWH_PASSWORD || "user01", server: process.env.SQL_YMWH_SERVER || "YM-WHSYS", database: process.env.SQL_YMWH_DB || "YMWHSYS2", options: { encrypt: false, trustServerCertificate: true }, requestTimeout: 300000, connectionTimeout: 300000, pool: { max: 10, min: 0, idleTimeoutMillis: 30000 } };
+const sqlConfigYMDataStore = { 
+  user: process.env.SQL_YMDS_USER || "ymdata", 
+  password: process.env.SQL_YMDS_PASSWORD || "Kzw15947", 
+  server: process.env.SQL_YMDS_SERVER || "192.167.1.13", 
+  port: parseInt(process.env.SQL_YMDS_PORT) || 1433, 
+  database: process.env.SQL_YMDS_DB || "YMDataStore", 
+  options: { encrypt: false, trustServerCertificate: true }, 
+  requestTimeout: 3000000, 
+  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 } 
+};
+const sqlConfigYMCE = { 
+  user: process.env.SQL_YMCE_USER || "visitor", 
+  password: process.env.SQL_YMCE_PASSWORD || "visitor", 
+  server: process.env.SQL_YMCE_SERVER || "ymws-150", 
+  database: process.env.SQL_YMCE_DB || "YMCE_SYSTEM", 
+  options: { encrypt: false, trustServerCertificate: true }, 
+  requestTimeout: 300000, 
+  connectionTimeout: 300000, 
+  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 } 
+};
+const sqlConfigYMWHSYS2 = { 
+  user: process.env.SQL_YMWH_USER || "user01", 
+  password: process.env.SQL_YMWH_PASSWORD || "user01", 
+  server: process.env.SQL_YMWH_SERVER || "YM-WHSYS", 
+  database: process.env.SQL_YMWH_DB || "YMWHSYS2", 
+  options: { encrypt: false, trustServerCertificate: true }, 
+  requestTimeout: 300000, 
+  connectionTimeout: 300000, 
+  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 } 
+};
 
 // SQL Server Connection Pools
 export const poolYMDataStore = new sql.ConnectionPool(sqlConfigYMDataStore);

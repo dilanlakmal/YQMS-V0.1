@@ -224,7 +224,7 @@ export default function RoleManagement() {
     "Live Dashboard",
     "Power BI",
     "QC1 Sunrise",
-    "System Administration"
+    "System Administration",
   ];
 
   // Prepare sorted table data for rendering

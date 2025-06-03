@@ -5,6 +5,8 @@ import {
 } from "../../Config/mongodb.js";
 import { generateRandomId } from "../../Helpers/heperFunction.js";
 
+import { normalizeDateString } from "../../Helpers/heperFunction.js";
+
 // Update the MONo search endpoint to handle partial matching
 export const getMoNoSearch = async (req, res) => {
     try {
@@ -492,4 +494,191 @@ export const fetchColorsAndSizes = async (req, res) => {
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch colors/sizes" });
     }
+};
+
+// NEW ENDPOINT: Get distinct values for filters
+export const getDistinctFilters = async (req, res) => {
+  try {
+    const distinctMonos = await QC2OrderData.distinct("selectedMono");
+    const distinctBuyers = await QC2OrderData.distinct("buyer");
+    const distinctQcIds = await QC2OrderData.distinct("emp_id"); // Assuming emp_id is QC ID
+    const distinctLineNos = await QC2OrderData.distinct("lineNo");
+
+    res.json({
+      monos: distinctMonos.sort(),
+      buyers: distinctBuyers.sort(),
+      qcIds: distinctQcIds.sort(),
+      lineNos: distinctLineNos.sort((a, b) => {
+        // Custom sort for alphanumeric line numbers
+        const numA = parseInt(a);
+        const numB = parseInt(b);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        if (!isNaN(numA)) return -1; // Numbers first
+        if (!isNaN(numB)) return 1;
+        return a.localeCompare(b); // Then string compare
+      })
+    });
+  } catch (error) {
+    console.error("Error fetching distinct filter values:", error);
+    res.status(500).json({ message: "Failed to fetch distinct filter values" });
+  }
+};
+
+// MODIFIED ENDPOINT: Fetch filtered bundle data with pagination and aggregated stats
+export const fetchFilteredBundleData = async (req, res) => {
+   try {
+    const {
+      date,
+      lineNo,
+      selectedMono,
+      packageNo,
+      buyer,
+      emp_id,
+      page = 1,
+      limit = 15, // Pagination params, default to page 1, 10 items per page
+      sortBy = "updated_date_seperator", // Default sort field
+      sortOrder = "desc" // Default sort order (descending for latest first)
+    } = req.query;
+
+    let matchQuery = {};
+
+    if (date) {
+      const normalizedQueryDate = normalizeDateString(date);
+      if (normalizedQueryDate) {
+        matchQuery.updated_date_seperator = normalizedQueryDate;
+      }
+    }
+    if (lineNo) matchQuery.lineNo = lineNo;
+    if (selectedMono) matchQuery.selectedMono = selectedMono;
+    if (packageNo) {
+      const pkgNo = parseInt(packageNo);
+      if (!isNaN(pkgNo)) matchQuery.package_no = pkgNo;
+    }
+    if (buyer) matchQuery.buyer = buyer;
+    if (emp_id) matchQuery.emp_id = emp_id;
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Determine sort direction
+    const sortDirection = sortOrder === "asc" ? 1 : -1;
+    let sortOptions = {};
+    if (sortBy === "updated_date_seperator") {
+      // For date and time, sort by date then time if dates are equal
+      sortOptions = {
+        updated_date_seperator: sortDirection,
+        updated_time_seperator: sortDirection
+      };
+    } else {
+      sortOptions[sortBy] = sortDirection;
+    }
+
+    // Fetch total count of matching documents for pagination
+    const totalRecords = await QC2OrderData.countDocuments(matchQuery);
+
+    // Fetch paginated and sorted records
+    const records = await QC2OrderData.find(matchQuery)
+      .sort(sortOptions) // Apply sorting
+      .skip(skip) // Apply skip for pagination
+      .limit(limitNum); // Apply limit for pagination
+
+    // Calculate aggregated stats based on ALL filtered records (not just the current page)
+    // This might be resource-intensive if the filtered set is very large.
+    // Consider if stats should also be paginated or if an approximation is okay for large sets.
+    // For now, calculating on the full filtered set.
+    const allFilteredRecordsForStats = await QC2OrderData.find(matchQuery); // Re-query without pagination for stats
+
+    let totalGarmentQty = 0;
+    let uniqueStyles = new Set();
+
+    allFilteredRecordsForStats.forEach((record) => {
+      totalGarmentQty += record.count || 0;
+      if (record.selectedMono) {
+        uniqueStyles.add(record.selectedMono);
+      }
+    });
+
+    const totalBundlesFromStats = allFilteredRecordsForStats.length; // This is the true total bundles for the filter
+    const totalStyles = uniqueStyles.size;
+
+    res.json({
+      records,
+      stats: {
+        totalGarmentQty,
+        totalBundles: totalBundlesFromStats, // Use count from all filtered records for stats
+        totalStyles
+      },
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalRecords / limitNum),
+        totalRecords: totalRecords, // Total records matching the filter
+        limit: limitNum
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching filtered bundle data:", error);
+    res.status(500).json({ message: "Failed to fetch filtered bundle data" });
+  }
+};
+ const formatDateToMMDDYYYY = (dateInput) => {
+   if (!dateInput) return null;
+  const d = new Date(dateInput);
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  const year = d.getFullYear();
+  return `${month}/${day}/${year}`;
+};
+// Endpoint to get hourly summary for qc2_orderdata
+export const getHourlySummary = async (req, res) => {
+  try {
+    const { date: queryDate } = req.query;
+
+    if (!queryDate) {
+      return res.status(400).json({ error: "Date parameter is required" });
+    }
+
+    const formattedDate = formatDateToMMDDYYYY(queryDate);
+    if (!formattedDate) {
+      return res.status(400).json({ error: "Invalid date format. Please use YYYY-MM-DD." });
+    }
+
+    const results = await QC2OrderData.aggregate([
+      {
+        $match: {
+          updated_date_seperator: formattedDate,
+        },
+      },
+      {
+        $addFields: {
+          hour: { $toInt: { $substrCP: ["$updated_time_seperator", 0, 2] } },
+        },
+      },
+      {
+        $match: {
+          hour: { $gte: 6, $lte: 17 }, // Hours from 6 AM to 5 PM (up to 17:59:59)
+        },
+      },
+      {
+        $group: {
+          _id: "$hour",
+          totalBundles: { $sum: "$totalBundleQty" },
+          totalGarments: { $sum: "$count" },
+        },
+      },
+      { $sort: { _id: 1 } }, // Sort by hour
+    ]);
+
+    const hourlySummary = {};
+    for (let i = 6; i <= 17; i++) {
+      const hourKey = String(i).padStart(2, '0');
+      const found = results.find(r => r._id === i);
+      hourlySummary[hourKey] = found ? { totalBundles: found.totalBundles, totalGarments: found.totalGarments } : { totalBundles: 0, totalGarments: 0 };
+    }
+
+    res.json(hourlySummary);
+  } catch (error) {
+    console.error("Error fetching hourly summary:", error);
+    res.status(500).json({ error: "Failed to fetch hourly summary", details: error.message });
+  }
 };

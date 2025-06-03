@@ -106,7 +106,7 @@
     "select_department": "Select Department",
     "production": " Production",
     "washing": "Washing",
-    "sub_con": "Sub-con",
+    "sub_con": "Send to Sub-con",
     "search_mono": "Search MONo",
     "search_mono_placeholder": "Enter MONo...",
     "order_details": "Order Details",

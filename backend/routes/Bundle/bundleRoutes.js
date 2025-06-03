@@ -14,6 +14,9 @@ import {
   updateQC2OrderData,
   searchQC2OrderData,
   fetchColorsAndSizes,
+  getDistinctFilters,
+  fetchFilteredBundleData,
+  getHourlySummary,
 } from '../../Controller/Bundle/bundleController.js';
 
 const router = express.Router();
@@ -32,6 +35,9 @@ router.post('/api/check-bundle-id', checkBundleIdExists);
 router.put('/api/update-qc2-orderdata/:bundleId', updateQC2OrderData);
 router.get('/api/reprint-search', searchQC2OrderData);
 router.get('/api/reprint-colors-sizes/:mono', fetchColorsAndSizes);
+router.get('/api/qc2-order/distinct-filters', getDistinctFilters);
+router.get('/api/filtered-bundle-data', fetchFilteredBundleData);
+router.get('/api/qc2-order/hourly-summary', getHourlySummary);
 
 
 export default router;
