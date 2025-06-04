@@ -1030,7 +1030,7 @@
     "registerMachineTitle": "注册机器进行弹性检查",
     "inspectionDataTitle": "弹性检查数据",
     "checkedQty": "检查数量",
-    "qualityIssue": "质量问题",
+    "qualityIssue": "数量问题",
     "measurement": "测量",
     "details": "缺陷",
     "result": "结果",

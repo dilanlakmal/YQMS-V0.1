@@ -52,6 +52,11 @@ import createSCCDefectModel from "./models/SCCDefectModel.js";
 import createHTInspectionReportModel from "./models/HTInspectionReportModel.js";
 import createElasticReportModel from "./models/ElasticReport.js";
 
+// Import the new SCC Operator models
+import createSCCHTOperatorModel from "./models/SCCHTOperatorModel.js";
+import createSCCFUOperatorModel from "./models/SCCFUOperatorModel.js";
+import createSCCElasticOperatorModel from "./models/SCCElasticOperatorModel.js";
+
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
 
@@ -182,6 +187,11 @@ const DailyTestingFUQC = createDailyTestingFUQCModel(ymProdConnection);
 const SCCDefect = createSCCDefectModel(ymProdConnection);
 const HTInspectionReport = createHTInspectionReportModel(ymProdConnection);
 const ElasticReport = createElasticReportModel(ymProdConnection);
+
+// Define new SCC Operator models on ymProdConnection
+const SCCHTOperator = createSCCHTOperatorModel(ymProdConnection);
+const SCCFUOperator = createSCCFUOperatorModel(ymProdConnection);
+const SCCElasticOperator = createSCCElasticOperatorModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -2239,6 +2249,49 @@ app.get("/api/sewing-defects", async (req, res) => {
   } catch (error) {
     // Handle errors
     res.status(500).json({ message: error.message });
+  }
+});
+
+// Endpoint to search users by emp_id or name (partial match)
+app.get("/api/users/search-by-empid", async (req, res) => {
+  try {
+    const searchTerm = req.query.term;
+    // console.log(`[API /api/users/search-by-empid] Received search term: "${searchTerm}"`);
+
+    if (!searchTerm || searchTerm.trim() === "") {
+      return res
+        .status(400)
+        .json({ error: "Search term is required and cannot be empty." });
+    }
+
+    const trimmedSearchTerm = searchTerm.trim();
+    const escapedSearchTerm = escapeRegex(trimmedSearchTerm);
+
+    const query = {
+      $or: [
+        // Prioritize exact match for emp_id if the term looks like a full ID
+        // This isn't perfect, but helps if user types full ID
+        { emp_id: trimmedSearchTerm }, // Try exact match first
+        { emp_id: { $regex: escapedSearchTerm, $options: "i" } },
+        { eng_name: { $regex: escapedSearchTerm, $options: "i" } }
+      ]
+    };
+
+    const users = await UserMain.find(
+      query,
+      "emp_id eng_name face_photo" // _id is included by default
+    )
+      .limit(10) // Limit results
+      .lean();
+
+    // console.log(`[API /api/users/search-by-empid] Found ${users.length} users.`);
+    res.json(users); // Send the array (even if empty)
+  } catch (error) {
+    console.error(
+      "[API /api/users/search-by-empid] Error searching users:",
+      error
+    );
+    res.status(500).json({ error: "Failed to search users" });
   }
 });
 
@@ -11028,6 +11081,114 @@ app.put("/api/cutting-inspection-general-update/:id", async (req, res) => {
   }
 });
 
+// ** NEW: PUT Endpoint to update the full/multiple sections of a CuttingInspection document **
+app.put("/api/cutting-inspection-full-update/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body; // Contains all fields from frontend: general, fabric, cuttingTable, mackerRatio
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid Record ID format." });
+    }
+
+    const recordToUpdate = await CuttingInspection.findById(id);
+    if (!recordToUpdate) {
+      return res.status(404).json({ message: "Inspection record not found." });
+    }
+
+    // Update General Info
+    if (updates.inspectionDate !== undefined)
+      recordToUpdate.inspectionDate = updates.inspectionDate;
+    if (updates.orderQty !== undefined)
+      recordToUpdate.orderQty = Number(updates.orderQty);
+    if (updates.totalBundleQty !== undefined)
+      recordToUpdate.totalBundleQty = Number(updates.totalBundleQty);
+    if (updates.bundleQtyCheck !== undefined)
+      recordToUpdate.bundleQtyCheck = Number(updates.bundleQtyCheck); // This is auto-calculated on frontend, but save it
+    if (updates.totalInspectionQty !== undefined)
+      recordToUpdate.totalInspectionQty = Number(updates.totalInspectionQty); // Also auto-calculated
+
+    // Update Fabric Details
+    if (updates.fabricDetails) {
+      recordToUpdate.fabricDetails = {
+        fabricType:
+          updates.fabricDetails.fabricType ||
+          recordToUpdate.fabricDetails.fabricType,
+        material:
+          updates.fabricDetails.material ||
+          recordToUpdate.fabricDetails.material,
+        rollQty:
+          updates.fabricDetails.rollQty !== undefined
+            ? Number(updates.fabricDetails.rollQty)
+            : recordToUpdate.fabricDetails.rollQty,
+        spreadYds:
+          updates.fabricDetails.spreadYds !== undefined
+            ? Number(updates.fabricDetails.spreadYds)
+            : recordToUpdate.fabricDetails.spreadYds,
+        unit: updates.fabricDetails.unit || recordToUpdate.fabricDetails.unit,
+        grossKgs:
+          updates.fabricDetails.grossKgs !== undefined
+            ? Number(updates.fabricDetails.grossKgs)
+            : recordToUpdate.fabricDetails.grossKgs,
+        netKgs:
+          updates.fabricDetails.netKgs !== undefined
+            ? Number(updates.fabricDetails.netKgs)
+            : recordToUpdate.fabricDetails.netKgs,
+        totalTTLRoll:
+          updates.fabricDetails.totalTTLRoll !== undefined
+            ? Number(updates.fabricDetails.totalTTLRoll)
+            : recordToUpdate.fabricDetails.totalTTLRoll
+      };
+    }
+
+    // Update Cutting Table Details (PlanLayers and ActualLayers are display-only on frontend, so we don't update them here from payload)
+    // Only update editable fields if provided
+    if (updates.cuttingTableDetails) {
+      if (updates.cuttingTableDetails.spreadTable !== undefined)
+        recordToUpdate.cuttingTableDetails.spreadTable =
+          updates.cuttingTableDetails.spreadTable;
+      if (updates.cuttingTableDetails.spreadTableNo !== undefined)
+        recordToUpdate.cuttingTableDetails.spreadTableNo =
+          updates.cuttingTableDetails.spreadTableNo;
+      // recordToUpdate.cuttingTableDetails.planLayers remains from DB
+      // recordToUpdate.cuttingTableDetails.actualLayers remains from DB
+      // recordToUpdate.cuttingTableDetails.totalPcs might need recalculation based on new ratios / layers on server-side if desired for integrity
+      if (updates.cuttingTableDetails.mackerNo !== undefined)
+        recordToUpdate.cuttingTableDetails.mackerNo =
+          updates.cuttingTableDetails.mackerNo;
+      if (updates.cuttingTableDetails.mackerLength !== undefined)
+        recordToUpdate.cuttingTableDetails.mackerLength = Number(
+          updates.cuttingTableDetails.mackerLength
+        );
+    }
+
+    // Update Macker Ratio - Replace the whole array with the new one
+    if (Array.isArray(updates.mackerRatio)) {
+      recordToUpdate.mackerRatio = updates.mackerRatio.map((ratio) => ({
+        index: Number(ratio.index),
+        markerSize: ratio.markerSize,
+        ratio: Number(ratio.ratio)
+      }));
+      recordToUpdate.markModified("mackerRatio");
+    }
+
+    recordToUpdate.updated_at = new Date();
+
+    const updatedRecord = await recordToUpdate.save();
+
+    res.status(200).json({
+      message: "Cutting inspection record updated successfully.",
+      data: updatedRecord
+    });
+  } catch (error) {
+    console.error("Error updating full cutting inspection record:", error);
+    res.status(500).json({
+      message: "Failed to update cutting inspection record.",
+      error: error.message
+    });
+  }
+});
+
 /* ------------------------------
    AQL ENDPOINTS
 ------------------------------ */
@@ -12803,6 +12964,214 @@ app.delete("/api/delete-measurement-record", async (req, res) => {
 });
 
 /* ------------------------------
+   End Points - SCC Operaqtors
+------------------------------ */
+
+// Helper function to get the correct operator model
+const getOperatorModel = (type) => {
+  switch (type.toLowerCase()) {
+    case "ht":
+      return SCCHTOperator;
+    case "fu":
+      return SCCFUOperator;
+    case "elastic":
+      return SCCElasticOperator;
+    default:
+      return null;
+  }
+};
+
+// Endpoint to fetch operators for a specific type (HT, FU, Elastic)
+app.get("/api/scc/operators/:type", async (req, res) => {
+  try {
+    const { type } = req.params;
+    const OperatorModel = getOperatorModel(type);
+
+    if (!OperatorModel) {
+      return res.status(400).json({ error: "Invalid operator type" });
+    }
+
+    const operators = await OperatorModel.find()
+      .populate({
+        path: "emp_reference",
+        select: "emp_id eng_name face_photo", // Fields to populate from User model
+        model: UserMain // Explicitly specify model if on different connection
+      })
+      .lean();
+    res.json(operators);
+  } catch (error) {
+    console.error(`Error fetching ${req.params.type} operators:`, error);
+    res.status(500).json({ error: "Failed to fetch operators" });
+  }
+});
+
+// Endpoint to save/update an operator
+app.post("/api/scc/operators/:type", async (req, res) => {
+  try {
+    const { type } = req.params;
+    const { machineNo, emp_id } = req.body;
+
+    if (!machineNo || !emp_id) {
+      return res
+        .status(400)
+        .json({ error: "Machine No and Employee ID are required" });
+    }
+
+    const OperatorModel = getOperatorModel(type);
+    if (!OperatorModel) {
+      return res.status(400).json({ error: "Invalid operator type" });
+    }
+
+    const user = await UserMain.findOne({ emp_id })
+      .select("_id emp_id eng_name face_photo") // Added emp_id for logging
+      .lean();
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ error: `User with emp_id ${emp_id} not found.` });
+    }
+
+    const operatorData = {
+      machineNo,
+      emp_id, // This is the emp_id of the user
+      emp_eng_name: user.eng_name, // This should be the string name
+      emp_face_photo: user.face_photo,
+      emp_reference: user._id
+    };
+
+    const updatedOperator = await OperatorModel.findOneAndUpdate(
+      { machineNo: machineNo },
+      operatorData,
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+        setDefaultsOnInsert: true
+      }
+    ).populate({
+      // Populate after update/insert to return full data
+      path: "emp_reference",
+      select: "emp_id eng_name face_photo",
+      model: UserMain
+    });
+
+    res.status(200).json(updatedOperator);
+  } catch (error) {
+    console.error(
+      `[POST /api/scc/operators/${type}] Error saving/updating operator:`,
+      error
+    );
+    if (error.code === 11000) {
+      return res.status(409).json({
+        error: `Operator for Machine No ${req.body.machineNo} might already exist or another unique constraint violated.`
+      });
+    }
+    res.status(500).json({ error: "Failed to save/update operator" });
+  }
+});
+
+// Endpoint to remove an operator (optional, if needed)
+app.delete("/api/scc/operators/:type/:machineNo", async (req, res) => {
+  try {
+    const { type, machineNo } = req.params;
+    const OperatorModel = getOperatorModel(type);
+
+    if (!OperatorModel) {
+      return res.status(400).json({ error: "Invalid operator type" });
+    }
+
+    const result = await OperatorModel.deleteOne({ machineNo });
+
+    if (result.deletedCount === 0) {
+      return res
+        .status(404)
+        .json({ error: "Operator not found or already removed" });
+    }
+
+    res.status(200).json({ message: "Operator removed successfully" });
+  } catch (error) {
+    console.error(
+      `Error removing ${req.params.type} operator ${req.params.machineNo}:`,
+      error
+    );
+    res.status(500).json({ error: "Failed to remove operator" });
+  }
+});
+
+app.get("/api/scc/operator-by-machine/:type/:machineNo", async (req, res) => {
+  try {
+    const { type, machineNo } = req.params;
+    console.log(
+      `[API /api/scc/operator-by-machine] Fetching operator for type: ${type}, machineNo: ${machineNo}`
+    );
+
+    const OperatorModel = getOperatorModel(type); // SCCHTOperator, SCCFUOperator, etc.
+
+    if (!OperatorModel) {
+      console.log(
+        `[API /api/scc/operator-by-machine] Invalid operator type: ${type}`
+      );
+      return res.status(400).json({ error: "Invalid operator type" });
+    }
+    if (!machineNo) {
+      console.log(`[API /api/scc/operator-by-machine] Machine No is required.`);
+      return res.status(400).json({ error: "Machine No is required" });
+    }
+
+    // Find the operator assigned to this machine
+    const assignedOperator = await OperatorModel.findOne({ machineNo })
+      .populate({
+        path: "emp_reference", // Path in SCCHTOperator schema etc.
+        select: "emp_id eng_name face_photo", // Fields from User model
+        model: UserMain // Specify UserMain model
+      })
+      .lean();
+
+    if (!assignedOperator) {
+      console.log(
+        `[API /api/scc/operator-by-machine] No operator found for type: ${type}, machineNo: ${machineNo}`
+      );
+      return res
+        .status(404)
+        .json({ message: "OPERATOR_NOT_FOUND", data: null });
+    }
+
+    // Structure the response to be easily consumable by the frontend for OperatorData
+    const operatorDetails = {
+      emp_id: assignedOperator.emp_id, // emp_id from the scc_xx_operator doc
+      emp_eng_name: assignedOperator.emp_eng_name, // name from scc_xx_operator doc
+      emp_face_photo: assignedOperator.emp_face_photo, // photo from scc_xx_operator doc
+      emp_reference_id: assignedOperator.emp_reference?._id // _id from populated User (if exists)
+    };
+
+    // If emp_reference was successfully populated, prefer its details for consistency
+    if (assignedOperator.emp_reference) {
+      operatorDetails.emp_id =
+        assignedOperator.emp_reference.emp_id || assignedOperator.emp_id; // Prefer populated
+      operatorDetails.emp_eng_name =
+        assignedOperator.emp_reference.eng_name ||
+        assignedOperator.emp_eng_name;
+      operatorDetails.emp_face_photo =
+        assignedOperator.emp_reference.face_photo ||
+        assignedOperator.emp_face_photo;
+    }
+
+    console.log(
+      `[API /api/scc/operator-by-machine] Found operator:`,
+      operatorDetails
+    );
+    res.json({ data: operatorDetails });
+  } catch (error) {
+    console.error(
+      `[API /api/scc/operator-by-machine] Error fetching operator by machine:`,
+      error
+    );
+    res.status(500).json({ error: "Failed to fetch operator details" });
+  }
+});
+
+/* ------------------------------
    End Points - SCC HT/FU
 ------------------------------ */
 
@@ -12873,7 +13242,7 @@ const formatDateToMMDDYYYY = (dateInput) => {
 
 app.post("/api/scc/ht-first-output", async (req, res) => {
   try {
-    const { _id, ...dataToSave } = req.body;
+    const { _id, operatorData, ...dataToSave } = req.body;
     if (!dataToSave.machineNo) {
       return res.status(400).json({ message: "Machine No is required." });
     }
@@ -12903,9 +13272,24 @@ app.post("/api/scc/ht-first-output", async (req, res) => {
         .json({ message: "Standard Specification is required." });
     }
 
+    // Include operatorData if provided
+    const finalDataToSave = { ...dataToSave };
+    if (operatorData && operatorData.emp_id && operatorData.emp_reference_id) {
+      finalDataToSave.operatorData = {
+        emp_id: operatorData.emp_id,
+        emp_eng_name: operatorData.emp_eng_name || "N/A",
+        emp_face_photo: operatorData.emp_face_photo || null,
+        emp_reference_id: operatorData.emp_reference_id
+      };
+    } else {
+      console.log(
+        "[API /api/scc/ht-first-output] No complete operatorData provided or found, will not be saved."
+      );
+    }
+
     let record;
     if (_id) {
-      record = await HTFirstOutput.findByIdAndUpdate(_id, dataToSave, {
+      record = await HTFirstOutput.findByIdAndUpdate(_id, finalDataToSave, {
         new: true,
         runValidators: true,
         upsert: false
@@ -12916,19 +13300,19 @@ app.post("/api/scc/ht-first-output", async (req, res) => {
           .json({ message: "Record not found for update." });
     } else {
       const existing = await HTFirstOutput.findOne({
-        moNo: dataToSave.moNo,
-        color: dataToSave.color,
-        inspectionDate: dataToSave.inspectionDate,
-        machineNo: dataToSave.machineNo
+        moNo: finalDataToSave.moNo,
+        color: finalDataToSave.color,
+        inspectionDate: finalDataToSave.inspectionDate,
+        machineNo: finalDataToSave.machineNo
       });
       if (existing) {
         record = await HTFirstOutput.findByIdAndUpdate(
           existing._id,
-          dataToSave,
+          finalDataToSave,
           { new: true, runValidators: true }
         );
       } else {
-        record = new HTFirstOutput(dataToSave);
+        record = new HTFirstOutput(finalDataToSave);
         await record.save();
       }
     }
@@ -12956,7 +13340,7 @@ app.post("/api/scc/ht-first-output", async (req, res) => {
 // POST /api/scc/fu-first-output - Apply analogous changes as above for HTFirstOutput
 app.post("/api/scc/fu-first-output", async (req, res) => {
   try {
-    const { _id, ...dataToSave } = req.body;
+    const { _id, operatorData, ...dataToSave } = req.body;
     if (!dataToSave.machineNo) {
       return res.status(400).json({ message: "Machine No is required." });
     }
@@ -12983,9 +13367,24 @@ app.post("/api/scc/fu-first-output", async (req, res) => {
         .json({ message: "Standard Specification is required." });
     }
 
+    const finalDataToSave = { ...dataToSave };
+    if (operatorData && operatorData.emp_id && operatorData.emp_reference_id) {
+      finalDataToSave.operatorData = {
+        emp_id: operatorData.emp_id,
+        emp_eng_name: operatorData.emp_eng_name || "N/A",
+        emp_face_photo: operatorData.emp_face_photo || null,
+        emp_reference_id: operatorData.emp_reference_id
+      };
+      //console.log("[API /api/scc/fu-first-output] OperatorData prepared for saving:", finalDataToSave.operatorData);
+    } else {
+      console.log(
+        "[API /api/scc/fu-first-output] No complete operatorData provided, will not be saved."
+      );
+    }
+
     let record;
     if (_id) {
-      record = await FUFirstOutput.findByIdAndUpdate(_id, dataToSave, {
+      record = await FUFirstOutput.findByIdAndUpdate(_id, finalDataToSave, {
         new: true,
         runValidators: true,
         upsert: false
@@ -12996,19 +13395,19 @@ app.post("/api/scc/fu-first-output", async (req, res) => {
           .json({ message: "Record not found for update." });
     } else {
       const existing = await FUFirstOutput.findOne({
-        moNo: dataToSave.moNo,
-        color: dataToSave.color,
-        inspectionDate: dataToSave.inspectionDate,
-        machineNo: dataToSave.machineNo
+        moNo: finalDataToSave.moNo,
+        color: finalDataToSave.color,
+        inspectionDate: finalDataToSave.inspectionDate,
+        machineNo: finalDataToSave.machineNo
       });
       if (existing) {
         record = await FUFirstOutput.findByIdAndUpdate(
           existing._id,
-          dataToSave,
+          finalDataToSave,
           { new: true, runValidators: true }
         );
       } else {
-        record = new FUFirstOutput(dataToSave);
+        record = new FUFirstOutput(finalDataToSave);
         await record.save();
       }
     }
@@ -14767,9 +15166,10 @@ app.post("/api/scc/elastic-report/submit-slot-inspection", async (req, res) => {
       inspectionNo,
       elasticReportDocId, // _id of the parent ElasticReport document
       checkedQty,
-      qualityIssue,
+      quantityIssue,
       measurement,
       defects,
+      specificDefectReason,
       result,
       remarks,
       emp_id,
@@ -14784,10 +15184,11 @@ app.post("/api/scc/elastic-report/submit-slot-inspection", async (req, res) => {
       !elasticReportDocId ||
       checkedQty === undefined ||
       checkedQty === null ||
-      !qualityIssue ||
+      !quantityIssue ||
       !measurement ||
       !defects ||
-      !result
+      !result ||
+      (defects === "Reject" && !specificDefectReason)
     ) {
       return res.status(400).json({
         success: false,
@@ -14815,9 +15216,10 @@ app.post("/api/scc/elastic-report/submit-slot-inspection", async (req, res) => {
       inspectionNo: Number(inspectionNo),
       timeSlotKey,
       checkedQty: Number(checkedQty),
-      qualityIssue,
+      quantityIssue,
       measurement,
       defects,
+      specificDefectReason: defects === "Reject" ? specificDefectReason : "",
       result,
       remarks: remarks || "",
       emp_id,

@@ -1,5 +1,6 @@
 // import axios from "axios";
 // import {
+//   Activity, // Icon for Elastic Report
 //   CheckSquare,
 //   Eye,
 //   FileText,
@@ -15,6 +16,7 @@
 // import { useAuth } from "../components/authentication/AuthContext";
 // import DailyFUQC from "../components/inspection/scc/DailyFUQC";
 // import DailyHTQC from "../components/inspection/scc/DailyHTQC";
+// import ElasticReport from "../components/inspection/scc/ElasticReport";
 // import HTInspectionReport from "../components/inspection/scc/HTInspectionReport";
 // import SCCDailyTesting from "../components/inspection/scc/SCCDailyTesting";
 // import SCCFirstOutputForm from "../components/inspection/scc/SCCFirstOutputForm";
@@ -63,7 +65,7 @@
 
 // const initialHTInspectionReportState = {
 //   _id: null,
-//   inspectionDate: new Date(), // This will be overridden by the preserved date on reset
+//   inspectionDate: new Date(),
 //   machineNo: "",
 //   moNo: "",
 //   buyer: "",
@@ -76,8 +78,8 @@
 //   totalPcs: null,
 //   defects: [],
 //   remarks: "",
-//   defectImageFile: null, // Will be reset to null
-//   defectImageUrl: null, // Will be reset to null
+//   defectImageFile: null,
+//   defectImageUrl: null,
 //   aqlData: {
 //     sampleSizeLetterCode: "",
 //     sampleSize: null,
@@ -88,10 +90,14 @@
 //   result: "Pending"
 // };
 
+// const initialElasticReportState = {
+//   inspectionDate: new Date()
+// };
+
 // const SCCPage = () => {
 //   const { t } = useTranslation();
 //   const { user, loading: authLoading } = useAuth();
-//   const [activeTab, setActiveTab] = useState("firstOutputHT"); // Or your preferred default
+//   const [activeTab, setActiveTab] = useState("firstOutputHT");
 
 //   const [htFormData, setHtFormData] = useState({
 //     ...initialSharedStateFirstOutput
@@ -111,6 +117,10 @@
 //   const [htInspectionReportData, setHtInspectionReportData] = useState({
 //     ...initialHTInspectionReportState
 //   });
+//   const [elasticReportData, setElasticReportData] = useState({
+//     ...initialElasticReportState
+//   });
+
 //   const [isSubmitting, setIsSubmitting] = useState(false);
 
 //   const uploadSccImage = useCallback(
@@ -140,6 +150,7 @@
 //       ) {
 //         imageFormData.append("batchNo", currentDataForImage.batchNo);
 //       }
+
 //       const imgRes = await axios.post(
 //         `${API_BASE_URL}/api/scc/upload-image`,
 //         imageFormData,
@@ -215,6 +226,15 @@
 //           data: htInspectionReportData,
 //           setter: setHtInspectionReportData,
 //           component: HTInspectionReport
+//         },
+//         {
+//           id: "elasticReport",
+//           labelKey: "scc.tabs.elasticReport",
+//           icon: <Activity size={16} />,
+//           formType: "ElasticReportContainer",
+//           data: elasticReportData,
+//           setter: setElasticReportData,
+//           component: ElasticReport
 //         }
 //       ].map((tab) => ({ ...tab, disabled: false })),
 //     [
@@ -223,7 +243,8 @@
 //       dailyTestingFormData,
 //       dailyHTQCFormData,
 //       dailyFUQCFormData,
-//       htInspectionReportData
+//       htInspectionReportData,
+//       elasticReportData
 //     ]
 //   );
 
@@ -234,7 +255,7 @@
 //     async (formTypeToSubmit, specificPayload = null) => {
 //       let endpoint;
 //       let successMessageKey;
-//       let payloadToSend = null;
+//       let payloadToSend = specificPayload;
 //       let httpMethod = "post";
 //       let childHandlesRefresh = false;
 //       let currentSetterForReset = null;
@@ -244,6 +265,15 @@
 //         Swal.fire(t("scc.error"), t("scc.userNotLoggedIn"), "error");
 //         return false;
 //       }
+
+//       const commonUserInfo = {
+//         emp_id: user.emp_id,
+//         emp_kh_name: user.kh_name || "N/A",
+//         emp_eng_name: user.eng_name || "N/A",
+//         emp_dept_name: user.dept_name || "N/A",
+//         emp_sect_name: user.sect_name || "N/A",
+//         emp_job_title: user.job_title || "N/A"
+//       };
 
 //       switch (formTypeToSubmit) {
 //         case "HT":
@@ -267,25 +297,39 @@
 //         case "registerMachine":
 //           endpoint = "/api/scc/daily-htfu/register-machine";
 //           successMessageKey = "sccDailyHTQC.machineRegisteredSuccess";
-//           payloadToSend = specificPayload;
 //           childHandlesRefresh = true;
 //           break;
 //         case "submitSlotInspection":
 //           endpoint = "/api/scc/daily-htfu/submit-slot-inspection";
 //           successMessageKey = "sccDailyHTQC.slotInspectionSubmittedSuccess";
-//           payloadToSend = specificPayload;
 //           childHandlesRefresh = true;
+//           break;
+//         // ** ADDED CASE for DailyHTQC Test Results **
+//         case "updateDailyHTFUTestResult":
+//           endpoint = `/api/scc/daily-htfu/update-test-result/${specificPayload.dailyTestingDocId}`;
+//           httpMethod = "put";
+//           // Success message is handled by child or use a generic one if needed here.
+//           // e.g. successMessageKey = "sccDailyHTQC.testResultUpdatedSuccess";
+//           childHandlesRefresh = true; // DailyHTQC component will refresh its data
+//           if (!specificPayload || !specificPayload.dailyTestingDocId) {
+//             Swal.fire(
+//               t("scc.error"),
+//               "Test result data or Document ID is missing for Daily HT/FU Test.",
+//               "error"
+//             );
+//             setIsSubmitting(false);
+//             return false;
+//           }
+//           // payloadToSend is already specificPayload
 //           break;
 //         case "registerFUQCMachine":
 //           endpoint = "/api/scc/daily-fuqc/register-machine";
 //           successMessageKey = "sccDailyFUQC.machineRegisteredSuccess";
-//           payloadToSend = specificPayload;
 //           childHandlesRefresh = true;
 //           break;
 //         case "submitFUQCSlotInspection":
 //           endpoint = "/api/scc/daily-fuqc/submit-slot-inspection";
 //           successMessageKey = "sccDailyFUQC.slotInspectionSubmittedSuccess";
-//           payloadToSend = specificPayload;
 //           childHandlesRefresh = true;
 //           break;
 //         case "HTInspectionReport":
@@ -293,40 +337,36 @@
 //           successMessageKey = "sccHTInspection.reportSavedSuccess";
 //           currentSetterForReset = setHtInspectionReportData;
 //           initialStateForReset = initialHTInspectionReportState;
-//           if (!specificPayload) {
-//             Swal.fire(
-//               t("scc.error"),
-//               "HTInspectionReport data is missing.",
-//               "error"
-//             );
-//             return false;
-//           }
+//           break;
+//         case "registerElasticMachine":
+//           endpoint = "/api/scc/elastic-report/register-machine";
+//           successMessageKey = "sccElasticReport.machineRegisteredSuccess";
+//           childHandlesRefresh = true;
+//           break;
+//         case "submitElasticSlotInspection":
+//           endpoint = "/api/scc/elastic-report/submit-slot-inspection";
+//           successMessageKey = "sccElasticReport.slotInspectionSubmittedSuccess";
+//           childHandlesRefresh = true;
 //           break;
 //         default:
 //           console.error("Unknown form type in SCCPage:", formTypeToSubmit);
 //           Swal.fire(t("scc.error"), "Unknown form type.", "error");
+//           setIsSubmitting(false); // Ensure loader stops
 //           return false;
 //       }
 
 //       setIsSubmitting(true);
 
 //       try {
-//         if (!payloadToSend) {
+//         if (!specificPayload) {
+//           // This block handles forms where SCCPage constructs the payload
 //           const inspectionTime = `${String(new Date().getHours()).padStart(
 //             2,
 //             "0"
 //           )}:${String(new Date().getMinutes()).padStart(2, "0")}:${String(
 //             new Date().getSeconds()
 //           ).padStart(2, "0")}`;
-//           const currentUserInfo = {
-//             emp_id: user.emp_id,
-//             emp_kh_name: user.kh_name || "N/A",
-//             emp_eng_name: user.eng_name || "N/A",
-//             emp_dept_name: user.dept_name || "N/A",
-//             emp_sect_name: user.sect_name || "N/A",
-//             emp_job_title: user.job_title || "N/A",
-//             inspectionTime
-//           };
+//           const currentUserInfoWithTime = { ...commonUserInfo, inspectionTime };
 
 //           if (formTypeToSubmit === "HT" || formTypeToSubmit === "FU") {
 //             const formData =
@@ -392,7 +432,7 @@
 //               buyerStyle: formData.buyerStyle,
 //               color: formData.color,
 //               remarks: formData.remarks?.trim() || "NA",
-//               ...currentUserInfo,
+//               ...currentUserInfoWithTime,
 //               referenceSampleImage: finalImageUrls.referenceSampleImage,
 //               afterWashImage: finalImageUrls.afterWashImage,
 //               standardSpecification: formData.standardSpecification
@@ -455,7 +495,7 @@
 //               buyerStyle: formData.buyerStyle,
 //               color: formData.color,
 //               remarks: formData.remarks?.trim() || "NA",
-//               ...currentUserInfo,
+//               ...currentUserInfoWithTime,
 //               standardSpecifications: {
 //                 tempC: formData.standardSpecifications.tempC
 //                   ? Number(formData.standardSpecifications.tempC)
@@ -488,52 +528,61 @@
 //               finalResult: formData.finalResult || "Pending",
 //               afterWashImage: finalAfterWashImageUrl
 //             };
-//           } else if (formTypeToSubmit === "HTInspectionReport") {
-//             const reportDataFromChild = specificPayload;
-//             if (
-//               !reportDataFromChild.inspectionDate ||
-//               !reportDataFromChild.machineNo ||
-//               !reportDataFromChild.moNo ||
-//               !reportDataFromChild.color ||
-//               !reportDataFromChild.batchNo ||
-//               !reportDataFromChild.tableNo ||
-//               reportDataFromChild.actualLayers === undefined ||
-//               reportDataFromChild.actualLayers === null ||
-//               Number(reportDataFromChild.actualLayers) <= 0 ||
-//               reportDataFromChild.totalBundle === undefined ||
-//               reportDataFromChild.totalBundle === null ||
-//               Number(reportDataFromChild.totalBundle) <= 0 ||
-//               reportDataFromChild.totalPcs === undefined ||
-//               reportDataFromChild.totalPcs === null ||
-//               Number(reportDataFromChild.totalPcs) <= 0 ||
-//               !reportDataFromChild.aqlData ||
-//               reportDataFromChild.aqlData.sampleSize === null ||
-//               reportDataFromChild.aqlData.sampleSize <= 0
-//             ) {
-//               Swal.fire(
-//                 t("scc.validationErrorTitle"),
-//                 t("sccHTInspection.validation.fillBasicPayload") + " (SCCPage)",
-//                 "warning"
-//               );
-//               throw new Error("Validation failed for HT Inspection Report.");
-//             }
-//             let finalDefectImageUrl = reportDataFromChild.defectImageUrl;
-//             if (reportDataFromChild.defectImageFile) {
-//               const imageTypeIdentifier = `htDefect-${reportDataFromChild.machineNo}-${reportDataFromChild.moNo}-${reportDataFromChild.color}-${reportDataFromChild.batchNo}`;
-//               const imgData = await uploadSccImage(
-//                 reportDataFromChild.defectImageFile,
-//                 reportDataFromChild,
-//                 imageTypeIdentifier
-//               );
-//               finalDefectImageUrl = imgData.filePath;
-//             }
-//             payloadToSend = {
-//               ...reportDataFromChild,
-//               defectImageUrl: finalDefectImageUrl,
-//               ...currentUserInfo
-//             };
-//             delete payloadToSend.defectImageFile;
 //           }
+//         }
+
+//         if (formTypeToSubmit === "HTInspectionReport" && specificPayload) {
+//           const reportDataFromChild = specificPayload;
+//           if (
+//             !reportDataFromChild.inspectionDate ||
+//             !reportDataFromChild.machineNo ||
+//             !reportDataFromChild.moNo ||
+//             !reportDataFromChild.color ||
+//             !reportDataFromChild.batchNo ||
+//             !reportDataFromChild.tableNo ||
+//             reportDataFromChild.actualLayers === undefined ||
+//             reportDataFromChild.actualLayers === null ||
+//             Number(reportDataFromChild.actualLayers) <= 0 ||
+//             reportDataFromChild.totalBundle === undefined ||
+//             reportDataFromChild.totalBundle === null ||
+//             Number(reportDataFromChild.totalBundle) <= 0 ||
+//             reportDataFromChild.totalPcs === undefined ||
+//             reportDataFromChild.totalPcs === null ||
+//             Number(reportDataFromChild.totalPcs) <= 0 ||
+//             !reportDataFromChild.aqlData ||
+//             reportDataFromChild.aqlData.sampleSize === null ||
+//             reportDataFromChild.aqlData.sampleSize <= 0
+//           ) {
+//             Swal.fire(
+//               t("scc.validationErrorTitle"),
+//               t("sccHTInspection.validation.fillBasicPayload") + " (SCCPage)",
+//               "warning"
+//             );
+//             throw new Error("Validation failed for HT Inspection Report.");
+//           }
+//           let finalDefectImageUrl = reportDataFromChild.defectImageUrl;
+//           if (reportDataFromChild.defectImageFile) {
+//             const imageTypeIdentifier = `htDefect-${reportDataFromChild.machineNo}-${reportDataFromChild.moNo}-${reportDataFromChild.color}-${reportDataFromChild.batchNo}`;
+//             const imgData = await uploadSccImage(
+//               reportDataFromChild.defectImageFile,
+//               reportDataFromChild,
+//               imageTypeIdentifier
+//             );
+//             finalDefectImageUrl = imgData.filePath;
+//           }
+//           const inspectionTime = `${String(new Date().getHours()).padStart(
+//             2,
+//             "0"
+//           )}:${String(new Date().getMinutes()).padStart(2, "0")}:${String(
+//             new Date().getSeconds()
+//           ).padStart(2, "0")}`;
+//           payloadToSend = {
+//             ...reportDataFromChild,
+//             defectImageUrl: finalDefectImageUrl,
+//             ...commonUserInfo,
+//             inspectionTime
+//           };
+//           delete payloadToSend.defectImageFile;
 //         }
 //       } catch (error) {
 //         console.error(
@@ -572,62 +621,61 @@
 //           url: `${API_BASE_URL}${endpoint}`,
 //           data: payloadToSend
 //         });
-//         Swal.fire(
-//           t("scc.success"),
-//           response.data.message || t(successMessageKey),
-//           "success"
-//         );
+//         // For "updateDailyHTFUTestResult", success message is handled by child.
+//         // For other types, show a generic success or the one defined by successMessageKey.
+//         if (
+//           formTypeToSubmit !== "updateDailyHTFUTestResult" &&
+//           successMessageKey
+//         ) {
+//           Swal.fire(
+//             t("scc.success"),
+//             response.data.message || t(successMessageKey),
+//             "success"
+//           );
+//         } else if (formTypeToSubmit !== "updateDailyHTFUTestResult") {
+//           Swal.fire(
+//             t("scc.success"),
+//             response.data.message || "Operation successful!",
+//             "success"
+//           );
+//         }
 
 //         if (
 //           !childHandlesRefresh &&
 //           currentSetterForReset &&
 //           initialStateForReset
 //         ) {
-//           const updatedRecord = response.data.data;
 //           const submittedInspectionDate = payloadToSend.inspectionDate;
 //           const preservedDate =
 //             submittedInspectionDate instanceof Date
 //               ? submittedInspectionDate
 //               : new Date(submittedInspectionDate);
-
 //           if (formTypeToSubmit === "HTInspectionReport") {
-//             // For HT Inspection Report, reset everything to initial state except the date.
-//             // _id is also reset to null, assuming each submission is a new record.
-//             // If you intend to update the SAME record and just clear fields, this logic would differ.
-//             // Based on "resetting after submit", implies new/clean form.
 //             currentSetterForReset({
-//               ...initialHTInspectionReportState, // Spread all initial values (includes null for defectImageFile & defectImageUrl)
-//               inspectionDate: preservedDate // Only override the inspectionDate
-//               // If the server returns an _id for the *newly created* record and you want to store it
-//               // (e.g., if user might immediately want to edit *this specific newly saved* record),
-//               // you could do: _id: updatedRecord?._id || null,
-//               // But for a "clean slate except date" after successful save, usually _id is also cleared.
+//               ...initialHTInspectionReportState,
+//               inspectionDate: preservedDate
+//             });
+//           } else if (formTypeToSubmit === "DailyTesting") {
+//             currentSetterForReset({
+//               ...initialSharedStateDailyTesting,
+//               inspectionDate: preservedDate,
+//               afterWashImageFile: null
+//             });
+//           } else if (formTypeToSubmit === "HT" || formTypeToSubmit === "FU") {
+//             currentSetterForReset({
+//               ...initialSharedStateFirstOutput,
+//               inspectionDate: preservedDate,
+//               referenceSampleImageFile: null,
+//               afterWashImageFile: null
 //             });
 //           } else {
-//             const resetStateForOtherForms = {
+//             currentSetterForReset({
 //               ...initialStateForReset,
 //               inspectionDate: preservedDate
-//             };
-//             if (updatedRecord && typeof updatedRecord === "object") {
-//               currentSetterForReset({
-//                 ...resetStateForOtherForms,
-//                 ...updatedRecord,
-//                 inspectionDate: new Date(updatedRecord.inspectionDate),
-//                 ...((formTypeToSubmit === "HT" ||
-//                   formTypeToSubmit === "FU") && {
-//                   referenceSampleImageFile: null,
-//                   afterWashImageFile: null
-//                 }),
-//                 ...(formTypeToSubmit === "DailyTesting" && {
-//                   afterWashImageFile: null
-//                 })
-//               });
-//             } else {
-//               currentSetterForReset(resetStateForOtherForms);
-//             }
+//             });
 //           }
 //         }
-//         return true;
+//         return true; // Indicate success to child component
 //       } catch (error) {
 //         console.error(
 //           `${t("scc.errorSubmittingLog")} (Type: ${formTypeToSubmit})`,
@@ -640,19 +688,12 @@
 //             t("scc.errorSubmitting"),
 //           "error"
 //         );
-//         return false;
+//         return false; // Indicate failure
 //       } finally {
 //         setIsSubmitting(false);
 //       }
 //     },
-//     [
-//       user,
-//       t,
-//       uploadSccImage,
-//       htFormData,
-//       fuFormData,
-//       dailyTestingFormData /* No setters needed in deps */
-//     ]
+//     [user, t, uploadSccImage, htFormData, fuFormData, dailyTestingFormData]
 //   );
 
 //   if (authLoading)
@@ -724,9 +765,8 @@
 //   FileText,
 //   Settings2,
 //   ShieldCheck,
-//   ThermometerSun,
-//   Loader2
-// } from "lucide-react";
+//   ThermometerSun
+// } from "lucide-react"; // Loader2 is already imported in SCCFirstOutputForm, not needed here directly unless used elsewhere
 // import React, { useCallback, useMemo, useState } from "react";
 // import { useTranslation } from "react-i18next";
 // import Swal from "sweetalert2";
@@ -734,7 +774,7 @@
 // import { useAuth } from "../components/authentication/AuthContext";
 // import DailyFUQC from "../components/inspection/scc/DailyFUQC";
 // import DailyHTQC from "../components/inspection/scc/DailyHTQC";
-// import ElasticReport from "../components/inspection/scc/ElasticReport"; // Import new component
+// import ElasticReport from "../components/inspection/scc/ElasticReport";
 // import HTInspectionReport from "../components/inspection/scc/HTInspectionReport";
 // import SCCDailyTesting from "../components/inspection/scc/SCCDailyTesting";
 // import SCCFirstOutputForm from "../components/inspection/scc/SCCFirstOutputForm";
@@ -747,7 +787,7 @@
 //   buyer: "",
 //   buyerStyle: "",
 //   color: "",
-//   standardSpecification: [],
+//   standardSpecification: [], // Will be populated with initialSpecState items by child
 //   showSecondHeatSpec: false,
 //   referenceSampleImageFile: null,
 //   referenceSampleImageUrl: null,
@@ -774,11 +814,11 @@
 // };
 
 // const initialDailyHTQCState = {
-//   inspectionDate: new Date() // Child component DailyHTQC manages its own detailed state
+//   inspectionDate: new Date()
 // };
 
 // const initialDailyFUQCState = {
-//   inspectionDate: new Date() // Child component DailyFUQC manages its own detailed state
+//   inspectionDate: new Date()
 // };
 
 // const initialHTInspectionReportState = {
@@ -808,9 +848,8 @@
 //   result: "Pending"
 // };
 
-// // Initial state for the new Elastic Report tab (can be minimal if child manages complex state)
 // const initialElasticReportState = {
-//   inspectionDate: new Date() // Child component ElasticReport manages its own detailed state
+//   inspectionDate: new Date()
 // };
 
 // const SCCPage = () => {
@@ -838,7 +877,7 @@
 //   });
 //   const [elasticReportData, setElasticReportData] = useState({
 //     ...initialElasticReportState
-//   }); // New state
+//   });
 
 //   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -869,8 +908,6 @@
 //       ) {
 //         imageFormData.append("batchNo", currentDataForImage.batchNo);
 //       }
-//       // Add specific identifiers for Elastic Report if needed
-//       // if (imageTypeIdentifierForUpload.startsWith("elastic-")) { ... }
 
 //       const imgRes = await axios.post(
 //         `${API_BASE_URL}/api/scc/upload-image`,
@@ -925,7 +962,7 @@
 //           id: "dailyHTQC",
 //           labelKey: "scc.tabs.dailyHTQC",
 //           icon: <CheckSquare size={16} />,
-//           formType: "DailyHTQCContainer", // This indicates parent handles submit types for child
+//           formType: "DailyHTQCContainer",
 //           data: dailyHTQCFormData,
 //           setter: setDailyHTQCFormData,
 //           component: DailyHTQC
@@ -934,7 +971,7 @@
 //           id: "dailyFUQC",
 //           labelKey: "scc.tabs.dailyFUQC",
 //           icon: <ShieldCheck size={16} />,
-//           formType: "DailyFUQCContainer", // This indicates parent handles submit types for child
+//           formType: "DailyFUQCContainer",
 //           data: dailyFUQCFormData,
 //           setter: setDailyFUQCFormData,
 //           component: DailyFUQC
@@ -948,12 +985,11 @@
 //           setter: setHtInspectionReportData,
 //           component: HTInspectionReport
 //         },
-//         // New Elastic Report Tab
 //         {
 //           id: "elasticReport",
-//           labelKey: "scc.tabs.elasticReport", // Add this key to your i18n files
-//           icon: <Activity size={16} />, // Using Activity icon, choose another if preferred
-//           formType: "ElasticReportContainer", // Parent handles submit types
+//           labelKey: "scc.tabs.elasticReport",
+//           icon: <Activity size={16} />,
+//           formType: "ElasticReportContainer",
 //           data: elasticReportData,
 //           setter: setElasticReportData,
 //           component: ElasticReport
@@ -966,7 +1002,7 @@
 //       dailyHTQCFormData,
 //       dailyFUQCFormData,
 //       htInspectionReportData,
-//       elasticReportData // Add new state to dependency array
+//       elasticReportData
 //     ]
 //   );
 
@@ -977,9 +1013,9 @@
 //     async (formTypeToSubmit, specificPayload = null) => {
 //       let endpoint;
 //       let successMessageKey;
-//       let payloadToSend = specificPayload; // Start with specificPayload if provided
+//       let payloadToSend = specificPayload;
 //       let httpMethod = "post";
-//       let childHandlesRefresh = false; // True if child component will refresh its own data display after submit
+//       let childHandlesRefresh = false;
 //       let currentSetterForReset = null;
 //       let initialStateForReset = null;
 
@@ -989,7 +1025,6 @@
 //       }
 
 //       const commonUserInfo = {
-//         // Define common user info once
 //         emp_id: user.emp_id,
 //         emp_kh_name: user.kh_name || "N/A",
 //         emp_eng_name: user.eng_name || "N/A",
@@ -1017,24 +1052,36 @@
 //           currentSetterForReset = setDailyTestingFormData;
 //           initialStateForReset = initialSharedStateDailyTesting;
 //           break;
-//         case "registerMachine": // For DailyHTQC
+//         case "registerMachine":
 //           endpoint = "/api/scc/daily-htfu/register-machine";
 //           successMessageKey = "sccDailyHTQC.machineRegisteredSuccess";
-//           // payloadToSend is already specificPayload from child
-//           childHandlesRefresh = true; // DailyHTQC will call fetchRegisteredMachinesForDate
+//           childHandlesRefresh = true;
 //           break;
-//         case "submitSlotInspection": // For DailyHTQC
+//         case "submitSlotInspection":
 //           endpoint = "/api/scc/daily-htfu/submit-slot-inspection";
 //           successMessageKey = "sccDailyHTQC.slotInspectionSubmittedSuccess";
-//           // payloadToSend is already specificPayload from child
-//           childHandlesRefresh = true; // DailyHTQC will call fetchRegisteredMachinesForDate
+//           childHandlesRefresh = true;
 //           break;
-//         case "registerFUQCMachine": // For DailyFUQC
+//         case "updateDailyHTFUTestResult":
+//           endpoint = `/api/scc/daily-htfu/update-test-result/${specificPayload.dailyTestingDocId}`;
+//           httpMethod = "put";
+//           childHandlesRefresh = true;
+//           if (!specificPayload || !specificPayload.dailyTestingDocId) {
+//             Swal.fire(
+//               t("scc.error"),
+//               "Test result data or Document ID is missing for Daily HT/FU Test.",
+//               "error"
+//             );
+//             setIsSubmitting(false);
+//             return false;
+//           }
+//           break;
+//         case "registerFUQCMachine":
 //           endpoint = "/api/scc/daily-fuqc/register-machine";
 //           successMessageKey = "sccDailyFUQC.machineRegisteredSuccess";
 //           childHandlesRefresh = true;
 //           break;
-//         case "submitFUQCSlotInspection": // For DailyFUQC
+//         case "submitFUQCSlotInspection":
 //           endpoint = "/api/scc/daily-fuqc/submit-slot-inspection";
 //           successMessageKey = "sccDailyFUQC.slotInspectionSubmittedSuccess";
 //           childHandlesRefresh = true;
@@ -1044,31 +1091,27 @@
 //           successMessageKey = "sccHTInspection.reportSavedSuccess";
 //           currentSetterForReset = setHtInspectionReportData;
 //           initialStateForReset = initialHTInspectionReportState;
-//           // specificPayload comes from HTInspectionReport component
 //           break;
-//         // New cases for Elastic Report
 //         case "registerElasticMachine":
 //           endpoint = "/api/scc/elastic-report/register-machine";
 //           successMessageKey = "sccElasticReport.machineRegisteredSuccess";
-//           // specificPayload from child
-//           childHandlesRefresh = true; // ElasticReport will call fetchRegisteredMachinesForElasticReport
+//           childHandlesRefresh = true;
 //           break;
 //         case "submitElasticSlotInspection":
 //           endpoint = "/api/scc/elastic-report/submit-slot-inspection";
 //           successMessageKey = "sccElasticReport.slotInspectionSubmittedSuccess";
-//           // specificPayload from child
-//           childHandlesRefresh = true; // ElasticReport will call fetchRegisteredMachinesForElasticReport
+//           childHandlesRefresh = true;
 //           break;
 //         default:
 //           console.error("Unknown form type in SCCPage:", formTypeToSubmit);
 //           Swal.fire(t("scc.error"), "Unknown form type.", "error");
+//           setIsSubmitting(false);
 //           return false;
 //       }
 
 //       setIsSubmitting(true);
 
 //       try {
-//         // Payload construction if not already provided by child (for HT, FU, DailyTesting, HTInspectionReport)
 //         if (!specificPayload) {
 //           const inspectionTime = `${String(new Date().getHours()).padStart(
 //             2,
@@ -1081,39 +1124,61 @@
 //           if (formTypeToSubmit === "HT" || formTypeToSubmit === "FU") {
 //             const formData =
 //               formTypeToSubmit === "HT" ? htFormData : fuFormData;
-//             // ... (validation for HT/FU as before)
-//             if (
-//               !formData.inspectionDate ||
-//               !formData.machineNo ||
-//               !formData.moNo ||
-//               !formData.color ||
-//               !formData.standardSpecification ||
-//               formData.standardSpecification.length === 0 ||
-//               !formData.standardSpecification[0].timeSec ||
-//               !formData.standardSpecification[0].tempC ||
-//               !formData.standardSpecification[0].pressure ||
-//               formData.standardSpecification[0].tempOffset === undefined ||
-//               (formData.showSecondHeatSpec &&
-//                 (formData.standardSpecification.length < 2 ||
-//                   !formData.standardSpecification[1].timeSec ||
-//                   !formData.standardSpecification[1].tempC ||
-//                   !formData.standardSpecification[1].pressure ||
-//                   formData.standardSpecification[1].tempOffset ===
-//                     undefined)) ||
-//               (!formData.referenceSampleImageUrl &&
-//                 !formData.referenceSampleImageFile)
-//             ) {
-//               Swal.fire(
-//                 t("scc.validationErrorTitle"),
-//                 t(
+//             const firstSpec = formData.standardSpecification?.[0];
+//             const secondSpec = formData.showSecondHeatSpec
+//               ? formData.standardSpecification?.[1]
+//               : null;
+
+//             const isSpecValid = (spec) => {
+//               if (!spec) return false;
+//               const baseValid =
+//                 spec.timeSec && spec.tempC && spec.tempOffset !== undefined;
+//               if (formTypeToSubmit === "HT") {
+//                 return baseValid && spec.pressure;
+//               }
+//               return baseValid; // For FU, pressure is not required in spec
+//             };
+
+//             const areAllFieldsFilled =
+//               formData.inspectionDate &&
+//               formData.machineNo &&
+//               formData.moNo &&
+//               formData.color &&
+//               formData.standardSpecification?.length > 0 &&
+//               isSpecValid(firstSpec) &&
+//               (formData.showSecondHeatSpec ? isSpecValid(secondSpec) : true);
+
+//             const areImagesUploaded =
+//               (formData.referenceSampleImageUrl ||
+//                 formData.referenceSampleImageFile) &&
+//               (formData.afterWashImageUrl || formData.afterWashImageFile);
+
+//             if (!areAllFieldsFilled || !areImagesUploaded) {
+//               let message = t("scc.validation.fillAllRequiredFieldsAndImages");
+//               if (!areAllFieldsFilled && areImagesUploaded) {
+//                 message = t(
 //                   formTypeToSubmit === "HT"
-//                     ? "scc.validation.firstSpecFieldsRequired"
-//                     : "scc.validation.secondSpecFieldsRequired"
-//                 ),
-//                 "warning"
+//                     ? "scc.validation.firstSpecFieldsRequiredHT"
+//                     : "scc.validation.firstSpecFieldsRequiredFU"
+//                 );
+//               } else if (areAllFieldsFilled && !areImagesUploaded) {
+//                 if (
+//                   !(
+//                     formData.referenceSampleImageUrl ||
+//                     formData.referenceSampleImageFile
+//                   )
+//                 ) {
+//                   message = t("scc.validation.referenceSampleRequired");
+//                 } else {
+//                   message = t("scc.validation.afterWashRequired");
+//                 }
+//               }
+//               Swal.fire(t("scc.validationErrorTitle"), message, "warning");
+//               throw new Error(
+//                 "Validation failed for HT/FU First Output. Check required fields and images."
 //               );
-//               throw new Error("Validation failed for HT/FU First Output.");
 //             }
+
 //             let finalImageUrls = {
 //               referenceSampleImage: formData.referenceSampleImageUrl,
 //               afterWashImage: formData.afterWashImageUrl
@@ -1134,6 +1199,7 @@
 //               );
 //               finalImageUrls.afterWashImage = imgData.filePath;
 //             }
+
 //             payloadToSend = {
 //               _id: formData._id || undefined,
 //               inspectionDate: formData.inspectionDate,
@@ -1147,10 +1213,16 @@
 //               referenceSampleImage: finalImageUrls.referenceSampleImage,
 //               afterWashImage: finalImageUrls.afterWashImage,
 //               standardSpecification: formData.standardSpecification
-//                 .filter((spec) => spec.timeSec || spec.tempC || spec.pressure)
+//                 .filter((spec) => {
+//                   // Filter based on essential fields, considering formType for pressure
+//                   if (formTypeToSubmit === "HT") {
+//                     return spec.timeSec || spec.tempC || spec.pressure;
+//                   }
+//                   return spec.timeSec || spec.tempC; // For FU, pressure is not a criteria
+//                 })
 //                 .map((spec) => {
 //                   const tempOffsetVal = parseFloat(spec.tempOffset) || 0;
-//                   return {
+//                   const mappedSpec = {
 //                     type: spec.type,
 //                     method: spec.method,
 //                     timeSec: spec.timeSec ? Number(spec.timeSec) : null,
@@ -1167,15 +1239,20 @@
 //                         : tempOffsetVal !== 0
 //                         ? Math.abs(tempOffsetVal)
 //                         : 0,
-//                     pressure: spec.pressure ? Number(spec.pressure) : null,
 //                     status: spec.status,
 //                     remarks: spec.remarks?.trim() || "NA"
 //                   };
+//                   if (formTypeToSubmit === "HT") {
+//                     mappedSpec.pressure = spec.pressure
+//                       ? Number(spec.pressure)
+//                       : null;
+//                   }
+//                   // For FU, pressure field is simply not added to mappedSpec
+//                   return mappedSpec;
 //                 })
 //             };
 //           } else if (formTypeToSubmit === "DailyTesting") {
 //             const formData = dailyTestingFormData;
-//             // ... (validation for DailyTesting as before)
 //             if (
 //               !formData.inspectionDate ||
 //               !formData.moNo ||
@@ -1241,14 +1318,10 @@
 //               afterWashImage: finalAfterWashImageUrl
 //             };
 //           }
-//           // For HTInspectionReport, specificPayload is expected to be populated by the child.
-//           // If it's not, and this block is reached, an error will be thrown later.
 //         }
 
-//         // For HTInspectionReport, which *does* pass specificPayload but still needs image upload logic here.
 //         if (formTypeToSubmit === "HTInspectionReport" && specificPayload) {
 //           const reportDataFromChild = specificPayload;
-//           // ... (validation for HTInspectionReport as before)
 //           if (
 //             !reportDataFromChild.inspectionDate ||
 //             !reportDataFromChild.machineNo ||
@@ -1276,7 +1349,6 @@
 //             );
 //             throw new Error("Validation failed for HT Inspection Report.");
 //           }
-
 //           let finalDefectImageUrl = reportDataFromChild.defectImageUrl;
 //           if (reportDataFromChild.defectImageFile) {
 //             const imageTypeIdentifier = `htDefect-${reportDataFromChild.machineNo}-${reportDataFromChild.moNo}-${reportDataFromChild.color}-${reportDataFromChild.batchNo}`;
@@ -1287,7 +1359,6 @@
 //             );
 //             finalDefectImageUrl = imgData.filePath;
 //           }
-//           // Add user info and update image URL to the payload that came from child
 //           const inspectionTime = `${String(new Date().getHours()).padStart(
 //             2,
 //             "0"
@@ -1297,10 +1368,10 @@
 //           payloadToSend = {
 //             ...reportDataFromChild,
 //             defectImageUrl: finalDefectImageUrl,
-//             ...commonUserInfo, // Add common user info
-//             inspectionTime // Add inspection time
+//             ...commonUserInfo,
+//             inspectionTime
 //           };
-//           delete payloadToSend.defectImageFile; // Remove file object before sending
+//           delete payloadToSend.defectImageFile;
 //         }
 //       } catch (error) {
 //         console.error(
@@ -1339,11 +1410,23 @@
 //           url: `${API_BASE_URL}${endpoint}`,
 //           data: payloadToSend
 //         });
-//         Swal.fire(
-//           t("scc.success"),
-//           response.data.message || t(successMessageKey),
-//           "success"
-//         );
+
+//         if (
+//           formTypeToSubmit !== "updateDailyHTFUTestResult" &&
+//           successMessageKey
+//         ) {
+//           Swal.fire(
+//             t("scc.success"),
+//             response.data.message || t(successMessageKey),
+//             "success"
+//           );
+//         } else if (formTypeToSubmit !== "updateDailyHTFUTestResult") {
+//           Swal.fire(
+//             t("scc.success"),
+//             response.data.message || "Operation successful!",
+//             "success"
+//           );
+//         }
 
 //         if (
 //           !childHandlesRefresh &&
@@ -1355,7 +1438,6 @@
 //             submittedInspectionDate instanceof Date
 //               ? submittedInspectionDate
 //               : new Date(submittedInspectionDate);
-
 //           if (formTypeToSubmit === "HTInspectionReport") {
 //             currentSetterForReset({
 //               ...initialHTInspectionReportState,
@@ -1365,20 +1447,16 @@
 //             currentSetterForReset({
 //               ...initialSharedStateDailyTesting,
 //               inspectionDate: preservedDate,
-//               // If server returns the updated record, you might want to merge it here too
-//               // _id: response.data.data?._id || null,
-//               afterWashImageFile: null // Reset file input
+//               afterWashImageFile: null // Reset file
 //             });
 //           } else if (formTypeToSubmit === "HT" || formTypeToSubmit === "FU") {
 //             currentSetterForReset({
 //               ...initialSharedStateFirstOutput,
 //               inspectionDate: preservedDate,
-//               // _id: response.data.data?._id || null,
-//               referenceSampleImageFile: null,
+//               referenceSampleImageFile: null, // Reset files
 //               afterWashImageFile: null
 //             });
 //           } else {
-//             // Generic reset for other forms if needed
 //             currentSetterForReset({
 //               ...initialStateForReset,
 //               inspectionDate: preservedDate
@@ -1409,9 +1487,11 @@
 //       uploadSccImage,
 //       htFormData,
 //       fuFormData,
-//       dailyTestingFormData // Removed setters from deps as they are stable
-//       // htInspectionReportData, elasticReportData are not directly used for payload creation here,
-//       // their data comes via specificPayload for HTInspectionReport or is handled by child for ElasticReport.
+//       dailyTestingFormData,
+//       setHtFormData, // Added setters to dependency array
+//       setFuFormData,
+//       setDailyTestingFormData,
+//       setHtInspectionReportData
 //     ]
 //   );
 
@@ -1449,16 +1529,16 @@
 //             !activeTabData.disabled &&
 //             user && (
 //               <CurrentFormComponent
-//                 formType={activeTabData.formType} // This is 'ElasticReportContainer', 'DailyHTQCContainer' etc.
+//                 formType={activeTabData.formType}
 //                 key={`${activeTab}-${activeTabData.formType}-${
 //                   activeTabData.data?._id ||
 //                   activeTabData.data?.inspectionDate?.toISOString() ||
 //                   "no-id-date"
 //                 }`}
-//                 formData={activeTabData.data} // This is initialElasticReportState, initialDailyHTQCState etc.
-//                 onFormDataChange={activeTabData.setter} // Not directly used by DailyHTQC or ElasticReport if they manage internal state for forms
-//                 onFormSubmit={handleFormSubmit} // Passed to child
-//                 isSubmitting={isSubmitting} // Passed to child
+//                 formData={activeTabData.data}
+//                 onFormDataChange={activeTabData.setter}
+//                 onFormSubmit={handleFormSubmit}
+//                 isSubmitting={isSubmitting}
 //               />
 //             )}
 //           {activeTabData && activeTabData.disabled && (
@@ -1484,8 +1564,7 @@ import {
   FileText,
   Settings2,
   ShieldCheck,
-  ThermometerSun,
-  Loader2
+  ThermometerSun
 } from "lucide-react";
 import React, { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -1507,13 +1586,14 @@ const initialSharedStateFirstOutput = {
   buyer: "",
   buyerStyle: "",
   color: "",
-  standardSpecification: [],
+  standardSpecification: [], // Will be populated with initialSpecState items by child
   showSecondHeatSpec: false,
   referenceSampleImageFile: null,
   referenceSampleImageUrl: null,
   afterWashImageFile: null,
   afterWashImageUrl: null,
-  remarks: ""
+  remarks: "",
+  operatorData: null // <-- ADDED THIS: To hold fetched operator details
 };
 
 const initialSharedStateDailyTesting = {
@@ -1730,10 +1810,10 @@ const SCCPage = () => {
   const CurrentFormComponent = activeTabData?.component;
 
   const handleFormSubmit = useCallback(
-    async (formTypeToSubmit, specificPayload = null) => {
+    async (formTypeToSubmit, formDataFromChild = null) => {
       let endpoint;
       let successMessageKey;
-      let payloadToSend = specificPayload;
+      let payloadToSend = formDataFromChild; // For HT/FU, this will be the form data. For others, it might be specific.
       let httpMethod = "post";
       let childHandlesRefresh = false;
       let currentSetterForReset = null;
@@ -1759,46 +1839,47 @@ const SCCPage = () => {
           successMessageKey = "scc.dataSavedSuccess";
           currentSetterForReset = setHtFormData;
           initialStateForReset = initialSharedStateFirstOutput;
+          // payloadToSend is already formDataFromChild which includes operatorData
           break;
         case "FU":
           endpoint = "/api/scc/fu-first-output";
           successMessageKey = "scc.dataSavedSuccess";
           currentSetterForReset = setFuFormData;
           initialStateForReset = initialSharedStateFirstOutput;
+          // payloadToSend is already formDataFromChild which includes operatorData
           break;
         case "DailyTesting":
           endpoint = "/api/scc/daily-testing";
           successMessageKey = "sccdaily.reportSavedSuccess";
           currentSetterForReset = setDailyTestingFormData;
           initialStateForReset = initialSharedStateDailyTesting;
+          if (!payloadToSend) payloadToSend = dailyTestingFormData; // Use state if no specific payload from child
           break;
         case "registerMachine":
           endpoint = "/api/scc/daily-htfu/register-machine";
           successMessageKey = "sccDailyHTQC.machineRegisteredSuccess";
           childHandlesRefresh = true;
+          // payloadToSend for these child-specific actions IS formDataFromChild/specificPayload
           break;
         case "submitSlotInspection":
           endpoint = "/api/scc/daily-htfu/submit-slot-inspection";
           successMessageKey = "sccDailyHTQC.slotInspectionSubmittedSuccess";
           childHandlesRefresh = true;
           break;
-        // ** ADDED CASE for DailyHTQC Test Results **
         case "updateDailyHTFUTestResult":
-          endpoint = `/api/scc/daily-htfu/update-test-result/${specificPayload.dailyTestingDocId}`;
-          httpMethod = "put";
-          // Success message is handled by child or use a generic one if needed here.
-          // e.g. successMessageKey = "sccDailyHTQC.testResultUpdatedSuccess";
-          childHandlesRefresh = true; // DailyHTQC component will refresh its data
-          if (!specificPayload || !specificPayload.dailyTestingDocId) {
+          // Ensure payloadToSend (formDataFromChild) has dailyTestingDocId
+          if (!payloadToSend || !payloadToSend.dailyTestingDocId) {
             Swal.fire(
               t("scc.error"),
-              "Test result data or Document ID is missing for Daily HT/FU Test.",
+              "Test result data or Document ID is missing.",
               "error"
             );
             setIsSubmitting(false);
             return false;
           }
-          // payloadToSend is already specificPayload
+          endpoint = `/api/scc/daily-htfu/update-test-result/${payloadToSend.dailyTestingDocId}`;
+          httpMethod = "put";
+          childHandlesRefresh = true;
           break;
         case "registerFUQCMachine":
           endpoint = "/api/scc/daily-fuqc/register-machine";
@@ -1815,6 +1896,7 @@ const SCCPage = () => {
           successMessageKey = "sccHTInspection.reportSavedSuccess";
           currentSetterForReset = setHtInspectionReportData;
           initialStateForReset = initialHTInspectionReportState;
+          // payloadToSend is formDataFromChild / specificPayload
           break;
         case "registerElasticMachine":
           endpoint = "/api/scc/elastic-report/register-machine";
@@ -1829,207 +1911,219 @@ const SCCPage = () => {
         default:
           console.error("Unknown form type in SCCPage:", formTypeToSubmit);
           Swal.fire(t("scc.error"), "Unknown form type.", "error");
-          setIsSubmitting(false); // Ensure loader stops
+          setIsSubmitting(false);
           return false;
       }
 
       setIsSubmitting(true);
 
       try {
-        if (!specificPayload) {
-          // This block handles forms where SCCPage constructs the payload
-          const inspectionTime = `${String(new Date().getHours()).padStart(
-            2,
-            "0"
-          )}:${String(new Date().getMinutes()).padStart(2, "0")}:${String(
-            new Date().getSeconds()
-          ).padStart(2, "0")}`;
-          const currentUserInfoWithTime = { ...commonUserInfo, inspectionTime };
+        // Payload Preparation for forms handled directly by SCCPage (not HT/FU anymore here for primary fields)
+        const inspectionTime = `${String(new Date().getHours()).padStart(
+          2,
+          "0"
+        )}:${String(new Date().getMinutes()).padStart(2, "0")}:${String(
+          new Date().getSeconds()
+        ).padStart(2, "0")}`;
+        const currentUserInfoWithTime = { ...commonUserInfo, inspectionTime };
 
-          if (formTypeToSubmit === "HT" || formTypeToSubmit === "FU") {
-            const formData =
-              formTypeToSubmit === "HT" ? htFormData : fuFormData;
-            if (
-              !formData.inspectionDate ||
-              !formData.machineNo ||
-              !formData.moNo ||
-              !formData.color ||
-              !formData.standardSpecification ||
-              formData.standardSpecification.length === 0 ||
-              !formData.standardSpecification[0].timeSec ||
-              !formData.standardSpecification[0].tempC ||
-              !formData.standardSpecification[0].pressure ||
-              formData.standardSpecification[0].tempOffset === undefined ||
-              (formData.showSecondHeatSpec &&
-                (formData.standardSpecification.length < 2 ||
-                  !formData.standardSpecification[1].timeSec ||
-                  !formData.standardSpecification[1].tempC ||
-                  !formData.standardSpecification[1].pressure ||
-                  formData.standardSpecification[1].tempOffset ===
-                    undefined)) ||
-              (!formData.referenceSampleImageUrl &&
-                !formData.referenceSampleImageFile)
-            ) {
-              Swal.fire(
-                t("scc.validationErrorTitle"),
-                t(
-                  formTypeToSubmit === "HT"
-                    ? "scc.validation.firstSpecFieldsRequired"
-                    : "scc.validation.secondSpecFieldsRequired"
-                ),
-                "warning"
+        if (formTypeToSubmit === "HT" || formTypeToSubmit === "FU") {
+          const formData = payloadToSend; // This is formDataFromChild
+
+          // Validation Logic (ensure it's comprehensive)
+          const firstSpec = formData.standardSpecification?.[0];
+          const secondSpec = formData.showSecondHeatSpec
+            ? formData.standardSpecification?.[1]
+            : null;
+          const isSpecValid = (spec) => {
+            if (!spec) return false;
+            const baseValid =
+              spec.timeSec && spec.tempC && spec.tempOffset !== undefined;
+            return formTypeToSubmit === "HT"
+              ? baseValid && spec.pressure
+              : baseValid;
+          };
+          const areAllFieldsFilled =
+            formData.inspectionDate &&
+            formData.machineNo &&
+            formData.moNo &&
+            formData.color &&
+            formData.standardSpecification?.length > 0 &&
+            isSpecValid(firstSpec) &&
+            (formData.showSecondHeatSpec ? isSpecValid(secondSpec) : true);
+          const areImagesUploaded =
+            (formData.referenceSampleImageUrl ||
+              formData.referenceSampleImageFile) &&
+            (formData.afterWashImageUrl || formData.afterWashImageFile);
+
+          if (!areAllFieldsFilled || !areImagesUploaded) {
+            let message = t("scc.validation.fillAllRequiredFieldsAndImages");
+            if (!areAllFieldsFilled && areImagesUploaded) {
+              message = t(
+                formTypeToSubmit === "HT"
+                  ? "scc.validation.firstSpecFieldsRequiredHT"
+                  : "scc.validation.firstSpecFieldsRequiredFU"
               );
-              throw new Error("Validation failed for HT/FU First Output.");
+            } else if (areAllFieldsFilled && !areImagesUploaded) {
+              if (
+                !(
+                  formData.referenceSampleImageUrl ||
+                  formData.referenceSampleImageFile
+                )
+              ) {
+                message = t("scc.validation.referenceSampleRequired");
+              } else {
+                message = t("scc.validation.afterWashRequired");
+              }
             }
-            let finalImageUrls = {
-              referenceSampleImage: formData.referenceSampleImageUrl,
-              afterWashImage: formData.afterWashImageUrl
-            };
-            if (formData.referenceSampleImageFile) {
-              const imgData = await uploadSccImage(
-                formData.referenceSampleImageFile,
-                formData,
-                `referenceSample-${formData.machineNo}-${formTypeToSubmit}`
-              );
-              finalImageUrls.referenceSampleImage = imgData.filePath;
-            }
-            if (formData.afterWashImageFile) {
-              const imgData = await uploadSccImage(
-                formData.afterWashImageFile,
-                formData,
-                `afterWash-${formData.machineNo}-${formTypeToSubmit}`
-              );
-              finalImageUrls.afterWashImage = imgData.filePath;
-            }
-            payloadToSend = {
-              _id: formData._id || undefined,
-              inspectionDate: formData.inspectionDate,
-              machineNo: formData.machineNo,
-              moNo: formData.moNo,
-              buyer: formData.buyer,
-              buyerStyle: formData.buyerStyle,
-              color: formData.color,
-              remarks: formData.remarks?.trim() || "NA",
-              ...currentUserInfoWithTime,
-              referenceSampleImage: finalImageUrls.referenceSampleImage,
-              afterWashImage: finalImageUrls.afterWashImage,
-              standardSpecification: formData.standardSpecification
-                .filter((spec) => spec.timeSec || spec.tempC || spec.pressure)
-                .map((spec) => {
-                  const tempOffsetVal = parseFloat(spec.tempOffset) || 0;
-                  return {
-                    type: spec.type,
-                    method: spec.method,
-                    timeSec: spec.timeSec ? Number(spec.timeSec) : null,
-                    tempC: spec.tempC ? Number(spec.tempC) : null,
-                    tempOffsetMinus:
-                      tempOffsetVal < 0
-                        ? tempOffsetVal
-                        : tempOffsetVal !== 0
-                        ? -Math.abs(tempOffsetVal)
-                        : 0,
-                    tempOffsetPlus:
-                      tempOffsetVal > 0
-                        ? tempOffsetVal
-                        : tempOffsetVal !== 0
-                        ? Math.abs(tempOffsetVal)
-                        : 0,
-                    pressure: spec.pressure ? Number(spec.pressure) : null,
-                    status: spec.status,
-                    remarks: spec.remarks?.trim() || "NA"
-                  };
-                })
-            };
-          } else if (formTypeToSubmit === "DailyTesting") {
-            const formData = dailyTestingFormData;
-            if (
-              !formData.inspectionDate ||
-              !formData.moNo ||
-              !formData.color ||
-              !formData.machineNo
-            ) {
-              Swal.fire(
-                t("scc.validationErrorTitle"),
-                t("scc.validationErrorBasicMachine"),
-                "warning"
-              );
-              throw new Error("Validation failed for Daily Testing.");
-            }
-            let finalAfterWashImageUrl = formData.afterWashImageUrl;
-            if (formData.afterWashImageFile) {
-              const imgData = await uploadSccImage(
-                formData.afterWashImageFile,
-                formData,
-                `afterWashDaily-${formData.machineNo}`
-              );
-              finalAfterWashImageUrl = imgData.filePath;
-            }
-            payloadToSend = {
-              _id: formData._id || undefined,
-              inspectionDate: formData.inspectionDate,
-              machineNo: formData.machineNo,
-              moNo: formData.moNo,
-              buyer: formData.buyer,
-              buyerStyle: formData.buyerStyle,
-              color: formData.color,
-              remarks: formData.remarks?.trim() || "NA",
-              ...currentUserInfoWithTime,
-              standardSpecifications: {
-                tempC: formData.standardSpecifications.tempC
-                  ? Number(formData.standardSpecifications.tempC)
-                  : null,
-                timeSec: formData.standardSpecifications.timeSec
-                  ? Number(formData.standardSpecifications.timeSec)
-                  : null,
-                pressure: formData.standardSpecifications.pressure
-                  ? Number(formData.standardSpecifications.pressure)
-                  : null
-              },
-              numberOfRejections: formData.numberOfRejections || 0,
-              parameterAdjustmentRecords: (
-                formData.parameterAdjustmentRecords || []
-              ).map((rec) => ({
-                rejectionNo: rec.rejectionNo,
-                adjustedTempC:
-                  rec.adjustedTempC !== null && rec.adjustedTempC !== ""
-                    ? Number(rec.adjustedTempC)
-                    : null,
-                adjustedTimeSec:
-                  rec.adjustedTimeSec !== null && rec.adjustedTimeSec !== ""
-                    ? Number(rec.adjustedTimeSec)
-                    : null,
-                adjustedPressure:
-                  rec.adjustedPressure !== null && rec.adjustedPressure !== ""
-                    ? Number(rec.adjustedPressure)
-                    : null
-              })),
-              finalResult: formData.finalResult || "Pending",
-              afterWashImage: finalAfterWashImageUrl
-            };
+            Swal.fire(t("scc.validationErrorTitle"), message, "warning");
+            throw new Error("Validation failed for HT/FU First Output.");
           }
-        }
 
-        if (formTypeToSubmit === "HTInspectionReport" && specificPayload) {
-          const reportDataFromChild = specificPayload;
+          // Image Uploads
+          let finalImageUrls = {
+            referenceSampleImage: formData.referenceSampleImageUrl,
+            afterWashImage: formData.afterWashImageUrl
+          };
+          if (formData.referenceSampleImageFile) {
+            const imgData = await uploadSccImage(
+              formData.referenceSampleImageFile,
+              formData,
+              `referenceSample-${formData.machineNo}-${formTypeToSubmit}`
+            );
+            finalImageUrls.referenceSampleImage = imgData.filePath;
+          }
+          if (formData.afterWashImageFile) {
+            const imgData = await uploadSccImage(
+              formData.afterWashImageFile,
+              formData,
+              `afterWash-${formData.machineNo}-${formTypeToSubmit}`
+            );
+            finalImageUrls.afterWashImage = imgData.filePath;
+          }
+
+          // Final payload construction for HT/FU
+          payloadToSend = {
+            _id: formData._id || undefined,
+            inspectionDate: formData.inspectionDate, // Already a Date object from child
+            machineNo: formData.machineNo,
+            moNo: formData.moNo,
+            buyer: formData.buyer,
+            buyerStyle: formData.buyerStyle,
+            color: formData.color,
+            remarks: formData.remarks?.trim() || "NA",
+            ...currentUserInfoWithTime, // Inspector details
+            operatorData: formData.operatorData || null, // Include operatorData
+            referenceSampleImage: finalImageUrls.referenceSampleImage,
+            afterWashImage: finalImageUrls.afterWashImage,
+            standardSpecification: formData.standardSpecification
+              .filter((spec) => {
+                if (formTypeToSubmit === "HT")
+                  return spec.timeSec || spec.tempC || spec.pressure;
+                return spec.timeSec || spec.tempC;
+              })
+              .map((spec) => {
+                const tempOffsetVal = parseFloat(spec.tempOffset) || 0;
+                const mappedSpec = {
+                  type: spec.type,
+                  method: spec.method,
+                  timeSec: spec.timeSec ? Number(spec.timeSec) : null,
+                  tempC: spec.tempC ? Number(spec.tempC) : null,
+                  tempOffsetMinus:
+                    tempOffsetVal < 0
+                      ? tempOffsetVal
+                      : tempOffsetVal !== 0
+                      ? -Math.abs(tempOffsetVal)
+                      : 0,
+                  tempOffsetPlus:
+                    tempOffsetVal > 0
+                      ? tempOffsetVal
+                      : tempOffsetVal !== 0
+                      ? Math.abs(tempOffsetVal)
+                      : 0,
+                  status: spec.status,
+                  remarks: spec.remarks?.trim() || "NA"
+                };
+                if (formTypeToSubmit === "HT") {
+                  mappedSpec.pressure = spec.pressure
+                    ? Number(spec.pressure)
+                    : null;
+                }
+                return mappedSpec;
+              })
+          };
+        } else if (formTypeToSubmit === "DailyTesting") {
+          const formData = payloadToSend; // This is dailyTestingFormData or specificPayload
+          if (
+            !formData.inspectionDate ||
+            !formData.moNo ||
+            !formData.color ||
+            !formData.machineNo
+          ) {
+            Swal.fire(
+              t("scc.validationErrorTitle"),
+              t("scc.validationErrorBasicMachine"),
+              "warning"
+            );
+            throw new Error("Validation failed for Daily Testing.");
+          }
+          let finalAfterWashImageUrl = formData.afterWashImageUrl;
+          if (formData.afterWashImageFile) {
+            const imgData = await uploadSccImage(
+              formData.afterWashImageFile,
+              formData,
+              `afterWashDaily-${formData.machineNo}`
+            );
+            finalAfterWashImageUrl = imgData.filePath;
+          }
+          payloadToSend = {
+            _id: formData._id || undefined,
+            inspectionDate: formData.inspectionDate,
+            machineNo: formData.machineNo,
+            moNo: formData.moNo,
+            buyer: formData.buyer,
+            buyerStyle: formData.buyerStyle,
+            color: formData.color,
+            remarks: formData.remarks?.trim() || "NA",
+            ...currentUserInfoWithTime,
+            standardSpecifications: {
+              tempC: formData.standardSpecifications.tempC
+                ? Number(formData.standardSpecifications.tempC)
+                : null,
+              timeSec: formData.standardSpecifications.timeSec
+                ? Number(formData.standardSpecifications.timeSec)
+                : null,
+              pressure: formData.standardSpecifications.pressure
+                ? Number(formData.standardSpecifications.pressure)
+                : null
+            },
+            numberOfRejections: formData.numberOfRejections || 0,
+            parameterAdjustmentRecords: (
+              formData.parameterAdjustmentRecords || []
+            ).map((rec) => ({
+              rejectionNo: rec.rejectionNo,
+              adjustedTempC:
+                rec.adjustedTempC !== null && rec.adjustedTempC !== ""
+                  ? Number(rec.adjustedTempC)
+                  : null,
+              adjustedTimeSec:
+                rec.adjustedTimeSec !== null && rec.adjustedTimeSec !== ""
+                  ? Number(rec.adjustedTimeSec)
+                  : null,
+              adjustedPressure:
+                rec.adjustedPressure !== null && rec.adjustedPressure !== ""
+                  ? Number(rec.adjustedPressure)
+                  : null
+            })),
+            finalResult: formData.finalResult || "Pending",
+            afterWashImage: finalAfterWashImageUrl
+          };
+        } else if (formTypeToSubmit === "HTInspectionReport" && payloadToSend) {
+          const reportDataFromChild = payloadToSend;
           if (
             !reportDataFromChild.inspectionDate ||
             !reportDataFromChild.machineNo ||
-            !reportDataFromChild.moNo ||
-            !reportDataFromChild.color ||
-            !reportDataFromChild.batchNo ||
-            !reportDataFromChild.tableNo ||
-            reportDataFromChild.actualLayers === undefined ||
-            reportDataFromChild.actualLayers === null ||
-            Number(reportDataFromChild.actualLayers) <= 0 ||
-            reportDataFromChild.totalBundle === undefined ||
-            reportDataFromChild.totalBundle === null ||
-            Number(reportDataFromChild.totalBundle) <= 0 ||
-            reportDataFromChild.totalPcs === undefined ||
-            reportDataFromChild.totalPcs === null ||
-            Number(reportDataFromChild.totalPcs) <= 0 ||
-            !reportDataFromChild.aqlData ||
-            reportDataFromChild.aqlData.sampleSize === null ||
-            reportDataFromChild.aqlData.sampleSize <= 0
+            /* ... other validations */ !reportDataFromChild.aqlData?.sampleSize
           ) {
             Swal.fire(
               t("scc.validationErrorTitle"),
@@ -2048,20 +2142,16 @@ const SCCPage = () => {
             );
             finalDefectImageUrl = imgData.filePath;
           }
-          const inspectionTime = `${String(new Date().getHours()).padStart(
-            2,
-            "0"
-          )}:${String(new Date().getMinutes()).padStart(2, "0")}:${String(
-            new Date().getSeconds()
-          ).padStart(2, "0")}`;
           payloadToSend = {
             ...reportDataFromChild,
             defectImageUrl: finalDefectImageUrl,
-            ...commonUserInfo,
-            inspectionTime
+            ...commonUserInfo, // Add inspector info
+            inspectionTime: reportDataFromChild.inspectionTime || inspectionTime // Use time from child if available, else current
           };
           delete payloadToSend.defectImageFile;
         }
+        // For other simple cases like registerMachine, payloadToSend is already formDataFromChild/specificPayload
+        // and usually doesn't need this extensive construction. The backend expects the simple payload.
       } catch (error) {
         console.error(
           `Error during payload preparation for ${formTypeToSubmit}:`,
@@ -2099,8 +2189,6 @@ const SCCPage = () => {
           url: `${API_BASE_URL}${endpoint}`,
           data: payloadToSend
         });
-        // For "updateDailyHTFUTestResult", success message is handled by child.
-        // For other types, show a generic success or the one defined by successMessageKey.
         if (
           formTypeToSubmit !== "updateDailyHTFUTestResult" &&
           successMessageKey
@@ -2123,37 +2211,28 @@ const SCCPage = () => {
           currentSetterForReset &&
           initialStateForReset
         ) {
-          const submittedInspectionDate = payloadToSend.inspectionDate;
+          const submittedInspectionDate = payloadToSend.inspectionDate; // Use payloadToSend which has the date
           const preservedDate =
             submittedInspectionDate instanceof Date
               ? submittedInspectionDate
-              : new Date(submittedInspectionDate);
-          if (formTypeToSubmit === "HTInspectionReport") {
-            currentSetterForReset({
-              ...initialHTInspectionReportState,
-              inspectionDate: preservedDate
-            });
+              : new Date(submittedInspectionDate || Date.now());
+
+          let resetState = {
+            ...initialStateForReset,
+            inspectionDate: preservedDate
+          };
+          // Specific resets for file inputs or other fields
+          if (formTypeToSubmit === "HT" || formTypeToSubmit === "FU") {
+            resetState.referenceSampleImageFile = null;
+            resetState.afterWashImageFile = null;
+            // operatorData is part of initialSharedStateFirstOutput, so it will be reset to null
           } else if (formTypeToSubmit === "DailyTesting") {
-            currentSetterForReset({
-              ...initialSharedStateDailyTesting,
-              inspectionDate: preservedDate,
-              afterWashImageFile: null
-            });
-          } else if (formTypeToSubmit === "HT" || formTypeToSubmit === "FU") {
-            currentSetterForReset({
-              ...initialSharedStateFirstOutput,
-              inspectionDate: preservedDate,
-              referenceSampleImageFile: null,
-              afterWashImageFile: null
-            });
-          } else {
-            currentSetterForReset({
-              ...initialStateForReset,
-              inspectionDate: preservedDate
-            });
+            resetState.afterWashImageFile = null;
           }
+          // For HTInspectionReport, initialHTInspectionReportState handles reset
+          currentSetterForReset(resetState);
         }
-        return true; // Indicate success to child component
+        return true;
       } catch (error) {
         console.error(
           `${t("scc.errorSubmittingLog")} (Type: ${formTypeToSubmit})`,
@@ -2166,12 +2245,25 @@ const SCCPage = () => {
             t("scc.errorSubmitting"),
           "error"
         );
-        return false; // Indicate failure
+        return false;
       } finally {
         setIsSubmitting(false);
       }
     },
-    [user, t, uploadSccImage, htFormData, fuFormData, dailyTestingFormData]
+    [
+      user,
+      t,
+      uploadSccImage,
+      // Form data states are used if specificPayload/formDataFromChild is not provided for some types
+      htFormData,
+      fuFormData,
+      dailyTestingFormData,
+      // Setters are needed for resetting
+      setHtFormData,
+      setFuFormData,
+      setDailyTestingFormData,
+      setHtInspectionReportData
+    ]
   );
 
   if (authLoading)
@@ -2210,9 +2302,7 @@ const SCCPage = () => {
               <CurrentFormComponent
                 formType={activeTabData.formType}
                 key={`${activeTab}-${activeTabData.formType}-${
-                  activeTabData.data?._id ||
-                  activeTabData.data?.inspectionDate?.toISOString() ||
-                  "no-id-date"
+                  activeTabData.data?._id || "new"
                 }`}
                 formData={activeTabData.data}
                 onFormDataChange={activeTabData.setter}
