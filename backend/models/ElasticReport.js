@@ -6,9 +6,10 @@ const elasticInspectionSlotSchema = new mongoose.Schema(
     timeSlotKey: { type: String, required: true }, // e.g., "07:00"
 
     checkedQty: { type: Number, default: 20 },
-    qualityIssue: { type: String, enum: ["Pass", "Reject"], default: "Pass" },
+    quantityIssue: { type: String, enum: ["Pass", "Reject"], default: "Pass" },
     measurement: { type: String, enum: ["Pass", "Reject"], default: "Pass" },
     defects: { type: String, enum: ["Pass", "Reject"], default: "Pass" },
+    specificDefectReason: { type: String, default: "" },
     result: { type: String, enum: ["Pass", "Reject"], default: "Pass" },
     remarks: { type: String, trim: true, default: "" },
 

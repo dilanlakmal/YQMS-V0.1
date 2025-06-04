@@ -772,7 +772,25 @@
       "totalInspectionQty": "Total Insp. Qty",
       "cuttingType": "Cutting Type",
       "inspectionDetailsSummary": "Insp. Details",
-      "orderQty": "Order Qty"
+      "orderQty": "Order Qty",
+      "fabricType": "Fabric Type",
+      "material": "Material",
+      "rollQty": "Roll Qty",
+      "spreadYds": "Spread Yds",
+      "unit": "Unit",
+      "grossKgs": "Gross Kgs",
+      "netKgs": "Net Kgs",
+      "totalTTLRoll": "Total TTL Roll",
+      "spreadTable": "Spread Table",
+      "spreadTableNo": "Spread Table No.",
+      "planLayers": "Plan Layers",
+      "actualLayers": "Actual Layers",
+      "totalPcs": "Total Pcs (Calculated)",
+      "mackerNo": "Macker No.",
+      "mackerLength": "Macker Length",
+      "markerIndex": "No.",
+      "markerSize": "Marker Size",
+      "ratio": "Ratio"
     },
     "sizesChecked": "Sizes Checked",
     "sizeLabel": "Size",
@@ -807,7 +825,15 @@
     "validation": {
       "totalBundleQtyTooHigh": "The entered 'Total Bundle Qty' results in calculations exceeding limits. Please adjust."
     },
-    "pleaseSelectMoAndTable": "Please select an MO and Table No to manage."
+    "pleaseSelectMoAndTable": "Please select an MO and Table No to manage.",
+    "modifyFabricDetailsTitle": "Modify Fabric Details",
+    "modifyCuttingTableTitle": "Modify Cutting Table Details",
+    "modifyMarkerRatioTitle": "Modify Marker Ratio",
+    "addMarkerRatioRow": "Add Ratio Row",
+    "removeRow": "Remove Row",
+    "saveAllModifications": "Save All Modifications",
+    "recordModifiedSuccess": "Inspection record updated successfully.",
+    "failedToUpdateRecordFull": "Failed to update inspection record."
   },
 
   "common": {
@@ -834,7 +860,19 @@
     "legend": "Legend",
     "totalSamplesShort": "Total",
     "applyFilters": "Apply",
-    "clearFilters": "Clear"
+    "clearFilters": "Clear",
+    "save": "Save",
+    "edit": "Edit",
+    "remove": "Remove",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "cancel": "Cancel",
+    "areYouSure": "Are you sure?",
+    "yesRemoveIt": "Yes, remove it!",
+    "removed": "Removed!",
+    "collapse": "Collapse",
+    "expand": "Expand"
   },
 
   "editGar": {
@@ -1133,7 +1171,7 @@
     "registerMachineTitle": "Register Machine for Elastic Check",
     "inspectionDataTitle": "Elastic Inspection Data",
     "checkedQty": "Checked Qty",
-    "qualityIssue": "Quality Issue",
+    "quantityIssue": "Quantity Issue",
     "measurement": "Measurement",
     "defects": "Defects",
     "result": "Result",
@@ -1190,5 +1228,30 @@
     "manageCuttingReports": "Manage Cutting Reports",
     "qc2Defects": "QC2 Defects",
     "contentComingSoon": "This section is under development. Content will be available soon."
+  },
+  "sccOperators": {
+    "settingsTitle": "Machine & Operator Settings",
+    "htMachines": "HT Machines Count",
+    "fuMachines": "FU Machines Count",
+    "elasticMachines": "Elastic Machines Count",
+    "htMachineOperators": "HT Machine Operators",
+    "fuMachineOperators": "Fusing Machine Operators",
+    "elasticMachineOperators": "Elastic Machine Operators",
+    "machineNo": "Machine No.",
+    "empId": "Employee ID",
+    "photo": "Photo",
+    "name": "Name",
+    "actions": "Actions",
+    "searchEmpIdPlaceholder": "Search Emp ID...",
+    "loadingName": "Loading...",
+    "selectEmployeeWarning": "Please search and select an employee or ensure a valid Employee ID is entered.",
+    "operatorSavedSuccess": "Operator assignment saved successfully.",
+    "errorSavingOperator": "Failed to save operator assignment.",
+    "errorFetchingData": "Failed to fetch operator data.",
+    "errorUserNotFound": "User with Employee ID {emp_id} not found.",
+    "confirmRemoveOperator": "Are you sure you want to remove the operator from Machine No. {machineNo}?",
+    "operatorRemovedSuccess": "Operator removed successfully.",
+    "errorRemovingOperator": "Failed to remove operator.",
+    "noMachinesConfigured": "No machines configured. Adjust count in settings."
   }
 }
