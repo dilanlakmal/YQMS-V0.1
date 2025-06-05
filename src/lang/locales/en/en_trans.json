@@ -956,6 +956,13 @@
     "validationErrorSpecFirst": "Please fill all 'First' specification fields (Time, Temp, Pressure).",
     "validationErrorSpecAfterHat": "If 'First' status is Reject, please fill all 'After Hat' specification fields (Time, Temp, Pressure).",
     "validationErrorRefSample": "Reference Sample image is required.",
+    "validation": {
+      "fillAllRequiredFieldsAndImages": "Please fill all required fields, including specifications and upload both Reference Sample and After Wash images.",
+      "firstSpecFieldsRequiredHT": "Please ensure all specification fields (Time, Temp, Temp Offset, Pressure) are filled for all active specs.",
+      "firstSpecFieldsRequiredFU": "Please ensure all specification fields (Time, Temp, Temp Offset) are filled for all active specs.",
+      "referenceSampleRequired": "Reference Sample image is required.",
+      "afterWashRequired": "After Wash image is required."
+    },
     "userNotLoggedIn": "User not logged in. Please log in again.",
     "errorUploadingRefImage": "Failed to upload reference sample image.",
     "errorUploadingWashImage": "Failed to upload after wash image.",
@@ -979,7 +986,19 @@
     "remarksPlaceholderShort": "Enter remarks here...",
     "select": "Select Machine No",
     "selectStatus": "Select Status",
-    "actions": "Action"
+    "actions": "Action",
+    "operatorData": "Operator Data",
+    "noOperatorAssigned": "No operator assigned.",
+    "2nd heat": "2nd Heat",
+    "secondHeatSpecificationQuestion": "2nd Heat Specification?",
+    "yes": "Yes",
+    "no": "No",
+    "missingInformation": "Missing Information",
+    "confirmDeleteTitle": "Are you sure?",
+    "yesDeleteIt": "Yes, delete it!",
+    "cancel": "Cancel",
+    "deleted": "Deleted!",
+    "saveNew": "Save New Defect"
   },
 
   "sccdaily": {
@@ -1026,9 +1045,14 @@
     "timeTolerance": "Time Tolerance (Sec)",
     "pressureTolerance": "Pressure Tolerance (Bar)",
     "registerMachineTitle": "Register Machine for Scheduled Inspection",
+    "orderDetails": "Order Details",
+    "specs": "Std. Specs",
     "reqTempShort": "Std.Temp",
     "reqTimeShort": "Std.Time",
     "reqPressureShort": "Std.Pres",
+    "tempShort": "Temp",
+    "timeShort": "Time",
+    "pressureShort": "Pres",
     "register": "Register",
     "inspectionDataTitle": "Hourly Inspection Data Entry",
     "timeSlot": "Scheduled Time Slot",
@@ -1057,11 +1081,15 @@
     "stretchScratchTest": "Stretch & Scratch Test",
     "washingTest": "Washing Test",
     "reasons": "Reasons",
+    "selectIssues": "Select Issues",
+    "selectRejectReasons": "Select Reject Reason(s)",
     "submitStretchTest": "Submit Stretch/Scratch",
     "submitWashingTest": "Submit Washing",
     "resultSubmitted": "Result Logged",
     "stretchTestSubmittedSuccess": "Stretch & Scratch Test result submitted successfully.",
-    "washingTestSubmittedSuccess": "Washing Test result submitted successfully."
+    "washingTestSubmittedSuccess": "Washing Test result submitted successfully.",
+    "allMoNo": "All MOs",
+    "testResultsTitleStretchScratchOnly": "Stretch & Scratch Test Results"
   },
 
   "sccDailyFUQC": {
@@ -1070,8 +1098,11 @@
     "settingsTitle": "Fusing Machine Settings & Tolerance",
     "totalMachines": "Total Fusing Machines",
     "tempTolerance": "Temp. Tolerance (°C)",
+    "timeToleranceFU": "Time Tolerance (Sec)",
     "registerMachineTitle": "Register Fusing Machine for Testing",
+    "orderDetails": "Order Details",
     "reqTempShort": "Std.Temp",
+    "reqTimeShort": "Std.Time",
     "register": "Register Unit",
     "inspectionDataTitle": "Fusing Inspection Data Entry",
     "timeSlot": "Scheduled Test Time",
@@ -1081,6 +1112,7 @@
     "reqValue": "Std. Value",
     "actualValue": "Actual Value",
     "temperature": "Fusing Temperature",
+    "timing": "Timing",
     "submitted": "Logged",
     "pleaseSelectTimeSlot": "Please choose a test time slot to view or input data.",
     "errorFetchingSpecs": "Failed to retrieve standard temperature for the selected MO/Color (Fusing).",
@@ -1089,7 +1121,8 @@
     "validation": {
       "fillMachineMoColor": "Machine No, MO No (searched and selected), and Color are required for FUQC registration.",
       "selectTimeSlot": "A time slot must be selected before submitting fusing test data.",
-      "fillActualTempOrNA": "Please enter the actual temperature or mark it as N/A before submission."
+      "fillActualTempOrNA": "Please enter the actual temperature or mark it as N/A before submission.",
+      "fillActualTimeOrNA": "Please fill actual time or mark as N/A."
     },
 
     "title": "Daily Fusing Machine Quality Control Test",
@@ -1125,7 +1158,11 @@
     "allInspectionsCompleted": "All fusing inspections for this MO/Color appear to be completed.",
     "currentInspectionSlot": "Current Fusing Test Slot",
     "enterNewMo": "Enter new MO number to begin or select from existing below (if any).",
-    "selectMoFromList": "Please select an MO/Color combination from the list below to load data or start a new entry."
+    "selectMoFromList": "Please select an MO/Color combination from the list below to load data or start a new entry.",
+    "tempShort": "Temp",
+    "timeShort": "Time",
+    "allMoNo": "All MOs",
+    "specs": "Std. Specs"
   },
 
   "sccHTInspection": {
@@ -1217,6 +1254,37 @@
     "failedToDelete": "Failed to delete Heat Transfer defect.",
     "failedToFetch": "Failed to fetch Heat Transfer defects."
   },
+
+  "sccScratchDefects": {
+    "manageTitle": "Manage Scratch Test Defect Issues",
+    "addNew": "Add New Scratch Defect",
+    "addNewFormTitle": "Add New Scratch Test Defect",
+    "defectNo": "Defect No.",
+    "defectNameEng": "Defect Name (EN)",
+    "defectNameKhmer": "Defect Name (KH)",
+    "defectNameChinese": "Defect Name (CH) (Optional)",
+    "defectNoPlaceholder": "Enter Defect No.",
+    "defectNameEngPlaceholder": "Enter English Name",
+    "defectNameKhmerPlaceholder": "Enter Khmer Name",
+    "defectNameChinesePlaceholder": "Enter Chinese Name (Optional)",
+    "searchPlaceholder": "Search by No. or name...",
+    "loading": "Loading scratch defects...",
+    "noDefectsFound": "No Scratch Test defects found.",
+    "tryDifferentSearch": "Try adjusting your search terms.",
+    "validation": {
+      "fillRequired": "Defect No., English Name, and Khmer Name are required.",
+      "fillRequiredNew": "Defect No. must be a positive number. English and Khmer names are required."
+    },
+    "updatedSuccess": "Scratch Test Defect updated successfully.",
+    "failedToUpdate": "Failed to update Scratch Test defect.",
+    "addedSuccess": "Scratch Test Defect added successfully.",
+    "failedToAdd": "Failed to add Scratch Test defect.",
+    "confirmDeleteMsg": "You won't be able to revert this Scratch Test defect!",
+    "deletedSuccess": "Scratch Test Defect has been deleted.",
+    "failedToDelete": "Failed to delete Scratch Test defect.",
+    "failedToFetch": "Failed to fetch Scratch Test defects."
+  },
+
   "systemAdmin": {
     "title": "System Administration",
     "subtitle": "Manage system configurations and master data.",
