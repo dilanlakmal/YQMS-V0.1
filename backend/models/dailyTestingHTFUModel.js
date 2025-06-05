@@ -1,5 +1,20 @@
 import mongoose from "mongoose";
 
+// Define the OperatorData sub-schema (if not imported from a shared file)
+const operatorDataSchema = new mongoose.Schema(
+  {
+    emp_id: { type: String, required: true },
+    emp_eng_name: { type: String, default: "N/A" },
+    emp_face_photo: { type: String, default: null },
+    emp_reference_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User", // Assuming your User model is named "User"
+      required: true
+    }
+  },
+  { _id: false }
+);
+
 const inspectionSlotSchema = new mongoose.Schema(
   {
     inspectionNo: { type: Number, required: true },
@@ -49,17 +64,19 @@ const dailyTestingHTFUSchema = new mongoose.Schema(
     baseReqTime: { type: Number, default: null },
     baseReqPressure: { type: Number, default: null }, // Changed to Number
 
+    operatorData: { type: operatorDataSchema, required: false },
+
     inspections: [inspectionSlotSchema],
 
     stretchTestResult: {
       type: String,
-      enum: ["Pass", "Reject", "Pending", null],
+      enum: ["Pass", "Reject", "Pending", null, ""],
       default: "Pending"
     },
     stretchTestRejectReasons: [{ type: String }], // New field: Array of strings
     washingTestResult: {
       type: String,
-      enum: ["Pass", "Reject", "Pending", null],
+      enum: ["Pass", "Reject", "Pending", null, ""],
       default: "Pending"
     },
     isStretchWashingTestDone: { type: Boolean, default: false }

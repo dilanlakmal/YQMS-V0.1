@@ -49,6 +49,7 @@ import createSCCDailyTestingModel from "./models/SCCDailyTesting.js";
 import createDailyTestingHTFUtModel from "./models/dailyTestingHTFUModel.js";
 import createDailyTestingFUQCModel from "./models/DailyTestingFUQCModel.js";
 import createSCCDefectModel from "./models/SCCDefectModel.js";
+import createSCCScratchDefectModel from "./models/SCCScratchDefectModel.js";
 import createHTInspectionReportModel from "./models/HTInspectionReportModel.js";
 import createElasticReportModel from "./models/ElasticReport.js";
 
@@ -185,6 +186,7 @@ const SCCDailyTesting = createSCCDailyTestingModel(ymProdConnection);
 const DailyTestingHTFU = createDailyTestingHTFUtModel(ymProdConnection);
 const DailyTestingFUQC = createDailyTestingFUQCModel(ymProdConnection);
 const SCCDefect = createSCCDefectModel(ymProdConnection);
+const SCCScratchDefect = createSCCScratchDefectModel(ymProdConnection);
 const HTInspectionReport = createHTInspectionReportModel(ymProdConnection);
 const ElasticReport = createElasticReportModel(ymProdConnection);
 
@@ -13102,20 +13104,12 @@ app.delete("/api/scc/operators/:type/:machineNo", async (req, res) => {
 app.get("/api/scc/operator-by-machine/:type/:machineNo", async (req, res) => {
   try {
     const { type, machineNo } = req.params;
-    console.log(
-      `[API /api/scc/operator-by-machine] Fetching operator for type: ${type}, machineNo: ${machineNo}`
-    );
-
     const OperatorModel = getOperatorModel(type); // SCCHTOperator, SCCFUOperator, etc.
 
     if (!OperatorModel) {
-      console.log(
-        `[API /api/scc/operator-by-machine] Invalid operator type: ${type}`
-      );
       return res.status(400).json({ error: "Invalid operator type" });
     }
     if (!machineNo) {
-      console.log(`[API /api/scc/operator-by-machine] Machine No is required.`);
       return res.status(400).json({ error: "Machine No is required" });
     }
 
@@ -13129,9 +13123,6 @@ app.get("/api/scc/operator-by-machine/:type/:machineNo", async (req, res) => {
       .lean();
 
     if (!assignedOperator) {
-      console.log(
-        `[API /api/scc/operator-by-machine] No operator found for type: ${type}, machineNo: ${machineNo}`
-      );
       return res
         .status(404)
         .json({ message: "OPERATOR_NOT_FOUND", data: null });
@@ -13157,10 +13148,6 @@ app.get("/api/scc/operator-by-machine/:type/:machineNo", async (req, res) => {
         assignedOperator.emp_face_photo;
     }
 
-    console.log(
-      `[API /api/scc/operator-by-machine] Found operator:`,
-      operatorDetails
-    );
     res.json({ data: operatorDetails });
   } catch (error) {
     console.error(
@@ -13168,6 +13155,179 @@ app.get("/api/scc/operator-by-machine/:type/:machineNo", async (req, res) => {
       error
     );
     res.status(500).json({ error: "Failed to fetch operator details" });
+  }
+});
+
+/* ------------------------------
+   End Points - SCC Scratch Defects
+------------------------------ */
+
+// GET - Fetch all SCC scratch defects
+app.get("/api/scc/scratch-defects", async (req, res) => {
+  try {
+    const defects = await SCCScratchDefect.find({}).sort({ no: 1 }).lean();
+    res.json(defects); // Send as a direct array
+  } catch (error) {
+    console.error("Error fetching SCC scratch defects:", error);
+    res.status(500).json({ message: "Server error fetching scratch defects" });
+  }
+});
+
+// POST - Add a new SCC scratch defect
+app.post("/api/scc/scratch-defects", async (req, res) => {
+  try {
+    const { no, defectNameEng, defectNameKhmer, defectNameChinese } = req.body;
+
+    if (no === undefined || no === null || !defectNameEng || !defectNameKhmer) {
+      return res.status(400).json({
+        message: "Defect No, English Name, and Khmer Name are required."
+      });
+    }
+    if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Defect No must be a positive number." });
+    }
+
+    const existingDefectByNo = await SCCScratchDefect.findOne({
+      no: Number(no)
+    });
+    if (existingDefectByNo) {
+      return res
+        .status(409)
+        .json({ message: `Scratch Defect No '${no}' already exists.` });
+    }
+    const existingDefectByName = await SCCScratchDefect.findOne({
+      defectNameEng
+    });
+    if (existingDefectByName) {
+      return res.status(409).json({
+        message: `Scratch Defect name (English) '${defectNameEng}' already exists.`
+      });
+    }
+
+    const newScratchDefect = new SCCScratchDefect({
+      no: Number(no),
+      defectNameEng,
+      defectNameKhmer,
+      defectNameChinese: defectNameChinese || ""
+    });
+    await newScratchDefect.save();
+    res.status(201).json({
+      message: "SCC scratch defect added successfully",
+      defect: newScratchDefect
+    });
+  } catch (error) {
+    console.error("Error adding SCC scratch defect:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message:
+          "Duplicate entry. Scratch Defect No or Name might already exist."
+      });
+    }
+    res.status(500).json({
+      message: "Failed to add SCC scratch defect",
+      error: error.message
+    });
+  }
+});
+
+// PUT - Update an existing SCC scratch defect by ID
+app.put("/api/scc/scratch-defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { no, defectNameEng, defectNameKhmer, defectNameChinese } = req.body;
+
+    if (no === undefined || no === null || !defectNameEng || !defectNameKhmer) {
+      return res.status(400).json({
+        message:
+          "Defect No, English Name, and Khmer Name are required for update."
+      });
+    }
+    if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Defect No must be a positive number." });
+    }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid scratch defect ID format." });
+    }
+
+    const existingDefectByNo = await SCCScratchDefect.findOne({
+      no: Number(no),
+      _id: { $ne: id }
+    });
+    if (existingDefectByNo) {
+      return res.status(409).json({
+        message: `Scratch Defect No '${no}' already exists for another defect.`
+      });
+    }
+    const existingDefectByName = await SCCScratchDefect.findOne({
+      defectNameEng,
+      _id: { $ne: id }
+    });
+    if (existingDefectByName) {
+      return res.status(409).json({
+        message: `Scratch Defect name (English) '${defectNameEng}' already exists for another defect.`
+      });
+    }
+
+    const updatedScratchDefect = await SCCScratchDefect.findByIdAndUpdate(
+      id,
+      {
+        no: Number(no),
+        defectNameEng,
+        defectNameKhmer,
+        defectNameChinese: defectNameChinese || ""
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedScratchDefect) {
+      return res.status(404).json({ message: "SCC Scratch Defect not found." });
+    }
+    res.status(200).json({
+      message: "SCC scratch defect updated successfully",
+      defect: updatedScratchDefect
+    });
+  } catch (error) {
+    console.error("Error updating SCC scratch defect:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Update failed due to duplicate Scratch Defect No or Name."
+      });
+    }
+    res.status(500).json({
+      message: "Failed to update SCC scratch defect",
+      error: error.message
+    });
+  }
+});
+
+// DELETE - Delete an SCC scratch defect by ID
+app.delete("/api/scc/scratch-defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid scratch defect ID format." });
+    }
+    const deletedScratchDefect = await SCCScratchDefect.findByIdAndDelete(id);
+    if (!deletedScratchDefect) {
+      return res.status(404).json({ message: "SCC Scratch Defect not found." });
+    }
+    res
+      .status(200)
+      .json({ message: "SCC scratch defect deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting SCC scratch defect:", error);
+    res.status(500).json({
+      message: "Failed to delete SCC scratch defect",
+      error: error.message
+    });
   }
 });
 
@@ -13194,29 +13354,6 @@ const sccImageStorage = multer.diskStorage({
     cb(null, filename);
   }
 });
-
-// const sccImageStorage = multer.diskStorage({
-//   destination: (req, file, cb) => {
-//     const dir = path.join(__dirname, "public/storage/scc_images");
-//     if (!fs.existsSync(dir)) {
-//       fs.mkdirSync(dir, { recursive: true });
-//     }
-//     cb(null, dir);
-//   },
-//   filename: (req, file, cb) => {
-//     // imageType should be passed in the body: 'referenceSample-HT', 'afterWash-FU', etc.
-//     const { imageType, inspectionDate } = req.body;
-//     const datePart = inspectionDate
-//       ? inspectionDate.replace(/\//g, "-")
-//       : new Date().toISOString().split("T")[0];
-//     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-//     // Filename: imageType-date-uniqueSuffix.extension
-//     const filename = `${
-//       imageType || "sccimage"
-//     }-${datePart}-${uniqueSuffix}${path.extname(file.originalname)}`;
-//     cb(null, filename);
-//   }
-// });
 
 const sccUpload = multer({ storage: sccImageStorage });
 
@@ -13599,17 +13736,17 @@ app.get("/api/scc/get-first-output-specs", async (req, res) => {
 });
 
 /* ------------------------------
-   End Points - SCC HT/FU - Daily Testing
+   End Points - SCC Daily Testing
 ------------------------------ */
 
 // Endpoints for SCCDailyTesting
 app.post("/api/scc/daily-testing", async (req, res) => {
   try {
-    const { _id, ...dataToSave } = req.body;
+    const { _id, operatorData, ...dataToSave } = req.body; // Destructure operatorData
+
     dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
     dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
 
-    // Ensure pressure in standardSpecifications is a number
     if (
       dataToSave.standardSpecifications &&
       dataToSave.standardSpecifications.pressure !== undefined
@@ -13621,7 +13758,6 @@ app.post("/api/scc/daily-testing", async (req, res) => {
           : null;
     }
 
-    // Ensure pressures in parameterAdjustmentRecords are numbers
     if (
       dataToSave.parameterAdjustmentRecords &&
       Array.isArray(dataToSave.parameterAdjustmentRecords)
@@ -13643,17 +13779,28 @@ app.post("/api/scc/daily-testing", async (req, res) => {
               : null
         }));
     } else {
-      // If user chose "No" for adjustment data, it might come as undefined or empty.
-      // The schema defaults to an empty array, so this should be fine.
-      // Or explicitly set to empty array if not provided or not an array.
       dataToSave.parameterAdjustmentRecords = [];
     }
 
-    // dataToSave.cycleWashingResults will no longer be present if removed from frontend payload
+    const finalDataToSave = { ...dataToSave };
+    // Include operatorData if provided and valid
+    if (operatorData && operatorData.emp_id && operatorData.emp_reference_id) {
+      finalDataToSave.operatorData = {
+        emp_id: operatorData.emp_id,
+        emp_eng_name: operatorData.emp_eng_name || "N/A",
+        emp_face_photo: operatorData.emp_face_photo || null,
+        emp_reference_id: operatorData.emp_reference_id
+      };
+    } else {
+      console.log(
+        "[API /api/scc/daily-testing] No complete operatorData provided, will not be saved."
+      );
+    }
 
     let record;
     if (_id) {
-      record = await SCCDailyTesting.findByIdAndUpdate(_id, dataToSave, {
+      record = await SCCDailyTesting.findByIdAndUpdate(_id, finalDataToSave, {
+        // Use finalDataToSave
         new: true,
         runValidators: true
       });
@@ -13663,19 +13810,19 @@ app.post("/api/scc/daily-testing", async (req, res) => {
           .json({ message: "Daily Testing record not found for update." });
     } else {
       const existing = await SCCDailyTesting.findOne({
-        moNo: dataToSave.moNo,
-        color: dataToSave.color,
-        machineNo: dataToSave.machineNo,
-        inspectionDate: dataToSave.inspectionDate
+        moNo: finalDataToSave.moNo,
+        color: finalDataToSave.color,
+        machineNo: finalDataToSave.machineNo,
+        inspectionDate: finalDataToSave.inspectionDate
       });
       if (existing) {
         record = await SCCDailyTesting.findByIdAndUpdate(
           existing._id,
-          dataToSave,
+          finalDataToSave,
           { new: true, runValidators: true }
         );
       } else {
-        record = new SCCDailyTesting(dataToSave);
+        record = new SCCDailyTesting(finalDataToSave); // Use finalDataToSave
         await record.save();
       }
     }
@@ -13684,7 +13831,10 @@ app.post("/api/scc/daily-testing", async (req, res) => {
       data: record
     });
   } catch (error) {
-    console.error("Error saving Daily Testing report:", error);
+    console.error(
+      "[API /api/scc/daily-testing] Error saving Daily Testing report:",
+      error
+    );
     if (error.code === 11000) {
       return res.status(409).json({
         message:
@@ -13732,133 +13882,8 @@ app.get("/api/scc/daily-testing", async (req, res) => {
   }
 });
 
-// 7. PUT /api/scc/daily-htfu/update-test-result/:docId
-//    Updates stretch or washing test results for a specific DailyTestingHTFU document.
-app.put("/api/scc/daily-htfu/update-test-result/:docId", async (req, res) => {
-  try {
-    const { docId } = req.params;
-    const {
-      stretchTestResult,
-      stretchTestRejectReasons,
-      washingTestResult,
-      emp_id // Employee performing the update
-    } = req.body;
-
-    if (!mongoose.Types.ObjectId.isValid(docId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid Document ID." });
-    }
-
-    const record = await DailyTestingHTFU.findById(docId);
-    if (!record) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Daily testing record not found." });
-    }
-
-    const updateFields = {};
-    let updated = false;
-
-    if (stretchTestResult !== undefined) {
-      if (
-        !["Pass", "Reject", "Pending", ""].includes(stretchTestResult) &&
-        stretchTestResult !== null
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid Stretch Test Result value."
-        });
-      }
-      updateFields.stretchTestResult =
-        stretchTestResult === "" ? "Pending" : stretchTestResult; // Treat empty as Pending
-      if (stretchTestResult === "Reject") {
-        updateFields.stretchTestRejectReasons = Array.isArray(
-          stretchTestRejectReasons
-        )
-          ? stretchTestRejectReasons
-          : [];
-      } else {
-        updateFields.stretchTestRejectReasons = []; // Clear reasons if not 'Reject'
-      }
-      updated = true;
-    }
-
-    if (washingTestResult !== undefined) {
-      if (
-        !["Pass", "Reject", "Pending", ""].includes(washingTestResult) &&
-        washingTestResult !== null
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid Washing Test Result value."
-        });
-      }
-      updateFields.washingTestResult =
-        washingTestResult === "" ? "Pending" : washingTestResult; // Treat empty as Pending
-      updated = true;
-    }
-
-    // Mark that at least one of these tests has been actioned if not already done.
-    // This can be more sophisticated if needed.
-    if (updated && !record.isStretchWashingTestDone) {
-      if (stretchTestResult && stretchTestResult !== "Pending")
-        updateFields.isStretchWashingTestDone = true;
-      if (washingTestResult && washingTestResult !== "Pending")
-        updateFields.isStretchWashingTestDone = true;
-    }
-
-    if (!updated) {
-      return res.status(400).json({
-        success: false,
-        message: "No valid test result fields provided for update."
-      });
-    }
-
-    // Update who last modified this record (optional, good for auditing)
-    if (emp_id) {
-      updateFields.emp_id = emp_id; // Overwrites previous emp_id, consider an audit trail if needed
-      const now = new Date();
-      updateFields.inspectionTime = `${String(now.getHours()).padStart(
-        2,
-        "0"
-      )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
-        now.getSeconds()
-      ).padStart(2, "0")}`;
-    }
-
-    const updatedRecord = await DailyTestingHTFU.findByIdAndUpdate(
-      docId,
-      { $set: updateFields },
-      { new: true, runValidators: true } // Return the updated document and run schema validators
-    );
-
-    if (!updatedRecord) {
-      // Should not happen if findById found the record, but as a safeguard
-      return res.status(404).json({
-        success: false,
-        message:
-          "Failed to update record, record not found after update attempt."
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Test result updated successfully.",
-      data: updatedRecord
-    });
-  } catch (error) {
-    console.error("Error updating test result:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update test result",
-      error: error.message
-    });
-  }
-});
-
 /* ------------------------------
-   End Points - SCC Daily HT/FU QC Test
+   End Points - SCC Daily HT QC
 ------------------------------ */
 
 // Helper to parse pressure string to number (if needed, but schema now enforces Number)
@@ -14087,6 +14112,7 @@ app.get("/api/scc/ht-first-output/specs-for-registration", async (req, res) => {
 
 // 4. POST /api/scc/daily-htfu/register-machine
 //    Registers a machine for daily testing. Creates a new document in daily_testing_ht_fus.
+
 app.post("/api/scc/daily-htfu/register-machine", async (req, res) => {
   try {
     const {
@@ -14096,15 +14122,16 @@ app.post("/api/scc/daily-htfu/register-machine", async (req, res) => {
       buyer,
       buyerStyle,
       color,
-      baseReqTemp, // These now come from the frontend state, populated by endpoint 3
+      baseReqTemp,
       baseReqTime,
       baseReqPressure,
+      operatorData, // Expecting { emp_id, emp_eng_name, emp_face_photo, emp_reference_id }
       emp_id,
       emp_kh_name,
       emp_eng_name,
       emp_dept_name,
       emp_sect_name,
-      emp_job_title
+      emp_job_title // Inspector info
     } = req.body;
 
     const formattedDate = inspectionDate; // Already formatted by frontend's formatDateForAPI
@@ -14116,7 +14143,19 @@ app.post("/api/scc/daily-htfu/register-machine", async (req, res) => {
           "Missing required fields: Inspection Date, Machine No, MO No, and Color."
       });
     }
-    // It's acceptable for baseReqTemp, baseReqTime, baseReqPressure to be null if not found
+
+    // Validate operatorData if provided
+    if (
+      operatorData &&
+      (!operatorData.emp_id || !operatorData.emp_reference_id)
+    ) {
+      console.warn(
+        "[Register Machine] Received operatorData but it's incomplete:",
+        operatorData
+      );
+      // Decide if this should be an error or if operatorData becomes null
+      // return res.status(400).json({ success: false, message: "Incomplete operator data provided." });
+    }
 
     const now = new Date();
     const registrationTime = `${String(now.getHours()).padStart(
@@ -14142,7 +14181,7 @@ app.post("/api/scc/daily-htfu/register-machine", async (req, res) => {
       });
     }
 
-    const newRegistration = new DailyTestingHTFU({
+    const newRegistrationData = {
       inspectionDate: formattedDate,
       machineNo,
       moNo,
@@ -14152,6 +14191,10 @@ app.post("/api/scc/daily-htfu/register-machine", async (req, res) => {
       baseReqTemp: baseReqTemp !== undefined ? baseReqTemp : null,
       baseReqTime: baseReqTime !== undefined ? baseReqTime : null,
       baseReqPressure: baseReqPressure !== undefined ? baseReqPressure : null,
+      operatorData:
+        operatorData && operatorData.emp_id && operatorData.emp_reference_id
+          ? operatorData
+          : null, // Save valid operatorData or null
       emp_id,
       emp_kh_name,
       emp_eng_name,
@@ -14163,21 +14206,35 @@ app.post("/api/scc/daily-htfu/register-machine", async (req, res) => {
       stretchTestResult: "Pending",
       washingTestResult: "Pending",
       isStretchWashingTestDone: false
-    });
+    };
 
+    console.log("[Register Machine] Data to save:", newRegistrationData);
+
+    const newRegistration = new DailyTestingHTFU(newRegistrationData);
     await newRegistration.save();
+
+    // Populate operatorData.emp_reference_id for the response
+    const populatedRegistration = await DailyTestingHTFU.findById(
+      newRegistration._id
+    )
+      .populate({
+        path: "operatorData.emp_reference_id",
+        model: UserMain,
+        select: "emp_id eng_name face_photo"
+      })
+      .lean();
+
     res.status(201).json({
       success: true,
       message: "Machine registered successfully for daily HT/FU QC.",
-      data: newRegistration
+      data: populatedRegistration || newRegistration
     });
   } catch (error) {
     console.error("Error registering machine for Daily HT/FU QC:", error);
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message:
-          "Duplicate entry. This registration might already exist (unique index violation).",
+        message: "Duplicate entry. This registration might already exist.",
         error: error.message
       });
     }
@@ -14189,9 +14246,173 @@ app.post("/api/scc/daily-htfu/register-machine", async (req, res) => {
   }
 });
 
+// app.post("/api/scc/daily-htfu/register-machine", async (req, res) => {
+//   try {
+//     const {
+//       inspectionDate,
+//       machineNo,
+//       moNo,
+//       buyer,
+//       buyerStyle,
+//       color,
+//       baseReqTemp, // These now come from the frontend state, populated by endpoint 3
+//       baseReqTime,
+//       baseReqPressure,
+//       emp_id,
+//       emp_kh_name,
+//       emp_eng_name,
+//       emp_dept_name,
+//       emp_sect_name,
+//       emp_job_title
+//     } = req.body;
+
+//     const formattedDate = inspectionDate; // Already formatted by frontend's formatDateForAPI
+
+//     if (!formattedDate || !machineNo || !moNo || !color) {
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "Missing required fields: Inspection Date, Machine No, MO No, and Color."
+//       });
+//     }
+//     // It's acceptable for baseReqTemp, baseReqTime, baseReqPressure to be null if not found
+
+//     const now = new Date();
+//     const registrationTime = `${String(now.getHours()).padStart(
+//       2,
+//       "0"
+//     )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+//       now.getSeconds()
+//     ).padStart(2, "0")}`;
+
+//     const existingRegistration = await DailyTestingHTFU.findOne({
+//       inspectionDate: formattedDate,
+//       machineNo,
+//       moNo,
+//       color
+//     });
+
+//     if (existingRegistration) {
+//       return res.status(409).json({
+//         success: false,
+//         message:
+//           "This Machine-MO-Color combination is already registered for this date.",
+//         data: existingRegistration
+//       });
+//     }
+
+//     const newRegistration = new DailyTestingHTFU({
+//       inspectionDate: formattedDate,
+//       machineNo,
+//       moNo,
+//       buyer,
+//       buyerStyle,
+//       color,
+//       baseReqTemp: baseReqTemp !== undefined ? baseReqTemp : null,
+//       baseReqTime: baseReqTime !== undefined ? baseReqTime : null,
+//       baseReqPressure: baseReqPressure !== undefined ? baseReqPressure : null,
+//       emp_id,
+//       emp_kh_name,
+//       emp_eng_name,
+//       emp_dept_name,
+//       emp_sect_name,
+//       emp_job_title,
+//       inspectionTime: registrationTime,
+//       inspections: [],
+//       stretchTestResult: "Pending",
+//       washingTestResult: "Pending",
+//       isStretchWashingTestDone: false
+//     });
+
+//     await newRegistration.save();
+//     res.status(201).json({
+//       success: true,
+//       message: "Machine registered successfully for daily HT/FU QC.",
+//       data: newRegistration
+//     });
+//   } catch (error) {
+//     console.error("Error registering machine for Daily HT/FU QC:", error);
+//     if (error.code === 11000) {
+//       return res.status(409).json({
+//         success: false,
+//         message:
+//           "Duplicate entry. This registration might already exist (unique index violation).",
+//         error: error.message
+//       });
+//     }
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to register machine",
+//       error: error.message
+//     });
+//   }
+// });
+
 // 5. GET /api/scc/daily-htfu/by-date?inspectionDate=<date>
 //    Fetches all DailyTestingHTFU records for a given inspection date.
+
 app.get("/api/scc/daily-htfu/by-date", async (req, res) => {
+  try {
+    const { inspectionDate, moNo: filterMoNo } = req.query; // Add moNo for filtering
+    if (!inspectionDate) {
+      return res.status(400).json({ message: "Inspection Date is required." });
+    }
+    const formattedDate = inspectionDate; // Expecting MM/DD/YYYY from frontend
+
+    const query = { inspectionDate: formattedDate };
+    if (filterMoNo && filterMoNo !== "All") {
+      query.moNo = filterMoNo;
+    }
+
+    const records = await DailyTestingHTFU.find(query)
+      .populate({
+        // Populate the emp_reference_id within operatorData
+        path: "operatorData.emp_reference_id",
+        model: UserMain, // Your User model
+        select: "emp_id eng_name face_photo" // Fields to select from User
+      })
+      .sort({ machineNo: 1 }) // Consider collation for proper numeric sort if machineNo can be "1", "10", "2"
+      .lean();
+
+    // The `operatorData` on each record will now have `emp_reference_id` populated if it was a valid ObjectId
+    // The frontend will then use `operatorData.emp_eng_name`, `operatorData.emp_face_photo` etc.
+    // which are stored directly, and the populated `emp_reference_id` can be used if needed for consistency.
+
+    res.json(records || []);
+  } catch (error) {
+    console.error("Error fetching Daily HT/FU records by date:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch daily records", error: error.message });
+  }
+});
+
+// app.get("/api/scc/daily-htfu/by-date", async (req, res) => {
+//   try {
+//     const { inspectionDate } = req.query;
+//     if (!inspectionDate) {
+//       return res.status(400).json({ message: "Inspection Date is required." });
+//     }
+//     const formattedDate = inspectionDate; // Expecting MM/DD/YYYY from frontend
+
+//     const records = await DailyTestingHTFU.find({
+//       inspectionDate: formattedDate
+//     })
+//       .sort({ machineNo: 1 }) // Consider `collation` for proper numeric sort if machineNo can be "1", "10", "2"
+//       .lean();
+
+//     res.json(records || []);
+//   } catch (error) {
+//     console.error("Error fetching Daily HT/FU records by date:", error);
+//     res.status(500).json({
+//       message: "Failed to fetch daily records",
+//       error: error.message
+//     });
+//   }
+// });
+
+// Endpoint to fetch distinct MO Numbers for a given inspection date from daily_testing_ht_fus
+app.get("/api/scc/daily-htfu/distinct-mos", async (req, res) => {
   try {
     const { inspectionDate } = req.query;
     if (!inspectionDate) {
@@ -14199,19 +14420,16 @@ app.get("/api/scc/daily-htfu/by-date", async (req, res) => {
     }
     const formattedDate = inspectionDate; // Expecting MM/DD/YYYY from frontend
 
-    const records = await DailyTestingHTFU.find({
+    const distinctMoNos = await DailyTestingHTFU.distinct("moNo", {
       inspectionDate: formattedDate
-    })
-      .sort({ machineNo: 1 }) // Consider `collation` for proper numeric sort if machineNo can be "1", "10", "2"
-      .lean();
-
-    res.json(records || []);
-  } catch (error) {
-    console.error("Error fetching Daily HT/FU records by date:", error);
-    res.status(500).json({
-      message: "Failed to fetch daily records",
-      error: error.message
     });
+
+    res.json(distinctMoNos.sort() || []);
+  } catch (error) {
+    console.error("Error fetching distinct MOs for Daily HT/FU QC:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch distinct MOs", error: error.message });
   }
 });
 
@@ -14350,8 +14568,258 @@ app.post("/api/scc/daily-htfu/submit-slot-inspection", async (req, res) => {
   }
 });
 
+// 7. PUT /api/scc/daily-htfu/update-test-result/:docId
+//    Updates stretch or washing test results for a specific DailyTestingHTFU document.
+app.put("/api/scc/daily-htfu/update-test-result/:docId", async (req, res) => {
+  try {
+    const { docId } = req.params;
+    const {
+      stretchTestResult,
+      stretchTestRejectReasons, // This will be an array of defect names (strings)
+      washingTestResult,
+      emp_id // Employee performing the update
+    } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(docId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Document ID." });
+    }
+
+    const record = await DailyTestingHTFU.findById(docId);
+    if (!record) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Daily testing record not found." });
+    }
+
+    const updateFields = {};
+    let updated = false;
+
+    if (stretchTestResult !== undefined) {
+      if (
+        !["Pass", "Reject", "Pending", "", null].includes(stretchTestResult)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid Stretch Test Result value."
+        });
+      }
+      updateFields.stretchTestResult =
+        stretchTestResult === "" ? "Pending" : stretchTestResult;
+      if (updateFields.stretchTestResult === "Reject") {
+        updateFields.stretchTestRejectReasons = Array.isArray(
+          stretchTestRejectReasons
+        )
+          ? stretchTestRejectReasons
+          : [];
+      } else {
+        updateFields.stretchTestRejectReasons = []; // Clear reasons if not 'Reject'
+      }
+      updated = true;
+    }
+
+    if (washingTestResult !== undefined) {
+      if (
+        !["Pass", "Reject", "Pending", "", null].includes(washingTestResult)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid Washing Test Result value."
+        });
+      }
+      updateFields.washingTestResult =
+        washingTestResult === "" ? "Pending" : washingTestResult;
+      updated = true;
+    }
+
+    if (updated && !record.isStretchWashingTestDone) {
+      if (
+        (updateFields.stretchTestResult &&
+          updateFields.stretchTestResult !== "Pending") ||
+        (updateFields.washingTestResult &&
+          updateFields.washingTestResult !== "Pending")
+      ) {
+        updateFields.isStretchWashingTestDone = true;
+      }
+    }
+
+    if (!updated) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid test result fields provided for update."
+      });
+    }
+
+    if (emp_id) {
+      updateFields.emp_id = emp_id;
+      const now = new Date();
+      updateFields.inspectionTime = `${String(now.getHours()).padStart(
+        2,
+        "0"
+      )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+        now.getSeconds()
+      ).padStart(2, "0")}`;
+    }
+
+    const updatedRecord = await DailyTestingHTFU.findByIdAndUpdate(
+      docId,
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    ).populate({
+      path: "operatorData.emp_reference_id",
+      model: UserMain,
+      select: "emp_id eng_name face_photo"
+    });
+
+    if (!updatedRecord) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Failed to update record, record not found after update attempt."
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Test result updated successfully.",
+      data: updatedRecord
+    });
+  } catch (error) {
+    console.error("Error updating test result:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update test result",
+      error: error.message
+    });
+  }
+});
+
+// app.put("/api/scc/daily-htfu/update-test-result/:docId", async (req, res) => {
+//   try {
+//     const { docId } = req.params;
+//     const {
+//       stretchTestResult,
+//       stretchTestRejectReasons,
+//       washingTestResult,
+//       emp_id // Employee performing the update
+//     } = req.body;
+
+//     if (!mongoose.Types.ObjectId.isValid(docId)) {
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Invalid Document ID." });
+//     }
+
+//     const record = await DailyTestingHTFU.findById(docId);
+//     if (!record) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Daily testing record not found." });
+//     }
+
+//     const updateFields = {};
+//     let updated = false;
+
+//     if (stretchTestResult !== undefined) {
+//       if (
+//         !["Pass", "Reject", "Pending", ""].includes(stretchTestResult) &&
+//         stretchTestResult !== null
+//       ) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid Stretch Test Result value."
+//         });
+//       }
+//       updateFields.stretchTestResult =
+//         stretchTestResult === "" ? "Pending" : stretchTestResult; // Treat empty as Pending
+//       if (stretchTestResult === "Reject") {
+//         updateFields.stretchTestRejectReasons = Array.isArray(
+//           stretchTestRejectReasons
+//         )
+//           ? stretchTestRejectReasons
+//           : [];
+//       } else {
+//         updateFields.stretchTestRejectReasons = []; // Clear reasons if not 'Reject'
+//       }
+//       updated = true;
+//     }
+
+//     if (washingTestResult !== undefined) {
+//       if (
+//         !["Pass", "Reject", "Pending", ""].includes(washingTestResult) &&
+//         washingTestResult !== null
+//       ) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid Washing Test Result value."
+//         });
+//       }
+//       updateFields.washingTestResult =
+//         washingTestResult === "" ? "Pending" : washingTestResult; // Treat empty as Pending
+//       updated = true;
+//     }
+
+//     // Mark that at least one of these tests has been actioned if not already done.
+//     // This can be more sophisticated if needed.
+//     if (updated && !record.isStretchWashingTestDone) {
+//       if (stretchTestResult && stretchTestResult !== "Pending")
+//         updateFields.isStretchWashingTestDone = true;
+//       if (washingTestResult && washingTestResult !== "Pending")
+//         updateFields.isStretchWashingTestDone = true;
+//     }
+
+//     if (!updated) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "No valid test result fields provided for update."
+//       });
+//     }
+
+//     // Update who last modified this record (optional, good for auditing)
+//     if (emp_id) {
+//       updateFields.emp_id = emp_id; // Overwrites previous emp_id, consider an audit trail if needed
+//       const now = new Date();
+//       updateFields.inspectionTime = `${String(now.getHours()).padStart(
+//         2,
+//         "0"
+//       )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+//         now.getSeconds()
+//       ).padStart(2, "0")}`;
+//     }
+
+//     const updatedRecord = await DailyTestingHTFU.findByIdAndUpdate(
+//       docId,
+//       { $set: updateFields },
+//       { new: true, runValidators: true } // Return the updated document and run schema validators
+//     );
+
+//     if (!updatedRecord) {
+//       // Should not happen if findById found the record, but as a safeguard
+//       return res.status(404).json({
+//         success: false,
+//         message:
+//           "Failed to update record, record not found after update attempt."
+//       });
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Test result updated successfully.",
+//       data: updatedRecord
+//     });
+//   } catch (error) {
+//     console.error("Error updating test result:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to update test result",
+//       error: error.message
+//     });
+//   }
+// });
+
 /* ------------------------------
-   End Point - SCC FU First Output - Specific Temp
+   End Point - SCC Daily FUQC
 ------------------------------ */
 
 // 1. Search Active MOs for FUQC Registration (from fu_first_outputs)
@@ -14457,26 +14925,31 @@ app.get("/api/scc/fu-first-output/specs-for-registration", async (req, res) => {
     ) {
       return res
         .status(200)
-        .json({ message: "FU_SPECS_NOT_FOUND", reqTemp: null });
+        .json({ message: "FU_SPECS_NOT_FOUND", reqTemp: null, reqTime: null });
     }
-    const firstSpec = record.standardSpecification.find(
-      (s) => s.type === "first" && s.tempC != null
+    // Prioritize 'first' type spec
+    let targetSpec = record.standardSpecification.find(
+      (s) => s.type === "first"
     );
 
-    if (!firstSpec) {
-      const anyFirstSpec = record.standardSpecification.find(
-        (s) => s.type === "first"
-      );
-      if (anyFirstSpec) {
-        return res.json({
-          reqTemp: anyFirstSpec.tempC !== undefined ? anyFirstSpec.tempC : null
-        });
-      }
-      return res
-        .status(200)
-        .json({ message: "FU_FIRST_TYPE_SPEC_INCOMPLETE", reqTemp: null });
+    if (!targetSpec) {
+      // Fallback if no 'first' spec (should ideally not happen)
+      targetSpec = record.standardSpecification[0];
     }
-    res.json({ reqTemp: firstSpec.tempC });
+
+    if (!targetSpec) {
+      // If still no spec
+      return res.status(200).json({
+        message: "FU_SPEC_DATA_MISSING",
+        reqTemp: null,
+        reqTime: null
+      });
+    }
+
+    res.json({
+      reqTemp: targetSpec.tempC !== undefined ? targetSpec.tempC : null,
+      reqTime: targetSpec.timeSec !== undefined ? targetSpec.timeSec : null // Added reqTime
+    });
   } catch (error) {
     console.error(
       "[SERVER FUQC] Error fetching FU specs for registration:",
@@ -14489,6 +14962,58 @@ app.get("/api/scc/fu-first-output/specs-for-registration", async (req, res) => {
   }
 });
 
+// app.get("/api/scc/fu-first-output/specs-for-registration", async (req, res) => {
+//   try {
+//     const { moNo, color } = req.query;
+//     if (!moNo || !color || moNo.trim() === "" || color.trim() === "") {
+//       return res.status(400).json({ message: "MO No and Color are required." });
+//     }
+//     const record = await FUFirstOutput.findOne({
+//       moNo: moNo.trim(),
+//       color: color.trim()
+//     })
+//       .sort({ inspectionDate: -1, createdAt: -1 })
+//       .lean();
+
+//     if (
+//       !record ||
+//       !record.standardSpecification ||
+//       record.standardSpecification.length === 0
+//     ) {
+//       return res
+//         .status(200)
+//         .json({ message: "FU_SPECS_NOT_FOUND", reqTemp: null });
+//     }
+//     const firstSpec = record.standardSpecification.find(
+//       (s) => s.type === "first" && s.tempC != null
+//     );
+
+//     if (!firstSpec) {
+//       const anyFirstSpec = record.standardSpecification.find(
+//         (s) => s.type === "first"
+//       );
+//       if (anyFirstSpec) {
+//         return res.json({
+//           reqTemp: anyFirstSpec.tempC !== undefined ? anyFirstSpec.tempC : null
+//         });
+//       }
+//       return res
+//         .status(200)
+//         .json({ message: "FU_FIRST_TYPE_SPEC_INCOMPLETE", reqTemp: null });
+//     }
+//     res.json({ reqTemp: firstSpec.tempC });
+//   } catch (error) {
+//     console.error(
+//       "[SERVER FUQC] Error fetching FU specs for registration:",
+//       error
+//     );
+//     res.status(500).json({
+//       message: "Failed to fetch FU specifications",
+//       error: error.message
+//     });
+//   }
+// });
+
 // 4. Register Machine for Daily FUQC
 app.post("/api/scc/daily-fuqc/register-machine", async (req, res) => {
   try {
@@ -14499,7 +15024,9 @@ app.post("/api/scc/daily-fuqc/register-machine", async (req, res) => {
       buyer,
       buyerStyle,
       color,
-      baseReqTemp, // Only baseReqTemp for FUQC
+      baseReqTemp,
+      baseReqTime, // Added baseReqTime
+      operatorData, // Expecting { emp_id, emp_eng_name, emp_face_photo, emp_reference_id }
       emp_id,
       emp_kh_name,
       emp_eng_name,
@@ -14508,13 +15035,14 @@ app.post("/api/scc/daily-fuqc/register-machine", async (req, res) => {
       emp_job_title
     } = req.body;
 
-    const formattedDate = inspectionDate; // Assuming MM/DD/YYYY from frontend
+    const formattedDate = inspectionDate; // Expecting MM/DD/YYYY from frontend
     if (!formattedDate || !machineNo || !moNo || !color) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields for FUQC machine registration."
       });
     }
+
     const now = new Date();
     const registrationTime = `${String(now.getHours()).padStart(
       2,
@@ -14538,7 +15066,7 @@ app.post("/api/scc/daily-fuqc/register-machine", async (req, res) => {
       });
     }
 
-    const newRegistration = new DailyTestingFUQC({
+    const newRegistrationData = {
       inspectionDate: formattedDate,
       machineNo,
       moNo,
@@ -14546,7 +15074,12 @@ app.post("/api/scc/daily-fuqc/register-machine", async (req, res) => {
       buyerStyle,
       color,
       baseReqTemp: baseReqTemp !== undefined ? baseReqTemp : null,
-      temp_offset: 5, // Default offset, can be made configurable later if needed
+      baseReqTime: baseReqTime !== undefined ? baseReqTime : null, // Save baseReqTime
+      temp_offset: 5, // Default, can be from settings if needed
+      operatorData:
+        operatorData && operatorData.emp_id && operatorData.emp_reference_id
+          ? operatorData
+          : null,
       emp_id,
       emp_kh_name,
       emp_eng_name,
@@ -14556,12 +15089,25 @@ app.post("/api/scc/daily-fuqc/register-machine", async (req, res) => {
       inspectionTime: registrationTime,
       inspections: [],
       remarks: "NA"
-    });
+    };
+
+    const newRegistration = new DailyTestingFUQC(newRegistrationData);
     await newRegistration.save();
+
+    const populatedRegistration = await DailyTestingFUQC.findById(
+      newRegistration._id
+    )
+      .populate({
+        path: "operatorData.emp_reference_id",
+        model: UserMain,
+        select: "emp_id eng_name face_photo"
+      })
+      .lean();
+
     res.status(201).json({
       success: true,
       message: "Machine registered successfully for Daily FUQC.",
-      data: newRegistration
+      data: populatedRegistration || newRegistration
     });
   } catch (error) {
     console.error(
@@ -14582,15 +15128,116 @@ app.post("/api/scc/daily-fuqc/register-machine", async (req, res) => {
   }
 });
 
+// app.post("/api/scc/daily-fuqc/register-machine", async (req, res) => {
+//   try {
+//     const {
+//       inspectionDate,
+//       machineNo,
+//       moNo,
+//       buyer,
+//       buyerStyle,
+//       color,
+//       baseReqTemp, // Only baseReqTemp for FUQC
+//       emp_id,
+//       emp_kh_name,
+//       emp_eng_name,
+//       emp_dept_name,
+//       emp_sect_name,
+//       emp_job_title
+//     } = req.body;
+
+//     const formattedDate = inspectionDate; // Assuming MM/DD/YYYY from frontend
+//     if (!formattedDate || !machineNo || !moNo || !color) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Missing required fields for FUQC machine registration."
+//       });
+//     }
+//     const now = new Date();
+//     const registrationTime = `${String(now.getHours()).padStart(
+//       2,
+//       "0"
+//     )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+//       now.getSeconds()
+//     ).padStart(2, "0")}`;
+
+//     const existingRegistration = await DailyTestingFUQC.findOne({
+//       inspectionDate: formattedDate,
+//       machineNo,
+//       moNo,
+//       color
+//     });
+//     if (existingRegistration) {
+//       return res.status(409).json({
+//         success: false,
+//         message:
+//           "This Machine-MO-Color is already registered for FUQC on this date.",
+//         data: existingRegistration
+//       });
+//     }
+
+//     const newRegistration = new DailyTestingFUQC({
+//       inspectionDate: formattedDate,
+//       machineNo,
+//       moNo,
+//       buyer,
+//       buyerStyle,
+//       color,
+//       baseReqTemp: baseReqTemp !== undefined ? baseReqTemp : null,
+//       temp_offset: 5, // Default offset, can be made configurable later if needed
+//       emp_id,
+//       emp_kh_name,
+//       emp_eng_name,
+//       emp_dept_name,
+//       emp_sect_name,
+//       emp_job_title,
+//       inspectionTime: registrationTime,
+//       inspections: [],
+//       remarks: "NA"
+//     });
+//     await newRegistration.save();
+//     res.status(201).json({
+//       success: true,
+//       message: "Machine registered successfully for Daily FUQC.",
+//       data: newRegistration
+//     });
+//   } catch (error) {
+//     console.error(
+//       "[SERVER FUQC] Error registering machine for Daily FUQC:",
+//       error
+//     );
+//     if (error.code === 11000)
+//       return res.status(409).json({
+//         success: false,
+//         message: "Duplicate FUQC registration.",
+//         error: error.message
+//       });
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to register machine for FUQC",
+//       error: error.message
+//     });
+//   }
+// });
+
 // 5. Get Daily FUQC Records by Date
 app.get("/api/scc/daily-fuqc/by-date", async (req, res) => {
   try {
-    const { inspectionDate } = req.query;
+    const { inspectionDate, moNo: filterMoNo } = req.query; // Added moNo for filtering
     if (!inspectionDate)
       return res.status(400).json({ message: "Inspection Date is required." });
-    const records = await DailyTestingFUQC.find({
-      inspectionDate: inspectionDate
-    })
+
+    const query = { inspectionDate: inspectionDate }; // Ensure consistent date format
+    if (filterMoNo && filterMoNo !== "All") {
+      query.moNo = filterMoNo;
+    }
+
+    const records = await DailyTestingFUQC.find(query)
+      .populate({
+        path: "operatorData.emp_reference_id",
+        model: UserMain,
+        select: "emp_id eng_name face_photo"
+      })
       .sort({ machineNo: 1 })
       .lean();
     res.json(records || []);
@@ -14606,18 +15253,68 @@ app.get("/api/scc/daily-fuqc/by-date", async (req, res) => {
   }
 });
 
+// NEW Endpoint: Get Distinct MOs for Daily FUQC
+app.get("/api/scc/daily-fuqc/distinct-mos", async (req, res) => {
+  try {
+    const { inspectionDate } = req.query;
+    if (!inspectionDate) {
+      return res.status(400).json({ message: "Inspection Date is required." });
+    }
+    const formattedDate = inspectionDate;
+
+    const distinctMoNos = await DailyTestingFUQC.distinct("moNo", {
+      inspectionDate: formattedDate
+    });
+    res.json(distinctMoNos.sort() || []);
+  } catch (error) {
+    console.error("Error fetching distinct MOs for Daily FUQC:", error);
+    res
+      .status(500)
+      .json({
+        message: "Failed to fetch distinct MOs for FUQC",
+        error: error.message
+      });
+  }
+});
+
+// app.get("/api/scc/daily-fuqc/by-date", async (req, res) => {
+//   try {
+//     const { inspectionDate } = req.query;
+//     if (!inspectionDate)
+//       return res.status(400).json({ message: "Inspection Date is required." });
+//     const records = await DailyTestingFUQC.find({
+//       inspectionDate: inspectionDate
+//     })
+//       .sort({ machineNo: 1 })
+//       .lean();
+//     res.json(records || []);
+//   } catch (error) {
+//     console.error(
+//       "[SERVER FUQC] Error fetching Daily FUQC records by date:",
+//       error
+//     );
+//     res.status(500).json({
+//       message: "Failed to fetch daily FUQC records",
+//       error: error.message
+//     });
+//   }
+// });
+
 // 6. Submit Slot Inspection for Daily FUQC
+
 app.post("/api/scc/daily-fuqc/submit-slot-inspection", async (req, res) => {
   try {
     const {
       inspectionDate,
       timeSlotKey,
       inspectionNo,
-      dailyFUQCDocId, // Changed key
+      dailyFUQCDocId,
       temp_req,
       temp_actual,
-      temp_isNA,
-      temp_isUserModified,
+      temp_isNA, // temp_isUserModified removed from FUQC schema
+      time_req,
+      time_actual,
+      time_isNA, // Added time fields
       emp_id
     } = req.body;
 
@@ -14626,7 +15323,8 @@ app.post("/api/scc/daily-fuqc/submit-slot-inspection", async (req, res) => {
       !timeSlotKey ||
       !inspectionNo ||
       !dailyFUQCDocId ||
-      (temp_actual === undefined && !temp_isNA)
+      (temp_actual === undefined && !temp_isNA) ||
+      (time_actual === undefined && !time_isNA) // Validation for time
     ) {
       return res.status(400).json({
         success: false,
@@ -14644,14 +15342,32 @@ app.post("/api/scc/daily-fuqc/submit-slot-inspection", async (req, res) => {
         .status(400)
         .json({ success: false, message: "Date mismatch for FUQC record." });
 
-    // Determine result based on actual, req, and offset stored in the record
-    let result = "Pending";
+    // Calculate results
+    let result_temp = "Pending";
     if (temp_isNA) {
-      result = "N/A";
+      result_temp = "N/A";
     } else if (temp_actual !== null && temp_req !== null) {
       const diff = Math.abs(Number(temp_actual) - Number(temp_req));
-      result = diff <= (record.temp_offset || 0) ? "Pass" : "Reject";
+      result_temp = diff <= (record.temp_offset || 0) ? "Pass" : "Reject";
     }
+
+    let result_time = "Pending";
+    if (time_isNA) {
+      result_time = "N/A";
+    } else if (time_actual !== null && time_req !== null) {
+      // For time, tolerance is 0, so actual must equal req
+      result_time =
+        Number(time_actual) === Number(time_req) ? "Pass" : "Reject";
+    }
+
+    let final_result_slot = "Pending";
+    if (result_temp === "N/A" && result_time === "N/A")
+      final_result_slot = "N/A";
+    else if (result_temp === "Pass" && result_time === "Pass")
+      final_result_slot = "Pass";
+    else if (result_temp === "Reject" || result_time === "Reject")
+      final_result_slot = "Reject";
+    // If one is Pass and other is N/A or Pending, it remains Pending unless both are Pass or one is Reject.
 
     const slotData = {
       inspectionNo: Number(inspectionNo),
@@ -14663,8 +15379,16 @@ app.post("/api/scc/daily-fuqc/submit-slot-inspection", async (req, res) => {
         ? temp_actual
         : null,
       temp_isNA: !!temp_isNA,
-      // temp_isUserModified: !!temp_isUserModified, // Schema for FUQC slot does not have this
-      result: result, // Calculated result
+      result_temp,
+      time_req: time_req !== undefined ? time_req : null,
+      time_actual: time_isNA
+        ? null
+        : time_actual !== undefined
+        ? time_actual
+        : null,
+      time_isNA: !!time_isNA,
+      result_time,
+      final_result_slot,
       inspectionTimestamp: new Date()
     };
 
@@ -14691,10 +15415,19 @@ app.post("/api/scc/daily-fuqc/submit-slot-inspection", async (req, res) => {
       now.getSeconds()
     ).padStart(2, "0")}`;
     await record.save();
+
+    const populatedRecord = await DailyTestingFUQC.findById(record._id)
+      .populate({
+        path: "operatorData.emp_reference_id",
+        model: UserMain,
+        select: "emp_id eng_name face_photo"
+      })
+      .lean();
+
     res.status(201).json({
       success: true,
       message: `FUQC Inspection for slot ${timeSlotKey} submitted.`,
-      data: record
+      data: populatedRecord || record
     });
   } catch (error) {
     console.error(
@@ -14708,6 +15441,108 @@ app.post("/api/scc/daily-fuqc/submit-slot-inspection", async (req, res) => {
     });
   }
 });
+
+// app.post("/api/scc/daily-fuqc/submit-slot-inspection", async (req, res) => {
+//   try {
+//     const {
+//       inspectionDate,
+//       timeSlotKey,
+//       inspectionNo,
+//       dailyFUQCDocId, // Changed key
+//       temp_req,
+//       temp_actual,
+//       temp_isNA,
+//       temp_isUserModified,
+//       emp_id
+//     } = req.body;
+
+//     if (
+//       !inspectionDate ||
+//       !timeSlotKey ||
+//       !inspectionNo ||
+//       !dailyFUQCDocId ||
+//       (temp_actual === undefined && !temp_isNA)
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Missing required fields for FUQC slot submission."
+//       });
+//     }
+//     const record = await DailyTestingFUQC.findById(dailyFUQCDocId);
+//     if (!record)
+//       return res.status(404).json({
+//         success: false,
+//         message: `FUQC Record not found: ${dailyFUQCDocId}`
+//       });
+//     if (record.inspectionDate !== inspectionDate)
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Date mismatch for FUQC record." });
+
+//     // Determine result based on actual, req, and offset stored in the record
+//     let result = "Pending";
+//     if (temp_isNA) {
+//       result = "N/A";
+//     } else if (temp_actual !== null && temp_req !== null) {
+//       const diff = Math.abs(Number(temp_actual) - Number(temp_req));
+//       result = diff <= (record.temp_offset || 0) ? "Pass" : "Reject";
+//     }
+
+//     const slotData = {
+//       inspectionNo: Number(inspectionNo),
+//       timeSlotKey,
+//       temp_req: temp_req !== undefined ? temp_req : null,
+//       temp_actual: temp_isNA
+//         ? null
+//         : temp_actual !== undefined
+//         ? temp_actual
+//         : null,
+//       temp_isNA: !!temp_isNA,
+//       // temp_isUserModified: !!temp_isUserModified, // Schema for FUQC slot does not have this
+//       result: result, // Calculated result
+//       inspectionTimestamp: new Date()
+//     };
+
+//     const existingSlotIndex = record.inspections.findIndex(
+//       (insp) => insp.timeSlotKey === timeSlotKey
+//     );
+//     if (existingSlotIndex > -1) {
+//       return res.status(409).json({
+//         success: false,
+//         message: `Slot ${timeSlotKey} already submitted for this FUQC record.`
+//       });
+//     } else {
+//       record.inspections.push(slotData);
+//     }
+//     record.inspections.sort(
+//       (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
+//     );
+//     record.emp_id = emp_id;
+//     const now = new Date();
+//     record.inspectionTime = `${String(now.getHours()).padStart(
+//       2,
+//       "0"
+//     )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+//       now.getSeconds()
+//     ).padStart(2, "0")}`;
+//     await record.save();
+//     res.status(201).json({
+//       success: true,
+//       message: `FUQC Inspection for slot ${timeSlotKey} submitted.`,
+//       data: record
+//     });
+//   } catch (error) {
+//     console.error(
+//       "[SERVER FUQC] Error submitting FUQC slot inspection:",
+//       error
+//     );
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to submit FUQC slot inspection",
+//       error: error.message
+//     });
+//   }
+// });
 
 /* ------------------------------
    End Points - SCC Defects
