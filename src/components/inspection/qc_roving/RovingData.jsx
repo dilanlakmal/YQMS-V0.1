@@ -343,7 +343,6 @@ const RovingData = ({ refreshTrigger }) => {
                 : Overall Roving Status is 'Pending', 'Unknown', or not determined.
               </li>
             </ul>
-            <li className="mt-1 text-xs text-gray-500">(*Note: 'Reject-Minor' for multiple defects should ideally be red, but current data might show yellow. See console warning for details.)</li>
           </ul>
         </div>
       </div>

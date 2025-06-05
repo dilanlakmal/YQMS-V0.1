@@ -6,6 +6,7 @@ import {
   getLasrWashId,
   saveWash,
   getWasingRecord,
+  getWashingFilterOptions,
 } from '../../Controller/Washing/washingController.js';
 
 const router = express.Router();
@@ -16,5 +17,7 @@ router.get('/api/check-defect-card-washing/:defectPrintId', getWashDefectId);
 router.get('/api/last-washing-record-id/:emp_id', getLasrWashId);
 router.post('/api/save-washing', saveWash);
 router.get('/api/washing-records', getWasingRecord);
+router.get('/api/washing-records/distinct-filters', getWashingFilterOptions);
+
 
 export default router;

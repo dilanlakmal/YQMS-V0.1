@@ -130,3 +130,32 @@ export const getWasingRecord = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch washing records" });
   }
 };
+
+// GET distinct filter options for washing records
+export const getWashingFilterOptions = async (req, res) => {
+   try {
+    const taskNos = await Washing.distinct('task_no_washing').exec();
+    // For moNo, you might need to check 'selectedMono' or 'moNo'
+    // This example assumes 'moNo' is the primary field. Adjust if needed.
+    const moNosFromMoNo = await Washing.distinct('moNo').exec();
+    const moNosFromSelectedMono = await Washing.distinct('selectedMono').exec();
+    
+    // Combine and get unique MO numbers
+    const combinedMoNos = [...new Set([...moNosFromMoNo, ...moNosFromSelectedMono].filter(Boolean))];
+
+    const packageNos = await Washing.distinct('package_no').exec();
+    const departments = await Washing.distinct('department').exec();
+    const custStyles = await Washing.distinct('custStyle').exec();
+
+    res.json({
+      taskNos: taskNos.filter(tn => tn != null), // Filter out null/undefined values
+      moNos: combinedMoNos.filter(mo => mo != null),
+      packageNos: packageNos.filter(pn => pn != null),
+      departments: departments.filter(dept => dept != null),
+      custStyles: custStyles.filter(style => style != null),
+    });
+  } catch (error) {
+    console.error('Error fetching distinct washing filter options:', error);
+    res.status(500).json({ message: 'Failed to fetch distinct filter options' });
+  } 
+};

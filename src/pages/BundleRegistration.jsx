@@ -2958,26 +2958,34 @@ function BundleRegistration() {
         mode="production"
       />
       {editModalOpen && recordToEdit && (
-        <EditModal
-          isOpen={true}
-          onClose={() => {
-            setEditModalOpen(false);
-            setEditRecordId(null);
-          }}
-          initialFormData={recordToEdit}
-          recordId={editRecordId}
-          onSave={(updatedBatch) => {
-            setUserBatches((prevBatches) =>
-              prevBatches.map((b) =>
-                b._id === updatedBatch._id ? updatedBatch : b
-              )
-            );
-            setEditModalOpen(false);
-            setEditRecordId(null);
-          }}
-          setUserBatches={setUserBatches}
-          setEditModalOpen={setEditModalOpen}
-        />
+        // Wrapper for modal positioning and z-index
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl transform transition-all">
+            <EditModal
+               isOpen={editModalOpen}
+              onClose={() => {
+                setEditModalOpen(false);
+                setEditRecordId(null);
+              }}
+              formData={recordToEdit ? { ...recordToEdit, id: recordToEdit._id } : null}
+              setFormData={(updater) => {
+                 console.warn("EditModal attempting to set FormData directly. This might be intended or might need review depending on EditModal's design.", updater);
+              }}
+              recordId={editRecordId}
+              onSave={(updatedBatch) => {
+                setUserBatches((prevBatches) =>
+                  prevBatches.map((b) =>
+                    b._id === updatedBatch._id ? updatedBatch : b
+                  )
+                );
+                setEditModalOpen(false);
+                setEditRecordId(null);
+              }}
+              setUserBatches={setUserBatches} // Consider if this is needed if onSave handles updates
+              setEditModalOpen={setEditModalOpen} // Consider if this is needed if onClose handles it
+            />
+          </div>
+        </div>
       )}
     </div>
   );

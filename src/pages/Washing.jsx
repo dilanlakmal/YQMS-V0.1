@@ -1,10 +1,11 @@
-import { AlertCircle, CalendarDays, Clock, QrCode, Table } from "lucide-react";
+import { AlertCircle, CalendarDays, Clock, QrCode, Table, Shirt, Package, Palette } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
 import QrCodeScanner from "../components/forms/QRCodeScanner";
 import { useTranslation } from 'react-i18next';
-import WashingFilterPane from "../components/filters/washingFilterPane";
+import DynamicFilterPane from "../components/filters/DynamicFilterPane";
+import StatCard from "../components/card/StateCard";
 
 const WashingPage = () => {
   const { t } = useTranslation();
@@ -27,6 +28,8 @@ const WashingPage = () => {
     packageNo: "",
     moNo: "",
     taskNo: "",
+    department: "",
+    custStyle: "",
   });
 
 
@@ -356,13 +359,75 @@ const WashingPage = () => {
 
       if (filterDateFrom && (!recordDate || recordDate < filterDateFrom)) return false;
       if (filterDateTo && (!recordDate || recordDate > filterDateTo)) return false;
-      if (filters.packageNo && !record.package_no?.toLowerCase().includes(filters.packageNo.toLowerCase())) return false;
-      if (filters.moNo && !(record.selectedMono || record.moNo)?.toLowerCase().includes(filters.moNo.toLowerCase())) return false;
-      if (filters.taskNo && !record.task_no_washing?.toString().includes(filters.taskNo)) return false;
+      // Package No filter
+      if (filters.packageNo !== undefined && filters.packageNo !== null && filters.packageNo !== "") {
+        const filterValue = String(filters.packageNo).toLowerCase();
+        const recordValue = String(record.package_no ?? '').toLowerCase();
+        if (recordValue !== filterValue) return false;
+      }
+
+      // MO No filter
+      if (filters.moNo !== undefined && filters.moNo !== null && filters.moNo !== "") {
+        const filterValue = String(filters.moNo).toLowerCase();
+        const recordValue = String(record.selectedMono || record.moNo || '').toLowerCase();
+        if (recordValue !== filterValue) return false;
+      }
       
+      // Task No filter
+      if (filters.taskNo !== undefined && filters.taskNo !== null && filters.taskNo !== "") {
+        const filterValue = String(filters.taskNo).toLowerCase();
+        const recordValue = String(record.task_no_washing ?? '').toLowerCase();
+        if (recordValue !== filterValue) return false;
+      }
+
+      // Department filter
+      if (filters.department !== undefined && filters.department !== null && filters.department !== "") {
+        const filterValue = String(filters.department).toLowerCase();
+        const recordValue = String(record.department ?? '').toLowerCase();
+        if (recordValue !== filterValue) return false;
+      }
+      // Customer Style (Style No) filter
+      if (filters.custStyle !== undefined && filters.custStyle !== null && filters.custStyle !== "") {
+        const filterValue = String(filters.custStyle).toLowerCase();
+        const recordValue = String(record.custStyle ?? '').toLowerCase();
+        if (recordValue !== filterValue) return false;
+      }
+
       return true;
     });
   }, [washingRecords, filters]);
+
+  const washingStats = useMemo(() => {
+    if (!filteredWashingRecords || filteredWashingRecords.length === 0) {
+      return { totalGarmentsWashed: 0, totalBundlesProcessed: 0, totalStyles: 0, task52Garments: 0, task101Garments: 0 };
+    }
+
+    let totalGarments = 0;
+    const uniqueStyles = new Set();
+    let task52Garments = 0;
+    let task101Garments = 0;
+
+    filteredWashingRecords.forEach(record => {
+      const qty = Number(record.passQtyWash) || 0;
+      totalGarments += qty;
+      if (record.custStyle) {
+        uniqueStyles.add(record.custStyle);
+      }
+      if (String(record.task_no_washing) === "52") {
+        task52Garments += qty;
+      } else if (String(record.task_no_washing) === "101") {
+        task101Garments += qty;
+      }
+    });
+
+    return {
+      totalGarmentsWashed: totalGarments,
+      totalBundlesProcessed: filteredWashingRecords.length,
+      totalStyles: uniqueStyles.size,
+      task52Garments: task52Garments,
+      task101Garments: task101Garments,
+    };
+  }, [filteredWashingRecords]);
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 sm:py-8">
@@ -464,9 +529,56 @@ const WashingPage = () => {
           </div>
         ) : (
           <div className="bg-white rounded-xl shadow-xl p-4 md:p-6">
-             <WashingFilterPane  
-             initialFilters={filters}
-              onApplyFilters={handleApplyFilters} />
+              {/* Statistics Cards */}
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {/* Modified Total Garments Card */}
+              <div className="bg-white p-4 rounded-xl shadow-lg flex items-stretch border-l-4 border-blue-500">
+                {/* Left Part: Total Garments */}
+                <div className="flex-1 flex items-center space-x-3 pr-3">
+                  <div className="p-3 rounded-full bg-opacity-20 bg-blue-500">
+                    <Shirt className="h-6 w-6 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">
+                      {t("wash.stats.total_garments", "Total Garments Washed")}
+                    </p>
+                    <p className="text-xl font-semibold text-gray-700">
+                      {loadingData ? "..." : washingStats.totalGarmentsWashed.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                {/* Right Part: Task-specific counts */}
+                <div className="flex flex-col justify-around pl-3 border-l border-gray-200 space-y-1 min-w-[120px]">
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium">{t("wash.stats.normal_wash", "Normal (T52)")}</p>
+                    <p className="text-base font-semibold text-gray-700">{loadingData ? "..." : washingStats.task52Garments.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium">{t("wash.stats.defect_wash", "Defect (T101)")}</p>
+                    <p className="text-base font-semibold text-gray-700">{loadingData ? "..." : washingStats.task101Garments.toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+              <StatCard
+                title={t("wash.stats.total_bundles", "Total Bundles Processed")}
+                value={washingStats.totalBundlesProcessed.toLocaleString()}
+                icon={<Package />}
+                colorClass="border-l-green-500 text-green-500 bg-green-500"
+                loading={loadingData}
+              />
+              <StatCard
+                title={t("wash.stats.total_styles", "Total Styles")}
+                value={washingStats.totalStyles.toLocaleString()}
+                icon={<Palette />}
+                colorClass="border-l-purple-500 text-purple-500 bg-purple-500"
+                loading={loadingData}
+              />
+            </div>
+            <DynamicFilterPane // Use the renamed/dynamic filter pane
+              initialFilters={filters}
+              onApplyFilters={handleApplyFilters}
+              distinctFiltersEndpoint="/api/washing-records/distinct-filters"
+            />
             <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm relative">
               <table className="min-w-full divide-y divide-gray-200 border border-gray-200">
                 <thead className="bg-slate-100 sticky top-0 z-10">

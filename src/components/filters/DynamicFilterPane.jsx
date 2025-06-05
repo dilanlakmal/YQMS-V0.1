@@ -1,11 +1,12 @@
-// File: d:/Yash/Projects/YQMS/YQMS-V0.1/src/components/filters/AdvancedFilterPane.jsx
 import React, { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { FaFilter, FaTimes, FaCalendarAlt } from 'react-icons/fa';
+import Select from 'react-select';
+import { API_BASE_URL } from '../../../config';
 import { useTranslation } from 'react-i18next';
 
-const WashingFilterPane = ({
+const DynamicFilterPane = ({
   initialFilters,
   onApplyFilters,
 }) => {
@@ -17,7 +18,16 @@ const WashingFilterPane = ({
     packageNo: '',
     moNo: '',
     taskNo: '',
+    department: '',
+    custStyle: '',
   });
+
+  const [taskNoOptions, setTaskNoOptions] = useState([]);
+  const [moNoOptions, setMoNoOptions] = useState([]);
+  const [packageNoOptions, setPackageNoOptions] = useState([]);
+  const [departmentOptions, setDepartmentOptions] = useState([]);
+  const [custStyleOptions, setCustStyleOptions] = useState([]);
+  const [loadingOptions, setLoadingOptions] = useState(false);
 
   useEffect(() => {
     // Update local state if initialFilters prop changes
@@ -26,6 +36,37 @@ const WashingFilterPane = ({
     }
   }, [initialFilters]);
 
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      setLoadingOptions(true);
+      try {
+        // Replace with your actual API endpoint for washing distinct filters
+        const response = await fetch(`${API_BASE_URL}/api/washing-records/distinct-filters`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch filter options for washing');
+        }
+        const data = await response.json();
+        setTaskNoOptions(data.taskNos?.map(tn => ({ value: tn, label: tn })) || []);
+        setMoNoOptions(data.moNos?.map(mo => ({ value: mo, label: mo })) || []);
+        setPackageNoOptions(data.packageNos?.map(pn => ({ value: pn, label: pn })) || []);
+        setDepartmentOptions(data.departments?.map(dept => ({ value: dept, label: dept })) || []);
+        setCustStyleOptions(data.custStyles?.map(style => ({ value: style, label: style })) || []);
+      } catch (error) {
+        console.error("Error fetching washing filter options:", error);
+        // Set empty options in case of an error
+        setTaskNoOptions([]);
+        setMoNoOptions([]);
+        setPackageNoOptions([]);
+        setDepartmentOptions([]);
+        setCustStyleOptions([]);
+      } finally {
+        setLoadingOptions(false);
+      }
+    };
+
+    fetchFilterOptions();
+  }, []);
+
   const handleChange = (name, value) => {
     setLocalFilters(prev => ({ ...prev, [name]: value }));
   };
@@ -33,6 +74,13 @@ const WashingFilterPane = ({
   const handleDateChange = (name, date) => {
     const dateString = date ? date.toISOString().split('T')[0] : '';
     handleChange(name, dateString);
+    };
+
+  const handleSelectChange = (name, selectedOption) => {
+    setLocalFilters(prev => ({
+      ...prev,
+      [name]: selectedOption ? selectedOption.value : ''
+    }));
   };
 
   const handleSubmit = (e) => {
@@ -49,6 +97,8 @@ const WashingFilterPane = ({
       packageNo: '',
       moNo: '',
       taskNo: '',
+      department: '',
+      custStyle: '',
     };
     setLocalFilters(resetState);
     if (onApplyFilters) {
@@ -71,6 +121,25 @@ const WashingFilterPane = ({
       }
     }
     return null;
+  };
+
+   const selectStyles = {
+    control: (provided) => ({
+      ...provided,
+      minHeight: '38px', // Matches DatePicker height
+      height: '38px',
+      boxShadow: 'none',
+      borderColor: 'rgb(209 213 219)', // border-gray-300
+      '&:hover': { borderColor: 'rgb(167 139 250)' }, // focus:border-indigo-500 (approx)
+      fontSize: '0.875rem', // text-sm
+      borderRadius: '0.375rem', // rounded-md
+    }),
+    valueContainer: (provided) => ({ ...provided, height: '38px', padding: '0 8px' }),
+    input: (provided) => ({ ...provided, margin: '0px', padding: '0px' }),
+    indicatorSeparator: () => ({ display: 'none' }),
+    indicatorsContainer: (provided) => ({ ...provided, height: '38px' }),
+    menu: (provided) => ({ ...provided, zIndex: 20 }), // Ensure dropdown is above other elements
+    placeholder: (provided) => ({ ...provided, color: 'rgb(107 114 128)'}) // text-gray-500
   };
 
   return (
@@ -101,7 +170,7 @@ const WashingFilterPane = ({
       </div>
 
       {showAdvancedFilters && (
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-1 transition-all duration-300 ease-in-out">
+         <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 md:gap-4 mb-1 transition-all duration-300 ease-in-out">
           {/* Date From */}
           <div className="flex flex-col">
             <label htmlFor="advancedDateFrom" className="text-xs font-medium text-gray-600 mb-1 flex items-center">
@@ -141,32 +210,34 @@ const WashingFilterPane = ({
             <label htmlFor="advancedPackageNo" className="text-xs font-medium text-gray-600 mb-1">
               {t('filters.package_no', 'Package No')}
             </label>
-            <input
-              type="text"
-              name="packageNo"
+             <Select
               id="advancedPackageNo"
-              value={localFilters.packageNo}
-              onChange={(e) => handleChange('packageNo', e.target.value)}
+              options={packageNoOptions}
+              value={packageNoOptions.find(option => option.value === localFilters.packageNo) || null}
+              onChange={(selectedOption) => handleSelectChange('packageNo', selectedOption)}
+              isClearable
+              isSearchable
               placeholder={t('filters.enter_package_no', 'Enter Package No')}
-              className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
-              autoComplete="off"
+              styles={selectStyles}
+              isLoading={loadingOptions}
             />
           </div>
 
           {/* Task No */}
           <div className="flex flex-col">
             <label htmlFor="advancedTaskNo" className="text-xs font-medium text-gray-600 mb-1">
-              {t('filters.task_no', 'Task No')}
+              {t('filters.task_no', 'Task No.')}
             </label>
-            <input
-              type="text"
-              name="taskNo"
+            <Select
               id="advancedTaskNo"
-              value={localFilters.taskNo}
-              onChange={(e) => handleChange('taskNo', e.target.value)}
-              placeholder={t('filters.enter_task_no', 'Enter Task No')}
-              className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
-              autoComplete="off"
+              options={taskNoOptions}
+              value={taskNoOptions.find(option => option.value === localFilters.taskNo) || null}
+              onChange={(selectedOption) => handleSelectChange('taskNo', selectedOption)}
+              isClearable
+              isSearchable
+              placeholder={t('filters.enter_task_no', 'Enter Task No.')}
+              styles={selectStyles}
+              isLoading={loadingOptions}
             />
           </div>
 
@@ -175,19 +246,56 @@ const WashingFilterPane = ({
             <label htmlFor="advancedMoNo" className="text-xs font-medium text-gray-600 mb-1">
               {t('filters.mo_no', 'MO No')}
             </label>
-            <input
-              type="text"
-              name="moNo"
+            <Select
               id="advancedMoNo"
-              value={localFilters.moNo}
-              onChange={(e) => handleChange('moNo', e.target.value)}
+              options={moNoOptions}
+              value={moNoOptions.find(option => option.value === localFilters.moNo) || null}
+              onChange={(selectedOption) => handleSelectChange('moNo', selectedOption)}
+              isClearable
+              isSearchable
               placeholder={t('filters.enter_mo_no', 'Enter MO No')}
-              className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
-              autoComplete="off"
+              styles={selectStyles}
+              isLoading={loadingOptions}
             />
           </div>
-          
-          <div className="sm:col-span-2 md:col-span-2 lg:col-span-4 flex justify-end items-end pt-2">
+
+          {/* Department */}
+          <div className="flex flex-col">
+            <label htmlFor="advancedDepartment" className="text-xs font-medium text-gray-600 mb-1">
+              {t('filters.department', 'Department')}
+            </label>
+            <Select
+              id="advancedDepartment"
+              options={departmentOptions}
+              value={departmentOptions.find(option => option.value === localFilters.department) || null}
+              onChange={(selectedOption) => handleSelectChange('department', selectedOption)}
+              isClearable
+              isSearchable
+              placeholder={t('filters.select_department', 'Select Department')}
+              styles={selectStyles}
+              isLoading={loadingOptions}
+            />
+          </div>
+
+          {/* Customer Style (Style No) */}
+          <div className="flex flex-col">
+            <label htmlFor="advancedCustStyle" className="text-xs font-medium text-gray-600 mb-1">
+              {t('filters.cust_style', 'Style No')}
+            </label>
+            <Select
+              id="advancedCustStyle"
+              options={custStyleOptions}
+              value={custStyleOptions.find(option => option.value === localFilters.custStyle) || null}
+              onChange={(selectedOption) => handleSelectChange('custStyle', selectedOption)}
+              isClearable
+              isSearchable
+              placeholder={t('filters.select_cust_style', 'Select Style No')}
+              styles={selectStyles}
+              isLoading={loadingOptions}
+            />
+          </div>
+
+          <div className="sm:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-7 flex justify-end items-end pt-2">
              <button
                 type="submit"
                 className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -201,4 +309,4 @@ const WashingFilterPane = ({
   );
 };
 
-export default WashingFilterPane;
+export default DynamicFilterPane;

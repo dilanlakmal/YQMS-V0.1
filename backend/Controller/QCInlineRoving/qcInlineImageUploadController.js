@@ -56,10 +56,10 @@ export const saveRovingImage = async (req, res) => {
               });
           }
     
-          if (!imageType || !["spi", "measurement"].includes(imageType.toLowerCase())) {
+          if (!imageType || !["spi", "measurement", "defect"].includes(imageType.toLowerCase())) {
             return res
               .status(400)
-              .json({ success: false, message: 'Invalid image type. Must be "spi" or "measurement".' });
+              .json({ success: false, message: 'Invalid image type. Must be "spi", "measurement", or "defect".' });
           }
     
           const sanitizedDate = sanitize(date);

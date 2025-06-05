@@ -40,6 +40,11 @@ const RovingPage = () => {
   const [measurementStatus, setMeasurementStatus] = useState("");
   const [spiFilesToUpload, setSpiFilesToUpload] = useState([]); 
   const [measurementFilesToUpload, setMeasurementFilesToUpload] = useState([]);
+  const [defectImageFilesToUpload, setDefectImageFilesToUpload] = useState([]);
+  const [currentDefectImageContext, setCurrentDefectImageContext] = useState({
+    garmentIndex: 0,
+    defectNames: []
+  });
   const [garments, setGarments] = useState([]);
   const [inspectionStartTime, setInspectionStartTime] = useState(null);
   const [currentGarmentIndex, setCurrentGarmentIndex] = useState(0);
@@ -120,10 +125,15 @@ const RovingPage = () => {
 
   useEffect(() => {
     const size = inspectionType === 'Critical' ? 15 : 5;
-    setGarments(Array.from({ length: size }, () => ({ garment_defect_id: '', defects: [], status: 'Pass' })));
+    setGarments(Array.from({ length: size }, () => ({ garment_defect_id: '', defects: [], status: 'Pass', defectImageFiles: []  })));
     setInspectionStartTime(new Date());
     setCurrentGarmentIndex(0);
     setGarmentQuantity(size);
+    // Reset defect image context when inspection type changes
+    setCurrentDefectImageContext({
+      garmentIndex: 0,
+      defectNames: []
+    });
   }, [inspectionType]);
 
   const fetchLineWorkerInfo = useCallback(async () => {
@@ -203,6 +213,25 @@ const RovingPage = () => {
   useEffect(() => {
     fetchInspectionsCompleted();
   }, [fetchInspectionsCompleted]);
+  
+  // Update defect image context when current garment index changes
+  useEffect(() => {
+    const currentGarment = garments[currentGarmentIndex];
+    if (currentGarment) {
+      setCurrentDefectImageContext({
+        garmentIndex: currentGarmentIndex,
+        defectNames: currentGarment.defects.map(d => d.name)
+      });
+      // If this garment has stored defect images, update the global state
+      if (currentGarment.defectImageFiles && currentGarment.defectImageFiles.length > 0) {
+        setDefectImageFilesToUpload(currentGarment.defectImageFiles);
+      } else {
+        // Don't clear the defect images when switching garments
+        // This ensures images remain visible until submission
+        // setDefectImageFilesToUpload([]);
+      }
+    }
+  }, [currentGarmentIndex, garments]);
 
   useEffect(() => {
     const fetchMoNumbers = async () => {
@@ -387,7 +416,7 @@ const RovingPage = () => {
 
   const resetForm = () => {
     const size = inspectionType === 'Critical' ? 15 : 5;
-    setGarments(Array.from({ length: size }, () => ({ garment_defect_id: '', defects: [], status: 'Pass' })));
+    setGarments(Array.from({ length: size }, () => ({ garment_defect_id: '', defects: [], status: 'Pass', defectImageFiles: [] })));
     setInspectionStartTime(new Date());
     setCurrentGarmentIndex(0);
     setSelectedDefectName("");
@@ -400,6 +429,11 @@ const RovingPage = () => {
     setMeasurementStatus("");
     setSpiFilesToUpload([]);
     setMeasurementFilesToUpload([]);
+    setDefectImageFilesToUpload([]);
+    setCurrentDefectImageContext({
+      garmentIndex: 0,
+      defectNames: []
+    });
     // setSelectedManualInspectionRep("");
     setImageUploaderKey(Date.now());
     setRemarkText("");
@@ -425,7 +459,7 @@ const RovingPage = () => {
     }
 
     // Helper function to upload a single file
-    const uploadFile = async (file, imageTypeForUpload, operatorEmpId, fileIndex) => {
+    const uploadFile = async (file, imageTypeForUpload, operatorEmpId, fileIndex, additionalData = {}) => {
       const formData = new FormData();
       formData.append('imageFile', file);
       formData.append('imageType', imageTypeForUpload);
@@ -436,11 +470,19 @@ const RovingPage = () => {
       formData.append('operatorEmpId', operatorEmpId || 'UNKNOWN_OPERATOR'); 
       formData.append('fileIndex', fileIndex); 
 
+      for (const key in additionalData) {
+        formData.append(key, additionalData[key]);
+      }
+
       try {
+        // Log the form data for debugging
+        console.log(`Uploading ${imageTypeForUpload} image:`, file.name);
+        
         const response = await axios.post(`${API_BASE_URL}/api/roving/upload-roving-image`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         if (response.data.success) {
+          console.log(`Successfully uploaded ${imageTypeForUpload} image:`, response.data.filePath);
           return response.data.filePath;
         } else {
           throw new Error(response.data.message || `Failed to upload ${imageTypeForUpload} image ${file.name}`);
@@ -453,6 +495,7 @@ const RovingPage = () => {
 
     let uploadedSpiImagePaths = [];
     let uploadedMeasurementImagePaths = [];
+    let uploadedDefectImagePaths = [];
 
     try {
       Swal.fire({ title: t('qcRoving.submission.uploadingImages', 'Uploading images...'), allowOutsideClick: false, didOpen: () => Swal.showLoading() });
@@ -465,6 +508,19 @@ const RovingPage = () => {
         const path = await uploadFile(measurementFilesToUpload[i], 'measurement', scannedUserData?.emp_id, i);
         uploadedMeasurementImagePaths.push(path);
       }
+
+      // Process defect images - explicitly specify the folder path
+      for (let i = 0; i < defectImageFilesToUpload.length; i++) {
+        try {
+          // No need for additional data as folderPath is set in uploadFile function
+          const path = await uploadFile(defectImageFilesToUpload[i], 'defect', scannedUserData?.emp_id, i);
+          uploadedDefectImagePaths.push(path);
+        } catch (error) {
+          console.error(`Error uploading defect image ${i}:`, error);
+          // Continue with other uploads even if one fails
+        }
+      }
+      
       Swal.close();
     } catch (uploadError) {
       Swal.fire(t('qcRoving.submission.imageUploadFailedTitle', 'Image Upload Failed'), uploadError.message || t('qcRoving.submission.imageUploadFailedText', 'One or more images could not be uploaded. Please try again.'), 'error');
@@ -575,6 +631,7 @@ const RovingPage = () => {
       spi_images: uploadedSpiImagePaths, 
       measurement: measurementStatus,
       measurement_images: uploadedMeasurementImagePaths, 
+      defect_images: uploadedDefectImagePaths,
       checked_quantity: garments.length,
       rejectedGarmentCount: rejectedGarmentCountForOperator,
       inspection_time: inspectionTime,
@@ -1311,6 +1368,27 @@ const RovingPage = () => {
                     </div>
                   </div>
                 </div>
+
+              <div className="md:col-span-3 mb-4">
+                <div className="p-3 bg-gray-100 rounded-md">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t("qcRoving.defectImagesCommon", "Defect Images (Common for All Parts)")}
+                  </label>
+                  <ImageCaptureUpload
+                    key={`defect-images-common-${imageUploaderKey}`}
+                    imageType="defect"
+                    maxImages={10} 
+                    onImageFilesChange={(files) => {
+                      // Only update the global state for form submission
+                      setDefectImageFilesToUpload(files);
+                    }}
+                    inspectionData={{
+                      ...inspectionContextData,
+                      hasDefects: garments.some(g => g.defects.length > 0)
+                    }}
+                  />
+                </div>
+                </div>
               </div>
 
               <div className="md:col-span-1 mb-2">
@@ -1340,7 +1418,8 @@ const RovingPage = () => {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </div> 
+            {/* close */}
 
             <div className="flex justify-end mt-2">
               <div className="space-x-4">
@@ -1443,6 +1522,7 @@ const RovingPage = () => {
                   remark: remarkText,
                   spiFilesToUpload,
                   measurementFilesToUpload,
+                  defectImageFilesToUpload,
                   rovingStatus: overallStatusText,
                   overallStatusColor: overallStatusColor,
                 }}
