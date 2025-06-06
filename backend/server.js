@@ -30,6 +30,7 @@ import createQC2InspectionPassBundleModel from "./models/qc2_inspection.js";
 import createQC2ReworksModel from "./models/qc2_rework.js";
 import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
 import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
+import createQCRovingPairingModel from "./models/QCRovingPairing.js";
 import createCuttingOrdersModel from "./models/CuttingOrders.js"; // New model import
 import createCutPanelOrdersModel from "./models/CutPanelOrders.js"; // New model import
 import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
@@ -167,6 +168,7 @@ const QC2InspectionPassBundle =
 const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
 const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
+const QCRovingPairing = createQCRovingPairingModel(ymProdConnection);
 const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
 const CuttingOrders = createCuttingOrdersModel(ymProdConnection); // New model
 const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New model
@@ -8898,6 +8900,206 @@ app.put("/api/cutting-inspection-update", async (req, res) => {
 });
 
 /* ------------------------------
+   QC Roving Pairing Endpoint
+------------------------------ */
+
+app.post("/api/save-qc-roving-pairing", async (req, res) => {
+  try {
+    const {
+      inspection_date,
+      moNo,
+      lineNo,
+      report_name,
+      emp_id,
+      eng_name,
+      operationNo,
+      operationName,
+      operationName_kh,
+      pairingDataItem
+    } = req.body;
+
+    // --- Basic Validation ---
+    if (!inspection_date || !moNo || !lineNo || !pairingDataItem || !emp_id) {
+      return res.status(400).json({ message: "Missing required fields." });
+    }
+
+    if (
+      typeof pairingDataItem !== "object" ||
+      !pairingDataItem.inspection_rep_name
+    ) {
+      return res
+        .status(400)
+        .json({
+          message:
+            "pairingDataItem is malformed or missing inspection_rep_name."
+        });
+    }
+
+    // --- Find or Create Document ---
+    let doc = await QCRovingPairing.findOne({ inspection_date, moNo, lineNo });
+
+    if (doc) {
+      // Document exists, update it
+      const existingRepIndex = doc.pairingData.findIndex(
+        (rep) => rep.inspection_rep_name === pairingDataItem.inspection_rep_name
+      );
+
+      if (existingRepIndex !== -1) {
+        // This inspection repetition already exists, so we overwrite it.
+        doc.pairingData[existingRepIndex] = pairingDataItem;
+      } else {
+        // This is a new inspection repetition for this document, add it.
+        doc.pairingData.push(pairingDataItem);
+      }
+
+      // Sort pairingData by inspection_rep_name (e.g., "1st", "2nd")
+      doc.pairingData.sort((a, b) => {
+        const numA = parseInt(a.inspection_rep_name, 10);
+        const numB = parseInt(b.inspection_rep_name, 10);
+        return numA - numB;
+      });
+
+      await doc.save();
+      res.status(200).json({
+        message: "QC Roving Pairing data updated successfully.",
+        data: doc
+      });
+    } else {
+      // Document does not exist, create a new one
+      const lastDoc = await QCRovingPairing.findOne().sort({ pairing_id: -1 });
+      const newId =
+        lastDoc && typeof lastDoc.pairing_id === "number"
+          ? lastDoc.pairing_id + 1
+          : 1;
+
+      const newDoc = new QCRovingPairing({
+        pairing_id: newId,
+        report_name,
+        inspection_date,
+        moNo,
+        lineNo,
+        emp_id,
+        eng_name,
+        operationNo,
+        operationName,
+        operationName_kh,
+        pairingData: [pairingDataItem] // Start with the first item
+      });
+
+      await newDoc.save();
+      res.status(201).json({
+        message: "New QC Roving Pairing record created successfully.",
+        data: newDoc
+      });
+    }
+  } catch (error) {
+    console.error("Error saving QC Roving Pairing data:", error);
+    res.status(500).json({
+      message: "Failed to save QC Roving Pairing data.",
+      error: error.message
+    });
+  }
+});
+
+// app.post("/api/save-qc-roving-pairing", async (req, res) => {
+//   try {
+//     const {
+//       inspection_date,
+//       moNo,
+//       lineNo,
+//       report_name,
+//       emp_id,
+//       eng_name,
+//       operationNo,
+//       operationName,
+//       operationName_kh,
+//       pairingDataItem
+//     } = req.body;
+
+//     // --- Basic Validation ---
+//     if (!inspection_date || !moNo || !lineNo || !pairingDataItem || !emp_id) {
+//       return res.status(400).json({ message: "Missing required fields." });
+//     }
+
+//     if (
+//       typeof pairingDataItem !== "object" ||
+//       !pairingDataItem.inspection_rep_name
+//     ) {
+//       return res
+//         .status(400)
+//         .json({
+//           message:
+//             "pairingDataItem is malformed or missing inspection_rep_name."
+//         });
+//     }
+
+//     // --- Find or Create Document ---
+//     let doc = await QCRovingPairing.findOne({ inspection_date, moNo, lineNo });
+
+//     if (doc) {
+//       // Document exists, update it
+//       const existingRepIndex = doc.pairingData.findIndex(
+//         (rep) => rep.inspection_rep_name === pairingDataItem.inspection_rep_name
+//       );
+
+//       if (existingRepIndex !== -1) {
+//         // This inspection repetition already exists, so we overwrite it.
+//         doc.pairingData[existingRepIndex] = pairingDataItem;
+//       } else {
+//         // This is a new inspection repetition for this document, add it.
+//         doc.pairingData.push(pairingDataItem);
+//       }
+
+//       // Sort pairingData by inspection_rep_name (e.g., "1st", "2nd")
+//       doc.pairingData.sort((a, b) => {
+//         const numA = parseInt(a.inspection_rep_name, 10);
+//         const numB = parseInt(b.inspection_rep_name, 10);
+//         return numA - numB;
+//       });
+
+//       await doc.save();
+//       res.status(200).json({
+//         message: "QC Roving Pairing data updated successfully.",
+//         data: doc
+//       });
+//     } else {
+//       // Document does not exist, create a new one
+//       const lastDoc = await QCRovingPairing.findOne().sort({ pairing_id: -1 });
+//       const newId =
+//         lastDoc && typeof lastDoc.pairing_id === "number"
+//           ? lastDoc.pairing_id + 1
+//           : 1;
+
+//       const newDoc = new QCRovingPairing({
+//         pairing_id: newId,
+//         report_name,
+//         inspection_date,
+//         moNo,
+//         lineNo,
+//         emp_id,
+//         eng_name,
+//         operationNo,
+//         operationName,
+//         operationName_kh,
+//         pairingData: [pairingDataItem] // Start with the first item
+//       });
+
+//       await newDoc.save();
+//       res.status(201).json({
+//         message: "New QC Roving Pairing record created successfully.",
+//         data: newDoc
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Error saving QC Roving Pairing data:", error);
+//     res.status(500).json({
+//       message: "Failed to save QC Roving Pairing data.",
+//       error: error.message
+//     });
+//   }
+// });
+
+/* ------------------------------
    Cutting Report ENDPOINTS
 ------------------------------ */
 
@@ -16153,13 +16355,11 @@ app.post("/api/scc/elastic-report/register-machine", async (req, res) => {
         .status(409)
         .json({ success: false, message: "This registration already exists." });
     }
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to register machine.",
-        error: error.message
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to register machine.",
+      error: error.message
+    });
   }
 });
 
@@ -16277,22 +16477,18 @@ app.post("/api/scc/elastic-report/submit-slot-inspection", async (req, res) => {
     );
     await reportDoc.save();
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Inspection slot submitted successfully.",
-        data: reportDoc
-      });
+    res.status(200).json({
+      success: true,
+      message: "Inspection slot submitted successfully.",
+      data: reportDoc
+    });
   } catch (error) {
     console.error("Error submitting Elastic slot inspection:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to submit slot inspection.",
-        error: error.message
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to submit slot inspection.",
+      error: error.message
+    });
   }
 });
 
