@@ -1059,6 +1059,7 @@ import RovingCamera from "../components/inspection/qc_roving/RovingCamera";
 import RovingData from "../components/inspection/qc_roving/RovingData";
 import InlineWorkers from "../components/inspection/qc_roving/InlineWorkers";
 import ImageCaptureUpload from "../components/inspection/qc_roving/ImageCaptureupload";
+import RovingPairing from "../components/inspection/qc_roving/RovingPairing";
 import i18next from "i18next";
 
 const RovingPage = () => {
@@ -1990,6 +1991,16 @@ const RovingPage = () => {
             {t("qcRoving.qcInlineRoving")}
           </button>
           <button
+            onClick={() => setActiveTab("pairing")}
+            className={`px-4 py-2 ${
+              activeTab === "pairing"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            {t("qcRoving.pairing", "Pairing")}
+          </button>
+          <button
             onClick={() => setActiveTab("data")}
             className={`px-4 py-2 ${
               activeTab === "data"
@@ -2783,6 +2794,8 @@ const RovingPage = () => {
               />
             )}
           </>
+        ) : activeTab === "pairing" ? (
+          <RovingPairing />
         ) : activeTab === "data" ? (
           <RovingData />
         ) : activeTab === "db" ? (
