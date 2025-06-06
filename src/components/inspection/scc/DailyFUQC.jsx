@@ -1933,7 +1933,11 @@ const DailyFUQC = ({ onFormSubmit, isSubmitting: parentIsSubmitting }) => {
           <BookUser size={18} className="mr-2 text-indigo-600" />{" "}
           {t("sccDailyFUQC.registerMachineTitle")}
         </h2>
-        <div className="overflow-x-auto pretty-scrollbar">
+        <div
+          className={`pretty-scrollbar ${
+            showRegMoDropdown ? "overflow-visible" : "overflow-x-auto"
+          }`}
+        >
           <table
             className="w-full text-xs sm:text-sm whitespace-nowrap"
             style={{ tableLayout: "fixed" }}

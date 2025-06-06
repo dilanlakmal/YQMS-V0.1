@@ -15268,12 +15268,10 @@ app.get("/api/scc/daily-fuqc/distinct-mos", async (req, res) => {
     res.json(distinctMoNos.sort() || []);
   } catch (error) {
     console.error("Error fetching distinct MOs for Daily FUQC:", error);
-    res
-      .status(500)
-      .json({
-        message: "Failed to fetch distinct MOs for FUQC",
-        error: error.message
-      });
+    res.status(500).json({
+      message: "Failed to fetch distinct MOs for FUQC",
+      error: error.message
+    });
   }
 });
 
@@ -15728,13 +15726,13 @@ app.post("/api/scc/ht-inspection-report", async (req, res) => {
       buyerStyle,
       color,
       batchNo,
-      tableNo, // New field
-      actualLayers, // New field
+      operatorData, // <-- New: Expect operatorData
+      tableNo,
+      actualLayers,
       totalBundle,
       totalPcs,
       aqlData,
-      defectsQty,
-      result,
+      // defectsQty, result, defectRate will be calculated by pre-save hook
       defects,
       remarks,
       defectImageUrl,
@@ -15744,48 +15742,60 @@ app.post("/api/scc/ht-inspection-report", async (req, res) => {
       emp_dept_name,
       emp_sect_name,
       emp_job_title
+      // inspectionTime is also generated now
     } = req.body;
 
-    // Basic validation (more comprehensive on model)
     if (
       !inspectionDate ||
       !machineNo ||
       !moNo ||
       !color ||
       !batchNo ||
-      !tableNo || // Validate new field
+      !tableNo ||
       actualLayers === undefined ||
-      actualLayers === null || // Validate new field (can be 0 if allowed, but usually >0)
+      actualLayers === null ||
       !totalPcs ||
       !aqlData
     ) {
-      return res.status(400).json({
-        message:
-          "Missing required fields for HT Inspection Report, including Table No and Actual Layers."
-      });
+      return res
+        .status(400)
+        .json({ message: "Missing required fields for HT Inspection Report." });
     }
 
     const now = new Date();
-    const inspectionTime = `${String(now.getHours()).padStart(2, "0")}:${String(
-      now.getMinutes()
-    ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+    const currentInspectionTime = `${String(now.getHours()).padStart(
+      2,
+      "0"
+    )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+      now.getSeconds()
+    ).padStart(2, "0")}`;
 
     const reportData = {
-      inspectionDate: new Date(inspectionDate),
+      inspectionDate: new Date(inspectionDate), // Store as ISODate
       machineNo,
       moNo,
       buyer,
       buyerStyle,
       color,
       batchNo,
-      tableNo, // Save new field
-      actualLayers: Number(actualLayers), // Save new field as number
+      operatorData:
+        operatorData && operatorData.emp_id && operatorData.emp_reference_id
+          ? operatorData
+          : null, // Save valid operatorData
+      tableNo,
+      actualLayers: Number(actualLayers),
       totalBundle: Number(totalBundle),
       totalPcs: Number(totalPcs),
-      aqlData,
-      defectsQty: Number(defectsQty),
-      result,
-      defects,
+      aqlData: {
+        // Ensure all AQL fields are present or defaulted
+        type: aqlData.type || "General",
+        level: aqlData.level || "II",
+        sampleSizeLetterCode: aqlData.sampleSizeLetterCode || "",
+        sampleSize: Number(aqlData.sampleSize) || 0,
+        acceptDefect: Number(aqlData.acceptDefect) || 0,
+        rejectDefect: Number(aqlData.rejectDefect) || 0
+      },
+      defects: defects || [], // Ensure defects is an array
       remarks: remarks?.trim() || "NA",
       defectImageUrl: defectImageUrl || null,
       emp_id,
@@ -15794,11 +15804,13 @@ app.post("/api/scc/ht-inspection-report", async (req, res) => {
       emp_dept_name,
       emp_sect_name,
       emp_job_title,
-      inspectionTime
+      inspectionTime: currentInspectionTime
+      // defectsQty, result, defectRate will be set by pre-save hook
     };
 
     let savedReport;
     if (_id) {
+      // For updates, the pre('findOneAndUpdate') hook will handle calculations
       savedReport = await HTInspectionReport.findByIdAndUpdate(
         _id,
         reportData,
@@ -15809,8 +15821,18 @@ app.post("/api/scc/ht-inspection-report", async (req, res) => {
           .status(404)
           .json({ message: "Report not found for update." });
     } else {
-      savedReport = new HTInspectionReport(reportData);
-      await savedReport.save();
+      // For new documents, pre('save') hook handles calculations
+      const reportToSave = new HTInspectionReport(reportData);
+      savedReport = await reportToSave.save();
+    }
+
+    // Populate operatorData for the response
+    if (savedReport.operatorData && savedReport.operatorData.emp_reference_id) {
+      await savedReport.populate({
+        path: "operatorData.emp_reference_id",
+        model: UserMain,
+        select: "emp_id eng_name face_photo"
+      });
     }
 
     res.status(201).json({
@@ -15840,27 +15862,172 @@ app.post("/api/scc/ht-inspection-report", async (req, res) => {
   }
 });
 
+// app.post("/api/scc/ht-inspection-report", async (req, res) => {
+//   try {
+//     const {
+//       _id,
+//       inspectionDate,
+//       machineNo,
+//       moNo,
+//       buyer,
+//       buyerStyle,
+//       color,
+//       batchNo,
+//       tableNo, // New field
+//       actualLayers, // New field
+//       totalBundle,
+//       totalPcs,
+//       aqlData,
+//       defectsQty,
+//       result,
+//       defects,
+//       remarks,
+//       defectImageUrl,
+//       emp_id,
+//       emp_kh_name,
+//       emp_eng_name,
+//       emp_dept_name,
+//       emp_sect_name,
+//       emp_job_title
+//     } = req.body;
+
+//     // Basic validation (more comprehensive on model)
+//     if (
+//       !inspectionDate ||
+//       !machineNo ||
+//       !moNo ||
+//       !color ||
+//       !batchNo ||
+//       !tableNo || // Validate new field
+//       actualLayers === undefined ||
+//       actualLayers === null || // Validate new field (can be 0 if allowed, but usually >0)
+//       !totalPcs ||
+//       !aqlData
+//     ) {
+//       return res.status(400).json({
+//         message:
+//           "Missing required fields for HT Inspection Report, including Table No and Actual Layers."
+//       });
+//     }
+
+//     const now = new Date();
+//     const inspectionTime = `${String(now.getHours()).padStart(2, "0")}:${String(
+//       now.getMinutes()
+//     ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+
+//     const reportData = {
+//       inspectionDate: new Date(inspectionDate),
+//       machineNo,
+//       moNo,
+//       buyer,
+//       buyerStyle,
+//       color,
+//       batchNo,
+//       tableNo, // Save new field
+//       actualLayers: Number(actualLayers), // Save new field as number
+//       totalBundle: Number(totalBundle),
+//       totalPcs: Number(totalPcs),
+//       aqlData,
+//       defectsQty: Number(defectsQty),
+//       result,
+//       defects,
+//       remarks: remarks?.trim() || "NA",
+//       defectImageUrl: defectImageUrl || null,
+//       emp_id,
+//       emp_kh_name,
+//       emp_eng_name,
+//       emp_dept_name,
+//       emp_sect_name,
+//       emp_job_title,
+//       inspectionTime
+//     };
+
+//     let savedReport;
+//     if (_id) {
+//       savedReport = await HTInspectionReport.findByIdAndUpdate(
+//         _id,
+//         reportData,
+//         { new: true, runValidators: true }
+//       );
+//       if (!savedReport)
+//         return res
+//           .status(404)
+//           .json({ message: "Report not found for update." });
+//     } else {
+//       savedReport = new HTInspectionReport(reportData);
+//       await savedReport.save();
+//     }
+
+//     res.status(201).json({
+//       message: "HT Inspection Report saved successfully.",
+//       data: savedReport
+//     });
+//   } catch (error) {
+//     console.error("Error saving HT Inspection Report:", error);
+//     if (error.code === 11000) {
+//       return res.status(409).json({
+//         message: "Duplicate entry. This report might already exist.",
+//         error: error.message,
+//         errorCode: "DUPLICATE_KEY"
+//       });
+//     }
+//     if (error.name === "ValidationError") {
+//       return res.status(400).json({
+//         message: "Validation Error: " + error.message,
+//         errors: error.errors
+//       });
+//     }
+//     res.status(500).json({
+//       message: "Failed to save HT Inspection Report.",
+//       error: error.message,
+//       details: error
+//     });
+//   }
+// });
+
 // GET endpoint to load an existing HT Inspection Report (Optional - for editing/viewing later)
+// GET /api/scc/ht-inspection-report - MODIFIED to populate operatorData
 app.get("/api/scc/ht-inspection-report", async (req, res) => {
   try {
-    const { inspectionDate, machineNo, moNo, color, batchNo } = req.query;
-    if (!inspectionDate || !machineNo || !moNo || !color || !batchNo) {
+    const { inspectionDate, machineNo, moNo, color, batchNo, tableNo } =
+      req.query; // Added tableNo
+    if (
+      !inspectionDate ||
+      !machineNo ||
+      !moNo ||
+      !color ||
+      !batchNo ||
+      !tableNo
+    ) {
       return res.status(400).json({
         message:
-          "Date, Machine, MO, Color, and Batch No are required to fetch report."
+          "Date, Machine, MO, Color, Batch No, and Table No are required to fetch report."
       });
     }
-    // Ensure date is handled correctly if coming as string
-    const searchDate = new Date(inspectionDate);
-    // To match just the date part, you might need to query for a date range or format stored date as string
-    // For simplicity, assuming client sends date in a way that matches stored format or you adjust here
+
+    // Convert string date from query to Date object for matching if dates are stored as ISODate
+    // If dates are stored as "MM/DD/YYYY" strings, this query needs adjustment.
+    // Assuming inspectionDate in schema is ISODate
+    const searchDateStart = new Date(inspectionDate);
+    searchDateStart.setHours(0, 0, 0, 0);
+    const searchDateEnd = new Date(inspectionDate);
+    searchDateEnd.setHours(23, 59, 59, 999);
+
     const report = await HTInspectionReport.findOne({
-      inspectionDate: searchDate, // This might need adjustment based on how dates are stored/queried
+      inspectionDate: { $gte: searchDateStart, $lte: searchDateEnd },
       machineNo,
       moNo,
       color,
-      batchNo
-    }).lean();
+      batchNo,
+      tableNo
+    })
+      .populate({
+        // Populate operatorData's emp_reference_id
+        path: "operatorData.emp_reference_id",
+        model: UserMain,
+        select: "emp_id eng_name face_photo"
+      })
+      .lean();
 
     if (!report) {
       return res
@@ -15877,21 +16044,57 @@ app.get("/api/scc/ht-inspection-report", async (req, res) => {
   }
 });
 
+// app.get("/api/scc/ht-inspection-report", async (req, res) => {
+//   try {
+//     const { inspectionDate, machineNo, moNo, color, batchNo } = req.query;
+//     if (!inspectionDate || !machineNo || !moNo || !color || !batchNo) {
+//       return res.status(400).json({
+//         message:
+//           "Date, Machine, MO, Color, and Batch No are required to fetch report."
+//       });
+//     }
+//     // Ensure date is handled correctly if coming as string
+//     const searchDate = new Date(inspectionDate);
+//     // To match just the date part, you might need to query for a date range or format stored date as string
+//     // For simplicity, assuming client sends date in a way that matches stored format or you adjust here
+//     const report = await HTInspectionReport.findOne({
+//       inspectionDate: searchDate, // This might need adjustment based on how dates are stored/queried
+//       machineNo,
+//       moNo,
+//       color,
+//       batchNo
+//     }).lean();
+
+//     if (!report) {
+//       return res
+//         .status(200)
+//         .json({ message: "HT_INSPECTION_REPORT_NOT_FOUND", data: null });
+//     }
+//     res.json({ message: "REPORT_FOUND", data: report });
+//   } catch (error) {
+//     console.error("Error fetching HT Inspection Report:", error);
+//     res.status(500).json({
+//       message: "Failed to fetch HT Inspection Report",
+//       error: error.message
+//     });
+//   }
+// });
+
 /* ------------------------------
    End Points - SCC Elastic Report
 ------------------------------ */
 
 // 1. POST /api/scc/elastic-report/register-machine
-//    Registers a machine for the Elastic Checking Report.
 app.post("/api/scc/elastic-report/register-machine", async (req, res) => {
   try {
     const {
-      inspectionDate, // Expecting YYYY-MM-DD
+      inspectionDate,
       machineNo,
       moNo,
       buyer,
       buyerStyle,
       color,
+      operatorData, // <-- MODIFIED: Expect operatorData
       emp_id,
       emp_kh_name,
       emp_eng_name
@@ -15913,37 +16116,31 @@ app.post("/api/scc/elastic-report/register-machine", async (req, res) => {
       now.getSeconds()
     ).padStart(2, "0")}`;
 
-    const existingRegistration = await ElasticReport.findOne({
-      inspectionDate,
-      machineNo,
-      moNo,
-      color
-    });
-
-    if (existingRegistration) {
-      return res.status(409).json({
-        success: false,
-        message:
-          "This Machine-MO-Color combination is already registered for this date for Elastic Report.",
-        data: existingRegistration
-      });
-    }
-
-    const newRegistration = new ElasticReport({
+    const newRegistrationData = {
       inspectionDate,
       machineNo,
       moNo,
       buyer,
       buyerStyle,
       color,
+      operatorData:
+        operatorData && operatorData.emp_id && operatorData.emp_reference_id
+          ? operatorData
+          : null, // <-- MODIFIED: Save valid operatorData
       registeredBy_emp_id: emp_id,
       registeredBy_emp_kh_name: emp_kh_name,
       registeredBy_emp_eng_name: emp_eng_name,
       registrationTime,
-      inspections: [] // Initialize with empty inspections array
-    });
+      inspections: []
+    };
 
-    await newRegistration.save();
+    // Use findOneAndUpdate with upsert to handle both creation and potential updates if logic changes
+    const newRegistration = await ElasticReport.findOneAndUpdate(
+      { inspectionDate, machineNo, moNo, color },
+      { $setOnInsert: newRegistrationData },
+      { new: true, upsert: true, runValidators: true }
+    );
+
     res.status(201).json({
       success: true,
       message: "Machine registered successfully for Elastic Report.",
@@ -15952,113 +16149,116 @@ app.post("/api/scc/elastic-report/register-machine", async (req, res) => {
   } catch (error) {
     console.error("Error registering machine for Elastic Report:", error);
     if (error.code === 11000) {
-      // Handle MongoDB duplicate key error
-      return res.status(409).json({
+      return res
+        .status(409)
+        .json({ success: false, message: "This registration already exists." });
+    }
+    res
+      .status(500)
+      .json({
         success: false,
-        message:
-          "Duplicate entry. This registration might already exist (unique index violation).",
+        message: "Failed to register machine.",
         error: error.message
       });
-    }
-    res.status(500).json({
-      success: false,
-      message: "Failed to register machine for Elastic Report",
-      error: error.message
-    });
   }
 });
 
 // 2. GET /api/scc/elastic-report/by-date?inspectionDate=<date>
-//    Fetches all ElasticReport records for a given inspection date.
 app.get("/api/scc/elastic-report/by-date", async (req, res) => {
   try {
-    const { inspectionDate } = req.query; // Expecting YYYY-MM-DD
+    const { inspectionDate } = req.query;
     if (!inspectionDate) {
       return res.status(400).json({ message: "Inspection Date is required." });
     }
 
     const records = await ElasticReport.find({ inspectionDate })
-      .sort({ machineNo: 1 }) // Sort by machine number
-      .lean(); // Use .lean() for faster queries if you don't need Mongoose model instances
+      .sort({ machineNo: 1 })
+      .populate({
+        // <-- MODIFIED: Populate operator data
+        path: "operatorData.emp_reference_id",
+        model: UserMain, // Assuming UserMain is your user model
+        select: "emp_id eng_name face_photo"
+      })
+      .lean();
 
     res.json(records || []);
   } catch (error) {
     console.error("Error fetching Elastic Report records by date:", error);
-    res.status(500).json({
-      message: "Failed to fetch Elastic Report daily records",
-      error: error.message
-    });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch records", error: error.message });
   }
 });
 
-// 3. POST /api/scc/elastic-report/submit-slot-inspection
-//    Submits inspection data for a specific time slot for ONE machine in Elastic Report.
+// 3. GET /api/scc/elastic-report/distinct-mos?inspectionDate=<date>
+//    NEW endpoint to get distinct MOs for the filter dropdown
+app.get("/api/scc/elastic-report/distinct-mos", async (req, res) => {
+  try {
+    const { inspectionDate } = req.query;
+    if (!inspectionDate) {
+      return res.status(400).json({ message: "Inspection Date is required." });
+    }
+    const mos = await ElasticReport.distinct("moNo", { inspectionDate });
+    res.json(mos || []);
+  } catch (error) {
+    console.error("Error fetching distinct MOs for Elastic Report:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch distinct MOs", error: error.message });
+  }
+});
+
+// 4. POST /api/scc/elastic-report/submit-slot-inspection
 app.post("/api/scc/elastic-report/submit-slot-inspection", async (req, res) => {
   try {
     const {
-      inspectionDate, // Expecting YYYY-MM-DD
+      elasticReportDocId,
       timeSlotKey,
       inspectionNo,
-      elasticReportDocId, // _id of the parent ElasticReport document
       checkedQty,
-      quantityIssue,
       measurement,
-      defects,
-      specificDefectReason,
-      result,
-      remarks,
+      defectDetails, // Expecting an array like [{ name: 'Broken Stich', qty: 1 }]
       emp_id,
-      isUserModified
+      remarks
     } = req.body;
 
-    // Basic validation
-    if (
-      !inspectionDate ||
-      !timeSlotKey ||
-      inspectionNo === undefined ||
-      !elasticReportDocId ||
-      checkedQty === undefined ||
-      checkedQty === null ||
-      !quantityIssue ||
-      !measurement ||
-      !defects ||
-      !result ||
-      (defects === "Reject" && !specificDefectReason)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Missing or invalid required fields for Elastic slot inspection submission."
-      });
+    if (!elasticReportDocId || !timeSlotKey || !checkedQty) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields." });
     }
 
     const reportDoc = await ElasticReport.findById(elasticReportDocId);
     if (!reportDoc) {
-      return res.status(404).json({
-        success: false,
-        message: `Elastic Report document not found for ID: ${elasticReportDocId}`
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Report document not found." });
     }
 
-    if (reportDoc.inspectionDate !== inspectionDate) {
-      return res.status(400).json({
-        success: false,
-        message: `Date mismatch for Elastic Report ID: ${elasticReportDocId}. Expected ${inspectionDate}, found ${reportDoc.inspectionDate}`
-      });
-    }
+    // --- Calculations ---
+    const totalDefectQty = (defectDetails || []).reduce(
+      (sum, defect) => sum + (defect.qty || 0),
+      0
+    );
+    const defectRate =
+      checkedQty > 0 ? parseFloat((totalDefectQty / checkedQty).toFixed(4)) : 0;
+    const qualityIssue = totalDefectQty > 0 ? "Reject" : "Pass";
+    const result =
+      qualityIssue === "Pass" && measurement === "Pass" ? "Pass" : "Reject";
 
     const slotData = {
       inspectionNo: Number(inspectionNo),
       timeSlotKey,
       checkedQty: Number(checkedQty),
-      quantityIssue,
       measurement,
-      defects,
-      specificDefectReason: defects === "Reject" ? specificDefectReason : "",
+      qualityIssue,
+      defectDetails: defectDetails || [],
+      totalDefectQty,
+      defectRate,
       result,
       remarks: remarks || "",
       emp_id,
-      isUserModified: !!isUserModified,
+      isUserModified: true,
       inspectionTimestamp: new Date()
     };
 
@@ -16067,38 +16267,253 @@ app.post("/api/scc/elastic-report/submit-slot-inspection", async (req, res) => {
     );
 
     if (existingSlotIndex > -1) {
-      // Update existing slot
-      reportDoc.inspections[existingSlotIndex] = {
-        ...reportDoc.inspections[existingSlotIndex],
-        ...slotData
-      };
+      reportDoc.inspections[existingSlotIndex] = slotData;
     } else {
-      // Add new slot
       reportDoc.inspections.push(slotData);
     }
 
-    // Ensure inspections are sorted
     reportDoc.inspections.sort(
       (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
     );
-
     await reportDoc.save();
 
-    res.status(200).json({
-      // 200 for update, 201 for new usually, but 200 is fine for upsert-like logic
-      success: true,
-      message: `Elastic inspection for slot ${timeSlotKey} submitted/updated successfully.`,
-      data: reportDoc
-    });
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Inspection slot submitted successfully.",
+        data: reportDoc
+      });
   } catch (error) {
     console.error("Error submitting Elastic slot inspection:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to submit Elastic slot inspection",
-      error: error.message
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to submit slot inspection.",
+        error: error.message
+      });
   }
 });
+
+// // 1. POST /api/scc/elastic-report/register-machine
+// //    Registers a machine for the Elastic Checking Report.
+// app.post("/api/scc/elastic-report/register-machine", async (req, res) => {
+//   try {
+//     const {
+//       inspectionDate, // Expecting YYYY-MM-DD
+//       machineNo,
+//       moNo,
+//       buyer,
+//       buyerStyle,
+//       color,
+//       emp_id,
+//       emp_kh_name,
+//       emp_eng_name
+//     } = req.body;
+
+//     if (!inspectionDate || !machineNo || !moNo || !color) {
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "Missing required fields: Inspection Date, Machine No, MO No, and Color."
+//       });
+//     }
+
+//     const now = new Date();
+//     const registrationTime = `${String(now.getHours()).padStart(
+//       2,
+//       "0"
+//     )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+//       now.getSeconds()
+//     ).padStart(2, "0")}`;
+
+//     const existingRegistration = await ElasticReport.findOne({
+//       inspectionDate,
+//       machineNo,
+//       moNo,
+//       color
+//     });
+
+//     if (existingRegistration) {
+//       return res.status(409).json({
+//         success: false,
+//         message:
+//           "This Machine-MO-Color combination is already registered for this date for Elastic Report.",
+//         data: existingRegistration
+//       });
+//     }
+
+//     const newRegistration = new ElasticReport({
+//       inspectionDate,
+//       machineNo,
+//       moNo,
+//       buyer,
+//       buyerStyle,
+//       color,
+//       registeredBy_emp_id: emp_id,
+//       registeredBy_emp_kh_name: emp_kh_name,
+//       registeredBy_emp_eng_name: emp_eng_name,
+//       registrationTime,
+//       inspections: [] // Initialize with empty inspections array
+//     });
+
+//     await newRegistration.save();
+//     res.status(201).json({
+//       success: true,
+//       message: "Machine registered successfully for Elastic Report.",
+//       data: newRegistration
+//     });
+//   } catch (error) {
+//     console.error("Error registering machine for Elastic Report:", error);
+//     if (error.code === 11000) {
+//       // Handle MongoDB duplicate key error
+//       return res.status(409).json({
+//         success: false,
+//         message:
+//           "Duplicate entry. This registration might already exist (unique index violation).",
+//         error: error.message
+//       });
+//     }
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to register machine for Elastic Report",
+//       error: error.message
+//     });
+//   }
+// });
+
+// // 2. GET /api/scc/elastic-report/by-date?inspectionDate=<date>
+// //    Fetches all ElasticReport records for a given inspection date.
+// app.get("/api/scc/elastic-report/by-date", async (req, res) => {
+//   try {
+//     const { inspectionDate } = req.query; // Expecting YYYY-MM-DD
+//     if (!inspectionDate) {
+//       return res.status(400).json({ message: "Inspection Date is required." });
+//     }
+
+//     const records = await ElasticReport.find({ inspectionDate })
+//       .sort({ machineNo: 1 }) // Sort by machine number
+//       .lean(); // Use .lean() for faster queries if you don't need Mongoose model instances
+
+//     res.json(records || []);
+//   } catch (error) {
+//     console.error("Error fetching Elastic Report records by date:", error);
+//     res.status(500).json({
+//       message: "Failed to fetch Elastic Report daily records",
+//       error: error.message
+//     });
+//   }
+// });
+
+// // 3. POST /api/scc/elastic-report/submit-slot-inspection
+// //    Submits inspection data for a specific time slot for ONE machine in Elastic Report.
+// app.post("/api/scc/elastic-report/submit-slot-inspection", async (req, res) => {
+//   try {
+//     const {
+//       inspectionDate, // Expecting YYYY-MM-DD
+//       timeSlotKey,
+//       inspectionNo,
+//       elasticReportDocId, // _id of the parent ElasticReport document
+//       checkedQty,
+//       quantityIssue,
+//       measurement,
+//       defects,
+//       specificDefectReason,
+//       result,
+//       remarks,
+//       emp_id,
+//       isUserModified
+//     } = req.body;
+
+//     // Basic validation
+//     if (
+//       !inspectionDate ||
+//       !timeSlotKey ||
+//       inspectionNo === undefined ||
+//       !elasticReportDocId ||
+//       checkedQty === undefined ||
+//       checkedQty === null ||
+//       !quantityIssue ||
+//       !measurement ||
+//       !defects ||
+//       !result ||
+//       (defects === "Reject" && !specificDefectReason)
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "Missing or invalid required fields for Elastic slot inspection submission."
+//       });
+//     }
+
+//     const reportDoc = await ElasticReport.findById(elasticReportDocId);
+//     if (!reportDoc) {
+//       return res.status(404).json({
+//         success: false,
+//         message: `Elastic Report document not found for ID: ${elasticReportDocId}`
+//       });
+//     }
+
+//     if (reportDoc.inspectionDate !== inspectionDate) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Date mismatch for Elastic Report ID: ${elasticReportDocId}. Expected ${inspectionDate}, found ${reportDoc.inspectionDate}`
+//       });
+//     }
+
+//     const slotData = {
+//       inspectionNo: Number(inspectionNo),
+//       timeSlotKey,
+//       checkedQty: Number(checkedQty),
+//       quantityIssue,
+//       measurement,
+//       defects,
+//       specificDefectReason: defects === "Reject" ? specificDefectReason : "",
+//       result,
+//       remarks: remarks || "",
+//       emp_id,
+//       isUserModified: !!isUserModified,
+//       inspectionTimestamp: new Date()
+//     };
+
+//     const existingSlotIndex = reportDoc.inspections.findIndex(
+//       (insp) => insp.timeSlotKey === timeSlotKey
+//     );
+
+//     if (existingSlotIndex > -1) {
+//       // Update existing slot
+//       reportDoc.inspections[existingSlotIndex] = {
+//         ...reportDoc.inspections[existingSlotIndex],
+//         ...slotData
+//       };
+//     } else {
+//       // Add new slot
+//       reportDoc.inspections.push(slotData);
+//     }
+
+//     // Ensure inspections are sorted
+//     reportDoc.inspections.sort(
+//       (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
+//     );
+
+//     await reportDoc.save();
+
+//     res.status(200).json({
+//       // 200 for update, 201 for new usually, but 200 is fine for upsert-like logic
+//       success: true,
+//       message: `Elastic inspection for slot ${timeSlotKey} submitted/updated successfully.`,
+//       data: reportDoc
+//     });
+//   } catch (error) {
+//     console.error("Error submitting Elastic slot inspection:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to submit Elastic slot inspection",
+//       error: error.message
+//     });
+//   }
+// });
 
 /* ------------------------------
 Washing Live Dashboard Endpoints
