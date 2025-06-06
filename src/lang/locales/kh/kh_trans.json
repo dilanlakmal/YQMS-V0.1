@@ -760,9 +760,9 @@
     "tabs": {
       "firstOutputHT": "លទ្ធផលដំបូង - HT",
       "firstOutputFU": "លទ្ធផលដំបូង - FU",
-      "dailyTesting": "ការធ្វើតេស្តប្រចាំថ្ងៃ HT/FU",
-      "dailyHTQC": "ការត្រួតពិនិត្យគុណភាព HT ប្រចាំថ្ងៃ",
-      "dailyFUQC": "ការត្រួតពិនិត្យគុណភាព FU ប្រចាំថ្ងៃ",
+      "dailyTesting": "ការធ្វើតេស្តប្រចាំថ្ងៃ HT",
+      "dailyHTQC": "ការពិនិត្យម៉ាស៊ីនអ៊ុតស្លាកប្រចាំថ្ងៃ (HT)",
+      "dailyFUQC": "ការពិនិត្យម៉ាស៊ីនអ៊ុតឈិនប្រចាំថ្ងៃ (FU)",
       "htInspection": "ការត្រួតពិនិត្យ HT",
       "elasticReport": "របាយការណ៍ Elastic"
     },

@@ -894,9 +894,9 @@
     "tabs": {
       "firstOutputHT": "First Output - HT",
       "firstOutputFU": "First Output - FU",
-      "dailyTesting": "Daily Testing HT/FU",
-      "dailyHTQC": "Daily HT QC",
-      "dailyFUQC": "Daily FU QC",
+      "dailyTesting": "Daily Washing HT",
+      "dailyHTQC": "Daily Machine HT",
+      "dailyFUQC": "Daily Machine FU",
       "htInspection": "HT Inspection",
       "elasticReport": "Elastic Report"
     },
@@ -1201,7 +1201,8 @@
       "fillBasicPayload": "Essential data missing for HT Inspection submission.",
       "fillBundlePcs": "Total Bundle and Total Pcs must be greater than 0.",
       "aqlNotLoaded": "AQL data not loaded. Ensure Total Pcs is valid and AQL details are fetched."
-    }
+    },
+    "defectRate": "Defect Rate (%)"
   },
   "sccElasticReport": {
     "mainTitle": "Daily Elastic Checking Report",
