@@ -2867,14 +2867,6 @@ const DailyHTQC = ({ onFormSubmit, isSubmitting: parentIsSubmitting }) => {
       ) {
         setShowRegMoDropdown(false);
       }
-      if (
-        machineNoDropdownRef.current &&
-        !machineNoDropdownRef.current.contains(event.target) &&
-        machineNoInputRef.current &&
-        !machineNoInputRef.current.contains(event.target)
-      ) {
-        setShowMachineNoDropdown(false);
-      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
