@@ -4,13 +4,10 @@ import {
   CheckCircle,
   FileText,
   Filter,
-  ImageOff,
   ListChecks,
   Loader2,
-  Percent,
   Search,
   TrendingUp,
-  UserCircle2,
   Users
 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -20,34 +17,8 @@ import { useTranslation } from "react-i18next";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../config";
 import { useAuth } from "../../authentication/AuthContext";
-import DefectBoxHT from "./DefectBoxHT";
+import DefectBox from "./DefectBoxHT"; // Reusing the same DefectBox component
 import SCCImageUpload from "./SCCImageUpload";
-
-// Helper: Get Face Photo URL
-const getFacePhotoUrl = (facePhotoPath) => {
-  if (!facePhotoPath) return null;
-  if (
-    facePhotoPath.startsWith("http://") ||
-    facePhotoPath.startsWith("https://")
-  )
-    return facePhotoPath;
-  if (facePhotoPath.startsWith("/storage/"))
-    return `${API_BASE_URL}${facePhotoPath}`;
-  if (facePhotoPath.startsWith("/")) {
-    try {
-      const apiOrigin = new URL(API_BASE_URL).origin;
-      return `${apiOrigin}${facePhotoPath}`;
-    } catch (e) {
-      console.warn(
-        "API_BASE_URL is not a valid URL for constructing operator image paths, using path directly:",
-        facePhotoPath
-      );
-      return facePhotoPath;
-    }
-  }
-  console.warn("Unhandled operator face_photo path format:", facePhotoPath);
-  return facePhotoPath;
-};
 
 const inputBaseClasses =
   "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none sm:text-sm";
@@ -57,6 +28,8 @@ const inputFieldReadonlyClasses = `${inputBaseClasses} bg-gray-100 cursor-not-al
 const labelClasses = "block text-sm font-medium text-gray-700 mb-0.5";
 const MAX_REMARKS_LENGTH = 250;
 
+const FACTORY_NAMES = ["Tong Chai", "WEL", "Da Feng", "Sunwahyu"];
+
 const debounce = (func, delay) => {
   let timeoutId;
   return (...args) => {
@@ -65,8 +38,8 @@ const debounce = (func, delay) => {
   };
 };
 
-const HTInspectionReport = ({
-  formData, // Use formData directly from props
+const EMBReport = ({
+  formData,
   onFormDataChange,
   onFormSubmit,
   isSubmitting: parentIsSubmitting,
@@ -75,12 +48,11 @@ const HTInspectionReport = ({
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
 
-  // Local UI state, not related to form data itself
+  // Local UI State
   const [moNoSearch, setMoNoSearch] = useState(formData.moNo || "");
   const [moNoOptions, setMoNoOptions] = useState([]);
   const [showMoNoDropdown, setShowMoNoDropdown] = useState(false);
   const [availableColors, setAvailableColors] = useState([]);
-
   const [tableNoSearchTerm, setTableNoSearchTerm] = useState(
     formData.tableNo || ""
   );
@@ -88,40 +60,33 @@ const HTInspectionReport = ({
   const [filteredTableNoOptions, setFilteredTableNoOptions] = useState([]);
   const [showTableNoDropdown, setShowTableNoDropdown] = useState(false);
   const [tableNoManuallyEntered, setTableNoManuallyEntered] = useState(false);
-  const tableNoManuallyEnteredRef = useRef(tableNoManuallyEntered);
 
+  // Loading State
   const [orderDetailsLoading, setOrderDetailsLoading] = useState(false);
   const [aqlDetailsLoading, setAqlDetailsLoading] = useState(false);
   const [defectsLoading, setDefectsLoading] = useState(false);
-  const [operatorDataLoading, setOperatorDataLoading] = useState(false);
   const [cutPanelDetailsLoading, setCutPanelDetailsLoading] = useState(false);
 
+  // Component State
   const [showDefectBox, setShowDefectBox] = useState(false);
-  const [availableSccDefects, setAvailableSccDefects] = useState([]);
+  const [availableEmbDefects, setAvailableEmbDefects] = useState([]);
   const [isSubmittingData, setIsSubmittingData] = useState(false);
 
+  // Refs
   const moNoInputRef = useRef(null);
   const moNoDropdownRef = useRef(null);
   const tableNoInputRef = useRef(null);
   const tableNoDropdownWrapperRef = useRef(null);
+  const tableNoManuallyEnteredRef = useRef(tableNoManuallyEntered);
 
   useEffect(() => {
     tableNoManuallyEnteredRef.current = tableNoManuallyEntered;
   }, [tableNoManuallyEntered]);
 
-  // Fetches AQL details and updates the parent form state
   const fetchAQLDetails = useCallback(
     async (lotSize, currentFormData) => {
       if (!lotSize || lotSize <= 0) {
-        onFormDataChange({
-          ...currentFormData,
-          aqlData: {
-            sampleSizeLetterCode: "",
-            sampleSize: null,
-            acceptDefect: null,
-            rejectDefect: null
-          }
-        });
+        onFormDataChange({ ...currentFormData, aqlData: { sampleSize: null } });
         return;
       }
       setAqlDetailsLoading(true);
@@ -133,33 +98,14 @@ const HTInspectionReport = ({
           type: "General",
           level: "II",
           sampleSizeLetterCode: response.data.SampleSizeLetterCode || "",
-          sampleSize:
-            response.data.SampleSize !== undefined
-              ? Number(response.data.SampleSize)
-              : null,
-          acceptDefect:
-            response.data.AcceptDefect !== undefined
-              ? Number(response.data.AcceptDefect)
-              : null,
-          rejectDefect:
-            response.data.RejectDefect !== undefined
-              ? Number(response.data.RejectDefect)
-              : null,
-          totalPcsForAQL: lotSize
+          sampleSize: Number(response.data.SampleSize) ?? null,
+          acceptDefect: Number(response.data.AcceptDefect) ?? null,
+          rejectDefect: Number(response.data.RejectDefect) ?? null
         };
         onFormDataChange({ ...currentFormData, aqlData: newAql });
       } catch (error) {
-        console.error(t("sccHTInspection.errorFetchingAQL"), error);
-        onFormDataChange({
-          ...currentFormData,
-          aqlData: {
-            sampleSizeLetterCode: "",
-            sampleSize: null,
-            acceptDefect: null,
-            rejectDefect: null,
-            totalPcsForAQL: lotSize
-          }
-        });
+        console.error(t("sccEMBReport.errorFetchingAQL"), error);
+        onFormDataChange({ ...currentFormData, aqlData: { sampleSize: null } });
       } finally {
         setAqlDetailsLoading(false);
       }
@@ -167,7 +113,6 @@ const HTInspectionReport = ({
     [onFormDataChange, t]
   );
 
-  // useEffect to calculate and update derived data (result, defectRate, etc.)
   useEffect(() => {
     const newTotalDefectsQty =
       formData.defects?.reduce((sum, defect) => sum + defect.count, 0) || 0;
@@ -175,9 +120,7 @@ const HTInspectionReport = ({
     let newResult = "Pending";
 
     if (formData.aqlData?.sampleSize && formData.aqlData.sampleSize > 0) {
-      newDefectRate = parseFloat(
-        ((newTotalDefectsQty / formData.aqlData.sampleSize) * 100).toFixed(2)
-      );
+      newDefectRate = newTotalDefectsQty / formData.aqlData.sampleSize; // Decimal value
       if (formData.aqlData.acceptDefect !== null) {
         newResult =
           newTotalDefectsQty <= formData.aqlData.acceptDefect
@@ -200,57 +143,19 @@ const HTInspectionReport = ({
         result: newResult
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.defects, formData.aqlData, onFormDataChange]);
-
-  // Correctly implemented operator fetching useEffect
-  useEffect(() => {
-    const fetchOperator = async () => {
-      if (!formData.machineNo) {
-        if (formData.operatorData !== null) {
-          onFormDataChange({ ...formData, operatorData: null });
-        }
-        return;
-      }
-      setOperatorDataLoading(true);
-      try {
-        const response = await axios.get(
-          `${API_BASE_URL}/api/scc/operator-by-machine/ht/${formData.machineNo}`
-        );
-        const fetchedOpData = response.data?.data || null;
-        onFormDataChange({ ...formData, operatorData: fetchedOpData });
-      } catch (error) {
-        if (formData.operatorData !== null) {
-          onFormDataChange({ ...formData, operatorData: null });
-        }
-        if (
-          !(
-            error.response?.status === 404 &&
-            error.response?.data?.message === "OPERATOR_NOT_FOUND"
-          )
-        ) {
-          console.error("Error fetching operator data for HT Insp:", error);
-        }
-      } finally {
-        setOperatorDataLoading(false);
-      }
-    };
-
-    fetchOperator();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.machineNo, onFormDataChange]);
 
   useEffect(() => {
     const fetchDefectsList = async () => {
       setDefectsLoading(true);
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/scc/defects`);
-        setAvailableSccDefects(response.data || []);
+        const response = await axios.get(`${API_BASE_URL}/api/scc/emb-defects`);
+        setAvailableEmbDefects(response.data || []);
       } catch (error) {
-        console.error(t("sccHTInspection.errorFetchingDefects"), error);
+        console.error(t("sccEMBReport.errorFetchingDefects"), error);
         Swal.fire(
           t("scc.error"),
-          t("sccHTInspection.errorFetchingDefectsMsg"),
+          t("sccEMBReport.errorFetchingDefectsMsg"),
           "error"
         );
       } finally {
@@ -297,34 +202,17 @@ const HTInspectionReport = ({
         formData.totalPcs !== newTotalPcsValue)
     ) {
       if (numTotalPcs > 0) {
-        if (newFormData.aqlData?.totalPcsForAQL !== numTotalPcs) {
-          fetchAQLDetails(numTotalPcs, newFormData);
-          return;
-        }
+        fetchAQLDetails(numTotalPcs, newFormData);
+        return;
       } else {
-        newFormData.aqlData = {
-          sampleSizeLetterCode: "",
-          sampleSize: null,
-          acceptDefect: null,
-          rejectDefect: null,
-          totalPcsForAQL: 0
-        };
+        newFormData.aqlData = { sampleSize: null };
       }
     }
     onFormDataChange(newFormData);
   };
 
-  const handleDateChange = (date) => {
+  const handleDateChange = (date) =>
     onFormDataChange({ ...formData, inspectionDate: date });
-  };
-
-  const handleMachineNoChange = (e) => {
-    onFormDataChange({
-      ...formData,
-      machineNo: e.target.value,
-      operatorData: null
-    });
-  };
 
   const fetchMoNumbers = useCallback(
     async (searchTerm) => {
@@ -375,22 +263,15 @@ const HTInspectionReport = ({
       totalBundle: "",
       totalPcs: "",
       defects: [],
-      // Keep remarks, images, operatorData
-      aqlData: {
-        sampleSizeLetterCode: "",
-        sampleSize: null,
-        acceptDefect: null,
-        rejectDefect: null,
-        totalPcsForAQL: 0
-      },
+      aqlData: { sampleSize: null },
       defectsQty: 0,
       result: "Pending",
       defectRate: 0
     });
+    setAvailableColors([]);
     setTableNoSearchTerm("");
     setAllTableNoOptions([]);
     setFilteredTableNoOptions([]);
-    setAvailableColors([]);
   };
 
   useEffect(() => {
@@ -430,42 +311,24 @@ const HTInspectionReport = ({
         setFilteredTableNoOptions([]);
       } catch (error) {
         console.error(t("scc.errorFetchingOrderDetailsLog"), error);
-        onFormDataChange({
-          ...formData,
-          buyer: "",
-          buyerStyle: "",
-          color: ""
-        });
+        onFormDataChange({ ...formData, buyer: "", buyerStyle: "", color: "" });
         setAvailableColors([]);
-        setTableNoSearchTerm("");
-        setAllTableNoOptions([]);
-        setFilteredTableNoOptions([]);
       } finally {
         setOrderDetailsLoading(false);
       }
     };
     if (formData.moNo) fetchOrderDetails();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.moNo, t, onFormDataChange]);
+  }, [formData.moNo, onFormDataChange, t]);
 
   const handleColorChange = (e) => {
-    const newColor = e.target.value;
     onFormDataChange({
       ...formData,
-      color: newColor,
+      color: e.target.value,
       tableNo: "",
       actualLayers: "",
+      totalBundle: "",
       totalPcs: "",
-      aqlData: {
-        sampleSizeLetterCode: "",
-        sampleSize: null,
-        acceptDefect: null,
-        rejectDefect: null,
-        totalPcsForAQL: 0
-      },
-      defectsQty: 0,
-      result: "Pending",
-      defectRate: 0
+      aqlData: { sampleSize: null }
     });
     setTableNoSearchTerm("");
     setAllTableNoOptions([]);
@@ -517,31 +380,24 @@ const HTInspectionReport = ({
         ...formData,
         tableNo: "",
         actualLayers: "",
+        totalBundle: "",
         totalPcs: "",
-        aqlData: {
-          sampleSizeLetterCode: "",
-          sampleSize: null,
-          acceptDefect: null,
-          rejectDefect: null,
-          totalPcsForAQL: 0
-        }
+        aqlData: { sampleSize: null }
       });
     }
   };
 
   const debouncedFilterOptions = useCallback(
     debounce((currentSearchTerm, currentAllOptions) => {
-      if (currentSearchTerm.trim() !== "") {
-        setFilteredTableNoOptions(
-          currentAllOptions.filter((option) =>
-            String(option)
-              .toLowerCase()
-              .includes(currentSearchTerm.toLowerCase())
-          )
-        );
-      } else {
-        setFilteredTableNoOptions(currentAllOptions);
-      }
+      setFilteredTableNoOptions(
+        currentSearchTerm.trim() !== ""
+          ? currentAllOptions.filter((option) =>
+              String(option)
+                .toLowerCase()
+                .includes(currentSearchTerm.toLowerCase())
+            )
+          : currentAllOptions
+      );
     }, 300),
     []
   );
@@ -592,16 +448,7 @@ const HTInspectionReport = ({
       if (newTotalPcs > 0) {
         fetchAQLDetails(newTotalPcs, newFormData);
       } else {
-        onFormDataChange({
-          ...newFormData,
-          aqlData: {
-            sampleSizeLetterCode: "",
-            sampleSize: null,
-            acceptDefect: null,
-            rejectDefect: null,
-            totalPcsForAQL: 0
-          }
-        });
+        onFormDataChange({ ...newFormData, aqlData: { sampleSize: null } });
       }
     } catch (error) {
       console.error(t("sccHTInspection.errorFetchingCutPanelDetails"), error);
@@ -610,13 +457,7 @@ const HTInspectionReport = ({
         tableNo: selectedTableNo,
         actualLayers: "",
         totalPcs: "",
-        aqlData: {
-          sampleSizeLetterCode: "",
-          sampleSize: null,
-          acceptDefect: null,
-          rejectDefect: null,
-          totalPcsForAQL: 0
-        }
+        aqlData: { sampleSize: null }
       });
     } finally {
       setCutPanelDetailsLoading(false);
@@ -639,14 +480,9 @@ const HTInspectionReport = ({
             ...formData,
             tableNo: trimmedSearchTerm,
             actualLayers: "",
+            totalBundle: "",
             totalPcs: "",
-            aqlData: {
-              sampleSizeLetterCode: "",
-              sampleSize: null,
-              acceptDefect: null,
-              rejectDefect: null,
-              totalPcsForAQL: 0
-            }
+            aqlData: { sampleSize: null }
           });
         }
         setTableNoManuallyEntered(false);
@@ -676,123 +512,80 @@ const HTInspectionReport = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleAddDefectToReport = (defect) => {
+  const handleAddDefectToReport = (defect) =>
     onFormDataChange({
       ...formData,
       defects: [...(formData.defects || []), { ...defect, count: 1 }]
     });
-  };
-  const handleRemoveDefectFromReport = (idx) => {
+  const handleRemoveDefectFromReport = (idx) =>
     onFormDataChange({
       ...formData,
       defects: formData.defects.filter((_, i) => i !== idx)
     });
-  };
   const handleUpdateDefectCountInReport = (idx, count) => {
     const newDefects = [...(formData.defects || [])];
     if (newDefects[idx])
       newDefects[idx] = { ...newDefects[idx], count: Math.max(0, count) };
     onFormDataChange({ ...formData, defects: newDefects });
   };
-  const handleImageChangeForDefect = (file, url) => {
+  const handleImageChangeForDefect = (file, url) =>
     onFormDataChange({
       ...formData,
       defectImageFile: file,
       defectImageUrl: url
     });
-  };
-  const handleImageRemoveForDefect = () => {
+  const handleImageRemoveForDefect = () =>
     onFormDataChange({
       ...formData,
       defectImageFile: null,
       defectImageUrl: null
     });
-  };
   const handleRemarksChange = (e) => {
-    const val = e.target.value;
-    if (val.length <= MAX_REMARKS_LENGTH) {
-      onFormDataChange({ ...formData, remarks: val });
-    }
+    if (e.target.value.length <= MAX_REMARKS_LENGTH)
+      onFormDataChange({ ...formData, remarks: e.target.value });
   };
 
   const handleSubmit = async () => {
-    // The derived data (result, defectRate, etc.) should already be current on formData
-    // due to the useEffect that calculates it. This is a final check.
-    const currentDefectsQty =
-      formData.defects?.reduce((sum, defect) => sum + defect.count, 0) || 0;
-    let currentDefectRate = 0;
-    let currentResult = "Pending";
-    if (formData.aqlData?.sampleSize && formData.aqlData.sampleSize > 0) {
-      currentDefectRate = parseFloat(
-        ((currentDefectsQty / formData.aqlData.sampleSize) * 100).toFixed(2)
-      );
-      if (formData.aqlData.acceptDefect !== null) {
-        currentResult =
-          currentDefectsQty <= formData.aqlData.acceptDefect
-            ? "Pass"
-            : "Reject";
-      }
-    } else if (formData.aqlData?.sampleSize === 0) {
-      currentResult = currentDefectsQty === 0 ? "Pass" : "Reject";
-    }
-
-    const finalPayload = {
-      ...formData,
-      inspectionDate:
-        formData.inspectionDate instanceof Date
-          ? formData.inspectionDate.toISOString()
-          : new Date(formData.inspectionDate).toISOString(),
-      actualLayers: Number(formData.actualLayers),
-      totalBundle: Number(formData.totalBundle),
-      totalPcs: Number(formData.totalPcs),
-      defects: formData.defects.map((d) => ({
-        no: d.no,
-        defectNameEng: d.defectNameEng,
-        defectNameKhmer: d.defectNameKhmer,
-        defectNameChinese: d.defectNameChinese,
-        count: d.count
-      })),
-      remarks: formData.remarks?.trim() || "NA",
-      defectsQty: currentDefectsQty,
-      defectRate: currentDefectRate,
-      result: currentResult
-    };
-
+    const {
+      inspectionDate,
+      factoryName,
+      moNo,
+      color,
+      batchNo,
+      tableNo,
+      totalPcs,
+      aqlData,
+      actualLayers,
+      totalBundle
+    } = formData;
     if (
-      !finalPayload.inspectionDate ||
-      !finalPayload.machineNo ||
-      !finalPayload.moNo ||
-      !finalPayload.color ||
-      !finalPayload.batchNo ||
-      !finalPayload.tableNo ||
-      finalPayload.actualLayers <= 0 ||
-      finalPayload.totalBundle <= 0 ||
-      finalPayload.totalPcs <= 0 ||
-      finalPayload.aqlData?.sampleSize === null ||
-      finalPayload.aqlData?.sampleSize < 0 ||
-      finalPayload.aqlData?.acceptDefect === null ||
-      finalPayload.aqlData?.rejectDefect === null
+      !inspectionDate ||
+      !factoryName ||
+      !moNo ||
+      !color ||
+      !batchNo ||
+      !tableNo ||
+      !totalPcs ||
+      !aqlData?.sampleSize ||
+      !actualLayers ||
+      !totalBundle
     ) {
       Swal.fire(
         t("scc.validationErrorTitle"),
-        t(
-          "sccHTInspection.validation.fillAllRequired",
-          "Please fill all required fields including AQL details before submitting."
-        ),
+        t("sccEMBReport.validation.fillAllRequired"),
         "warning"
       );
       return;
     }
-
     setIsSubmittingData(true);
     try {
-      const success = await onFormSubmit(formType, finalPayload);
+      const success = await onFormSubmit(formType, formData);
       if (success) {
         setMoNoSearch("");
         setTableNoSearchTerm("");
       }
     } catch (error) {
-      // Parent handles error display
+      /* Parent handles error */
     } finally {
       setIsSubmittingData(false);
     }
@@ -808,10 +601,9 @@ const HTInspectionReport = ({
     orderDetailsLoading ||
     aqlDetailsLoading ||
     defectsLoading ||
-    cutPanelDetailsLoading ||
     parentIsSubmitting ||
     isSubmittingData ||
-    operatorDataLoading;
+    cutPanelDetailsLoading;
 
   if (!user)
     return <div className="p-6 text-center">{t("scc.loadingUser")}</div>;
@@ -819,7 +611,7 @@ const HTInspectionReport = ({
   return (
     <div className="space-y-5">
       <h2 className="text-xl font-semibold text-gray-800">
-        {t("sccHTInspection.title")}
+        {t("sccEMBReport.title")}
       </h2>
       {isLoading && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-[150]">
@@ -827,207 +619,155 @@ const HTInspectionReport = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-6 gap-y-4 items-start">
-        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
-          <div>
-            <label htmlFor="htInspDate" className={labelClasses}>
-              {t("scc.date")}
-            </label>
-            <DatePicker
-              selected={
-                formData.inspectionDate
-                  ? new Date(formData.inspectionDate)
-                  : new Date()
-              }
-              onChange={handleDateChange}
-              dateFormat="MM/dd/yyyy"
-              className={`${inputFieldClasses} py-1.5`}
-              required
-              popperPlacement="bottom-start"
-              id="htInspDate"
-            />
-          </div>
-          <div>
-            <label htmlFor="htInspMachineNo" className={labelClasses}>
-              {t("scc.machineNo")}
-            </label>
-            <select
-              id="htInspMachineNo"
-              name="machineNo"
-              value={formData.machineNo || ""}
-              onChange={handleMachineNoChange}
-              className={`${inputFieldClasses} py-1.5`}
-              required
-            >
-              <option value="">{t("scc.selectMachine")}</option>
-              {Array.from({ length: 15 }, (_, i) => String(i + 1)).map(
-                (num) => (
-                  <option key={`machine-${num}`} value={num}>
-                    {num}
-                  </option>
-                )
-              )}
-            </select>
-          </div>
-          <div className="relative md:col-span-1">
-            <label htmlFor="htInspMoNoSearch" className={labelClasses}>
-              {t("scc.moNo")}
-            </label>
-            <div className="relative mt-1" ref={moNoDropdownRef}>
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                id="htInspMoNoSearch"
-                value={moNoSearch}
-                ref={moNoInputRef}
-                onChange={(e) => setMoNoSearch(e.target.value)}
-                onFocus={() => {
-                  if (moNoSearch && moNoOptions.length === 0)
-                    fetchMoNumbers(moNoSearch);
-                  setShowMoNoDropdown(true);
-                }}
-                placeholder={t("scc.searchMoNo")}
-                className={`${inputFieldClasses} pl-9 py-1.5`}
-                required
-                autoComplete="off"
-              />
-              {showMoNoDropdown && moNoOptions.length > 0 && (
-                <ul
-                  ref={moNoDropdownRef}
-                  className="absolute z-20 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"
-                >
-                  {moNoOptions.map((mo) => (
-                    <li
-                      key={mo}
-                      onClick={() => handleMoSelect(mo)}
-                      className="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-500 hover:text-white"
-                    >
-                      {mo}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-          <div className="md:col-span-1">
-            <label className={labelClasses}>{t("scc.buyer")}</label>
-            <input
-              type="text"
-              value={formData.buyer || ""}
-              readOnly
-              className={`${inputFieldReadonlyClasses} py-1.5`}
-            />
-          </div>
-          <div className="md:col-span-1">
-            <label className={labelClasses}>{t("scc.buyerStyle")}</label>
-            <input
-              type="text"
-              value={formData.buyerStyle || ""}
-              readOnly
-              className={`${inputFieldReadonlyClasses} py-1.5`}
-            />
-          </div>
-          <div className="md:col-span-1">
-            <label htmlFor="htInspColor" className={labelClasses}>
-              {t("scc.color")}
-            </label>
-            <select
-              id="htInspColor"
-              name="color"
-              value={formData.color || ""}
-              onChange={handleColorChange}
-              className={`${inputFieldClasses} py-1.5`}
-              disabled={
-                !formData.moNo ||
-                availableColors.length === 0 ||
-                orderDetailsLoading
-              }
-              required
-            >
-              <option value="">{t("scc.selectColor")}</option>
-              {availableColors.map((c) => (
-                <option key={c.key || c.original} value={c.original}>
-                  {c.original} {c.chn ? `(${c.chn})` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="md:col-span-1">
-            <label htmlFor="htInspBatchNo" className={labelClasses}>
-              {t("sccHTInspection.batchNo")}
-            </label>
-            <input
-              type="text"
-              id="htInspBatchNo"
-              name="batchNo"
-              value={formData.batchNo || ""}
-              onChange={handleInputChange}
-              className={`${inputFieldClasses} py-1.5`}
-              placeholder="e.g. 001"
-              maxLength={3}
-              inputMode="numeric"
-              pattern="[0-9]{3}"
-              required
-            />
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3">
+        <div>
+          <label htmlFor="embInspDate" className={labelClasses}>
+            {t("scc.date")}
+          </label>
+          <DatePicker
+            selected={
+              formData.inspectionDate
+                ? new Date(formData.inspectionDate)
+                : new Date()
+            }
+            onChange={handleDateChange}
+            dateFormat="MM/dd/yyyy"
+            className={`${inputFieldClasses} py-1.5`}
+            required
+            popperPlacement="bottom-start"
+            id="embInspDate"
+          />
         </div>
-
-        <div className="lg:col-span-1 lg:max-w-[240px] w-full self-start lg:mt-1">
-          <div className="bg-slate-50 p-3 rounded-lg shadow border border-slate-200 h-full flex flex-col justify-center items-center min-h-[100px]">
-            <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1 self-start">
-              {t("scc.operatorData")}
-            </h3>
-            {operatorDataLoading ? (
-              <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-            ) : formData.operatorData && formData.operatorData.emp_id ? (
-              <div className="text-center w-full flex flex-col items-center">
-                {formData.operatorData.emp_face_photo ? (
-                  <img
-                    src={getFacePhotoUrl(formData.operatorData.emp_face_photo)}
-                    alt={formData.operatorData.emp_eng_name || "Operator"}
-                    className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-slate-200 mb-1"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                      // Optionally show a placeholder icon inside this div
-                      const parent = e.currentTarget.parentElement;
-                      if (parent) {
-                        const placeholder =
-                          parent.querySelector(".placeholder-icon");
-                        if (placeholder) placeholder.style.display = "flex";
-                      }
-                    }}
-                  />
-                ) : (
-                  <UserCircle2 className="w-12 h-12 sm:w-16 sm:h-16 text-slate-300 mb-1" />
-                )}
-                <p
-                  className="text-xs font-medium text-slate-800 truncate w-full px-1"
-                  title={formData.operatorData.emp_id}
-                >
-                  {formData.operatorData.emp_id}
-                </p>
-                <p
-                  className="text-[10px] text-slate-500 truncate w-full px-1"
-                  title={formData.operatorData.emp_eng_name}
-                >
-                  {formData.operatorData.emp_eng_name || "N/A"}
-                </p>
-              </div>
-            ) : (
-              <div className="text-center text-slate-400 flex flex-col items-center justify-center h-full">
-                <UserCircle2 className="w-10 h-10 mb-1" />
-                <p className="text-[11px]">{t("scc.noOperatorAssigned")}</p>
-              </div>
+        <div>
+          <label htmlFor="embFactoryName" className={labelClasses}>
+            {t("sccEMBReport.factoryName")}
+          </label>
+          <select
+            id="embFactoryName"
+            name="factoryName"
+            value={formData.factoryName || ""}
+            onChange={handleInputChange}
+            className={`${inputFieldClasses} py-1.5`}
+            required
+          >
+            <option value="">{t("scc.select")}</option>
+            {FACTORY_NAMES.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="relative">
+          <label htmlFor="embMoNoSearch" className={labelClasses}>
+            {t("scc.moNo")}
+          </label>
+          <div className="relative mt-1" ref={moNoDropdownRef}>
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              id="embMoNoSearch"
+              value={moNoSearch}
+              ref={moNoInputRef}
+              onChange={(e) => setMoNoSearch(e.target.value)}
+              onFocus={() => {
+                if (moNoSearch && moNoOptions.length === 0)
+                  fetchMoNumbers(moNoSearch);
+                setShowMoNoDropdown(true);
+              }}
+              placeholder={t("scc.searchMoNo")}
+              className={`${inputFieldClasses} pl-9 py-1.5`}
+              required
+              autoComplete="off"
+            />
+            {showMoNoDropdown && moNoOptions.length > 0 && (
+              <ul
+                ref={moNoDropdownRef}
+                className="absolute z-20 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"
+              >
+                {moNoOptions.map((mo) => (
+                  <li
+                    key={mo}
+                    onClick={() => handleMoSelect(mo)}
+                    className="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-500 hover:text-white"
+                  >
+                    {mo}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
+        </div>
+        <div>
+          <label htmlFor="embBatchNo" className={labelClasses}>
+            {t("sccEMBReport.batchNo")}
+          </label>
+          <input
+            type="text"
+            id="embBatchNo"
+            name="batchNo"
+            value={formData.batchNo || ""}
+            onChange={handleInputChange}
+            className={`${inputFieldClasses} py-1.5`}
+            placeholder="e.g. 001"
+            maxLength={3}
+            inputMode="numeric"
+            pattern="[0-9]{3}"
+            required
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+        <div>
+          <label className={labelClasses}>{t("scc.buyer")}</label>
+          <input
+            type="text"
+            value={formData.buyer || ""}
+            readOnly
+            className={`${inputFieldReadonlyClasses} py-1.5`}
+          />
+        </div>
+        <div>
+          <label className={labelClasses}>{t("scc.buyerStyle")}</label>
+          <input
+            type="text"
+            value={formData.buyerStyle || ""}
+            readOnly
+            className={`${inputFieldReadonlyClasses} py-1.5`}
+          />
+        </div>
+        <div>
+          <label htmlFor="embColor" className={labelClasses}>
+            {t("scc.color")}
+          </label>
+          <select
+            id="embColor"
+            name="color"
+            value={formData.color || ""}
+            onChange={handleColorChange}
+            className={`${inputFieldClasses} py-1.5`}
+            disabled={
+              !formData.moNo ||
+              availableColors.length === 0 ||
+              orderDetailsLoading
+            }
+            required
+          >
+            <option value="">{t("scc.selectColor")}</option>
+            {availableColors.map((c) => (
+              <option key={c.key || c.original} value={c.original}>
+                {c.original} {c.chn ? `(${c.chn})` : ""}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
       <div className="mt-5">
         <h3 className="text-md font-semibold text-gray-700 mb-2">
-          {t("sccHTInspection.inspectionDetails")}
+          {t("sccEMBReport.inspectionDetails")}
         </h3>
         <div
           className={`relative bg-white rounded-md shadow ${
@@ -1038,28 +778,28 @@ const HTInspectionReport = ({
             <thead className="bg-gray-100">
               <tr>
                 <th className="px-3 py-2.5 text-left font-medium text-gray-600">
-                  {t("sccHTInspection.tableNo")}
+                  {t("sccEMBReport.tableNo")}
                 </th>
                 <th className="px-3 py-2.5 text-left font-medium text-gray-600">
-                  {t("sccHTInspection.actualLayers")}
+                  {t("sccEMBReport.actualLayers")}
                 </th>
                 <th className="px-3 py-2.5 text-left font-medium text-gray-600">
-                  {t("sccHTInspection.totalBundle")}
+                  {t("sccEMBReport.totalBundle")}
                 </th>
                 <th className="px-3 py-2.5 text-left font-medium text-gray-600">
-                  {t("sccHTInspection.totalPcs")}
+                  {t("sccEMBReport.totalPcs")}
                 </th>
                 <th className="px-3 py-2.5 text-left font-medium text-gray-600">
-                  {t("sccHTInspection.totalInspectedQty")}
+                  {t("sccEMBReport.totalInspectedQty")}
                 </th>
                 <th className="px-3 py-2.5 text-left font-medium text-gray-600">
-                  {t("sccHTInspection.defectsQty")}
+                  {t("sccEMBReport.defectsQty")}
                 </th>
                 <th className="px-3 py-2.5 text-left font-medium text-gray-600">
-                  {t("sccHTInspection.defectRate")}
+                  {t("sccEMBReport.defectRate")}
                 </th>
                 <th className="px-3 py-2.5 text-left font-medium text-gray-600">
-                  {t("sccHTInspection.result")}
+                  {t("sccEMBReport.result")}
                 </th>
               </tr>
             </thead>
@@ -1067,7 +807,7 @@ const HTInspectionReport = ({
               <tr>
                 <td className="px-2 py-1 whitespace-nowrap">
                   <div
-                    className="relative z-[40]"
+                    className="relative z-[10]"
                     ref={tableNoDropdownWrapperRef}
                   >
                     <input
@@ -1090,7 +830,7 @@ const HTInspectionReport = ({
                         setShowTableNoDropdown(true);
                       }}
                       onBlur={handleTableNoInputBlur}
-                      placeholder={t("sccHTInspection.searchOrEnterTableNo")}
+                      placeholder={t("sccEMBReport.searchOrEnterTableNo")}
                       className={`${inputFieldClasses} py-1.5 w-full`}
                       disabled={
                         !formData.moNo ||
@@ -1101,7 +841,7 @@ const HTInspectionReport = ({
                     />
                     {showTableNoDropdown &&
                       filteredTableNoOptions.length > 0 && (
-                        <ul className="absolute z-[50] mt-1 w-full bg-white shadow-lg max-h-40 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm top-full left-0">
+                        <ul className="absolute z-[20] mt-1 w-full bg-white shadow-lg max-h-40 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm top-full left-0">
                           {filteredTableNoOptions.map((tableOpt) => (
                             <li
                               key={
@@ -1161,12 +901,7 @@ const HTInspectionReport = ({
                   <input
                     type="number"
                     name="totalPcs"
-                    value={
-                      formData.totalPcs === null ||
-                      formData.totalPcs === undefined
-                        ? ""
-                        : formData.totalPcs
-                    }
+                    value={formData.totalPcs || ""}
                     onChange={handleInputChange}
                     className={`${inputFieldClasses} py-1.5 w-full ${
                       Number(formData.totalBundle) > 0 &&
@@ -1174,7 +909,6 @@ const HTInspectionReport = ({
                         ? "bg-yellow-50"
                         : ""
                     }`}
-                    inputMode="numeric"
                     min="0"
                   />
                 </td>
@@ -1190,12 +924,7 @@ const HTInspectionReport = ({
                   className={`px-3 py-2 font-medium ${getResultCellBG(
                     formData.result
                   )}`}
-                >
-                  {formData.aqlData?.sampleSize === null ||
-                  formData.aqlData?.sampleSize === 0
-                    ? "0.00%"
-                    : `${formData.defectRate?.toFixed(2) ?? "0.00"}%`}
-                </td>
+                >{`${((formData.defectRate || 0) * 100).toFixed(2)}%`}</td>
                 <td
                   className={`px-3 py-2 font-medium ${getResultCellBG(
                     formData.result
@@ -1219,33 +948,33 @@ const HTInspectionReport = ({
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md shadow-sm">
             <h4 className="text-sm font-semibold text-blue-700 mb-2 flex items-center">
               <ListChecks size={18} className="mr-2" />
-              {t("sccHTInspection.aqlInfoTitle")}
+              {t("sccEMBReport.aqlInfoTitle")}
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">
               <div className="flex items-center">
                 <Filter size={14} className="mr-1.5 text-blue-600" />
-                {t("sccHTInspection.aqlType")}:{" "}
+                {t("sccEMBReport.aqlType")}:{" "}
                 <strong className="ml-1">
                   {formData.aqlData.type || "General"}
                 </strong>
               </div>
               <div className="flex items-center">
                 <TrendingUp size={14} className="mr-1.5 text-blue-600" />
-                {t("sccHTInspection.aqlLevel")}:{" "}
+                {t("sccEMBReport.aqlLevel")}:{" "}
                 <strong className="ml-1">
                   {formData.aqlData.level || "II"}
                 </strong>
               </div>
               <div className="flex items-center">
                 <FileText size={14} className="mr-1.5 text-blue-600" />
-                {t("sccHTInspection.sampleSizeCode")}:{" "}
+                {t("sccEMBReport.sampleSizeCode")}:{" "}
                 <strong className="ml-1">
                   {formData.aqlData.sampleSizeLetterCode || "N/A"}
                 </strong>
               </div>
               <div className="flex items-center">
                 <Users size={14} className="mr-1.5 text-blue-600" />
-                {t("sccHTInspection.aqlSampleReq")}:{" "}
+                {t("sccEMBReport.aqlSampleReq")}:{" "}
                 <strong className="ml-1">{formData.aqlData.sampleSize}</strong>
               </div>
               <div className="flex items-center text-green-600">
@@ -1265,16 +994,11 @@ const HTInspectionReport = ({
             </div>
           </div>
         )}
-      {Number(formData.totalPcs) > 0 && aqlDetailsLoading && (
-        <div className="mt-4 p-3 flex justify-center items-center">
-          <Loader2 className="animate-spin text-blue-600" size={24} />
-        </div>
-      )}
 
       <div className="mt-5">
         <div className="flex justify-between items-center mb-2">
           <h3 className="text-md font-semibold text-gray-700">
-            {t("sccHTInspection.defectDetailsTitle")}
+            {t("sccEMBReport.defectDetailsTitle")}
           </h3>
           <button
             type="button"
@@ -1286,7 +1010,7 @@ const HTInspectionReport = ({
               formData.aqlData?.sampleSize <= 0
             }
           >
-            {t("sccHTInspection.manageDefectsBtn")}{" "}
+            {t("sccEMBReport.manageDefectsBtn")}{" "}
             {defectsLoading && (
               <Loader2 size={14} className="animate-spin ml-2" />
             )}
@@ -1302,29 +1026,29 @@ const HTInspectionReport = ({
                 <span className="flex-1 pr-2">
                   {i18n.language === "kh" && defect.defectNameKhmer
                     ? defect.defectNameKhmer
-                    : i18n.language === "zh" && defect.defectNameChinese
-                    ? defect.defectNameChinese
+                    : i18n.language === "zh" && defect.defectNameChine
+                    ? defect.defectNameChine
                     : defect.defectNameEng}
                 </span>
                 <span className="font-medium">{defect.count}</span>
               </div>
             ))}
             <div className="flex justify-between p-1.5 bg-gray-100 rounded-b font-semibold mt-1">
-              <span>{t("sccHTInspection.totalDefects")}:</span>
+              <span>{t("sccEMBReport.totalDefects")}:</span>
               <span>{formData.defectsQty}</span>
             </div>
           </div>
         ) : (
           <p className="text-xs text-gray-500 italic">
-            {t("sccHTInspection.noDefectsRecorded")}
+            {t("sccEMBReport.noDefectsRecorded")}
           </p>
         )}
       </div>
 
       {showDefectBox && (
-        <DefectBoxHT
+        <DefectBox
           defects={formData.defects || []}
-          availableDefects={availableSccDefects}
+          availableDefects={availableEmbDefects}
           onClose={() => setShowDefectBox(false)}
           onAddDefect={handleAddDefectToReport}
           onRemoveDefect={handleRemoveDefectFromReport}
@@ -1333,17 +1057,17 @@ const HTInspectionReport = ({
       )}
 
       <div className="mt-5">
-        <label htmlFor="htInspRemarks" className={labelClasses}>
-          {t("sccHTInspection.remarks")}
+        <label htmlFor="embRemarks" className={labelClasses}>
+          {t("sccEMBReport.remarks")}
         </label>
         <textarea
-          id="htInspRemarks"
+          id="embRemarks"
           name="remarks"
           rows="3"
           value={formData.remarks || ""}
           onChange={handleRemarksChange}
           className={inputFieldClasses}
-          placeholder={t("sccHTInspection.remarksPlaceholder")}
+          placeholder={t("sccEMBReport.remarksPlaceholder")}
           maxLength={MAX_REMARKS_LENGTH}
         ></textarea>
         <p className="text-xs text-gray-500 text-right mt-0.5">
@@ -1352,11 +1076,11 @@ const HTInspectionReport = ({
       </div>
       <div className="mt-5">
         <SCCImageUpload
-          label={t("sccHTInspection.defectImageLabel")}
+          label={t("sccEMBReport.defectImageLabel")}
           onImageChange={handleImageChangeForDefect}
           onImageRemove={handleImageRemoveForDefect}
           initialImageUrl={formData.defectImageUrl}
-          imageType="htInspectionDefect"
+          imageType="embInspectionDefect"
         />
       </div>
       <div className="pt-5 flex justify-end">
@@ -1376,4 +1100,4 @@ const HTInspectionReport = ({
   );
 };
 
-export default HTInspectionReport;
+export default EMBReport;

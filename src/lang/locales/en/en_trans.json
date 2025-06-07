@@ -952,8 +952,29 @@
       "dailyHTQC": "Daily Machine HT",
       "dailyFUQC": "Daily Machine FU",
       "htInspection": "HT Inspection",
-      "elasticReport": "Elastic Report"
+      "elasticReport": "Elastic Report",
+      "embReport": "EMB Report",
+      "finalConsolidate": "Final Consolidate Report"
     },
+    "finalReports": {
+      "title": "Final Consolidated Reports",
+      "ht": "Heat Transfer",
+      "fu": "Fusing",
+      "emb": "Embroidery",
+      "elastic": "Elastic",
+      "fetchError": "Failed to fetch consolidated report.",
+      "noData": "No data available for this date or filter selection.",
+      "firstOutputTitle": "First Output - HT",
+      "dailyWashingTitle": "Daily Washing Test Results",
+      "machineCalibTitle": "Daily HT Machine Calibration Test",
+      "htInspectionTitle": "HT Inspection Results",
+      "htTitle": "Final Report: Heat Transfer",
+      "firstOutputFUTitle": "First Output - FU",
+      "machineCalibFUTitle": "Daily FU Machine Calibration Test",
+      "embCheckingTitle": "Daily Embroidery Checking Reports"
+    },
+    "specs": "Std. Specs",
+    "factory": "Factory",
     "date": "Date",
     "moNo": "MO No",
     "searchMoNo": "Search MO No...",
@@ -1052,7 +1073,16 @@
     "yesDeleteIt": "Yes, delete it!",
     "cancel": "Cancel",
     "deleted": "Deleted!",
-    "saveNew": "Save New Defect"
+    "saveNew": "Save New Defect",
+    "empId": "EMP ID",
+    "clearFilters": "Clear Filters",
+    "numRejections": "No. of Rejections",
+    "finalResult": "Final Result",
+    "specs2ndHeat": "Specs - 2nd Heat",
+    "secondHeat": "2nd Heat",
+    "stretchScratchTest": "Stretch & Scratch Test",
+    "timeSlotResults": "Time Slot Results",
+    "allEmpIds": "All EMP IDs"
   },
 
   "sccdaily": {
@@ -1256,7 +1286,9 @@
       "fillBundlePcs": "Total Bundle and Total Pcs must be greater than 0.",
       "aqlNotLoaded": "AQL data not loaded. Ensure Total Pcs is valid and AQL details are fetched."
     },
-    "defectRate": "Defect Rate (%)"
+    "defectRate": "Defect Rate (%)",
+    "inspQty": "Insp. Qty",
+    "defectDetails": "Defect Details"
   },
   "sccElasticReport": {
     "mainTitle": "Daily Elastic Checking Report",
@@ -1278,6 +1310,41 @@
     },
     "machineRegisteredSuccess": "Machine registered successfully for Elastic Report.",
     "slotInspectionSubmittedSuccess": "Elastic inspection for slot submitted successfully."
+  },
+  "sccEMBReport": {
+    "title": "Embroidery Inspection Report",
+    "factoryName": "Factory Name",
+    "batchNo": "Batch No.",
+    "inspectionDetails": "Inspection Details",
+    "tableNo": "Table No",
+    "actualLayers": "Actual Layers",
+    "totalBundle": "Total Bundle",
+    "totalPcs": "Total Pcs",
+    "totalInspectedQty": "Insp. Qty (AQL)",
+    "defectsQty": "Defects Qty",
+    "defectRate": "Defect Rate",
+    "result": "Result",
+    "aqlInfoTitle": "AQL Sampling Plan Information",
+    "aqlType": "Type",
+    "aqlLevel": "Level",
+    "sampleSizeCode": "Code Letter",
+    "aqlSampleReq": "Sample Size",
+    "defectDetailsTitle": "Defect Details",
+    "manageDefectsBtn": "Manage Defects",
+    "totalDefects": "Total Defects",
+    "noDefectsRecorded": "No defects recorded.",
+    "remarks": "Remarks",
+    "remarksPlaceholder": "Enter any remarks here (max 250 chars)...",
+    "defectImageLabel": "Defect Image (Optional)",
+    "searchOrEnterTableNo": "Search or Enter Table No.",
+    "errorFetchingAQL": "Error fetching AQL details.",
+    "errorFetchingDefects": "Error fetching defects list.",
+    "errorFetchingDefectsMsg": "Failed to load defect list. Please try again.",
+    "validation": {
+      "fillAllRequired": "Please fill all required fields before submitting."
+    },
+    "inspQty": "Insp. Qty",
+    "defectDetails": "Defect Details"
   },
   "sccDefects": {
     "manageTitle": "Manage Heat Transfer Defects",

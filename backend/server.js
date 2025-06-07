@@ -59,6 +59,9 @@ import createSCCHTOperatorModel from "./models/SCCHTOperatorModel.js";
 import createSCCFUOperatorModel from "./models/SCCFUOperatorModel.js";
 import createSCCElasticOperatorModel from "./models/SCCElasticOperatorModel.js";
 
+import createEMBDefectModel from "./models/EMBdefect.js";
+import createEMBReportModel from "./models/EMBReport.js";
+
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
 
@@ -111,14 +114,6 @@ const io = new Server(server, {
   }
 });
 
-app.use("/storage", express.static(path.join(__dirname, "public/storage")));
-app.use("/public", express.static(path.join(__dirname, "../public")));
-
-app.use(bodyParser.json({ limit: "50mb" }));
-app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
-
-//app.use(cors());
-app.use(bodyParser.json());
 app.use(
   cors({
     origin: "https://192.167.14.32:3001", //["http://localhost:3001", "https://localhost:3001"],
@@ -129,6 +124,14 @@ app.use(
 );
 
 app.options("*", cors());
+
+app.use("/storage", express.static(path.join(__dirname, "public/storage")));
+app.use("/public", express.static(path.join(__dirname, "../public")));
+
+app.use(bodyParser.json({ limit: "50mb" }));
+app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
+
+//app.use(cors());
 
 const ymProdConnection = mongoose.createConnection(
   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
@@ -154,6 +157,10 @@ ymEcoConnection.on("error", (err) => console.error("unexpected error:", err));
 
 //const UserMain = createUserModel(ymProdConnection);
 const UserMain = createUserModel(ymEcoConnection);
+
+// User model for the PROD board (for populating references)
+const UserProd = createUserModel(ymProdConnection);
+
 const Role = createRoleModel(ymProdConnection);
 const QCData = createQCDataModel(ymProdConnection);
 const QC2OrderData = createQc2OrderDataModel(ymProdConnection);
@@ -191,6 +198,9 @@ const SCCDefect = createSCCDefectModel(ymProdConnection);
 const SCCScratchDefect = createSCCScratchDefectModel(ymProdConnection);
 const HTInspectionReport = createHTInspectionReportModel(ymProdConnection);
 const ElasticReport = createElasticReportModel(ymProdConnection);
+
+const EMBDefect = createEMBDefectModel(ymProdConnection);
+const EMBReport = createEMBReportModel(ymProdConnection);
 
 // Define new SCC Operator models on ymProdConnection
 const SCCHTOperator = createSCCHTOperatorModel(ymProdConnection);
@@ -8927,12 +8937,9 @@ app.post("/api/save-qc-roving-pairing", async (req, res) => {
       typeof pairingDataItem !== "object" ||
       !pairingDataItem.inspection_rep_name
     ) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "pairingDataItem is malformed or missing inspection_rep_name."
-        });
+      return res.status(400).json({
+        message: "pairingDataItem is malformed or missing inspection_rep_name."
+      });
     }
 
     // --- Find or Create Document ---
@@ -9000,104 +9007,6 @@ app.post("/api/save-qc-roving-pairing", async (req, res) => {
     });
   }
 });
-
-// app.post("/api/save-qc-roving-pairing", async (req, res) => {
-//   try {
-//     const {
-//       inspection_date,
-//       moNo,
-//       lineNo,
-//       report_name,
-//       emp_id,
-//       eng_name,
-//       operationNo,
-//       operationName,
-//       operationName_kh,
-//       pairingDataItem
-//     } = req.body;
-
-//     // --- Basic Validation ---
-//     if (!inspection_date || !moNo || !lineNo || !pairingDataItem || !emp_id) {
-//       return res.status(400).json({ message: "Missing required fields." });
-//     }
-
-//     if (
-//       typeof pairingDataItem !== "object" ||
-//       !pairingDataItem.inspection_rep_name
-//     ) {
-//       return res
-//         .status(400)
-//         .json({
-//           message:
-//             "pairingDataItem is malformed or missing inspection_rep_name."
-//         });
-//     }
-
-//     // --- Find or Create Document ---
-//     let doc = await QCRovingPairing.findOne({ inspection_date, moNo, lineNo });
-
-//     if (doc) {
-//       // Document exists, update it
-//       const existingRepIndex = doc.pairingData.findIndex(
-//         (rep) => rep.inspection_rep_name === pairingDataItem.inspection_rep_name
-//       );
-
-//       if (existingRepIndex !== -1) {
-//         // This inspection repetition already exists, so we overwrite it.
-//         doc.pairingData[existingRepIndex] = pairingDataItem;
-//       } else {
-//         // This is a new inspection repetition for this document, add it.
-//         doc.pairingData.push(pairingDataItem);
-//       }
-
-//       // Sort pairingData by inspection_rep_name (e.g., "1st", "2nd")
-//       doc.pairingData.sort((a, b) => {
-//         const numA = parseInt(a.inspection_rep_name, 10);
-//         const numB = parseInt(b.inspection_rep_name, 10);
-//         return numA - numB;
-//       });
-
-//       await doc.save();
-//       res.status(200).json({
-//         message: "QC Roving Pairing data updated successfully.",
-//         data: doc
-//       });
-//     } else {
-//       // Document does not exist, create a new one
-//       const lastDoc = await QCRovingPairing.findOne().sort({ pairing_id: -1 });
-//       const newId =
-//         lastDoc && typeof lastDoc.pairing_id === "number"
-//           ? lastDoc.pairing_id + 1
-//           : 1;
-
-//       const newDoc = new QCRovingPairing({
-//         pairing_id: newId,
-//         report_name,
-//         inspection_date,
-//         moNo,
-//         lineNo,
-//         emp_id,
-//         eng_name,
-//         operationNo,
-//         operationName,
-//         operationName_kh,
-//         pairingData: [pairingDataItem] // Start with the first item
-//       });
-
-//       await newDoc.save();
-//       res.status(201).json({
-//         message: "New QC Roving Pairing record created successfully.",
-//         data: newDoc
-//       });
-//     }
-//   } catch (error) {
-//     console.error("Error saving QC Roving Pairing data:", error);
-//     res.status(500).json({
-//       message: "Failed to save QC Roving Pairing data.",
-//       error: error.message
-//     });
-//   }
-// });
 
 /* ------------------------------
    Cutting Report ENDPOINTS
@@ -13534,6 +13443,44 @@ app.delete("/api/scc/scratch-defects/:id", async (req, res) => {
 });
 
 /* ------------------------------
+   End Points - EMB Defects
+------------------------------ */
+app.get("/api/scc/emb-defects", async (req, res) => {
+  try {
+    const defects = await EMBDefect.find({}).sort({ no: 1 }).lean();
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching EMB defects:", error);
+    res.status(500).json({ message: "Server error fetching EMB defects" });
+  }
+});
+
+app.post("/api/scc/emb-defects", async (req, res) => {
+  try {
+    const { no, defectNameEng, defectNameKhmer, defectNameChine } = req.body;
+    const newDefect = new EMBDefect({
+      no,
+      defectNameEng,
+      defectNameKhmer,
+      defectNameChine
+    });
+    await newDefect.save();
+    res
+      .status(201)
+      .json({ message: "EMB defect added successfully", defect: newDefect });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Duplicate entry. Defect No or Name might already exist."
+      });
+    }
+    res
+      .status(500)
+      .json({ message: "Failed to add EMB defect", error: error.message });
+  }
+});
+
+/* ------------------------------
    End Points - SCC HT/FU
 ------------------------------ */
 
@@ -14448,108 +14395,6 @@ app.post("/api/scc/daily-htfu/register-machine", async (req, res) => {
   }
 });
 
-// app.post("/api/scc/daily-htfu/register-machine", async (req, res) => {
-//   try {
-//     const {
-//       inspectionDate,
-//       machineNo,
-//       moNo,
-//       buyer,
-//       buyerStyle,
-//       color,
-//       baseReqTemp, // These now come from the frontend state, populated by endpoint 3
-//       baseReqTime,
-//       baseReqPressure,
-//       emp_id,
-//       emp_kh_name,
-//       emp_eng_name,
-//       emp_dept_name,
-//       emp_sect_name,
-//       emp_job_title
-//     } = req.body;
-
-//     const formattedDate = inspectionDate; // Already formatted by frontend's formatDateForAPI
-
-//     if (!formattedDate || !machineNo || !moNo || !color) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Missing required fields: Inspection Date, Machine No, MO No, and Color."
-//       });
-//     }
-//     // It's acceptable for baseReqTemp, baseReqTime, baseReqPressure to be null if not found
-
-//     const now = new Date();
-//     const registrationTime = `${String(now.getHours()).padStart(
-//       2,
-//       "0"
-//     )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
-//       now.getSeconds()
-//     ).padStart(2, "0")}`;
-
-//     const existingRegistration = await DailyTestingHTFU.findOne({
-//       inspectionDate: formattedDate,
-//       machineNo,
-//       moNo,
-//       color
-//     });
-
-//     if (existingRegistration) {
-//       return res.status(409).json({
-//         success: false,
-//         message:
-//           "This Machine-MO-Color combination is already registered for this date.",
-//         data: existingRegistration
-//       });
-//     }
-
-//     const newRegistration = new DailyTestingHTFU({
-//       inspectionDate: formattedDate,
-//       machineNo,
-//       moNo,
-//       buyer,
-//       buyerStyle,
-//       color,
-//       baseReqTemp: baseReqTemp !== undefined ? baseReqTemp : null,
-//       baseReqTime: baseReqTime !== undefined ? baseReqTime : null,
-//       baseReqPressure: baseReqPressure !== undefined ? baseReqPressure : null,
-//       emp_id,
-//       emp_kh_name,
-//       emp_eng_name,
-//       emp_dept_name,
-//       emp_sect_name,
-//       emp_job_title,
-//       inspectionTime: registrationTime,
-//       inspections: [],
-//       stretchTestResult: "Pending",
-//       washingTestResult: "Pending",
-//       isStretchWashingTestDone: false
-//     });
-
-//     await newRegistration.save();
-//     res.status(201).json({
-//       success: true,
-//       message: "Machine registered successfully for daily HT/FU QC.",
-//       data: newRegistration
-//     });
-//   } catch (error) {
-//     console.error("Error registering machine for Daily HT/FU QC:", error);
-//     if (error.code === 11000) {
-//       return res.status(409).json({
-//         success: false,
-//         message:
-//           "Duplicate entry. This registration might already exist (unique index violation).",
-//         error: error.message
-//       });
-//     }
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to register machine",
-//       error: error.message
-//     });
-//   }
-// });
-
 // 5. GET /api/scc/daily-htfu/by-date?inspectionDate=<date>
 //    Fetches all DailyTestingHTFU records for a given inspection date.
 
@@ -14588,30 +14433,6 @@ app.get("/api/scc/daily-htfu/by-date", async (req, res) => {
       .json({ message: "Failed to fetch daily records", error: error.message });
   }
 });
-
-// app.get("/api/scc/daily-htfu/by-date", async (req, res) => {
-//   try {
-//     const { inspectionDate } = req.query;
-//     if (!inspectionDate) {
-//       return res.status(400).json({ message: "Inspection Date is required." });
-//     }
-//     const formattedDate = inspectionDate; // Expecting MM/DD/YYYY from frontend
-
-//     const records = await DailyTestingHTFU.find({
-//       inspectionDate: formattedDate
-//     })
-//       .sort({ machineNo: 1 }) // Consider `collation` for proper numeric sort if machineNo can be "1", "10", "2"
-//       .lean();
-
-//     res.json(records || []);
-//   } catch (error) {
-//     console.error("Error fetching Daily HT/FU records by date:", error);
-//     res.status(500).json({
-//       message: "Failed to fetch daily records",
-//       error: error.message
-//     });
-//   }
-// });
 
 // Endpoint to fetch distinct MO Numbers for a given inspection date from daily_testing_ht_fus
 app.get("/api/scc/daily-htfu/distinct-mos", async (req, res) => {
@@ -14897,129 +14718,6 @@ app.put("/api/scc/daily-htfu/update-test-result/:docId", async (req, res) => {
   }
 });
 
-// app.put("/api/scc/daily-htfu/update-test-result/:docId", async (req, res) => {
-//   try {
-//     const { docId } = req.params;
-//     const {
-//       stretchTestResult,
-//       stretchTestRejectReasons,
-//       washingTestResult,
-//       emp_id // Employee performing the update
-//     } = req.body;
-
-//     if (!mongoose.Types.ObjectId.isValid(docId)) {
-//       return res
-//         .status(400)
-//         .json({ success: false, message: "Invalid Document ID." });
-//     }
-
-//     const record = await DailyTestingHTFU.findById(docId);
-//     if (!record) {
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Daily testing record not found." });
-//     }
-
-//     const updateFields = {};
-//     let updated = false;
-
-//     if (stretchTestResult !== undefined) {
-//       if (
-//         !["Pass", "Reject", "Pending", ""].includes(stretchTestResult) &&
-//         stretchTestResult !== null
-//       ) {
-//         return res.status(400).json({
-//           success: false,
-//           message: "Invalid Stretch Test Result value."
-//         });
-//       }
-//       updateFields.stretchTestResult =
-//         stretchTestResult === "" ? "Pending" : stretchTestResult; // Treat empty as Pending
-//       if (stretchTestResult === "Reject") {
-//         updateFields.stretchTestRejectReasons = Array.isArray(
-//           stretchTestRejectReasons
-//         )
-//           ? stretchTestRejectReasons
-//           : [];
-//       } else {
-//         updateFields.stretchTestRejectReasons = []; // Clear reasons if not 'Reject'
-//       }
-//       updated = true;
-//     }
-
-//     if (washingTestResult !== undefined) {
-//       if (
-//         !["Pass", "Reject", "Pending", ""].includes(washingTestResult) &&
-//         washingTestResult !== null
-//       ) {
-//         return res.status(400).json({
-//           success: false,
-//           message: "Invalid Washing Test Result value."
-//         });
-//       }
-//       updateFields.washingTestResult =
-//         washingTestResult === "" ? "Pending" : washingTestResult; // Treat empty as Pending
-//       updated = true;
-//     }
-
-//     // Mark that at least one of these tests has been actioned if not already done.
-//     // This can be more sophisticated if needed.
-//     if (updated && !record.isStretchWashingTestDone) {
-//       if (stretchTestResult && stretchTestResult !== "Pending")
-//         updateFields.isStretchWashingTestDone = true;
-//       if (washingTestResult && washingTestResult !== "Pending")
-//         updateFields.isStretchWashingTestDone = true;
-//     }
-
-//     if (!updated) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "No valid test result fields provided for update."
-//       });
-//     }
-
-//     // Update who last modified this record (optional, good for auditing)
-//     if (emp_id) {
-//       updateFields.emp_id = emp_id; // Overwrites previous emp_id, consider an audit trail if needed
-//       const now = new Date();
-//       updateFields.inspectionTime = `${String(now.getHours()).padStart(
-//         2,
-//         "0"
-//       )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
-//         now.getSeconds()
-//       ).padStart(2, "0")}`;
-//     }
-
-//     const updatedRecord = await DailyTestingHTFU.findByIdAndUpdate(
-//       docId,
-//       { $set: updateFields },
-//       { new: true, runValidators: true } // Return the updated document and run schema validators
-//     );
-
-//     if (!updatedRecord) {
-//       // Should not happen if findById found the record, but as a safeguard
-//       return res.status(404).json({
-//         success: false,
-//         message:
-//           "Failed to update record, record not found after update attempt."
-//       });
-//     }
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Test result updated successfully.",
-//       data: updatedRecord
-//     });
-//   } catch (error) {
-//     console.error("Error updating test result:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to update test result",
-//       error: error.message
-//     });
-//   }
-// });
-
 /* ------------------------------
    End Point - SCC Daily FUQC
 ------------------------------ */
@@ -15164,58 +14862,6 @@ app.get("/api/scc/fu-first-output/specs-for-registration", async (req, res) => {
   }
 });
 
-// app.get("/api/scc/fu-first-output/specs-for-registration", async (req, res) => {
-//   try {
-//     const { moNo, color } = req.query;
-//     if (!moNo || !color || moNo.trim() === "" || color.trim() === "") {
-//       return res.status(400).json({ message: "MO No and Color are required." });
-//     }
-//     const record = await FUFirstOutput.findOne({
-//       moNo: moNo.trim(),
-//       color: color.trim()
-//     })
-//       .sort({ inspectionDate: -1, createdAt: -1 })
-//       .lean();
-
-//     if (
-//       !record ||
-//       !record.standardSpecification ||
-//       record.standardSpecification.length === 0
-//     ) {
-//       return res
-//         .status(200)
-//         .json({ message: "FU_SPECS_NOT_FOUND", reqTemp: null });
-//     }
-//     const firstSpec = record.standardSpecification.find(
-//       (s) => s.type === "first" && s.tempC != null
-//     );
-
-//     if (!firstSpec) {
-//       const anyFirstSpec = record.standardSpecification.find(
-//         (s) => s.type === "first"
-//       );
-//       if (anyFirstSpec) {
-//         return res.json({
-//           reqTemp: anyFirstSpec.tempC !== undefined ? anyFirstSpec.tempC : null
-//         });
-//       }
-//       return res
-//         .status(200)
-//         .json({ message: "FU_FIRST_TYPE_SPEC_INCOMPLETE", reqTemp: null });
-//     }
-//     res.json({ reqTemp: firstSpec.tempC });
-//   } catch (error) {
-//     console.error(
-//       "[SERVER FUQC] Error fetching FU specs for registration:",
-//       error
-//     );
-//     res.status(500).json({
-//       message: "Failed to fetch FU specifications",
-//       error: error.message
-//     });
-//   }
-// });
-
 // 4. Register Machine for Daily FUQC
 app.post("/api/scc/daily-fuqc/register-machine", async (req, res) => {
   try {
@@ -15330,98 +14976,6 @@ app.post("/api/scc/daily-fuqc/register-machine", async (req, res) => {
   }
 });
 
-// app.post("/api/scc/daily-fuqc/register-machine", async (req, res) => {
-//   try {
-//     const {
-//       inspectionDate,
-//       machineNo,
-//       moNo,
-//       buyer,
-//       buyerStyle,
-//       color,
-//       baseReqTemp, // Only baseReqTemp for FUQC
-//       emp_id,
-//       emp_kh_name,
-//       emp_eng_name,
-//       emp_dept_name,
-//       emp_sect_name,
-//       emp_job_title
-//     } = req.body;
-
-//     const formattedDate = inspectionDate; // Assuming MM/DD/YYYY from frontend
-//     if (!formattedDate || !machineNo || !moNo || !color) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Missing required fields for FUQC machine registration."
-//       });
-//     }
-//     const now = new Date();
-//     const registrationTime = `${String(now.getHours()).padStart(
-//       2,
-//       "0"
-//     )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
-//       now.getSeconds()
-//     ).padStart(2, "0")}`;
-
-//     const existingRegistration = await DailyTestingFUQC.findOne({
-//       inspectionDate: formattedDate,
-//       machineNo,
-//       moNo,
-//       color
-//     });
-//     if (existingRegistration) {
-//       return res.status(409).json({
-//         success: false,
-//         message:
-//           "This Machine-MO-Color is already registered for FUQC on this date.",
-//         data: existingRegistration
-//       });
-//     }
-
-//     const newRegistration = new DailyTestingFUQC({
-//       inspectionDate: formattedDate,
-//       machineNo,
-//       moNo,
-//       buyer,
-//       buyerStyle,
-//       color,
-//       baseReqTemp: baseReqTemp !== undefined ? baseReqTemp : null,
-//       temp_offset: 5, // Default offset, can be made configurable later if needed
-//       emp_id,
-//       emp_kh_name,
-//       emp_eng_name,
-//       emp_dept_name,
-//       emp_sect_name,
-//       emp_job_title,
-//       inspectionTime: registrationTime,
-//       inspections: [],
-//       remarks: "NA"
-//     });
-//     await newRegistration.save();
-//     res.status(201).json({
-//       success: true,
-//       message: "Machine registered successfully for Daily FUQC.",
-//       data: newRegistration
-//     });
-//   } catch (error) {
-//     console.error(
-//       "[SERVER FUQC] Error registering machine for Daily FUQC:",
-//       error
-//     );
-//     if (error.code === 11000)
-//       return res.status(409).json({
-//         success: false,
-//         message: "Duplicate FUQC registration.",
-//         error: error.message
-//       });
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to register machine for FUQC",
-//       error: error.message
-//     });
-//   }
-// });
-
 // 5. Get Daily FUQC Records by Date
 app.get("/api/scc/daily-fuqc/by-date", async (req, res) => {
   try {
@@ -15476,29 +15030,6 @@ app.get("/api/scc/daily-fuqc/distinct-mos", async (req, res) => {
     });
   }
 });
-
-// app.get("/api/scc/daily-fuqc/by-date", async (req, res) => {
-//   try {
-//     const { inspectionDate } = req.query;
-//     if (!inspectionDate)
-//       return res.status(400).json({ message: "Inspection Date is required." });
-//     const records = await DailyTestingFUQC.find({
-//       inspectionDate: inspectionDate
-//     })
-//       .sort({ machineNo: 1 })
-//       .lean();
-//     res.json(records || []);
-//   } catch (error) {
-//     console.error(
-//       "[SERVER FUQC] Error fetching Daily FUQC records by date:",
-//       error
-//     );
-//     res.status(500).json({
-//       message: "Failed to fetch daily FUQC records",
-//       error: error.message
-//     });
-//   }
-// });
 
 // 6. Submit Slot Inspection for Daily FUQC
 
@@ -15641,108 +15172,6 @@ app.post("/api/scc/daily-fuqc/submit-slot-inspection", async (req, res) => {
     });
   }
 });
-
-// app.post("/api/scc/daily-fuqc/submit-slot-inspection", async (req, res) => {
-//   try {
-//     const {
-//       inspectionDate,
-//       timeSlotKey,
-//       inspectionNo,
-//       dailyFUQCDocId, // Changed key
-//       temp_req,
-//       temp_actual,
-//       temp_isNA,
-//       temp_isUserModified,
-//       emp_id
-//     } = req.body;
-
-//     if (
-//       !inspectionDate ||
-//       !timeSlotKey ||
-//       !inspectionNo ||
-//       !dailyFUQCDocId ||
-//       (temp_actual === undefined && !temp_isNA)
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Missing required fields for FUQC slot submission."
-//       });
-//     }
-//     const record = await DailyTestingFUQC.findById(dailyFUQCDocId);
-//     if (!record)
-//       return res.status(404).json({
-//         success: false,
-//         message: `FUQC Record not found: ${dailyFUQCDocId}`
-//       });
-//     if (record.inspectionDate !== inspectionDate)
-//       return res
-//         .status(400)
-//         .json({ success: false, message: "Date mismatch for FUQC record." });
-
-//     // Determine result based on actual, req, and offset stored in the record
-//     let result = "Pending";
-//     if (temp_isNA) {
-//       result = "N/A";
-//     } else if (temp_actual !== null && temp_req !== null) {
-//       const diff = Math.abs(Number(temp_actual) - Number(temp_req));
-//       result = diff <= (record.temp_offset || 0) ? "Pass" : "Reject";
-//     }
-
-//     const slotData = {
-//       inspectionNo: Number(inspectionNo),
-//       timeSlotKey,
-//       temp_req: temp_req !== undefined ? temp_req : null,
-//       temp_actual: temp_isNA
-//         ? null
-//         : temp_actual !== undefined
-//         ? temp_actual
-//         : null,
-//       temp_isNA: !!temp_isNA,
-//       // temp_isUserModified: !!temp_isUserModified, // Schema for FUQC slot does not have this
-//       result: result, // Calculated result
-//       inspectionTimestamp: new Date()
-//     };
-
-//     const existingSlotIndex = record.inspections.findIndex(
-//       (insp) => insp.timeSlotKey === timeSlotKey
-//     );
-//     if (existingSlotIndex > -1) {
-//       return res.status(409).json({
-//         success: false,
-//         message: `Slot ${timeSlotKey} already submitted for this FUQC record.`
-//       });
-//     } else {
-//       record.inspections.push(slotData);
-//     }
-//     record.inspections.sort(
-//       (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
-//     );
-//     record.emp_id = emp_id;
-//     const now = new Date();
-//     record.inspectionTime = `${String(now.getHours()).padStart(
-//       2,
-//       "0"
-//     )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
-//       now.getSeconds()
-//     ).padStart(2, "0")}`;
-//     await record.save();
-//     res.status(201).json({
-//       success: true,
-//       message: `FUQC Inspection for slot ${timeSlotKey} submitted.`,
-//       data: record
-//     });
-//   } catch (error) {
-//     console.error(
-//       "[SERVER FUQC] Error submitting FUQC slot inspection:",
-//       error
-//     );
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to submit FUQC slot inspection",
-//       error: error.message
-//     });
-//   }
-// });
 
 /* ------------------------------
    End Points - SCC Defects
@@ -16064,131 +15493,7 @@ app.post("/api/scc/ht-inspection-report", async (req, res) => {
   }
 });
 
-// app.post("/api/scc/ht-inspection-report", async (req, res) => {
-//   try {
-//     const {
-//       _id,
-//       inspectionDate,
-//       machineNo,
-//       moNo,
-//       buyer,
-//       buyerStyle,
-//       color,
-//       batchNo,
-//       tableNo, // New field
-//       actualLayers, // New field
-//       totalBundle,
-//       totalPcs,
-//       aqlData,
-//       defectsQty,
-//       result,
-//       defects,
-//       remarks,
-//       defectImageUrl,
-//       emp_id,
-//       emp_kh_name,
-//       emp_eng_name,
-//       emp_dept_name,
-//       emp_sect_name,
-//       emp_job_title
-//     } = req.body;
-
-//     // Basic validation (more comprehensive on model)
-//     if (
-//       !inspectionDate ||
-//       !machineNo ||
-//       !moNo ||
-//       !color ||
-//       !batchNo ||
-//       !tableNo || // Validate new field
-//       actualLayers === undefined ||
-//       actualLayers === null || // Validate new field (can be 0 if allowed, but usually >0)
-//       !totalPcs ||
-//       !aqlData
-//     ) {
-//       return res.status(400).json({
-//         message:
-//           "Missing required fields for HT Inspection Report, including Table No and Actual Layers."
-//       });
-//     }
-
-//     const now = new Date();
-//     const inspectionTime = `${String(now.getHours()).padStart(2, "0")}:${String(
-//       now.getMinutes()
-//     ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-
-//     const reportData = {
-//       inspectionDate: new Date(inspectionDate),
-//       machineNo,
-//       moNo,
-//       buyer,
-//       buyerStyle,
-//       color,
-//       batchNo,
-//       tableNo, // Save new field
-//       actualLayers: Number(actualLayers), // Save new field as number
-//       totalBundle: Number(totalBundle),
-//       totalPcs: Number(totalPcs),
-//       aqlData,
-//       defectsQty: Number(defectsQty),
-//       result,
-//       defects,
-//       remarks: remarks?.trim() || "NA",
-//       defectImageUrl: defectImageUrl || null,
-//       emp_id,
-//       emp_kh_name,
-//       emp_eng_name,
-//       emp_dept_name,
-//       emp_sect_name,
-//       emp_job_title,
-//       inspectionTime
-//     };
-
-//     let savedReport;
-//     if (_id) {
-//       savedReport = await HTInspectionReport.findByIdAndUpdate(
-//         _id,
-//         reportData,
-//         { new: true, runValidators: true }
-//       );
-//       if (!savedReport)
-//         return res
-//           .status(404)
-//           .json({ message: "Report not found for update." });
-//     } else {
-//       savedReport = new HTInspectionReport(reportData);
-//       await savedReport.save();
-//     }
-
-//     res.status(201).json({
-//       message: "HT Inspection Report saved successfully.",
-//       data: savedReport
-//     });
-//   } catch (error) {
-//     console.error("Error saving HT Inspection Report:", error);
-//     if (error.code === 11000) {
-//       return res.status(409).json({
-//         message: "Duplicate entry. This report might already exist.",
-//         error: error.message,
-//         errorCode: "DUPLICATE_KEY"
-//       });
-//     }
-//     if (error.name === "ValidationError") {
-//       return res.status(400).json({
-//         message: "Validation Error: " + error.message,
-//         errors: error.errors
-//       });
-//     }
-//     res.status(500).json({
-//       message: "Failed to save HT Inspection Report.",
-//       error: error.message,
-//       details: error
-//     });
-//   }
-// });
-
 // GET endpoint to load an existing HT Inspection Report (Optional - for editing/viewing later)
-// GET /api/scc/ht-inspection-report - MODIFIED to populate operatorData
 app.get("/api/scc/ht-inspection-report", async (req, res) => {
   try {
     const { inspectionDate, machineNo, moNo, color, batchNo, tableNo } =
@@ -16246,41 +15551,129 @@ app.get("/api/scc/ht-inspection-report", async (req, res) => {
   }
 });
 
-// app.get("/api/scc/ht-inspection-report", async (req, res) => {
-//   try {
-//     const { inspectionDate, machineNo, moNo, color, batchNo } = req.query;
-//     if (!inspectionDate || !machineNo || !moNo || !color || !batchNo) {
-//       return res.status(400).json({
-//         message:
-//           "Date, Machine, MO, Color, and Batch No are required to fetch report."
-//       });
-//     }
-//     // Ensure date is handled correctly if coming as string
-//     const searchDate = new Date(inspectionDate);
-//     // To match just the date part, you might need to query for a date range or format stored date as string
-//     // For simplicity, assuming client sends date in a way that matches stored format or you adjust here
-//     const report = await HTInspectionReport.findOne({
-//       inspectionDate: searchDate, // This might need adjustment based on how dates are stored/queried
-//       machineNo,
-//       moNo,
-//       color,
-//       batchNo
-//     }).lean();
+/* ------------------------------
+   End Points - EMB Report
+------------------------------ */
+app.post("/api/scc/emb-report", async (req, res) => {
+  try {
+    const {
+      _id,
+      inspectionDate,
+      factoryName,
+      moNo,
+      buyer,
+      buyerStyle,
+      color,
+      batchNo,
+      tableNo,
+      actualLayers,
+      totalBundle,
+      totalPcs,
+      aqlData,
+      defects,
+      remarks,
+      defectImageUrl,
+      emp_id,
+      emp_kh_name,
+      emp_eng_name,
+      emp_dept_name,
+      emp_sect_name,
+      emp_job_title
+    } = req.body;
 
-//     if (!report) {
-//       return res
-//         .status(200)
-//         .json({ message: "HT_INSPECTION_REPORT_NOT_FOUND", data: null });
-//     }
-//     res.json({ message: "REPORT_FOUND", data: report });
-//   } catch (error) {
-//     console.error("Error fetching HT Inspection Report:", error);
-//     res.status(500).json({
-//       message: "Failed to fetch HT Inspection Report",
-//       error: error.message
-//     });
-//   }
-// });
+    if (
+      !inspectionDate ||
+      !factoryName ||
+      !moNo ||
+      !color ||
+      !batchNo ||
+      !tableNo ||
+      !actualLayers ||
+      !totalBundle ||
+      !totalPcs ||
+      !aqlData
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Missing required fields for EMB Report." });
+    }
+
+    const now = new Date();
+    const currentInspectionTime = `${String(now.getHours()).padStart(
+      2,
+      "0"
+    )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+      now.getSeconds()
+    ).padStart(2, "0")}`;
+
+    const reportData = {
+      inspectionDate: new Date(inspectionDate),
+      factoryName,
+      moNo,
+      buyer,
+      buyerStyle,
+      color,
+      batchNo,
+      tableNo,
+      actualLayers: Number(actualLayers),
+      totalBundle: Number(totalBundle),
+      totalPcs: Number(totalPcs),
+      aqlData: {
+        type: aqlData.type || "General",
+        level: aqlData.level || "II",
+        sampleSizeLetterCode: aqlData.sampleSizeLetterCode || "",
+        sampleSize: Number(aqlData.sampleSize) || 0,
+        acceptDefect: Number(aqlData.acceptDefect) || 0,
+        rejectDefect: Number(aqlData.rejectDefect) || 0
+      },
+      defects: defects || [],
+      remarks: remarks?.trim() || "NA",
+      defectImageUrl: defectImageUrl || null,
+      emp_id,
+      emp_kh_name,
+      emp_eng_name,
+      emp_dept_name,
+      emp_sect_name,
+      emp_job_title,
+      inspectionTime: currentInspectionTime
+    };
+
+    let savedReport;
+    if (_id) {
+      savedReport = await EMBReport.findByIdAndUpdate(_id, reportData, {
+        new: true,
+        runValidators: true
+      });
+      if (!savedReport)
+        return res
+          .status(404)
+          .json({ message: "Report not found for update." });
+    } else {
+      const reportToSave = new EMBReport(reportData);
+      savedReport = await reportToSave.save();
+    }
+
+    res
+      .status(201)
+      .json({ message: "EMB Report saved successfully.", data: savedReport });
+  } catch (error) {
+    console.error("Error saving EMB Report:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Duplicate entry. This EMB report might already exist."
+      });
+    }
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        message: "Validation Error: " + error.message,
+        errors: error.errors
+      });
+    }
+    res
+      .status(500)
+      .json({ message: "Failed to save EMB Report.", error: error.message });
+  }
+});
 
 /* ------------------------------
    End Points - SCC Elastic Report
@@ -16492,224 +15885,541 @@ app.post("/api/scc/elastic-report/submit-slot-inspection", async (req, res) => {
   }
 });
 
-// // 1. POST /api/scc/elastic-report/register-machine
-// //    Registers a machine for the Elastic Checking Report.
-// app.post("/api/scc/elastic-report/register-machine", async (req, res) => {
-//   try {
-//     const {
-//       inspectionDate, // Expecting YYYY-MM-DD
-//       machineNo,
-//       moNo,
-//       buyer,
-//       buyerStyle,
-//       color,
-//       emp_id,
-//       emp_kh_name,
-//       emp_eng_name
-//     } = req.body;
+/* -------------------------------------
+   End Point - Final Consolidated HT Report
+------------------------------------- */
 
-//     if (!inspectionDate || !machineNo || !moNo || !color) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Missing required fields: Inspection Date, Machine No, MO No, and Color."
-//       });
-//     }
+// Helper function to generate all necessary date formats from a single input
+const getConsolidatedDateFormats = (dateInput) => {
+  const date = new Date(dateInput);
 
-//     const now = new Date();
-//     const registrationTime = `${String(now.getHours()).padStart(
-//       2,
-//       "0"
-//     )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
-//       now.getSeconds()
-//     ).padStart(2, "0")}`;
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
 
-//     const existingRegistration = await ElasticReport.findOne({
-//       inspectionDate,
-//       machineNo,
-//       moNo,
-//       color
-//     });
+  // Format for schemas without leading zeros: 'M/D/YYYY'
+  const stringDate = `${month}/${day}/${year}`;
 
-//     if (existingRegistration) {
-//       return res.status(409).json({
-//         success: false,
-//         message:
-//           "This Machine-MO-Color combination is already registered for this date for Elastic Report.",
-//         data: existingRegistration
-//       });
-//     }
+  // Format for schemas WITH leading zeros: 'MM/DD/YYYY'
+  const paddedStringDate = `${String(month).padStart(2, "0")}/${String(
+    day
+  ).padStart(2, "0")}/${year}`;
 
-//     const newRegistration = new ElasticReport({
-//       inspectionDate,
-//       machineNo,
-//       moNo,
-//       buyer,
-//       buyerStyle,
-//       color,
-//       registeredBy_emp_id: emp_id,
-//       registeredBy_emp_kh_name: emp_kh_name,
-//       registeredBy_emp_eng_name: emp_eng_name,
-//       registrationTime,
-//       inspections: [] // Initialize with empty inspections array
-//     });
+  // Format for ISODate-based schemas (timestamp)
+  const startOfDay = new Date(date);
+  startOfDay.setHours(0, 0, 0, 0);
 
-//     await newRegistration.save();
-//     res.status(201).json({
-//       success: true,
-//       message: "Machine registered successfully for Elastic Report.",
-//       data: newRegistration
-//     });
-//   } catch (error) {
-//     console.error("Error registering machine for Elastic Report:", error);
-//     if (error.code === 11000) {
-//       // Handle MongoDB duplicate key error
-//       return res.status(409).json({
-//         success: false,
-//         message:
-//           "Duplicate entry. This registration might already exist (unique index violation).",
-//         error: error.message
-//       });
-//     }
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to register machine for Elastic Report",
-//       error: error.message
-//     });
-//   }
-// });
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
 
-// // 2. GET /api/scc/elastic-report/by-date?inspectionDate=<date>
-// //    Fetches all ElasticReport records for a given inspection date.
-// app.get("/api/scc/elastic-report/by-date", async (req, res) => {
-//   try {
-//     const { inspectionDate } = req.query; // Expecting YYYY-MM-DD
-//     if (!inspectionDate) {
-//       return res.status(400).json({ message: "Inspection Date is required." });
-//     }
+  return {
+    stringDate,
+    paddedStringDate,
+    isoStartDate: startOfDay,
+    isoEndDate: endOfDay
+  };
+};
 
-//     const records = await ElasticReport.find({ inspectionDate })
-//       .sort({ machineNo: 1 }) // Sort by machine number
-//       .lean(); // Use .lean() for faster queries if you don't need Mongoose model instances
+app.get("/api/scc/final-report/ht", async (req, res) => {
+  try {
+    const { date, empId, moNo, machineNo } = req.query;
+    if (!date) {
+      return res.status(400).json({ message: "Date is required." });
+    }
 
-//     res.json(records || []);
-//   } catch (error) {
-//     console.error("Error fetching Elastic Report records by date:", error);
-//     res.status(500).json({
-//       message: "Failed to fetch Elastic Report daily records",
-//       error: error.message
-//     });
-//   }
-// });
+    const { stringDate, paddedStringDate, isoStartDate, isoEndDate } =
+      getConsolidatedDateFormats(date);
 
-// // 3. POST /api/scc/elastic-report/submit-slot-inspection
-// //    Submits inspection data for a specific time slot for ONE machine in Elastic Report.
-// app.post("/api/scc/elastic-report/submit-slot-inspection", async (req, res) => {
-//   try {
-//     const {
-//       inspectionDate, // Expecting YYYY-MM-DD
-//       timeSlotKey,
-//       inspectionNo,
-//       elasticReportDocId, // _id of the parent ElasticReport document
-//       checkedQty,
-//       quantityIssue,
-//       measurement,
-//       defects,
-//       specificDefectReason,
-//       result,
-//       remarks,
-//       emp_id,
-//       isUserModified
-//     } = req.body;
+    // --- Build Filter Queries ---
+    // These objects will be passed to the find() method for each model
+    const stringDateFilter = { inspectionDate: stringDate };
+    if (empId && empId !== "All") stringDateFilter.emp_id = empId;
+    if (moNo && moNo !== "All") stringDateFilter.moNo = moNo;
+    if (machineNo && machineNo !== "All")
+      stringDateFilter.machineNo = machineNo;
 
-//     // Basic validation
-//     if (
-//       !inspectionDate ||
-//       !timeSlotKey ||
-//       inspectionNo === undefined ||
-//       !elasticReportDocId ||
-//       checkedQty === undefined ||
-//       checkedQty === null ||
-//       !quantityIssue ||
-//       !measurement ||
-//       !defects ||
-//       !result ||
-//       (defects === "Reject" && !specificDefectReason)
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Missing or invalid required fields for Elastic slot inspection submission."
-//       });
-//     }
+    const paddedDateFilter = { inspectionDate: paddedStringDate };
+    if (empId && empId !== "All") paddedDateFilter.emp_id = empId;
+    if (moNo && moNo !== "All") paddedDateFilter.moNo = moNo;
+    if (machineNo && machineNo !== "All")
+      paddedDateFilter.machineNo = machineNo;
 
-//     const reportDoc = await ElasticReport.findById(elasticReportDocId);
-//     if (!reportDoc) {
-//       return res.status(404).json({
-//         success: false,
-//         message: `Elastic Report document not found for ID: ${elasticReportDocId}`
-//       });
-//     }
+    const isoDateFilter = {
+      inspectionDate: { $gte: isoStartDate, $lte: isoEndDate }
+    };
+    if (empId && empId !== "All") isoDateFilter.emp_id = empId;
+    if (moNo && moNo !== "All") isoDateFilter.moNo = moNo;
+    if (machineNo && machineNo !== "All") isoDateFilter.machineNo = machineNo;
 
-//     if (reportDoc.inspectionDate !== inspectionDate) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Date mismatch for Elastic Report ID: ${elasticReportDocId}. Expected ${inspectionDate}, found ${reportDoc.inspectionDate}`
-//       });
-//     }
+    // --- Execute All Queries Concurrently using Promise.all ---
+    const [
+      firstOutputData,
+      dailyWashingData,
+      machineCalibrationData,
+      htInspectionData,
+      // Queries to get unique filter options for the selected DATE only
+      uniqueEmpIds_1,
+      uniqueEmpIds_2,
+      uniqueEmpIds_3,
+      uniqueMoNos_1,
+      uniqueMoNos_2,
+      uniqueMoNos_3
+    ] = await Promise.all([
+      // Data queries with filters applied
+      HTFirstOutput.find(stringDateFilter)
+        .populate({
+          path: "operatorData.emp_reference_id",
+          select: "emp_id eng_name face_photo",
+          model: UserProd
+        })
+        .lean(),
+      SCCDailyTesting.find(stringDateFilter)
+        .populate({
+          path: "operatorData.emp_reference_id",
+          select: "emp_id eng_name face_photo",
+          model: UserProd
+        })
+        .lean(),
+      DailyTestingHTFU.find(paddedDateFilter)
+        .populate({
+          path: "operatorData.emp_reference_id",
+          select: "emp_id eng_name face_photo",
+          model: UserProd
+        })
+        .lean(),
+      HTInspectionReport.find(isoDateFilter)
+        .populate({
+          path: "operatorData.emp_reference_id",
+          select: "emp_id eng_name face_photo",
+          model: UserProd
+        })
+        .lean(),
 
-//     const slotData = {
-//       inspectionNo: Number(inspectionNo),
-//       timeSlotKey,
-//       checkedQty: Number(checkedQty),
-//       quantityIssue,
-//       measurement,
-//       defects,
-//       specificDefectReason: defects === "Reject" ? specificDefectReason : "",
-//       result,
-//       remarks: remarks || "",
-//       emp_id,
-//       isUserModified: !!isUserModified,
-//       inspectionTimestamp: new Date()
-//     };
+      // Filter option queries (only filter by date to get all options for that day)
+      HTFirstOutput.distinct("emp_id", { inspectionDate: stringDate }),
+      SCCDailyTesting.distinct("emp_id", { inspectionDate: stringDate }),
+      DailyTestingHTFU.distinct("emp_id", { inspectionDate: paddedStringDate }),
+      HTFirstOutput.distinct("moNo", { inspectionDate: stringDate }),
+      SCCDailyTesting.distinct("moNo", { inspectionDate: stringDate }),
+      DailyTestingHTFU.distinct("moNo", { inspectionDate: paddedStringDate })
+    ]);
 
-//     const existingSlotIndex = reportDoc.inspections.findIndex(
-//       (insp) => insp.timeSlotKey === timeSlotKey
-//     );
+    // Combine and get unique filter options
+    const allEmpIds = [
+      ...uniqueEmpIds_1,
+      ...uniqueEmpIds_2,
+      ...uniqueEmpIds_3,
+      ...htInspectionData.map((d) => d.emp_id)
+    ];
+    const uniqueEmpIds = [...new Set(allEmpIds)].filter(Boolean).sort();
 
-//     if (existingSlotIndex > -1) {
-//       // Update existing slot
-//       reportDoc.inspections[existingSlotIndex] = {
-//         ...reportDoc.inspections[existingSlotIndex],
-//         ...slotData
-//       };
-//     } else {
-//       // Add new slot
-//       reportDoc.inspections.push(slotData);
-//     }
+    const allMoNos = [
+      ...uniqueMoNos_1,
+      ...uniqueMoNos_2,
+      ...uniqueMoNos_3,
+      ...htInspectionData.map((d) => d.moNo)
+    ];
+    const uniqueMoNos = [...new Set(allMoNos)].filter(Boolean).sort();
 
-//     // Ensure inspections are sorted
-//     reportDoc.inspections.sort(
-//       (a, b) => (a.inspectionNo || 0) - (b.inspectionNo || 0)
-//     );
+    // Process First Output Data
+    const processedFirstOutput = firstOutputData.map((doc) => {
+      const firstSpec = doc.standardSpecification.find(
+        (s) => s.type === "first"
+      );
+      const secondSpec = doc.standardSpecification.find(
+        (s) => s.type === "2nd heat"
+      );
+      return {
+        ...doc,
+        specs: firstSpec
+          ? {
+              tempC: firstSpec.tempC,
+              timeSec: firstSpec.timeSec,
+              pressure: firstSpec.pressure
+            }
+          : {},
+        secondHeatSpecs: secondSpec
+          ? {
+              tempC: secondSpec.tempC,
+              timeSec: secondSpec.timeSec,
+              pressure: secondSpec.pressure
+            }
+          : null
+      };
+    });
 
-//     await reportDoc.save();
+    // Process and Consolidate HT Inspection Data
+    const consolidatedInspections = {};
+    htInspectionData.forEach((doc) => {
+      const key = `${doc.machineNo}-${doc.moNo}-${doc.color}-${doc.tableNo}`;
+      if (!consolidatedInspections[key]) {
+        consolidatedInspections[key] = {
+          machineNo: doc.machineNo,
+          moNo: doc.moNo,
+          buyer: doc.buyer,
+          buyerStyle: doc.buyerStyle,
+          color: doc.color,
+          operatorData: doc.operatorData,
+          batchNo: doc.batchNo,
+          tableNo: doc.tableNo,
+          totalPcs: 0,
+          totalInspectedQty: 0,
+          totalDefectsQty: 0,
+          defectSummary: {},
+          defectImageUrls: []
+        };
+      }
+      const group = consolidatedInspections[key];
+      group.totalPcs += doc.totalPcs || 0;
+      group.totalInspectedQty += doc.aqlData?.sampleSize || 0;
+      group.totalDefectsQty += doc.defectsQty || 0;
 
-//     res.status(200).json({
-//       // 200 for update, 201 for new usually, but 200 is fine for upsert-like logic
-//       success: true,
-//       message: `Elastic inspection for slot ${timeSlotKey} submitted/updated successfully.`,
-//       data: reportDoc
-//     });
-//   } catch (error) {
-//     console.error("Error submitting Elastic slot inspection:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to submit Elastic slot inspection",
-//       error: error.message
-//     });
-//   }
-// });
+      if (
+        doc.defectImageUrl &&
+        !group.defectImageUrls.includes(doc.defectImageUrl)
+      ) {
+        group.defectImageUrls.push(doc.defectImageUrl);
+      }
+
+      doc.defects.forEach((defect) => {
+        const name = defect.defectNameEng;
+        group.defectSummary[name] =
+          (group.defectSummary[name] || 0) + defect.count;
+      });
+    });
+
+    const finalInspectionArray = Object.values(consolidatedInspections).map(
+      (group) => {
+        const finalDefectRate =
+          group.totalInspectedQty > 0
+            ? group.totalDefectsQty / group.totalInspectedQty
+            : 0;
+        return {
+          ...group,
+          finalDefectRate,
+          defectImageUrl: group.defectImageUrls[0] || null
+        };
+      }
+    );
+
+    res.json({
+      firstOutput: processedFirstOutput,
+      dailyWashing: dailyWashingData,
+      machineCalibration: machineCalibrationData,
+      htInspection: finalInspectionArray,
+      filterOptions: {
+        empIds: uniqueEmpIds,
+        moNos: uniqueMoNos
+      }
+    });
+  } catch (error) {
+    console.error("Error creating consolidated HT report:", error);
+    res.status(500).json({
+      message: "Failed to generate consolidated report",
+      error: error.message
+    });
+  }
+});
+
+/* -------------------------------------
+   End Point - Final Consolidated FU Report
+------------------------------------- */
+app.get("/api/scc/final-report/fu", async (req, res) => {
+  try {
+    const { date, empId, moNo, machineNo } = req.query;
+    if (!date) {
+      return res.status(400).json({ message: "Date is required." });
+    }
+
+    const { stringDate, paddedStringDate } = getConsolidatedDateFormats(date);
+
+    // --- Build Filter Queries ---
+    const stringDateFilter = { inspectionDate: stringDate };
+    if (empId && empId !== "All") stringDateFilter.emp_id = empId;
+    if (moNo && moNo !== "All") stringDateFilter.moNo = moNo;
+    if (machineNo && machineNo !== "All")
+      stringDateFilter.machineNo = machineNo;
+
+    const paddedDateFilter = { inspectionDate: paddedStringDate };
+    if (empId && empId !== "All") paddedDateFilter.emp_id = empId;
+    if (moNo && moNo !== "All") paddedDateFilter.moNo = moNo;
+    if (machineNo && machineNo !== "All")
+      paddedDateFilter.machineNo = machineNo;
+
+    // --- Execute All FU Queries Concurrently ---
+    const [
+      firstOutputData,
+      machineCalibrationData,
+      // Queries for filter dropdowns
+      uniqueEmpIds_1,
+      uniqueEmpIds_2,
+      uniqueMoNos_1,
+      uniqueMoNos_2
+    ] = await Promise.all([
+      // Data queries with filters
+      FUFirstOutput.find(stringDateFilter)
+        .populate({
+          path: "operatorData.emp_reference_id",
+          select: "emp_id eng_name face_photo",
+          model: UserProd
+        })
+        .lean(),
+      DailyTestingFUQC.find(paddedDateFilter)
+        .populate({
+          path: "operatorData.emp_reference_id",
+          select: "emp_id eng_name face_photo",
+          model: UserProd
+        })
+        .lean(),
+
+      // Filter option queries (only by date)
+      FUFirstOutput.distinct("emp_id", { inspectionDate: stringDate }),
+      DailyTestingFUQC.distinct("emp_id", { inspectionDate: paddedStringDate }),
+      FUFirstOutput.distinct("moNo", { inspectionDate: stringDate }),
+      DailyTestingFUQC.distinct("moNo", { inspectionDate: paddedStringDate })
+    ]);
+
+    // Combine and get unique filter options
+    const allEmpIds = [...uniqueEmpIds_1, ...uniqueEmpIds_2];
+    const uniqueEmpIds = [...new Set(allEmpIds)].filter(Boolean).sort();
+
+    const allMoNos = [...uniqueMoNos_1, ...uniqueMoNos_2];
+    const uniqueMoNos = [...new Set(allMoNos)].filter(Boolean).sort();
+
+    // Process First Output Data
+    const processedFirstOutput = firstOutputData.map((doc) => {
+      const firstSpec = doc.standardSpecification.find(
+        (s) => s.type === "first"
+      );
+      return {
+        ...doc,
+        specs: firstSpec
+          ? { tempC: firstSpec.tempC, timeSec: firstSpec.timeSec }
+          : {}
+      };
+    });
+
+    res.json({
+      firstOutput: processedFirstOutput,
+      machineCalibration: machineCalibrationData,
+      filterOptions: {
+        empIds: uniqueEmpIds,
+        moNos: uniqueMoNos
+      }
+    });
+  } catch (error) {
+    console.error("Error creating consolidated FU report:", error);
+    res.status(500).json({
+      message: "Failed to generate consolidated FU report",
+      error: error.message
+    });
+  }
+});
+
+/* -------------------------------------
+   End Point - Final Consolidated EMB Report
+------------------------------------- */
+app.get("/api/scc/final-report/emb", async (req, res) => {
+  try {
+    const { date, empId, moNo, factoryName } = req.query; // New 'factoryName' filter
+    if (!date) {
+      return res.status(400).json({ message: "Date is required." });
+    }
+
+    // The EMBReport schema uses ISODate, so we only need the date range
+    const { isoStartDate, isoEndDate } = getConsolidatedDateFormats(date);
+
+    // --- Build Filter Query ---
+    const filter = { inspectionDate: { $gte: isoStartDate, $lte: isoEndDate } };
+    if (empId && empId !== "All") filter.emp_id = empId;
+    if (moNo && moNo !== "All") filter.moNo = moNo;
+    if (factoryName && factoryName !== "All") filter.factoryName = factoryName;
+
+    // --- Execute Queries Concurrently ---
+    const [
+      reportData,
+      // Queries to get unique filter options for the selected DATE only
+      uniqueEmpIds,
+      uniqueMoNos,
+      uniqueFactories
+    ] = await Promise.all([
+      // Data query with all filters applied
+      EMBReport.find(filter).lean(),
+      // Filter option queries (only filter by date)
+      EMBReport.distinct("emp_id", {
+        inspectionDate: { $gte: isoStartDate, $lte: isoEndDate }
+      }),
+      EMBReport.distinct("moNo", {
+        inspectionDate: { $gte: isoStartDate, $lte: isoEndDate }
+      }),
+      EMBReport.distinct("factoryName", {
+        inspectionDate: { $gte: isoStartDate, $lte: isoEndDate }
+      })
+    ]);
+
+    // --- Process and Consolidate Data ---
+    // This is similar to the HT Inspection consolidation logic
+    const consolidatedReports = {};
+    reportData.forEach((doc) => {
+      const key = `${doc.factoryName}-${doc.moNo}-${doc.color}-${doc.tableNo}-${doc.batchNo}`;
+      if (!consolidatedReports[key]) {
+        consolidatedReports[key] = {
+          factoryName: doc.factoryName,
+          moNo: doc.moNo,
+          buyer: doc.buyer,
+          buyerStyle: doc.buyerStyle,
+          color: doc.color,
+          batchNo: doc.batchNo,
+          tableNo: doc.tableNo,
+          totalPcs: 0,
+          totalInspectedQty: 0,
+          totalDefectsQty: 0,
+          defectSummary: {}
+        };
+      }
+      const group = consolidatedReports[key];
+      group.totalPcs += doc.totalPcs || 0;
+      group.totalInspectedQty += doc.aqlData?.sampleSize || 0;
+      group.totalDefectsQty += doc.defectsQty || 0;
+
+      (doc.defects || []).forEach((defect) => {
+        const name = defect.defectNameEng;
+        group.defectSummary[name] =
+          (group.defectSummary[name] || 0) + defect.count;
+      });
+    });
+
+    const finalReportArray = Object.values(consolidatedReports).map((group) => {
+      const finalDefectRate =
+        group.totalInspectedQty > 0
+          ? group.totalDefectsQty / group.totalInspectedQty
+          : 0;
+      return { ...group, finalDefectRate };
+    });
+
+    res.json({
+      embReport: finalReportArray,
+      filterOptions: {
+        empIds: uniqueEmpIds.filter(Boolean).sort(),
+        moNos: uniqueMoNos.filter(Boolean).sort(),
+        factories: uniqueFactories.filter(Boolean).sort()
+      }
+    });
+  } catch (error) {
+    console.error("Error creating consolidated EMB report:", error);
+    res.status(500).json({
+      message: "Failed to generate consolidated EMB report",
+      error: error.message
+    });
+  }
+});
+
+/* -------------------------------------
+   End Point - Final Consolidated Elastic Report
+------------------------------------- */
+app.get("/api/scc/final-report/elastic", async (req, res) => {
+  try {
+    const { date, empId, moNo, machineNo } = req.query;
+    if (!date) {
+      return res.status(400).json({ message: "Date is required." });
+    }
+
+    // For Elastic report, date is stored as 'YYYY-MM-DD' string
+    const d = new Date(date);
+    const formattedDate = `${d.getFullYear()}-${String(
+      d.getMonth() + 1
+    ).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+    // --- Build Filter Query ---
+    const filter = { inspectionDate: formattedDate };
+    // Note: The elasticReportSchema doesn't have a top-level emp_id for the inspector of the whole report,
+    // but we can filter by the operator's emp_id if needed. Let's assume filter is for operator.
+    if (empId && empId !== "All") filter["operatorData.emp_id"] = empId;
+    if (moNo && moNo !== "All") filter.moNo = moNo;
+    if (machineNo && machineNo !== "All") filter.machineNo = machineNo;
+
+    // --- Execute All Elastic Queries Concurrently ---
+    const [
+      reportData,
+      // Queries for filter dropdowns (based on date only)
+      uniqueEmpObjects,
+      uniqueMoNos
+    ] = await Promise.all([
+      // Data query with filters
+      ElasticReport.find(filter)
+        .populate({
+          path: "operatorData.emp_reference_id",
+          select: "emp_id eng_name face_photo",
+          model: UserProd
+        })
+        .lean(),
+      // Filter option queries (only filter by date)
+      ElasticReport.find({ inspectionDate: formattedDate })
+        .select("operatorData.emp_id")
+        .lean(),
+      ElasticReport.distinct("moNo", { inspectionDate: formattedDate })
+    ]);
+
+    // Combine and get unique filter options
+    const uniqueEmpIds = [
+      ...new Set(uniqueEmpObjects.map((item) => item.operatorData?.emp_id))
+    ]
+      .filter(Boolean)
+      .sort();
+
+    // --- Process Data for Aggregation ---
+    const processedData = reportData.map((doc) => {
+      let totalCheckedQty = 0;
+      let totalDefectsQty = 0;
+      const defectSummary = {};
+      let measurementPassCount = 0;
+      let measurementTotalCount = 0;
+
+      doc.inspections.forEach((insp) => {
+        totalCheckedQty += insp.checkedQty || 0;
+        totalDefectsQty += insp.totalDefectQty || 0;
+
+        if (insp.measurement) {
+          measurementTotalCount++;
+          if (insp.measurement === "Pass") {
+            measurementPassCount++;
+          }
+        }
+
+        (insp.defectDetails || []).forEach((defect) => {
+          defectSummary[defect.name] =
+            (defectSummary[defect.name] || 0) + defect.qty;
+        });
+      });
+
+      const totalDefectRate =
+        totalCheckedQty > 0 ? totalDefectsQty / totalCheckedQty : 0;
+
+      return {
+        ...doc,
+        totalCheckedQty,
+        totalDefectsQty,
+        defectSummary,
+        totalDefectRate,
+        measurementSummary: `${measurementPassCount}/${measurementTotalCount} Pass`
+      };
+    });
+
+    res.json({
+      elasticReport: processedData,
+      filterOptions: {
+        empIds: uniqueEmpIds,
+        moNos: uniqueMoNos.sort()
+      }
+    });
+  } catch (error) {
+    console.error("Error creating consolidated Elastic report:", error);
+    res.status(500).json({
+      message: "Failed to generate consolidated Elastic report",
+      error: error.message
+    });
+  }
+});
 
 /* ------------------------------
 Washing Live Dashboard Endpoints
