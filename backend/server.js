@@ -62,6 +62,8 @@ import createSCCElasticOperatorModel from "./models/SCCElasticOperatorModel.js";
 import createEMBDefectModel from "./models/EMBdefect.js";
 import createEMBReportModel from "./models/EMBReport.js";
 
+import createAuditCheckPointModel from "./models/AuditCheckPoint.js";
+
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
 
@@ -114,6 +116,15 @@ const io = new Server(server, {
   }
 });
 
+app.use("/storage", express.static(path.join(__dirname, "public/storage")));
+app.use("/public", express.static(path.join(__dirname, "../public")));
+
+app.use(bodyParser.json({ limit: "50mb" }));
+app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
+
+//app.use(cors());
+app.use(bodyParser.json());
+
 app.use(
   cors({
     origin: "https://192.167.14.32:3001", //["http://localhost:3001", "https://localhost:3001"],
@@ -125,13 +136,47 @@ app.use(
 
 app.options("*", cors());
 
-app.use("/storage", express.static(path.join(__dirname, "public/storage")));
-app.use("/public", express.static(path.join(__dirname, "../public")));
+// // Define allowed origins for CORS
+// const allowedOrigins = [
+//   "https://192.167.14.32:3001", // Your deployed frontend
+//   "https://localhost:3001", // For local HTTPS development
+//   "http://localhost:3001" // For local HTTP development
+// ];
 
-app.use(bodyParser.json({ limit: "50mb" }));
-app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
+// // --- Middleware Setup ---
 
-//app.use(cors());
+// // 1. Configure CORS
+// app.use(
+//   cors({
+//     origin: function (origin, callback) {
+//       // Allow requests with no origin (like mobile apps or curl requests)
+//       if (!origin) return callback(null, true);
+//       if (allowedOrigins.indexOf(origin) === -1) {
+//         const msg =
+//           "The CORS policy for this site does not allow access from the specified Origin.";
+//         return callback(new Error(msg), false);
+//       }
+//       return callback(null, true);
+//     },
+//     methods: ["GET", "POST", "PUT", "DELETE"],
+//     allowedHeaders: ["Content-Type", "Authorization"],
+//     credentials: true
+//   })
+// );
+
+// // 2. Configure Body Parsers (only need to do this once)
+// app.use(bodyParser.json({ limit: "50mb" }));
+// app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
+
+// // 3. Serve static files
+// app.use("/storage", express.static(path.join(__dirname, "public/storage")));
+// app.use("/public", express.static(path.join(__dirname, "../public")));
+
+// // 4. Set default Content-Type header
+// app.use((req, res, next) => {
+//   res.setHeader("Content-Type", "application/json; charset=utf-8");
+//   next();
+// });
 
 const ymProdConnection = mongoose.createConnection(
   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
@@ -206,6 +251,8 @@ const EMBReport = createEMBReportModel(ymProdConnection);
 const SCCHTOperator = createSCCHTOperatorModel(ymProdConnection);
 const SCCFUOperator = createSCCFUOperatorModel(ymProdConnection);
 const SCCElasticOperator = createSCCElasticOperatorModel(ymProdConnection);
+
+const AuditCheckPoint = createAuditCheckPointModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -9964,9 +10011,15 @@ app.get("/api/cutting-issues", async (req, res) => {
 });
 
 // Multer configuration for cutting images
+
+// Define the destination path and ensure the directory exists
+const cuttingUploadPath = path.join(__dirname, "public", "storage", "cutting");
+// fs.mkdirSync(cuttingUploadPath, { recursive: true }); // This creates the directory if it doesn't exist.
+
 const cutting_storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "public/storage/cutting/");
+    // 2. Use the absolute path variable here
+    cb(null, cuttingUploadPath);
   },
   filename: (req, file, cb) => {
     cb(null, `cutting-${Date.now()}${path.extname(file.originalname)}`);
@@ -9975,17 +10028,7 @@ const cutting_storage = multer.diskStorage({
 
 // const cutting_storage = multer.diskStorage({
 //   destination: (req, file, cb) => {
-//     const dir = path.join(__dirname, "public/storage/cutting/");
-//     try {
-//       // Create directory synchronously if it doesn't exist
-//       if (!fs.existsSync(dir)) {
-//         fs.mkdirSync(dir, { recursive: true });
-//       }
-//       cb(null, dir);
-//     } catch (error) {
-//       console.error("Error creating directory:", error);
-//       cb(error);
-//     }
+//     cb(null, "public/storage/cutting/");
 //   },
 //   filename: (req, file, cb) => {
 //     cb(null, `cutting-${Date.now()}${path.extname(file.originalname)}`);
@@ -13485,24 +13528,48 @@ app.post("/api/scc/emb-defects", async (req, res) => {
 ------------------------------ */
 
 // Multer setup for SCC image uploads
+// 1. Define the absolute destination path and ensure the directory exists
+const sccUploadPath = path.join(__dirname, "public", "storage", "scc_images");
+//fs.mkdirSync(sccUploadPath, { recursive: true }); // Creates the directory if it doesn't exist
+
+// 2. Update the multer storage configuration
 const sccImageStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "public/storage/scc_images");
+    // Use the absolute path variable here
+    cb(null, sccUploadPath);
   },
   filename: (req, file, cb) => {
-    // imageType should be passed in the body: 'referenceSample-HT', 'afterWash-FU', etc.
+    // This logic is complex and specific, so we keep it as is.
     const { imageType, inspectionDate } = req.body;
     const datePart = inspectionDate
       ? inspectionDate.replace(/\//g, "-")
       : new Date().toISOString().split("T")[0];
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    // Filename: imageType-date-uniqueSuffix.extension
     const filename = `${
       imageType || "sccimage"
     }-${datePart}-${uniqueSuffix}${path.extname(file.originalname)}`;
     cb(null, filename);
   }
 });
+
+// const sccImageStorage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     cb(null, "public/storage/scc_images");
+//   },
+//   filename: (req, file, cb) => {
+//     // imageType should be passed in the body: 'referenceSample-HT', 'afterWash-FU', etc.
+//     const { imageType, inspectionDate } = req.body;
+//     const datePart = inspectionDate
+//       ? inspectionDate.replace(/\//g, "-")
+//       : new Date().toISOString().split("T")[0];
+//     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+//     // Filename: imageType-date-uniqueSuffix.extension
+//     const filename = `${
+//       imageType || "sccimage"
+//     }-${datePart}-${uniqueSuffix}${path.extname(file.originalname)}`;
+//     cb(null, filename);
+//   }
+// });
 
 const sccUpload = multer({ storage: sccImageStorage });
 
@@ -16319,12 +16386,11 @@ app.get("/api/scc/final-report/emb", async (req, res) => {
 ------------------------------------- */
 app.get("/api/scc/final-report/elastic", async (req, res) => {
   try {
-    const { date, empId, moNo, machineNo } = req.query;
+    const { date, empId, operatorId, moNo, machineNo } = req.query; // Added operatorId
     if (!date) {
       return res.status(400).json({ message: "Date is required." });
     }
 
-    // For Elastic report, date is stored as 'YYYY-MM-DD' string
     const d = new Date(date);
     const formattedDate = `${d.getFullYear()}-${String(
       d.getMonth() + 1
@@ -16332,37 +16398,37 @@ app.get("/api/scc/final-report/elastic", async (req, res) => {
 
     // --- Build Filter Query ---
     const filter = { inspectionDate: formattedDate };
-    // Note: The elasticReportSchema doesn't have a top-level emp_id for the inspector of the whole report,
-    // but we can filter by the operator's emp_id if needed. Let's assume filter is for operator.
-    if (empId && empId !== "All") filter["operatorData.emp_id"] = empId;
+    if (empId && empId !== "All") filter.registeredBy_emp_id = empId; // Filter by Inspector
+    if (operatorId && operatorId !== "All")
+      filter["operatorData.emp_id"] = operatorId; // Filter by Operator
     if (moNo && moNo !== "All") filter.moNo = moNo;
     if (machineNo && machineNo !== "All") filter.machineNo = machineNo;
 
     // --- Execute All Elastic Queries Concurrently ---
-    const [
-      reportData,
-      // Queries for filter dropdowns (based on date only)
-      uniqueEmpObjects,
-      uniqueMoNos
-    ] = await Promise.all([
-      // Data query with filters
-      ElasticReport.find(filter)
-        .populate({
-          path: "operatorData.emp_reference_id",
-          select: "emp_id eng_name face_photo",
-          model: UserProd
-        })
-        .lean(),
-      // Filter option queries (only filter by date)
-      ElasticReport.find({ inspectionDate: formattedDate })
-        .select("operatorData.emp_id")
-        .lean(),
-      ElasticReport.distinct("moNo", { inspectionDate: formattedDate })
-    ]);
+    const [reportData, uniqueInspectorIds, uniqueOperatorObjects, uniqueMoNos] =
+      await Promise.all([
+        // Data query with all filters
+        ElasticReport.find(filter)
+          .populate({
+            path: "operatorData.emp_reference_id",
+            select: "emp_id eng_name face_photo",
+            model: UserProd
+          })
+          .lean(),
+
+        // Filter option queries (based on date only)
+        ElasticReport.distinct("registeredBy_emp_id", {
+          inspectionDate: formattedDate
+        }),
+        ElasticReport.find({ inspectionDate: formattedDate })
+          .select("operatorData.emp_id")
+          .lean(),
+        ElasticReport.distinct("moNo", { inspectionDate: formattedDate })
+      ]);
 
     // Combine and get unique filter options
-    const uniqueEmpIds = [
-      ...new Set(uniqueEmpObjects.map((item) => item.operatorData?.emp_id))
+    const uniqueOperatorIds = [
+      ...new Set(uniqueOperatorObjects.map((item) => item.operatorData?.emp_id))
     ]
       .filter(Boolean)
       .sort();
@@ -16408,7 +16474,8 @@ app.get("/api/scc/final-report/elastic", async (req, res) => {
     res.json({
       elasticReport: processedData,
       filterOptions: {
-        empIds: uniqueEmpIds,
+        empIds: uniqueInspectorIds.filter(Boolean).sort(),
+        operatorIds: uniqueOperatorIds,
         moNos: uniqueMoNos.sort()
       }
     });
@@ -19009,6 +19076,434 @@ app.get("/api/packing/hourly-summary", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch hourly Packing summary" });
   }
 });
+
+/* ------------------------------------
+   End Points - Audit Image
+------------------------------------ */
+
+// 1. Define the absolute destination path and ensure the directory exists
+const auditUploadPath = path.join(
+  __dirname,
+  "public",
+  "storage",
+  "audit_images"
+);
+fs.mkdirSync(auditUploadPath, { recursive: true }); // This is the correct way to ensure the directory exists
+
+// 2. Update the multer storage configuration
+const audit_storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // Use the absolute path variable here
+    cb(null, auditUploadPath);
+  },
+  filename: (req, file, cb) => {
+    // Sanitize requirementId or use a UUID for more robust filenames
+    const requirementId = req.body.requirementId || "unknown";
+    cb(
+      null,
+      `audit-${requirementId}-${Date.now()}${path.extname(file.originalname)}`
+    );
+  }
+});
+
+// // Multer configuration for audit images
+// const audit_storage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     const dir = "public/storage/audit_images/"; // Main directory
+//     // You might want to create subdirectories, e.g., by auditId or date
+//     // fs.mkdirSync(dir, { recursive: true }); // Ensure directory exists (if not using dynamic subdirs)
+//     cb(null, dir);
+//   },
+//   filename: (req, file, cb) => {
+//     // Sanitize requirementId or use a UUID for more robust filenames
+//     const requirementId = req.body.requirementId || "unknown";
+//     cb(
+//       null,
+//       `audit-${requirementId}-${Date.now()}${path.extname(file.originalname)}`
+//     );
+//   }
+// });
+
+const audit_image_upload = multer({
+  storage: audit_storage,
+  fileFilter: (req, file, cb) => {
+    // Same fileFilter as your cutting_upload
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif"]; // Added GIF
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG, GIF images are allowed"), false);
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
+// Audit Image upload endpoint
+app.post(
+  "/api/audit/upload-image",
+  audit_image_upload.single("auditImage"), // field name in FormData
+  (req, res) => {
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No file uploaded" });
+    }
+    // Store relative path to be used with API_BASE_URL on client
+    const relativePath = `/storage/audit_images/${req.file.filename}`;
+    res.status(200).json({
+      success: true,
+      filePath: relativePath,
+      message: "Image uploaded successfully"
+    });
+  }
+);
+
+/* ------------------------------------
+   End Points - Audit Check Points
+------------------------------------ */
+
+// GET all audit checkpoints, sorted by mainTitleNo
+app.get("/api/audit-checkpoints", async (req, res) => {
+  try {
+    const checkpoints = await AuditCheckPoint.find({})
+      .sort({ mainTitleNo: 1 })
+      .lean();
+    res.json(checkpoints);
+  } catch (error) {
+    console.error("Error fetching audit checkpoints:", error);
+    res
+      .status(500)
+      .json({ message: "Server error fetching audit checkpoints" });
+  }
+});
+
+// GET unique section titles for dropdowns
+app.get("/api/audit-checkpoints/unique-section-titles", async (req, res) => {
+  try {
+    const titles = await AuditCheckPoint.aggregate([
+      {
+        $group: {
+          _id: null,
+          eng: { $addToSet: "$sectionTitleEng" },
+          khmer: { $addToSet: "$sectionTitleKhmer" },
+          chinese: { $addToSet: "$sectionTitleChinese" }
+        }
+      },
+      { $project: { _id: 0, eng: 1, khmer: 1, chinese: 1 } }
+    ]);
+    res.json(
+      titles.length > 0 ? titles[0] : { eng: [], khmer: [], chinese: [] }
+    );
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching unique section titles" });
+  }
+});
+
+// GET unique main topics for dropdowns (can be filtered by mainTitle if needed)
+app.get("/api/audit-checkpoints/unique-main-topics", async (req, res) => {
+  try {
+    // This gets all unique topics across all checkpoints.
+    // You might want to filter by a specific checkpoint if adding to an existing one.
+    const topics = await AuditCheckPoint.aggregate([
+      { $unwind: "$requirements" },
+      {
+        $group: {
+          _id: null,
+          eng: { $addToSet: "$requirements.mainTopicEng" },
+          khmer: { $addToSet: "$requirements.mainTopicKhmer" },
+          chinese: { $addToSet: "$requirements.mainTopicChinese" }
+        }
+      },
+      { $project: { _id: 0, eng: 1, khmer: 1, chinese: 1 } }
+    ]);
+    res.json(
+      topics.length > 0 ? topics[0] : { eng: [], khmer: [], chinese: [] }
+    );
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching unique main topics" });
+  }
+});
+
+// POST - Create a new audit checkpoint section (e.g., QMS, Fabric)
+app.post("/api/audit-checkpoints", async (req, res) => {
+  try {
+    const {
+      mainTitle,
+      mainTitleNo,
+      sectionTitleEng,
+      sectionTitleKhmer,
+      sectionTitleChinese
+      // requirements array will be empty initially or can be sent
+    } = req.body;
+
+    if (
+      !mainTitle ||
+      mainTitleNo === undefined ||
+      !sectionTitleEng ||
+      !sectionTitleKhmer ||
+      !sectionTitleChinese
+    ) {
+      return res.status(400).json({
+        message: "All main title and section title fields are required."
+      });
+    }
+
+    const existingCheckpointByNo = await AuditCheckPoint.findOne({
+      mainTitleNo
+    });
+    if (existingCheckpointByNo) {
+      return res
+        .status(409)
+        .json({ message: `Main Title No '${mainTitleNo}' already exists.` });
+    }
+    const existingCheckpointByTitle = await AuditCheckPoint.findOne({
+      mainTitle
+    });
+    if (existingCheckpointByTitle) {
+      return res
+        .status(409)
+        .json({ message: `Main Title '${mainTitle}' already exists.` });
+    }
+
+    const newCheckpoint = new AuditCheckPoint({
+      mainTitle,
+      mainTitleNo,
+      sectionTitleEng,
+      sectionTitleKhmer,
+      sectionTitleChinese,
+      requirements: [] // Start with no requirements, add them separately
+    });
+    await newCheckpoint.save();
+    res.status(201).json({
+      message: "Audit checkpoint section created successfully",
+      checkpoint: newCheckpoint
+    });
+  } catch (error) {
+    console.error("Error creating audit checkpoint section:", error);
+    if (error.code === 11000)
+      return res
+        .status(409)
+        .json({ message: "Duplicate Main Title or Main Title No." });
+    res
+      .status(500)
+      .json({ message: "Server error creating checkpoint section" });
+  }
+});
+
+// PUT - Update an audit checkpoint section's titles (not requirements here)
+app.put("/api/audit-checkpoints/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      mainTitle,
+      mainTitleNo,
+      sectionTitleEng,
+      sectionTitleKhmer,
+      sectionTitleChinese
+    } = req.body;
+
+    if (
+      !mainTitle ||
+      mainTitleNo === undefined ||
+      !sectionTitleEng ||
+      !sectionTitleKhmer ||
+      !sectionTitleChinese
+    ) {
+      return res.status(400).json({
+        message:
+          "All main title and section title fields are required for update."
+      });
+    }
+
+    // Check for duplicates excluding current
+    const existingByNo = await AuditCheckPoint.findOne({
+      mainTitleNo,
+      _id: { $ne: id }
+    });
+    if (existingByNo)
+      return res
+        .status(409)
+        .json({ message: `Main Title No '${mainTitleNo}' already taken.` });
+    const existingByTitle = await AuditCheckPoint.findOne({
+      mainTitle,
+      _id: { $ne: id }
+    });
+    if (existingByTitle)
+      return res
+        .status(409)
+        .json({ message: `Main Title '${mainTitle}' already taken.` });
+
+    const updatedCheckpoint = await AuditCheckPoint.findByIdAndUpdate(
+      id,
+      {
+        mainTitle,
+        mainTitleNo,
+        sectionTitleEng,
+        sectionTitleKhmer,
+        sectionTitleChinese
+      },
+      { new: true, runValidators: true }
+    );
+    if (!updatedCheckpoint)
+      return res
+        .status(404)
+        .json({ message: "Audit checkpoint section not found." });
+    res.json({
+      message: "Audit checkpoint section updated successfully",
+      checkpoint: updatedCheckpoint
+    });
+  } catch (error) {
+    console.error("Error updating audit checkpoint section:", error);
+    if (error.code === 11000)
+      return res
+        .status(409)
+        .json({ message: "Duplicate Main Title or Main Title No on update." });
+    res
+      .status(500)
+      .json({ message: "Server error updating checkpoint section" });
+  }
+});
+
+// DELETE - Delete an entire audit checkpoint section
+app.delete("/api/audit-checkpoints/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedCheckpoint = await AuditCheckPoint.findByIdAndDelete(id);
+    if (!deletedCheckpoint)
+      return res
+        .status(404)
+        .json({ message: "Audit checkpoint section not found." });
+    res.json({ message: "Audit checkpoint section deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting audit checkpoint section:", error);
+    res
+      .status(500)
+      .json({ message: "Server error deleting checkpoint section" });
+  }
+});
+
+// --- Requirements within a Checkpoint Section ---
+
+// POST - Add a requirement to a specific checkpoint section
+app.post(
+  "/api/audit-checkpoints/:checkpointId/requirements",
+  async (req, res) => {
+    try {
+      const { checkpointId } = req.params;
+      const requirementData = req.body; // { mainTopicEng, ..., mustHave }
+
+      // Basic validation for requirement data
+      if (
+        !requirementData.mainTopicEng ||
+        !requirementData.no ||
+        !requirementData.pointTitleEng ||
+        !requirementData.pointDescriptionEng ||
+        requirementData.levelValue === undefined ||
+        requirementData.mustHave === undefined
+      ) {
+        return res
+          .status(400)
+          .json({ message: "Missing required fields for the requirement." });
+      }
+
+      const checkpoint = await AuditCheckPoint.findById(checkpointId);
+      if (!checkpoint)
+        return res
+          .status(404)
+          .json({ message: "Audit checkpoint section not found." });
+
+      // Check if requirement 'no' already exists in this section
+      const existingRequirementNo = checkpoint.requirements.find(
+        (r) => r.no === requirementData.no
+      );
+      if (existingRequirementNo) {
+        return res.status(409).json({
+          message: `Requirement No. '${requirementData.no}' already exists in this section.`
+        });
+      }
+
+      checkpoint.requirements.push(requirementData);
+      await checkpoint.save();
+      res
+        .status(201)
+        .json({ message: "Requirement added successfully", checkpoint });
+    } catch (error) {
+      console.error("Error adding requirement:", error);
+      res.status(500).json({ message: "Server error adding requirement" });
+    }
+  }
+);
+
+// PUT - Update a specific requirement within a checkpoint section
+app.put(
+  "/api/audit-checkpoints/:checkpointId/requirements/:requirementId",
+  async (req, res) => {
+    try {
+      const { checkpointId, requirementId } = req.params;
+      const updatedRequirementData = req.body;
+
+      const checkpoint = await AuditCheckPoint.findById(checkpointId);
+      if (!checkpoint)
+        return res
+          .status(404)
+          .json({ message: "Audit checkpoint section not found." });
+
+      const requirement = checkpoint.requirements.id(requirementId);
+      if (!requirement)
+        return res.status(404).json({ message: "Requirement not found." });
+
+      // Check for 'no' conflict if 'no' is being changed
+      if (
+        updatedRequirementData.no &&
+        updatedRequirementData.no !== requirement.no
+      ) {
+        const existingRequirementNo = checkpoint.requirements.find(
+          (r) =>
+            r.no === updatedRequirementData.no &&
+            r._id.toString() !== requirementId
+        );
+        if (existingRequirementNo) {
+          return res.status(409).json({
+            message: `Requirement No. '${updatedRequirementData.no}' already exists in this section for another item.`
+          });
+        }
+      }
+
+      Object.assign(requirement, updatedRequirementData); // Update the subdocument
+      await checkpoint.save();
+      res.json({ message: "Requirement updated successfully", checkpoint });
+    } catch (error) {
+      console.error("Error updating requirement:", error);
+      res.status(500).json({ message: "Server error updating requirement" });
+    }
+  }
+);
+
+// DELETE - Delete a specific requirement from a checkpoint section
+app.delete(
+  "/api/audit-checkpoints/:checkpointId/requirements/:requirementId",
+  async (req, res) => {
+    try {
+      const { checkpointId, requirementId } = req.params;
+      const checkpoint = await AuditCheckPoint.findById(checkpointId);
+      if (!checkpoint)
+        return res
+          .status(404)
+          .json({ message: "Audit checkpoint section not found." });
+
+      const requirement = checkpoint.requirements.id(requirementId);
+      if (!requirement)
+        return res.status(404).json({ message: "Requirement not found." });
+
+      requirement.remove(); // Mongoose subdocument remove method
+      await checkpoint.save();
+      res.json({ message: "Requirement deleted successfully", checkpoint });
+    } catch (error) {
+      console.error("Error deleting requirement:", error);
+      res.status(500).json({ message: "Server error deleting requirement" });
+    }
+  }
+);
 
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {

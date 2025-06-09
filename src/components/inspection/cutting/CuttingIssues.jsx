@@ -93,14 +93,26 @@ const CuttingIssues = forwardRef(({ moNo, selectedPanel }, ref) => {
           withCredentials: true
         }
       );
-      const imageUrl = `${API_BASE_URL}${response.data.url}`;
-      if (index === null) {
-        setAdditionalImages([...additionalImages, imageUrl]);
-      } else {
-        const newIssues = [...issues];
-        newIssues[index].evidence = imageUrl;
-        setIssues(newIssues);
+      const imagePath = response.data.url; // This will be "/storage/cutting/..."
+      if (imagePath) {
+        if (index === null) {
+          // For additional images
+          setAdditionalImages([...additionalImages, imagePath]);
+        } else {
+          // For issue evidence
+          const newIssues = [...issues];
+          newIssues[index].evidence = imagePath;
+          setIssues(newIssues);
+        }
       }
+      // const imageUrl = `${API_BASE_URL}${response.data.url}`;
+      // if (index === null) {
+      //   setAdditionalImages([...additionalImages, imageUrl]);
+      // } else {
+      //   const newIssues = [...issues];
+      //   newIssues[index].evidence = imageUrl;
+      //   setIssues(newIssues);
+      // }
     } catch (error) {
       console.error("Error uploading image:", error);
     }
@@ -304,7 +316,8 @@ const CuttingIssues = forwardRef(({ moNo, selectedPanel }, ref) => {
           {additionalImages.map((img, idx) => (
             <div key={idx} className="relative">
               <img
-                src={img}
+                //src={img}
+                src={`${API_BASE_URL}${img}`}
                 alt="Additional"
                 className="w-32 h-32 object-cover rounded cursor-pointer"
                 onClick={() => openImagePopup(img)}
@@ -384,7 +397,8 @@ const CuttingIssues = forwardRef(({ moNo, selectedPanel }, ref) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-4 rounded-lg max-w-3xl max-h-[80vh] overflow-auto">
             <img
-              src={selectedImage}
+              //src={selectedImage}
+              src={`${API_BASE_URL}${selectedImage}`}
               alt="Preview"
               className="max-w-full max-h-[70vh] object-contain"
             />

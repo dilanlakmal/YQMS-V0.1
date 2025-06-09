@@ -49,6 +49,8 @@ import { BluetoothProvider } from "./components/context/BluetoothContext.jsx";
 import { FormDataProvider } from "./components/context/FormDataContext";
 import CuttingPage from "./pages/Cutting.jsx";
 
+import QAAudit from "./pages/QAAudit.jsx";
+
 export const BluetoothContext = createContext(null);
 
 function AppContent() {
@@ -345,6 +347,7 @@ function AppContent() {
               <Route path="/cutting" element={<CuttingPage />} />
               <Route path="/scc" element={<SCCPage />} />
               <Route path="/sysadmin" element={<SystemAdmin />} />
+              <Route path="/audit" element={<QAAudit />} />
               <Route path="/inline-emp" element={<EmpData />} />
               <Route path="/opa" element={<OPAPage />} />
               <Route path="/packing" element={<PackingPage />} />
