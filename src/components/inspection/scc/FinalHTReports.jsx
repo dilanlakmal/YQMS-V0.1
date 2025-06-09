@@ -583,7 +583,18 @@ const FinalHTReports = () => {
     {
       key: "defectRate",
       label: "sccHTInspection.defectRate",
-      render: (row) => `${(row.finalDefectRate * 100).toFixed(2)}%`
+      render: (row) => (
+        // Add a parent span with the conditional background color
+        <span
+          className={`inline-block w-full text-center p-1 rounded-md ${
+            row.finalDefectRate > 0
+              ? "bg-red-100 text-red-700"
+              : "bg-green-100 text-green-700"
+          }`}
+        >
+          {`${(row.finalDefectRate * 100).toFixed(2)}%`}
+        </span>
+      )
     }
   ];
 

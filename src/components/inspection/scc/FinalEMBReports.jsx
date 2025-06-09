@@ -7,7 +7,7 @@ import {
   Palette,
   RefreshCw
 } from "lucide-react";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useTranslation } from "react-i18next";
@@ -41,7 +41,7 @@ const FinalEMBReports = () => {
           `${API_BASE_URL}/api/scc/final-report/emb`,
           {
             params: {
-              date: date.toISOString(), // EMB schema uses ISODate
+              date: date.toISOString(),
               factoryName: factory,
               empId,
               moNo
@@ -49,7 +49,6 @@ const FinalEMBReports = () => {
           }
         );
         setReportData(response.data.embReport || []);
-        // Set filter options only when all filters are 'All'
         if (factory === "All" && empId === "All" && moNo === "All") {
           setFilterOptions(
             response.data.filterOptions || {
@@ -101,7 +100,46 @@ const FinalEMBReports = () => {
     return [...data].sort((a, b) => a.factoryName.localeCompare(b.factoryName));
   };
 
-  const columns = [
+  // --- NEW: Memoized function to calculate factory summary ---
+  const factorySummaryData = useMemo(() => {
+    if (!reportData || reportData.length === 0) return [];
+
+    const summary = {};
+    // { 'Tong Chai': { totalPcs: 100, ... }, 'WEL': { ... } }
+
+    reportData.forEach((row) => {
+      const factory = row.factoryName;
+      if (!summary[factory]) {
+        summary[factory] = {
+          factoryName: factory,
+          totalPcs: 0,
+          totalInspectedQty: 0,
+          totalDefectsQty: 0,
+          defectSummary: {}
+        };
+      }
+
+      const factoryGroup = summary[factory];
+      factoryGroup.totalPcs += row.totalPcs || 0;
+      factoryGroup.totalInspectedQty += row.totalInspectedQty || 0;
+      factoryGroup.totalDefectsQty += row.totalDefectsQty || 0;
+
+      Object.entries(row.defectSummary).forEach(([defectName, qty]) => {
+        factoryGroup.defectSummary[defectName] =
+          (factoryGroup.defectSummary[defectName] || 0) + qty;
+      });
+    });
+
+    return Object.values(summary).map((group) => ({
+      ...group,
+      finalDefectRate:
+        group.totalInspectedQty > 0
+          ? group.totalDefectsQty / group.totalInspectedQty
+          : 0
+    }));
+  }, [reportData]);
+
+  const detailColumns = [
     { key: "factory", label: "scc.factory", render: (row) => row.factoryName },
     { key: "moNo", label: "scc.moNo", render: (row) => row.moNo },
     { key: "buyer", label: "scc.buyer", render: (row) => row.buyer },
@@ -152,9 +190,117 @@ const FinalEMBReports = () => {
     {
       key: "defectRate",
       label: "sccEMBReport.defectRate",
-      render: (row) => `${(row.finalDefectRate * 100).toFixed(2)}%`
+      render: (row) => (
+        <span
+          className={`inline-block w-full text-center p-1 rounded-md font-semibold ${
+            row.finalDefectRate > 0
+              ? "bg-red-100 text-red-700"
+              : "bg-green-100 text-green-700"
+          }`}
+        >{`${(row.finalDefectRate * 100).toFixed(2)}%`}</span>
+      )
     }
   ];
+
+  // --- NEW: Columns definition for the summary table ---
+  const summaryColumns = [
+    {
+      key: "factory",
+      label: "scc.factory",
+      render: (row) => <span className="font-bold">{row.factoryName}</span>
+    },
+    {
+      key: "totalPcs",
+      label: "sccEMBReport.totalPcs",
+      render: (row) => row.totalPcs
+    },
+    {
+      key: "inspQty",
+      label: "sccEMBReport.inspQty",
+      render: (row) => row.totalInspectedQty
+    },
+    {
+      key: "defectsQty",
+      label: "sccEMBReport.defectsQty",
+      render: (row) => row.totalDefectsQty
+    },
+    {
+      key: "defectDetails",
+      label: "sccEMBReport.defectDetails",
+      render: (row) => (
+        <div className="text-xs">
+          {Object.entries(row.defectSummary).map(([name, qty]) => (
+            <div key={name}>
+              {name}: {qty}
+            </div>
+          ))}
+        </div>
+      )
+    },
+    {
+      key: "defectRate",
+      label: "sccEMBReport.defectRate",
+      render: (row) => (
+        <span
+          className={`inline-block w-full text-center p-1 rounded-md font-semibold ${
+            row.finalDefectRate > 0
+              ? "bg-red-100 text-red-700"
+              : "bg-green-100 text-green-700"
+          }`}
+        >{`${(row.finalDefectRate * 100).toFixed(2)}%`}</span>
+      )
+    }
+  ];
+
+  const renderTable = (titleKey, data, columns) => (
+    <section className="mb-8 p-4 bg-white border border-slate-200 rounded-lg shadow-md">
+      <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center">
+        <BookOpen className="mr-3 text-indigo-600" />
+        {t(titleKey)}
+      </h2>
+      <div className="overflow-x-auto pretty-scrollbar">
+        <table className="min-w-full text-sm border-collapse">
+          <thead className="bg-slate-100">
+            <tr>
+              {columns.map((col) => (
+                <th
+                  key={col.key}
+                  className="p-2 border border-slate-300 text-left font-semibold text-slate-600"
+                >
+                  {t(col.label)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {data.length > 0 ? (
+              data.map((row, rowIndex) => (
+                <tr key={rowIndex} className="hover:bg-slate-50">
+                  {columns.map((col) => (
+                    <td
+                      key={`${col.key}-${rowIndex}`}
+                      className="p-2 border border-slate-300 align-top"
+                    >
+                      {col.render(row)}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  className="p-4 text-center text-slate-500 italic"
+                >
+                  {t("scc.finalReports.noData")}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
 
   return (
     <div>
@@ -164,9 +310,11 @@ const FinalEMBReports = () => {
         </h1>
         <p className="text-sm text-slate-600">
           SCC - EMB Daily Reports | {selectedDate.toLocaleDateString()} |{" "}
-          {selectedFactory === "All" ? "All Factories" : selectedFactory} |{" "}
-          {selectedEmpId === "All" ? "All EMP" : selectedEmpId} |{" "}
-          {selectedMoNo === "All" ? "All MOs" : selectedMoNo}
+          {selectedFactory === "All"
+            ? t("scc.finalReports.allFactories")
+            : selectedFactory}{" "}
+          | {selectedEmpId === "All" ? t("scc.allEmpIds") : selectedEmpId} |{" "}
+          {selectedMoNo === "All" ? t("scc.allMoNos") : selectedMoNo}
         </p>
       </div>
 
@@ -200,7 +348,7 @@ const FinalEMBReports = () => {
               onChange={(e) => setSelectedFactory(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded-md bg-white text-sm"
             >
-              <option value="All">All Factories</option>
+              <option value="All">{t("scc.finalReports.allFactories")}</option>
               {filterOptions.factories.map((f) => (
                 <option key={f} value={f}>
                   {f}
@@ -221,7 +369,7 @@ const FinalEMBReports = () => {
               onChange={(e) => setSelectedEmpId(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded-md bg-white text-sm"
             >
-              <option value="All">All EMP IDs</option>
+              <option value="All">{t("scc.allEmpIds")}</option>
               {filterOptions.empIds.map((id) => (
                 <option key={id} value={id}>
                   {id}
@@ -242,7 +390,7 @@ const FinalEMBReports = () => {
               onChange={(e) => setSelectedMoNo(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded-md bg-white text-sm"
             >
-              <option value="All">All MO Nos</option>
+              <option value="All">{t("scc.allMoNos")}</option>
               {filterOptions.moNos.map((mo) => (
                 <option key={mo} value={mo}>
                   {mo}
@@ -262,66 +410,30 @@ const FinalEMBReports = () => {
         </div>
       </div>
 
-      <section className="mb-8 p-4 bg-white border border-slate-200 rounded-lg shadow-md">
-        <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center">
-          <Palette className="mr-3 text-indigo-600" />
-          {t(
-            "scc.finalReports.embCheckingTitle",
-            "Daily Embroidery Checking Reports"
+      {loading ? (
+        <div className="text-center p-10">
+          <Loader2 className="animate-spin h-12 w-12 text-indigo-600 mx-auto" />
+        </div>
+      ) : error ? (
+        <div className="text-center p-10 text-red-600 bg-red-100 rounded-md">
+          {error}
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {/* --- NEW: Render the summary table --- */}
+          {renderTable(
+            "scc.finalReports.embFactorySummaryTitle",
+            factorySummaryData,
+            summaryColumns
           )}
-        </h2>
-        {loading ? (
-          <div className="text-center p-10">
-            <Loader2 className="animate-spin h-12 w-12 text-indigo-600 mx-auto" />
-          </div>
-        ) : error ? (
-          <div className="text-center p-10 text-red-600 bg-red-100 rounded-md">
-            {error}
-          </div>
-        ) : (
-          <div className="overflow-x-auto pretty-scrollbar">
-            <table className="min-w-full text-sm border-collapse">
-              <thead className="bg-slate-100">
-                <tr>
-                  {columns.map((col) => (
-                    <th
-                      key={col.key}
-                      className="p-2 border border-slate-300 text-left font-semibold text-slate-600"
-                    >
-                      {t(col.label)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {reportData.length > 0 ? (
-                  sortByFactory(reportData).map((row, rowIndex) => (
-                    <tr key={rowIndex} className="hover:bg-slate-50">
-                      {columns.map((col) => (
-                        <td
-                          key={`${col.key}-${rowIndex}`}
-                          className="p-2 border border-slate-300 align-top"
-                        >
-                          {col.render(row)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={columns.length}
-                      className="p-4 text-center text-slate-500 italic"
-                    >
-                      {t("scc.finalReports.noData")}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+          {/* Render the detailed table */}
+          {renderTable(
+            "scc.finalReports.embCheckingTitle",
+            sortByFactory(reportData),
+            detailColumns
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -1,7 +1,6 @@
 import axios from "axios";
 import {
   BookOpen,
-  CalendarDays,
   Check,
   Clock,
   Filter as FilterIcon,
@@ -85,16 +84,26 @@ const SpecsCell = ({ temp, time }) => (
   </div>
 );
 
-const TimeSlotSpecsCell = ({ icon, label, actual, required }) => {
+// --- MODIFICATION HERE: Corrected TimeSlotSpecsCell ---
+const TimeSlotSpecsCell = ({
+  icon,
+  label,
+  actual,
+  required,
+  tolerance = 0
+}) => {
   const isPass = () => {
     if (
       actual === null ||
       actual === undefined ||
       required === null ||
       required === undefined
-    )
-      return null;
-    return Number(actual) === Number(required);
+    ) {
+      return null; // Undetermined state
+    }
+    // Use the tolerance for comparison
+    const diff = Math.abs(Number(actual) - Number(required));
+    return diff <= tolerance;
   };
   const status = isPass();
   return (
@@ -325,12 +334,19 @@ const FinalFUReports = () => {
                 </div>
               );
             }
+
+            // --- MODIFICATION HERE: Correct tolerance logic ---
             const tempIsPass =
-              Number(inspection.temp_actual) === Number(row.baseReqTemp); // FU has specific tolerance logic in its daily form, but here we simplify
+              Math.abs(
+                (inspection.temp_actual ?? 0) - (row.baseReqTemp ?? 0)
+              ) <= 5;
             const timeIsPass =
-              Number(inspection.time_actual) === Number(row.baseReqTime);
+              Number(inspection.time_actual ?? null) ===
+              Number(row.baseReqTime ?? null);
+
             const isOverallFail = !tempIsPass || !timeIsPass;
             const bgColor = isOverallFail ? "bg-red-50" : "bg-green-50";
+
             return (
               <div
                 key={slot.key}
@@ -346,12 +362,14 @@ const FinalFUReports = () => {
                   label="T"
                   actual={inspection.temp_actual}
                   required={row.baseReqTemp}
+                  tolerance={5} // Pass the tolerance for temperature
                 />
                 <TimeSlotSpecsCell
                   icon={<Clock size={12} className="mr-1.5 text-blue-500" />}
                   label="t"
                   actual={inspection.time_actual}
                   required={row.baseReqTime}
+                  tolerance={0} // Tolerance for time is 0 (exact match)
                 />
               </div>
             );

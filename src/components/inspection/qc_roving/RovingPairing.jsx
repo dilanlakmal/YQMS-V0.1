@@ -1259,13 +1259,6 @@ const RovingPairing = () => {
     };
   });
 
-  // const inspectionRepOptions = [1, 2, 3, 4, 5].map((num) => ({
-  //   value: `${num}${
-  //     ["th", "st", "nd", "rd"][(num - 1) % 10 > 2 ? 0 : (num - 1) % 10] || "th"
-  //   } Inspection`,
-  //   label: t(`ordinalInspection`, { count: num })
-  // }));
-
   // --- API and Data Fetching ---
   useEffect(() => {
     const fetchDefects = async () => {
