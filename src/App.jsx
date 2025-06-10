@@ -32,6 +32,7 @@ import RovingPage from "./pages/Roving";
 import EmpData from "./pages/EmpData.jsx";
 import SystemAdmin from "./pages/SystemAdmin.jsx";
 import SCCPage from "./pages/SCC.jsx";
+import QAInspectionEvaluation from "./pages/QAInspectionEvaluation.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -348,6 +349,7 @@ function AppContent() {
               <Route path="/scc" element={<SCCPage />} />
               <Route path="/sysadmin" element={<SystemAdmin />} />
               <Route path="/audit" element={<QAAudit />} />
+              <Route path="/qa-pivot" element={<QAInspectionEvaluation />} />
               <Route path="/inline-emp" element={<EmpData />} />
               <Route path="/opa" element={<OPAPage />} />
               <Route path="/packing" element={<PackingPage />} />

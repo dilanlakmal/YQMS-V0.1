@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   CheckSquare,
   ThermometerSnowflake,
+  Combine,
   Users, // << CHANGED from UsersCog to Users
   SlidersHorizontal
 } from "lucide-react";
@@ -24,6 +25,7 @@ import CuttingDefectsModifyAdd from "../components/inspection/cutting/CuttingDef
 import SCCDefectsModifyAdd from "../components/inspection/scc/SCCDefectsModifyAdd";
 import CuttingInspectionManage from "../components/inspection/cutting/CuttingInspectionManage";
 import SCCOperatorsManage from "../components/inspection/scc/SCCOperatorsManage";
+import RovingMasterDataManage from "../components/inspection/qc_roving/RovingMasterDataManage";
 
 // Placeholder components for other tabs
 const PlaceholderComponent = ({ titleKey, contentKey }) => {
@@ -55,6 +57,12 @@ const SystemAdmin = () => {
         labelKey: "systemAdmin.rovingDefects",
         icon: <CheckCircle size={18} />,
         component: <DefectBuyerStatus />
+      },
+      {
+        id: "rovingPairing",
+        labelKey: "systemAdmin.rovingPairing",
+        icon: <Combine size={18} />,
+        component: <RovingMasterDataManage />
       },
       {
         id: "cuttingPoints",

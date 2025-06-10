@@ -245,6 +245,13 @@ function Home() {
           description: "Power BI Report"
         },
         {
+          path: "/qa-pivot",
+          roles: ["Admin", "QA Pivot"], // Matches "QA Pivot" role
+          image: "assets/Home/qalogo.png",
+          title: "QA YM/Sub Con Evaluation",
+          description: "Upload Excel / Dashboard"
+        },
+        {
           path: "/qc1-sunrise",
           roles: ["Admin", "QC1 Sunrise"], // Matches "QC1 Sunrise" role
           image: "assets/Home/sunrise.png",
