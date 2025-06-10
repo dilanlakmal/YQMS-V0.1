@@ -7905,67 +7905,10 @@ const sanitize = (input) => {
 // Roving Image Upload
 // --------------------------------------------------------------------------
 
-// --- Multer Configuration for Roving Images ---
+// 1. Use memoryStorage. This is simple and reliable.
+const rovingStorage = multer.memoryStorage();
 
-// 1. Define the single, absolute destination path for all roving images.
-const qcinlineUploadPath = path.join(
-  __dirname,
-  "public",
-  "storage",
-  "qcinline"
-);
-
-// 2. Ensure this directory exists when the server starts.
-// This is a one-time operation.
-try {
-  fs.mkdirSync(qcinlineUploadPath, { recursive: true });
-} catch (error) {
-  console.error("Could not create qcinline upload directory:", error);
-}
-
-// 3. Configure multer's disk storage.
-const rovingStorage = multer.diskStorage({
-  // The 'destination' is now a static, absolute path.
-  destination: (req, file, cb) => {
-    cb(null, qcinlineUploadPath);
-  },
-
-  // The 'filename' function creates the unique filename.
-  filename: async (req, file, cb) => {
-    try {
-      const { imageType, date, lineNo, moNo, operationId } = req.body;
-      const fileExtension = path.extname(file.originalname);
-
-      // Sanitize all parts of the filename
-      const sanitizedImageType = sanitize(imageType.toUpperCase());
-      const sanitizedDate = sanitize(date);
-      const sanitizedLineNo = sanitize(lineNo);
-      const sanitizedMoNo = sanitize(moNo);
-      const sanitizedOperationId = sanitize(operationId);
-
-      // Construct a prefix that includes the image type to keep it unique
-      const imagePrefix = `${sanitizedImageType}_${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
-
-      // Find the next available index for the filename within the single directory
-      let existingImageCount = 0;
-      const filesInDir = await fsPromises.readdir(qcinlineUploadPath);
-      filesInDir.forEach((f) => {
-        if (f.startsWith(imagePrefix)) {
-          existingImageCount++;
-        }
-      });
-
-      const imageIndex = existingImageCount + 1;
-      const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
-      cb(null, newFilename);
-    } catch (error) {
-      console.error("Error generating filename for roving image:", error);
-      cb(error, null);
-    }
-  }
-});
-
-// 4. Configure the multer upload instance.
+// 2. Configure the multer instance with only the file filter and limits.
 const rovingUpload = multer({
   storage: rovingStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
@@ -7979,48 +7922,221 @@ const rovingUpload = multer({
   }
 });
 
-// --- Simplified Roving Image Upload Endpoint ---
+// 3. The main endpoint with all logic inside.
 app.post(
   "/api/roving/upload-roving-image",
-  rovingUpload.single("imageFile"), // This middleware saves the file automatically
+  rovingUpload.single("imageFile"), // This just prepares req.file in memory
   async (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: "No image file provided or file type is not allowed."
-      });
-    }
-
     try {
-      // The public URL path is now simpler.
-      const publicUrl = `/storage/qcinline/${req.file.filename}`;
+      // --- All data is now guaranteed to be available here ---
+      const { imageType, date, lineNo, moNo, operationId } = req.body;
+      const imageFile = req.file;
+
+      // --- Validation ---
+      if (!imageFile) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "No image file provided or file type is not allowed."
+          });
+      }
+
+      if (!imageType || !date || !lineNo || !moNo || !operationId) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "Missing required metadata fields."
+          });
+      }
+
+      // --- File Saving Logic ---
+
+      // Define the single, absolute destination path
+      const qcinlineUploadPath = path.join(
+        __dirname,
+        "public",
+        "storage",
+        "qcinline"
+      );
+      await fsPromises.mkdir(qcinlineUploadPath, { recursive: true });
+
+      // Sanitize all parts of the filename
+      const sanitizedImageType = sanitize(imageType.toUpperCase());
+      const sanitizedDate = sanitize(date);
+      const sanitizedLineNo = sanitize(lineNo);
+      const sanitizedMoNo = sanitize(moNo);
+      const sanitizedOperationId = sanitize(operationId);
+      const fileExtension = path.extname(imageFile.originalname);
+
+      // Construct a prefix that includes the image type
+      const imagePrefix = `${sanitizedImageType}_${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
+
+      // Find the next available index for the filename
+      let existingImageCount = 0;
+      const filesInDir = await fsPromises.readdir(qcinlineUploadPath);
+      filesInDir.forEach((f) => {
+        if (f.startsWith(imagePrefix)) {
+          existingImageCount++;
+        }
+      });
+
+      const imageIndex = existingImageCount + 1;
+      const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
+
+      // Define the full path to save the file
+      const fullFilePath = path.join(qcinlineUploadPath, newFilename);
+
+      // Write the file from memory to the disk
+      await fsPromises.writeFile(fullFilePath, imageFile.buffer);
+
+      // Construct the public URL for the client
+      const publicUrl = `/storage/qcinline/${newFilename}`;
 
       res.json({
         success: true,
         filePath: publicUrl,
-        filename: req.file.filename
+        filename: newFilename
       });
     } catch (error) {
-      console.error("Error processing roving image upload request:", error);
-      res.status(500).json({
-        success: false,
-        message: "Server error after image upload."
-      });
+      console.error("Error in /api/roving/upload-roving-image:", error);
+      if (error instanceof multer.MulterError) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: `File upload error: ${error.message}`
+          });
+      } else if (error.message.includes("Images Only!")) {
+        return res.status(400).json({ success: false, message: error.message });
+      }
+      res
+        .status(500)
+        .json({
+          success: false,
+          message: "Server error during image processing."
+        });
     }
-  },
-  // Final error handler for multer errors
-  (error, req, res, next) => {
-    if (error instanceof multer.MulterError) {
-      return res.status(400).json({
-        success: false,
-        message: `File upload error: ${error.message}`
-      });
-    } else if (error) {
-      return res.status(400).json({ success: false, message: error.message });
-    }
-    next();
   }
 );
+
+// // --- Multer Configuration for Roving Images ---
+
+// // 1. Define the single, absolute destination path for all roving images.
+// const qcinlineUploadPath = path.join(
+//   __dirname,
+//   "public",
+//   "storage",
+//   "qcinline"
+// );
+
+// // 2. Ensure this directory exists when the server starts.
+// // This is a one-time operation.
+// try {
+//   fs.mkdirSync(qcinlineUploadPath, { recursive: true });
+// } catch (error) {
+//   console.error("Could not create qcinline upload directory:", error);
+// }
+
+// // 3. Configure multer's disk storage.
+// const rovingStorage = multer.diskStorage({
+//   // The 'destination' is now a static, absolute path.
+//   destination: (req, file, cb) => {
+//     cb(null, qcinlineUploadPath);
+//   },
+
+//   // The 'filename' function creates the unique filename.
+//   filename: async (req, file, cb) => {
+//     try {
+//       const { imageType, date, lineNo, moNo, operationId } = req.body;
+//       const fileExtension = path.extname(file.originalname);
+
+//       // Sanitize all parts of the filename
+//       const sanitizedImageType = sanitize(imageType.toUpperCase());
+//       const sanitizedDate = sanitize(date);
+//       const sanitizedLineNo = sanitize(lineNo);
+//       const sanitizedMoNo = sanitize(moNo);
+//       const sanitizedOperationId = sanitize(operationId);
+
+//       // Construct a prefix that includes the image type to keep it unique
+//       const imagePrefix = `${sanitizedImageType}_${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
+
+//       // Find the next available index for the filename within the single directory
+//       let existingImageCount = 0;
+//       const filesInDir = await fsPromises.readdir(qcinlineUploadPath);
+//       filesInDir.forEach((f) => {
+//         if (f.startsWith(imagePrefix)) {
+//           existingImageCount++;
+//         }
+//       });
+
+//       const imageIndex = existingImageCount + 1;
+//       const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
+//       cb(null, newFilename);
+//     } catch (error) {
+//       console.error("Error generating filename for roving image:", error);
+//       cb(error, null);
+//     }
+//   }
+// });
+
+// // 4. Configure the multer upload instance.
+// const rovingUpload = multer({
+//   storage: rovingStorage,
+//   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+//   fileFilter: (req, file, cb) => {
+//     const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i;
+//     if (allowedMimeTypes.test(file.mimetype)) {
+//       cb(null, true);
+//     } else {
+//       cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)"), false);
+//     }
+//   }
+// });
+
+// // --- Simplified Roving Image Upload Endpoint ---
+// app.post(
+//   "/api/roving/upload-roving-image",
+//   rovingUpload.single("imageFile"), // This middleware saves the file automatically
+//   async (req, res) => {
+//     if (!req.file) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "No image file provided or file type is not allowed."
+//       });
+//     }
+
+//     try {
+//       // The public URL path is now simpler.
+//       const publicUrl = `/storage/qcinline/${req.file.filename}`;
+
+//       res.json({
+//         success: true,
+//         filePath: publicUrl,
+//         filename: req.file.filename
+//       });
+//     } catch (error) {
+//       console.error("Error processing roving image upload request:", error);
+//       res.status(500).json({
+//         success: false,
+//         message: "Server error after image upload."
+//       });
+//     }
+//   },
+//   // Final error handler for multer errors
+//   (error, req, res, next) => {
+//     if (error instanceof multer.MulterError) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `File upload error: ${error.message}`
+//       });
+//     } else if (error) {
+//       return res.status(400).json({ success: false, message: error.message });
+//     }
+//     next();
+//   }
+// );
 
 // const sanitize = (input) => {
 //   if (typeof input !== "string") input = String(input);
