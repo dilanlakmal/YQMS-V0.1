@@ -217,6 +217,11 @@ export default function Navbar({ onLogout }) {
           requiredRoles: ["Super Admin", "Admin", "Power BI"]
         },
         {
+          path: "/qa-pivot",
+          title: "QA Evaluation",
+          requiredRoles: ["Super Admin", "Admin", "QA Pivot"]
+        },
+        {
           path: "/qc1-sunrise",
           title: "QC1 Sunrise",
           requiredRoles: ["Super Admin", "Admin", "QC1 Sunrise"]

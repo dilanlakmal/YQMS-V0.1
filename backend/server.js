@@ -29,20 +29,24 @@ import createQc2OrderDataModel from "./models/qc2_orderdata.js";
 import createQC2InspectionPassBundleModel from "./models/qc2_inspection.js";
 import createQC2ReworksModel from "./models/qc2_rework.js";
 import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
-import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
-import createQCRovingPairingModel from "./models/QCRovingPairing.js";
-import createCuttingOrdersModel from "./models/CuttingOrders.js"; // New model import
-import createCutPanelOrdersModel from "./models/CutPanelOrders.js"; // New model import
-import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
 
-import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
 import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
+import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
+import createPairingDefectModel from "./models/PairingDefect.js";
+import createAccessoryIssueModel from "./models/AccessoryIssue.js";
+import createQCRovingPairingModel from "./models/QCRovingPairing.js";
 import createSewingDefectsModel from "./models/SewingDefects.js";
+
+import createCuttingOrdersModel from "./models/CuttingOrders.js"; // New model import
+import createCutPanelOrdersModel from "./models/CutPanelOrders.js"; // New model import
+import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
 import createCuttingMeasurementPointModel from "./models/CuttingMeasurementPoints.js"; // New model import
 import createCuttingFabricDefectModel from "./models/CuttingFabricDefects.js";
 import createCuttingIssueModel from "./models/CuttingIssues.js";
 import createAQLChartModel from "./models/AQLChart.js";
+
+import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
 
 import createHTFirstOutputModel from "./models/HTFirstOutput.js";
 import createFUFirstOutputModel from "./models/FUFirstOutput.js";
@@ -66,6 +70,7 @@ import createAuditCheckPointModel from "./models/AuditCheckPoint.js";
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
+import { promises as fsPromises } from "fs";
 
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "./config.js";
@@ -219,20 +224,25 @@ const QC2InspectionPassBundle =
   createQC2InspectionPassBundleModel(ymProdConnection);
 const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
-const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
-const QCRovingPairing = createQCRovingPairingModel(ymProdConnection);
+
 const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
+const SewingDefects = createSewingDefectsModel(ymProdConnection);
+const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection);
+const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
+const PairingDefect = createPairingDefectModel(ymProdConnection);
+const AccessoryIssue = createAccessoryIssueModel(ymProdConnection);
+const QCRovingPairing = createQCRovingPairingModel(ymProdConnection);
+
 const CuttingOrders = createCuttingOrdersModel(ymProdConnection); // New model
 const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New model
 const CuttingMeasurementPoint =
   createCuttingMeasurementPointModel(ymProdConnection); // New model instance
-const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
 const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection); // New model instance
 const CuttingFabricDefect = createCuttingFabricDefectModel(ymProdConnection);
 const CuttingIssue = createCuttingIssueModel(ymProdConnection);
 const AQLChart = createAQLChartModel(ymProdConnection);
-const SewingDefects = createSewingDefectsModel(ymProdConnection);
-const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection);
+
+const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
 
 const HTFirstOutput = createHTFirstOutputModel(ymProdConnection);
 const FUFirstOutput = createFUFirstOutputModel(ymProdConnection);
@@ -330,37 +340,61 @@ const poolYMDataStore = new sql.ConnectionPool(sqlConfig);
 const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
 const poolYMWHSYS2 = new sql.ConnectionPool(sqlConfigYMWHSYS2);
 
-// Function to connect to a pool with reconnection logic
+// MODIFICATION: Add a status tracker for SQL connections
+const sqlConnectionStatus = {
+  YMDataStore: false,
+  YMCE_SYSTEM: false,
+  YMWHSYS2: false
+};
+
+// Function to connect to a pool, now it updates the status tracker
 async function connectPool(pool, poolName) {
-  let retries = 3;
-  while (retries > 0) {
-    try {
-      await pool.connect();
-      console.log(`Connected to ${poolName} pool at ${pool.config.server}`);
-      return pool;
-    } catch (err) {
-      console.error(`Error connecting to ${poolName} pool:`, err);
-      retries -= 1;
-      if (retries === 0) {
-        throw new Error(`Failed to connect to ${poolName} after 3 attempts`);
-      }
-      console.log(
-        `Retrying ${poolName} connection (${retries} attempts left)...`
-      );
-      await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds before retrying
-    }
+  try {
+    await pool.connect();
+    console.log(
+      `✅ Successfully connected to ${poolName} pool at ${pool.config.server}`
+    );
+    sqlConnectionStatus[poolName] = true; // Set status to true on success
+
+    // Listen for errors on the pool to detect disconnections
+    pool.on("error", (err) => {
+      console.error(`SQL Pool Error for ${poolName}:`, err);
+      sqlConnectionStatus[poolName] = false; // Set status to false on error
+    });
+  } catch (err) {
+    console.error(`❌ FAILED to connect to ${poolName} pool:`, err.message);
+    sqlConnectionStatus[poolName] = false; // Ensure status is false on failure
+    // We throw the error so Promise.allSettled can catch it
+    throw new Error(`Failed to connect to ${poolName}`);
   }
 }
 
-// Function to ensure pool is connected before querying
+// MODIFICATION: This function is now more critical for on-demand reconnections.
 async function ensurePoolConnected(pool, poolName) {
-  if (!pool.connected) {
+  // If we know the connection is down, or the pool reports it's not connected
+  if (!sqlConnectionStatus[poolName] || !pool.connected) {
     console.log(
-      `${poolName} pool is not connected. Attempting to reconnect...`
+      `Pool ${poolName} is not connected. Attempting to reconnect...`
     );
-    await connectPool(pool, poolName);
+    try {
+      // Attempt to close the pool if it's in a broken state before reconnecting
+      if (pool.connected || pool.connecting) {
+        await pool.close();
+      }
+      await connectPool(pool, poolName); // This will re-attempt connection and update the status
+    } catch (reconnectErr) {
+      console.error(
+        `Failed to reconnect to ${poolName}:`,
+        reconnectErr.message
+      );
+      sqlConnectionStatus[poolName] = false; // Ensure status is false
+      throw reconnectErr; // Throw error to be caught by the calling function
+    }
   }
-  return pool;
+  // If we reach here, the pool should be connected.
+  if (!sqlConnectionStatus[poolName]) {
+    throw new Error(`Database ${poolName} is unavailable.`);
+  }
 }
 
 // Drop the conflicting St_No_1 index if it exists
@@ -378,50 +412,73 @@ async function dropConflictingIndex() {
   }
 }
 
-// Initialize pools and wait for connections
-async function initializePools() {
-  try {
-    await Promise.all([
-      connectPool(poolYMDataStore, "YMDataStore"),
-      connectPool(poolYMCE, "YMCE_SYSTEM"),
-      connectPool(poolYMWHSYS2, "YMWHSYS2")
-    ]);
-  } catch (err) {
-    console.error("Failed to initialize SQL connection pools:", err);
-    process.exit(1); // Exit if pools cannot be initialized
-  }
-}
-
 /* ------------------------------
    Initialize Pools and Run Initial Syncs
 ------------------------------ */
 
-// Call this before initializePools
-dropConflictingIndex().then(() => {
-  initializePools()
-    .then(() => {
-      console.log("All SQL connection pools initialized successfully.");
-      syncInlineOrders().then(() =>
-        console.log("Initial inline_orders sync completed.")
+// MODIFICATION: Rewritten initializePools and server startup logic
+async function initializeServer() {
+  console.log("--- Initializing Server ---");
+
+  // 1. Handle MongoDB Index
+  await dropConflictingIndex();
+
+  // 2. Attempt to connect to all SQL pools without crashing
+  console.log("Initializing SQL connection pools...");
+  const connectionPromises = [
+    connectPool(poolYMDataStore, "YMDataStore"),
+    connectPool(poolYMCE, "YMCE_SYSTEM"),
+    connectPool(poolYMWHSYS2, "YMWHSYS2")
+  ];
+
+  // Promise.allSettled will not short-circuit. It waits for all promises.
+  const results = await Promise.allSettled(connectionPromises);
+
+  results.forEach((result) => {
+    if (result.status === "rejected") {
+      // The error is already logged in connectPool, but we can add a summary here.
+      console.warn(
+        `Initialization Warning: ${result.reason.message}. Dependent services will be unavailable.`
       );
-      syncCuttingOrders().then(() =>
-        console.log("Initial cuttingOrders sync completed.")
-      );
-      syncCutPanelOrders().then(() =>
-        console.log("Initial cutpanelorders sync completed.")
-      );
-      syncQC1SunriseData().then(() =>
-        console.log("Initial QC1 Sunrise sync completed.")
-      );
-    })
-    .catch((err) => {
-      console.error("Failed to initialize SQL connection pools:", err);
-      process.exit(1);
-    });
+    }
+  });
+
+  console.log("Current SQL Connection Status:", sqlConnectionStatus);
+  console.log(
+    "SQL pool initialization complete. Server will continue regardless of failures."
+  );
+
+  // 3. Run initial data syncs. These functions will now check the connection status internally.
+  console.log("Running initial data synchronizations...");
+  await syncInlineOrders();
+  await syncCuttingOrders();
+  await syncCutPanelOrders();
+  await syncQC1SunriseData();
+
+  console.log("--- Server Initialization Complete ---");
+}
+
+// Start the server initialization
+initializeServer().catch((err) => {
+  // This catch is for any unexpected errors during the setup process itself.
+  console.error("A critical error occurred during server initialization:", err);
+  // still want to exit here if something truly fundamental fails.
+  // process.exit(1);
 });
+
+/* ------------------------------
+  Fetching RS18 Data from YMDataStore
+------------------------------ */
 
 // New Endpoint for RS18 Data (YMDataStore)
 app.get("/api/sunrise/rs18", async (req, res) => {
+  if (!sqlConnectionStatus.YMDataStore) {
+    return res.status(503).json({
+      message:
+        "Service Unavailable: The YMDataStore database is not connected.",
+      error: "Database connection failed"
+    });
+  }
   try {
     await ensurePoolConnected(poolYMDataStore, "YMDataStore");
     const request = poolYMDataStore.request();
@@ -559,8 +616,19 @@ app.get("/api/sunrise/rs18", async (req, res) => {
   }
 });
 
+/* ------------------------------
+   Fetching Sunrise Output Data from YMDataStore
+------------------------------ */
+
 // New Endpoint for Sunrise Output Data (YMDataStore)
 app.get("/api/sunrise/output", async (req, res) => {
+  if (!sqlConnectionStatus.YMDataStore) {
+    return res.status(503).json({
+      message:
+        "Service Unavailable: The YMDataStore database is not connected.",
+      error: "Database connection failed"
+    });
+  }
   try {
     await ensurePoolConnected(poolYMDataStore, "YMDataStore");
     const request = poolYMDataStore.request();
@@ -612,6 +680,13 @@ app.get("/api/sunrise/output", async (req, res) => {
 
 // Function to fetch RS18 data (defects) - Last 7 days only
 const fetchRS18Data = async () => {
+  if (!sqlConnectionStatus.YMDataStore) {
+    return res.status(503).json({
+      message:
+        "Service Unavailable: The YMDataStore database is not connected.",
+      error: "Database connection failed"
+    });
+  }
   try {
     await ensurePoolConnected(poolYMDataStore, "YMDataStore");
     const request = poolYMDataStore.request();
@@ -750,6 +825,13 @@ const fetchRS18Data = async () => {
 
 // Function to fetch Output data - Last 7 days only
 const fetchOutputData = async () => {
+  if (!sqlConnectionStatus.YMDataStore) {
+    return res.status(503).json({
+      message:
+        "Service Unavailable: The YMDataStore database is not connected.",
+      error: "Database connection failed"
+    });
+  }
   try {
     await ensurePoolConnected(poolYMDataStore, "YMDataStore");
     const request = poolYMDataStore.request();
@@ -989,10 +1071,17 @@ cron.schedule("0 0 * * *", async () => {
 });
 
 /* ------------------------------
-   API to fetch inline data from SQL to ym_prod
+   Fetch inline data from SQL to ym_prod
 ------------------------------ */
 
 async function syncInlineOrders() {
+  // MODIFICATION: Add connection status check
+  if (!sqlConnectionStatus.YMCE_SYSTEM) {
+    console.warn(
+      "Skipping syncInlineOrders: YMCE_SYSTEM database is not connected."
+    );
+    return;
+  }
   try {
     console.log("Starting inline_orders sync at", new Date().toISOString());
     await ensurePoolConnected(poolYMCE, "YMCE_SYSTEM");
@@ -1201,6 +1290,15 @@ app.get("/api/inline-orders-details", async (req, res) => {
 
 // New Endpoint for YMCE_SYSTEM Data
 app.get("/api/ymce-system-data", async (req, res) => {
+  // MODIFICATION: Add connection status check
+  if (!sqlConnectionStatus.YMCE_SYSTEM) {
+    return res.status(503).json({
+      message:
+        "Service Unavailable: The YMCE_SYSTEM database is not connected.",
+      error: "Database connection failed"
+    });
+  }
+
   //let pool;
   try {
     await ensurePoolConnected(poolYMCE, "YMCE_SYSTEM");
@@ -1249,6 +1347,13 @@ app.get("/api/ymce-system-data", async (req, res) => {
 ------------------------------ */
 
 async function syncCuttingOrders() {
+  // MODIFICATION: Add connection status check
+  if (!sqlConnectionStatus.YMWHSYS2) {
+    console.warn(
+      "Skipping cuttingOrders sync: YMWHSYS2 database is not connected."
+    );
+    return;
+  }
   try {
     console.log("Starting cuttingOrders sync at", new Date().toISOString());
     await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
@@ -1524,6 +1629,13 @@ async function syncCuttingOrders() {
 ------------------------------ */
 
 async function syncCutPanelOrders() {
+  // MODIFICATION: Add connection status check
+  if (!sqlConnectionStatus.YMWHSYS2) {
+    console.warn(
+      "Skipping cuttingOrders sync: YMWHSYS2 database is not connected."
+    );
+    return;
+  }
   try {
     console.log("Starting cutpanelorders sync at", new Date().toISOString());
     await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
@@ -1771,17 +1883,6 @@ ORDER BY
         });
       }
 
-      // const documents = result.recordset.map((row) => {
-      //   const markerRatio = [];
-      //   for (let i = 1; i <= 10; i++) {
-      //     markerRatio.push({
-      //       no: i,
-      //       size: row[`Size${i}`],
-      //       cuttingRatio: row[`CuttingRatio${i}`],
-      //       orderQty: row[`OrderQty${i}`]
-      //     });
-      //   }
-
       const lotNos = row.LotNos
         ? row.LotNos.split(",").map((lot) => lot.trim())
         : [];
@@ -1836,12 +1937,6 @@ ORDER BY
     console.log(
       `Successfully synced ${bulkOps.length} documents to cutpanelorders.`
     );
-
-    //await CutPanelOrders.deleteMany({});
-    // await CutPanelOrders.insertMany(documents);
-    // console.log(
-    //   `Successfully synced ${documents.length} documents to cutpanelorders.`
-    // );
   } catch (err) {
     console.error("Error during cutpanelorders sync:", err);
     throw err;
@@ -7797,135 +7892,265 @@ app.get("/api/qc-inline-roving-reports/filtered", async (req, res) => {
   }
 });
 
+// --- Helper function for sanitizing filenames (This is good, keep it) ---
 const sanitize = (input) => {
   if (typeof input !== "string") input = String(input);
-  let sane = input.replace(/[^a-zA-Z0-9-_]/g, "_");
+  // Allow dots for file extensions but sanitize everything else
+  let sane = input.replace(/[^a-zA-Z0-9-._]/g, "_");
   if (sane === "." || sane === "..") return "_";
   return sane;
 };
 
-const rovingStorage = multer.memoryStorage();
+// --------------------------------------------------------------------------
+// Roving Image Upload
+// --------------------------------------------------------------------------
 
-const rovingUpload = multer({
-  storage: rovingStorage,
-  limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowedExtensions = /^(jpeg|jpg|png|gif)$/i;
-    const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i;
-    const fileExt = path.extname(file.originalname).toLowerCase().substring(1);
-    const isExtAllowed = allowedExtensions.test(fileExt);
-    const isMimeAllowed = allowedMimeTypes.test(file.mimetype.toLowerCase());
-    if (isMimeAllowed && isExtAllowed) {
-      cb(null, true);
-    } else {
-      console.error(
-        `File rejected by filter: name='${file.originalname}', mime='${file.mimetype}', ext='${fileExt}'. IsMimeAllowed: ${isMimeAllowed}, IsExtAllowed: ${isExtAllowed}`
-      );
-      cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)"));
-    }
-  }
-});
+// --- Multer Configuration for Roving Images ---
 
-//Roving image upload
-app.post(
-  "/api/roving/upload-roving-image",
-  rovingUpload.single("imageFile"),
-  async (req, res) => {
+// 1. Define the single, absolute destination path for all roving images.
+const qcinlineUploadPath = path.join(
+  __dirname,
+  "public",
+  "storage",
+  "qcinline"
+);
+
+// 2. Ensure this directory exists when the server starts.
+// This is a one-time operation.
+try {
+  fs.mkdirSync(qcinlineUploadPath, { recursive: true });
+} catch (error) {
+  console.error("Could not create qcinline upload directory:", error);
+}
+
+// 3. Configure multer's disk storage.
+const rovingStorage = multer.diskStorage({
+  // The 'destination' is now a static, absolute path.
+  destination: (req, file, cb) => {
+    cb(null, qcinlineUploadPath);
+  },
+
+  // The 'filename' function creates the unique filename.
+  filename: async (req, file, cb) => {
     try {
       const { imageType, date, lineNo, moNo, operationId } = req.body;
-      const imageFile = req.file;
-      if (!imageFile) {
-        const errorMessage =
-          req.fileValidationError ||
-          (req.multerError && req.multerError.message) ||
-          "No image file provided or file rejected by filter.";
-        return res.status(400).json({ success: false, message: errorMessage });
-      }
+      const fileExtension = path.extname(file.originalname);
 
-      if (
-        !date ||
-        !lineNo ||
-        lineNo === "NA_Line" ||
-        !moNo ||
-        moNo === "NA_MO" ||
-        !operationId ||
-        operationId === "NA_Op"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Missing or invalid required metadata: date, lineNo, moNo, operationId must be actual values."
-        });
-      }
-
-      if (
-        !imageType ||
-        !["spi", "measurement"].includes(imageType.toLowerCase())
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid image type. Must be "spi" or "measurement".'
-        });
-      }
-
+      // Sanitize all parts of the filename
+      const sanitizedImageType = sanitize(imageType.toUpperCase());
       const sanitizedDate = sanitize(date);
       const sanitizedLineNo = sanitize(lineNo);
       const sanitizedMoNo = sanitize(moNo);
       const sanitizedOperationId = sanitize(operationId);
-      const upperImageType = imageType.toUpperCase();
 
-      const targetDir = path.resolve(
-        __dirname,
-        "..",
-        "public",
-        "storage",
-        "roving",
-        upperImageType
-      );
-      await fsPromises.mkdir(targetDir, { recursive: true });
+      // Construct a prefix that includes the image type to keep it unique
+      const imagePrefix = `${sanitizedImageType}_${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
 
-      const imagePrefix = `${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
+      // Find the next available index for the filename within the single directory
       let existingImageCount = 0;
-      try {
-        const filesInDir = await fsPromises.readdir(targetDir);
-        filesInDir.forEach((file) => {
-          if (file.startsWith(imagePrefix)) {
-            existingImageCount++;
-          }
-        });
-      } catch (readDirError) {
-        if (readDirError.code !== "ENOENT") {
-          console.error(
-            "Error reading directory for indexing:",
-            targetDir,
-            readDirError
-          );
+      const filesInDir = await fsPromises.readdir(qcinlineUploadPath);
+      filesInDir.forEach((f) => {
+        if (f.startsWith(imagePrefix)) {
+          existingImageCount++;
         }
-      }
+      });
 
       const imageIndex = existingImageCount + 1;
-      const fileExtension = path.extname(imageFile.originalname);
       const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
-      const filePathInPublic = path.join(targetDir, newFilename);
-      await fsPromises.writeFile(filePathInPublic, imageFile.buffer);
-      const publicUrl = `/storage/roving/${upperImageType}/${newFilename}`;
-      res.json({ success: true, filePath: publicUrl, filename: newFilename });
+      cb(null, newFilename);
     } catch (error) {
-      console.error("Error uploading roving image:", error);
-      if (error.message && error.message.startsWith("Error: Images Only!")) {
-        return res.status(400).json({ success: false, message: error.message });
-      }
-      if (error instanceof multer.MulterError) {
-        return res
-          .status(400)
-          .json({ success: false, message: `Multer error: ${error.message}` });
-      }
-      res
-        .status(500)
-        .json({ success: false, message: "Server error during image upload." });
+      console.error("Error generating filename for roving image:", error);
+      cb(error, null);
     }
   }
+});
+
+// 4. Configure the multer upload instance.
+const rovingUpload = multer({
+  storage: rovingStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i;
+    if (allowedMimeTypes.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)"), false);
+    }
+  }
+});
+
+// --- Simplified Roving Image Upload Endpoint ---
+app.post(
+  "/api/roving/upload-roving-image",
+  rovingUpload.single("imageFile"), // This middleware saves the file automatically
+  async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No image file provided or file type is not allowed."
+      });
+    }
+
+    try {
+      // The public URL path is now simpler.
+      const publicUrl = `/storage/qcinline/${req.file.filename}`;
+
+      res.json({
+        success: true,
+        filePath: publicUrl,
+        filename: req.file.filename
+      });
+    } catch (error) {
+      console.error("Error processing roving image upload request:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error after image upload."
+      });
+    }
+  },
+  // Final error handler for multer errors
+  (error, req, res, next) => {
+    if (error instanceof multer.MulterError) {
+      return res.status(400).json({
+        success: false,
+        message: `File upload error: ${error.message}`
+      });
+    } else if (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    next();
+  }
 );
+
+// const sanitize = (input) => {
+//   if (typeof input !== "string") input = String(input);
+//   let sane = input.replace(/[^a-zA-Z0-9-_]/g, "_");
+//   if (sane === "." || sane === "..") return "_";
+//   return sane;
+// };
+
+// const rovingStorage = multer.memoryStorage();
+
+// const rovingUpload = multer({
+//   storage: rovingStorage,
+//   limits: { fileSize: 10 * 1024 * 1024 },
+//   fileFilter: (req, file, cb) => {
+//     const allowedExtensions = /^(jpeg|jpg|png|gif)$/i;
+//     const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i;
+//     const fileExt = path.extname(file.originalname).toLowerCase().substring(1);
+//     const isExtAllowed = allowedExtensions.test(fileExt);
+//     const isMimeAllowed = allowedMimeTypes.test(file.mimetype.toLowerCase());
+//     if (isMimeAllowed && isExtAllowed) {
+//       cb(null, true);
+//     } else {
+//       console.error(
+//         `File rejected by filter: name='${file.originalname}', mime='${file.mimetype}', ext='${fileExt}'. IsMimeAllowed: ${isMimeAllowed}, IsExtAllowed: ${isExtAllowed}`
+//       );
+//       cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)"));
+//     }
+//   }
+// });
+
+// //Roving image upload
+// app.post(
+//   "/api/roving/upload-roving-image",
+//   rovingUpload.single("imageFile"),
+//   async (req, res) => {
+//     try {
+//       const { imageType, date, lineNo, moNo, operationId } = req.body;
+//       const imageFile = req.file;
+//       if (!imageFile) {
+//         const errorMessage =
+//           req.fileValidationError ||
+//           (req.multerError && req.multerError.message) ||
+//           "No image file provided or file rejected by filter.";
+//         return res.status(400).json({ success: false, message: errorMessage });
+//       }
+
+//       if (
+//         !date ||
+//         !lineNo ||
+//         lineNo === "NA_Line" ||
+//         !moNo ||
+//         moNo === "NA_MO" ||
+//         !operationId ||
+//         operationId === "NA_Op"
+//       ) {
+//         return res.status(400).json({
+//           success: false,
+//           message:
+//             "Missing or invalid required metadata: date, lineNo, moNo, operationId must be actual values."
+//         });
+//       }
+
+//       if (
+//         !imageType ||
+//         !["spi", "measurement"].includes(imageType.toLowerCase())
+//       ) {
+//         return res.status(400).json({
+//           success: false,
+//           message: 'Invalid image type. Must be "spi" or "measurement".'
+//         });
+//       }
+
+//       const sanitizedDate = sanitize(date);
+//       const sanitizedLineNo = sanitize(lineNo);
+//       const sanitizedMoNo = sanitize(moNo);
+//       const sanitizedOperationId = sanitize(operationId);
+//       const upperImageType = imageType.toUpperCase();
+
+//       const targetDir = path.resolve(
+//         __dirname,
+//         "..",
+//         "public",
+//         "storage",
+//         "roving",
+//         upperImageType
+//       );
+//       await fsPromises.mkdir(targetDir, { recursive: true });
+
+//       const imagePrefix = `${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
+//       let existingImageCount = 0;
+//       try {
+//         const filesInDir = await fsPromises.readdir(targetDir);
+//         filesInDir.forEach((file) => {
+//           if (file.startsWith(imagePrefix)) {
+//             existingImageCount++;
+//           }
+//         });
+//       } catch (readDirError) {
+//         if (readDirError.code !== "ENOENT") {
+//           console.error(
+//             "Error reading directory for indexing:",
+//             targetDir,
+//             readDirError
+//           );
+//         }
+//       }
+
+//       const imageIndex = existingImageCount + 1;
+//       const fileExtension = path.extname(imageFile.originalname);
+//       const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
+//       const filePathInPublic = path.join(targetDir, newFilename);
+//       await fsPromises.writeFile(filePathInPublic, imageFile.buffer);
+//       const publicUrl = `/storage/roving/${upperImageType}/${newFilename}`;
+//       res.json({ success: true, filePath: publicUrl, filename: newFilename });
+//     } catch (error) {
+//       console.error("Error uploading roving image:", error);
+//       if (error.message && error.message.startsWith("Error: Images Only!")) {
+//         return res.status(400).json({ success: false, message: error.message });
+//       }
+//       if (error instanceof multer.MulterError) {
+//         return res
+//           .status(400)
+//           .json({ success: false, message: `Multer error: ${error.message}` });
+//       }
+//       res
+//         .status(500)
+//         .json({ success: false, message: "Server error during image upload." });
+//     }
+//   }
+// );
 
 // Endpoint for get the buyer status
 app.get("/api/buyer-by-mo", (req, res) => {
@@ -8957,6 +9182,372 @@ app.put("/api/cutting-inspection-update", async (req, res) => {
 });
 
 /* ------------------------------
+   End Points - Pairing Defects
+------------------------------ */
+
+// GET - Fetch all Pairing Defects
+app.get("/api/pairing-defects", async (req, res) => {
+  try {
+    const defects = await PairingDefect.find({}).sort({ no: 1 }).lean(); // Fetch all defects, sorted by 'no'
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching Pairing defects:", error);
+    res.status(500).json({ message: "Server error fetching defects" });
+  }
+});
+
+// POST - Add a new Pairing defect
+app.post("/api/pairing-defects", async (req, res) => {
+  try {
+    const { no, defectNameEng, defectNameKhmer, defectNameChinese } = req.body;
+
+    // Validate required fields
+    if (
+      no === undefined ||
+      no === null ||
+      !defectNameEng ||
+      !defectNameKhmer ||
+      !defectNameChinese
+    ) {
+      return res.status(400).json({
+        message:
+          "Defect No, English Name, Khmer Name, and Chinese Name are required."
+      });
+    }
+    if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Defect No must be a positive number." });
+    }
+
+    // Check for duplicate 'no'
+    const existingDefectByNo = await PairingDefect.findOne({ no: Number(no) });
+    if (existingDefectByNo) {
+      return res
+        .status(409)
+        .json({ message: `Defect No '${no}' already exists.` });
+    }
+    // Check for duplicate English name
+    const existingDefectByName = await PairingDefect.findOne({ defectNameEng });
+    if (existingDefectByName) {
+      return res.status(409).json({
+        message: `Defect name (English) '${defectNameEng}' already exists.`
+      });
+    }
+
+    const newPairingDefect = new PairingDefect({
+      no: Number(no),
+      defectNameEng,
+      defectNameKhmer,
+      defectNameChinese
+    });
+    await newPairingDefect.save();
+    res.status(201).json({
+      message: "Pairing defect added successfully",
+      defect: newPairingDefect
+    });
+  } catch (error) {
+    console.error("Error adding Pairing defect:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Duplicate entry. Defect No or Name might already exist."
+      });
+    }
+    res
+      .status(500)
+      .json({ message: "Failed to add Pairing defect", error: error.message });
+  }
+});
+
+// PUT - Update an existing Pairing defect by ID
+app.put("/api/pairing-defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { no, defectNameEng, defectNameKhmer, defectNameChinese } = req.body;
+
+    // Validate required fields
+    if (
+      no === undefined ||
+      no === null ||
+      !defectNameEng ||
+      !defectNameKhmer ||
+      !defectNameChinese
+    ) {
+      return res.status(400).json({
+        message:
+          "Defect No, English Name, Khmer Name, and Chinese Name are required for update."
+      });
+    }
+    if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Defect No must be a positive number." });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid defect ID format." });
+    }
+
+    // Check for duplicate 'no' (excluding the current document being updated)
+    const existingDefectByNo = await PairingDefect.findOne({
+      no: Number(no),
+      _id: { $ne: id }
+    });
+    if (existingDefectByNo) {
+      return res.status(409).json({
+        message: `Defect No '${no}' already exists for another defect.`
+      });
+    }
+    // Check for duplicate English name (excluding the current document)
+    const existingDefectByName = await PairingDefect.findOne({
+      defectNameEng,
+      _id: { $ne: id }
+    });
+    if (existingDefectByName) {
+      return res.status(409).json({
+        message: `Defect name (English) '${defectNameEng}' already exists for another defect.`
+      });
+    }
+
+    const updatedPairingDefect = await PairingDefect.findByIdAndUpdate(
+      id,
+      {
+        no: Number(no),
+        defectNameEng,
+        defectNameKhmer,
+        defectNameChinese
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedPairingDefect) {
+      return res.status(404).json({ message: "Pairing Defect not found." });
+    }
+    res.status(200).json({
+      message: "Pairing defect updated successfully",
+      defect: updatedPairingDefect
+    });
+  } catch (error) {
+    console.error("Error updating Pairing defect:", error);
+    if (error.code === 11000) {
+      return res
+        .status(409)
+        .json({ message: "Update failed due to duplicate Defect No or Name." });
+    }
+    res.status(500).json({
+      message: "Failed to update Pairing defect",
+      error: error.message
+    });
+  }
+});
+
+// DELETE - Delete a Pairing defect by ID
+app.delete("/api/pairing-defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid defect ID format." });
+    }
+
+    const deletedPairingDefect = await PairingDefect.findByIdAndDelete(id);
+    if (!deletedPairingDefect) {
+      return res.status(404).json({ message: "Pairing Defect not found." });
+    }
+    res.status(200).json({ message: "Pairing defect deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting Pairing defect:", error);
+    res.status(500).json({
+      message: "Failed to delete Pairing defect",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   End Points - Accessory Issues
+------------------------------ */
+
+// GET - Fetch all Accessory Issues
+app.get("/api/accessory-issues", async (req, res) => {
+  try {
+    const issues = await AccessoryIssue.find({}).sort({ no: 1 }).lean();
+    res.json(issues);
+  } catch (error) {
+    console.error("Error fetching Accessory issues:", error);
+    res.status(500).json({ message: "Server error fetching issues" });
+  }
+});
+
+// POST - Add a new Accessory issue
+app.post("/api/accessory-issues", async (req, res) => {
+  try {
+    const { no, issueEng, issueKhmer, issueChi } = req.body;
+
+    // Validate required fields
+    if (
+      no === undefined ||
+      no === null ||
+      !issueEng ||
+      !issueKhmer ||
+      !issueChi
+    ) {
+      return res.status(400).json({
+        message:
+          "Issue No, English Name, Khmer Name, and Chinese Name are required."
+      });
+    }
+    if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Issue No must be a positive number." });
+    }
+
+    // Check for duplicate 'no'
+    const existingIssueByNo = await AccessoryIssue.findOne({ no: Number(no) });
+    if (existingIssueByNo) {
+      return res
+        .status(409)
+        .json({ message: `Issue No '${no}' already exists.` });
+    }
+    // Check for duplicate English name
+    const existingIssueByName = await AccessoryIssue.findOne({ issueEng });
+    if (existingIssueByName) {
+      return res.status(409).json({
+        message: `Issue name (English) '${issueEng}' already exists.`
+      });
+    }
+
+    const newAccessoryIssue = new AccessoryIssue({
+      no: Number(no),
+      issueEng,
+      issueKhmer,
+      issueChi
+    });
+    await newAccessoryIssue.save();
+    res.status(201).json({
+      message: "Accessory issue added successfully",
+      issue: newAccessoryIssue
+    });
+  } catch (error) {
+    console.error("Error adding Accessory issue:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Duplicate entry. Issue No or Name might already exist."
+      });
+    }
+    res
+      .status(500)
+      .json({ message: "Failed to add Accessory issue", error: error.message });
+  }
+});
+
+// PUT - Update an existing Accessory issue by ID
+app.put("/api/accessory-issues/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { no, issueEng, issueKhmer, issueChi } = req.body;
+
+    // Validate required fields
+    if (
+      no === undefined ||
+      no === null ||
+      !issueEng ||
+      !issueKhmer ||
+      !issueChi
+    ) {
+      return res.status(400).json({
+        message:
+          "Issue No, English Name, Khmer Name, and Chinese Name are required for update."
+      });
+    }
+    if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Issue No must be a positive number." });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid issue ID format." });
+    }
+
+    // Check for duplicate 'no' (excluding the current document)
+    const existingIssueByNo = await AccessoryIssue.findOne({
+      no: Number(no),
+      _id: { $ne: id }
+    });
+    if (existingIssueByNo) {
+      return res.status(409).json({
+        message: `Issue No '${no}' already exists for another issue.`
+      });
+    }
+    // Check for duplicate English name (excluding the current document)
+    const existingIssueByName = await AccessoryIssue.findOne({
+      issueEng,
+      _id: { $ne: id }
+    });
+    if (existingIssueByName) {
+      return res.status(409).json({
+        message: `Issue name (English) '${issueEng}' already exists for another issue.`
+      });
+    }
+
+    const updatedAccessoryIssue = await AccessoryIssue.findByIdAndUpdate(
+      id,
+      {
+        no: Number(no),
+        issueEng,
+        issueKhmer,
+        issueChi
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedAccessoryIssue) {
+      return res.status(404).json({ message: "Accessory Issue not found." });
+    }
+    res.status(200).json({
+      message: "Accessory issue updated successfully",
+      issue: updatedAccessoryIssue
+    });
+  } catch (error) {
+    console.error("Error updating Accessory issue:", error);
+    if (error.code === 11000) {
+      return res
+        .status(409)
+        .json({ message: "Update failed due to duplicate Issue No or Name." });
+    }
+    res.status(500).json({
+      message: "Failed to update Accessory issue",
+      error: error.message
+    });
+  }
+});
+
+// DELETE - Delete an Accessory issue by ID
+app.delete("/api/accessory-issues/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid issue ID format." });
+    }
+
+    const deletedAccessoryIssue = await AccessoryIssue.findByIdAndDelete(id);
+    if (!deletedAccessoryIssue) {
+      return res.status(404).json({ message: "Accessory Issue not found." });
+    }
+    res.status(200).json({ message: "Accessory issue deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting Accessory issue:", error);
+    res.status(500).json({
+      message: "Failed to delete Accessory issue",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
    QC Roving Pairing Endpoint
 ------------------------------ */
 
@@ -8988,6 +9579,27 @@ app.post("/api/save-qc-roving-pairing", async (req, res) => {
         message: "pairingDataItem is malformed or missing inspection_rep_name."
       });
     }
+
+    // ---------------------------------------------------------------------
+
+    if (
+      pairingDataItem.accessoryComplete === "No" &&
+      !Array.isArray(pairingDataItem.accessoryIssues)
+    ) {
+      return res.status(400).json({
+        message:
+          "Accessory status is 'No' but the list of accessory issues is missing or not an array."
+      });
+    }
+    // If accessory is complete, ensure the issues array is empty.
+    if (pairingDataItem.accessoryComplete === "Yes") {
+      pairingDataItem.accessoryIssues = [];
+    }
+
+    // ---------------------------------------------------------------------
+
+    //Add the current server timestamp to the object from the frontend
+    pairingDataItem.inspectionTime = new Date();
 
     // --- Find or Create Document ---
     let doc = await QCRovingPairing.findOne({ inspection_date, moNo, lineNo });
@@ -9054,6 +9666,190 @@ app.post("/api/save-qc-roving-pairing", async (req, res) => {
     });
   }
 });
+
+/* -------------------------------------------------------------------------- */
+/*             NEW ENDPOINTS FOR ROVING PAIRING DATA REPORT                   */
+/* -------------------------------------------------------------------------- */
+
+// --- Endpoint to get dynamic filter options ---
+app.get("/api/roving-pairing/filters", async (req, res) => {
+  try {
+    const { date } = req.query; // Expecting date in 'M/D/YYYY' format
+    if (!date) {
+      return res.status(400).json({ message: "Date is a required parameter." });
+    }
+
+    const matchQuery = { inspection_date: date };
+
+    const [uniqueQCs, uniqueOperators, uniqueLines, uniqueMOs] =
+      await Promise.all([
+        // Get unique QC IDs (emp_id)
+        QCRovingPairing.distinct("emp_id", matchQuery),
+        // Get unique Operator IDs (operator_emp_id)
+        QCRovingPairing.distinct("pairingData.operator_emp_id", matchQuery),
+        // Get unique Line Numbers
+        QCRovingPairing.distinct("lineNo", matchQuery),
+        // Get unique MO Numbers
+        QCRovingPairing.distinct("moNo", matchQuery)
+      ]);
+
+    res.json({
+      qcIds: uniqueQCs.sort(),
+      operatorIds: uniqueOperators.sort(),
+      lineNos: uniqueLines.sort((a, b) => Number(a) - Number(b)),
+      moNos: uniqueMOs.sort()
+    });
+  } catch (error) {
+    console.error("Error fetching filter options for Roving Pairing:", error);
+    res.status(500).json({
+      message: "Failed to fetch filter options.",
+      error: error.message
+    });
+  }
+});
+
+// --- Endpoint to get aggregated data for the report table ---
+app.get("/api/roving-pairing/report-data", async (req, res) => {
+  try {
+    const { date, qcId, operatorId, lineNo, moNo } = req.query;
+
+    if (!date) {
+      return res.status(400).json({ message: "Date is required." });
+    }
+
+    // Build the initial match pipeline stage
+    const matchPipeline = { inspection_date: date };
+    if (qcId) matchPipeline.emp_id = qcId;
+    if (lineNo) matchPipeline.lineNo = lineNo;
+    if (moNo) matchPipeline.moNo = moNo;
+
+    const pipeline = [{ $match: matchPipeline }, { $unwind: "$pairingData" }];
+
+    if (operatorId) {
+      pipeline.push({
+        $match: { "pairingData.operator_emp_id": operatorId }
+      });
+    }
+
+    pipeline.push({
+      $group: {
+        _id: {
+          operatorId: "$pairingData.operator_emp_id",
+          lineNo: "$lineNo",
+          moNo: "$moNo"
+        },
+        operatorName: { $first: "$pairingData.operator_eng_name" },
+        inspections: {
+          $push: {
+            rep_name: "$pairingData.inspection_rep_name",
+            accessoryComplete: "$pairingData.accessoryComplete",
+            totalSummary: "$pairingData.totalSummary"
+          }
+        }
+      }
+    });
+
+    // **** START OF CORRECTION ****
+    // The keys being accessed here now correctly match the keys defined in the $group stage's _id object.
+    pipeline.push({
+      $project: {
+        _id: 0,
+        operatorId: "$_id.operatorId", // Was "$_id.opId"
+        lineNo: "$_id.lineNo", // Was "$_id.line"
+        moNo: "$_id.moNo", // Was "$_id.mo"
+        operatorName: "$operatorName",
+        inspections: "$inspections"
+      }
+    });
+    // **** END OF CORRECTION ****
+
+    pipeline.push({ $sort: { lineNo: 1, moNo: 1, operatorId: 1 } });
+
+    const reportData = await QCRovingPairing.aggregate(pipeline);
+
+    res.json(reportData);
+  } catch (error) {
+    console.error("Error fetching report data for Roving Pairing:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch report data.", error: error.message });
+  }
+});
+
+// // --- Endpoint to get aggregated data for the report table ---
+// app.get("/api/roving-pairing/report-data", async (req, res) => {
+//   try {
+//     const { date, qcId, operatorId, lineNo, moNo } = req.query;
+
+//     if (!date) {
+//       return res.status(400).json({ message: "Date is required." });
+//     }
+
+//     // Build the initial match pipeline stage
+//     const matchPipeline = { inspection_date: date };
+//     if (qcId) matchPipeline.emp_id = qcId;
+//     if (lineNo) matchPipeline.lineNo = lineNo;
+//     if (moNo) matchPipeline.moNo = moNo;
+
+//     const pipeline = [
+//       { $match: matchPipeline },
+//       { $unwind: "$pairingData" } // Deconstruct the pairingData array
+//     ];
+
+//     // If an operatorId is specified, add another match stage
+//     if (operatorId) {
+//       pipeline.push({
+//         $match: { "pairingData.operator_emp_id": operatorId }
+//       });
+//     }
+
+//     // Group the data by operator to create one row per operator
+//     pipeline.push({
+//       $group: {
+//         //_id: "$pairingData.operator_emp_id", // Group by Operator ID
+//         _id: {
+//           // Group by a composite key to separate rows if operator works on different MO/Lines
+//           operatorId: "$pairingData.operator_emp_id",
+//           lineNo: "$lineNo",
+//           moNo: "$moNo"
+//         },
+//         operatorName: { $first: "$pairingData.operator_eng_name" }, // Get the operator's name
+//         inspections: {
+//           // Push each inspection's data into an array for this operator
+//           $push: {
+//             rep_name: "$pairingData.inspection_rep_name",
+//             accessoryComplete: "$pairingData.accessoryComplete",
+//             totalSummary: "$pairingData.totalSummary"
+//           }
+//         }
+//       }
+//     });
+
+//     // Add a final projection stage to format the output nicely
+//     pipeline.push({
+//       $project: {
+//         _id: 0, // Exclude the default _id
+//         operatorId: "$_id.opId",
+//         lineNo: "$_id.line",
+//         moNo: "$_id.mo",
+//         operatorName: "$operatorName",
+//         inspections: "$inspections"
+//       }
+//     });
+
+//     // Add a sorting stage
+//     pipeline.push({ $sort: { lineNo: 1, moNo: 1, operatorId: 1 } });
+
+//     const reportData = await QCRovingPairing.aggregate(pipeline);
+
+//     res.json(reportData);
+//   } catch (error) {
+//     console.error("Error fetching report data for Roving Pairing:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to fetch report data.", error: error.message });
+//   }
+// });
 
 /* ------------------------------
    Cutting Report ENDPOINTS

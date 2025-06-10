@@ -488,11 +488,13 @@
     "finish_inspection": "Finish Inspection",
     "inlineWorkers": "Inline Workers",
     "defectStatus": "Defect Status",
-    "inspectionNo": "Inspection No"
+    "inspectionNo": "Inspection No",
+    "pairingdata": "Data(Pairing)"
   },
 
   "qcPairing": {
     "title": "QC Inline Roving - Pairing",
+    "pairing_kh": "ការផ្គូផ្គង",
     "inspectionNo": "Inspection No",
     "inspectionText": "Inspection",
     "date": "Date",
@@ -1421,6 +1423,7 @@
     "title": "System Administration",
     "subtitle": "Manage system configurations and master data.",
     "rovingDefects": "Roving Defects",
+    "rovingPairing": "Roving Pairing",
     "cuttingPoints": "Cutting Modify Points",
     "cuttingAdding": "Cutting - Add Points",
     "cuttingFabricDefects": "Cutting Fabric Defects",
@@ -1640,5 +1643,61 @@
     "point_2_17_desc": "The lighting level must be acceptable in all working areas.",
     "point_2_18_title": "Aisle Clarity and Working Areas",
     "point_2_18_desc": "The aisles must be clear of any litter and adequate working areas provided for material store administration."
+  },
+  "pairingDefect": {
+    "manageTitle": "Manage Roving Pairing Defects",
+    "addNewFormTitle": "Add New Pairing Defect",
+    "addNew": "Add New Defect",
+    "no": "Defect No.",
+    "noPlaceholder": "e.g., 1",
+    "nameEng": "Defect Name (English)",
+    "nameEngPlaceholder": "e.g., Panel with selvage",
+    "nameKhmer": "Defect Name (Khmer)",
+    "nameKhmerPlaceholder": "e.g., ផ្ទាំងជាប់ជើងម្ជុល",
+    "nameChinese": "Defect Name (Chinese)",
+    "nameChinesePlaceholder": "e.g., 裁片带布边",
+    "searchPlaceholder": "Search by No, English, Khmer, or Chinese name...",
+    "loading": "Loading pairing defects...",
+    "noDataFound": "No pairing defects found.",
+    "failedToFetch": "Failed to fetch pairing defects.",
+    "updatedSuccess": "Pairing defect updated successfully.",
+    "failedToUpdate": "Failed to update pairing defect.",
+    "addedSuccess": "Pairing defect added successfully.",
+    "failedToAdd": "Failed to add pairing defect.",
+    "deletedSuccess": "Pairing defect deleted successfully.",
+    "failedToDelete": "Failed to delete pairing defect.",
+    "confirmDeleteMsg": "This action cannot be undone.",
+    "validation": {
+      "fillRequired": "Defect No, English Name, and Khmer Name are required.",
+      "fillRequiredNew": "Please provide a valid Defect No, English Name, and Khmer Name."
+    }
+  },
+  "accessoryIssue": {
+    "manageTitle": "Manage Roving Accessory Issues",
+    "addNewFormTitle": "Add New Accessory Issue",
+    "addNew": "Add New Issue",
+    "no": "Issue No.",
+    "noPlaceholder": "e.g., 1",
+    "nameEng": "Issue Name (English)",
+    "nameEngPlaceholder": "e.g., Lacking care label",
+    "nameKhmer": "Issue Name (Khmer)",
+    "nameKhmerPlaceholder": "e.g., ខ្លះស្លាកបោកទឹក",
+    "nameChinese": "Issue Name (Chinese)",
+    "nameChinesePlaceholder": "e.g., 缺少洗水唛",
+    "searchPlaceholder": "Search by No, English, Khmer, or Chinese name...",
+    "loading": "Loading accessory issues...",
+    "noDataFound": "No accessory issues found.",
+    "failedToFetch": "Failed to fetch accessory issues.",
+    "updatedSuccess": "Accessory issue updated successfully.",
+    "failedToUpdate": "Failed to update accessory issue.",
+    "addedSuccess": "Accessory issue added successfully.",
+    "failedToAdd": "Failed to add accessory issue.",
+    "deletedSuccess": "Accessory issue deleted successfully.",
+    "failedToDelete": "Failed to delete accessory issue.",
+    "confirmDeleteMsg": "This action cannot be undone.",
+    "validation": {
+      "fillRequired": "Issue No, English Name, and Khmer Name are required.",
+      "fillRequiredNew": "Please provide a valid Issue No, English Name, and Khmer Name."
+    }
   }
 }
