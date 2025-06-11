@@ -1055,7 +1055,6 @@ import "react-datepicker/dist/react-datepicker.css";
 import CEDatabase from "../components/inspection/qc_roving/CEDatabase";
 import EmpQRCodeScanner from "../components/inspection/qc_roving/EmpQRCodeScanner";
 import PreviewRoving from "../components/inspection/qc_roving/PreviewRoving";
-import RovingCamera from "../components/inspection/qc_roving/RovingCamera";
 import RovingData from "../components/inspection/qc_roving/RovingData";
 import InlineWorkers from "../components/inspection/qc_roving/InlineWorkers";
 import ImageCaptureUpload from "../components/inspection/qc_roving/ImageCaptureupload";
