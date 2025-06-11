@@ -38,7 +38,7 @@ import createAccessoryIssueModel from "./models/AccessoryIssue.js";
 import createQCRovingPairingModel from "./models/QCRovingPairing.js";
 import createSewingDefectsModel from "./models/SewingDefects.js";
 
-import createCuttingOrdersModel from "./models/CuttingOrders.js"; // New model import
+//import createCuttingOrdersModel from "./models/CuttingOrders.js"; // New model import
 import createCutPanelOrdersModel from "./models/CutPanelOrders.js"; // New model import
 import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
 import createCuttingMeasurementPointModel from "./models/CuttingMeasurementPoints.js"; // New model import
@@ -233,7 +233,7 @@ const PairingDefect = createPairingDefectModel(ymProdConnection);
 const AccessoryIssue = createAccessoryIssueModel(ymProdConnection);
 const QCRovingPairing = createQCRovingPairingModel(ymProdConnection);
 
-const CuttingOrders = createCuttingOrdersModel(ymProdConnection); // New model
+//const CuttingOrders = createCuttingOrdersModel(ymProdConnection); // New model
 const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New model
 const CuttingMeasurementPoint =
   createCuttingMeasurementPointModel(ymProdConnection); // New model instance
@@ -323,15 +323,15 @@ const sqlConfigYMCE = {
 
 const sqlConfigYMWHSYS2 = {
   user: "user01",
-  password: "user01",
+  password: "Ur@12323",
   server: "YM-WHSYS",
-  database: "YMWHSYS2",
+  database: "FC_SYSTEM",
   options: {
     encrypt: false,
     trustServerCertificate: true
   },
-  requestTimeout: 300000,
-  connectionTimeout: 300000,
+  requestTimeout: 18000000,
+  connectionTimeout: 18000000,
   pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
 };
 
@@ -451,7 +451,6 @@ async function initializeServer() {
   // 3. Run initial data syncs. These functions will now check the connection status internally.
   console.log("Running initial data synchronizations...");
   await syncInlineOrders();
-  await syncCuttingOrders();
   await syncCutPanelOrders();
   await syncQC1SunriseData();
 
@@ -1342,557 +1341,285 @@ app.get("/api/ymce-system-data", async (req, res) => {
   }
 });
 
-/* ------------------------------
-   Sync Cutting Orders Function
------------------------------- */
+// /* -----------------------------------------------------------------
+//    STREAMING Cut Panel Orders Sync
+// ----------------------------------------------------------------- */
+// async function syncCutPanelOrders() {
+//   if (!sqlConnectionStatus.YMWHSYS2) {
+//     console.warn(
+//       "[CutPanelOrders] Skipping sync: FC_SYSTEM database is not connected."
+//     );
+//     return;
+//   }
 
-async function syncCuttingOrders() {
-  // MODIFICATION: Add connection status check
-  if (!sqlConnectionStatus.YMWHSYS2) {
-    console.warn(
-      "Skipping cuttingOrders sync: YMWHSYS2 database is not connected."
-    );
-    return;
-  }
-  try {
-    console.log("Starting cuttingOrders sync at", new Date().toISOString());
-    await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
+//   // Wrap the entire streaming operation in a Promise for clean async handling
+//   return new Promise(async (resolve, reject) => {
+//     try {
+//       const syncStartTime = new Date();
+//       console.log(
+//         `[CutPanelOrders] Starting STREAMING sync at ${syncStartTime.toISOString()}`
+//       );
+//       await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
 
-    // Define SQL queries
-    const query1 = `
-      SELECT 
-        StyleNo, 
-        Batch AS LotNo
-      FROM [YMWHSYS2].[dbo].[tbSpreading]
-      GROUP BY StyleNo, Batch
-      ORDER BY StyleNo, Batch;
-    `;
+//       // The final, fully corrected and optimized SQL query
+//       const query = `
+//         -- *** 1. DATE RANGE UPDATED TO -600 DAYS ***
+//         DECLARE @StartDate DATE = CAST(DATEADD(DAY, -600, GETDATE()) AS DATE);
 
-    const query2 = `
-      SELECT DISTINCT 
-        StyleNo, 
-        Buyer, 
-        BuyerStyle, 
-        EngColor, 
-        ChColor, 
-        ColorCode, 
-        Size1, 
-        Size2, 
-        Size3, 
-        Size4, 
-        Size5, 
-        Size6, 
-        Size7, 
-        Size8, 
-        Size9, 
-        Size10
-      FROM [YMWHSYS2].[dbo].[ViewCuttingOrderReport]
-      WHERE FabricType = 'A'
-      ORDER BY StyleNo, Buyer, BuyerStyle, EngColor, ChColor, ColorCode;
-    `;
+//         WITH
+//         LotData AS (
+//             SELECT
+//                 v.Style, v.TableNo,
+//                 STUFF((SELECT DISTINCT ', ' + v_inner.Lot FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v_inner WHERE v_inner.Style = v.Style AND v_inner.TableNo = v.TableNo AND v_inner.Lot IS NOT NULL AND v_inner.Lot <> '' FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos
+//             FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v
+//             INNER JOIN [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS inv_filter ON v.TxnNo = inv_filter.TxnNo
+//             WHERE v.Lot IS NOT NULL AND v.Lot <> '' AND inv_filter.Create_Date >= @StartDate
+//             GROUP BY v.Style, v.TableNo
+//         ),
+//         OrderData AS (
+//             SELECT Style, EngColor, Size1, Size2, Size3, Size4, Size5, Size6, Size7, Size8, Size9, Size10,
+//                 OrderQty1, OrderQty2, OrderQty3, OrderQty4, OrderQty5, OrderQty6, OrderQty7, OrderQty8, OrderQty9, OrderQty10,
+//                 TotalOrderQty, SUM(TotalOrderQty) OVER (PARTITION BY Style) AS TotalOrderQtyStyle
+//             FROM (
+//                 SELECT o.Style, o.EngColor, MAX(o.Size1) AS Size1, MAX(o.Size2) AS Size2, MAX(o.Size3) AS Size3, MAX(o.Size4) AS Size4, MAX(o.Size5) AS Size5, MAX(o.Size6) AS Size6, MAX(o.Size7) AS Size7, MAX(o.Size8) AS Size8, MAX(o.Size9) AS Size9, MAX(o.Size10) AS Size10,
+//                     SUM(ISNULL(o.Qty1, 0)) AS OrderQty1, SUM(ISNULL(o.Qty2, 0)) AS OrderQty2, SUM(ISNULL(o.Qty3, 0)) AS OrderQty3, SUM(ISNULL(o.Qty4, 0)) AS OrderQty4, SUM(ISNULL(o.Qty5, 0)) AS OrderQty5, SUM(ISNULL(o.Qty6, 0)) AS OrderQty6, SUM(ISNULL(o.Qty7, 0)) AS OrderQty7, SUM(ISNULL(o.Qty8, 0)) AS OrderQty8, SUM(ISNULL(o.Qty9, 0)) AS OrderQty9, SUM(ISNULL(o.Qty10, 0)) AS OrderQty10,
+//                     SUM(ISNULL(o.Total, 0)) AS TotalOrderQty
+//                 FROM [FC_SYSTEM].[dbo].[ViewOrderQty] AS o
+//                 WHERE EXISTS (SELECT 1 FROM [FC_SYSTEM].[dbo].[ViewSpreading_Inv] vi WHERE vi.Style = o.Style AND vi.EngColor = o.EngColor AND vi.Create_Date >= @StartDate)
+//                 GROUP BY o.Style, o.EngColor
+//             ) AS OrderColorAggregates
+//         )
+//         SELECT
+//             v.Style AS StyleNo, v.Create_Date AS TxnDate, v.TxnNo, CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer, v.BuyerStyle,
+//             v.EngColor AS Color, v.ChnColor, v.ColorNo AS ColorCode, v.Fabric_Type AS FabricType, v.Material,
 
-    const query3 = `
-      SELECT 
-        StyleNo, 
-        Buyer, 
-        BuyerStyle, 
-        EngColor, 
-        ChColor, 
-        ColorCode, 
-        SUM(Qty1) AS Sum_Qty1,
-        SUM(Qty2) AS Sum_Qty2,
-        SUM(Qty3) AS Sum_Qty3,
-        SUM(Qty4) AS Sum_Qty4,
-        SUM(Qty5) AS Sum_Qty5,
-        SUM(Qty6) AS Sum_Qty6,
-        SUM(Qty7) AS Sum_Qty7,
-        SUM(Qty8) AS Sum_Qty8,
-        SUM(Qty9) AS Sum_Qty9,
-        SUM(Qty10) AS Sum_Qty10
-      FROM [YMWHSYS2].[dbo].[ViewCuttingOrderReport]
-      WHERE FabricType = 'A'
-      GROUP BY 
-        StyleNo, 
-        Buyer, 
-        BuyerStyle, 
-        EngColor, 
-        ChColor, 
-        ColorCode
-      ORDER BY 
-        StyleNo, 
-        Buyer, 
-        BuyerStyle, 
-        EngColor, 
-        ChColor, 
-        ColorCode;
-    `;
+//             -- *** 2. ROBUST SPREADTABLE LOGIC ADDED ***
+//             CASE
+//                 WHEN PATINDEX('%[_ ]%', v.PreparedBy) > 0
+//                 THEN LTRIM(SUBSTRING(v.PreparedBy, PATINDEX('%[_ ]%', v.PreparedBy) + 1, LEN(v.PreparedBy)))
+//                 ELSE v.PreparedBy
+//             END AS SpreadTable,
 
-    const query4 = `
-      SELECT 
-        StyleNo, 
-        Buyer, 
-        BuyerStyle, 
-        EngColor, 
-        ChColor, 
-        ColorCode, 
-        TableNo, 
-        MackerNo, 
-        MAX(PlanLayer) AS PlanLayer,
-        MAX(PlanPcs) AS PlanPcs,
-        MAX(ActualLayer) AS ActualLayer,
-        MAX(RollQty) AS RollQty,
-        MAX(Ratio1) AS Ratio1,
-        MAX(Ratio2) AS Ratio2,
-        MAX(Ratio3) AS Ratio3,
-        MAX(Ratio4) AS Ratio4,
-        MAX(Ratio5) AS Ratio5,
-        MAX(Ratio6) AS Ratio6,
-        MAX(Ratio7) AS Ratio7,
-        MAX(Ratio8) AS Ratio8,
-        MAX(Ratio9) AS Ratio9,
-        MAX(Ratio10) AS Ratio10
-      FROM [YMWHSYS2].[dbo].[ViewCuttingDetailReport]
-      WHERE FabricType = 'A' 
-      GROUP BY 
-        StyleNo, 
-        Buyer, 
-        BuyerStyle, 
-        EngColor, 
-        ChColor, 
-        ColorCode, 
-        TableNo, 
-        MackerNo
-      ORDER BY 
-        StyleNo, 
-        Buyer, 
-        BuyerStyle, 
-        EngColor, 
-        ChColor, 
-        ColorCode, 
-        TableNo, 
-        MackerNo;
-    `;
+//             v.TableNo, v.RollQty, ROUND(v.SpreadYds, 3) AS SpreadYds, v.Unit,
+//             ROUND(v.GrossKgs, 3) AS GrossKgs, ROUND(v.NetKgs, 3) AS NetKgs, v.PlanLayer, v.ActualLayer,
+//             CAST(ISNULL(v.PlanLayer, 0) * (ISNULL(v.Ratio1, 0) + ISNULL(v.Ratio2, 0) + ISNULL(v.Ratio3, 0) + ISNULL(v.Ratio4, 0) + ISNULL(v.Ratio5, 0) + ISNULL(v.Ratio6, 0) + ISNULL(v.Ratio7, 0) + ISNULL(v.Ratio8, 0) + ISNULL(v.Ratio9, 0) + ISNULL(v.Ratio10, 0)) AS INT) AS TotalPcs,
+//             v.Pattern AS MackerNo, ROUND(v.MarkerLength, 3) AS MackerLength, ld.LotNos, od.OrderQty1, od.OrderQty2, od.OrderQty3, od.OrderQty4, od.OrderQty5,
+//             od.OrderQty6, od.OrderQty7, od.OrderQty8, od.OrderQty9, od.OrderQty10, od.TotalOrderQty, od.TotalOrderQtyStyle, v.Ratio1 AS CuttingRatio1,
+//             v.Ratio2 AS CuttingRatio2, v.Ratio3 AS CuttingRatio3, v.Ratio4 AS CuttingRatio4, v.Ratio5 AS CuttingRatio5, v.Ratio6 AS CuttingRatio6,
+//             v.Ratio7 AS CuttingRatio7, v.Ratio8 AS CuttingRatio8, v.Ratio9 AS CuttingRatio9, v.Ratio10 AS CuttingRatio10, v.Size1, v.Size2, v.Size3,
+//             v.Size4, v.Size5, v.Size6, v.Size7, v.Size8, v.Size9, v.Size10,
+//             NULL AS TotalTTLRoll, NULL AS TotalTTLQty, NULL AS TotalBiddingQty, NULL AS TotalBiddingRollQty,
+//             NULL AS SendFactory, NULL AS SendTxnDate, NULL AS SendTxnNo, NULL AS SendTotalQty
+//         FROM [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS v
+//         LEFT JOIN LotData AS ld ON v.Style = ld.Style AND v.TableNo = ld.TableNo
+//         LEFT JOIN OrderData AS od ON v.Style = od.Style AND v.EngColor = od.EngColor
+//         WHERE v.TableNo IS NOT NULL AND v.TableNo <> '' AND v.Create_Date >= @StartDate
+//         ORDER BY v.Create_Date DESC;
+//       `;
 
-    // Fetch data concurrently
-    const [lotNumbersResult, sizesResult, orderQtyResult, markersResult] =
-      await Promise.all([
-        poolYMWHSYS2.request().query(query1),
-        poolYMWHSYS2.request().query(query2),
-        poolYMWHSYS2.request().query(query3),
-        poolYMWHSYS2.request().query(query4)
-      ]);
+//       const request = new sql.Request(poolYMWHSYS2);
+//       request.stream = true; // Enable streaming mode
 
-    // Process lot numbers into a map
-    const lotNumbersMap = {};
-    lotNumbersResult.recordset.forEach((row) => {
-      if (!lotNumbersMap[row.StyleNo]) {
-        lotNumbersMap[row.StyleNo] = new Set();
-      }
-      lotNumbersMap[row.StyleNo].add(row.LotNo);
-    });
+//       let syncedCount = 0;
+//       let hadError = false;
 
-    // Process sizes into a map
-    const sizesMap = {};
-    sizesResult.recordset.forEach((row) => {
-      const key = `${row.StyleNo}|${row.Buyer}|${row.BuyerStyle}|${row.EngColor}|${row.ChColor}|${row.ColorCode}`;
-      sizesMap[key] = {
-        Size1: row.Size1,
-        Size2: row.Size2,
-        Size3: row.Size3,
-        Size4: row.Size4,
-        Size5: row.Size5,
-        Size6: row.Size6,
-        Size7: row.Size7,
-        Size8: row.Size8,
-        Size9: row.Size9,
-        Size10: row.Size10
-      };
-    });
+//       // Event fires for EACH ROW
+//       request.on("row", async (row) => {
+//         try {
+//           request.pause();
 
-    // Process order quantities into a map
-    const orderQtyMap = {};
-    orderQtyResult.recordset.forEach((row) => {
-      const key = `${row.StyleNo}|${row.Buyer}|${row.BuyerStyle}|${row.EngColor}|${row.ChColor}|${row.ColorCode}`;
-      orderQtyMap[key] = {
-        Sum_Qty1: row.Sum_Qty1,
-        Sum_Qty2: row.Sum_Qty2,
-        Sum_Qty3: row.Sum_Qty3,
-        Sum_Qty4: row.Sum_Qty4,
-        Sum_Qty5: row.Sum_Qty5,
-        Sum_Qty6: row.Sum_Qty6,
-        Sum_Qty7: row.Sum_Qty7,
-        Sum_Qty8: row.Sum_Qty8,
-        Sum_Qty9: row.Sum_Qty9,
-        Sum_Qty10: row.Sum_Qty10
-      };
-    });
+//           const markerRatio = [];
+//           for (let j = 1; j <= 10; j++) {
+//             markerRatio.push({
+//               no: j,
+//               size: row[`Size${j}`],
+//               cuttingRatio: row[`CuttingRatio${j}`],
+//               orderQty: row[`OrderQty${j}`]
+//             });
+//           }
+//           const lotNos = row.LotNos
+//             ? row.LotNos.split(",").map((lot) => lot.trim())
+//             : [];
 
-    // Process markers into a map
-    const markersMap = {};
-    markersResult.recordset.forEach((row) => {
-      const key = `${row.StyleNo}|${row.Buyer}|${row.BuyerStyle}|${row.EngColor}|${row.ChColor}|${row.ColorCode}`;
-      if (!markersMap[key]) {
-        markersMap[key] = [];
-      }
-      markersMap[key].push({
-        TableNo: row.TableNo,
-        MackerNo: row.MackerNo,
-        PlanLayer: row.PlanLayer, // Include PlanLayer
-        PlanPcs: row.PlanPcs, // Include PlanPcs
-        ActualLayer: row.ActualLayer, // Include ActualLayer
-        Ratio1: row.Ratio1,
-        Ratio2: row.Ratio2,
-        Ratio3: row.Ratio3,
-        Ratio4: row.Ratio4,
-        Ratio5: row.Ratio5,
-        Ratio6: row.Ratio6,
-        Ratio7: row.Ratio7,
-        Ratio8: row.Ratio8,
-        Ratio9: row.Ratio9,
-        Ratio10: row.Ratio10
-      });
-    });
+//           // *** 3. COMPOUND FILTER FOR UNIQUENESS ***
+//           await CutPanelOrders.updateOne(
+//             { TxnNo: row.TxnNo, StyleNo: row.StyleNo }, // Corrected compound filter
+//             {
+//               $set: {
+//                 /* Full document mapping */ StyleNo: row.StyleNo,
+//                 TxnDate: row.TxnDate ? new Date(row.TxnDate) : null,
+//                 TxnNo: row.TxnNo,
+//                 Buyer: row.Buyer,
+//                 Color: row.Color,
+//                 SpreadTable: row.SpreadTable,
+//                 TableNo: row.TableNo,
+//                 BuyerStyle: row.BuyerStyle,
+//                 ChColor: row.ChColor,
+//                 ColorCode: row.ColorCode,
+//                 FabricType: row.FabricType,
+//                 Material: row.Material,
+//                 RollQty: row.RollQty,
+//                 SpreadYds: row.SpreadYds,
+//                 Unit: row.Unit,
+//                 GrossKgs: row.GrossKgs,
+//                 NetKgs: row.NetKgs,
+//                 MackerNo: row.MackerNo,
+//                 MackerLength: row.MackerLength,
+//                 SendFactory: row.SendFactory,
+//                 SendTxnDate: row.SendTxnDate ? new Date(row.SendTxnDate) : null,
+//                 SendTxnNo: row.SendTxnNo,
+//                 SendTotalQty: row.SendTotalQty,
+//                 PlanLayer: row.PlanLayer,
+//                 ActualLayer: row.ActualLayer,
+//                 TotalPcs: row.TotalPcs,
+//                 LotNos: lotNos,
+//                 TotalOrderQty: row.TotalOrderQty,
+//                 TotalTTLRoll: row.TotalTTLRoll,
+//                 TotalTTLQty: row.TotalTTLQty,
+//                 TotalBiddingQty: row.TotalBiddingQty,
+//                 TotalBiddingRollQty: row.TotalBiddingRollQty,
+//                 TotalOrderQtyStyle: row.TotalOrderQtyStyle,
+//                 MarkerRatio: markerRatio
+//               }
+//             },
+//             { upsert: true }
+//           );
 
-    // Build MongoDB documents
-    const documents = [];
-    for (const key in sizesMap) {
-      const [StyleNo, Buyer, BuyerStyle, EngColor, ChColor, ColorCode] =
-        key.split("|");
-      const sizes = sizesMap[key];
-      const orderQtys = orderQtyMap[key] || {};
-      const markers = markersMap[key] || [];
-      const lotNumbers = lotNumbersMap[StyleNo]
-        ? Array.from(lotNumbersMap[StyleNo])
-        : [];
+//           syncedCount++;
+//           if (syncedCount % 100 === 0) {
+//             console.log(
+//               `[CutPanelOrders] ...synced ${syncedCount} records so far...`
+//             );
+//           }
+//         } catch (mongoErr) {
+//           console.error(
+//             `[CutPanelOrders] Error processing row for TxnNo ${row.TxnNo}, Style ${row.StyleNo}:`,
+//             mongoErr
+//           );
+//           hadError = true;
+//         } finally {
+//           request.resume();
+//         }
+//       });
 
-      // Build lotNo array
-      const lotNoArray = lotNumbers.map((lotName, index) => ({
-        No: index + 1,
-        LotName: lotName
-      }));
+//       // Event fires on a fatal SQL error
+//       request.on("error", (err) => {
+//         console.error("[CutPanelOrders] CRITICAL SQL STREAM ERROR:", err);
+//         hadError = true;
+//         reject(err);
+//       });
 
-      // Build cuttingData array
-      const cuttingData = markers.map((marker) => {
-        const markerData = [];
-        for (let i = 1; i <= 10; i++) {
-          markerData.push({
-            No: i,
-            size: sizes[`Size${i}`] || null,
-            orderQty: orderQtys[`Sum_Qty${i}`] || null,
-            markerRatio: marker[`Ratio${i}`] || null
-          });
-        }
-        return {
-          tableNo: marker.TableNo,
-          markerNo: marker.MackerNo,
-          planLayerQty: marker.PlanLayer || 0, // Map PlanLayer to planLayerQty
-          totalPlanPcs: marker.PlanPcs || 0, // Map PlanPcs to totalPlanPcs
-          actualLayers: marker.ActualLayer || 0, // Map ActualLayer to actualLayers
-          markerData
-        };
-      });
+//       // Event fires when all rows have been processed
+//       request.on("done", () => {
+//         if (!hadError) {
+//           console.log(
+//             `[CutPanelOrders] STREAMING SYNC COMPLETE. Total documents processed: ${syncedCount}.`
+//           );
+//           resolve();
+//         } else {
+//           console.error(
+//             "[CutPanelOrders] STREAMING SYNC finished with one or more errors."
+//           );
+//           reject(new Error("Sync completed with errors."));
+//         }
+//       });
 
-      // Calculate totalOrderQty
-      let totalOrderQty = 0;
-      for (let i = 1; i <= 10; i++) {
-        totalOrderQty += orderQtys[`Sum_Qty${i}`] || 0;
-      }
+//       // Start the query
+//       console.log(
+//         "[CutPanelOrders] Executing streaming SQL query for the last 600 days..."
+//       );
+//       request.query(query);
+//     } catch (err) {
+//       console.error("[CutPanelOrders] Error setting up the sync:", err);
+//       reject(err);
+//     }
+//   });
+// }
 
-      // Create document
-      documents.push({
-        StyleNo,
-        Buyer,
-        BuyerStyle,
-        EngColor,
-        ChColor,
-        ColorCode,
-        lotNo: lotNoArray,
-        cuttingData,
-        totalOrderQty
-      });
-    }
+/* --------------------------------------------------------
+   Cut Panel Orders Sync with GATEKEEPER to prevent deadlocks
+-------------------------------------------------------- */
 
-    // Sync to MongoDB
-    await CuttingOrders.deleteMany({});
-    await CuttingOrders.insertMany(documents);
-    console.log(
-      `Successfully synced ${documents.length} documents to cuttingOrders.`
-    );
-  } catch (err) {
-    console.error("Error during cuttingOrders sync:", err);
-    throw err;
-  }
-}
-
-/* ------------------------------
-   New Cut Panel Orders Endpoint
------------------------------- */
+// *** 1. THE GATEKEEPER VARIABLE ***
+let isCutPanelSyncRunning = false;
 
 async function syncCutPanelOrders() {
-  // MODIFICATION: Add connection status check
-  if (!sqlConnectionStatus.YMWHSYS2) {
-    console.warn(
-      "Skipping cuttingOrders sync: YMWHSYS2 database is not connected."
+  // *** 2. THE GATEKEEPER CHECK ***
+  if (isCutPanelSyncRunning) {
+    console.log(
+      "[CutPanelOrders] Sync is already in progress. Skipping this run."
     );
     return;
   }
+
+  // *** 3. THE TRY...FINALLY BLOCK TO ENSURE THE LOCK IS RELEASED ***
   try {
-    console.log("Starting cutpanelorders sync at", new Date().toISOString());
+    isCutPanelSyncRunning = true; // Set the lock
+    console.log("[CutPanelOrders] Starting sync at", new Date().toISOString());
+
+    if (!sqlConnectionStatus.YMWHSYS2) {
+      console.warn(
+        "[CutPanelOrders] Skipping sync: YMWHSYS2 database is not connected."
+      );
+      return; // The 'finally' block will still run to release the lock
+    }
+
     await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
 
+    // This is your query for a rolling 3-day update. This is perfect for the cron job.
     const query = `
-    WITH AggregatedQty AS (
-    SELECT 
-        StyleNo,
-        SUM(ISNULL(Qty1, 0) + ISNULL(Qty2, 0) + ISNULL(Qty3, 0) + ISNULL(Qty4, 0) +
-            ISNULL(Qty5, 0) + ISNULL(Qty6, 0) + ISNULL(Qty7, 0) + ISNULL(Qty8, 0) +
-            ISNULL(Qty9, 0) + ISNULL(Qty10, 0)) AS TotalOrderQtyStyle
-    FROM 
-        [YMWHSYS2].[dbo].[tbOrderQty]
-    WHERE 
-        Dept = 'YMCUTTING' AND FabricType = 'A'
-    GROUP BY 
-        StyleNo
-),
-OrderAggregates AS (
-    SELECT 
-        StyleNo,
-        EngColor,
-        SUM(TTLRoll) AS TotalTTLRoll,
-        SUM(TTLQty) AS TotalTTLQty,
-        SUM(BiddingQty) AS TotalBiddingQty,
-        SUM(BiddingRollQty) AS TotalBiddingRollQty,
-        COALESCE(SUM(Qty1), 0) AS OrderQty1,
-        COALESCE(SUM(Qty2), 0) AS OrderQty2,
-        COALESCE(SUM(Qty3), 0) AS OrderQty3,
-        COALESCE(SUM(Qty4), 0) AS OrderQty4,
-        COALESCE(SUM(Qty5), 0) AS OrderQty5,
-        COALESCE(SUM(Qty6), 0) AS OrderQty6,
-        COALESCE(SUM(Qty7), 0) AS OrderQty7,
-        COALESCE(SUM(Qty8), 0) AS OrderQty8,
-        COALESCE(SUM(Qty9), 0) AS OrderQty9,
-        COALESCE(SUM(Qty10), 0) AS OrderQty10,
-        COALESCE(SUM(Qty1), 0) + COALESCE(SUM(Qty2), 0) + COALESCE(SUM(Qty3), 0) + 
-        COALESCE(SUM(Qty4), 0) + COALESCE(SUM(Qty5), 0) + COALESCE(SUM(Qty6), 0) + 
-        COALESCE(SUM(Qty7), 0) + COALESCE(SUM(Qty8), 0) + COALESCE(SUM(Qty9), 0) + 
-        COALESCE(SUM(Qty10), 0) AS TotalOrderQty
-    FROM 
-        [YMWHSYS2].[dbo].[ViewCuttingOrderReport]
-    WHERE 
-        StyleNo IS NOT NULL AND EngColor IS NOT NULL
-    GROUP BY 
-        StyleNo, 
-        EngColor
-)
-SELECT 
-    v.StyleNo,
-    v.TxnDate,
-    v.TxnNo,
-    CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer,
-    v.EngColor AS Color,
-    REPLACE(v.PreparedBy, 'SPREAD ', '') AS SpreadTable,
-    v.TableNo,
-    v.BuyerStyle,
-    v.ChColor,
-    v.ColorCode,
-    v.FabricType,
-    v.Material,
-    v.RollQty,
-    ROUND(v.SpreadYds, 3) AS SpreadYds,
-    v.Unit,
-    ROUND(v.GrossKgs, 3) AS GrossKgs,
-    ROUND(v.NetKgs, 3) AS NetKgs,
-    v.AMackerNo AS MackerNo,
-    ROUND(v.MackerLength, 3) AS MackerLength,
-    v.SendFactory,
-    v.SendTxnDate,
-    v.SendTxnNo,
-    v.SendTotalQty,
-    v.Ratio1 AS CuttingRatio1,
-    v.Ratio2 AS CuttingRatio2,
-    v.Ratio3 AS CuttingRatio3,
-    v.Ratio4 AS CuttingRatio4,
-    v.Ratio5 AS CuttingRatio5,
-    v.Ratio6 AS CuttingRatio6,
-    v.Ratio7 AS CuttingRatio7,
-    v.Ratio8 AS CuttingRatio8,
-    v.Ratio9 AS CuttingRatio9,
-    v.Ratio10 AS CuttingRatio10,
-    MAX(v.PlanLayer) AS PlanLayer,
-    MAX(v.ActualLayer) AS ActualLayer,
-    MAX(v.PlanPcs) AS TotalPcs,
-    STUFF((
-        SELECT DISTINCT ', ' + CAST(s2.Batch AS VARCHAR)
-        FROM [YMWHSYS2].[dbo].[tbSpreading] s2
-        WHERE s2.StyleNo = v.StyleNo
-          AND s2.PreparedBy = v.PreparedBy
-          AND s2.Batch IS NOT NULL
-        FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos,
-    t.Size1,
-    t.Size2,
-    t.Size3,
-    t.Size4,
-    t.Size5,
-    t.Size6,
-    t.Size7,
-    t.Size8,
-    t.Size9,
-    t.Size10,
-    t.OrderQty1,
-    t.OrderQty2,
-    t.OrderQty3,
-    t.OrderQty4,
-    t.OrderQty5,
-    t.OrderQty6,
-    t.OrderQty7,
-    t.OrderQty8,
-    t.OrderQty9,
-    t.OrderQty10,
-    t.TotalOrderQty,
-    t.TotalTTLRoll,
-    t.TotalTTLQty,
-    t.TotalBiddingQty,
-    t.TotalBiddingRollQty,
-    agg.TotalOrderQtyStyle
-FROM 
-    [YMWHSYS2].[dbo].[ViewCuttingDetailReport] v
-    LEFT JOIN [YMWHSYS2].[dbo].[tbSpreading] s
-        ON v.StyleNo = s.StyleNo
-        AND v.PreparedBy = s.PreparedBy
-    LEFT JOIN (
-        SELECT DISTINCT
-            t.StyleNo,
-            t.EngColor AS Color,
-            t.Size1,
-            t.Size2,
-            t.Size3,
-            t.Size4,
-            t.Size5,
-            t.Size6,
-            t.Size7,
-            t.Size8,
-            t.Size9,
-            t.Size10,
-            agg.OrderQty1,
-            agg.OrderQty2,
-            agg.OrderQty3,
-            agg.OrderQty4,
-            agg.OrderQty5,
-            agg.OrderQty6,
-            agg.OrderQty7,
-            agg.OrderQty8,
-            agg.OrderQty9,
-            agg.OrderQty10,
-            agg.TotalOrderQty,
-            agg.TotalTTLRoll,
-            agg.TotalTTLQty,
-            agg.TotalBiddingQty,
-            agg.TotalBiddingRollQty
-        FROM 
-            [YMWHSYS2].[dbo].[ViewCuttingOrderReport] t
-            LEFT JOIN OrderAggregates agg
-                ON t.StyleNo = agg.StyleNo
-                AND t.EngColor = agg.EngColor
-        WHERE 
-            t.StyleNo IS NOT NULL
-            AND t.EngColor IS NOT NULL
-    ) t
-        ON v.StyleNo = t.StyleNo
-        AND v.EngColor = t.Color
-    LEFT JOIN AggregatedQty agg
-        ON v.StyleNo = agg.StyleNo
-WHERE 
-    v.TableNo IS NOT NULL 
-    AND v.TableNo <> '' 
-    AND v.TxnDate >= CAST(DATEADD(DAY, -7, GETDATE()) AS DATE)
-GROUP BY 
-    v.StyleNo,
-    v.TxnDate,
-    v.TxnNo,
-    v.Buyer,
-    v.EngColor,
-    v.PreparedBy,
-    v.TableNo,
-    v.BuyerStyle,
-    v.ChColor,
-    v.ColorCode,
-    v.FabricType,
-    v.Material,
-    v.RollQty,
-    v.SpreadYds,
-    v.Unit,
-    v.GrossKgs,
-    v.NetKgs,
-    v.AMackerNo,
-    v.MackerLength,
-    v.SendFactory,
-    v.SendTxnDate,
-    v.SendTxnNo,
-    v.SendTotalQty,
-    v.Ratio1,
-    v.Ratio2,
-    v.Ratio3,
-    v.Ratio4,
-    v.Ratio5,
-    v.Ratio6,
-    v.Ratio7,
-    v.Ratio8,
-    v.Ratio9,
-    v.Ratio10,
-    t.Size1,
-    t.Size2,
-    t.Size3,
-    t.Size4,
-    t.Size5,
-    t.Size6,
-    t.Size7,
-    t.Size8,
-    t.Size9,
-    t.Size10,
-    t.OrderQty1,
-    t.OrderQty2,
-    t.OrderQty3,
-    t.OrderQty4,
-    t.OrderQty5,
-    t.OrderQty6,
-    t.OrderQty7,
-    t.OrderQty8,
-    t.OrderQty9,
-    t.OrderQty10,
-    t.TotalOrderQty,
-    t.TotalTTLRoll,
-    t.TotalTTLQty,
-    t.TotalBiddingQty,
-    t.TotalBiddingRollQty,
-    agg.TotalOrderQtyStyle
-ORDER BY 
-    v.TxnDate DESC;
+      DECLARE @StartDate DATE = CAST(DATEADD(DAY, -3, GETDATE()) AS DATE);
+      -- The rest of your optimized SQL query...
+      WITH 
+      LotData AS (
+          SELECT v.Style, v.TableNo, STUFF((SELECT DISTINCT ', ' + v_inner.Lot FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v_inner WHERE v_inner.Style = v.Style AND v_inner.TableNo = v.TableNo AND v_inner.Lot IS NOT NULL AND v_inner.Lot <> '' FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos
+          FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v INNER JOIN [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS inv_filter ON v.TxnNo = inv_filter.TxnNo
+          WHERE v.Lot IS NOT NULL AND v.Lot <> '' AND inv_filter.Create_Date >= @StartDate
+          GROUP BY v.Style, v.TableNo
+      ),
+      OrderData AS (
+          SELECT Style, EngColor, Size1, Size2, Size3, Size4, Size5, Size6, Size7, Size8, Size9, Size10,
+              OrderQty1, OrderQty2, OrderQty3, OrderQty4, OrderQty5, OrderQty6, OrderQty7, OrderQty8, OrderQty9, OrderQty10,
+              TotalOrderQty, SUM(TotalOrderQty) OVER (PARTITION BY Style) AS TotalOrderQtyStyle
+          FROM (
+              SELECT o.Style, o.EngColor, MAX(o.Size1) AS Size1, MAX(o.Size2) AS Size2, MAX(o.Size3) AS Size3, MAX(o.Size4) AS Size4, MAX(o.Size5) AS Size5, MAX(o.Size6) AS Size6, MAX(o.Size7) AS Size7, MAX(o.Size8) AS Size8, MAX(o.Size9) AS Size9, MAX(o.Size10) AS Size10,
+                  SUM(ISNULL(o.Qty1, 0)) AS OrderQty1, SUM(ISNULL(o.Qty2, 0)) AS OrderQty2, SUM(ISNULL(o.Qty3, 0)) AS OrderQty3, SUM(ISNULL(o.Qty4, 0)) AS OrderQty4, SUM(ISNULL(o.Qty5, 0)) AS OrderQty5, SUM(ISNULL(o.Qty6, 0)) AS OrderQty6, SUM(ISNULL(o.Qty7, 0)) AS OrderQty7, SUM(ISNULL(o.Qty8, 0)) AS OrderQty8, SUM(ISNULL(o.Qty9, 0)) AS OrderQty9, SUM(ISNULL(o.Qty10, 0)) AS OrderQty10,
+                  SUM(ISNULL(o.Total, 0)) AS TotalOrderQty
+              FROM [FC_SYSTEM].[dbo].[ViewOrderQty] AS o
+              WHERE EXISTS (SELECT 1 FROM [FC_SYSTEM].[dbo].[ViewSpreading_Inv] vi WHERE vi.Style = o.Style AND vi.EngColor = o.EngColor AND vi.Create_Date >= @StartDate)
+              GROUP BY o.Style, o.EngColor
+          ) AS OrderColorAggregates
+      )
+      SELECT
+          v.Style AS StyleNo, v.Create_Date AS TxnDate, v.TxnNo, CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer, v.BuyerStyle,
+          v.EngColor AS Color, v.ChnColor, v.ColorNo AS ColorCode, v.Fabric_Type AS FabricType, v.Material,
+          CASE WHEN PATINDEX('%[_ ]%', v.PreparedBy) > 0 THEN LTRIM(SUBSTRING(v.PreparedBy, PATINDEX('%[_ ]%', v.PreparedBy) + 1, LEN(v.PreparedBy))) ELSE v.PreparedBy END AS SpreadTable,
+          v.TableNo, v.RollQty, ROUND(v.SpreadYds, 3) AS SpreadYds, v.Unit, ROUND(v.GrossKgs, 3) AS GrossKgs, ROUND(v.NetKgs, 3) AS NetKgs,
+          v.PlanLayer, v.ActualLayer, CAST(ISNULL(v.PlanLayer, 0) * (ISNULL(v.Ratio1, 0) + ISNULL(v.Ratio2, 0) + ISNULL(v.Ratio3, 0) + ISNULL(v.Ratio4, 0) + ISNULL(v.Ratio5, 0) + ISNULL(v.Ratio6, 0) + ISNULL(v.Ratio7, 0) + ISNULL(v.Ratio8, 0) + ISNULL(v.Ratio9, 0) + ISNULL(v.Ratio10, 0)) AS INT) AS TotalPcs,
+          v.Pattern AS MackerNo, ROUND(v.MarkerLength, 3) AS MackerLength, ld.LotNos, od.OrderQty1, od.OrderQty2, od.OrderQty3, od.OrderQty4, od.OrderQty5,
+          od.OrderQty6, od.OrderQty7, od.OrderQty8, od.OrderQty9, od.OrderQty10, od.TotalOrderQty, od.TotalOrderQtyStyle, v.Ratio1 AS CuttingRatio1,
+          v.Ratio2 AS CuttingRatio2, v.Ratio3 AS CuttingRatio3, v.Ratio4 AS CuttingRatio4, v.Ratio5 AS CuttingRatio5, v.Ratio6 AS CuttingRatio6,
+          v.Ratio7 AS CuttingRatio7, v.Ratio8 AS CuttingRatio8, v.Ratio9 AS CuttingRatio9, v.Ratio10 AS CuttingRatio10, v.Size1, v.Size2, v.Size3,
+          v.Size4, v.Size5, v.Size6, v.Size7, v.Size8, v.Size9, v.Size10,
+          NULL AS TotalTTLRoll, NULL AS TotalTTLQty, NULL AS TotalBiddingQty, NULL AS TotalBiddingRollQty,
+          NULL AS SendFactory, NULL AS SendTxnDate, NULL AS SendTxnNo, NULL AS SendTotalQty
+      FROM [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS v
+      LEFT JOIN LotData AS ld ON v.Style = ld.Style AND v.TableNo = ld.TableNo
+      LEFT JOIN OrderData AS od ON v.Style = od.Style AND v.EngColor = od.EngColor
+      WHERE v.TableNo IS NOT NULL AND v.TableNo <> '' AND v.Create_Date >= @StartDate
+      ORDER BY v.Create_Date DESC;
     `;
 
     const result = await poolYMWHSYS2.request().query(query);
+    const records = result.recordset;
 
-    const bulkOps = result.recordset.map((row) => {
-      const markerRatio = [];
-
-      for (let i = 1; i <= 10; i++) {
-        markerRatio.push({
-          no: i,
-          size: row[`Size${i}`],
-          cuttingRatio: row[`CuttingRatio${i}`],
-          orderQty: row[`OrderQty${i}`]
-        });
-      }
-
-      const lotNos = row.LotNos
-        ? row.LotNos.split(",").map((lot) => lot.trim())
-        : [];
-
-      return {
+    if (records.length > 0) {
+      const bulkOps = records.map((row) => ({
         updateOne: {
-          filter: { StyleNo: row.StyleNo, TxnNo: row.TxnNo },
+          filter: { TxnNo: row.TxnNo, StyleNo: row.StyleNo }, // Using compound key
           update: {
             $set: {
-              StyleNo: row.StyleNo,
+              /* ... your document mapping ... */ StyleNo: row.StyleNo,
               TxnDate: row.TxnDate ? new Date(row.TxnDate) : null,
               TxnNo: row.TxnNo,
               Buyer: row.Buyer,
@@ -1918,82 +1645,284 @@ ORDER BY
               PlanLayer: row.PlanLayer,
               ActualLayer: row.ActualLayer,
               TotalPcs: row.TotalPcs,
-              LotNos: lotNos,
+              LotNos: row.LotNos
+                ? row.LotNos.split(",").map((lot) => lot.trim())
+                : [],
               TotalOrderQty: row.TotalOrderQty,
               TotalTTLRoll: row.TotalTTLRoll,
               TotalTTLQty: row.TotalTTLQty,
               TotalBiddingQty: row.TotalBiddingQty,
               TotalBiddingRollQty: row.TotalBiddingRollQty,
               TotalOrderQtyStyle: row.TotalOrderQtyStyle,
-              MarkerRatio: markerRatio
+              MarkerRatio: Array.from({ length: 10 }, (_, k) => ({
+                no: k + 1,
+                size: row[`Size${k + 1}`],
+                cuttingRatio: row[`CuttingRatio${k + 1}`],
+                orderQty: row[`OrderQty${k + 1}`]
+              }))
             }
           },
           upsert: true
         }
-      };
-    });
-
-    await CutPanelOrders.bulkWrite(bulkOps);
-    console.log(
-      `Successfully synced ${bulkOps.length} documents to cutpanelorders.`
-    );
+      }));
+      await CutPanelOrders.bulkWrite(bulkOps);
+      console.log(
+        `[CutPanelOrders] Successfully synced ${bulkOps.length} documents.`
+      );
+    } else {
+      console.log(
+        "[CutPanelOrders] No new documents to sync in the last 3 days."
+      );
+    }
   } catch (err) {
     console.error("Error during cutpanelorders sync:", err);
-    throw err;
+  } finally {
+    isCutPanelSyncRunning = false; // Release the lock
   }
 }
 
 // Schedule the syncCutPanelOrders function to run every 5 minutes
 cron.schedule("*/5 * * * *", syncCutPanelOrders);
-
-//console.log("Scheduled cutpanelorders sync every 5 minutes.");
+console.log("Scheduled cutpanelorders sync with deadlock protection.");
 
 /* ------------------------------
-   Manual Sync Endpoint
+   Manual Sync Endpoint & Server Start
 ------------------------------ */
-
-app.post("/api/sync-cutting-orders", async (req, res) => {
-  try {
-    await syncCuttingOrders();
-    res
-      .status(200)
-      .json({ message: "Cutting orders sync completed successfully." });
-  } catch (err) {
-    console.error("Error in /api/sync-cutting-orders endpoint:", err);
-    res.status(500).json({
-      message: "Failed to sync cutting orders",
-      error: err.message
-    });
-  }
-});
 
 app.post("/api/sync-cutpanel-orders", async (req, res) => {
-  try {
-    await syncCutPanelOrders();
-    res
-      .status(200)
-      .json({ message: "Cut panel orders sync completed successfully." });
-  } catch (err) {
-    console.error("Error in /api/sync-cutpanel-orders endpoint:", err);
-    res.status(500).json({
-      message: "Failed to sync cut panel orders",
-      error: err.message
+  // This manual trigger will also respect the gatekeeper
+  syncCutPanelOrders();
+  res
+    .status(202)
+    .json({
+      message:
+        "Cut panel orders sync initiated successfully. Check logs for progress."
     });
-  }
 });
 
-/* ------------------------------
-   Schedule Daily Sync
------------------------------- */
+// /* ------------------------------
+//    New Cut Panel Orders Endpoint
+// ------------------------------ */
 
-cron.schedule("0 7 * * *", async () => {
-  console.log("Running scheduled cuttingOrders sync at 7 AM...");
-  try {
-    await syncCuttingOrders();
-  } catch (err) {
-    console.error("Scheduled cuttingOrders sync failed:", err);
-  }
-});
+// async function syncCutPanelOrders() {
+//   // MODIFICATION: Add connection status check
+//   if (!sqlConnectionStatus.YMWHSYS2) {
+//     console.warn(
+//       "Skipping cuttingOrders sync: YMWHSYS2 database is not connected."
+//     );
+//     return;
+//   }
+//   try {
+//     console.log("Starting cutpanelorders sync at", new Date().toISOString());
+//     await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
+
+//     const query = `
+//     -- Use the WITH keyword only ONCE at the start of all CTE definitions.
+// WITH
+// -- CTE #1: For aggregating Lot Numbers
+// LotData AS (
+//     SELECT
+//         v.Style,
+//         v.TableNo,
+//         STUFF((SELECT DISTINCT ', ' + v_inner.Lot FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v_inner WHERE v_inner.Style = v.Style AND v_inner.TableNo = v.TableNo AND v_inner.Lot IS NOT NULL AND v_inner.Lot <> '' FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos
+//     FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v
+//     WHERE v.Lot IS NOT NULL AND v.Lot <> ''
+//     GROUP BY v.Style, v.TableNo
+// ),
+// -- CTE #2: For aggregating Order Quantities
+// OrderData AS (
+//     -- Use a final SELECT with a Window Function on top of a subquery.
+//     SELECT
+//         Style, EngColor, Size1, Size2, Size3, Size4, Size5, Size6, Size7, Size8, Size9, Size10,
+//         OrderQty1, OrderQty2, OrderQty3, OrderQty4, OrderQty5, OrderQty6, OrderQty7, OrderQty8, OrderQty9, OrderQty10,
+//         TotalOrderQty,
+//         SUM(TotalOrderQty) OVER (PARTITION BY Style) AS TotalOrderQtyStyle
+//     FROM (
+//         -- This subquery performs the first level of aggregation by Style and Color.
+//         SELECT
+//             Style, EngColor,
+//             MAX(Size1) AS Size1, MAX(Size2) AS Size2, MAX(Size3) AS Size3, MAX(Size4) AS Size4, MAX(Size5) AS Size5,
+//             MAX(Size6) AS Size6, MAX(Size7) AS Size7, MAX(Size8) AS Size8, MAX(Size9) AS Size9, MAX(Size10) AS Size10,
+//             SUM(ISNULL(Qty1, 0)) AS OrderQty1, SUM(ISNULL(Qty2, 0)) AS OrderQty2, SUM(ISNULL(Qty3, 0)) AS OrderQty3,
+//             SUM(ISNULL(Qty4, 0)) AS OrderQty4, SUM(ISNULL(Qty5, 0)) AS OrderQty5, SUM(ISNULL(Qty6, 0)) AS OrderQty6,
+//             SUM(ISNULL(Qty7, 0)) AS OrderQty7, SUM(ISNULL(Qty8, 0)) AS OrderQty8, SUM(ISNULL(Qty9, 0)) AS OrderQty9,
+//             SUM(ISNULL(Qty10, 0)) AS OrderQty10,
+//             SUM(ISNULL(Total, 0)) AS TotalOrderQty
+//         FROM [FC_SYSTEM].[dbo].[ViewOrderQty]
+//         GROUP BY Style, EngColor
+//     ) AS OrderColorAggregates
+// )
+// -- FINAL SELECT STATEMENT
+// SELECT
+//     -- Core Information
+//     v.Style AS StyleNo,
+//     v.Create_Date AS TxnDate,
+//     v.TxnNo,
+//     CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer,
+//     v.BuyerStyle,
+
+//     -- Color and Fabric Information
+//     v.EngColor AS Color,
+//     v.ChnColor,
+//     v.ColorNo AS ColorCode,
+//     v.Fabric_Type AS FabricType,
+//     v.Material,
+
+//     -- Spreading Details
+//     -- *** THIS IS THE CORRECTED LOGIC FOR SpreadTable ***
+//     -- It handles 'SPREAD G', 'Spread_I', 'SPREAD_J', etc. robustly.
+//     CASE
+//         WHEN PATINDEX('%[_ ]%', v.PreparedBy) > 0
+//         THEN LTRIM(SUBSTRING(v.PreparedBy, PATINDEX('%[_ ]%', v.PreparedBy) + 1, LEN(v.PreparedBy)))
+//         ELSE v.PreparedBy -- Fallback if no space or underscore is found
+//     END AS SpreadTable,
+
+//     v.TableNo,
+//     v.RollQty,
+//     ROUND(v.SpreadYds, 3) AS SpreadYds,
+//     v.Unit,
+//     ROUND(v.GrossKgs, 3) AS GrossKgs,
+//     ROUND(v.NetKgs, 3) AS NetKgs,
+//     v.PlanLayer,
+//     v.ActualLayer,
+//     CAST(ISNULL(v.PlanLayer, 0) * (ISNULL(v.Ratio1, 0) + ISNULL(v.Ratio2, 0) + ISNULL(v.Ratio3, 0) + ISNULL(v.Ratio4, 0) + ISNULL(v.Ratio5, 0) + ISNULL(v.Ratio6, 0) + ISNULL(v.Ratio7, 0) + ISNULL(v.Ratio8, 0) + ISNULL(v.Ratio9, 0) + ISNULL(v.Ratio10, 0)) AS INT) AS TotalPcs,
+
+//     -- Marker (Pattern) Information
+//     v.Pattern AS MackerNo,
+//     ROUND(v.MarkerLength, 3) AS MackerLength,
+
+//     -- Data from LotData CTE
+//     ld.LotNos,
+
+//     -- Data from OrderData CTE
+//     od.OrderQty1, od.OrderQty2, od.OrderQty3, od.OrderQty4, od.OrderQty5, od.OrderQty6, od.OrderQty7, od.OrderQty8, od.OrderQty9, od.OrderQty10,
+//     od.TotalOrderQty,
+//     od.TotalOrderQtyStyle,
+
+//     -- Cutting Ratios (from spreading view)
+//     v.Ratio1 AS CuttingRatio1, v.Ratio2 AS CuttingRatio2, v.Ratio3 AS CuttingRatio3, v.Ratio4 AS CuttingRatio4, v.Ratio5 AS CuttingRatio5,
+//     v.Ratio6 AS CuttingRatio6, v.Ratio7 AS CuttingRatio7, v.Ratio8 AS CuttingRatio8, v.Ratio9 AS CuttingRatio9, v.Ratio10 AS CuttingRatio10,
+
+//     -- Sizes from the spreading view
+//     v.Size1, v.Size2, v.Size3, v.Size4, v.Size5, v.Size6, v.Size7, v.Size8, v.Size9, v.Size10,
+
+//     -- Remaining placeholders
+//     NULL AS TotalTTLRoll, NULL AS TotalTTLQty, NULL AS TotalBiddingQty, NULL AS TotalBiddingRollQty,
+//     NULL AS SendFactory, NULL AS SendTxnDate, NULL AS SendTxnNo, NULL AS SendTotalQty
+
+// FROM
+//     [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS v
+// LEFT JOIN LotData AS ld
+//     ON v.Style = ld.Style AND v.TableNo = ld.TableNo
+// LEFT JOIN OrderData AS od
+//     ON v.Style = od.Style AND v.EngColor = od.EngColor
+// WHERE
+//     v.TableNo IS NOT NULL AND v.TableNo <> ''
+//     AND v.Create_Date >= CAST(DATEADD(DAY, -3, GETDATE()) AS DATE)
+// ORDER BY
+//     v.Create_Date DESC;
+//     `;
+
+//     const result = await poolYMWHSYS2.request().query(query);
+
+//     const bulkOps = result.recordset.map((row) => {
+//       const markerRatio = [];
+
+//       for (let i = 1; i <= 10; i++) {
+//         markerRatio.push({
+//           no: i,
+//           size: row[`Size${i}`],
+//           cuttingRatio: row[`CuttingRatio${i}`],
+//           orderQty: row[`OrderQty${i}`]
+//         });
+//       }
+
+//       const lotNos = row.LotNos
+//         ? row.LotNos.split(",").map((lot) => lot.trim())
+//         : [];
+
+//       return {
+//         updateOne: {
+//           filter: { TxnNo: row.TxnNo },
+//           update: {
+//             $set: {
+//               StyleNo: row.StyleNo,
+//               TxnDate: row.TxnDate ? new Date(row.TxnDate) : null,
+//               TxnNo: row.TxnNo,
+//               Buyer: row.Buyer,
+//               Color: row.Color,
+//               SpreadTable: row.SpreadTable,
+//               TableNo: row.TableNo,
+//               BuyerStyle: row.BuyerStyle,
+//               ChColor: row.ChColor,
+//               ColorCode: row.ColorCode,
+//               FabricType: row.FabricType,
+//               Material: row.Material,
+//               RollQty: row.RollQty,
+//               SpreadYds: row.SpreadYds,
+//               Unit: row.Unit,
+//               GrossKgs: row.GrossKgs,
+//               NetKgs: row.NetKgs,
+//               MackerNo: row.MackerNo,
+//               MackerLength: row.MackerLength,
+//               SendFactory: row.SendFactory,
+//               SendTxnDate: row.SendTxnDate ? new Date(row.SendTxnDate) : null,
+//               SendTxnNo: row.SendTxnNo,
+//               SendTotalQty: row.SendTotalQty,
+//               PlanLayer: row.PlanLayer,
+//               ActualLayer: row.ActualLayer,
+//               TotalPcs: row.TotalPcs,
+//               LotNos: lotNos,
+//               TotalOrderQty: row.TotalOrderQty,
+//               TotalTTLRoll: row.TotalTTLRoll,
+//               TotalTTLQty: row.TotalTTLQty,
+//               TotalBiddingQty: row.TotalBiddingQty,
+//               TotalBiddingRollQty: row.TotalBiddingRollQty,
+//               TotalOrderQtyStyle: row.TotalOrderQtyStyle,
+//               MarkerRatio: markerRatio
+//             }
+//           },
+//           upsert: true
+//         }
+//       };
+//     });
+
+//     if (bulkOps.length > 0) {
+//       await CutPanelOrders.bulkWrite(bulkOps);
+//       console.log(
+//         `Successfully synced ${bulkOps.length} documents to cutpanelorders.`
+//       );
+//     }
+
+//     // await CutPanelOrders.bulkWrite(bulkOps);
+//     // console.log(
+//     //   `Successfully synced ${bulkOps.length} documents to cutpanelorders.`
+//     // );
+//   } catch (err) {
+//     console.error("Error during cutpanelorders sync:", err);
+//     throw err;
+//   }
+// }
+
+// // Schedule the syncCutPanelOrders function to run every 5 minutes
+// cron.schedule("*/5 * * * *", syncCutPanelOrders);
+
+// //console.log("Scheduled cutpanelorders sync every 5 minutes.");
+
+// app.post("/api/sync-cutpanel-orders", async (req, res) => {
+//   try {
+//     await syncCutPanelOrders();
+//     res
+//       .status(200)
+//       .json({ message: "Cut panel orders sync completed successfully." });
+//   } catch (err) {
+//     console.error("Error in /api/sync-cutpanel-orders endpoint:", err);
+//     res.status(500).json({
+//       message: "Failed to sync cut panel orders",
+//       error: err.message
+//     });
+//   }
+// });
 
 // cron.schedule("0 8 * * *", async () => {
 //   console.log("Running scheduled cutpanelorders sync at 8 AM...");
@@ -2174,166 +2103,121 @@ app.get("/api/cutpanel-orders/aggregated-total-order-qty", async (req, res) => {
   }
 });
 
-// app.get("/api/cutpanel-orders/aggregated-total-order-qty", async (req, res) => {
+// /* ------------------------------
+//    Updated Endpoints for Cutting.jsx
+// ------------------------------ */
+
+// // Endpoint to Search MO Numbers (StyleNo) from cuttingOrders with partial matching
+// app.get("/api/cutting-orders-mo-numbers", async (req, res) => {
 //   try {
-//     const { styleNo } = req.query;
-//     if (!styleNo) {
-//       return res.status(400).json({ error: "StyleNo (MO No) is required" });
+//     const searchTerm = req.query.search;
+//     if (!searchTerm) {
+//       return res.status(400).json({ error: "Search term is required" });
 //     }
 
-//     const aggregationPipeline = [
-//       {
-//         $match: { StyleNo: styleNo } // Filter by the specific StyleNo
-//       },
-//       {
-//         $group: {
-//           _id: { styleNo: "$StyleNo", color: "$Color" }, // Group by StyleNo and Color
-//           // Assuming TotalOrderQty is the same for all records of a given StyleNo+Color.
-//           // If not, and you want the sum per StyleNo+Color, use $sum: '$TotalOrderQty' here.
-//           // But for the final sum across colors, we need one value per color.
-//           uniqueTotalOrderQtyForColor: { $first: "$TotalOrderQty" }
-//         }
-//       },
-//       {
-//         $group: {
-//           _id: "$_id.styleNo", // Group again by StyleNo (effectively just one group now)
-//           aggregatedTotal: { $sum: "$uniqueTotalOrderQtyForColor" } // Sum the unique TotalOrderQty for each color
-//         }
-//       }
-//     ];
+//     // Use a case-insensitive regex to match the term anywhere in StyleNo
+//     const regexPattern = new RegExp(searchTerm, "i");
 
-//     const result = await CutPanelOrders.aggregate(aggregationPipeline);
+//     // Query the cuttingOrders collection
+//     const results = await CuttingOrders.find({
+//       StyleNo: { $regex: regexPattern }
+//     })
+//       .select("StyleNo") // Only return the StyleNo field
+//       .limit(100) // Limit results to prevent overwhelming the UI
+//       .sort({ StyleNo: 1 }) // Sort alphabetically
+//       .exec();
 
-//     if (result.length > 0) {
-//       res.json({ aggregatedTotalOrderQty: result[0].aggregatedTotal });
-//     } else {
-//       // If no matching StyleNo, or no orders, return 0 or an appropriate message
-//       res.json({ aggregatedTotalOrderQty: 0 });
-//     }
+//     // Extract unique StyleNo values
+//     const uniqueMONos = [...new Set(results.map((r) => r.StyleNo))];
+
+//     res.json(uniqueMONos);
 //   } catch (err) {
-//     console.error("Error fetching aggregated total order quantity:", err);
+//     console.error("Error fetching MO numbers from cuttingOrders:", err);
 //     res.status(500).json({
-//       message: "Failed to fetch aggregated total order quantity",
+//       message: "Failed to fetch MO numbers from cuttingOrders",
 //       error: err.message
 //     });
 //   }
 // });
 
-/* ------------------------------
-   Updated Endpoints for Cutting.jsx
------------------------------- */
+// // Endpoint to Fetch Cutting Order Details for a given MO No (StyleNo)
+// app.get("/api/cutting-orders-details", async (req, res) => {
+//   try {
+//     const styleNo = req.query.styleNo;
+//     if (!styleNo) {
+//       return res.status(400).json({ error: "StyleNo is required" });
+//     }
 
-// Endpoint to Search MO Numbers (StyleNo) from cuttingOrders with partial matching
-app.get("/api/cutting-orders-mo-numbers", async (req, res) => {
-  try {
-    const searchTerm = req.query.search;
-    if (!searchTerm) {
-      return res.status(400).json({ error: "Search term is required" });
-    }
+//     // Find all documents where StyleNo matches
+//     const documents = await CuttingOrders.find({ StyleNo: styleNo }).exec();
 
-    // Use a case-insensitive regex to match the term anywhere in StyleNo
-    const regexPattern = new RegExp(searchTerm, "i");
+//     if (documents.length === 0) {
+//       console.log(`No documents found for StyleNo: ${styleNo}`);
+//       return res.status(404).json({ error: "MO No not found" });
+//     }
 
-    // Query the cuttingOrders collection
-    const results = await CuttingOrders.find({
-      StyleNo: { $regex: regexPattern }
-    })
-      .select("StyleNo") // Only return the StyleNo field
-      .limit(100) // Limit results to prevent overwhelming the UI
-      .sort({ StyleNo: 1 }) // Sort alphabetically
-      .exec();
+//     res.json(documents);
+//   } catch (err) {
+//     console.error("Error fetching Cutting Orders details:", err);
+//     res.status(500).json({
+//       message: "Failed to fetch Cutting Orders details",
+//       error: err.message
+//     });
+//   }
+// });
 
-    // Extract unique StyleNo values
-    const uniqueMONos = [...new Set(results.map((r) => r.StyleNo))];
+// app.get("/api/cutting-orders-sizes", async (req, res) => {
+//   try {
+//     const { styleNo, color, tableNo } = req.query;
 
-    res.json(uniqueMONos);
-  } catch (err) {
-    console.error("Error fetching MO numbers from cuttingOrders:", err);
-    res.status(500).json({
-      message: "Failed to fetch MO numbers from cuttingOrders",
-      error: err.message
-    });
-  }
-});
+//     if (!styleNo || !color || !tableNo) {
+//       return res
+//         .status(400)
+//         .json({ error: "styleNo, color, and tableNo are required" });
+//     }
 
-// Endpoint to Fetch Cutting Order Details for a given MO No (StyleNo)
-app.get("/api/cutting-orders-details", async (req, res) => {
-  try {
-    const styleNo = req.query.styleNo;
-    if (!styleNo) {
-      return res.status(400).json({ error: "StyleNo is required" });
-    }
+//     // Find the document matching the styleNo and color
+//     const document = await CuttingOrders.findOne({
+//       StyleNo: styleNo,
+//       EngColor: color
+//     }).exec();
 
-    // Find all documents where StyleNo matches
-    const documents = await CuttingOrders.find({ StyleNo: styleNo }).exec();
+//     if (!document) {
+//       return res
+//         .status(404)
+//         .json({ error: "Document not found for the given styleNo and color" });
+//     }
 
-    if (documents.length === 0) {
-      console.log(`No documents found for StyleNo: ${styleNo}`);
-      return res.status(404).json({ error: "MO No not found" });
-    }
+//     // Find the cuttingData entry matching the tableNo
+//     const cuttingDataEntry = document.cuttingData.find(
+//       (cd) => cd.tableNo === tableNo
+//     );
 
-    res.json(documents);
-  } catch (err) {
-    console.error("Error fetching Cutting Orders details:", err);
-    res.status(500).json({
-      message: "Failed to fetch Cutting Orders details",
-      error: err.message
-    });
-  }
-});
+//     if (!cuttingDataEntry) {
+//       return res
+//         .status(404)
+//         .json({ error: "Table number not found in cuttingData" });
+//     }
 
-app.get("/api/cutting-orders-sizes", async (req, res) => {
-  try {
-    const { styleNo, color, tableNo } = req.query;
+//     // Extract sizes from markerData, filter out null/empty sizes, and sort by no
+//     const sizes = cuttingDataEntry.markerData
+//       .filter((md) => md.size && md.size.trim() !== "" && md.size !== "0") // Exclude null or empty sizes
+//       .map((md) => ({ no: md.no, size: md.size })) // Map to { no, size }
+//       .sort((a, b) => a.no - b.no) // Sort by no
+//       .map((md) => md.size); // Extract only the size values
 
-    if (!styleNo || !color || !tableNo) {
-      return res
-        .status(400)
-        .json({ error: "styleNo, color, and tableNo are required" });
-    }
+//     // Remove duplicates
+//     const uniqueSizes = [...new Set(sizes)];
 
-    // Find the document matching the styleNo and color
-    const document = await CuttingOrders.findOne({
-      StyleNo: styleNo,
-      EngColor: color
-    }).exec();
-
-    if (!document) {
-      return res
-        .status(404)
-        .json({ error: "Document not found for the given styleNo and color" });
-    }
-
-    // Find the cuttingData entry matching the tableNo
-    const cuttingDataEntry = document.cuttingData.find(
-      (cd) => cd.tableNo === tableNo
-    );
-
-    if (!cuttingDataEntry) {
-      return res
-        .status(404)
-        .json({ error: "Table number not found in cuttingData" });
-    }
-
-    // Extract sizes from markerData, filter out null/empty sizes, and sort by no
-    const sizes = cuttingDataEntry.markerData
-      .filter((md) => md.size && md.size.trim() !== "" && md.size !== "0") // Exclude null or empty sizes
-      .map((md) => ({ no: md.no, size: md.size })) // Map to { no, size }
-      .sort((a, b) => a.no - b.no) // Sort by no
-      .map((md) => md.size); // Extract only the size values
-
-    // Remove duplicates
-    const uniqueSizes = [...new Set(sizes)];
-
-    res.json(uniqueSizes);
-  } catch (err) {
-    console.error("Error fetching sizes from cuttingOrders:", err);
-    res.status(500).json({
-      message: "Failed to fetch sizes from cuttingOrders",
-      error: err.message
-    });
-  }
-});
+//     res.json(uniqueSizes);
+//   } catch (err) {
+//     console.error("Error fetching sizes from cuttingOrders:", err);
+//     res.status(500).json({
+//       message: "Failed to fetch sizes from cuttingOrders",
+//       error: err.message
+//     });
+//   }
+// });
 
 /* ------------------------------
    Graceful Shutdown
@@ -7934,21 +7818,17 @@ app.post(
 
       // --- Validation ---
       if (!imageFile) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "No image file provided or file type is not allowed."
-          });
+        return res.status(400).json({
+          success: false,
+          message: "No image file provided or file type is not allowed."
+        });
       }
 
       if (!imageType || !date || !lineNo || !moNo || !operationId) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "Missing required metadata fields."
-          });
+        return res.status(400).json({
+          success: false,
+          message: "Missing required metadata fields."
+        });
       }
 
       // --- File Saving Logic ---
@@ -7992,7 +7872,7 @@ app.post(
       await fsPromises.writeFile(fullFilePath, imageFile.buffer);
 
       // Construct the public URL for the client
-      const publicUrl = `/storage/qcinline/${newFilename}`;
+      const publicUrl = `${API_BASE_URL}/storage/qcinline/${newFilename}`;
 
       res.json({
         success: true,
@@ -8002,271 +7882,20 @@ app.post(
     } catch (error) {
       console.error("Error in /api/roving/upload-roving-image:", error);
       if (error instanceof multer.MulterError) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: `File upload error: ${error.message}`
-          });
+        return res.status(400).json({
+          success: false,
+          message: `File upload error: ${error.message}`
+        });
       } else if (error.message.includes("Images Only!")) {
         return res.status(400).json({ success: false, message: error.message });
       }
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "Server error during image processing."
-        });
+      res.status(500).json({
+        success: false,
+        message: "Server error during image processing."
+      });
     }
   }
 );
-
-// // --- Multer Configuration for Roving Images ---
-
-// // 1. Define the single, absolute destination path for all roving images.
-// const qcinlineUploadPath = path.join(
-//   __dirname,
-//   "public",
-//   "storage",
-//   "qcinline"
-// );
-
-// // 2. Ensure this directory exists when the server starts.
-// // This is a one-time operation.
-// try {
-//   fs.mkdirSync(qcinlineUploadPath, { recursive: true });
-// } catch (error) {
-//   console.error("Could not create qcinline upload directory:", error);
-// }
-
-// // 3. Configure multer's disk storage.
-// const rovingStorage = multer.diskStorage({
-//   // The 'destination' is now a static, absolute path.
-//   destination: (req, file, cb) => {
-//     cb(null, qcinlineUploadPath);
-//   },
-
-//   // The 'filename' function creates the unique filename.
-//   filename: async (req, file, cb) => {
-//     try {
-//       const { imageType, date, lineNo, moNo, operationId } = req.body;
-//       const fileExtension = path.extname(file.originalname);
-
-//       // Sanitize all parts of the filename
-//       const sanitizedImageType = sanitize(imageType.toUpperCase());
-//       const sanitizedDate = sanitize(date);
-//       const sanitizedLineNo = sanitize(lineNo);
-//       const sanitizedMoNo = sanitize(moNo);
-//       const sanitizedOperationId = sanitize(operationId);
-
-//       // Construct a prefix that includes the image type to keep it unique
-//       const imagePrefix = `${sanitizedImageType}_${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
-
-//       // Find the next available index for the filename within the single directory
-//       let existingImageCount = 0;
-//       const filesInDir = await fsPromises.readdir(qcinlineUploadPath);
-//       filesInDir.forEach((f) => {
-//         if (f.startsWith(imagePrefix)) {
-//           existingImageCount++;
-//         }
-//       });
-
-//       const imageIndex = existingImageCount + 1;
-//       const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
-//       cb(null, newFilename);
-//     } catch (error) {
-//       console.error("Error generating filename for roving image:", error);
-//       cb(error, null);
-//     }
-//   }
-// });
-
-// // 4. Configure the multer upload instance.
-// const rovingUpload = multer({
-//   storage: rovingStorage,
-//   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-//   fileFilter: (req, file, cb) => {
-//     const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i;
-//     if (allowedMimeTypes.test(file.mimetype)) {
-//       cb(null, true);
-//     } else {
-//       cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)"), false);
-//     }
-//   }
-// });
-
-// // --- Simplified Roving Image Upload Endpoint ---
-// app.post(
-//   "/api/roving/upload-roving-image",
-//   rovingUpload.single("imageFile"), // This middleware saves the file automatically
-//   async (req, res) => {
-//     if (!req.file) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "No image file provided or file type is not allowed."
-//       });
-//     }
-
-//     try {
-//       // The public URL path is now simpler.
-//       const publicUrl = `/storage/qcinline/${req.file.filename}`;
-
-//       res.json({
-//         success: true,
-//         filePath: publicUrl,
-//         filename: req.file.filename
-//       });
-//     } catch (error) {
-//       console.error("Error processing roving image upload request:", error);
-//       res.status(500).json({
-//         success: false,
-//         message: "Server error after image upload."
-//       });
-//     }
-//   },
-//   // Final error handler for multer errors
-//   (error, req, res, next) => {
-//     if (error instanceof multer.MulterError) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `File upload error: ${error.message}`
-//       });
-//     } else if (error) {
-//       return res.status(400).json({ success: false, message: error.message });
-//     }
-//     next();
-//   }
-// );
-
-// const sanitize = (input) => {
-//   if (typeof input !== "string") input = String(input);
-//   let sane = input.replace(/[^a-zA-Z0-9-_]/g, "_");
-//   if (sane === "." || sane === "..") return "_";
-//   return sane;
-// };
-
-// const rovingStorage = multer.memoryStorage();
-
-// const rovingUpload = multer({
-//   storage: rovingStorage,
-//   limits: { fileSize: 10 * 1024 * 1024 },
-//   fileFilter: (req, file, cb) => {
-//     const allowedExtensions = /^(jpeg|jpg|png|gif)$/i;
-//     const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i;
-//     const fileExt = path.extname(file.originalname).toLowerCase().substring(1);
-//     const isExtAllowed = allowedExtensions.test(fileExt);
-//     const isMimeAllowed = allowedMimeTypes.test(file.mimetype.toLowerCase());
-//     if (isMimeAllowed && isExtAllowed) {
-//       cb(null, true);
-//     } else {
-//       console.error(
-//         `File rejected by filter: name='${file.originalname}', mime='${file.mimetype}', ext='${fileExt}'. IsMimeAllowed: ${isMimeAllowed}, IsExtAllowed: ${isExtAllowed}`
-//       );
-//       cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)"));
-//     }
-//   }
-// });
-
-// //Roving image upload
-// app.post(
-//   "/api/roving/upload-roving-image",
-//   rovingUpload.single("imageFile"),
-//   async (req, res) => {
-//     try {
-//       const { imageType, date, lineNo, moNo, operationId } = req.body;
-//       const imageFile = req.file;
-//       if (!imageFile) {
-//         const errorMessage =
-//           req.fileValidationError ||
-//           (req.multerError && req.multerError.message) ||
-//           "No image file provided or file rejected by filter.";
-//         return res.status(400).json({ success: false, message: errorMessage });
-//       }
-
-//       if (
-//         !date ||
-//         !lineNo ||
-//         lineNo === "NA_Line" ||
-//         !moNo ||
-//         moNo === "NA_MO" ||
-//         !operationId ||
-//         operationId === "NA_Op"
-//       ) {
-//         return res.status(400).json({
-//           success: false,
-//           message:
-//             "Missing or invalid required metadata: date, lineNo, moNo, operationId must be actual values."
-//         });
-//       }
-
-//       if (
-//         !imageType ||
-//         !["spi", "measurement"].includes(imageType.toLowerCase())
-//       ) {
-//         return res.status(400).json({
-//           success: false,
-//           message: 'Invalid image type. Must be "spi" or "measurement".'
-//         });
-//       }
-
-//       const sanitizedDate = sanitize(date);
-//       const sanitizedLineNo = sanitize(lineNo);
-//       const sanitizedMoNo = sanitize(moNo);
-//       const sanitizedOperationId = sanitize(operationId);
-//       const upperImageType = imageType.toUpperCase();
-
-//       const targetDir = path.resolve(
-//         __dirname,
-//         "..",
-//         "public",
-//         "storage",
-//         "roving",
-//         upperImageType
-//       );
-//       await fsPromises.mkdir(targetDir, { recursive: true });
-
-//       const imagePrefix = `${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
-//       let existingImageCount = 0;
-//       try {
-//         const filesInDir = await fsPromises.readdir(targetDir);
-//         filesInDir.forEach((file) => {
-//           if (file.startsWith(imagePrefix)) {
-//             existingImageCount++;
-//           }
-//         });
-//       } catch (readDirError) {
-//         if (readDirError.code !== "ENOENT") {
-//           console.error(
-//             "Error reading directory for indexing:",
-//             targetDir,
-//             readDirError
-//           );
-//         }
-//       }
-
-//       const imageIndex = existingImageCount + 1;
-//       const fileExtension = path.extname(imageFile.originalname);
-//       const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
-//       const filePathInPublic = path.join(targetDir, newFilename);
-//       await fsPromises.writeFile(filePathInPublic, imageFile.buffer);
-//       const publicUrl = `/storage/roving/${upperImageType}/${newFilename}`;
-//       res.json({ success: true, filePath: publicUrl, filename: newFilename });
-//     } catch (error) {
-//       console.error("Error uploading roving image:", error);
-//       if (error.message && error.message.startsWith("Error: Images Only!")) {
-//         return res.status(400).json({ success: false, message: error.message });
-//       }
-//       if (error instanceof multer.MulterError) {
-//         return res
-//           .status(400)
-//           .json({ success: false, message: `Multer error: ${error.message}` });
-//       }
-//       res
-//         .status(500)
-//         .json({ success: false, message: "Server error during image upload." });
-//     }
-//   }
-// );
 
 // Endpoint for get the buyer status
 app.get("/api/buyer-by-mo", (req, res) => {
