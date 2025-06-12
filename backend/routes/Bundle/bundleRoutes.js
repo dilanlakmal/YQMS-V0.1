@@ -17,6 +17,7 @@ import {
   getDistinctFilters,
   fetchFilteredBundleData,
   getHourlySummary,
+  getDistinctReprintFilters,
 } from '../../Controller/Bundle/bundleController.js';
 
 const router = express.Router();
@@ -38,6 +39,6 @@ router.get('/api/reprint-colors-sizes/:mono', fetchColorsAndSizes);
 router.get('/api/qc2-order/distinct-filters', getDistinctFilters);
 router.get('/api/filtered-bundle-data', fetchFilteredBundleData);
 router.get('/api/qc2-order/hourly-summary', getHourlySummary);
-
+router.get('/api/reprint-distinct-filters', getDistinctReprintFilters);
 
 export default router;

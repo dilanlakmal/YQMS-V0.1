@@ -11,7 +11,8 @@ import {
   EyeOff,
   Camera,
   Languages,
-  X
+  X,
+  UserCheck
 } from "lucide-react";
 import Swal from "sweetalert2";
 import DatePicker from "react-datepicker";
@@ -21,6 +22,7 @@ import EmpQRCodeScanner from "../components/inspection/qc_roving/EmpQRCodeScanne
 import PreviewRoving from "../components/inspection/qc_roving/PreviewRoving";
 import RovingCamera from "../components/inspection/qc_roving/RovingCamera";
 import RovingData from "../components/inspection/qc_roving/RovingData"; 
+// import WorkerAttendance from "../components/inspection/qc_roving/WorkerAttendance";
 import InlineWorkers from "../components/inspection/qc_roving/InlineWorkers";
 import ImageCaptureUpload from "../components/inspection/qc_roving/ImageCaptureupload";
 import i18next from 'i18next';
@@ -457,6 +459,22 @@ const RovingPage = () => {
       });
       return;
     }
+    
+    // Save worker attendance data when submitting roving data
+    try {
+      await axios.post(`${API_BASE_URL}/api/roving-worker-attendance`, {
+        date: currentDate.toLocaleDateString("en-US"),
+        lineNo: lineNo,
+        moNo: moNo,
+        operator_emp_id: scannedUserData.emp_id,
+        inspection_rep_name: selectedManualInspectionRep,
+        status: "✓",
+        inspection_time: `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}:${String(new Date().getSeconds()).padStart(2, "0")}`
+      });
+    } catch (error) {
+      console.error("Error saving attendance data:", error);
+      // Continue with the submission even if attendance saving fails
+    }
 
     // Helper function to upload a single file
     const uploadFile = async (file, imageTypeForUpload, operatorEmpId, fileIndex, additionalData = {}) => {
@@ -858,6 +876,17 @@ const RovingPage = () => {
           >
             {t("qcRoving.data")}
           </button>
+          {/* <button
+            onClick={() => setActiveTab("attendance")}
+            className={`px-4 py-2 flex items-center space-x-2 ${
+              activeTab === "attendance"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            <UserCheck className="w-5 h-5" />
+            <span>Worker Attendance</span>
+          </button> */}
           <button
             onClick={() => setActiveTab("db")}
             className={`px-4 py-2 flex items-center space-x-2 ${
@@ -1388,7 +1417,6 @@ const RovingPage = () => {
                     }}
                   />
                 </div>
-                </div>
               </div>
 
               <div className="md:col-span-1 mb-2">
@@ -1418,7 +1446,8 @@ const RovingPage = () => {
                   </tbody>
                 </table>
               </div>
-            </div> 
+            </div>
+             </div> 
             {/* close */}
 
             <div className="flex justify-end mt-2">
@@ -1531,6 +1560,8 @@ const RovingPage = () => {
           </>
         ) : activeTab === "data" ? (
           <RovingData />
+        // ) : activeTab === "attendance" ? (
+        //   <WorkerAttendance />
         ) : activeTab === "db" ? (
           <CEDatabase />
         ): (

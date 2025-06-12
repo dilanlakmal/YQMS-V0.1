@@ -744,7 +744,7 @@ function BundleRegistrationTabData({
           </button>
           {qrData.length > 0 && (
             <>
-              {/* <button
+              <button
                 type="button"
                 onClick={() => setShowQRPreview(true)}
                 className={`flex items-center justify-center font-semibold transition-colors shadow-md text-white bg-blue-500 hover:bg-blue-600
@@ -759,7 +759,7 @@ function BundleRegistrationTabData({
                   {t("bundle.preview_qr")}
                 </span>
                 <span className={forMobile ? "xs:hidden" : "hidden"}>View</span>
-              </button> */}
+              </button>
               <button
                 type="button"
                 onClick={handlePrintQR}

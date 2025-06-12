@@ -1,4 +1,4 @@
-import { AlertCircle, CalendarDays, Clock, QrCode, Table, Shirt, Package, Palette } from "lucide-react";
+import { AlertCircle, CalendarDays, Clock, QrCode, Table, Shirt, Package, Palette, UserCircle } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -6,6 +6,7 @@ import QrCodeScanner from "../components/forms/QRCodeScanner";
 import { useTranslation } from 'react-i18next';
 import DynamicFilterPane from "../components/filters/DynamicFilterPane";
 import StatCard from "../components/card/StateCard";
+import UserStatsCard from "../components/card/UserStatsCard"; // Import the new component
 
 const WashingPage = () => {
   const { t } = useTranslation();
@@ -23,8 +24,8 @@ const WashingPage = () => {
   const [isDefectCard, setIsDefectCard] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [filters, setFilters] = useState({
-    dateFrom: "",
-    dateTo: "",
+    filterDate: new Date().toISOString().split('T')[0], 
+    qcId: "",
     packageNo: "",
     moNo: "",
     taskNo: "",
@@ -32,7 +33,14 @@ const WashingPage = () => {
     custStyle: "",
   });
 
-
+  useEffect(() => {
+    if (user && user.emp_id) {
+      setFilters(prevFilters => ({
+        ...prevFilters,
+        qcId: user.emp_id, 
+      }));
+    }
+  }, [user]);
   useEffect(() => {
     const fetchInitialRecordId = async () => {
       if (user && user.emp_id) {
@@ -351,14 +359,21 @@ const WashingPage = () => {
       return new Date(year, month - 1, day); // month is 0-indexed for Date constructor
     };
 
-    const filterDateFrom = parseToLocalDate(filters.dateFrom);
-    const filterDateTo = parseToLocalDate(filters.dateTo);
+    const filterDateSelected = filters.filterDate ? parseToLocalDate(filters.filterDate) : null;
 
     return washingRecords.filter(record => {
       const recordDate = parseToLocalDate(record.washing_updated_date);
 
-      if (filterDateFrom && (!recordDate || recordDate < filterDateFrom)) return false;
-      if (filterDateTo && (!recordDate || recordDate > filterDateTo)) return false;
+       if (filters.filterDate) { // Check if filterDate is actually set
+        if (!recordDate || !filterDateSelected || recordDate.getTime() !== filterDateSelected.getTime()) {
+          return false;
+        }
+      }
+
+      // QC ID filter
+      if (filters.qcId && String(record.emp_id_washing ?? '').toLowerCase() !== String(filters.qcId).toLowerCase()) {
+        return false;
+      }
       // Package No filter
       if (filters.packageNo !== undefined && filters.packageNo !== null && filters.packageNo !== "") {
         const filterValue = String(filters.packageNo).toLowerCase();
@@ -395,7 +410,7 @@ const WashingPage = () => {
 
       return true;
     });
-  }, [washingRecords, filters]);
+  }, [washingRecords, filters, user]);
 
   const washingStats = useMemo(() => {
     if (!filteredWashingRecords || filteredWashingRecords.length === 0) {
@@ -428,6 +443,45 @@ const WashingPage = () => {
       task101Garments: task101Garments,
     };
   }, [filteredWashingRecords]);
+
+  const userTodayStats = useMemo(() => {
+    // If user is not loaded, or emp_id is missing, return zero stats.
+    // `loading` is from useAuth()
+    if (loading || !user || !user.emp_id) {
+      return { task52: 0, task101: 0, total: 0 };
+    }
+
+    const today = new Date().toLocaleDateString("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
+    });
+
+    let task52Count = 0;
+    let task101Count = 0;
+    let totalCount = 0;
+
+    // washingRecords is guaranteed to be an array by useState([])
+    washingRecords.forEach(record => {
+      if (record.emp_id_washing === user.emp_id &&
+          record.washing_updated_date === today) {
+        const qty = Number(record.passQtyWash) || 0;
+        totalCount += qty;
+        // Assuming task_no_washing is stored as a number or string that can be compared
+        if (String(record.task_no_washing) === "52") {
+          task52Count += qty;
+        } else if (String(record.task_no_washing) === "101") {
+          task101Count += qty;
+        }
+      }
+    });
+
+    return { task52: task52Count, task101: task101Count, total: totalCount };
+  }, [washingRecords, user, loading]);
+
+
+  // Placeholder for Day Target - this should ideally come from config or API
+  const DAY_TARGET = 500;
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 sm:py-8">
@@ -497,9 +551,27 @@ const WashingPage = () => {
           //   isDefectCard={isDefectCard}
           // />
           <div className="space-y-6">
+            {/* User Stats Card */}
+            {!loading && user && (
+              <UserStatsCard
+                user={user}
+                apiBaseUrl={API_BASE_URL}
+                stats={{
+                  tasks: [
+                    { label: t("wash.stats.card.normal_wash", "Task (T52)"), value: userTodayStats.task52 },
+                    { label: t("wash.stats.card.defect_wash", "Task (T101)"), value: userTodayStats.task101 }
+                  ],
+                  totalValue: userTodayStats.total,
+                  totalUnit: t("wash.stats.card.garments", "garments"),
+                  totalLabel: t("wash.stats.card.total_scanned_today", "Total Scanned (Today)"),
+                }}
+                 className="w-full"
+                // className="max-w-sm ml-auto"
+              />
+            )}
             <div className="bg-white shadow-lg rounded-xl p-4 sm:p-6 flex items-center justify-between">
               <label htmlFor="autoAddCheckbox" className="text-sm font-medium text-gray-700 flex items-center">
-                {t("iro.auto_add_record", "Auto Add Record after Scan")}:
+                {t("iro.auto_add_record", "Auto Add")}:
               </label>
               <input
                 id="autoAddCheckbox"

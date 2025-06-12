@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo  } from 'react';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { FaFilter, FaTimes, FaCalendarAlt } from 'react-icons/fa';
@@ -9,12 +9,13 @@ import { useTranslation } from 'react-i18next';
 const DynamicFilterPane = ({
   initialFilters,
   onApplyFilters,
+  distinctFiltersEndpoint,
 }) => {
   const { t } = useTranslation();
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(true);
   const [localFilters, setLocalFilters] = useState({
-    dateFrom: '',
-    dateTo: '',
+    filterDate: '', 
+    qcId: '',  
     packageNo: '',
     moNo: '',
     taskNo: '',
@@ -27,23 +28,36 @@ const DynamicFilterPane = ({
   const [packageNoOptions, setPackageNoOptions] = useState([]);
   const [departmentOptions, setDepartmentOptions] = useState([]);
   const [custStyleOptions, setCustStyleOptions] = useState([]);
+  const [qcIdOptions, setQcIdOptions] = useState([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
   useEffect(() => {
     // Update local state if initialFilters prop changes
     if (initialFilters) {
-      setLocalFilters(initialFilters);
+       setLocalFilters({
+        filterDate: initialFilters.filterDate || new Date().toISOString().split('T')[0],
+        qcId: initialFilters.qcId || '',
+        packageNo: initialFilters.packageNo || '',
+        moNo: initialFilters.moNo || '',
+        taskNo: initialFilters.taskNo || '',
+        department: initialFilters.department || '',
+        custStyle: initialFilters.custStyle || '',
+      });
     }
   }, [initialFilters]);
 
   useEffect(() => {
     const fetchFilterOptions = async () => {
       setLoadingOptions(true);
+       if (!distinctFiltersEndpoint) {
+        setLoadingOptions(false);
+        return;
+      }
       try {
         // Replace with your actual API endpoint for washing distinct filters
-        const response = await fetch(`${API_BASE_URL}/api/washing-records/distinct-filters`);
+         const response = await fetch(`${API_BASE_URL}${distinctFiltersEndpoint}`);
         if (!response.ok) {
-          throw new Error('Failed to fetch filter options for washing');
+          throw new Error(`Failed to fetch filter options from ${distinctFiltersEndpoint}`);
         }
         const data = await response.json();
         setTaskNoOptions(data.taskNos?.map(tn => ({ value: tn, label: tn })) || []);
@@ -51,21 +65,23 @@ const DynamicFilterPane = ({
         setPackageNoOptions(data.packageNos?.map(pn => ({ value: pn, label: pn })) || []);
         setDepartmentOptions(data.departments?.map(dept => ({ value: dept, label: dept })) || []);
         setCustStyleOptions(data.custStyles?.map(style => ({ value: style, label: style })) || []);
+        setQcIdOptions(data.qcIds?.map(id => ({ value: id, label: id })) || []);
       } catch (error) {
-        console.error("Error fetching washing filter options:", error);
+         console.error("Error fetching filter options:", error);
         // Set empty options in case of an error
         setTaskNoOptions([]);
         setMoNoOptions([]);
         setPackageNoOptions([]);
         setDepartmentOptions([]);
         setCustStyleOptions([]);
+        setQcIdOptions([]);
       } finally {
         setLoadingOptions(false);
       }
     };
 
     fetchFilterOptions();
-  }, []);
+   }, [distinctFiltersEndpoint]);
 
   const handleChange = (name, value) => {
     setLocalFilters(prev => ({ ...prev, [name]: value }));
@@ -73,8 +89,8 @@ const DynamicFilterPane = ({
 
   const handleDateChange = (name, date) => {
     const dateString = date ? date.toISOString().split('T')[0] : '';
-    handleChange(name, dateString);
-    };
+     handleChange(name, dateString); // name will be 'filterDate'
+  };
 
   const handleSelectChange = (name, selectedOption) => {
     setLocalFilters(prev => ({
@@ -92,13 +108,13 @@ const DynamicFilterPane = ({
 
   const handleReset = () => {
     const resetState = {
-      dateFrom: '',
-      dateTo: '',
-      packageNo: '',
-      moNo: '',
-      taskNo: '',
-      department: '',
-      custStyle: '',
+      filterDate: initialFilters?.filterDate || new Date().toISOString().split('T')[0],
+      qcId: initialFilters?.qcId || '',
+      packageNo: initialFilters?.packageNo || '',
+      moNo: initialFilters?.moNo || '',
+      taskNo: initialFilters?.taskNo || '',
+      department: initialFilters?.department || '',
+      custStyle: initialFilters?.custStyle || '',
     };
     setLocalFilters(resetState);
     if (onApplyFilters) {
@@ -142,6 +158,19 @@ const DynamicFilterPane = ({
     placeholder: (provided) => ({ ...provided, color: 'rgb(107 114 128)'}) // text-gray-500
   };
 
+  const qcIdValueForSelect = useMemo(() => {
+    if (!localFilters.qcId) return null; // No QC ID selected
+
+    const foundOption = qcIdOptions.find(option => option.value === localFilters.qcId);
+    if (foundOption) {
+      return foundOption; // { value: localFilters.qcId, label: foundOption.label }
+    }
+    // If qcId is set but not in options (e.g., options not loaded yet, or logged-in user ID not in the list from API)
+    // create a temporary option object for display.
+    // The label will be the ID itself until options load or if it's a new/unlisted ID.
+    return { value: localFilters.qcId, label: localFilters.qcId };
+  }, [localFilters.qcId, qcIdOptions]);
+
   return (
     <div className={`bg-white rounded-xl shadow-xl p-4 mb-6 ${!showAdvancedFilters ? "pb-1" : ""}`}>
       <div className="flex justify-between items-center mb-3">
@@ -170,36 +199,19 @@ const DynamicFilterPane = ({
       </div>
 
       {showAdvancedFilters && (
-         <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 md:gap-4 mb-1 transition-all duration-300 ease-in-out">
-          {/* Date From */}
+         <form onSubmit={handleSubmit} className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 md:gap-4 mb-1 transition-all duration-300 ease-in-out">
+           {/* Date Filter */}
           <div className="flex flex-col">
-            <label htmlFor="advancedDateFrom" className="text-xs font-medium text-gray-600 mb-1 flex items-center">
+            <label htmlFor="filterDate" className="text-xs font-medium text-gray-600 mb-1 flex items-center">
               <FaCalendarAlt className="mr-1.5 text-gray-400" />
-              {t('filters.date_from', 'Date From')}
+              {t('filters.date', 'Date')}
             </label>
             <DatePicker
-              selected={parseDateForPicker(localFilters.dateFrom)}
-              onChange={(date) => handleDateChange('dateFrom', date)}
+              selected={parseDateForPicker(localFilters.filterDate)}
+              onChange={(date) => handleDateChange('filterDate', date)}
               dateFormat="MM/dd/yyyy"
               className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
-              id="advancedDateFrom"
-              autoComplete="off"
-              placeholderText={t('filters.select_date', 'Select date')}
-            />
-          </div>
-
-          {/* Date To */}
-          <div className="flex flex-col">
-            <label htmlFor="advancedDateTo" className="text-xs font-medium text-gray-600 mb-1 flex items-center">
-              <FaCalendarAlt className="mr-1.5 text-gray-400" />
-              {t('filters.date_to', 'Date To')}
-            </label>
-            <DatePicker
-              selected={parseDateForPicker(localFilters.dateTo)}
-              onChange={(date) => handleDateChange('dateTo', date)}
-              dateFormat="MM/dd/yyyy"
-              className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
-              id="advancedDateTo"
+               id="filterDate"
               autoComplete="off"
               placeholderText={t('filters.select_date', 'Select date')}
             />
@@ -207,17 +219,17 @@ const DynamicFilterPane = ({
 
           {/* Package No */}
           <div className="flex flex-col">
-            <label htmlFor="advancedPackageNo" className="text-xs font-medium text-gray-600 mb-1">
+           <label htmlFor="packageNoFilter" className="text-xs font-medium text-gray-600 mb-1">
               {t('filters.package_no', 'Package No')}
             </label>
              <Select
-              id="advancedPackageNo"
+              id="packageNoFilter"
               options={packageNoOptions}
               value={packageNoOptions.find(option => option.value === localFilters.packageNo) || null}
               onChange={(selectedOption) => handleSelectChange('packageNo', selectedOption)}
               isClearable
               isSearchable
-              placeholder={t('filters.enter_package_no', 'Enter Package No')}
+              placeholder={t('filters.enter_package_no', 'Package...')}
               styles={selectStyles}
               isLoading={loadingOptions}
             />
@@ -225,17 +237,17 @@ const DynamicFilterPane = ({
 
           {/* Task No */}
           <div className="flex flex-col">
-            <label htmlFor="advancedTaskNo" className="text-xs font-medium text-gray-600 mb-1">
+            <label htmlFor="taskNoFilter" className="text-xs font-medium text-gray-600 mb-1">
               {t('filters.task_no', 'Task No.')}
             </label>
             <Select
-              id="advancedTaskNo"
+              id="taskNoFilter"
               options={taskNoOptions}
               value={taskNoOptions.find(option => option.value === localFilters.taskNo) || null}
               onChange={(selectedOption) => handleSelectChange('taskNo', selectedOption)}
               isClearable
               isSearchable
-              placeholder={t('filters.enter_task_no', 'Enter Task No.')}
+              placeholder={t('filters.enter_task_no', 'Task...')}
               styles={selectStyles}
               isLoading={loadingOptions}
             />
@@ -243,17 +255,17 @@ const DynamicFilterPane = ({
 
           {/* MO No */}
           <div className="flex flex-col">
-            <label htmlFor="advancedMoNo" className="text-xs font-medium text-gray-600 mb-1">
+            <label htmlFor="moNoFilter" className="text-xs font-medium text-gray-600 mb-1">
               {t('filters.mo_no', 'MO No')}
             </label>
             <Select
-              id="advancedMoNo"
+              id="moNoFilter"
               options={moNoOptions}
               value={moNoOptions.find(option => option.value === localFilters.moNo) || null}
               onChange={(selectedOption) => handleSelectChange('moNo', selectedOption)}
               isClearable
               isSearchable
-              placeholder={t('filters.enter_mo_no', 'Enter MO No')}
+              placeholder={t('filters.enter_mo_no', 'MONo...')}
               styles={selectStyles}
               isLoading={loadingOptions}
             />
@@ -261,17 +273,17 @@ const DynamicFilterPane = ({
 
           {/* Department */}
           <div className="flex flex-col">
-            <label htmlFor="advancedDepartment" className="text-xs font-medium text-gray-600 mb-1">
+            <label htmlFor="departmentFilter" className="text-xs font-medium text-gray-600 mb-1">
               {t('filters.department', 'Department')}
             </label>
             <Select
-              id="advancedDepartment"
+              id="departmentFilter"
               options={departmentOptions}
               value={departmentOptions.find(option => option.value === localFilters.department) || null}
               onChange={(selectedOption) => handleSelectChange('department', selectedOption)}
               isClearable
               isSearchable
-              placeholder={t('filters.select_department', 'Select Department')}
+              placeholder={t('filters.select_department', 'Department')}
               styles={selectStyles}
               isLoading={loadingOptions}
             />
@@ -279,21 +291,40 @@ const DynamicFilterPane = ({
 
           {/* Customer Style (Style No) */}
           <div className="flex flex-col">
-            <label htmlFor="advancedCustStyle" className="text-xs font-medium text-gray-600 mb-1">
+            <label htmlFor="custStyleFilter" className="text-xs font-medium text-gray-600 mb-1">
               {t('filters.cust_style', 'Style No')}
             </label>
             <Select
-              id="advancedCustStyle"
+              id="custStyleFilter"
               options={custStyleOptions}
               value={custStyleOptions.find(option => option.value === localFilters.custStyle) || null}
               onChange={(selectedOption) => handleSelectChange('custStyle', selectedOption)}
               isClearable
               isSearchable
-              placeholder={t('filters.select_cust_style', 'Select Style No')}
+              placeholder={t('filters.select_cust_style', 'Style No')}
               styles={selectStyles}
               isLoading={loadingOptions}
             />
           </div>
+          
+          {/* QC ID Filter */}
+          <div className="flex flex-col">
+            <label htmlFor="qcIdFilter" className="text-xs font-medium text-gray-600 mb-1">
+              {t('filters.qc_id', 'QC ID')}
+            </label>
+            <Select
+              id="qcIdFilter"
+              options={qcIdOptions}
+              value={qcIdValueForSelect}
+              onChange={(selectedOption) => handleSelectChange('qcId', selectedOption)}
+              isClearable
+              isSearchable
+              placeholder={t('filters.select_qc_id', 'QC ID')}
+              styles={selectStyles}
+              isLoading={loadingOptions}
+            />
+          </div>
+
 
           <div className="sm:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-7 flex justify-end items-end pt-2">
              <button

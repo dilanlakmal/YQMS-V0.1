@@ -23,7 +23,7 @@ const sqlConfigYMCE = {
 };
 const sqlConfigYMWHSYS2 = { 
   user: process.env.SQL_YMWH_USER || "user01", 
-  password: process.env.SQL_YMWH_PASSWORD || "user01", 
+  password: process.env.SQL_YMWH_PASSWORD || "Ur@12323", 
   server: process.env.SQL_YMWH_SERVER || "YM-WHSYS", 
   database: process.env.SQL_YMWH_DB || "YMWHSYS2", 
   options: { encrypt: false, trustServerCertificate: true }, 
