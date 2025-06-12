@@ -10439,16 +10439,6 @@ const cutting_storage = multer.diskStorage({
   }
 });
 
-// const cutting_storage = multer.diskStorage({
-//   destination: (req, file, cb) => {
-//     cb(null, "public/storage/cutting/");
-//   },
-//   filename: (req, file, cb) => {
-//     cb(null, `cutting-${Date.now()}${path.extname(file.originalname)}`);
-//   }
-// });
-
-// File filter for JPEG/PNG only
 const fileFilter = (req, file, cb) => {
   const allowedTypes = ["image/jpeg", "image/png"];
   if (allowedTypes.includes(file.mimetype)) {
@@ -10472,8 +10462,10 @@ app.post(
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
-    const url = `/storage/cutting/${req.file.filename}`;
-    res.status(200).json({ url });
+
+    // Construct the full URL by prepending the API_BASE_URL
+    const fullUrl = `${API_BASE_URL}/storage/cutting/${req.file.filename}`;
+    res.status(200).json({ url: fullUrl });
   }
 );
 
