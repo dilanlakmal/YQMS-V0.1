@@ -10423,49 +10423,78 @@ app.get("/api/cutting-issues", async (req, res) => {
   }
 });
 
-// Multer configuration for cutting images
+// --- Multer Configuration for Cutting Images ---
 
-// Define the destination path and ensure the directory exists
-const cuttingUploadPath = path.join(__dirname, "public", "storage", "cutting");
-// fs.mkdirSync(cuttingUploadPath, { recursive: true }); // This creates the directory if it doesn't exist.
+// 1. Use memoryStorage to handle the file in memory first.
+const cuttingMemoryStorage = multer.memoryStorage();
 
-const cutting_storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // 2. Use the absolute path variable here
-    cb(null, cuttingUploadPath);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `cutting-${Date.now()}${path.extname(file.originalname)}`);
-  }
-});
-
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = ["image/jpeg", "image/png"];
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error("Only JPEG and PNG images are allowed"), false);
-  }
-};
-
+// 2. Configure multer with the new storage, file filter, and limits.
 const cutting_upload = multer({
-  storage: cutting_storage,
-  fileFilter: fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+  storage: cuttingMemoryStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG and PNG images are allowed"), false);
+    }
+  }
 });
 
-// Image upload endpoint
+// --- Image Upload Endpoint ---
 app.post(
   "/api/upload-cutting-image",
-  cutting_upload.single("image"),
-  (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
+  cutting_upload.single("image"), // This uses the memory storage config
+  async (req, res) => {
+    try {
+      const imageFile = req.file;
 
-    // Construct the full URL by prepending the API_BASE_URL
-    const fullUrl = `${API_BASE_URL}/storage/cutting/${req.file.filename}`;
-    res.status(200).json({ url: fullUrl });
+      if (!imageFile) {
+        return res.status(400).json({
+          success: false,
+          message: "No file uploaded or file type is not allowed."
+        });
+      }
+
+      // --- File Saving Logic ---
+      const cuttingUploadPath = path.join(
+        __dirname,
+        "public",
+        "storage",
+        "cutting"
+      );
+      //await fs.promises.mkdir(cuttingUploadPath, { recursive: true });
+
+      // Create a unique filename
+      const fileExtension = path.extname(imageFile.originalname);
+      const newFilename = `cutting-${Date.now()}-${Math.round(
+        Math.random() * 1e9
+      )}${fileExtension}`;
+
+      // Define the full path and write the file from buffer
+      const fullFilePath = path.join(cuttingUploadPath, newFilename);
+      await fs.promises.writeFile(fullFilePath, imageFile.buffer);
+
+      // --- URL Construction ---
+      // IMPORTANT: Return a RELATIVE path. The frontend will add the base URL.
+      // This is the most flexible pattern.
+      const relativeUrl = `/storage/cutting/${newFilename}`;
+
+      res.status(200).json({ success: true, url: relativeUrl });
+    } catch (error) {
+      console.error("Error in /api/upload-cutting-image:", error);
+      if (error instanceof multer.MulterError) {
+        return res.status(400).json({
+          success: false,
+          message: `File upload error: ${error.message}`
+        });
+      }
+      res.status(500).json({
+        success: false,
+        message: "Server error during image processing."
+      });
+    }
   }
 );
 
