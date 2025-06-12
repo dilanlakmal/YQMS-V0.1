@@ -1080,6 +1080,7 @@ const RovingPage = () => {
   const [measurementStatus, setMeasurementStatus] = useState("");
   const [spiFilesToUpload, setSpiFilesToUpload] = useState([]);
   const [measurementFilesToUpload, setMeasurementFilesToUpload] = useState([]);
+  const [defectFilesToUpload, setDefectFilesToUpload] = useState([]);
   const [garments, setGarments] = useState([]);
   const [inspectionStartTime, setInspectionStartTime] = useState(null);
   const [currentGarmentIndex, setCurrentGarmentIndex] = useState(0);
@@ -1481,6 +1482,7 @@ const RovingPage = () => {
     setMeasurementStatus("");
     setSpiFilesToUpload([]);
     setMeasurementFilesToUpload([]);
+    setDefectFilesToUpload([]);
     // setSelectedManualInspectionRep("");
     setImageUploaderKey(Date.now());
     setRemarkText("");
@@ -1552,6 +1554,7 @@ const RovingPage = () => {
 
     let uploadedSpiImagePaths = [];
     let uploadedMeasurementImagePaths = [];
+    let uploadedDefectImagePaths = [];
 
     try {
       Swal.fire({
@@ -1560,6 +1563,7 @@ const RovingPage = () => {
         didOpen: () => Swal.showLoading()
       });
 
+      // Upload SPI images
       for (let i = 0; i < spiFilesToUpload.length; i++) {
         const path = await uploadFile(
           spiFilesToUpload[i],
@@ -1569,6 +1573,7 @@ const RovingPage = () => {
         );
         uploadedSpiImagePaths.push(path);
       }
+      // Upload Measurement images
       for (let i = 0; i < measurementFilesToUpload.length; i++) {
         const path = await uploadFile(
           measurementFilesToUpload[i],
@@ -1577,6 +1582,16 @@ const RovingPage = () => {
           i
         );
         uploadedMeasurementImagePaths.push(path);
+      }
+      // Upload Defects images
+      for (let i = 0; i < defectFilesToUpload.length; i++) {
+        const path = await uploadFile(
+          defectFilesToUpload[i],
+          "defect",
+          scannedUserData?.emp_id,
+          i
+        );
+        uploadedDefectImagePaths.push(path);
       }
       Swal.close();
     } catch (uploadError) {
@@ -1723,6 +1738,7 @@ const RovingPage = () => {
       inspection_time: inspectionTime,
       remark: remarkText,
       qualityStatus,
+      defectImages: uploadedDefectImagePaths,
       overall_roving_status: overallOperatorStatusKey,
       rejectGarments: [
         {
@@ -1979,6 +1995,7 @@ const RovingPage = () => {
         <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">
           {t("qcRoving.qc_inline_roving_inspection")}
         </h1>
+        {/* Tab Buttons*/}
         <div className="flex justify-center mb-4">
           <button
             onClick={() => setActiveTab("form")}
@@ -2045,6 +2062,7 @@ const RovingPage = () => {
 
         {activeTab === "form" ? (
           <>
+            {/* ... Progress Bar and Main Form Section (Inspection Rep, Date, Line, MO)... */}
             <div className="my-4 p-4 bg-blue-100 rounded-lg shadow">
               <h3 className="text-md font-semibold text-gray-700 mb-2">
                 {t(
@@ -2407,6 +2425,7 @@ const RovingPage = () => {
 
               <hr className="my-6 border-gray-300" />
 
+              {/* --- SPI and Measurement Section --- */}
               <div className="flex flex-wrap items-start gap-4">
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700 mt-2">
@@ -2459,6 +2478,7 @@ const RovingPage = () => {
               </div>
             </div>
 
+            {/* --- Quality Section (Defect Recording) --- */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2 mb-2">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">
@@ -2653,6 +2673,7 @@ const RovingPage = () => {
                 </div>
               </div>
 
+              {/* --- Defect Metrics and Image Upload --- */}
               <div className="md:col-span-1 mb-2">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">
                   {t("qcRoving.defect_metrics")}
@@ -2679,6 +2700,19 @@ const RovingPage = () => {
                     </tr>
                   </tbody>
                 </table>
+                {/* ImageCaptureUpload component for defects */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t("qcRoving.defectImages", "Defect Images")}
+                  </label>
+                  <ImageCaptureUpload
+                    key={`defect-${imageUploaderKey}`}
+                    imageType="defect"
+                    maxImages={5}
+                    onImageFilesChange={setDefectFilesToUpload}
+                    inspectionData={inspectionContextData}
+                  />
+                </div>
               </div>
             </div>
 

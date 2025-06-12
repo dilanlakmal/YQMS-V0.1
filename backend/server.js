@@ -1692,12 +1692,10 @@ console.log("Scheduled cutpanelorders sync with deadlock protection.");
 app.post("/api/sync-cutpanel-orders", async (req, res) => {
   // This manual trigger will also respect the gatekeeper
   syncCutPanelOrders();
-  res
-    .status(202)
-    .json({
-      message:
-        "Cut panel orders sync initiated successfully. Check logs for progress."
-    });
+  res.status(202).json({
+    message:
+      "Cut panel orders sync initiated successfully. Check logs for progress."
+  });
 });
 
 // /* ------------------------------
@@ -8048,108 +8046,6 @@ app.delete("/api/sewing-defects/:defectCode", async (req, res) => {
   }
 });
 
-//Old end points
-
-// // ------------------------
-// // Multer Storage Setup for QC Inline Roving
-// // ------------------------
-// const qcStorage = multer.diskStorage({
-//   destination: (req, file, cb) => {
-//     const uploadPath = path.join(__dirname, "../public/storage/qcinline");
-//     // Create directory if it doesn't exist
-//     if (!fs.existsSync(uploadPath)) {
-//       fs.mkdirSync(uploadPath, { recursive: true });
-//     }
-//     cb(null, uploadPath);
-//   },
-//   filename: (req, file, cb) => {
-//     const { date, type, emp_id } = req.body;
-//     // Validate the inputs to prevent 'undefined' in the filename
-//     const currentDate = date || new Date().toISOString().split("T")[0]; // Fallback to current date if not provided
-//     const imageType = type || "spi-measurement"; // Fallback to 'unknown' if type is not provided
-//     const userEmpId = emp_id || "emp"; // Fallback to 'guest' if emp_id is not provided
-//     const randomId = Math.random().toString(36).substring(2, 15);
-//     const fileName = `${currentDate}-${imageType}-${userEmpId}-${randomId}.jpg`;
-//     cb(null, fileName);
-//   }
-// });
-
-// const qcUpload = multer({
-//   storage: qcStorage,
-//   limits: { fileSize: 5000000 }, // Limit file size to 5MB
-//   fileFilter: (req, file, cb) => {
-//     const filetypes = /jpeg|jpg|png|gif/;
-//     const extname = filetypes.test(
-//       path.extname(file.originalname).toLowerCase()
-//     );
-//     const mimetype = filetypes.test(file.mimetype);
-//     if (mimetype && extname) {
-//       return cb(null, true);
-//     } else {
-//       cb("Error: Images Only (jpeg, jpg, png, gif)!");
-//     }
-//   }
-// }).single("image");
-
-// // Serve static files (for accessing uploaded images)
-// app.use("/storage", express.static(path.join(__dirname, "../public/storage")));
-
-// // Endpoint to upload images for QC Inline Roving
-// app.post("/api/upload-qc-image", qcUpload, (req, res) => {
-//   try {
-//     if (!req.file) {
-//       return res.status(400).json({ message: "No image uploaded" });
-//     }
-//     const imagePath = `/storage/qcinline/${req.file.filename}`;
-//     res.status(200).json({ imagePath });
-//   } catch (error) {
-//     console.error("Error uploading image:", error);
-//     res
-//       .status(500)
-//       .json({ message: "Failed to upload image", error: error.message });
-//   }
-// });
-
-// // Updated endpoint to save or update QC Inline Roving data
-// app.post("/api/save-qc-inline-roving", async (req, res) => {
-//   try {
-//     const qcInlineRovingData = req.body;
-
-//     const { inspection_date, line_no, mo_no } = qcInlineRovingData;
-
-//     // Check if a record exists with the same emp_id and inspection_date
-//     let existingRecord = await QCInlineRoving.findOne({
-//       inspection_date,
-//       line_no,
-//       mo_no
-//     });
-
-//     if (existingRecord) {
-//       // If a matching record exists, append the new inlineData to the existing record
-//       existingRecord.inlineData.push(qcInlineRovingData.inlineData[0]);
-//       await existingRecord.save();
-//       res.status(200).json({
-//         message: "QC Inline Roving data updated successfully",
-//         data: existingRecord
-//       });
-//     } else {
-//       // If no matching record exists, create a new one
-//       const newQCInlineRoving = new QCInlineRoving(qcInlineRovingData);
-//       await newQCInlineRoving.save();
-//       res.status(201).json({
-//         message: "QC Inline Roving data saved successfully",
-//         data: newQCInlineRoving
-//       });
-//     }
-//   } catch (error) {
-//     console.error("Error saving QC Inline Roving data:", error);
-//     res.status(500).json({
-//       message: "Failed to save QC Inline Roving data",
-//       error: error.message
-//     });
-//   }
-// });
-
 //Dashboard Old Endpoints
 // Endpoint to fetch QC Inline Roving reports
 app.get("/api/qc-inline-roving-reports", async (req, res) => {
@@ -10117,30 +10013,6 @@ app.post("/api/save-measurement-point", async (req, res) => {
   }
 });
 
-// app.post("/api/save-measurement-point", async (req, res) => {
-//   try {
-//     const measurementPoint = req.body;
-//     // Find the maximum 'no' in the collection
-//     const maxNo = await CuttingMeasurementPoint.findOne()
-//       .sort({ no: -1 })
-//       .select("no");
-//     const newNo = maxNo ? maxNo.no + 1 : 1;
-//     // Create new document
-//     const newDoc = new CuttingMeasurementPoint({
-//       ...measurementPoint,
-//       no: newNo
-//     });
-//     await newDoc.save();
-//     res.status(200).json({ message: "Measurement point saved successfully" });
-//   } catch (error) {
-//     console.error("Error saving measurement point:", error);
-//     res.status(500).json({
-//       message: "Failed to save measurement point",
-//       error: error.message
-//     });
-//   }
-// });
-
 /* ------------------------------
    Cutting Measurement Points Edit ENDPOINTS
 ------------------------------ */
@@ -10608,23 +10480,6 @@ app.post(
 /* ------------------------------
   Cutting Trend Analysis ENDPOINTS
 ------------------------------ */
-
-// server.js (ADD THESE NEW ENDPOINTS)
-
-// // Helper function (if not already present from previous responses)
-// const normalizeDateString = (dateStr) => {
-//   if (!dateStr) return null;
-//   try {
-//     const date = new Date(dateStr);
-//     const month = (date.getMonth() + 1).toString().padStart(2, "0");
-//     const day = date.getDate().toString().padStart(2, "0");
-//     const year = date.getFullYear();
-//     return `${month}/${day}/${year}`;
-//   } catch (e) {
-//     // Fallback for already formatted strings or handle error
-//     return dateStr;
-//   }
-// };
 
 // --- Trend Analysis Filter Options ---
 app.get("/api/cutting/filter-options/mo-numbers", async (req, res) => {
@@ -19629,7 +19484,7 @@ const auditUploadPath = path.join(
   "storage",
   "audit_images"
 );
-fs.mkdirSync(auditUploadPath, { recursive: true }); // This is the correct way to ensure the directory exists
+//fs.mkdirSync(auditUploadPath, { recursive: true }); // This is the correct way to ensure the directory exists
 
 // 2. Update the multer storage configuration
 const audit_storage = multer.diskStorage({
@@ -19646,24 +19501,6 @@ const audit_storage = multer.diskStorage({
     );
   }
 });
-
-// // Multer configuration for audit images
-// const audit_storage = multer.diskStorage({
-//   destination: (req, file, cb) => {
-//     const dir = "public/storage/audit_images/"; // Main directory
-//     // You might want to create subdirectories, e.g., by auditId or date
-//     // fs.mkdirSync(dir, { recursive: true }); // Ensure directory exists (if not using dynamic subdirs)
-//     cb(null, dir);
-//   },
-//   filename: (req, file, cb) => {
-//     // Sanitize requirementId or use a UUID for more robust filenames
-//     const requirementId = req.body.requirementId || "unknown";
-//     cb(
-//       null,
-//       `audit-${requirementId}-${Date.now()}${path.extname(file.originalname)}`
-//     );
-//   }
-// });
 
 const audit_image_upload = multer({
   storage: audit_storage,
