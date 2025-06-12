@@ -22,3 +22,17 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+# ==================================
+#      BACKEND SPECIFIC IGNORES
+# ==================================
+# Ignore the user-uploaded content directory inside the backend folder.
+# This single line handles all your image upload folders (cutting, scc, etc.)
+/backend/public/storage/
+
+
+# --- USER UPLOADED CONTENT ---
+# Ignore all content within the public storage directory.
+# This single line handles all your image upload folders.
+public/storage/
