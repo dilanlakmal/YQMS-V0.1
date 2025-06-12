@@ -7295,6 +7295,182 @@ app.get("/api/opa-autocomplete", async (req, res) => {
 ------------------------------ */
 
 /* ------------------------------
+   End Points - Roving Sewing Defects
+------------------------------ */
+
+// GET - Fetch all sewing defects
+app.get("/api/sewing-defects", async (req, res) => {
+  try {
+    const defects = await SewingDefects.find({}).sort({ code: 1 }).lean();
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching sewing defects:", error);
+    res.status(500).json({ message: "Server error fetching sewing defects" });
+  }
+});
+
+// GET - Fetch options for the 'Add Defect' form (with linked categories)
+app.get("/api/sewing-defects/options", async (req, res) => {
+  try {
+    const [
+      repairs,
+      types,
+      lastDefect,
+      // Use an aggregation pipeline to get unique, linked category groups
+      categoryGroups
+    ] = await Promise.all([
+      SewingDefects.distinct("repair"),
+      SewingDefects.distinct("type"),
+      SewingDefects.findOne().sort({ code: -1 }),
+      SewingDefects.aggregate([
+        {
+          $group: {
+            _id: {
+              english: "$categoryEnglish",
+              khmer: "$categoryKhmer",
+              chinese: "$categoryChinese"
+            }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            english: "$_id.english",
+            khmer: "$_id.khmer",
+            chinese: "$_id.chinese"
+          }
+        },
+        { $match: { english: { $ne: null, $ne: "" } } }, // Ensure english name exists
+        { $sort: { english: 1 } }
+      ])
+    ]);
+
+    const nextCode = lastDefect ? lastDefect.code + 1 : 1001;
+
+    res.json({
+      repairs: repairs.filter(Boolean),
+      types: types.filter(Boolean),
+      categories: categoryGroups,
+      nextCode
+    });
+  } catch (error) {
+    console.error("Error fetching defect options:", error);
+    res.status(500).json({ message: "Server error fetching options" });
+  }
+});
+
+// POST - Add a new sewing defect
+app.post("/api/sewing-defects", async (req, res) => {
+  try {
+    const {
+      shortEng,
+      english,
+      khmer,
+      chinese,
+      repair,
+      categoryEnglish,
+      categoryKhmer,
+      categoryChinese,
+      type,
+      isCommon
+    } = req.body;
+
+    if (
+      !shortEng ||
+      !english ||
+      !khmer ||
+      !categoryEnglish ||
+      !repair ||
+      !type
+    ) {
+      return res.status(400).json({
+        message:
+          "Required fields are missing. Please fill out all fields marked with *."
+      });
+    }
+
+    const existingDefect = await SewingDefects.findOne({
+      $or: [{ shortEng }, { english }]
+    });
+    if (existingDefect) {
+      return res.status(409).json({
+        message: `Defect with name '${
+          existingDefect.shortEng === shortEng ? shortEng : english
+        }' already exists.`
+      });
+    }
+
+    const lastDefect = await SewingDefects.findOne().sort({ code: -1 });
+    const newCode = lastDefect ? lastDefect.code + 1 : 1001;
+
+    const allBuyers = await Buyer.find({}, "buyerName").lean();
+    const statusByBuyer = allBuyers.map((buyer) => ({
+      buyerName: buyer.buyerName,
+      defectStatus: ["Major"],
+      isCommon: "Major"
+    }));
+
+    const newSewingDefect = new SewingDefects({
+      code: newCode,
+      shortEng,
+      english,
+      khmer,
+      chinese: chinese || "",
+      image: "",
+      repair,
+      categoryEnglish,
+      categoryKhmer,
+      categoryChinese,
+      type,
+      isCommon,
+      statusByBuyer,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    await newSewingDefect.save();
+    res.status(201).json({
+      message: "Sewing defect added successfully",
+      defect: newSewingDefect
+    });
+  } catch (error) {
+    console.error("Error adding sewing defect:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Duplicate entry. Defect code or name might already exist."
+      });
+    }
+    res
+      .status(500)
+      .json({ message: "Failed to add sewing defect", error: error.message });
+  }
+});
+
+// DELETE - Delete a sewing defect by its CODE
+app.delete("/api/sewing-defects/:code", async (req, res) => {
+  try {
+    const { code } = req.params;
+    const defectCode = parseInt(code, 10);
+    if (isNaN(defectCode)) {
+      return res.status(400).json({ message: "Invalid defect code format." });
+    }
+    const deletedDefect = await SewingDefects.findOneAndDelete({
+      code: defectCode
+    });
+    if (!deletedDefect) {
+      return res.status(404).json({ message: "Sewing Defect not found." });
+    }
+    res.status(200).json({ message: "Sewing defect deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting sewing defect:", error);
+    res.status(500).json({
+      message: "Failed to delete sewing defect",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
    QC Inline Roving New
 ------------------------------ */
 
