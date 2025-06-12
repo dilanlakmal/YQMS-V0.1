@@ -13948,25 +13948,6 @@ const sccImageStorage = multer.diskStorage({
   }
 });
 
-// const sccImageStorage = multer.diskStorage({
-//   destination: (req, file, cb) => {
-//     cb(null, "public/storage/scc_images");
-//   },
-//   filename: (req, file, cb) => {
-//     // imageType should be passed in the body: 'referenceSample-HT', 'afterWash-FU', etc.
-//     const { imageType, inspectionDate } = req.body;
-//     const datePart = inspectionDate
-//       ? inspectionDate.replace(/\//g, "-")
-//       : new Date().toISOString().split("T")[0];
-//     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-//     // Filename: imageType-date-uniqueSuffix.extension
-//     const filename = `${
-//       imageType || "sccimage"
-//     }-${datePart}-${uniqueSuffix}${path.extname(file.originalname)}`;
-//     cb(null, filename);
-//   }
-// });
-
 const sccUpload = multer({ storage: sccImageStorage });
 
 app.post("/api/scc/upload-image", sccUpload.single("imageFile"), (req, res) => {
