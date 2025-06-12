@@ -1431,6 +1431,7 @@
     "manageCuttingReports": "Manage Cutting Reports",
     "qc2Defects": "QC2 Defects",
     "sccOperators": "SCC Operators",
+    "auditCheckpointsTab": "Audit Checkpoints",
     "contentComingSoon": "This section is under development. Content will be available soon."
   },
   "sccOperators": {
