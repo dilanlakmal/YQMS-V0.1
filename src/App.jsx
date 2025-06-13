@@ -33,6 +33,7 @@ import EmpData from "./pages/EmpData.jsx";
 import SystemAdministrationPage from "./pages/SystemAdministration.jsx";
 import SCCPage from "./pages/SCC.jsx";
 import SystemAdmin from "./pages/SystemAdmin.jsx";
+import QAInspectionEvaluation from "./pages/QAInspectionEvaluation.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -50,6 +51,8 @@ import { BluetoothProvider } from './components/context/BluetoothContext.jsx';
 import { AuthProvider } from "./components/authentication/AuthContext.jsx";
 import { FormDataProvider } from "./components/context/FormDataContext";
 import CuttingPage from "./pages/Cutting.jsx";
+
+import QAAudit from "./pages/QAAudit.jsx";
 
 export const BluetoothContext = createContext(null);
 
@@ -347,6 +350,8 @@ function AppContent() {
               <Route path="/cutting" element={<CuttingPage />} />
               <Route path="/scc" element={<SCCPage />} />
               <Route path="/sysadmin" element={<SystemAdmin />} />
+              <Route path="/audit" element={<QAAudit />} />
+              <Route path="/qa-pivot" element={<QAInspectionEvaluation />} />
               <Route path="/inline-emp" element={<EmpData />} />
               <Route path="/opa" element={<OPAPage />} />
               <Route path="/packing" element={<PackingPage />} />

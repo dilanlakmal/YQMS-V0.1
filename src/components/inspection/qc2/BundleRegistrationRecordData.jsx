@@ -156,6 +156,7 @@ function BundleRegistrationRecordData({ handleEdit }) {
         const response = await fetch(
           `${API_BASE_URL}/api/filtered-bundle-data?${params.toString()}`
         );
+         
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();

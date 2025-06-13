@@ -25,6 +25,8 @@ import RovingData from "../components/inspection/qc_roving/RovingData";
 // import WorkerAttendance from "../components/inspection/qc_roving/WorkerAttendance";
 import InlineWorkers from "../components/inspection/qc_roving/InlineWorkers";
 import ImageCaptureUpload from "../components/inspection/qc_roving/ImageCaptureupload";
+import RovingPairing from "../components/inspection/qc_roving/RovingPairing";
+import RovingPairingData from "../components/inspection/qc_roving/RovingPairingData";
 import i18next from 'i18next';
 
 const RovingPage = () => {
@@ -47,6 +49,7 @@ const RovingPage = () => {
     garmentIndex: 0,
     defectNames: []
   });
+  const [defectFilesToUpload, setDefectFilesToUpload] = useState([]);
   const [garments, setGarments] = useState([]);
   const [inspectionStartTime, setInspectionStartTime] = useState(null);
   const [currentGarmentIndex, setCurrentGarmentIndex] = useState(0);
@@ -436,6 +439,7 @@ const RovingPage = () => {
       garmentIndex: 0,
       defectNames: []
     });
+    setDefectFilesToUpload([]);
     // setSelectedManualInspectionRep("");
     setImageUploaderKey(Date.now());
     setRemarkText("");
@@ -518,10 +522,12 @@ const RovingPage = () => {
     try {
       Swal.fire({ title: t('qcRoving.submission.uploadingImages', 'Uploading images...'), allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
+      // Upload SPI images
       for (let i = 0; i < spiFilesToUpload.length; i++) {
         const path = await uploadFile(spiFilesToUpload[i], 'spi', scannedUserData?.emp_id, i);
         uploadedSpiImagePaths.push(path);
       }
+      // Upload Measurement images
       for (let i = 0; i < measurementFilesToUpload.length; i++) {
         const path = await uploadFile(measurementFilesToUpload[i], 'measurement', scannedUserData?.emp_id, i);
         uploadedMeasurementImagePaths.push(path);
@@ -539,6 +545,16 @@ const RovingPage = () => {
         }
       }
       
+      // Upload Defects images
+      for (let i = 0; i < defectFilesToUpload.length; i++) {
+        const path = await uploadFile(
+          defectFilesToUpload[i],
+          "defect",
+          scannedUserData?.emp_id,
+          i
+        );
+        uploadedDefectImagePaths.push(path);
+      }
       Swal.close();
     } catch (uploadError) {
       Swal.fire(t('qcRoving.submission.imageUploadFailedTitle', 'Image Upload Failed'), uploadError.message || t('qcRoving.submission.imageUploadFailedText', 'One or more images could not be uploaded. Please try again.'), 'error');
@@ -655,6 +671,7 @@ const RovingPage = () => {
       inspection_time: inspectionTime,
       remark: remarkText,
       qualityStatus,
+      defectImages: uploadedDefectImagePaths,
       overall_roving_status: overallOperatorStatusKey,
       rejectGarments: [
         {
@@ -780,19 +797,19 @@ const RovingPage = () => {
     overallStatusColor = 'bg-gray-200 text-gray-700';
    } else if (anyCriticalDefectInOverallGarments) {
     overallStatusText = t('qcRoving.rejectCritical', 'Reject-Critical');
-    overallStatusColor = 'bg-red-100 text-red-800';
+    overallStatusColor = 'bg-red-300 text-red-800';
   } else if (totalMajorDefectsInOverallGarments >= 2) {
     overallStatusText = t('qcRoving.rejectMajorMultiple', 'Reject-Major-M');
-    overallStatusColor = 'bg-red-100 text-red-800';
+    overallStatusColor = 'bg-red-300 text-red-800';
   } else if (totalMinorDefectsInOverallGarments >= 2) {
     overallStatusText = t('qcRoving.rejectMinorMultiple', 'Reject-Minor-M');
     overallStatusColor = 'bg-red-100 text-red-800';
   } else if (totalMajorDefectsInOverallGarments === 1) {
     overallStatusText = t('qcRoving.rejectMajorSingle', 'Reject-Major-S');
-    overallStatusColor = 'bg-yellow-100 text-yellow-800';
+    overallStatusColor = 'bg-red-300 text-red-800';
   } else if (totalMinorDefectsInOverallGarments === 1) {
     overallStatusText = t('qcRoving.rejectMinorSingle', 'Reject-Minor-S');
-    overallStatusColor = 'bg-yellow-100 text-yellow-800';
+    overallStatusColor = 'bg-yellow-200 text-yellow-800';
   } else if (spiStatus === 'Reject' || measurementStatus === 'Reject') {
     overallStatusText = t('qcRoving.rejectSpiMeas', 'Reject');
     overallStatusColor = 'bg-yellow-100 text-yellow-800';
@@ -859,12 +876,23 @@ const RovingPage = () => {
         <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">
           {t("qcRoving.qc_inline_roving_inspection")}
         </h1>
+        {/* Tab Buttons*/}
         <div className="flex justify-center mb-4">
           <button
             onClick={() => setActiveTab('form')}
             className={`px-4 py-2 ${activeTab === 'form' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'} rounded-l-lg`}
           >
             {t("qcRoving.qcInlineRoving")}
+          </button>
+          <button
+            onClick={() => setActiveTab("pairing")}
+            className={`px-4 py-2 ${
+              activeTab === "pairing"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            {t("qcRoving.pairing", "Pairing")}
           </button>
           <button
             onClick={() => setActiveTab("data")}
@@ -887,6 +915,16 @@ const RovingPage = () => {
             <UserCheck className="w-5 h-5" />
             <span>Worker Attendance</span>
           </button> */}
+          <button
+            onClick={() => setActiveTab("pairingdata")}
+            className={`px-4 py-2 ${
+              activeTab === "pairingdata"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            {t("qcRoving.pairingdata")}
+          </button>
           <button
             onClick={() => setActiveTab("db")}
             className={`px-4 py-2 flex items-center space-x-2 ${
@@ -913,6 +951,7 @@ const RovingPage = () => {
 
         {activeTab === 'form' ? (
           <>
+            {/* ... Progress Bar and Main Form Section (Inspection Rep, Date, Line, MO)... */}
             <div className="my-4 p-4 bg-blue-100 rounded-lg shadow">
               <h3 className="text-md font-semibold text-gray-700 mb-2">
                 {t("qcRoving.lineRepProgressTitle", "Line {{lineDisplayValue}} - {{repName}}: Inspection Progress", { 
@@ -1201,6 +1240,7 @@ const RovingPage = () => {
 
               <hr className="my-6 border-gray-300" />
 
+              {/* --- SPI and Measurement Section --- */}
               <div className="flex flex-wrap items-start gap-4">
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700 mt-2">
@@ -1251,6 +1291,7 @@ const RovingPage = () => {
               </div>
             </div>
 
+            {/* --- Quality Section (Defect Recording) --- */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2 mb-2">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">
@@ -1419,6 +1460,7 @@ const RovingPage = () => {
                 </div>
               </div>
 
+              {/* --- Defect Metrics and Image Upload --- */}
               <div className="md:col-span-1 mb-2">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">
                   {t("qcRoving.defect_metrics")}
@@ -1445,6 +1487,19 @@ const RovingPage = () => {
                     </tr>
                   </tbody>
                 </table>
+                {/* ImageCaptureUpload component for defects */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t("qcRoving.defectImages", "Defect Images")}
+                  </label>
+                  <ImageCaptureUpload
+                    key={`defect-${imageUploaderKey}`}
+                    imageType="defect"
+                    maxImages={5}
+                    onImageFilesChange={setDefectFilesToUpload}
+                    inspectionData={inspectionContextData}
+                  />
+                </div>
               </div>
             </div>
              </div> 
@@ -1558,10 +1613,14 @@ const RovingPage = () => {
               />
             )}
           </>
+        ) : activeTab === "pairing" ? (
+          <RovingPairing />
         ) : activeTab === "data" ? (
           <RovingData />
         // ) : activeTab === "attendance" ? (
         //   <WorkerAttendance />
+        ) : activeTab === "pairingdata" ? (
+          <RovingPairingData />
         ) : activeTab === "db" ? (
           <CEDatabase />
         ): (

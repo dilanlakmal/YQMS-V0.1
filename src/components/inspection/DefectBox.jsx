@@ -21,7 +21,7 @@ const DefectBox = ({
   onDefectUpdate,
   activeFilter,
   confirmedDefects,
-  sortOption,
+  sortOption
 }) => {
   const defectItems = defectsList[language] || [];
   const totalDefects = defectItems.length;

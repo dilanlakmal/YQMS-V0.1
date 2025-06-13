@@ -4,10 +4,17 @@ import {
   Info,
   Loader2,
   Minus,
-  Plus, // Might remove if cycles are gone
-  Search
+  Plus,
+  Search,
+  UserCircle2
 } from "lucide-react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useMemo
+} from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useTranslation } from "react-i18next";
@@ -16,39 +23,56 @@ import { API_BASE_URL } from "../../../../config";
 import { useAuth } from "../../authentication/AuthContext";
 import SCCImageUpload from "./SCCImageUpload";
 
-// Define common input field styling
+// Helper function to determine the correct image URL
+const getFacePhotoUrl = (facePhotoPath) => {
+  if (!facePhotoPath) return null;
+  if (
+    facePhotoPath.startsWith("http://") ||
+    facePhotoPath.startsWith("https://")
+  )
+    return facePhotoPath;
+  if (facePhotoPath.startsWith("/storage/"))
+    return `${API_BASE_URL}${facePhotoPath}`;
+  if (facePhotoPath.startsWith("/")) {
+    try {
+      const apiOrigin = new URL(API_BASE_URL).origin;
+      return `${apiOrigin}${facePhotoPath}`;
+    } catch (e) {
+      console.warn(
+        "API_BASE_URL is not valid for operator image paths, using path directly:",
+        facePhotoPath
+      );
+      return facePhotoPath;
+    }
+  }
+  console.warn("Unhandled operator face_photo path format:", facePhotoPath);
+  return facePhotoPath;
+};
+
 const inputBaseClasses =
   "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none sm:text-sm";
 const inputFocusClasses = "focus:ring-indigo-500 focus:border-indigo-500";
 const inputFieldClasses = `${inputBaseClasses} ${inputFocusClasses}`;
 const inputFieldReadonlyClasses = `${inputBaseClasses} bg-gray-100 cursor-not-allowed`;
-const inputFieldTableClasses = // For table inputs
+const inputFieldTableClasses =
   "w-full p-1.5 border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500";
-
 const labelClasses = "block text-sm font-medium text-gray-700 mb-0.5";
-
-// New: Initial state for parameter adjustment record
-const initialAdjustmentRecordState = {
-  rejectionNo: 1, // Will correspond to the rejection count
-  adjustedTempC: null,
-  adjustedTimeSec: null,
-  adjustedPressure: null
-};
 
 const SCCDailyTesting = ({
   formData,
   onFormDataChange,
   onFormSubmit,
-  isSubmitting,
-  formType // Should be "DailyTesting"
+  isSubmitting
 }) => {
   const { t } = useTranslation();
   const { user } = useAuth();
 
-  // Local state for managing parameter adjustment records and user preference
-  const [provideAdjustmentData, setProvideAdjustmentData] = useState(true); // Default to Yes
+  const [provideAdjustmentData, setProvideAdjustmentData] = useState(
+    (formData.parameterAdjustmentRecords &&
+      formData.parameterAdjustmentRecords.length > 0) ||
+      formData.numberOfRejections > 0
+  );
 
-  // --- State Hooks (copied from your provided code, then modified) ---
   const [moNoSearch, setMoNoSearch] = useState(formData.moNo || "");
   const [moNoOptions, setMoNoOptions] = useState([]);
   const [showMoNoDropdown, setShowMoNoDropdown] = useState(false);
@@ -57,7 +81,7 @@ const SCCDailyTesting = ({
   const [machineNoSearch, setMachineNoSearch] = useState(
     formData.machineNo || ""
   );
-  const [machineNoOptionsInternal, setMachineNoOptionsInternal] = useState([]);
+  const [machineNoOptionsInternal, setMachineNoOptionsInternal] = useState([]); // For the dropdown suggestions
   const [showMachineNoDropdown, setShowMachineNoDropdown] = useState(false);
 
   const [orderDetailsLoading, setOrderDetailsLoading] = useState(false);
@@ -65,33 +89,80 @@ const SCCDailyTesting = ({
   const [specsLoading, setSpecsLoading] = useState(false);
   const [recordStatusMessage, setRecordStatusMessage] = useState("");
 
+  const [operatorDisplayData, setOperatorDisplayData] = useState(
+    formData.operatorData || null
+  );
+  const [operatorLoading, setOperatorLoading] = useState(false);
+
   const moNoInputRef = useRef(null);
   const machineNoInputRef = useRef(null);
   const moNoDropdownRef = useRef(null);
   const machineNoDropdownRef = useRef(null);
 
-  // Initialize machine options for 1-15
-  useEffect(() => {
-    const machines = [];
-    for (let i = 1; i <= 15; i++) {
-      machines.push(String(i)); // Just the numbers 1 to 15
-    }
-    setMachineNoOptionsInternal(machines);
-  }, []); // Empty dependency array, runs once on mount
+  // Machine numbers for Daily Testing (HT only: 1-15)
+  const htMachineOptions = useMemo(() => {
+    return Array.from({ length: 15 }, (_, i) => String(i + 1));
+  }, []);
 
-  // // Initialize machine options (same as before)
-  // useEffect(() => {
-  //   const machines = [];
-  //   for (let i = 1; i <= 15; i++) machines.push(String(i));
-  //   for (let i = 1; i <= 5; i++) machines.push(String(i).padStart(3, "0"));
-  //   setMachineNoOptionsInternal(machines);
-  // }, []);
+  useEffect(() => {
+    setMachineNoOptionsInternal(htMachineOptions);
+  }, [htMachineOptions]);
 
   const filteredMachineOptions = machineNoOptionsInternal.filter((machine) =>
-    machine.toLowerCase().includes(machineNoSearch.toLowerCase())
+    machine.toLowerCase().includes(String(machineNoSearch).toLowerCase())
   );
 
-  // Fetch MO Numbers (same as before)
+  // Fetch Operator Data - Simplified for HT only
+  useEffect(() => {
+    const fetchOperator = async () => {
+      if (!formData.machineNo) {
+        setOperatorDisplayData(null);
+        if (formData.operatorData !== null) {
+          onFormDataChange({ ...formData, operatorData: null });
+        }
+        return;
+      }
+
+      const operatorTypeForAPI = "ht"; // Always HT for Daily Testing as per new requirement
+
+      setOperatorLoading(true);
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/api/scc/operator-by-machine/${operatorTypeForAPI}/${formData.machineNo}`
+        );
+        const fetchedOpData = response.data?.data || null;
+        setOperatorDisplayData(fetchedOpData);
+        if (
+          JSON.stringify(formData.operatorData) !==
+          JSON.stringify(fetchedOpData)
+        ) {
+          onFormDataChange({ ...formData, operatorData: fetchedOpData });
+        }
+      } catch (error) {
+        setOperatorDisplayData(null);
+        if (formData.operatorData !== null) {
+          onFormDataChange({ ...formData, operatorData: null });
+        }
+        if (
+          !(
+            error.response?.status === 404 &&
+            error.response?.data?.message === "OPERATOR_NOT_FOUND"
+          )
+        ) {
+          console.error(
+            `Error fetching ${operatorTypeForAPI} operator data for machine ${formData.machineNo}:`,
+            error
+          );
+        }
+      } finally {
+        setOperatorLoading(false);
+      }
+    };
+
+    fetchOperator();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.machineNo]); // Only depends on machineNo now
+
   const fetchMoNumbers = useCallback(async () => {
     if (moNoSearch.trim() === "") {
       setMoNoOptions([]);
@@ -103,7 +174,7 @@ const SCCDailyTesting = ({
         params: { term: moNoSearch }
       });
       setMoNoOptions(response.data || []);
-      setShowMoNoDropdown(response.data.length > 0);
+      setShowMoNoDropdown(response.data?.length > 0);
     } catch (error) {
       console.error(t("sccdaily.errorFetchingMoLog"), error);
       setMoNoOptions([]);
@@ -122,48 +193,45 @@ const SCCDailyTesting = ({
 
   const handleMoSelect = (selectedMo) => {
     setMoNoSearch(selectedMo);
-    onFormDataChange({
-      ...formData, // Preserve date, machineNo
+    onFormDataChange((prevFormData) => ({
+      ...prevFormData,
       moNo: selectedMo,
       buyer: "",
       buyerStyle: "",
       color: "",
       _id: null,
       standardSpecifications: { tempC: "", timeSec: "", pressure: "" },
-      // cycleWashingResults: [], // Removed
-      numberOfRejections: 0, // Reset rejections
-      parameterAdjustmentRecords: [], // New: Reset adjustment records
+      numberOfRejections: 0,
+      parameterAdjustmentRecords: [],
       finalResult: "Pending",
       afterWashImageFile: null,
       afterWashImageUrl: null,
       remarks: ""
-    });
+    }));
     setShowMoNoDropdown(false);
     setRecordStatusMessage("");
-    setProvideAdjustmentData(true); // Reset preference
+    setProvideAdjustmentData(true);
   };
 
   const handleMachineSelect = (selectedMachine) => {
     setMachineNoSearch(selectedMachine);
-    onFormDataChange({
-      ...formData, // Preserve date, moNo, color etc. if already set
+    onFormDataChange((prevFormData) => ({
+      ...prevFormData,
       machineNo: selectedMachine,
-      _id: null, // Reset _id as machineNo change might mean a different record
-      // Reset fields that might depend on machine + MO + color combination
+      _id: null,
+      operatorData: null,
       standardSpecifications: { tempC: "", timeSec: "", pressure: "" },
       numberOfRejections: 0,
       parameterAdjustmentRecords: [],
       finalResult: "Pending",
       afterWashImageFile: null,
       afterWashImageUrl: null
-      // remarks: "" // Optionally reset remarks or keep them
-    });
+    }));
     setShowMachineNoDropdown(false);
     setRecordStatusMessage("");
     setProvideAdjustmentData(true);
   };
 
-  // Fetch Order Details (same as before)
   useEffect(() => {
     const fetchOrderDetails = async () => {
       if (!formData.moNo) {
@@ -221,7 +289,7 @@ const SCCDailyTesting = ({
       setAvailableColors([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.moNo, t]);
+  }, [formData.moNo]);
 
   const fetchStandardSpecs = useCallback(async () => {
     if (!formData.moNo || !formData.color || !formData.inspectionDate) return;
@@ -233,27 +301,20 @@ const SCCDailyTesting = ({
           params: {
             moNo: formData.moNo,
             color: formData.color,
-            inspectionDate: formData.inspectionDate.toISOString()
+            inspectionDate: new Date(formData.inspectionDate).toISOString()
           }
         }
       );
-      if (response.data.data) {
-        onFormDataChange((prev) => ({
-          ...prev,
-          standardSpecifications: {
-            tempC: response.data.data.tempC || "",
-            timeSec: response.data.data.timeSec || "",
-            pressure: response.data.data.pressure || ""
-          }
-        }));
-      } else {
-        // Specs not found
-        onFormDataChange((prev) => ({
-          ...prev,
-          standardSpecifications: { tempC: "", timeSec: "", pressure: "" }
-        }));
-        console.log(t("sccdaily.specsNotFoundLog"));
-      }
+      const specs = response.data?.data;
+      onFormDataChange((prev) => ({
+        ...prev,
+        standardSpecifications: {
+          tempC: specs?.tempC || "",
+          timeSec: specs?.timeSec || "",
+          pressure: specs?.pressure || ""
+        }
+      }));
+      if (!specs) console.log(t("sccdaily.specsNotFoundLog"));
     } catch (error) {
       console.error(t("sccdaily.errorFetchingSpecsLog"), error);
       onFormDataChange((prev) => ({
@@ -263,15 +324,9 @@ const SCCDailyTesting = ({
     } finally {
       setSpecsLoading(false);
     }
-  }, [
-    formData.moNo,
-    formData.color,
-    formData.inspectionDate,
-    onFormDataChange,
-    t
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.moNo, formData.color, formData.inspectionDate, t]); // Removed onFormDataChange
 
-  // Fetch Existing Daily Testing Record or Standard Specs
   useEffect(() => {
     const fetchDailyTestingRecordOrSpecs = async () => {
       if (
@@ -281,7 +336,6 @@ const SCCDailyTesting = ({
         !formData.inspectionDate
       )
         return;
-
       setExistingRecordLoading(true);
       setRecordStatusMessage("");
       try {
@@ -292,70 +346,74 @@ const SCCDailyTesting = ({
               moNo: formData.moNo,
               color: formData.color,
               machineNo: formData.machineNo,
-              inspectionDate: formData.inspectionDate.toISOString()
+              inspectionDate: new Date(formData.inspectionDate).toISOString()
             }
           }
         );
-        const recordData = response.data; // Full response object
+        const recordData = response.data;
+        const actualRecord = recordData.data
+          ? recordData.data
+          : recordData.message
+          ? null
+          : recordData;
 
         if (
-          recordData.message === "DAILY_TESTING_RECORD_NOT_FOUND" ||
-          !recordData.data
+          !actualRecord ||
+          recordData.message === "DAILY_TESTING_RECORD_NOT_FOUND"
         ) {
           setRecordStatusMessage(t("sccdaily.newRecordMessage"));
           onFormDataChange((prev) => ({
-            ...prev, // Keep current MO, color, machine, date
+            ...prev,
             _id: null,
-            // standardSpecifications will be fetched by fetchStandardSpecs
             numberOfRejections: 0,
-            parameterAdjustmentRecords: [], // Initialize as empty
+            parameterAdjustmentRecords: [],
             finalResult: "Pending",
             afterWashImageUrl: null,
-            remarks: prev.remarks || "" // Preserve remarks if any
+            afterWashImageFile: null,
+            remarks: prev.remarks || ""
+            // operatorData is handled by its own effect
           }));
-          setProvideAdjustmentData(true); // Default to yes for new records
-          fetchStandardSpecs(); // Fetch specs for the new record context
+          setProvideAdjustmentData(true);
+          fetchStandardSpecs();
         } else {
-          // Existing record found
-          const loadedRecord = recordData.data || recordData; // Handle direct or nested data
           setRecordStatusMessage(t("sccdaily.existingRecordLoadedShort"));
           onFormDataChange((prev) => ({
-            ...prev, // Keep current date, machineNo, moNo, color
-            _id: loadedRecord._id,
-            standardSpecifications: loadedRecord.standardSpecifications || {
+            ...prev,
+            _id: actualRecord._id,
+            standardSpecifications: actualRecord.standardSpecifications || {
               tempC: "",
               timeSec: "",
               pressure: ""
             },
-            numberOfRejections: loadedRecord.numberOfRejections || 0,
+            numberOfRejections: actualRecord.numberOfRejections || 0,
             parameterAdjustmentRecords: (
-              loadedRecord.parameterAdjustmentRecords || []
+              actualRecord.parameterAdjustmentRecords || []
             ).map((rec) => ({
-              ...rec, // Ensure all fields are present, convert to string for input if necessary
+              ...rec,
               adjustedTempC:
-                rec.adjustedTempC !== null ? String(rec.adjustedTempC) : "",
+                rec.adjustedTempC != null ? String(rec.adjustedTempC) : "",
               adjustedTimeSec:
-                rec.adjustedTimeSec !== null ? String(rec.adjustedTimeSec) : "",
+                rec.adjustedTimeSec != null ? String(rec.adjustedTimeSec) : "",
               adjustedPressure:
-                rec.adjustedPressure !== null
-                  ? String(rec.adjustedPressure)
-                  : ""
+                rec.adjustedPressure != null ? String(rec.adjustedPressure) : ""
             })),
-            finalResult: loadedRecord.finalResult || "Pending",
-            afterWashImageUrl: loadedRecord.afterWashImage,
+            finalResult: actualRecord.finalResult || "Pending",
+            afterWashImageUrl: actualRecord.afterWashImage,
             remarks:
-              loadedRecord.remarks === "NA" ? "" : loadedRecord.remarks || ""
+              actualRecord.remarks === "NA" ? "" : actualRecord.remarks || "",
+            operatorData: actualRecord.operatorData || prev.operatorData || null
           }));
-          // Determine if user provided adjustment data for existing record
           setProvideAdjustmentData(
-            (loadedRecord.parameterAdjustmentRecords || []).length > 0
+            (actualRecord.parameterAdjustmentRecords || []).length > 0
           );
-          // If standard specs are missing in loaded record but MO/Color/Date known, try fetching them
+          if (actualRecord.operatorData) {
+            setOperatorDisplayData(actualRecord.operatorData);
+          }
           if (
-            !loadedRecord.standardSpecifications?.tempC &&
-            loadedRecord.moNo &&
-            loadedRecord.color &&
-            loadedRecord.inspectionDate
+            !actualRecord.standardSpecifications?.tempC &&
+            actualRecord.moNo &&
+            actualRecord.color &&
+            actualRecord.inspectionDate
           ) {
             fetchStandardSpecs();
           }
@@ -394,9 +452,7 @@ const SCCDailyTesting = ({
       formData.inspectionDate &&
       !formData.machineNo
     ) {
-      // If machineNo is missing but others are present, try to fetch standard specs
       fetchStandardSpecs();
-      // And reset parts of the form that depend on machineNo
       onFormDataChange((prev) => ({
         ...prev,
         _id: null,
@@ -414,47 +470,38 @@ const SCCDailyTesting = ({
     formData.color,
     formData.machineNo,
     formData.inspectionDate,
-    fetchStandardSpecs,
-    t
+    fetchStandardSpecs
   ]);
-  // onFormDataChange removed from deps as it's called inside
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    let newFormData = { ...formData, [name]: value };
-    // If key identifiers change, reset _id
-    if (
-      name === "moNo" ||
-      name === "machineNo" ||
-      name === "color" ||
-      name === "inspectionDate"
-    ) {
-      newFormData._id = null;
+    const newValues = { [name]: value };
+    if (name === "moNo" || name === "machineNo" || name === "color") {
+      newValues._id = null;
       setRecordStatusMessage("");
       if (name === "moNo") {
         setMoNoSearch(value);
-        newFormData.color = "";
-        newFormData.buyer = "";
-        newFormData.buyerStyle = "";
+        newValues.color = "";
+        newValues.buyer = "";
+        newValues.buyerStyle = "";
         setAvailableColors([]);
       }
-      // Reset rejections and adjustments when identifiers change
-      newFormData.numberOfRejections = 0;
-      newFormData.parameterAdjustmentRecords = [];
+      newValues.numberOfRejections = 0;
+      newValues.parameterAdjustmentRecords = [];
       setProvideAdjustmentData(true);
+      newValues.finalResult = "Pending";
     }
-    onFormDataChange(newFormData);
+    onFormDataChange({ ...formData, ...newValues });
   };
 
   const handleDateChange = (date) => {
     onFormDataChange({
       ...formData,
       inspectionDate: date,
-      _id: null, // Reset ID
+      _id: null,
       numberOfRejections: 0,
       parameterAdjustmentRecords: [],
       finalResult: "Pending"
-      // Standard specs will be re-fetched or cleared by useEffect
     });
     setRecordStatusMessage("");
     setProvideAdjustmentData(true);
@@ -464,11 +511,10 @@ const SCCDailyTesting = ({
     onFormDataChange({
       ...formData,
       color: e.target.value,
-      _id: null, // Reset ID
+      _id: null,
       numberOfRejections: 0,
       parameterAdjustmentRecords: [],
       finalResult: "Pending"
-      // Standard specs will be re-fetched or cleared by useEffect
     });
     setRecordStatusMessage("");
     setProvideAdjustmentData(true);
@@ -477,25 +523,18 @@ const SCCDailyTesting = ({
   const handleSpecChange = (field, value) => {
     onFormDataChange((prev) => ({
       ...prev,
-      standardSpecifications: {
-        ...prev.standardSpecifications,
-        [field]: value
-      }
+      standardSpecifications: { ...prev.standardSpecifications, [field]: value }
     }));
   };
 
-  // Handle Number of Rejections Change
   const handleNumberOfRejectionsChange = (e) => {
     let numRejections = parseInt(e.target.value, 10);
-    if (isNaN(numRejections) || numRejections < 0) {
-      numRejections = 0;
-    }
-    if (numRejections > 5) numRejections = 5; // Max 5 rejections for this example
+    if (isNaN(numRejections) || numRejections < 0) numRejections = 0;
+    if (numRejections > 5) numRejections = 5;
 
     const newAdjustmentRecords = [];
     if (provideAdjustmentData) {
       for (let i = 1; i <= numRejections; i++) {
-        // Try to get existing or default to standard specs
         const existingRec = (formData.parameterAdjustmentRecords || [])[i - 1];
         newAdjustmentRecords.push({
           rejectionNo: i,
@@ -511,21 +550,14 @@ const SCCDailyTesting = ({
         });
       }
     }
-
     onFormDataChange({
       ...formData,
       numberOfRejections: numRejections,
       parameterAdjustmentRecords: newAdjustmentRecords,
-      finalResult:
-        numRejections > 0
-          ? "Reject"
-          : formData.finalResult === "Reject"
-          ? "Reject"
-          : "Pass" // Auto set final result
+      finalResult: numRejections > 0 ? "Reject" : "Pass"
     });
   };
 
-  // Handle Parameter Adjustment Input Change
   const handleAdjustmentRecordChange = (index, field, value) => {
     const updatedRecords = [...(formData.parameterAdjustmentRecords || [])];
     if (updatedRecords[index]) {
@@ -542,8 +574,7 @@ const SCCDailyTesting = ({
     if (updatedRecords[index]) {
       let currentValue = parseFloat(updatedRecords[index][field]);
       if (isNaN(currentValue)) {
-        // Default to standard spec if current is not a number
-        const standardField = field.replace("adjusted", "").toLowerCase(); // e.g. adjustedTempC -> tempc
+        const standardField = field.replace("adjusted", "").toLowerCase();
         let standardVal;
         if (standardField === "tempc")
           standardVal = formData.standardSpecifications?.tempC;
@@ -553,11 +584,9 @@ const SCCDailyTesting = ({
           standardVal = formData.standardSpecifications?.pressure;
         currentValue = parseFloat(standardVal) || 0;
       }
-
       if (action === "increment") currentValue += 1;
-      if (action === "decrement") currentValue = Math.max(0, currentValue - 1); // Prevent negative for time/temp/pressure
-
-      updatedRecords[index][field] = String(currentValue); // Store as string for input
+      if (action === "decrement") currentValue = Math.max(0, currentValue - 1);
+      updatedRecords[index][field] = String(currentValue);
       onFormDataChange({
         ...formData,
         parameterAdjustmentRecords: updatedRecords
@@ -570,14 +599,12 @@ const SCCDailyTesting = ({
   };
 
   const handleImageChange = (imageTypeIdentifier, file, previewUrl) => {
-    // Renamed imageType to imageTypeIdentifier
     onFormDataChange({
       ...formData,
       afterWashImageFile: file,
       afterWashImageUrl: previewUrl
     });
   };
-
   const handleImageRemove = () => {
     onFormDataChange({
       ...formData,
@@ -586,7 +613,6 @@ const SCCDailyTesting = ({
     });
   };
 
-  // Click outside handlers (same as before)
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -610,25 +636,37 @@ const SCCDailyTesting = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Handle "Provide Adjustment Data" toggle
   useEffect(() => {
     if (!provideAdjustmentData) {
-      onFormDataChange((prev) => ({ ...prev, parameterAdjustmentRecords: [] }));
+      if (formData.parameterAdjustmentRecords?.length > 0) {
+        onFormDataChange((prev) => ({
+          ...prev,
+          parameterAdjustmentRecords: []
+        }));
+      }
     } else {
-      // If toggling back to Yes, and rejections exist, repopulate based on standard specs
       const numRejections = formData.numberOfRejections || 0;
       if (
         numRejections > 0 &&
         (!formData.parameterAdjustmentRecords ||
-          formData.parameterAdjustmentRecords.length === 0)
+          formData.parameterAdjustmentRecords.length !== numRejections)
       ) {
         const newAdjustmentRecords = [];
         for (let i = 1; i <= numRejections; i++) {
+          const existingRec = (formData.parameterAdjustmentRecords || [])[
+            i - 1
+          ];
           newAdjustmentRecords.push({
             rejectionNo: i,
-            adjustedTempC: formData.standardSpecifications?.tempC || "",
-            adjustedTimeSec: formData.standardSpecifications?.timeSec || "",
-            adjustedPressure: formData.standardSpecifications?.pressure || ""
+            adjustedTempC:
+              existingRec?.adjustedTempC ??
+              (formData.standardSpecifications?.tempC || ""),
+            adjustedTimeSec:
+              existingRec?.adjustedTimeSec ??
+              (formData.standardSpecifications?.timeSec || ""),
+            adjustedPressure:
+              existingRec?.adjustedPressure ??
+              (formData.standardSpecifications?.pressure || "")
           });
         }
         onFormDataChange((prev) => ({
@@ -638,10 +676,13 @@ const SCCDailyTesting = ({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [provideAdjustmentData, formData.numberOfRejections]); // Rerun if provideAdjustmentData or numberOfRejections changes
+  }, [
+    provideAdjustmentData,
+    formData.numberOfRejections,
+    formData.standardSpecifications
+  ]);
 
   const handleActualSubmit = () => {
-    // Basic validation before calling parent submit
     if (
       !formData.moNo ||
       !formData.color ||
@@ -655,8 +696,8 @@ const SCCDailyTesting = ({
       );
       return;
     }
-    // Add any other crucial client-side validation here
-    onFormSubmit("DailyTesting"); // Pass the formType
+    // The formData prop passed to onFormSubmit will now include operatorData if it was set
+    onFormSubmit("DailyTesting", formData);
   };
 
   if (!user)
@@ -665,13 +706,13 @@ const SCCDailyTesting = ({
   return (
     <div className="space-y-6 sm:space-y-8">
       <h2 className="text-xl font-semibold text-gray-800">
-        {t(
-          "sccdaily.formTitle",
-          "Fusing and Heat Transfer Daily Testing Report"
-        )}
+        {t("sccdaily.formTitle")}
       </h2>
 
-      {(orderDetailsLoading || existingRecordLoading || specsLoading) && (
+      {(orderDetailsLoading ||
+        existingRecordLoading ||
+        specsLoading ||
+        operatorLoading) && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ease-in-out">
           <Loader2 className="animate-spin h-12 w-12 text-white" />
         </div>
@@ -691,154 +732,193 @@ const SCCDailyTesting = ({
         </div>
       )}
 
-      {/* Row 1: Date, MO No, Machine No */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4 items-end">
-        <div>
-          <label htmlFor="dailyTestInspectionDate" className={labelClasses}>
-            {t("scc.date")}
-          </label>
-          <DatePicker
-            selected={
-              formData.inspectionDate
-                ? new Date(formData.inspectionDate)
-                : new Date()
-            }
-            onChange={handleDateChange}
-            dateFormat="MM/dd/yyyy"
-            className={inputFieldClasses}
-            required
-            popperPlacement="bottom-start"
-            id="dailyTestInspectionDate"
-          />
-        </div>
-        <div className="relative">
-          <label htmlFor="dailyTestMoNoSearch" className={labelClasses}>
-            {t("scc.moNo")}
-          </label>
-          <div className="relative mt-1">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              id="dailyTestMoNoSearch"
-              ref={moNoInputRef}
-              value={moNoSearch}
-              onChange={(e) => setMoNoSearch(e.target.value)}
-              onFocus={() => setShowMoNoDropdown(true)}
-              placeholder={t("scc.searchMoNo")}
-              className={`${inputFieldClasses} pl-10`}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-x-6 gap-y-4 items-start">
+        <div className="xl:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
+          <div>
+            <label htmlFor="dailyTestInspectionDate" className={labelClasses}>
+              {t("scc.date")}
+            </label>
+            <DatePicker
+              selected={
+                formData.inspectionDate
+                  ? new Date(formData.inspectionDate)
+                  : new Date()
+              }
+              onChange={handleDateChange}
+              dateFormat="MM/dd/yyyy"
+              className={`${inputFieldClasses} py-1.5`}
               required
+              popperPlacement="bottom-start"
+              id="dailyTestInspectionDate"
             />
-            {showMoNoDropdown && moNoOptions.length > 0 && (
-              <ul
-                ref={moNoDropdownRef}
-                className="absolute z-20 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"
-              >
-                {moNoOptions.map((mo) => (
-                  <li
-                    key={mo}
-                    onClick={() => handleMoSelect(mo)}
-                    className="text-gray-900 cursor-default select-none relative py-2 pl-3 pr-9 hover:bg-indigo-500 hover:text-white"
-                  >
-                    {mo}
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
-        </div>
-        <div className="relative">
-          <label htmlFor="dailyTestMachineNo" className={labelClasses}>
-            {t("sccdaily.machineNo")}
-          </label>
-          <div className="relative mt-1">
-            <input
-              type="text"
-              id="dailyTestMachineNo"
-              ref={machineNoInputRef}
-              value={machineNoSearch}
-              onChange={(e) => {
-                setMachineNoSearch(e.target.value);
-                setShowMachineNoDropdown(true);
-              }}
-              onFocus={() => setShowMachineNoDropdown(true)}
-              placeholder={t("sccdaily.selectOrTypeMachine")}
-              className={inputFieldClasses}
-              required
-            />
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <ChevronDown className="h-5 w-5 text-gray-400" />
-            </div>
-            {showMachineNoDropdown && (
-              <ul
-                ref={machineNoDropdownRef}
-                className="absolute z-20 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"
-              >
-                {filteredMachineOptions.length > 0 ? (
-                  filteredMachineOptions.map((machine) => (
+          <div className="relative">
+            <label htmlFor="dailyTestMoNoSearch" className={labelClasses}>
+              {t("scc.moNo")}
+            </label>
+            <div className="relative mt-0.5">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                id="dailyTestMoNoSearch"
+                ref={moNoInputRef}
+                value={moNoSearch}
+                onChange={(e) => setMoNoSearch(e.target.value)}
+                onFocus={() => setShowMoNoDropdown(moNoOptions.length > 0)}
+                placeholder={t("scc.searchMoNo")}
+                className={`${inputFieldClasses} pl-9 py-1.5`}
+                required
+              />
+              {showMoNoDropdown && moNoOptions.length > 0 && (
+                <ul
+                  ref={moNoDropdownRef}
+                  className="absolute z-20 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"
+                >
+                  {moNoOptions.map((mo) => (
                     <li
-                      key={machine}
-                      onClick={() => handleMachineSelect(machine)}
+                      key={mo}
+                      onClick={() => handleMoSelect(mo)}
                       className="text-gray-900 cursor-default select-none relative py-2 pl-3 pr-9 hover:bg-indigo-500 hover:text-white"
                     >
-                      {machine}
+                      {mo}
                     </li>
-                  ))
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          <div className="relative">
+            <label htmlFor="dailyTestMachineNo" className={labelClasses}>
+              {t("sccdaily.machineNo")}
+            </label>
+            <div className="relative mt-0.5">
+              <input
+                type="text"
+                id="dailyTestMachineNo"
+                ref={machineNoInputRef}
+                value={machineNoSearch}
+                onChange={(e) => {
+                  setMachineNoSearch(e.target.value);
+                  setShowMachineNoDropdown(true);
+                }}
+                onFocus={() => setShowMachineNoDropdown(true)}
+                placeholder={t("sccdaily.selectOrTypeMachine")}
+                className={`${inputFieldClasses} py-1.5`}
+                required
+              />
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <ChevronDown className="h-5 w-5 text-gray-400" />
+              </div>
+              {showMachineNoDropdown && (
+                <ul
+                  ref={machineNoDropdownRef}
+                  className="absolute z-20 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"
+                >
+                  {filteredMachineOptions.length > 0 ? (
+                    filteredMachineOptions.map((machine) => (
+                      <li
+                        key={machine}
+                        onClick={() => handleMachineSelect(machine)}
+                        className="text-gray-900 cursor-default select-none relative py-2 pl-3 pr-9 hover:bg-indigo-500 hover:text-white"
+                      >
+                        {machine}
+                      </li>
+                    ))
+                  ) : (
+                    <li className="text-gray-500 cursor-default select-none relative py-2 px-3">
+                      {t("sccdaily.noMachineMatch")}
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
+          </div>
+          <div>
+            <label className={labelClasses}>{t("scc.buyer")}</label>
+            <input
+              type="text"
+              value={formData.buyer || ""}
+              readOnly
+              className={`${inputFieldReadonlyClasses} py-1.5`}
+            />
+          </div>
+          <div>
+            <label className={labelClasses}>{t("scc.buyerStyle")}</label>
+            <input
+              type="text"
+              value={formData.buyerStyle || ""}
+              readOnly
+              className={`${inputFieldReadonlyClasses} py-1.5`}
+            />
+          </div>
+          <div>
+            <label htmlFor="dailyTestColor" className={labelClasses}>
+              {t("scc.color")}
+            </label>
+            <select
+              id="dailyTestColor"
+              value={formData.color || ""}
+              onChange={handleColorChange}
+              className={`${inputFieldClasses} py-1.5`}
+              disabled={!formData.moNo || availableColors.length === 0}
+              required
+            >
+              <option value="">{t("scc.selectColor")}</option>
+              {availableColors.map((c) => (
+                <option key={c.key || c.original} value={c.original}>
+                  {c.original} {c.chn ? `(${c.chn})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="xl:col-span-1 lg:max-w-[220px] md:max-w-xs w-full">
+          <div className="bg-slate-50 p-3 rounded-lg shadow border border-slate-200 h-full flex flex-col justify-center items-center min-h-[155px] sm:min-h-[140px]">
+            <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1 self-start">
+              {t("scc.operatorData")}
+            </h3>
+            {operatorLoading ? (
+              <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+            ) : operatorDisplayData && operatorDisplayData.emp_id ? (
+              <div className="text-center w-full flex flex-col items-center">
+                {operatorDisplayData.emp_face_photo ? (
+                  <img
+                    src={getFacePhotoUrl(operatorDisplayData.emp_face_photo)}
+                    alt={operatorDisplayData.emp_eng_name || "Operator"}
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-slate-200 mb-1"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
                 ) : (
-                  <li className="text-gray-500 cursor-default select-none relative py-2 px-3">
-                    {t("sccdaily.noMachineMatch")}
-                  </li>
+                  <UserCircle2 className="w-16 h-16 sm:w-20 sm:h-20 text-slate-300 mb-1" />
                 )}
-              </ul>
+                <p
+                  className="text-sm font-medium text-slate-800 truncate w-full px-1"
+                  title={operatorDisplayData.emp_id}
+                >
+                  {operatorDisplayData.emp_id}
+                </p>
+                <p
+                  className="text-xs text-slate-500 truncate w-full px-1"
+                  title={operatorDisplayData.emp_eng_name}
+                >
+                  {operatorDisplayData.emp_eng_name || "N/A"}
+                </p>
+              </div>
+            ) : (
+              <div className="text-center text-slate-400 flex flex-col items-center justify-center h-full">
+                <UserCircle2 className="w-12 h-12 mb-1" />
+                <p className="text-xs">{t("scc.noOperatorAssigned")}</p>
+              </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Row 2: Buyer, Buyer Style, Color */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4 items-end">
-        <div>
-          <label className={labelClasses}>{t("scc.buyer")}</label>
-          <input
-            type="text"
-            value={formData.buyer || ""}
-            readOnly
-            className={inputFieldReadonlyClasses}
-          />
-        </div>
-        <div>
-          <label className={labelClasses}>{t("scc.buyerStyle")}</label>
-          <input
-            type="text"
-            value={formData.buyerStyle || ""}
-            readOnly
-            className={inputFieldReadonlyClasses}
-          />
-        </div>
-        <div>
-          <label htmlFor="dailyTestColor" className={labelClasses}>
-            {t("scc.color")}
-          </label>
-          <select
-            id="dailyTestColor"
-            value={formData.color || ""}
-            onChange={handleColorChange}
-            className={inputFieldClasses}
-            disabled={!formData.moNo || availableColors.length === 0}
-            required
-          >
-            <option value="">{t("scc.selectColor")}</option>
-            {availableColors.map((c) => (
-              <option key={c.key || c.original} value={c.original}>
-                {c.original} {c.chn ? `(${c.chn})` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Standard Specifications Table */}
       <div className="mt-6 border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         <h3 className="text-lg font-semibold text-gray-800 bg-gray-50 px-4 py-3 border-b border-gray-200">
           {t("scc.standardSpecifications")}
@@ -851,19 +931,19 @@ const SCCDailyTesting = ({
                   scope="col"
                   className="px-4 py-2.5 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r border-gray-200"
                 >
-                  {t("sccdaily.temperature", "Temperature (°C)")}
+                  {t("sccdaily.temperature")}
                 </th>
                 <th
                   scope="col"
                   className="px-4 py-2.5 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r border-gray-200"
                 >
-                  {t("sccdaily.time", "Time (sec)")}
+                  {t("sccdaily.time")}
                 </th>
                 <th
                   scope="col"
                   className="px-4 py-2.5 text-left text-xs font-medium text-gray-600 uppercase tracking-wider"
                 >
-                  {t("sccdaily.pressure", "Pressure")}
+                  {t("sccdaily.pressure")}
                 </th>
               </tr>
             </thead>
@@ -906,40 +986,32 @@ const SCCDailyTesting = ({
         </div>
       </div>
 
-      {/* Number of Rejections Input */}
       <div className="mt-8">
         <label htmlFor="numberOfRejections" className={labelClasses}>
-          {t("sccdaily.numberOfRejections", "Number of Rejections")}
+          {t("sccdaily.numberOfRejections")}
         </label>
         <input
           type="number"
           id="numberOfRejections"
           name="numberOfRejections"
-          inputMode="numeric" // For number pad on mobile
+          inputMode="numeric"
           value={formData.numberOfRejections || 0}
           onChange={handleNumberOfRejectionsChange}
-          className={`${inputFieldClasses} w-full sm:w-1/3 md:w-1/4`}
+          className={`${inputFieldClasses} w-full sm:w-1/3 md:w-1/4 py-1.5`}
           min="0"
-          max="5" // Example max
+          max="5"
         />
       </div>
 
-      {/* Parameter Adjustment Section */}
       {formData.numberOfRejections > 0 && (
         <div className="mt-6">
           <div className="flex items-center space-x-4 mb-3">
             <h3 className="text-md font-semibold text-gray-700">
-              {t(
-                "sccdaily.parameterAdjustmentTitle",
-                "Parameter Adjustment Records"
-              )}
+              {t("sccdaily.parameterAdjustmentTitle")}
             </h3>
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600">
-                {t(
-                  "sccdaily.provideAdjustmentDataPrompt",
-                  "Provide adjustment data?"
-                )}
+                {t("sccdaily.provideAdjustmentDataPrompt")}
               </span>
               <button
                 type="button"
@@ -950,7 +1022,7 @@ const SCCDailyTesting = ({
                     : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                 }`}
               >
-                {t("scc.yes", "Yes")}
+                {t("scc.yes")}
               </button>
               <button
                 type="button"
@@ -961,11 +1033,10 @@ const SCCDailyTesting = ({
                     : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                 }`}
               >
-                {t("scc.no", "No")}
+                {t("scc.no")}
               </button>
             </div>
           </div>
-
           {provideAdjustmentData &&
             (formData.parameterAdjustmentRecords || []).length > 0 && (
               <div className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
@@ -977,25 +1048,25 @@ const SCCDailyTesting = ({
                           scope="col"
                           className="px-3 py-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r"
                         >
-                          {t("sccdaily.rejectionNo", "Rej. No")}
+                          {t("sccdaily.rejectionNo")}
                         </th>
                         <th
                           scope="col"
                           className="px-3 py-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r"
                         >
-                          {t("sccdaily.adjustedTemp", "Adj. Temp (°C)")}
+                          {t("sccdaily.adjustedTemp")}
                         </th>
                         <th
                           scope="col"
                           className="px-3 py-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider border-r"
                         >
-                          {t("sccdaily.adjustedTime", "Adj. Time (sec)")}
+                          {t("sccdaily.adjustedTime")}
                         </th>
                         <th
                           scope="col"
                           className="px-3 py-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider"
                         >
-                          {t("sccdaily.adjustedPressure", "Adj. Pressure")}
+                          {t("sccdaily.adjustedPressure")}
                         </th>
                       </tr>
                     </thead>
@@ -1145,20 +1216,16 @@ const SCCDailyTesting = ({
             )}
           {!provideAdjustmentData && (
             <p className="text-sm text-gray-500 italic py-2">
-              {t(
-                "sccdaily.adjustmentDataSkipped",
-                "Parameter adjustment data will not be saved."
-              )}
+              {t("sccdaily.adjustmentDataSkipped")}
             </p>
           )}
         </div>
       )}
 
-      {/* Final Results and Remarks */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 items-start mt-8">
         <div>
           <label htmlFor="finalResult" className={labelClasses}>
-            {t("sccdaily.finalResult", "Final Result")}
+            {t("sccdaily.finalResult")}
           </label>
           <select
             id="finalResult"
@@ -1170,16 +1237,16 @@ const SCCDailyTesting = ({
                 : formData.finalResult === "Reject"
                 ? "bg-red-50 text-red-700 font-medium"
                 : ""
-            }`}
+            } py-1.5`}
           >
-            <option value="Pending">{t("sccdaily.pending", "Pending")}</option>
+            <option value="Pending">{t("sccdaily.pending")}</option>
             <option value="Pass">{t("scc.pass")}</option>
             <option value="Reject">{t("scc.reject")}</option>
           </select>
         </div>
         <div>
           <label htmlFor="dailyTestRemarks" className={labelClasses}>
-            {t("sccdaily.remarks", "Remarks")}
+            {t("sccdaily.remarks")}
           </label>
           <textarea
             id="dailyTestRemarks"
@@ -1188,7 +1255,7 @@ const SCCDailyTesting = ({
             maxLength="150"
             value={formData.remarks || ""}
             onChange={handleInputChange}
-            className={inputFieldClasses}
+            className={`${inputFieldClasses} py-1.5`}
             placeholder={t("sccdaily.remarksPlaceholder")}
           ></textarea>
           <p className="mt-1 text-xs text-gray-500 text-right">
@@ -1196,21 +1263,18 @@ const SCCDailyTesting = ({
           </p>
         </div>
       </div>
-
-      {/* After Wash Image */}
       <div className="mt-8">
         <SCCImageUpload
-          label={t("sccdaily.afterWashImage", "After Wash Image")}
+          label={t("sccdaily.afterWashImage")}
           onImageChange={(file, url) =>
             handleImageChange("afterWashDaily", file, url)
           }
           onImageRemove={handleImageRemove}
           initialImageUrl={formData.afterWashImageUrl}
-          imageType="afterWashDaily" // Pass a unique identifier if needed by SCCImageUpload
+          imageType="afterWashDaily"
         />
       </div>
 
-      {/* Submit Button */}
       <div className="pt-5 flex justify-end">
         <button
           type="button"

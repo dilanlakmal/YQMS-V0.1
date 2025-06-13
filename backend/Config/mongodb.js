@@ -30,6 +30,21 @@ import createHTFirstOutputModel from "../models/HTFirstOutput.js";
 import createFUFirstOutputModel from "../models/FUFirstOutput.js";
 import createSCCDailyTestingModel from "../models/SCCDailyTesting.js";
 import createDailyTestingHTFUtModel from "../models/dailyTestingHTFUModel.js";
+import createPairingDefectModel from "../models/PairingDefect.js";
+import createAccessoryIssueModel from "../models/AccessoryIssue.js";
+import createSCCHTOperatorModel from "../models/SCCHTOperatorModel.js";
+import createSCCFUOperatorModel from "../models/SCCFUOperatorModel.js";
+import createSCCElasticOperatorModel from "../models/SCCElasticOperatorModel.js";
+import createQC2InspectionPassBundleModel from "../models/qc2_inspection.js";
+import createQCRovingPairingModel from "../models/QCRovingPairing.js";
+import createDailyTestingFUQCModel from "../models/DailyTestingFUQCModel.js";
+import createSCCDefectModel from "../models/SCCDefectModel.js";
+import createSCCScratchDefectModel from "../models/SCCScratchDefectModel.js";
+import createHTInspectionReportModel from "../models/HTInspectionReportModel.js";
+import createElasticReportModel from "../models/ElasticReport.js";
+import createEMBDefectModel from "../models/EMBdefect.js";
+import createEMBReportModel from "../models/EMBReport.js";
+import createAuditCheckPointModel from "../models/AuditCheckPoint.js";
 
 // MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(process.env.YM_PROD_DB_URI || "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin");
@@ -70,6 +85,22 @@ export const HTFirstOutput = createHTFirstOutputModel(ymProdConnection);
 export const FUFirstOutput = createFUFirstOutputModel(ymProdConnection);
 export const SCCDailyTesting = createSCCDailyTestingModel(ymProdConnection);
 export const DailyTestingHTFU = createDailyTestingHTFUtModel(ymProdConnection);
+export const PairingDefect = createPairingDefectModel(ymProdConnection);
+export const AccessoryIssue = createAccessoryIssueModel(ymProdConnection);
+export const SCCHTOperator = createSCCHTOperatorModel(ymProdConnection);
+export const SCCFUOperator = createSCCFUOperatorModel(ymProdConnection);
+export const SCCElasticOperator = createSCCElasticOperatorModel(ymProdConnection);
+export const QC2InspectionPassBundleModel = createQC2InspectionPassBundleModel(ymProdConnection);	
+export const UserProd = createUserModel(ymProdConnection);
+export const QCRovingPairing = createQCRovingPairingModel(ymProdConnection);
+export const DailyTestingFUQC = createDailyTestingFUQCModel(ymProdConnection);
+export const SCCDefect = createSCCDefectModel(ymProdConnection);
+export const SCCScratchDefect = createSCCScratchDefectModel(ymProdConnection);
+export const HTInspectionReport = createHTInspectionReportModel(ymProdConnection);
+export const ElasticReport = createElasticReportModel(ymProdConnection);
+export const EMBDefect = createEMBDefectModel(ymProdConnection);
+export const EMBReport = createEMBReportModel(ymProdConnection);
+export const AuditCheckPoint = createAuditCheckPointModel(ymProdConnection);
 
 export async function disconnectMongoDB() {
     try {

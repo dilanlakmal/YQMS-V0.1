@@ -16,7 +16,10 @@ import cuttingMesurmentRoutes from "./routes/Cutting/cuttingMeasurementRoutes.js
 import cuttingOrderRoutes from "./routes/Cutting/cuttingOrderRoutes.js";
 import cuttingTrendRoutes from "./routes/Cutting/cuttingTrendRoutes.js";
 import sccRoutes from "./routes/SCC/sccRoutes.js";
+import sccScratchDefectRoutes from "./routes/SCC/sccScratchDefectRoutes.js";
+import sccOperatorRoutes from "./routes/SCC/sccOperatorsRoutes.js";
 import sccImageUploadRoutes from "./routes/SCC/sccImageUploadRoutes.js";
+import sccDefectsRoutes from "./routes/SCC/sccDefectsRoutes.js";
 import bundleRoutes from "./routes/Bundle/bundleRoutes.js";
 import washingRoutes from "./routes/Washing/washingRoutes.js";
 import opaRoutes from "./routes/OPA/opaRoutes.js";
@@ -36,6 +39,8 @@ import qc1SunriseRoutes from "./routes/QC1Sunrise/qc1SunriseRoutes.js";
 import aqlRoutes from "./routes/AQL/aqlRoutes.js";
 import sewingDefectRoutes from "./routes/Defects/sewingDefectRoutes.js";
 import measurementRoutes from "./routes/DigitalMeasurement/measurementRoutes.js";
+import paringDefectsRoutes from "./routes/ParingDefects/paringDefectRoutes.js";
+import accessoryIssuesRoutes from "./routes/AccessoryIssue/accessoryIssuesRoutes.js";
 //Import Mongodb.js
 import { disconnectMongoDB } from "../backend/Config/mongodb.js";
 //Import sqldb.js
@@ -60,7 +65,10 @@ app.use(cuttingMesurmentRoutes);
 app.use(cuttingOrderRoutes);
 app.use(cuttingTrendRoutes);
 app.use(sccRoutes);
+app.use(sccScratchDefectRoutes);
+app.use(sccOperatorRoutes);
 app.use(sccImageUploadRoutes);
+app.use(sccDefectsRoutes);
 app.use(bundleRoutes);
 app.use(washingRoutes);
 app.use(opaRoutes);
@@ -80,6 +88,9 @@ app.use(qc1SunriseRoutes);
 app.use(aqlRoutes);
 app.use(sewingDefectRoutes);
 app.use(measurementRoutes);
+app.use(paringDefectsRoutes);
+app.use(accessoryIssuesRoutes);
+
 
 // Initialize the scheduler, which also handles initial pool setup and data syncs
 initializeSchedulerAndSyncs();

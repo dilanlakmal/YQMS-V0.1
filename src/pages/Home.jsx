@@ -276,6 +276,13 @@ function Home() {
           version: '0.1', // Changed to 0.1 as per previous context
         },
         {
+          path: "/qa-pivot",
+          roles: ["Admin", "QA Pivot"], // Matches "QA Pivot" role
+          image: "assets/Home/qalogo.png",
+          title: "QA YM/Sub Con Evaluation",
+          description: "Upload Excel / Dashboard"
+        },
+        {
           path: "/qc1-sunrise",
           roles: ["Admin", "QC1 Sunrise"],
           image: "/IMG/sunrise.png",

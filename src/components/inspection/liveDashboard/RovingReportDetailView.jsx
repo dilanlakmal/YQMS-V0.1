@@ -1,58 +1,46 @@
 import React, { useState } from 'react';
 import { XCircle } from 'lucide-react';
 
-// Placeholder for defect categorization logic - Customize this with your actual rules
-const categorizeDefect = (defectName) => {
-   if (!defectName) {
+/// Updated function to categorize based on defectStatus
+const categorizeDefect = (defectStatus) => {
+  const normalizedStatus = defectStatus ? String(defectStatus).toLowerCase() : 'unknown';
+
+  switch (normalizedStatus) {
+    case 'critical':
+      return {
+        category: 'Critical',
+        color: 'bg-red-200 text-red-800',
+        statusTextColor: 'text-red-700 font-semibold',
+        statusDisplayClasses: 'bg-red-700 text-white px-1.5 py-0.5 rounded-md text-xs font-medium',
+        symbol: '❗',
+      };
+    case 'major':
+      return {
+        category: 'Major',
+        color: 'bg-red-200 text-red-800', // Or a distinct color like orange if preferred
+        statusTextColor: 'text-red-500 font-semibold', // Or orange
+        statusDisplayClasses: 'bg-red-500 text-white px-1.5 py-0.5 rounded-md text-xs font-medium', // Or orange
+        symbol: '⚠️',
+      };
+    case 'minor':
+      return {
+        category: 'Minor',
+        color: 'bg-yellow-200 text-yellow-800',
+        statusTextColor: 'text-yellow-600 font-semibold',
+        statusDisplayClasses: 'bg-yellow-500 text-black px-1.5 py-0.5 rounded-md text-xs font-medium',
+        symbol: '🟡',
+      };
+    case 'n/a': // Handling for "N/A" status if it comes from data
+    case 'unknown':
+    default:
     return {
-      category: 'Unknown',
-      color: 'bg-gray-100 text-gray-800', 
-      statusTextColor: 'text-gray-500', 
+      category: defectStatus && normalizedStatus !== 'unknown' ? defectStatus : 'Unknown', // Display original status or 'Unknown'
+      color: 'bg-gray-100 text-gray-800',
+      statusTextColor: 'text-gray-500',
       statusDisplayClasses: 'bg-gray-400 text-white px-1.5 py-0.5 rounded-md text-xs font-medium',
       symbol: '❓',
     };
   }
-
-  const lowerDefectName = defectName.toLowerCase();
-
-  // Prioritize Critical
-  if (lowerDefectName.includes('critical') || lowerDefectName.includes('safety') || lowerDefectName.includes('hole')) {
-    return {
-      category: 'Critical',
-      color: 'bg-red-200 text-red-800', 
-      statusTextColor: 'text-red-700 font-semibold', 
-      statusDisplayClasses: 'bg-red-700 text-white px-1.5 py-0.5 rounded-md text-xs font-medium',
-      symbol: '❗',
-    };
-  }
-  // Then Major
-  if (lowerDefectName.includes('major') || lowerDefectName.includes('broken') || lowerDefectName.includes('open') || lowerDefectName.includes('mismatched') || lowerDefectName.includes('skip') || lowerDefectName.includes('unravel')) {
-    return {
-      category: 'Major',
-      color: 'bg-red-200 text-red-800', 
-      statusTextColor: 'text-red-500 font-semibold', 
-      statusDisplayClasses: 'bg-red-500 text-white px-1.5 py-0.5 rounded-md text-xs font-medium',
-      symbol: '⚠️',
-    };
-  }
-  // Then Minor
-  if (lowerDefectName.includes('minor') || lowerDefectName.includes('dirty') || lowerDefectName.includes('uneven') || lowerDefectName.includes('puckering') || lowerDefectName.includes('stain') || lowerDefectName.includes('crease')) {
-     return {
-      category: 'Minor',
-      color: 'bg-yellow-200 text-yellow-800', 
-      statusTextColor: 'text-yellow-600 font-semibold', 
-      statusDisplayClasses: 'bg-yellow-500 text-black px-1.5 py-0.5 rounded-md text-xs font-medium',
-      symbol: '🟡',
-    };
-  }
-  // Default if no keywords match
-  return {
-    category: 'Minor', 
-    color: 'bg-yellow-200 text-yellow-800',
-    statusTextColor: 'text-yellow-600 font-semibold', 
-    statusDisplayClasses: 'bg-yellow-500 text-black px-1.5 py-0.5 rounded-md text-xs font-medium',
-    symbol: '🟡',
-  };
 };
 
 const getOverallRovingStatusColor = (status) => {
@@ -132,8 +120,8 @@ const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, 
               rg.garments.forEach(garment => {
                 if (garment.defects && Array.isArray(garment.defects)) {
                   garment.defects.forEach(defect => {
-                    if (defect && defect.name && typeof defect.count === 'number') {
-                      const { category } = categorizeDefect(defect.name);
+                    if (defect && defect.defect_status && typeof defect.count === 'number') {
+                      const { category } = categorizeDefect(defect.defect_status);
                       if (category === 'Critical') criticalDefectsCount += defect.count;
                       else if (category === 'Major') majorDefectsCount += defect.count;
                       else if (category === 'Minor') minorDefectsCount += defect.count;
@@ -426,7 +414,7 @@ const RovingReportDetailView = ({ reportDetail, onClose, calculateGroupMetrics, 
                                 {item.rejectGarments && item.rejectGarments.map(rg =>
                                   rg.garments && rg.garments.map(g =>
                                     g.defects && g.defects.map((defect, defectIdx) => {
-                                      const cat = categorizeDefect(defect.name);
+                                      const cat = categorizeDefect(defect.defect_status);
                                       const defectKey = defect._id?.$oid || `${item._id?.$oid}-defect-${defectIdx}-${defect.name}`;
                                       return (
                                        <div key={defectKey} className="mb-1 text-xs">

@@ -15,6 +15,21 @@ const standardSpecificationSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Define the OperatorData sub-schema
+const operatorDataSchema = new mongoose.Schema(
+  {
+    emp_id: { type: String, required: true },
+    emp_eng_name: { type: String, default: "N/A" },
+    emp_face_photo: { type: String, default: null },
+    emp_reference_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    }
+  },
+  { _id: false } // No separate _id for this sub-document
+);
+
 const fuFirstOutputSchema = new mongoose.Schema(
   {
     inspectionDate: { type: String, required: true },
@@ -33,7 +48,8 @@ const fuFirstOutputSchema = new mongoose.Schema(
     emp_dept_name: { type: String, default: "N/A" },
     emp_sect_name: { type: String, default: "N/A" },
     emp_job_title: { type: String, default: "N/A" },
-    inspectionTime: { type: String, required: true }
+    inspectionTime: { type: String, required: true },
+    operatorData: { type: operatorDataSchema, required: false }
   },
   {
     timestamps: true,

@@ -9,17 +9,23 @@ import {
   AlertTriangle,
   FileCog,
   ShieldAlert,
+  CheckSquare,
   ThermometerSnowflake,
+  Combine,
+  Users, // << CHANGED from UsersCog to Users
   SlidersHorizontal
-} from "lucide-react"; // Added ThermometerSnowflake for SCC Defects
+} from "lucide-react";
 
 // Import your actual components
+import AuditCheckPoints from "../components/inspection/audit/AuditCheckPoints";
 import DefectBuyerStatus from "../components/inspection/qc_roving/DefectBuyserStatus";
 import CuttingMeasurementPointsModify from "../components/inspection/cutting/CuttingMeasurementPointsModify";
 import CuttingOrderModify from "../components/inspection/cutting/CuttingOrderModify";
 import CuttingDefectsModifyAdd from "../components/inspection/cutting/CuttingDefectsModifyAdd";
-import SCCDefectsModifyAdd from "../components/inspection/scc/SCCDefectsModifyAdd"; // Import the new SCC component
-import CuttingInspectionManage from "../components/inspection/cutting/CuttingInspectionManage"; // ** IMPORT NEW COMPONENT **
+import SCCDefectsModifyAdd from "../components/inspection/scc/SCCDefectsModifyAdd";
+import CuttingInspectionManage from "../components/inspection/cutting/CuttingInspectionManage";
+import SCCOperatorsManage from "../components/inspection/scc/SCCOperatorsManage";
+import RovingMasterDataManage from "../components/inspection/qc_roving/RovingMasterDataManage";
 
 // Placeholder components for other tabs
 const PlaceholderComponent = ({ titleKey, contentKey }) => {
@@ -53,6 +59,12 @@ const SystemAdmin = () => {
         component: <DefectBuyerStatus />
       },
       {
+        id: "rovingPairing",
+        labelKey: "systemAdmin.rovingPairing",
+        icon: <Combine size={18} />,
+        component: <RovingMasterDataManage />
+      },
+      {
         id: "cuttingPoints",
         labelKey: "systemAdmin.cuttingPoints",
         icon: <Scissors size={18} />,
@@ -71,17 +83,22 @@ const SystemAdmin = () => {
         component: <CuttingDefectsModifyAdd />
       },
       {
-        // New Tab for SCC Defects
+        id: "sccOperators",
+        labelKey: "systemAdmin.sccOperators",
+        icon: <Users size={18} />, // << CHANGED from UsersCog to Users
+        component: <SCCOperatorsManage />
+      },
+      {
         id: "sccHeatTransferDefects",
-        labelKey: "systemAdmin.sccHeatTransferDefects", // New translation key
-        icon: <ThermometerSnowflake size={18} />, // Example icon for heat transfer
-        component: <SCCDefectsModifyAdd /> // Use the new component
+        labelKey: "systemAdmin.sccHeatTransferDefects",
+        icon: <ThermometerSnowflake size={18} />,
+        component: <SCCDefectsModifyAdd />
       },
       {
         id: "manageCuttingReports",
         labelKey: "systemAdmin.manageCuttingReports",
         icon: <FileCog size={18} />,
-        component: <CuttingInspectionManage /> // Use the new component
+        component: <CuttingInspectionManage />
       },
       {
         id: "qc2Defects",
@@ -93,12 +110,22 @@ const SystemAdmin = () => {
             contentKey="systemAdmin.contentComingSoon"
           />
         )
+      },
+      {
+        // New Tab for Audit Checkpoints
+        id: "auditCheckpoints",
+        labelKey: "systemAdmin.auditCheckpointsTab", // You'll need to add this translation key
+        icon: <CheckSquare size={18} />, // Example Icon
+        component: <AuditCheckPoints />
       }
     ],
-    []
+    [] // t is not needed here as labelKey strings are static. If they were dynamic like t('some.key'), then t would be a dependency.
   );
 
-  const activeComponent = tabs.find((tab) => tab.id === activeTab)?.component;
+  const activeComponentData = tabs.find((tab) => tab.id === activeTab);
+  const ActiveComponent = activeComponentData
+    ? activeComponentData.component
+    : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-gray-200 p-4 sm:p-6 lg:p-8">
@@ -112,7 +139,8 @@ const SystemAdmin = () => {
               "systemAdmin.subtitle",
               "Manage system configurations and master data."
             )}
-          </p>
+          </p>{" "}
+          {/* Corrected self-closing p tag for JSX validity, though browsers are lenient */}
         </header>
         <div className="bg-white rounded-xl shadow-2xl overflow-hidden">
           <div className="border-b border-gray-300">
@@ -122,7 +150,7 @@ const SystemAdmin = () => {
             >
               {tabs.map((tab) => (
                 <button
-                  key={tab.id}
+                  key={tab.id} // Key prop is essential here
                   onClick={() => setActiveTab(tab.id)}
                   className={`
                     group inline-flex items-center py-3 sm:py-4 px-2 sm:px-3 border-b-2 font-medium text-sm
@@ -150,7 +178,12 @@ const SystemAdmin = () => {
             </nav>
           </div>
           <div className="p-4 sm:p-6 lg:p-8 bg-slate-50 min-h-[calc(100vh-250px)]">
-            {activeComponent}
+            {ActiveComponent ? (
+              ActiveComponent
+            ) : (
+              <p>{t("systemAdmin.selectTab", "Please select a tab.")}</p>
+            )}{" "}
+            {/* Render component or fallback */}
           </div>
         </div>
       </div>
