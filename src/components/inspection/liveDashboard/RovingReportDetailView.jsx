@@ -51,12 +51,15 @@ const getOverallRovingStatusColor = (status) => {
   }
    if (lowerStatus === 'reject-critical' || 
       lowerStatus === 'reject-major-m' || 
-      lowerStatus === 'reject-minor-m') {
-    return 'bg-red-100 text-red-700';
-  }
-   if (lowerStatus === 'reject' || 
-      lowerStatus === 'reject-minor-s' || 
+      lowerStatus === 'reject-minor-m' || 
       lowerStatus === 'reject-major-s') {
+    return 'bg-red-300 text-red-700';
+  }
+   if (lowerStatus === 'reject-minor-s'
+      ) {
+    return 'bg-yellow-200 text-yellow-700';
+  }
+  if (lowerStatus === 'reject') {
     return 'bg-yellow-100 text-yellow-700';
   }
    return 'bg-gray-100 text-gray-800'; 
