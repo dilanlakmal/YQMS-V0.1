@@ -7298,10 +7298,17 @@ app.get("/api/opa-autocomplete", async (req, res) => {
    End Points - Roving Sewing Defects
 ------------------------------ */
 
-// GET - Fetch all sewing defects
+// GET - Fetch all sewing defects with optional filtering (This is the better, more flexible version)
 app.get("/api/sewing-defects", async (req, res) => {
   try {
-    const defects = await SewingDefects.find({}).sort({ code: 1 }).lean();
+    const { categoryEnglish, type, isCommon } = req.query;
+    const filter = {};
+    if (categoryEnglish) filter.categoryEnglish = categoryEnglish;
+    if (type) filter.type = type;
+    if (isCommon) filter.isCommon = isCommon;
+
+    // Fetch defects, sort by code for consistent order, and use lean() for performance
+    const defects = await SewingDefects.find(filter).sort({ code: 1 }).lean();
     res.json(defects);
   } catch (error) {
     console.error("Error fetching sewing defects:", error);
@@ -7309,16 +7316,10 @@ app.get("/api/sewing-defects", async (req, res) => {
   }
 });
 
-// GET - Fetch options for the 'Add Defect' form (with linked categories)
+// GET - Fetch options for the 'Add Defect' form
 app.get("/api/sewing-defects/options", async (req, res) => {
   try {
-    const [
-      repairs,
-      types,
-      lastDefect,
-      // Use an aggregation pipeline to get unique, linked category groups
-      categoryGroups
-    ] = await Promise.all([
+    const [repairs, types, lastDefect, categoryGroups] = await Promise.all([
       SewingDefects.distinct("repair"),
       SewingDefects.distinct("type"),
       SewingDefects.findOne().sort({ code: -1 }),
@@ -7340,7 +7341,7 @@ app.get("/api/sewing-defects/options", async (req, res) => {
             chinese: "$_id.chinese"
           }
         },
-        { $match: { english: { $ne: null, $ne: "" } } }, // Ensure english name exists
+        { $match: { english: { $ne: null, $ne: "" } } },
         { $sort: { english: 1 } }
       ])
     ]);
@@ -7403,9 +7404,13 @@ app.post("/api/sewing-defects", async (req, res) => {
     const lastDefect = await SewingDefects.findOne().sort({ code: -1 });
     const newCode = lastDefect ? lastDefect.code + 1 : 1001;
 
-    const allBuyers = await Buyer.find({}, "buyerName").lean();
-    const statusByBuyer = allBuyers.map((buyer) => ({
-      buyerName: buyer.buyerName,
+    // *** FIX IS HERE ***
+    // Instead of querying a 'Buyer' model, we use the hardcoded list from your /api/buyers endpoint.
+    const allBuyers = ["Costco", "Aritzia", "Reitmans", "ANF", "MWW"];
+
+    // Now, we map this array of strings to the required object structure.
+    const statusByBuyer = allBuyers.map((buyerName) => ({
+      buyerName: buyerName, // The buyer's name from the array
       defectStatus: ["Major"],
       isCommon: "Major"
     }));
@@ -7446,7 +7451,7 @@ app.post("/api/sewing-defects", async (req, res) => {
   }
 });
 
-// DELETE - Delete a sewing defect by its CODE
+// DELETE - Delete a sewing defect by its code (This is the better, more robust version)
 app.delete("/api/sewing-defects/:code", async (req, res) => {
   try {
     const { code } = req.params;
@@ -7471,8 +7476,115 @@ app.delete("/api/sewing-defects/:code", async (req, res) => {
 });
 
 /* ------------------------------
+   Defect Buyer Status ENDPOINTS
+------------------------------ */
+
+// Endpoint for /api/defects/all-details
+app.get("/api/defects/all-details", async (req, res) => {
+  try {
+    const defects = await SewingDefects.find({}).lean();
+    const transformedDefects = defects.map((defect) => ({
+      code: defect.code.toString(),
+      name_en: defect.english,
+      name_kh: defect.khmer,
+      name_ch: defect.chinese,
+      categoryEnglish: defect.categoryEnglish,
+      type: defect.type,
+      repair: defect.repair,
+      statusByBuyer: defect.statusByBuyer || []
+    }));
+    res.json(transformedDefects);
+  } catch (error) {
+    console.error("Error fetching all defect details:", error);
+    res.status(500).json({
+      message: "Failed to fetch defect details",
+      error: error.message
+    });
+  }
+});
+
+// Endpoint for /api/buyers
+app.get("/api/buyers", (req, res) => {
+  const buyers = ["Costco", "Aritzia", "Reitmans", "ANF", "MWW"];
+  res.json(buyers);
+});
+
+// New Endpoint for updating buyer statuses in SewingDefects
+app.post("/api/sewing-defects/buyer-statuses", async (req, res) => {
+  try {
+    const statusesPayload = req.body;
+    if (!Array.isArray(statusesPayload)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid payload: Expected an array of statuses." });
+    }
+    const updatesByDefect = statusesPayload.reduce((acc, status) => {
+      const defectCode = status.defectCode;
+      if (!acc[defectCode]) {
+        acc[defectCode] = [];
+      }
+      acc[defectCode].push({
+        buyerName: status.buyerName,
+        defectStatus: Array.isArray(status.defectStatus)
+          ? status.defectStatus
+          : [],
+        isCommon: ["Critical", "Major", "Minor"].includes(status.isCommon)
+          ? status.isCommon
+          : "Minor"
+      });
+      return acc;
+    }, {});
+
+    const bulkOps = [];
+    for (const defectCodeStr in updatesByDefect) {
+      const defectCodeNum = parseInt(defectCodeStr, 10);
+      if (isNaN(defectCodeNum)) {
+        console.warn(
+          `Invalid defectCode received: ${defectCodeStr}, skipping.`
+        );
+        continue;
+      }
+      const newStatusByBuyerArray = updatesByDefect[defectCodeStr];
+      bulkOps.push({
+        updateOne: {
+          filter: { code: defectCodeNum },
+          update: {
+            $set: {
+              statusByBuyer: newStatusByBuyerArray,
+              updatedAt: new Date()
+            }
+          }
+        }
+      });
+    }
+    if (bulkOps.length > 0) {
+      await SewingDefects.bulkWrite(bulkOps);
+    }
+    res.status(200).json({
+      message: "Defect buyer statuses updated successfully in SewingDefects."
+    });
+  } catch (error) {
+    console.error("Error updating defect buyer statuses:", error);
+    res.status(500).json({
+      message: "Failed to update defect buyer statuses",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
    QC Inline Roving New
 ------------------------------ */
+
+// Endpoint for get the buyer status
+app.get("/api/buyer-by-mo", (req, res) => {
+  const { moNo } = req.query;
+  if (!moNo) {
+    return res.status(400).json({ message: "MO number is required" });
+  }
+  const buyerName = determineBuyer(moNo);
+  res.json({ buyerName });
+});
 
 //get the each line related working worker count
 app.get("/api/line-summary", async (req, res) => {
@@ -7522,6 +7634,53 @@ app.get("/api/line-summary", async (req, res) => {
       message: "Failed to fetch line summary data.",
       error: error.message
     });
+  }
+});
+
+//Get the completed inspect operators
+app.get("/api/inspections-completed", async (req, res) => {
+  const { line_no, inspection_date, mo_no, operation_id, inspection_rep_name } =
+    req.query;
+
+  try {
+    const findQuery = {
+      line_no,
+      inspection_date
+    };
+
+    if (mo_no) {
+      findQuery.mo_no = mo_no;
+    }
+
+    const elemMatchConditions = { inspection_rep_name };
+
+    if (operation_id) {
+      elemMatchConditions["inlineData.tg_no"] = operation_id;
+    }
+
+    findQuery.inspection_rep = { $elemMatch: elemMatchConditions };
+
+    const inspection = await QCInlineRoving.findOne(findQuery);
+
+    if (!inspection) {
+      return res.json({ completeInspectOperators: 0 });
+    }
+
+    const specificRep = inspection.inspection_rep.find(
+      (rep) => rep.inspection_rep_name === inspection_rep_name
+    );
+
+    if (!specificRep) {
+      return res.json({ completeInspectOperators: 0 });
+    }
+
+    const completeInspectOperators =
+      specificRep.complete_inspect_operators || 0;
+
+    res.json({ completeInspectOperators });
+  } catch (error) {
+    console.error("Error fetching inspections completed:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -7593,6 +7752,7 @@ app.put("/api/line-sewing-workers/:lineNo", async (req, res) => {
     });
   }
 });
+
 //Save the inline Roving data
 app.post("/api/save-qc-inline-roving", async (req, res) => {
   try {
@@ -7746,146 +7906,9 @@ app.post("/api/save-qc-inline-roving", async (req, res) => {
   }
 });
 
-function getOrdinal(n) {
-  if (n <= 0) return String(n);
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0] || "th");
-}
-
-//Get the inspection Number
-app.get("/api/qc-inline-roving/inspection-time-info", async (req, res) => {
-  try {
-    const { line_no, inspection_date } = req.query;
-    if (!line_no || !inspection_date) {
-      return res
-        .status(400)
-        .json({ message: "Line number and inspection date are required." });
-    }
-    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(inspection_date)) {
-      return res.status(400).json({
-        message: "Invalid inspection date format. Expected MM/DD/YYYY."
-      });
-    }
-
-    const lineWorkerInfo = await LineSewingWorker.findOne({ line_no });
-
-    if (!lineWorkerInfo) {
-      return res.json({ inspectionTimeOrdinal: "N/A (Line not configured)" });
-    }
-
-    const target_worker_count = lineWorkerInfo.edited_worker_count;
-
-    if (target_worker_count === 0) {
-      return res.json({ inspectionTimeOrdinal: "N/A (Target 0 workers)" });
-    }
-
-    const rovingRecords = await QCInlineRoving.find({
-      line_no: line_no,
-      inspection_date: inspection_date
-    });
-
-    if (rovingRecords.length === 0) {
-      return res.json({ inspectionTimeOrdinal: getOrdinal(1) });
-    }
-
-    const operatorInspectionCounts = {};
-
-    rovingRecords.forEach((record) => {
-      record.inlineData.forEach((entry) => {
-        const operatorId = entry.operator_emp_id;
-        if (operatorId) {
-          operatorInspectionCounts[operatorId] =
-            (operatorInspectionCounts[operatorId] || 0) + 1;
-        }
-      });
-    });
-
-    if (Object.keys(operatorInspectionCounts).length === 0) {
-      return res.json({ inspectionTimeOrdinal: getOrdinal(1) });
-    }
-
-    let completed_rounds = 0;
-
-    for (let round_num = 1; round_num <= 5; round_num++) {
-      let operators_finished_this_round = 0;
-
-      for (const operator_id in operatorInspectionCounts) {
-        if (operatorInspectionCounts[operator_id] >= round_num) {
-          operators_finished_this_round++;
-        }
-      }
-
-      if (operators_finished_this_round >= target_worker_count) {
-        completed_rounds = round_num;
-      } else {
-        break;
-      }
-    }
-
-    const current_inspection_time_number = completed_rounds + 1;
-
-    const ordinal =
-      current_inspection_time_number > 5
-        ? `${getOrdinal(5)} (Completed)`
-        : getOrdinal(current_inspection_time_number);
-
-    res.json({ inspectionTimeOrdinal: ordinal });
-  } catch (error) {
-    console.error("Error fetching inspection time info:", error);
-    res.status(500).json({
-      message: "Failed to fetch inspection time info.",
-      error: error.message
-    });
-  }
-});
-
-//Get the completed inspect operators
-app.get("/api/inspections-completed", async (req, res) => {
-  const { line_no, inspection_date, mo_no, operation_id, inspection_rep_name } =
-    req.query;
-
-  try {
-    const findQuery = {
-      line_no,
-      inspection_date
-    };
-
-    if (mo_no) {
-      findQuery.mo_no = mo_no;
-    }
-
-    const elemMatchConditions = { inspection_rep_name };
-
-    if (operation_id) {
-      elemMatchConditions["inlineData.tg_no"] = operation_id;
-    }
-
-    findQuery.inspection_rep = { $elemMatch: elemMatchConditions };
-
-    const inspection = await QCInlineRoving.findOne(findQuery);
-
-    if (!inspection) {
-      return res.json({ completeInspectOperators: 0 });
-    }
-
-    const specificRep = inspection.inspection_rep.find(
-      (rep) => rep.inspection_rep_name === inspection_rep_name
-    );
-
-    if (!specificRep) {
-      return res.json({ completeInspectOperators: 0 });
-    }
-
-    const completeInspectOperators =
-      specificRep.complete_inspect_operators || 0;
-
-    res.json({ completeInspectOperators });
-  } catch (error) {
-    console.error("Error fetching inspections completed:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+/* ------------------------------
+   QC Inline Roving Data / Reports
+------------------------------ */
 
 // Roving data filter function
 app.get("/api/qc-inline-roving-reports/filtered", async (req, res) => {
@@ -7950,7 +7973,99 @@ app.get("/api/qc-inline-roving-reports/filtered", async (req, res) => {
   }
 });
 
-// --- Helper function for sanitizing filenames (This is good, keep it) ---
+app.get("/api/qc-inline-roving-reports", async (req, res) => {
+  try {
+    const reports = await QCInlineRoving.find();
+    res.json(reports);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching reports", error });
+  }
+});
+
+// New endpoint to fetch filtered QC Inline Roving reports with date handling
+app.get("/api/qc-inline-roving-reports-filtered", async (req, res) => {
+  try {
+    const { startDate, endDate, line_no, mo_no, emp_id } = req.query;
+
+    let match = {};
+
+    // Date filtering using $expr for string dates
+    if (startDate || endDate) {
+      match.$expr = match.$expr || {};
+      match.$expr.$and = match.$expr.$and || [];
+      if (startDate) {
+        const normalizedStartDate = normalizeDateString(startDate);
+        match.$expr.$and.push({
+          $gte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedStartDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+      if (endDate) {
+        const normalizedEndDate = normalizeDateString(endDate);
+        match.$expr.$and.push({
+          $lte: [
+            {
+              $dateFromString: {
+                dateString: "$inspection_date",
+                format: "%m/%d/%Y"
+              }
+            },
+            {
+              $dateFromString: {
+                dateString: normalizedEndDate,
+                format: "%m/%d/%Y"
+              }
+            }
+          ]
+        });
+      }
+    }
+
+    // Other filters
+    if (line_no) {
+      match.line_no = line_no;
+    }
+    if (mo_no) {
+      match.mo_no = mo_no;
+    }
+    if (emp_id) {
+      match.emp_id = emp_id;
+    }
+
+    const reports = await QCInlineRoving.find(match);
+    res.json(reports);
+  } catch (error) {
+    console.error("Error fetching filtered roving reports:", error);
+    res.status(500).json({ message: "Error fetching filtered reports", error });
+  }
+});
+
+// Endpoint to fetch distinct MO Nos
+app.get("/api/qc-inline-roving-mo-nos", async (req, res) => {
+  try {
+    const moNos = await QCInlineRoving.distinct("mo_no");
+    res.json(moNos.filter((mo) => mo)); // Filter out null/empty values
+  } catch (error) {
+    console.error("Error fetching MO Nos:", error);
+    res.status(500).json({ message: "Failed to fetch MO Nos" });
+  }
+});
+
+// --------------------------------------------------------------------------
+
+// --- Helper function for sanitizing filenames ---
 const sanitize = (input) => {
   if (typeof input !== "string") input = String(input);
   // Allow dots for file extensions but sanitize everything else
@@ -8071,259 +8186,9 @@ app.post(
   }
 );
 
-// Endpoint for get the buyer status
-app.get("/api/buyer-by-mo", (req, res) => {
-  const { moNo } = req.query;
-  if (!moNo) {
-    return res.status(400).json({ message: "MO number is required" });
-  }
-  const buyerName = determineBuyer(moNo);
-  res.json({ buyerName });
-});
-
 /* ------------------------------
-   Defect Buyer Status ENDPOINTS
+  USERS ENDPOINTS ---- Reporting
 ------------------------------ */
-
-// Endpoint for /api/defects/all-details
-app.get("/api/defects/all-details", async (req, res) => {
-  try {
-    const defects = await SewingDefects.find({}).lean();
-    const transformedDefects = defects.map((defect) => ({
-      code: defect.code.toString(),
-      name_en: defect.english,
-      name_kh: defect.khmer,
-      name_ch: defect.chinese,
-      categoryEnglish: defect.categoryEnglish,
-      type: defect.type,
-      repair: defect.repair,
-      statusByBuyer: defect.statusByBuyer || []
-    }));
-    res.json(transformedDefects);
-  } catch (error) {
-    console.error("Error fetching all defect details:", error);
-    res.status(500).json({
-      message: "Failed to fetch defect details",
-      error: error.message
-    });
-  }
-});
-
-// Endpoint for /api/buyers
-app.get("/api/buyers", (req, res) => {
-  const buyers = ["Costco", "Aritzia", "Reitmans", "ANF", "MWW"];
-  res.json(buyers);
-});
-
-// New Endpoint for updating buyer statuses in SewingDefects
-app.post("/api/sewing-defects/buyer-statuses", async (req, res) => {
-  try {
-    const statusesPayload = req.body;
-    if (!Array.isArray(statusesPayload)) {
-      return res
-        .status(400)
-        .json({ message: "Invalid payload: Expected an array of statuses." });
-    }
-    const updatesByDefect = statusesPayload.reduce((acc, status) => {
-      const defectCode = status.defectCode;
-      if (!acc[defectCode]) {
-        acc[defectCode] = [];
-      }
-      acc[defectCode].push({
-        buyerName: status.buyerName,
-        defectStatus: Array.isArray(status.defectStatus)
-          ? status.defectStatus
-          : [],
-        isCommon: ["Critical", "Major", "Minor"].includes(status.isCommon)
-          ? status.isCommon
-          : "Minor"
-      });
-      return acc;
-    }, {});
-
-    const bulkOps = [];
-    for (const defectCodeStr in updatesByDefect) {
-      const defectCodeNum = parseInt(defectCodeStr, 10);
-      if (isNaN(defectCodeNum)) {
-        console.warn(
-          `Invalid defectCode received: ${defectCodeStr}, skipping.`
-        );
-        continue;
-      }
-      const newStatusByBuyerArray = updatesByDefect[defectCodeStr];
-      bulkOps.push({
-        updateOne: {
-          filter: { code: defectCodeNum },
-          update: {
-            $set: {
-              statusByBuyer: newStatusByBuyerArray,
-              updatedAt: new Date()
-            }
-          }
-        }
-      });
-    }
-    if (bulkOps.length > 0) {
-      await SewingDefects.bulkWrite(bulkOps);
-    }
-    res.status(200).json({
-      message: "Defect buyer statuses updated successfully in SewingDefects."
-    });
-  } catch (error) {
-    console.error("Error updating defect buyer statuses:", error);
-    res.status(500).json({
-      message: "Failed to update defect buyer statuses",
-      error: error.message
-    });
-  }
-});
-
-/* ------------------------------
-   End Points - SewingDefects
------------------------------- */
-app.get("/api/sewing-defects", async (req, res) => {
-  try {
-    // Extract query parameters
-    const { categoryEnglish, type, isCommon } = req.query;
-
-    // Build filter object based on provided query parameters
-    const filter = {};
-    if (categoryEnglish) filter.categoryEnglish = categoryEnglish;
-    if (type) filter.type = type;
-    if (isCommon) filter.isCommon = isCommon;
-
-    // Fetch defects from the database
-    const defects = await SewingDefects.find(filter);
-
-    // Send the response with fetched defects
-    res.json(defects);
-  } catch (error) {
-    // Handle errors
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// DELETE a defect by code
-app.delete("/api/sewing-defects/:defectCode", async (req, res) => {
-  try {
-    const { defectCode } = req.params;
-    const result = await SewingDefects.findOneAndDelete({ code: defectCode });
-
-    if (!result) {
-      return res.status(404).json({ message: "Defect not found" });
-    }
-
-    res.status(200).json({ message: "Defect deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting defect:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to delete defect", error: error.message });
-  }
-});
-
-//Dashboard Old Endpoints
-// Endpoint to fetch QC Inline Roving reports
-app.get("/api/qc-inline-roving-reports", async (req, res) => {
-  try {
-    const reports = await QCInlineRoving.find();
-    res.json(reports);
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching reports", error });
-  }
-});
-
-// New endpoint to fetch filtered QC Inline Roving reports with date handling
-app.get("/api/qc-inline-roving-reports-filtered", async (req, res) => {
-  try {
-    const { startDate, endDate, line_no, mo_no, emp_id } = req.query;
-
-    let match = {};
-
-    // Date filtering using $expr for string dates
-    if (startDate || endDate) {
-      match.$expr = match.$expr || {};
-      match.$expr.$and = match.$expr.$and || [];
-      if (startDate) {
-        const normalizedStartDate = normalizeDateString(startDate);
-        match.$expr.$and.push({
-          $gte: [
-            {
-              $dateFromString: {
-                dateString: "$inspection_date",
-                format: "%m/%d/%Y"
-              }
-            },
-            {
-              $dateFromString: {
-                dateString: normalizedStartDate,
-                format: "%m/%d/%Y"
-              }
-            }
-          ]
-        });
-      }
-      if (endDate) {
-        const normalizedEndDate = normalizeDateString(endDate);
-        match.$expr.$and.push({
-          $lte: [
-            {
-              $dateFromString: {
-                dateString: "$inspection_date",
-                format: "%m/%d/%Y"
-              }
-            },
-            {
-              $dateFromString: {
-                dateString: normalizedEndDate,
-                format: "%m/%d/%Y"
-              }
-            }
-          ]
-        });
-      }
-    }
-
-    // Other filters
-    if (line_no) {
-      match.line_no = line_no;
-    }
-    if (mo_no) {
-      match.mo_no = mo_no;
-    }
-    if (emp_id) {
-      match.emp_id = emp_id;
-    }
-
-    const reports = await QCInlineRoving.find(match);
-    res.json(reports);
-  } catch (error) {
-    console.error("Error fetching filtered roving reports:", error);
-    res.status(500).json({ message: "Error fetching filtered reports", error });
-  }
-});
-
-// Endpoint to fetch distinct MO Nos
-app.get("/api/qc-inline-roving-mo-nos", async (req, res) => {
-  try {
-    const moNos = await QCInlineRoving.distinct("mo_no");
-    res.json(moNos.filter((mo) => mo)); // Filter out null/empty values
-  } catch (error) {
-    console.error("Error fetching MO Nos:", error);
-    res.status(500).json({ message: "Failed to fetch MO Nos" });
-  }
-});
-
-// Endpoint to fetch distinct QC IDs (emp_id)
-app.get("/api/qc-inline-roving-qc-ids", async (req, res) => {
-  try {
-    const qcIds = await QCInlineRoving.distinct("emp_id");
-    res.json(qcIds.filter((id) => id)); // Filter out null/empty values
-  } catch (error) {
-    console.error("Error fetching QC IDs:", error);
-    res.status(500).json({ message: "Failed to fetch QC IDs" });
-  }
-});
 
 // Endpoint to fetch user data by emp_id
 app.get("/api/user-by-emp-id", async (req, res) => {
