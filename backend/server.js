@@ -7294,6 +7294,27 @@ app.get("/api/opa-autocomplete", async (req, res) => {
    QC Inline Roving ENDPOINTS
 ------------------------------ */
 
+// Helper function to determine Buyer based on mo_no (Corrected Logic)
+
+const getBuyerFromMoNumber = (moNo) => {
+  if (!moNo) return "Other";
+
+  // Check for the more specific "COM" first to correctly identify MWW
+  if (moNo.includes("COM")) return "MWW";
+
+  // Then, check for the more general "CO" for Costco
+  if (moNo.includes("CO")) return "Costco";
+
+  // The rest of the original rules
+  if (moNo.includes("AR")) return "Aritzia";
+  if (moNo.includes("RT")) return "Reitmans";
+  if (moNo.includes("AF")) return "ANF";
+  if (moNo.includes("NT")) return "STORI";
+
+  // Default case if no other rules match
+  return "Other";
+};
+
 /* ------------------------------
    End Points - Roving Sewing Defects
 ------------------------------ */
@@ -7576,15 +7597,28 @@ app.post("/api/sewing-defects/buyer-statuses", async (req, res) => {
    QC Inline Roving New
 ------------------------------ */
 
-// Endpoint for get the buyer status
+// CORRECTED ENDPOINT: Get the buyer name based on MO number
 app.get("/api/buyer-by-mo", (req, res) => {
   const { moNo } = req.query;
   if (!moNo) {
     return res.status(400).json({ message: "MO number is required" });
   }
-  const buyerName = determineBuyer(moNo);
+
+  // Call the new, separated helper function with corrected logic
+  const buyerName = getBuyerFromMoNumber(moNo);
+
   res.json({ buyerName });
 });
+
+// // Endpoint for get the buyer status
+// app.get("/api/buyer-by-mo", (req, res) => {
+//   const { moNo } = req.query;
+//   if (!moNo) {
+//     return res.status(400).json({ message: "MO number is required" });
+//   }
+//   const buyerName = determineBuyer(moNo);
+//   res.json({ buyerName });
+// });
 
 //get the each line related working worker count
 app.get("/api/line-summary", async (req, res) => {
