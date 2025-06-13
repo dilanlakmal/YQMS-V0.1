@@ -19926,6 +19926,38 @@ app.delete(
   }
 );
 
+// NEW ENDPOINT: Search for users by emp_id or name
+app.get("/api/users/search", async (req, res) => {
+  try {
+    const searchTerm = req.query.term;
+    if (!searchTerm || searchTerm.trim().length < 2) {
+      return res.json([]); // Return empty if search term is too short
+    }
+
+    // Create a case-insensitive regular expression for searching
+    const regex = new RegExp(searchTerm, "i");
+
+    const users = await UserMain.find({
+      $and: [
+        { working_status: "Working" }, // Ensure only active users
+        {
+          $or: [{ emp_id: { $regex: regex } }, { eng_name: { $regex: regex } }]
+        }
+      ]
+    })
+      .limit(10) // Limit results for performance
+      .select("emp_id eng_name job_title face_photo") // Select only needed fields
+      .exec();
+
+    res.json(users);
+  } catch (err) {
+    console.error("Error searching users:", err);
+    res
+      .status(500)
+      .json({ message: "Failed to search for users", error: err.message });
+  }
+});
+
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`HTTPS Server is running on https://localhost:${PORT}`);

@@ -33,6 +33,7 @@ import EmpData from "./pages/EmpData.jsx";
 import SystemAdmin from "./pages/SystemAdmin.jsx";
 import SCCPage from "./pages/SCC.jsx";
 import QAInspectionEvaluation from "./pages/QAInspectionEvaluation.jsx";
+import YQMSProject from "./pages/YQMSProject.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -350,6 +351,7 @@ function AppContent() {
               <Route path="/sysadmin" element={<SystemAdmin />} />
               <Route path="/audit" element={<QAAudit />} />
               <Route path="/qa-pivot" element={<QAInspectionEvaluation />} />
+              <Route path="/yqms" element={<YQMSProject />} />
               <Route path="/inline-emp" element={<EmpData />} />
               <Route path="/opa" element={<OPAPage />} />
               <Route path="/packing" element={<PackingPage />} />
