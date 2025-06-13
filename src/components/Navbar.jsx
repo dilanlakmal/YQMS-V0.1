@@ -111,6 +111,11 @@ export default function Navbar({ onLogout }) {
           path: "/sysadmin",
           title: t("home.systemadmin"),
           requiredRoles: ["Super Admin", "System Administration"]
+        },
+        {
+          path: "/yqms",
+          title: t("home.yqms"),
+          requiredRoles: ["Super Admin", "YQMS"]
         }
       ]
     },

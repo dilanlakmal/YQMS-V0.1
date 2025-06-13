@@ -118,6 +118,13 @@ function Home() {
           image: "assets/Home/sysadmin.jpg",
           title: t("home.systemadmin"),
           description: "Modify Defect & Measurements"
+        },
+        {
+          path: "/yqms",
+          roles: ["Admin", "YQMS"], // Matches "YQMS" role
+          image: "assets/Home/yqms.png",
+          title: t("home.yqms"),
+          description: "YQMS Project Management"
         }
       ]
     },

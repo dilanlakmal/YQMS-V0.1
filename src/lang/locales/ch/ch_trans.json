@@ -28,7 +28,8 @@
     "qa_audit_report": "质量保证审计报告",
     "download_data": "下载数据",
     "live_dashboard": "实时仪表板",
-    "systemadmin": "System Administration"
+    "systemadmin": "System Administration",
+    "yqms": "YQMS"
   },
 
   "nav": {

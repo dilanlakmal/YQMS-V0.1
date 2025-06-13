@@ -28,7 +28,8 @@
     "qa_audit_report": "QA Audit Report",
     "download_data": "Download Data",
     "live_dashboard": "Live Dashboard",
-    "systemadmin": "System Administration"
+    "systemadmin": "System Administration",
+    "yqms": "YQMS"
   },
 
   "nav": {
