@@ -9,7 +9,6 @@ import RovingReportPDFA4 from "./RovingReportPDFA4";
 import { Eye } from "lucide-react";
 import RovingReportFilterPane from "./RovingReportFilterPane";
 import RovingReportDetailView from "./RovingReportDetailView";
-import { determineBuyerRoving } from "../../../utils/fractionUtils.js";
 
 const RovingReport = () => {
   // Filter states
@@ -32,6 +31,31 @@ const RovingReport = () => {
   const [lineNos, setLineNos] = useState([]); // Make lineNos stateful
   const [lastUpdated, setLastUpdated] = useState(null);
   const RECORDS_PER_PAGE = 20;
+
+  //Roving Buyer selection
+
+const BUYER_MAPPINGS = [
+  { pattern: "COM", name: "MWW" },   
+  { pattern: "CO", name: "Costco" },
+  { pattern: "AR", name: "Aritzia" },
+  { pattern: "RT", name: "Reitmans" },
+  { pattern: "AF", name: "ANF" },
+  { pattern: "NT", name: "STORI" },
+];
+
+const determineBuyerRoving = (MONo) => {
+  if (!MONo) {
+    return "Other";
+  }
+
+  for (const mapping of BUYER_MAPPINGS) {
+    if (MONo.includes(mapping.pattern)) {
+      return mapping.name;
+    }
+  }
+
+  return "Other";
+};
 
   // Format date to "MM/DD/YYYY"
   const formatDate = (date) => {
