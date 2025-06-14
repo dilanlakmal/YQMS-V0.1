@@ -8,7 +8,7 @@ import {
 import { 
     normalizeDateString,
     escapeRegExp,
- } from "../../Helpers/heperFunction.js";
+ } from "../../Helpers/helperFunction.js";
 
 /* ------------------------------
    QC2 - Inspection Pass Bundle, Reworks

@@ -6,10 +6,9 @@ import {
 import { 
     getOrdinal,
     normalizeDateString,
- } from "../../Helpers/heperFunction.js";
- import {
-     determineBuyer,
- } from "../SQL/sqlSyncController.js";
+    determineBuyerRoving,
+ } from "../../Helpers/helperFunction.js";
+
 
 
 // Endpoint to fetch QC Inline Roving reports
@@ -428,7 +427,7 @@ export const getBuyerStatus = async (req, res) => {
       if (!moNo) {
         return res.status(400).json({ message: "MO number is required" });
       }
-      const buyerName = determineBuyer(moNo);
+      const buyerName = determineBuyerRoving(moNo);
       res.json({ buyerName });
 };
 

@@ -166,3 +166,39 @@ export const getOperatorModel = (type) => {
       return null;
   }
 };
+
+
+//washing live dashboard
+export const getDayRange = (date) => {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+};
+
+//Roving Buyer selection
+
+const BUYER_MAPPINGS = [
+  { pattern: "COM", name: "MWW" },    // "COM" is intentionally first to be checked before "CO"
+  { pattern: "CO", name: "Costco" },
+  { pattern: "AR", name: "Aritzia" },
+  { pattern: "RT", name: "Reitmans" },
+  { pattern: "AF", name: "ANF" },
+  { pattern: "NT", name: "STORI" },
+  // Add more mappings here as needed
+];
+
+export const determineBuyerRoving = (MONo) => {
+  if (!MONo) {
+    return "Other";
+  }
+
+  for (const mapping of BUYER_MAPPINGS) {
+    if (MONo.includes(mapping.pattern)) {
+      return mapping.name;
+    }
+  }
+
+  return "Other";
+};

@@ -4,7 +4,7 @@ import {
   QC2OrderData,              
 } from "../../Config/mongodb.js";
 
-import { formatDate } from "../../Helpers/heperFunction.js";
+import { formatDate } from "../../Helpers/helperFunction.js";
 
 /* ------------------------------
    End Points - Download Data

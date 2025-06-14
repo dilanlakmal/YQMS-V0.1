@@ -3,9 +3,9 @@ import {
  ymEcoConnection,
  QC2OrderData,                
 } from "../../Config/mongodb.js";
-import { generateRandomId } from "../../Helpers/heperFunction.js";
+import { generateRandomId } from "../../Helpers/helperFunction.js";
 
-import { normalizeDateString } from "../../Helpers/heperFunction.js";
+import { normalizeDateString } from "../../Helpers/helperFunction.js";
 
 // Update the MONo search endpoint to handle partial matching
 export const getMoNoSearch = async (req, res) => {
@@ -553,11 +553,11 @@ export const fetchFilteredBundleData = async (req, res) => {
       selectedMono,
       packageNo,
       buyer,
-      empId, // Renamed from selectedEmpId to empId for consistency
+      emp_id,
       page = 1,
-      limit = 15,
-      sortBy = "updated_date_seperator", // Default sort for latest
-      sortOrder = "desc"
+      limit = 15, // Pagination params, default to page 1, 10 items per page
+      sortBy = "updated_date_seperator", // Default sort field
+      sortOrder = "desc" // Default sort order (descending for latest first)
     } = req.query;
 
     let matchQuery = {};
@@ -575,15 +575,17 @@ export const fetchFilteredBundleData = async (req, res) => {
       if (!isNaN(pkgNo)) matchQuery.package_no = pkgNo;
     }
     if (buyer) matchQuery.buyer = buyer;
-    if (empId) matchQuery.emp_id = empId;
+    if (emp_id) matchQuery.emp_id = emp_id;
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
+    // Determine sort direction
     const sortDirection = sortOrder === "asc" ? 1 : -1;
     let sortOptions = {};
     if (sortBy === "updated_date_seperator") {
+      // For date and time, sort by date then time if dates are equal
       sortOptions = {
         updated_date_seperator: sortDirection,
         updated_time_seperator: sortDirection
@@ -592,26 +594,51 @@ export const fetchFilteredBundleData = async (req, res) => {
       sortOptions[sortBy] = sortDirection;
     }
 
+    // Fetch total count of matching documents for pagination
     const totalRecords = await QC2OrderData.countDocuments(matchQuery);
-    const records = await QC2OrderData.find(matchQuery)
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(limitNum);
 
-    // For reprint, we don't necessarily need global stats like in the other tab,
-    // but we do need pagination info.
+    // Fetch paginated and sorted records
+    const records = await QC2OrderData.find(matchQuery)
+      .sort(sortOptions) // Apply sorting
+      .skip(skip) // Apply skip for pagination
+      .limit(limitNum); // Apply limit for pagination
+
+    // Calculate aggregated stats based on ALL filtered records (not just the current page)
+    // This might be resource-intensive if the filtered set is very large.
+    // Consider if stats should also be paginated or if an approximation is okay for large sets.
+    // For now, calculating on the full filtered set.
+    const allFilteredRecordsForStats = await QC2OrderData.find(matchQuery); // Re-query without pagination for stats
+
+    let totalGarmentQty = 0;
+    let uniqueStyles = new Set();
+
+    allFilteredRecordsForStats.forEach((record) => {
+      totalGarmentQty += record.count || 0;
+      if (record.selectedMono) {
+        uniqueStyles.add(record.selectedMono);
+      }
+    });
+
+    const totalBundlesFromStats = allFilteredRecordsForStats.length; // This is the true total bundles for the filter
+    const totalStyles = uniqueStyles.size;
+
     res.json({
       records,
+      stats: {
+        totalGarmentQty,
+        totalBundles: totalBundlesFromStats, // Use count from all filtered records for stats
+        totalStyles
+      },
       pagination: {
         currentPage: pageNum,
         totalPages: Math.ceil(totalRecords / limitNum),
-        totalRecords,
+        totalRecords: totalRecords, // Total records matching the filter
         limit: limitNum
       }
     });
   } catch (error) {
-    console.error("Error searching qc2_orderdata for reprint:", error);
-    res.status(500).json({ error: "Failed to search records for reprint" });
+    console.error("Error fetching filtered bundle data:", error);
+    res.status(500).json({ message: "Failed to fetch filtered bundle data" });
   }
 };
 

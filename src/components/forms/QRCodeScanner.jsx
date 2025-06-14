@@ -1,6 +1,6 @@
-import React, { useState } from "react";
-import Scanner from "./Scanner";
-import { Loader2, Package, Minus, Plus, Check, Clock, X, AlertCircle } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { Html5Qrcode } from "html5-qrcode";
+import { Loader2, Package, Minus, Plus, Check, Clock, X, AlertCircle, Camera } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const QrCodeScanner = ({ 
@@ -22,14 +22,137 @@ const QrCodeScanner = ({
   isIroningPage, isWashingPage, isPackingPage, isOPAPage,isDefectCard }) => {
     const {t} = useTranslation();
 
+    // State from Scanner.jsx
+  const [scanning, setScanning] = useState(false);
+  const [html5QrCodeInstance, setHtml5QrCodeInstance] = useState(null);
+  const [cameras, setCameras] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState(null);
+
+  const selectDefaultCamera = useCallback((devices) => {
+    if (devices && devices.length > 0) {
+      const backCamera = devices.find(
+        (device) =>
+          device.label.toLowerCase().includes("back") ||
+          device.label.toLowerCase().includes("environment")
+      );
+
+      if (backCamera) {
+        setSelectedCameraId(backCamera.id);
+        return;
+      }
+      if (devices.length > 1) {
+        setSelectedCameraId(devices[devices.length - 1].id);
+        return;
+      }
+      setSelectedCameraId(devices[0].id);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (html5QrCodeInstance) return;
+
+    const instance = new Html5Qrcode("qr-reader");
+    setHtml5QrCodeInstance(instance);
+
+    Html5Qrcode.getCameras()
+      .then((devices) => {
+        if (devices && devices.length) {
+          setCameras(devices);
+          selectDefaultCamera(devices);
+        }
+      })
+      .catch((err) => {
+        onScanError(err.message || "Failed to access cameras");
+      });
+  }, [html5QrCodeInstance, onScanError, selectDefaultCamera]);
+
+  useEffect(() => {
+    return () => {
+      if (html5QrCodeInstance && html5QrCodeInstance.isScanning) {
+        html5QrCodeInstance
+          .stop()
+          .catch((err) =>
+            console.error("Error stopping scanner on unmount:", err)
+          );
+      }
+    };
+  }, [html5QrCodeInstance]);
+
+  const stopScanning = useCallback(async () => {
+    if (html5QrCodeInstance && html5QrCodeInstance.isScanning) {
+      try {
+        await html5QrCodeInstance.stop();
+      } catch (err) {
+        console.error("Error while stopping the scanner:", err);
+      } finally {
+        setScanning(false);
+      }
+    }
+  }, [html5QrCodeInstance]);
+
+  const startScanning = useCallback(async () => {
+    if (!html5QrCodeInstance || !selectedCameraId) {
+      onScanError("Scanner not ready or no camera selected.");
+      return;
+    }
+    setScanning(true);
+    try {
+      await html5QrCodeInstance.start(
+        selectedCameraId,
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          onScanSuccess(decodedText);
+          stopScanning(); 
+        },
+        (errorMessage) => { /* Error callback for each frame, can be ignored */ }
+      );
+    } catch (err) {
+      onScanError(err.message || "Failed to start scanning. Please check camera permissions.");
+      setScanning(false);
+    }
+  }, [html5QrCodeInstance, selectedCameraId, onScanError, onScanSuccess, stopScanning]);
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg relative">
-      <Scanner
-        onScanSuccess={onScanSuccess}
-        onScanError={onScanError}
-        continuous={true}
-      />
-
+     {/* Integrated Scanner UI */}
+      <div id="qr-reader" className="mb-6 rounded-lg overflow-hidden border-2 border-gray-300 w-full h-[250px] bg-gray-300 flex justify-center items-center"></div>
+      {cameras.length > 1 && (
+        <div className="flex justify-center mb-4">
+          <select
+            value={selectedCameraId || ""}
+            onChange={(e) => setSelectedCameraId(e.target.value)}
+            className="px-4 py-2 border rounded-lg text-sm bg-white"
+            disabled={scanning}
+          >
+            {cameras.map((camera, index) => (
+              <option key={camera.id} value={camera.id}>
+                {camera.label || `Camera ${index + 1}`}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="flex justify-center mb-6"> {/* Added mb-6 for spacing */}
+        {!scanning ? (
+          <button
+            onClick={startScanning}
+            disabled={!html5QrCodeInstance || !selectedCameraId}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:bg-gray-400"
+          >
+            <Camera className="w-5 h-5" />
+            {t("scan.start")}
+          </button>
+        ) : (
+          <button
+            onClick={stopScanning}
+            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2"
+          >
+            <X className="w-5 h-5" />
+            {t("scan.stop")}
+          </button>
+        )}
+      </div>
+      {/* End of Integrated Scanner UI */}
       {loadingData && (
         <div className="flex items-center justify-center gap-2 text-blue-600 mt-4">
           <Loader2 className="w-5 h-5 animate-spin" />

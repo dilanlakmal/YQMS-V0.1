@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import fsPromises from 'fs/promises';
-import {sanitize } from "../../Helpers/heperFunction.js";
+import {sanitize } from "../../Helpers/helperFunction.js";
 import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";

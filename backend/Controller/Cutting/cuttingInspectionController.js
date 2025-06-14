@@ -3,7 +3,7 @@ import {
   CuttingInspection,                
 } from "../../Config/mongodb.js"; 
 
-import { normalizeDateString, getResult } from "../../Helpers/heperFunction.js";
+import { normalizeDateString, getResult } from "../../Helpers/helperFunction.js";
 
 export const saveCuttingInspection = async (req, res) => {
 try {

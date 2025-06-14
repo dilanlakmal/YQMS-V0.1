@@ -19,7 +19,6 @@ export const determineBuyer = (MONo) => {
   if (MONo.includes("RT")) return "Reitmans";
   if (MONo.includes("AF")) return "ANF";
   if (MONo.includes("NT")) return "STORI";
-  if (MONo.includes("COM")) return "MWW";
   return "Other";
 };
 

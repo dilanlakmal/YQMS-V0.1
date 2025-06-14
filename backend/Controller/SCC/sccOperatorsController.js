@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import {
   UserMain,                
 } from "../../Config/mongodb.js";
-import  {  getOperatorModel } from "../../Helpers/heperFunction.js";
+import  {  getOperatorModel } from "../../Helpers/helperFunction.js";
 
 // Endpoint to fetch operators for a specific type (HT, FU, Elastic)
 export const getOperators = async (req, res) => {

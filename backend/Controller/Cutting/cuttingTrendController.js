@@ -3,7 +3,7 @@ import {
   CuttingInspection,
   CuttingMeasurementPoint,                
 } from "../../Config/mongodb.js"; 
-import { normalizeDateString } from "../../Helpers/heperFunction.js";
+import { normalizeDateString } from "../../Helpers/helperFunction.js";
 
 // --- Trend Analysis Filter Options ---//
 export const getCuttingFilterMo = async (req, res) => {

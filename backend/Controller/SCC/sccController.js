@@ -5,7 +5,7 @@ import {
   SCCDailyTesting,
   DailyTestingHTFU,                
 } from "../../Config/mongodb.js";
-import  { formatDateToMMDDYYYY } from "../../Helpers/heperFunction.js";
+import  { formatDateToMMDDYYYY } from "../../Helpers/helperFunction.js";
 
 export const saveHtFirstOutput = async (req, res) => {
     try {
