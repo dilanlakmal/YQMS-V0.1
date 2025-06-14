@@ -9,6 +9,7 @@ import RovingReportPDFA4 from "./RovingReportPDFA4";
 import { Eye } from "lucide-react";
 import RovingReportFilterPane from "./RovingReportFilterPane";
 import RovingReportDetailView from "./RovingReportDetailView";
+import { determineBuyerRoving } from "../../../utils/fractionUtils.js";
 
 const RovingReport = () => {
   // Filter states
@@ -107,8 +108,10 @@ const RovingReport = () => {
       reportData.forEach(report => {
         if (report.line_no) uniqueLineNos.add(report.line_no);
         if (report.mo_no) uniqueMoNos.add(report.mo_no);
+        //  console.log("Inspecting report for buyer_name:", report.buyer_name, "Full report object:", report);
         // Assuming buyer_name is at the root level
-        if (report.buyer_name) uniqueBuyers.add(report.buyer_name);
+        const derivedBuyer = determineBuyerRoving(report.mo_no);
+        if (derivedBuyer) uniqueBuyers.add(derivedBuyer);
 
         if (report.inspection_rep && Array.isArray(report.inspection_rep)) {
           report.inspection_rep.forEach(repEntry => {

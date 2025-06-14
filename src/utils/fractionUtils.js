@@ -37,3 +37,29 @@ export const decimalToFraction = (value) => {
   }
   return `${sign}${absValue.toFixed(3)}`;
 };
+
+//Roving Buyer selection
+
+const BUYER_MAPPINGS = [
+  { pattern: "COM", name: "MWW" },    // "COM" is intentionally first to be checked before "CO"
+  { pattern: "CO", name: "Costco" },
+  { pattern: "AR", name: "Aritzia" },
+  { pattern: "RT", name: "Reitmans" },
+  { pattern: "AF", name: "ANF" },
+  { pattern: "NT", name: "STORI" },
+  // Add more mappings here as needed
+];
+
+export const determineBuyerRoving = (MONo) => {
+  if (!MONo) {
+    return "Other";
+  }
+
+  for (const mapping of BUYER_MAPPINGS) {
+    if (MONo.includes(mapping.pattern)) {
+      return mapping.name;
+    }
+  }
+
+  return "Other";
+};
