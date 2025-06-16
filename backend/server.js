@@ -29,6 +29,8 @@ import createQc2OrderDataModel from "./models/qc2_orderdata.js";
 import createQC2InspectionPassBundleModel from "./models/qc2_inspection.js";
 import createQC2ReworksModel from "./models/qc2_rework.js";
 import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
+import createSubconFactoryModel from "./models/SubconFactory.js";
+import createQC2DefectsModel from "./models/QC2DefectsModel.js";
 
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
 import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
@@ -224,6 +226,8 @@ const QC2InspectionPassBundle =
   createQC2InspectionPassBundleModel(ymProdConnection);
 const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
+const SubconFactory = createSubconFactoryModel(ymProdConnection);
+const QC2Defects = createQC2DefectsModel(ymProdConnection);
 
 const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
 const SewingDefects = createSewingDefectsModel(ymProdConnection);
@@ -2333,6 +2337,462 @@ app.get("/api/users/search-by-empid", async (req, res) => {
   }
 });
 
+/* =============================================================================
+   End Points - Sub-Con Factories
+   ============================================================================= */
+
+// GET - Fetch all sub-con factories
+app.get("/api/subcon-factories", async (req, res) => {
+  try {
+    const factories = await SubconFactory.find({}).sort({ no: 1 }).lean();
+    res.json(factories);
+  } catch (error) {
+    console.error("Error fetching sub-con factories:", error);
+    res.status(500).json({ message: "Server error fetching factories" });
+  }
+});
+
+// POST - Add a new sub-con factory
+app.post("/api/subcon-factories", async (req, res) => {
+  try {
+    const { no, factory } = req.body;
+
+    if (no === undefined || no === null || !factory) {
+      return res
+        .status(400)
+        .json({ message: "Factory No and Name are required." });
+    }
+    if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Factory No must be a positive number." });
+    }
+
+    const existingFactoryByNo = await SubconFactory.findOne({ no: Number(no) });
+    if (existingFactoryByNo) {
+      return res
+        .status(409)
+        .json({ message: `Factory No '${no}' already exists.` });
+    }
+
+    const existingFactoryByName = await SubconFactory.findOne({ factory });
+    if (existingFactoryByName) {
+      return res
+        .status(409)
+        .json({ message: `Factory name '${factory}' already exists.` });
+    }
+
+    const newFactory = new SubconFactory({
+      no: Number(no),
+      factory
+    });
+    await newFactory.save();
+
+    res.status(201).json({
+      message: "Sub-con factory added successfully",
+      factory: newFactory
+    });
+  } catch (error) {
+    console.error("Error adding sub-con factory:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Duplicate entry. Factory No or Name might already exist."
+      });
+    }
+    res
+      .status(500)
+      .json({ message: "Failed to add sub-con factory", error: error.message });
+  }
+});
+
+// PUT - Update an existing sub-con factory by ID
+app.put("/api/subcon-factories/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { no, factory } = req.body;
+
+    if (no === undefined || no === null || !factory) {
+      return res
+        .status(400)
+        .json({ message: "Factory No and Name are required for update." });
+    }
+    if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Factory No must be a positive number." });
+    }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid factory ID format." });
+    }
+
+    // Check for duplicates, excluding the current document being updated
+    const existingFactoryByNo = await SubconFactory.findOne({
+      no: Number(no),
+      _id: { $ne: id }
+    });
+    if (existingFactoryByNo) {
+      return res.status(409).json({
+        message: `Factory No '${no}' already exists for another factory.`
+      });
+    }
+
+    const existingFactoryByName = await SubconFactory.findOne({
+      factory,
+      _id: { $ne: id }
+    });
+    if (existingFactoryByName) {
+      return res.status(409).json({
+        message: `Factory name '${factory}' already exists for another factory.`
+      });
+    }
+
+    const updatedFactory = await SubconFactory.findByIdAndUpdate(
+      id,
+      { no: Number(no), factory },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedFactory) {
+      return res.status(404).json({ message: "Sub-con factory not found." });
+    }
+
+    res.status(200).json({
+      message: "Sub-con factory updated successfully",
+      factory: updatedFactory
+    });
+  } catch (error) {
+    console.error("Error updating sub-con factory:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Update failed due to duplicate Factory No or Name."
+      });
+    }
+    res.status(500).json({
+      message: "Failed to update sub-con factory",
+      error: error.message
+    });
+  }
+});
+
+// DELETE - Delete a sub-con factory by ID
+app.delete("/api/subcon-factories/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid factory ID format." });
+    }
+
+    const deletedFactory = await SubconFactory.findByIdAndDelete(id);
+    if (!deletedFactory) {
+      return res.status(404).json({ message: "Sub-con factory not found." });
+    }
+
+    res.status(200).json({ message: "Sub-con factory deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting sub-con factory:", error);
+    res.status(500).json({
+      message: "Failed to delete sub-con factory",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   End Points - QC2 Defects
+------------------------------ */
+
+// GET - Fetch all QC2 defects
+app.get("/api/qc2-defects", async (req, res) => {
+  try {
+    const defects = await QC2Defects.find({}).sort({ code: 1 }).lean();
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching QC2 defects:", error);
+    res.status(500).json({ message: "Server error fetching defects" });
+  }
+});
+
+// POST - Add a new QC2 defect
+app.post("/api/qc2-defects", async (req, res) => {
+  try {
+    const { code, defectLetter, english, khmer } = req.body;
+    if (code === undefined || !defectLetter || !english || !khmer) {
+      return res.status(400).json({
+        message: "Code, Defect Letter, English & Khmer names are required."
+      });
+    }
+    const existingByCode = await QC2Defects.findOne({ code });
+    if (existingByCode) {
+      return res
+        .status(409)
+        .json({ message: `Defect code '${code}' already exists.` });
+    }
+    const newDefect = new QC2Defects(req.body);
+    await newDefect.save();
+    res
+      .status(201)
+      .json({ message: "QC2 defect added successfully", defect: newDefect });
+  } catch (error) {
+    console.error("Error adding QC2 defect:", error);
+    if (error.code === 11000)
+      return res
+        .status(409)
+        .json({ message: "Duplicate entry. Defect code or name might exist." });
+    res
+      .status(500)
+      .json({ message: "Failed to add QC2 defect", error: error.message });
+  }
+});
+
+// PUT - Update an existing QC2 defect by ID
+app.put("/api/qc2-defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid defect ID format." });
+    }
+    const updatedDefect = await QC2Defects.findByIdAndUpdate(id, req.body, {
+      new: true,
+      runValidators: true
+    });
+    if (!updatedDefect) {
+      return res.status(404).json({ message: "QC2 Defect not found." });
+    }
+    res.status(200).json({
+      message: "QC2 defect updated successfully",
+      defect: updatedDefect
+    });
+  } catch (error) {
+    console.error("Error updating QC2 defect:", error);
+    if (error.code === 11000)
+      return res
+        .status(409)
+        .json({ message: "Update failed due to duplicate code or name." });
+    res
+      .status(500)
+      .json({ message: "Failed to update QC2 defect", error: error.message });
+  }
+});
+
+// DELETE - Delete a QC2 defect by ID
+app.delete("/api/qc2-defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid defect ID format." });
+    }
+    const defect = await QC2Defects.findById(id);
+    if (!defect) {
+      return res.status(404).json({ message: "QC2 Defect not found." });
+    }
+    // Delete associated image file before deleting the record
+    if (defect.image) {
+      const imagePath = path.join(
+        "storage",
+        defect.image.replace("/storage/", "")
+      );
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
+    await QC2Defects.findByIdAndDelete(id);
+    res.status(200).json({
+      message: "QC2 defect and associated image deleted successfully"
+    });
+  } catch (error) {
+    console.error("Error deleting QC2 defect:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to delete QC2 defect", error: error.message });
+  }
+});
+
+// =================================================================
+// MULTER CONFIGURATION (Memory Storage Pattern)
+// =================================================================
+
+// Use memoryStorage to handle the file as a buffer in memory first.
+const qc2MemoryStorage = multer.memoryStorage();
+
+// Configure multer with memory storage, file filter, and limits.
+const uploadQc2Image = multer({
+  storage: qc2MemoryStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG, and GIF images are allowed"), false);
+    }
+  }
+});
+
+/* ----------------------------------------------------
+   End Points - QC2 Defects Image Management (New Pattern)
+---------------------------------------------------- */
+
+// ENDPOINT 1: UPLOAD A NEW IMAGE (Generic)
+// Use this when creating a NEW defect. The frontend uploads the image first,
+// gets the URL back, then includes that URL in the POST request to create the defect.
+app.post(
+  "/api/qc2-defects/upload-image",
+  uploadQc2Image.single("defectImage"), // "defectImage" is the form field name
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res
+          .status(400)
+          .json({ success: false, message: "No image file provided." });
+      }
+
+      const uploadPath = path.join(
+        __dirname,
+        "public",
+        "storage",
+        "qc2_images"
+      );
+      await fs.promises.mkdir(uploadPath, { recursive: true });
+
+      const fileExtension = path.extname(req.file.originalname);
+      const newFilename = `qc2-defect-${Date.now()}-${Math.round(
+        Math.random() * 1e9
+      )}${fileExtension}`;
+
+      const fullFilePath = path.join(uploadPath, newFilename);
+      await fs.promises.writeFile(fullFilePath, req.file.buffer);
+
+      // Return the relative URL path for the database
+      const relativeUrl = `/storage/qc2_images/${newFilename}`;
+
+      res.status(200).json({ success: true, url: relativeUrl });
+    } catch (error) {
+      console.error("Error in /api/qc2-defects/upload-image:", error);
+      res
+        .status(500)
+        .json({ success: false, message: "Server error during image upload." });
+    }
+  }
+);
+
+// ENDPOINT 2: REPLACE IMAGE FOR AN EXISTING DEFECT
+// Use this to upload a new image for a defect that already exists.
+app.put(
+  "/api/qc2-defects/:id/image",
+  uploadQc2Image.single("defectImage"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (!req.file) {
+        return res
+          .status(400)
+          .json({ success: false, message: "No new image file provided." });
+      }
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid defect ID." });
+      }
+
+      const defect = await QC2Defects.findById(id);
+      if (!defect) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Defect not found." });
+      }
+
+      // --- Delete the old image file if it exists ---
+      if (defect.image) {
+        const oldImagePath = path.join(__dirname, "public", defect.image);
+        if (fs.existsSync(oldImagePath)) {
+          await fs.promises.unlink(oldImagePath);
+        }
+      }
+
+      // --- Save the new image file ---
+      const uploadPath = path.join(
+        __dirname,
+        "public",
+        "storage",
+        "qc2_images"
+      );
+      const fileExtension = path.extname(req.file.originalname);
+      const newFilename = `qc2-defect-${Date.now()}-${Math.round(
+        Math.random() * 1e9
+      )}${fileExtension}`;
+      const fullFilePath = path.join(uploadPath, newFilename);
+      await fs.promises.writeFile(fullFilePath, req.file.buffer);
+
+      // --- Update the database with the new path ---
+      const newRelativeUrl = `/storage/qc2_images/${newFilename}`;
+      defect.image = newRelativeUrl;
+      const updatedDefect = await defect.save();
+
+      res.status(200).json({
+        success: true,
+        message: "Image replaced successfully.",
+        defect: updatedDefect
+      });
+    } catch (error) {
+      console.error("Error replacing defect image:", error);
+      res
+        .status(500)
+        .json({
+          success: false,
+          message: "Server error while replacing image."
+        });
+    }
+  }
+);
+
+// ENDPOINT 3: DELETE IMAGE FROM AN EXISTING DEFECT
+// Use this to remove an image without uploading a new one.
+app.delete("/api/qc2-defects/:id/image", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid defect ID." });
+    }
+
+    const defect = await QC2Defects.findById(id);
+    if (!defect) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Defect not found." });
+    }
+
+    if (!defect.image) {
+      return res
+        .status(200)
+        .json({ success: true, message: "No image to delete." });
+    }
+
+    // --- Delete the image file from the filesystem ---
+    const imagePath = path.join(__dirname, "public", defect.image);
+    if (fs.existsSync(imagePath)) {
+      await fs.promises.unlink(imagePath);
+    }
+
+    // --- Update the database to remove the image path ---
+    defect.image = ""; // Set to empty string or null
+    const updatedDefect = await defect.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Image deleted successfully.",
+      defect: updatedDefect
+    });
+  } catch (error) {
+    console.error("Error deleting defect image:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while deleting image." });
+  }
+});
+
 /* ------------------------------
    End Points - dt_orders
 ------------------------------ */
@@ -2574,10 +3034,19 @@ const generateRandomId = async () => {
 app.post("/api/save-bundle-data", async (req, res) => {
   try {
     const { bundleData } = req.body;
+    if (!bundleData || !Array.isArray(bundleData)) {
+      return res.status(400).json({ message: "Invalid bundle data format." });
+    }
     const savedRecords = [];
 
     // Save each bundle record
     for (const bundle of bundleData) {
+      // Basic validation for required fields from the new logic
+      if (!bundle.task_no) {
+        return res
+          .status(400)
+          .json({ message: "Task No is a required field." });
+      }
       // Get current package number for this MONo-Color-Size combination
       const packageCount = await QC2OrderData.countDocuments({
         selectedMono: bundle.selectedMono
@@ -2667,10 +3136,23 @@ app.put("/api/update-bundle-data/:id", async (req, res) => {
 // NEW ENDPOINT: Get distinct values for filters
 app.get("/api/bundle-data/distinct-filters", async (req, res) => {
   try {
-    const distinctMonos = await QC2OrderData.distinct("selectedMono");
-    const distinctBuyers = await QC2OrderData.distinct("buyer");
-    const distinctQcIds = await QC2OrderData.distinct("emp_id"); // Assuming emp_id is QC ID
-    const distinctLineNos = await QC2OrderData.distinct("lineNo");
+    const [
+      distinctMonos,
+      distinctBuyers,
+      distinctQcIds,
+      distinctLineNos,
+      distinctTaskNos
+    ] = await Promise.all([
+      QC2OrderData.distinct("selectedMono"),
+      QC2OrderData.distinct("buyer"),
+      QC2OrderData.distinct("emp_id"),
+      QC2OrderData.distinct("lineNo"),
+      QC2OrderData.distinct("task_no")
+    ]);
+    // const distinctMonos = await QC2OrderData.distinct("selectedMono");
+    // const distinctBuyers = await QC2OrderData.distinct("buyer");
+    // const distinctQcIds = await QC2OrderData.distinct("emp_id"); // Assuming emp_id is QC ID
+    // const distinctLineNos = await QC2OrderData.distinct("lineNo");
 
     res.json({
       monos: distinctMonos.sort(),
@@ -2684,7 +3166,8 @@ app.get("/api/bundle-data/distinct-filters", async (req, res) => {
         if (!isNaN(numA)) return -1; // Numbers first
         if (!isNaN(numB)) return 1;
         return a.localeCompare(b); // Then string compare
-      })
+      }),
+      taskNos: distinctTaskNos.sort((a, b) => a - b) // Add task numbers
     });
   } catch (error) {
     console.error("Error fetching distinct filter values:", error);
@@ -2702,6 +3185,7 @@ app.get("/api/filtered-bundle-data", async (req, res) => {
       packageNo,
       buyer,
       emp_id,
+      task_no, // New filter param
       page = 1,
       limit = 15, // Pagination params, default to page 1, 10 items per page
       sortBy = "updated_date_seperator", // Default sort field
@@ -2724,6 +3208,7 @@ app.get("/api/filtered-bundle-data", async (req, res) => {
     }
     if (buyer) matchQuery.buyer = buyer;
     if (emp_id) matchQuery.emp_id = emp_id;
+    if (task_no) matchQuery.task_no = parseInt(task_no, 10); // Add task_no to query
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
@@ -2755,35 +3240,92 @@ app.get("/api/filtered-bundle-data", async (req, res) => {
     // This might be resource-intensive if the filtered set is very large.
     // Consider if stats should also be paginated or if an approximation is okay for large sets.
     // For now, calculating on the full filtered set.
-    const allFilteredRecordsForStats = await QC2OrderData.find(matchQuery); // Re-query without pagination for stats
+
+    // --- New Stats Aggregation ---
+    const statsPipeline = [
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: { task_no: "$task_no", mono: "$selectedMono" },
+          garmentQty: { $sum: "$count" },
+          bundleCount: { $sum: 1 } // Use 1 to count documents, not bundleQty
+        }
+      },
+      {
+        $group: {
+          _id: "$_id.task_no",
+          totalGarmentQty: { $sum: "$garmentQty" },
+          totalBundles: { $sum: "$bundleCount" },
+          uniqueStyles: { $addToSet: "$_id.mono" }
+        }
+      }
+    ];
+
+    const statsResults = await QC2OrderData.aggregate(statsPipeline);
+
+    //const allFilteredRecordsForStats = await QC2OrderData.find(matchQuery); // Re-query without pagination for stats
 
     let totalGarmentQty = 0;
-    let uniqueStyles = new Set();
+    let totalBundles = 0;
+    let totalStylesSet = new Set();
+    let garmentQtyByTask = {};
+    let bundleCountByTask = {};
 
-    allFilteredRecordsForStats.forEach((record) => {
-      totalGarmentQty += record.count || 0;
-      if (record.selectedMono) {
-        uniqueStyles.add(record.selectedMono);
-      }
+    statsResults.forEach((result) => {
+      const task = result._id || "unknown"; // Handle null task_no if any
+      totalGarmentQty += result.totalGarmentQty;
+      totalBundles += result.totalBundles;
+      result.uniqueStyles.forEach((style) => totalStylesSet.add(style));
+      garmentQtyByTask[task] = result.totalGarmentQty;
+      bundleCountByTask[task] = result.totalBundles;
     });
 
-    const totalBundlesFromStats = allFilteredRecordsForStats.length; // This is the true total bundles for the filter
-    const totalStyles = uniqueStyles.size;
+    const stats = {
+      totalGarmentQty,
+      totalBundles,
+      totalStyles: totalStylesSet.size,
+      garmentQtyByTask, // e.g., { '51': 500, '52': 734 }
+      bundleCountByTask
+    };
+
+    // let totalGarmentQty = 0;
+    // let uniqueStyles = new Set();
+
+    // allFilteredRecordsForStats.forEach((record) => {
+    //   totalGarmentQty += record.count || 0;
+    //   if (record.selectedMono) {
+    //     uniqueStyles.add(record.selectedMono);
+    //   }
+    // });
+
+    // const totalBundlesFromStats = allFilteredRecordsForStats.length; // This is the true total bundles for the filter
+    // const totalStyles = uniqueStyles.size;
 
     res.json({
       records,
-      stats: {
-        totalGarmentQty,
-        totalBundles: totalBundlesFromStats, // Use count from all filtered records for stats
-        totalStyles
-      },
+      stats,
       pagination: {
         currentPage: pageNum,
         totalPages: Math.ceil(totalRecords / limitNum),
-        totalRecords: totalRecords, // Total records matching the filter
+        totalRecords: totalRecords,
         limit: limitNum
       }
     });
+
+    // res.json({
+    //   records,
+    //   stats: {
+    //     totalGarmentQty,
+    //     totalBundles: totalBundlesFromStats, // Use count from all filtered records for stats
+    //     totalStyles
+    //   },
+    //   pagination: {
+    //     currentPage: pageNum,
+    //     totalPages: Math.ceil(totalRecords / limitNum),
+    //     totalRecords: totalRecords, // Total records matching the filter
+    //     limit: limitNum
+    //   }
+    // });
   } catch (error) {
     console.error("Error fetching filtered bundle data:", error);
     res.status(500).json({ message: "Failed to fetch filtered bundle data" });
@@ -3131,6 +3673,63 @@ app.get("/api/ironing-records", async (req, res) => {
   }
 });
 
+// NEW ENDPOINT: Get distinct filter values for Ironing Records
+app.get("/api/ironing-records/distinct-filters", async (req, res) => {
+  try {
+    // Run all distinct queries on the Ironing collection in parallel
+    const [
+      distinctTaskNos,
+      moNosFromMoNoField,
+      moNosFromSelectedMonoField,
+      distinctPackageNos,
+      distinctDepartments,
+      distinctLineNos, // ADDED
+      distinctQcIds // ADDED
+    ] = await Promise.all([
+      Ironing.distinct("task_no_ironing").exec(),
+      Ironing.distinct("moNo").exec(),
+      Ironing.distinct("selectedMono").exec(),
+      Ironing.distinct("package_no").exec(),
+      Ironing.distinct("department").exec(),
+      Ironing.distinct("lineNo").exec(), // ADDED: Fetch distinct line numbers
+      Ironing.distinct("emp_id_ironing").exec() // ADDED: Fetch distinct QC IDs
+    ]);
+
+    // Combine MO numbers from two different fields and get unique values
+    const combinedMoNos = [
+      ...new Set([...moNosFromMoNoField, ...moNosFromSelectedMonoField])
+    ];
+
+    // Send the cleaned and sorted data in the JSON response
+    res.json({
+      taskNos: distinctTaskNos
+        .filter((item) => item != null)
+        .sort((a, b) => a - b),
+      moNos: combinedMoNos.filter((item) => item != null).sort(),
+      packageNos: distinctPackageNos
+        .filter((item) => item != null)
+        .sort((a, b) => a - b),
+      departments: distinctDepartments.filter((item) => item != null).sort(),
+      lineNos: distinctLineNos
+        .filter((item) => item != null)
+        .sort((a, b) => {
+          const numA = parseInt(a);
+          const numB = parseInt(b);
+          if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+          if (!isNaN(numA)) return -1;
+          if (!isNaN(numB)) return 1;
+          return String(a).localeCompare(String(b));
+        }),
+      qcIds: distinctQcIds.filter((item) => item != null).sort()
+    });
+  } catch (error) {
+    console.error("Error fetching distinct ironing filter options:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch distinct ironing filter options" });
+  }
+});
+
 /* ------------------------------
    End Points - Washing
 ------------------------------ */
@@ -3254,6 +3853,75 @@ app.get("/api/washing-records", async (req, res) => {
   }
 });
 
+// NEW ENDPOINT: Get distinct filter values for Washing Records
+app.get("/api/washing-records/distinct-filters", async (req, res) => {
+  try {
+    // Run all distinct queries in parallel for better performance
+    const [
+      distinctTaskNos,
+      moNosFromMoNoField,
+      moNosFromSelectedMonoField,
+      distinctPackageNos,
+      distinctDepartments,
+      distinctLineNos, // ADDED
+      distinctQcIds // ADDED
+    ] = await Promise.all([
+      Washing.distinct("task_no_washing").exec(),
+      Washing.distinct("moNo").exec(),
+      Washing.distinct("selectedMono").exec(),
+      Washing.distinct("package_no").exec(),
+      Washing.distinct("department").exec(),
+      Washing.distinct("lineNo").exec(), // ADDED: Fetch distinct line numbers
+      Washing.distinct("emp_id_washing").exec() // ADDED: Fetch distinct QC IDs from washing records
+    ]);
+
+    // Post-processing: Combine, filter, and sort the results after they are fetched
+
+    // 1. Combine MO numbers from two different fields and get only unique values
+    const combinedMoNos = [
+      ...new Set([...moNosFromMoNoField, ...moNosFromSelectedMonoField])
+    ];
+
+    // 2. Send the cleaned and sorted data in the JSON response
+    res.json({
+      taskNos: distinctTaskNos
+        .filter((item) => item != null)
+        .sort((a, b) => a - b),
+
+      moNos: combinedMoNos.filter((item) => item != null).sort(),
+
+      packageNos: distinctPackageNos
+        .filter((item) => item != null)
+        .sort((a, b) => a - b),
+
+      departments: distinctDepartments.filter((item) => item != null).sort(),
+
+      // ADDED: lineNos field
+      lineNos: distinctLineNos
+        .filter((item) => item != null)
+        .sort((a, b) => {
+          const numA = parseInt(a);
+          const numB = parseInt(b);
+          if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+          if (!isNaN(numA)) return -1;
+          if (!isNaN(numB)) return 1;
+          return String(a).localeCompare(String(b));
+        }),
+
+      // ADDED: qcIds field
+      qcIds: distinctQcIds.filter((item) => item != null).sort()
+
+      // REMOVED: custStyles field is no longer sent
+      // custStyles: distinctCustStyles.filter((item) => item != null).sort()
+    });
+  } catch (error) {
+    console.error("Error fetching distinct washing filter options:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch distinct filter options" });
+  }
+});
+
 /* ------------------------------
    End Points - OPA
 ------------------------------ */
@@ -3374,6 +4042,68 @@ app.get("/api/opa-records", async (req, res) => {
     res.json(records);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch OPA records" });
+  }
+});
+
+// NEW ENDPOINT: Get distinct filter values for OPA Records
+app.get("/api/opa-records/distinct-filters", async (req, res) => {
+  try {
+    // Run all distinct queries in parallel for better performance
+    const [
+      distinctTaskNos,
+      moNosFromMoNoField,
+      moNosFromSelectedMonoField,
+      distinctPackageNos,
+      distinctDepartments,
+      distinctLineNos, // ADDED
+      distinctQcIds // ADDED
+    ] = await Promise.all([
+      OPA.distinct("task_no_opa").exec(), // Querying the OPA collection
+      OPA.distinct("moNo").exec(),
+      OPA.distinct("selectedMono").exec(),
+      OPA.distinct("package_no").exec(),
+      OPA.distinct("department").exec(),
+      OPA.distinct("lineNo").exec(), // ADDED: Fetch distinct line numbers
+      OPA.distinct("emp_id_opa").exec() // ADDED: Fetch distinct QC IDs from OPA records
+    ]);
+
+    // Combine MO numbers from two different fields and get only unique values
+    const combinedMoNos = [
+      ...new Set([...moNosFromMoNoField, ...moNosFromSelectedMonoField])
+    ];
+
+    // Send the cleaned and sorted data in the JSON response
+    res.json({
+      taskNos: distinctTaskNos
+        .filter((item) => item != null)
+        .sort((a, b) => a - b),
+
+      moNos: combinedMoNos.filter((item) => item != null).sort(),
+
+      packageNos: distinctPackageNos
+        .filter((item) => item != null)
+        .sort((a, b) => a - b),
+
+      departments: distinctDepartments.filter((item) => item != null).sort(),
+
+      lineNos: distinctLineNos
+        .filter((item) => item != null)
+        .sort((a, b) => {
+          const numA = parseInt(a);
+          const numB = parseInt(b);
+          if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+          if (!isNaN(numA)) return -1;
+          if (!isNaN(numB)) return 1;
+          return String(a).localeCompare(String(b));
+        }),
+
+      qcIds: distinctQcIds.filter((item) => item != null).sort()
+    });
+  } catch (error) {
+    console.error("Error fetching distinct OPA filter options:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch distinct OPA filter options" });
   }
 });
 
@@ -3553,6 +4283,63 @@ app.get("/api/packing-records", async (req, res) => {
     res.json(records);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch Packing records" });
+  }
+});
+
+// NEW ENDPOINT: Get distinct filter values for Packing Records
+app.get("/api/packing-records/distinct-filters", async (req, res) => {
+  try {
+    // Run all distinct queries on the Packing collection in parallel
+    const [
+      distinctTaskNos,
+      moNosFromMoNoField,
+      moNosFromSelectedMonoField,
+      distinctPackageNos,
+      distinctDepartments,
+      distinctLineNos, // ADDED
+      distinctQcIds // ADDED
+    ] = await Promise.all([
+      Packing.distinct("task_no_packing").exec(),
+      Packing.distinct("moNo").exec(),
+      Packing.distinct("selectedMono").exec(),
+      Packing.distinct("package_no").exec(),
+      Packing.distinct("department").exec(),
+      Packing.distinct("lineNo").exec(), // ADDED: Fetch distinct line numbers
+      Packing.distinct("emp_id_packing").exec() // ADDED: Fetch distinct QC IDs
+    ]);
+
+    // Combine MO numbers from two different fields and get unique values
+    const combinedMoNos = [
+      ...new Set([...moNosFromMoNoField, ...moNosFromSelectedMonoField])
+    ];
+
+    // Send the cleaned and sorted data in the JSON response
+    res.json({
+      taskNos: distinctTaskNos
+        .filter((item) => item != null)
+        .sort((a, b) => a - b),
+      moNos: combinedMoNos.filter((item) => item != null).sort(),
+      packageNos: distinctPackageNos
+        .filter((item) => item != null)
+        .sort((a, b) => a - b),
+      departments: distinctDepartments.filter((item) => item != null).sort(),
+      lineNos: distinctLineNos
+        .filter((item) => item != null)
+        .sort((a, b) => {
+          const numA = parseInt(a);
+          const numB = parseInt(b);
+          if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+          if (!isNaN(numA)) return -1;
+          if (!isNaN(numB)) return 1;
+          return String(a).localeCompare(String(b));
+        }),
+      qcIds: distinctQcIds.filter((item) => item != null).sort()
+    });
+  } catch (error) {
+    console.error("Error fetching distinct packing filter options:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch distinct packing filter options" });
   }
 });
 
@@ -7610,16 +8397,6 @@ app.get("/api/buyer-by-mo", (req, res) => {
   res.json({ buyerName });
 });
 
-// // Endpoint for get the buyer status
-// app.get("/api/buyer-by-mo", (req, res) => {
-//   const { moNo } = req.query;
-//   if (!moNo) {
-//     return res.status(400).json({ message: "MO number is required" });
-//   }
-//   const buyerName = determineBuyer(moNo);
-//   res.json({ buyerName });
-// });
-
 //get the each line related working worker count
 app.get("/api/line-summary", async (req, res) => {
   try {
@@ -8019,7 +8796,8 @@ app.get("/api/qc-inline-roving-reports", async (req, res) => {
 // New endpoint to fetch filtered QC Inline Roving reports with date handling
 app.get("/api/qc-inline-roving-reports-filtered", async (req, res) => {
   try {
-    const { startDate, endDate, line_no, mo_no, emp_id } = req.query;
+    const { startDate, endDate, line_no, mo_no, emp_id, buyer_name } =
+      req.query;
 
     let match = {};
 
@@ -8074,12 +8852,31 @@ app.get("/api/qc-inline-roving-reports-filtered", async (req, res) => {
     if (mo_no) {
       match.mo_no = mo_no;
     }
+    // In the report, qcId is passed as emp_id
     if (emp_id) {
-      match.emp_id = emp_id;
+      match["inspection_rep.emp_id"] = emp_id;
     }
 
-    const reports = await QCInlineRoving.find(match);
-    res.json(reports);
+    // First, fetch reports using the filters that can be applied at the database level
+    const reportsFromDb = await QCInlineRoving.find(match);
+
+    // *** NEW LOGIC: Apply the derived buyer filter after fetching from DB ***
+    let finalFilteredReports = reportsFromDb;
+
+    if (buyer_name) {
+      finalFilteredReports = reportsFromDb.filter((report) => {
+        // For each report, determine the buyer from its MO number
+        const derivedBuyer = getBuyerFromMoNumber(report.mo_no);
+        // Keep the report only if its derived buyer matches the filter
+        return derivedBuyer === buyer_name;
+      });
+    }
+
+    // Send the final, fully filtered data to the client
+    res.json(finalFilteredReports);
+
+    // const reports = await QCInlineRoving.find(match);
+    // res.json(reports);
   } catch (error) {
     console.error("Error fetching filtered roving reports:", error);
     res.status(500).json({ message: "Error fetching filtered reports", error });

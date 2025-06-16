@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css"; // Base styles needed
+import "react-datepicker/dist/react-datepicker.css";
 import { useTranslation } from "react-i18next";
 import {
   FaAngleDoubleLeft,
@@ -15,6 +15,7 @@ import {
   FaHashtag,
   FaListOl,
   FaProjectDiagram,
+  FaTasks,
   FaTimes,
   FaUserCheck,
   FaUserTie
@@ -74,28 +75,38 @@ const normalizeDateString = (dateStr) => {
 function BundleRegistrationRecordData({ handleEdit }) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const isMobileDevice =
+    typeof navigator !== "undefined" &&
+    /Mobi|Android/i.test(navigator.userAgent);
 
   const [records, setRecords] = useState([]);
   const [stats, setStats] = useState({
     totalGarmentQty: 0,
     totalBundles: 0,
-    totalStyles: 0
+    totalStyles: 0,
+    garmentQtyByTask: {},
+    bundleCountByTask: {}
   });
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(true);
 
+  // Filters State
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedTaskNo, setSelectedTaskNo] = useState(null);
   const [selectedLineNo, setSelectedLineNo] = useState(null);
   const [selectedMono, setSelectedMono] = useState(null);
   const [packageNoInput, setPackageNoInput] = useState("");
   const [selectedBuyer, setSelectedBuyer] = useState(null);
   const [selectedQcId, setSelectedQcId] = useState(null);
 
+  // Filter Options State
+  const [taskNoOptions, setTaskNoOptions] = useState([]);
   const [lineNoOptions, setLineNoOptions] = useState([]);
   const [monoOptions, setMonoOptions] = useState([]);
   const [buyerOptions, setBuyerOptions] = useState([]);
   const [qcIdOptions, setQcIdOptions] = useState([]);
 
+  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -110,6 +121,7 @@ function BundleRegistrationRecordData({ handleEdit }) {
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
+        setTaskNoOptions(data.taskNos.map((tn) => ({ value: tn, label: tn })));
         setLineNoOptions(data.lineNos.map((ln) => ({ value: ln, label: ln })));
         setMonoOptions(data.monos.map((mo) => ({ value: mo, label: mo })));
         setBuyerOptions(data.buyers.map((b) => ({ value: b, label: b })));
@@ -139,6 +151,7 @@ function BundleRegistrationRecordData({ handleEdit }) {
       const params = new URLSearchParams();
       if (selectedDate)
         params.append("date", selectedDate.toISOString().split("T")[0]);
+      if (selectedTaskNo) params.append("task_no", selectedTaskNo.value);
       if (selectedLineNo) params.append("lineNo", selectedLineNo.value);
       if (selectedMono) params.append("selectedMono", selectedMono.value);
       if (debouncedPackageNo) params.append("packageNo", debouncedPackageNo);
@@ -157,7 +170,13 @@ function BundleRegistrationRecordData({ handleEdit }) {
         const data = await response.json();
         setRecords(data.records || []);
         setStats(
-          data.stats || { totalGarmentQty: 0, totalBundles: 0, totalStyles: 0 }
+          data.stats || {
+            totalGarmentQty: 0,
+            totalBundles: 0,
+            totalStyles: 0,
+            garmentQtyByTask: {},
+            bundleCountByTask: {}
+          }
         );
         if (data.pagination) {
           setTotalPages(data.pagination.totalPages);
@@ -169,7 +188,13 @@ function BundleRegistrationRecordData({ handleEdit }) {
       } catch (error) {
         console.error("Error fetching filtered bundle data:", error);
         setRecords([]);
-        setStats({ totalGarmentQty: 0, totalBundles: 0, totalStyles: 0 });
+        setStats({
+          totalGarmentQty: 0,
+          totalBundles: 0,
+          totalStyles: 0,
+          garmentQtyByTask: {},
+          bundleCountByTask: {}
+        });
         setTotalPages(0);
         setTotalRecords(0);
       } finally {
@@ -178,6 +203,7 @@ function BundleRegistrationRecordData({ handleEdit }) {
     },
     [
       selectedDate,
+      selectedTaskNo,
       selectedLineNo,
       selectedMono,
       debouncedPackageNo,
@@ -187,22 +213,21 @@ function BundleRegistrationRecordData({ handleEdit }) {
     ]
   );
 
-  // This useEffect was causing an issue by including fetchFilteredData in its dependency array,
-  // which is itself a useCallback. The dependency array for this effect should list the actual
-  // filter states that, when changed, should trigger a fetch for the *first page*.
   useEffect(() => {
     fetchFilteredData(1);
   }, [
     selectedDate,
+    selectedTaskNo,
     selectedLineNo,
     selectedMono,
     debouncedPackageNo,
     selectedBuyer,
     selectedQcId
-  ]); // Removed fetchFilteredData
+  ]);
 
   const clearFilters = () => {
     setSelectedDate(new Date());
+    setSelectedTaskNo(null);
     setSelectedLineNo(null);
     setSelectedMono(null);
     setPackageNoInput("");
@@ -216,7 +241,6 @@ function BundleRegistrationRecordData({ handleEdit }) {
     } else {
       setSelectedQcId(null);
     }
-    // fetchFilteredData(1) will be called by the useEffect above due to filter state changes
   };
 
   const handlePageChange = (newPage) => {
@@ -228,6 +252,7 @@ function BundleRegistrationRecordData({ handleEdit }) {
   const headers = [
     "record_id",
     "package_no",
+    "task_no",
     "date",
     "modify",
     "time",
@@ -274,7 +299,19 @@ function BundleRegistrationRecordData({ handleEdit }) {
     menu: (provided) => ({ ...provided, zIndex: 100 })
   };
 
-  const StatCard = ({ title, value, icon, colorClass }) => (
+  const formatTaskBreakdown = (taskData) => {
+    if (!selectedQcId || !taskData || Object.keys(taskData).length === 0)
+      return "";
+    const breakdown = Object.entries(taskData)
+      .map(
+        ([task, count]) =>
+          `${t("task", "Task")} ${task}: ${count.toLocaleString()}`
+      )
+      .join(", ");
+    return breakdown ? `(${breakdown})` : "";
+  };
+
+  const StatCard = ({ title, value, icon, colorClass, breakdown }) => (
     <div
       className={`bg-white p-4 rounded-xl shadow-lg flex items-center space-x-3 border-l-4 ${colorClass}`}
     >
@@ -294,6 +331,7 @@ function BundleRegistrationRecordData({ handleEdit }) {
           {title}
         </p>
         <p className="text-xl font-semibold text-gray-700">{value}</p>
+        {breakdown && <p className="text-xs text-gray-500 mt-1">{breakdown}</p>}
       </div>
     </div>
   );
@@ -335,7 +373,7 @@ function BundleRegistrationRecordData({ handleEdit }) {
             <FaAngleDoubleLeft
               className="h-4 w-4 sm:h-5 sm:w-5"
               aria-hidden="true"
-            />{" "}
+            />
             <span className="hidden sm:inline ml-1">
               {t("pagination.first", "First")}
             </span>
@@ -345,7 +383,7 @@ function BundleRegistrationRecordData({ handleEdit }) {
             disabled={currentPage === 1}
             className="relative inline-flex items-center px-2 py-2 text-xs sm:text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <FaAngleLeft className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />{" "}
+            <FaAngleLeft className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
             <span className="hidden sm:inline ml-1">
               {t("pagination.previous", "Prev")}
             </span>
@@ -417,7 +455,7 @@ function BundleRegistrationRecordData({ handleEdit }) {
           >
             <span className="hidden sm:inline mr-1">
               {t("pagination.last", "Last")}
-            </span>{" "}
+            </span>
             <FaAngleDoubleRight
               className="h-4 w-4 sm:h-5 sm:w-5"
               aria-hidden="true"
@@ -430,9 +468,6 @@ function BundleRegistrationRecordData({ handleEdit }) {
 
   return (
     <>
-      {/* Removed the fixed portalId div for DatePicker from here */}
-      {/* We will try to control z-index via wrapper or popperClassName if available on DatePicker */}
-
       <div
         className={`bg-white rounded-xl shadow-xl p-4 mb-4 ${
           !showFilters ? "pb-1" : ""
@@ -440,7 +475,7 @@ function BundleRegistrationRecordData({ handleEdit }) {
       >
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-base md:text-lg font-semibold text-gray-700 flex items-center">
-            <FaFilter className="mr-2 text-indigo-600" />{" "}
+            <FaFilter className="mr-2 text-indigo-600" />
             {t("bundle.filters", "Filters")}
           </h2>
           <div className="flex items-center space-x-2">
@@ -465,10 +500,8 @@ function BundleRegistrationRecordData({ handleEdit }) {
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-3 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mb-4 transition-all duration-300 ease-in-out">
+          <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-7 gap-3 md:gap-4 mb-4 transition-all duration-300 ease-in-out">
             <div className="flex flex-col relative z-[60]">
-              {" "}
-              {/* Higher z-index for DatePicker wrapper */}
               <label className="text-xs font-medium text-gray-600 mb-1 flex items-center">
                 <FaCalendarAlt className="mr-1.5 text-gray-400" />
                 {t("bundle.date")}
@@ -478,7 +511,22 @@ function BundleRegistrationRecordData({ handleEdit }) {
                 onChange={(date) => setSelectedDate(date)}
                 className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
                 dateFormat="MM/dd/yyyy"
-                // popperPlacement="bottom-start" // You can try different placements
+                popperPlacement="bottom-start"
+                readOnly={isMobileDevice} // PREVENT KEYBOARD ON MOBILE
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-xs font-medium text-gray-600 mb-1 flex items-center">
+                <FaTasks className="mr-1.5 text-gray-400" />
+                {t("bundle.task_no")}
+              </label>
+              <Select
+                options={taskNoOptions}
+                value={selectedTaskNo}
+                onChange={setSelectedTaskNo}
+                isClearable
+                placeholder={t("bundle.select_task_no", "Task...")}
+                styles={selectStyles}
               />
             </div>
             <div className="flex flex-col">
@@ -558,12 +606,14 @@ function BundleRegistrationRecordData({ handleEdit }) {
         <StatCard
           title={t("bundle.total_garment_qty_card", "Total Garments")}
           value={loading ? "..." : stats.totalGarmentQty.toLocaleString()}
+          breakdown={formatTaskBreakdown(stats.garmentQtyByTask)}
           icon={<FaArchive />}
           colorClass="border-l-blue-500 text-blue-500 bg-blue-500"
         />
         <StatCard
           title={t("bundle.total_bundles_card", "Total Bundles")}
           value={loading ? "..." : stats.totalBundles.toLocaleString()}
+          breakdown={formatTaskBreakdown(stats.bundleCountByTask)}
           icon={<FaBoxes />}
           colorClass="border-l-green-500 text-green-500 bg-green-500"
         />
@@ -579,8 +629,6 @@ function BundleRegistrationRecordData({ handleEdit }) {
         <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm relative">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-slate-200 sticky top-0 z-10">
-              {" "}
-              {/* Sticky header with z-index */}
               <tr>
                 {headers.map((headerKey) => (
                   <th
@@ -626,6 +674,9 @@ function BundleRegistrationRecordData({ handleEdit }) {
                     </td>
                     <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
                       {batch.package_no}
+                    </td>
+                    <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap font-semibold">
+                      {batch.task_no}
                     </td>
                     <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
                       {batch.updated_date_seperator}

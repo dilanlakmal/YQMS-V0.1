@@ -166,7 +166,8 @@
     "filter_by_package_no_placeholder": "Filter by Package No",
     "filter_by_mono_placeholder_ends": "Filter by MONo (ends with)",
     "showing_records": "Showing {{count}} of {{total}} records",
-    "showing_records_paginated": "Showing records"
+    "showing_records_paginated": "Showing records",
+    "task_no": "Task No"
   },
 
   "defIm": {
@@ -807,7 +808,8 @@
     "search_mono_placeholder": "Search MO No...",
     "modifyMeasurementPointsTitle": "Modify / Delete Cutting Measurement Points",
     "noPointsFoundTitle": "No Measurement Points Found",
-    "noPointsFoundMsg": "No measurement points found for this Garment Type. Please add points to proceed."
+    "noPointsFoundMsg": "No measurement points found for this Garment Type. Please add points to proceed.",
+    "remarks": "Remarks"
   },
 
   "cuttingReport": {
@@ -929,7 +931,15 @@
     "yesRemoveIt": "Yes, remove it!",
     "removed": "Removed!",
     "collapse": "Collapse",
-    "expand": "Expand"
+    "expand": "Expand",
+    "deleted": "Deleted!",
+    "add": "Add",
+    "addDefect": "Add Defect",
+    "actions": "Actions",
+    "missingInfo": "Missing Information",
+    "confirmDeleteTitle": "Are you sure?",
+    "confirmDeleteText": "This action cannot be undone.",
+    "yesDelete": "Yes, delete it!"
   },
 
   "editGar": {
@@ -1700,6 +1710,57 @@
     "validation": {
       "fillRequired": "Issue No, English Name, and Khmer Name are required.",
       "fillRequiredNew": "Please provide a valid Issue No, English Name, and Khmer Name."
+    }
+  },
+  "qc2defects": {
+    "factory": {
+      "manageTitle": "Manage QC2 Factory Names",
+      "no": "Factory No",
+      "name": "Factory Name",
+      "fetchError": "Failed to fetch factories.",
+      "validationError": "Factory No and Name are required.",
+      "addSuccess": "Factory added successfully.",
+      "addFail": "Failed to add factory.",
+      "updateSuccess": "Factory updated successfully.",
+      "updateFail": "Failed to update factory.",
+      "deleteSuccess": "Factory deleted successfully.",
+      "deleteFail": "Failed to delete factory."
+    },
+    "defect": {
+      "addTitle": "Add New QC2 Defect",
+      "listTitle": "Manage Existing QC2 Defects",
+      "code": "Code",
+      "defectLetter": "Defect Letter",
+      "shortEng": "Short English",
+      "english": "English",
+      "khmer": "Khmer",
+      "chinese": "Chinese",
+      "image": "Image",
+      "repair": "Repair Dept.",
+      "categoryEnglish": "Category (Eng)",
+      "categoryKhmer": "Category (Khm)",
+      "categoryChinese": "Category (Chn)",
+      "type": "Type",
+      "isCommon": "Common?",
+      "addSuccess": "New defect added successfully.",
+      "addFail": "Failed to add new defect.",
+      "updateSuccess": "Defect updated successfully.",
+      "updateFail": "Failed to update defect.",
+      "deleteSuccess": "Defect deleted successfully.",
+      "deleteFail": "Failed to delete defect.",
+      "fetchError": "Failed to load defects list."
+    },
+    "table": {
+      "code": "Code",
+      "defectLetter": "Letter",
+      "english": "English Name",
+      "khmer": "Khmer Name",
+      "chinese": "Chinese Name",
+      "categoryEnglish": "Category",
+      "type": "Type",
+      "isCommon": "Common?",
+      "image": "Image",
+      "actions": "Actions"
     }
   }
 }
