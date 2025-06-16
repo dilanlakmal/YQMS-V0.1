@@ -125,3 +125,31 @@ export const getOPARecords = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch OPA records" });
   }
 };
+
+// GET distinct filter options for OPA records
+export const getOpaFilterOptions = async (req, res) => {
+  try {
+    const qcIds = await OPA.distinct('emp_id_opa').exec();
+    const taskNos = await OPA.distinct('task_no_opa').exec();
+    
+    const moNosFromMoNo = await OPA.distinct('moNo').exec();
+    const moNosFromSelectedMono = await OPA.distinct('selectedMono').exec();
+    const combinedMoNos = [...new Set([...moNosFromMoNo, ...moNosFromSelectedMono].filter(Boolean))];
+
+    const packageNos = await OPA.distinct('package_no').exec();
+    const departments = await OPA.distinct('department').exec();
+    const custStyles = await OPA.distinct('custStyle').exec();
+
+    res.json({
+      qcIds: qcIds.filter(id => id != null),
+      taskNos: taskNos.filter(tn => tn != null),
+      moNos: combinedMoNos.filter(mo => mo != null),
+      packageNos: packageNos.filter(pn => pn != null),
+      departments: departments.filter(dept => dept != null),
+      custStyles: custStyles.filter(style => style != null),
+    });
+  } catch (error) {
+    console.error('Error fetching distinct OPA filter options:', error);
+    res.status(500).json({ message: 'Failed to fetch distinct OPA filter options' });
+  }
+};

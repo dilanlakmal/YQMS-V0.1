@@ -103,7 +103,7 @@ const IroningPage = () => {
         console.log("Defect card data fetched:", defectData);
 
         const existsResponse = await fetch(
-          `${API_BASE_URL}/api/check-ironing-exists/${trimmedId}-84`
+          `${API_BASE_URL}/api/check-ironing-exists/${trimmedId}-85`
         );
         const existsData = await existsResponse.json();
         if (existsData.exists) {
@@ -155,13 +155,13 @@ const IroningPage = () => {
   const handleAddRecord = useCallback(async () => {
     try {
       const now = new Date();
-      const taskNoIroning = isDefectCard ? 84 : 53;
+      const taskNoIroning = isDefectCard ? 85 : 53;
 
       const newRecord = {
         ironing_record_id: isDefectCard ? 0 : ironingRecordId,
         task_no_ironing: taskNoIroning,
         ironing_bundle_id: isDefectCard
-          ? `${scannedData.defect_print_id}-84`
+          ? `${scannedData.defect_print_id}-85`
           : `${scannedData.bundle_id}-53`,
         ironing_updated_date: now.toLocaleDateString("en-US", {
           month: "2-digit",
@@ -373,13 +373,13 @@ const IroningPage = () => {
 
   const ironingStats = useMemo(() => {
     if (!filteredIroningRecords || filteredIroningRecords.length === 0) {
-      return { totalGarmentsIroned: 0, totalBundlesProcessed: 0, totalStyles: 0, task53Garments: 0, task84Garments: 0 };
+      return { totalGarmentsIroned: 0, totalBundlesProcessed: 0, totalStyles: 0, task53Garments: 0, task85Garments: 0 };
     }
 
     let totalGarments = 0;
     const uniqueStyles = new Set();
     let task53Garments = 0;
-    let task84Garments = 0;
+    let task85Garments = 0;
 
     filteredIroningRecords.forEach(record => {
       const qty = Number(record.passQtyIron) || 0;
@@ -389,8 +389,8 @@ const IroningPage = () => {
       }
       if (String(record.task_no_ironing) === "53") {
         task53Garments += qty;
-      } else if (String(record.task_no_ironing) === "84") {
-        task84Garments += qty;
+      } else if (String(record.task_no_ironing) === "85") {
+        task85Garments += qty;
       }
     });
 
@@ -399,13 +399,13 @@ const IroningPage = () => {
       totalBundlesProcessed: filteredIroningRecords.length,
       totalStyles: uniqueStyles.size,
       task53Garments: task53Garments,
-      task84Garments: task84Garments,
+      task85Garments: task85Garments,
     };
   }, [filteredIroningRecords]);
 
   const userTodayStats = useMemo(() => {
     if (loading || !user || !user.emp_id) {
-      return { task53: 0, task84: 0, total: 0 };
+      return { task53: 0, task85: 0, total: 0 };
     }
 
     const today = new Date().toLocaleDateString("en-US", {
@@ -415,7 +415,7 @@ const IroningPage = () => {
     });
 
     let task53Count = 0;
-    let task84Count = 0;
+    let task85Count = 0;
     let totalCount = 0;
 
     ironingRecords.forEach(record => {
@@ -425,13 +425,13 @@ const IroningPage = () => {
         totalCount += qty;
         if (String(record.task_no_ironing) === "53") {
           task53Count += qty;
-        } else if (String(record.task_no_ironing) === "84") {
-          task84Count += qty;
+        } else if (String(record.task_no_ironing) === "85") {
+          task85Count += qty;
         }
       }
     });
 
-    return { task53: task53Count, task84: task84Count, total: totalCount };
+    return { task53: task53Count, task85: task85Count, total: totalCount };
   }, [ironingRecords, user, loading]);
 
   // Placeholder for Day Target - this should ideally come from config or API
@@ -503,7 +503,7 @@ const IroningPage = () => {
                 stats={{
                   tasks: [
                     { label: t("iro.stats.card.normal_iron", "Normal Iron (T53)"), value: userTodayStats.task53},
-                    { label: t("iro.stats.card.defect_iron", "Defect Iron (T84)"), value: userTodayStats.task84}
+                    { label: t("iro.stats.card.defect_iron", "Defect Iron (T85)"), value: userTodayStats.task85}
                   ],
                   totalValue: userTodayStats.total,
                   totalUnit: t("iro.stats.card.garments", "garments"),
@@ -566,13 +566,13 @@ const IroningPage = () => {
                     <p className="text-base font-semibold text-gray-700">{loadingData ? "..." : ironingStats.task53Garments.toLocaleString()}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 font-medium">{t("iro.stats.defect_iron", "Defect (T84)")}</p>
-                    <p className="text-base font-semibold text-gray-700">{loadingData ? "..." : ironingStats.task84Garments.toLocaleString()}</p>
+                    <p className="text-xs text-gray-500 font-medium">{t("iro.stats.defect_iron", "Defect (T85)")}</p>
+                    <p className="text-base font-semibold text-gray-700">{loadingData ? "..." : ironingStats.task85Garments.toLocaleString()}</p>
                   </div>
                 </div>
               </div>
               <StatCard
-                title={t("iro.stats.total_bundles", "Total Bundles Processed")}
+                title={t("iro.stats.total_bundles", "Total Bundles Processed")} 
                 value={ironingStats.totalBundlesProcessed.toLocaleString()}
                 icon={<Package />}
                 colorClass="border-l-green-500 text-green-500 bg-green-500"

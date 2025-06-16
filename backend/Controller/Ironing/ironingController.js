@@ -122,3 +122,31 @@ export const getIroningRecords = async (req, res) => {
       }
 };
 
+// GET distinct filter options for Ironing records
+export const getIroningFilterOptions = async (req, res) => {
+  try {
+    // Assuming 'emp_id_ironing' is the field for QC ID in Ironing records
+    const qcIds = await Ironing.distinct('emp_id_ironing').exec(); 
+    const taskNos = await Ironing.distinct('task_no_ironing').exec();
+    
+    const moNosFromMoNo = await Ironing.distinct('moNo').exec();
+    const moNosFromSelectedMono = await Ironing.distinct('selectedMono').exec();
+    const combinedMoNos = [...new Set([...moNosFromMoNo, ...moNosFromSelectedMono].filter(Boolean))];
+
+    const packageNos = await Ironing.distinct('package_no').exec();
+    const departments = await Ironing.distinct('department').exec();
+    const custStyles = await Ironing.distinct('custStyle').exec();
+
+    res.json({
+      qcIds: qcIds.filter(id => id != null),
+      taskNos: taskNos.filter(tn => tn != null),
+      moNos: combinedMoNos.filter(mo => mo != null),
+      packageNos: packageNos.filter(pn => pn != null),
+      departments: departments.filter(dept => dept != null),
+      custStyles: custStyles.filter(style => style != null),
+    });
+  } catch (error) {
+    console.error('Error fetching distinct Ironing filter options:', error);
+    res.status(500).json({ message: 'Failed to fetch distinct Ironing filter options' });
+  }
+};

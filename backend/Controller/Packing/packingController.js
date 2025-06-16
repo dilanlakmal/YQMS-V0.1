@@ -182,3 +182,31 @@ export const getPackingRecords = async (req, res) => {
         res.status(500).json({ message: "Failed to fetch Packing records" });
       }
 };
+
+// GET distinct filter options for Packing records
+export const getPackingFilterOptions = async (req, res) => {
+  try {
+    const qcIds = await Packing.distinct('emp_id_packing').exec();
+    const taskNos = await Packing.distinct('task_no_packing').exec();
+
+    const moNosFromMoNo = await Packing.distinct('moNo').exec();
+    const moNosFromSelectedMono = await Packing.distinct('selectedMono').exec();
+    const combinedMoNos = [...new Set([...moNosFromMoNo, ...moNosFromSelectedMono].filter(Boolean))];
+
+    const packageNos = await Packing.distinct('package_no').exec();
+    const departments = await Packing.distinct('department').exec();
+    const custStyles = await Packing.distinct('custStyle').exec();
+
+    res.json({
+      qcIds: qcIds.filter(id => id != null),
+      taskNos: taskNos.filter(tn => tn != null),
+      moNos: combinedMoNos.filter(mo => mo != null),
+      packageNos: packageNos.filter(pn => pn != null),
+      departments: departments.filter(dept => dept != null),
+      custStyles: custStyles.filter(style => style != null),
+    });
+  } catch (error) {
+    console.error('Error fetching distinct Packing filter options:', error);
+    res.status(500).json({ message: 'Failed to fetch distinct Packing filter options' });
+  }
+};
