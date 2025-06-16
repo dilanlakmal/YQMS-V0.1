@@ -448,8 +448,11 @@ const PackingPage = () => {
       return { task63: 0, task66: 0, task67: 0, task68: 0, total: 0 };
     }
 
-    const today = new Date().toLocaleDateString("en-CA", { 
-      year: "numeric", month: "2-digit", day: "2-digit",
+    // Ensure 'today' format matches 'packing_updated_date' (MM/DD/YYYY)
+    const today = new Date().toLocaleDateString("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
     });
 
     let t63 = 0, t66 = 0, t67 = 0, t68 = 0, t106 = 0, t107 = 0, t108 = 0, t109 = 0, total = 0;
@@ -519,6 +522,9 @@ const PackingPage = () => {
                     { label: t("pack.stats.card.task68", "Task (T68)"), value: userTodayStats.task68},
                     // Defect Tasks
                     { label: t("pack.stats.card.task106", "Defect Task (T106)"), value: userTodayStats.task106},
+                    { label: t("pack.stats.card.task107", "Defect Task (T107)"), value: userTodayStats.task107},
+                    { label: t("pack.stats.card.task108", "Defect Task (T108)"), value: userTodayStats.task108},
+                    { label: t("pack.stats.card.task109", "Defect Task (T109)"), value: userTodayStats.task109},
                   ],
                   totalValue: userTodayStats.total,
                   totalUnit: t("pack.stats.card.garments", "garments"),

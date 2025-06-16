@@ -453,8 +453,10 @@ const OPAPage = () => {
       return { task60: 0, task61: 0, task62: 0, task103: 0, task104: 0, task105: 0, total: 0 };
     }
 
-    const today = new Date().toLocaleDateString("en-CA", { // Use YYYY-MM-DD for consistent comparison
-      year: "numeric", month: "2-digit", day: "2-digit",
+    const today = new Date().toLocaleDateString("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
     });
 
     let t60 = 0, t61 = 0, t62 = 0, t103 = 0, t104 = 0, t105 = 0, total = 0;
@@ -536,12 +538,13 @@ const OPAPage = () => {
                     { label: t("opa.stats.card.task61", "OPA Task (T61)"), value: userTodayStats.task61},
                     { label: t("opa.stats.card.task62", "OPA Task (T62)"), value: userTodayStats.task62},
                     // Defect Tasks
-                    { label: t("opa.stats.card.task103", "Defect OPA (T103)"), value: userTodayStats.task103},
+                   { label: t("opa.stats.card.task103", "Defect OPA (T103)"), value: userTodayStats.task103 },
+                    { label: t("opa.stats.card.task104", "Defect OPA (T104)"), value: userTodayStats.task104 },
+                    { label: t("opa.stats.card.task105", "Defect OPA (T105)"), value: userTodayStats.task105 },
                     
                   ],
                   totalValue: userTodayStats.total,
                   totalUnit: t("opa.stats.card.garments", "garments"),
-                  totalColor: "text-green-600",
                   totalLabel: t("opa.stats.card.total_scanned_today", "Total Scanned (Today)"),
                 }}
                 // className="max-w-sm ml-auto"

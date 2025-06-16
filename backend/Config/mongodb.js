@@ -46,6 +46,7 @@ import createEMBDefectModel from "../models/EMBdefect.js";
 import createEMBReportModel from "../models/EMBReport.js";
 import createAuditCheckPointModel from "../models/AuditCheckPoint.js";
 
+
 // MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(process.env.YM_PROD_DB_URI || "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin");
 export const ymEcoConnection = mongoose.createConnection(process.env.YM_ECO_DB_URI || "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin");
@@ -101,6 +102,7 @@ export const ElasticReport = createElasticReportModel(ymProdConnection);
 export const EMBDefect = createEMBDefectModel(ymProdConnection);
 export const EMBReport = createEMBReportModel(ymProdConnection);
 export const AuditCheckPoint = createAuditCheckPointModel(ymProdConnection);
+// export const DailyUserStatus = createDailyUserStatusModel(ymProdConnection);
 
 export async function disconnectMongoDB() {
     try {
