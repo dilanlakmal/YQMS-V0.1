@@ -2652,7 +2652,7 @@ app.post(
         "storage",
         "qc2_images"
       );
-      await fs.promises.mkdir(uploadPath, { recursive: true });
+      //await fs.promises.mkdir(uploadPath, { recursive: true });
 
       const fileExtension = path.extname(req.file.originalname);
       const newFilename = `qc2-defect-${Date.now()}-${Math.round(
@@ -2736,12 +2736,10 @@ app.put(
       });
     } catch (error) {
       console.error("Error replacing defect image:", error);
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "Server error while replacing image."
-        });
+      res.status(500).json({
+        success: false,
+        message: "Server error while replacing image."
+      });
     }
   }
 );
