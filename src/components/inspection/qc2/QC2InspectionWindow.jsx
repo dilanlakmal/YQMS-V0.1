@@ -8,35 +8,9 @@ import DefectBox from "../DefectBox";
 
 const QC2InspectionWindow = (props) => {
   const {
-    bundleData,
-    isReturnInspection,
-    sessionData,
-    totalPass,
-    totalRejects,
-    defectQty,
-    hasDefects,
-    selectedGarment,
-    rejectedGarmentNumbers,
-    qrCodesData,
-    printMethod,
-    isPassingBundle,
-    rejectedOnce,
-    passBundleCountdown,
-    generateQRDisabled,
-    isBluetoothConnected,
-    printing,
-    handleRejectGarment,
-    handlePassBundle,
-    handleGenerateQRCodes,
-    handlePrintQRCode,
-    setShowQRPreview,
-    defectTrackingDetails,
+    // --- FIX: Receive the master defects list ---
+    defectsData,
     language,
-    handleLanguageChange,
-    lockedGarments,
-    repairStatuses,
-    handleDefectStatusToggle,
-    rejectedGarmentDefects,
     showDefectBoxes,
     tempDefects,
     setTempDefects,
@@ -49,51 +23,19 @@ const QC2InspectionWindow = (props) => {
     <>
       <div className="p-2 bg-blue-100 border-b">
         <div className="flex items-center">
-          <QC2InspectionActions
-            hasDefects={hasDefects}
-            isReturnInspection={isReturnInspection}
-            totalPass={totalPass}
-            selectedGarment={selectedGarment}
-            rejectedGarmentNumbers={rejectedGarmentNumbers}
-            qrCodesData={qrCodesData}
-            printMethod={printMethod}
-            isPassingBundle={isPassingBundle}
-            rejectedOnce={rejectedOnce}
-            passBundleCountdown={passBundleCountdown}
-            defectQty={defectQty}
-            generateQRDisabled={generateQRDisabled}
-            isBluetoothConnected={isBluetoothConnected}
-            printing={printing}
-            handleRejectGarment={handleRejectGarment}
-            handlePassBundle={handlePassBundle}
-            handleGenerateQRCodes={handleGenerateQRCodes}
-            handlePrintQRCode={handlePrintQRCode}
-            setShowQRPreview={setShowQRPreview}
-          />
-          <QC2InspectionDashboard
-            bundleData={bundleData}
-            isReturnInspection={isReturnInspection}
-            sessionData={sessionData}
-            totalPass={totalPass}
-            totalRejects={totalRejects}
-            defectQty={defectQty}
-          />
+          {/* These components seem correct and just receive props */}
+          <QC2InspectionActions {...props} />
+          <QC2InspectionDashboard {...props} />
         </div>
       </div>
       <div className="h-[calc(100vh-200px)] overflow-y-auto p-2">
-        <QC2InspectionReturnDetails
-          defectTrackingDetails={defectTrackingDetails}
-          language={language}
-          handleLanguageChange={handleLanguageChange}
-          lockedGarments={lockedGarments}
-          rejectedGarmentNumbers={rejectedGarmentNumbers}
-          repairStatuses={repairStatuses}
-          handleDefectStatusToggle={handleDefectStatusToggle}
-          rejectedGarmentDefects={rejectedGarmentDefects}
-        />
+        {/* QC2InspectionReturnDetails also receives all props it needs */}
+        <QC2InspectionReturnDetails {...props} />
 
         {showDefectBoxes && (
+          // --- FIX: Pass all required props to DefectBox ---
           <DefectBox
+            defectsData={defectsData} // Pass the master data
             language={language}
             tempDefects={tempDefects}
             onDefectUpdate={setTempDefects}

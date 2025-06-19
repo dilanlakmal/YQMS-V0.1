@@ -37,6 +37,7 @@ const QC2InspectionReturnDetails = ({
         <h3 className="text-xl font-semibold text-gray-800 mb-4">
           {t("qc2In.defect_card_details", "Defect Card Details")}
         </h3>
+        {/* ... (Header info is correct) ... */}
         <div className="flex justify-between mb-6 bg-gray-100 p-2 rounded">
           <p className="text-gray-700">
             <strong>{t("bundle.mono")}:</strong> {defectTrackingDetails.moNo}
@@ -75,6 +76,7 @@ const QC2InspectionReturnDetails = ({
         <Table className="min-w-full">
           <TableHead>
             <TableRow className="bg-gray-100 text-white">
+              {/* ... (Table Head cells are correct) ... */}
               <TableCell className="px-2 py-1 text-left text-sm font-medium text-gray-700 border border-gray-200">
                 {t("qc2In.garment_number", "Garment Number")}
               </TableCell>
@@ -103,6 +105,7 @@ const QC2InspectionReturnDetails = ({
                     <TableRow
                       key={`${garment.garmentNumber}-${defect.name}-${index}`}
                       className={
+                        /* ... (className logic is correct) ... */
                         lockedGarments.has(garment.garmentNumber) ||
                         rejectedGarmentNumbers.has(garment.garmentNumber)
                           ? "bg-gray-300"
@@ -118,12 +121,15 @@ const QC2InspectionReturnDetails = ({
                         {defect.repair}
                       </TableCell>
                       <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
+                        {/* --- FIX: Use the new displayName property --- */}
+                        {/* Fallback to defect.name if displayName isn't available */}
                         {defect.displayName || defect.name}
                       </TableCell>
                       <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
                         {defect.count}
                       </TableCell>
                       <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
+                        {/* ... (Button logic is correct) ... */}
                         <Button
                           variant="contained"
                           color={
