@@ -13,7 +13,10 @@ import {
   Tag,
   XCircle,
   Languages,
-  Paperclip
+  Paperclip,
+  ClipboardCheck,
+  Redo,
+  Database
 } from "lucide-react";
 import BluetoothComponent from "../components/forms/Bluetooth";
 import QRCodePreview from "../components/forms/QRCodePreview";
@@ -1592,8 +1595,34 @@ const QC2InspectionPage = () => {
     }
   }, [language]);
 
+  // --- NEW: Refactored PageTitle component ---
+  const PageTitle = useCallback(
+    () => (
+      <div className="text-center">
+        <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
+          {t("qc2In.title", "QC2 Inspection")}
+        </h1>
+        <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-0.5 md:mt-1">
+          Yorkmars (Cambodia) Garment MFG Co., LTD
+          {user && ` | ${user.job_title || "Operator"} | ${user.emp_id}`}
+        </p>
+      </div>
+    ),
+    [t, user]
+  );
+
+  // --- NEW: Tab Icons definition ---
+  const tabIcons = {
+    first: <ClipboardCheck />,
+    edit: <Eye />, // Using Eye for "View/Edit"
+    return: <Redo />, // Using Redo for "Return"
+    data: <Database />,
+    "defect-cards": <Tag />
+  };
+
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-slate-100">
+      {/* Sidebar Navigation */}
       <div
         className={`${
           navOpen ? "w-80 md:w-72" : "w-16"
@@ -1608,6 +1637,7 @@ const QC2InspectionPage = () => {
           <div className="space-y-6">
             {menuClicked ? (
               <>
+                {/* Languages Section */}
                 <div className="flex items-center mb-1">
                   <Languages className="w-5 h-5 mr-1" />
                   <span className="font-medium">{t("qc2In.language")}</span>
@@ -1622,6 +1652,7 @@ const QC2InspectionPage = () => {
                   <option value="chinese">{t("languages.ch")}</option>
                   <option value="all">{t("qc2In.all_languages")}</option>
                 </select>
+                {/* Defect Type Filter */}
                 <div className="flex items-center mb-1">
                   <Filter className="w-5 h-5 mr-1" />
                   <span className="font-medium">
@@ -1648,6 +1679,7 @@ const QC2InspectionPage = () => {
                     </button>
                   ))}
                 </div>
+                {/* Category Filter */}
                 <div className="flex items-center mb-1">
                   <Tag className="w-5 h-5 mr-1" />
                   <span className="font-medium">{t("ana.category")}</span>
@@ -1670,6 +1702,7 @@ const QC2InspectionPage = () => {
                     </button>
                   ))}
                 </div>
+                {/* Sort Section */}
                 <div className="flex items-center mb-1">
                   <ArrowUpDown className="w-5 h-5 mr-1" />
                   <span className="font-medium">{t("qc2In.sort")}</span>
@@ -1719,11 +1752,14 @@ const QC2InspectionPage = () => {
                     </div>
                   )}
                 </div>
+                {/* Printer Section */}
                 <div className="flex items-center mb-1">
                   <Printer className="w-5 h-5 mr-1" />
                   <span className="font-medium">{t("qc2In.printer")}</span>
                 </div>
                 <BluetoothComponent ref={bluetoothRef} />
+
+                {/* Printing Method Section */}
                 <div className="flex items-center mb-1">
                   <Paperclip className="w-5 h-5 mr-1" />
                   <span className="font-medium">
@@ -1759,6 +1795,7 @@ const QC2InspectionPage = () => {
               </>
             ) : (
               <>
+                {/* ... collapsed sidebar logic ... */}
                 {selectedFeature === "language" && (
                   <div>
                     <div className="flex items-center mb-1">
@@ -1986,8 +2023,44 @@ const QC2InspectionPage = () => {
       <div style={{ position: "absolute", left: "-9999px" }}>
         <BluetoothComponent ref={bluetoothRef} />
       </div>
+
       <div className={`${navOpen ? "w-3/4" : "w-11/12"} flex flex-col`}>
-        {!inDefectWindow && (
+        <header className="bg-white shadow-md p-3 sticky top-0 z-20">
+          <PageTitle />
+          {!inDefectWindow && (
+            <div className="mt-4 border-b border-gray-300">
+              <nav
+                className="-mb-px flex space-x-1 sm:space-x-4 justify-center"
+                aria-label="Tabs"
+              >
+                {["first", "edit", "return", "data", "defect-cards"].map(
+                  (tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`group inline-flex items-center py-2 sm:py-3 px-1 sm:px-4 border-b-2 font-semibold text-xs sm:text-sm focus:outline-none transition-all duration-200 ease-in-out
+                          ${
+                            activeTab === tab
+                              ? "border-indigo-600 text-indigo-700"
+                              : "border-transparent text-gray-500 hover:text-indigo-700 hover:border-indigo-300"
+                          }`}
+                    >
+                      {React.cloneElement(tabIcons[tab], {
+                        className: `mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 ${
+                          activeTab === tab
+                            ? "text-indigo-600"
+                            : "text-gray-400 group-hover:text-indigo-500"
+                        }`
+                      })}
+                      {t(`qc2In.tabs.${tab}`)}
+                    </button>
+                  )
+                )}
+              </nav>
+            </div>
+          )}
+        </header>
+        {/* {!inDefectWindow && (
           <div className="bg-gray-200 p-2">
             <div className="flex space-x-4">
               {["first", "edit", "return", "data", "defect-cards"].map(
@@ -2015,19 +2088,24 @@ const QC2InspectionPage = () => {
               )}
             </div>
           </div>
-        )}
-        {activeTab === "edit" && <EditInspection />}
-        {activeTab === "return" && <DefectNames />}
-        {activeTab === "data" && <QC2Data />}
-        {activeTab === "defect-cards" && (
-          <DefectPrint bluetoothRef={bluetoothRef} printMethod={printMethod} />
-        )}
-        <div className="flex-grow overflow-hidden bg-gray-50">
-          {activeTab !== "first" ? (
-            <div className="h-full flex items-center justify-center">
-              {/* <p className="text-gray-500">Coming Soon</p> */}
+        )} */}
+        <main className="flex-grow">
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-300 rounded-lg flex items-center gap-3 shadow-md m-4">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+              <p className="text-sm text-red-700">{error}</p>
             </div>
-          ) : (
+          )}
+          {activeTab === "edit" && <EditInspection />}
+          {activeTab === "return" && <DefectNames />}
+          {activeTab === "data" && <QC2Data />}
+          {activeTab === "defect-cards" && (
+            <DefectPrint
+              bluetoothRef={bluetoothRef}
+              printMethod={printMethod}
+            />
+          )}
+          {activeTab === "first" && (
             <>
               {!inDefectWindow ? (
                 <div className="flex flex-col items-center justify-center h-full p-4">
@@ -2035,7 +2113,6 @@ const QC2InspectionPage = () => {
                     <div className="w-full max-w-2xl h-96">
                       <Scanner
                         onScanSuccess={handleScanSuccess}
-                        // onScanError={(err) => setError(err)}
                         onScanError={handleScanError}
                       />
                       {loadingData && (
@@ -2043,9 +2120,6 @@ const QC2InspectionPage = () => {
                           <Loader2 className="w-5 h-5 animate-spin" />
                           <p>{t("qc2In.loading_data")}</p>
                         </div>
-                      )}
-                      {error && (
-                        <div className="text-red-600 mt-4">{error}</div>
                       )}
                     </div>
                   )}
@@ -2511,7 +2585,7 @@ const QC2InspectionPage = () => {
               )}
             </>
           )}
-        </div>
+        </main>
       </div>
       <QRCodePreview
         isOpen={showQRPreview}
