@@ -26,6 +26,7 @@ import SCCDefectsModifyAdd from "../components/inspection/scc/SCCDefectsModifyAd
 import CuttingInspectionManage from "../components/inspection/cutting/CuttingInspectionManage";
 import SCCOperatorsManage from "../components/inspection/scc/SCCOperatorsManage";
 import RovingMasterDataManage from "../components/inspection/qc_roving/RovingMasterDataManage";
+import QC2DefectsAddModify from "../components/inspection/qc2/QC2DefectsAddModify";
 
 // Placeholder components for other tabs
 const PlaceholderComponent = ({ titleKey, contentKey }) => {
@@ -104,12 +105,7 @@ const SystemAdmin = () => {
         id: "qc2Defects",
         labelKey: "systemAdmin.qc2Defects",
         icon: <Settings size={18} />,
-        component: (
-          <PlaceholderComponent
-            titleKey="systemAdmin.qc2Defects"
-            contentKey="systemAdmin.contentComingSoon"
-          />
-        )
+        component: <QC2DefectsAddModify /> // Use the new component
       },
       {
         // New Tab for Audit Checkpoints

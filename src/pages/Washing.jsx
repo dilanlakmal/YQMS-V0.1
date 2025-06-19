@@ -31,6 +31,7 @@ const WashingPage = () => {
     taskNo: "",
     department: "",
     custStyle: "",
+    lineNo: ""
   });
 
   useEffect(() => {
@@ -478,7 +479,6 @@ const WashingPage = () => {
 
     return { task52: task52Count, task101: task101Count, total: totalCount };
   }, [washingRecords, user, loading]);
-
 
   // Placeholder for Day Target - this should ideally come from config or API
   const DAY_TARGET = 500;

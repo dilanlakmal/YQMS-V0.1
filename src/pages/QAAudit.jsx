@@ -1,30 +1,40 @@
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import FabricAudit from "../components/inspection/audit/FabricAudit"; // 2. IMPORT FabricAudit.jsx
-import PUOV from "../components/inspection/audit/PUOV"; // Assuming PUOV.jsx is in this path
-import QMSAudit from "../components/inspection/audit/QMSAudit"; // 1. IMPORT QMSAudit.jsx
+
+// --- STEP 1: Import all the components ---
+import CuttingFusingAudit from "../components/inspection/audit/CuttingFusingAudit";
+import EmbellishmentsAudit from "../components/inspection/audit/EmbellishmentsAudit";
+import FabricAudit from "../components/inspection/audit/FabricAudit";
+import FinishingPackingAudit from "../components/inspection/audit/FinishingPackingAudit";
+import PUOV from "../components/inspection/audit/PUOV";
+import ProductSafetyAudit from "../components/inspection/audit/ProductSafetyAudit";
+import ProductionSewingAudit from "../components/inspection/audit/ProductionSewingAudit";
+import QMSAudit from "../components/inspection/audit/QMSAudit";
+import SampleAndPatternAudit from "../components/inspection/audit/SampleAndPatternAudit";
+import TrimsAudit from "../components/inspection/audit/TrimsAudit";
 
 // Import Lucide Icons
 import {
-  BookCheck, // For QMS (Quality Management System) // Corrected icon usage
-  ClipboardCheck, // For CAP
-  DraftingCompass, // For Sample and Pattern Room
-  Factory, // For PU OV
-  GraduationCap, // For Final Score
-  Info, // Default/Placeholder Icon
-  Layers, // For Fabric
-  PackageCheck, // For Finishing and Packing
-  Scissors, // For Trims
-  ScissorsLineDashed, // For Cutting and Fusing
-  ShieldAlert, // For Product Safety
-  Sparkles, // For Embellishments
-  Wrench // For Production and Sewing
+  BookCheck,
+  ClipboardCheck,
+  DraftingCompass,
+  Factory,
+  GraduationCap,
+  Info,
+  Layers,
+  PackageCheck,
+  Scissors,
+  ScissorsLineDashed,
+  ShieldAlert,
+  Sparkles,
+  Wrench
 } from "lucide-react";
 
 const QAAudit = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState(0);
 
+  // This placeholder is now only for the last two tabs
   const PlaceholderComponent = ({ tabKey }) => (
     <div className="p-10 text-center">
       <Info size={48} className="mx-auto mb-4 text-gray-400" />
@@ -38,6 +48,7 @@ const QAAudit = () => {
     </div>
   );
 
+  // --- STEP 2: Update the `component` property for each tab ---
   const TABS = useMemo(
     () => [
       {
@@ -62,61 +73,55 @@ const QAAudit = () => {
         id: "trims",
         labelKey: "qaAudit.tabs.trims",
         icon: <Scissors size={16} />,
-        component: <PlaceholderComponent tabKey="qaAudit.tabs.trims" />
+        component: <TrimsAudit />
       },
       {
         id: "samplePatternRoom",
         labelKey: "qaAudit.tabs.samplePatternRoom",
         icon: <DraftingCompass size={16} />,
-        component: (
-          <PlaceholderComponent tabKey="qaAudit.tabs.samplePatternRoom" />
-        )
+        component: <SampleAndPatternAudit />
       },
       {
         id: "embellishments",
         labelKey: "qaAudit.tabs.embellishments",
         icon: <Sparkles size={16} />,
-        component: <PlaceholderComponent tabKey="qaAudit.tabs.embellishments" />
+        component: <EmbellishmentsAudit />
       },
       {
         id: "cuttingFusing",
         labelKey: "qaAudit.tabs.cuttingFusing",
         icon: <ScissorsLineDashed size={16} />,
-        component: <PlaceholderComponent tabKey="qaAudit.tabs.cuttingFusing" />
+        component: <CuttingFusingAudit />
       },
       {
         id: "productionSewing",
         labelKey: "qaAudit.tabs.productionSewing",
         icon: <Wrench size={16} />,
-        component: (
-          <PlaceholderComponent tabKey="qaAudit.tabs.productionSewing" />
-        )
+        component: <ProductionSewingAudit />
       },
       {
         id: "finishingPacking",
         labelKey: "qaAudit.tabs.finishingPacking",
         icon: <PackageCheck size={16} />,
-        component: (
-          <PlaceholderComponent tabKey="qaAudit.tabs.finishingPacking" />
-        )
+        component: <FinishingPackingAudit />
       },
       {
         id: "productSafety",
         labelKey: "qaAudit.tabs.productSafety",
         icon: <ShieldAlert size={16} />,
-        component: <PlaceholderComponent tabKey="qaAudit.tabs.productSafety" />
+        component: <ProductSafetyAudit />
       },
       {
         id: "cap",
         labelKey: "qaAudit.tabs.cap",
-        icon: <ClipboardCheck size={16} />, // Correct icon for CAP
-        component: <PlaceholderComponent tabKey="qaAudit.tabs.cap" />
+        icon: <ClipboardCheck size={16} />,
+        component: <PlaceholderComponent tabKey="qaAudit.tabs.cap" /> // Keep as placeholder for now
       },
       {
         id: "finalScore",
         labelKey: "qaAudit.tabs.finalScore",
         icon: <GraduationCap size={16} />,
-        component: <PlaceholderComponent tabKey="qaAudit.tabs.finalScore" />
+        component: <PlaceholderComponent tabKey="qaAudit.tabs.finalScore" /> // Keep as placeholder for now
       }
     ],
     [t]

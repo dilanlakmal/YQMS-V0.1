@@ -1,4 +1,3 @@
-// File: d:/Yash/Projects/YQMS/YQMS-V0.1/src/components/cards/StatCard.jsx
 import React from 'react';
 
 const StatCard = ({ title, value, icon, colorClass, loading }) => (

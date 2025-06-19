@@ -35,6 +35,8 @@ import { useTranslation } from "react-i18next";
 import DigitalMeasurement from "../components/inspection/liveDashboard/DigitalMeasurement";
 import DigitalMeasurementCPK from "../components/inspection/liveDashboard/DigitalMeasurement-CPK";
 import DigitalMeasurementBuyerSpec from "../components/inspection/digital_measurement/DigitalMeasurementBuyerSpec";
+import { useAuth } from "../components/authentication/AuthContext";
+import { User } from "lucide-react";
 
 const LiveDashboard = () => {
   const { t } = useTranslation();
@@ -47,6 +49,7 @@ const LiveDashboard = () => {
   const [qc1Filters, setQc1Filters] = useState({});
   const [qc1Loading, setQc1Loading] = useState(false);
   const [qc1Error, setQc1Error] = useState(null);
+  const { user } = useAuth();
 
   // Filter states
   const [startDate, setStartDate] = useState(null);
@@ -520,9 +523,78 @@ const LiveDashboard = () => {
           isNavOpen ? "ml-72" : "ml-0"
         }`}
       >
-        <h1 className="text-2xl font-bold mb-4 text-center text-gray-800">
+        {/* --- THIS IS THE NEW, PROFESSIONAL HEADER --- */}
+        <div className="bg-white rounded-lg shadow-md mb-6 p-4">
+          <div className="flex items-center justify-between">
+            {/* Left side: Logo and the Text block are now direct children of this flex container */}
+            <div className="flex items-center space-x-4 flex-grow">
+              {/* 1. Logo - Moved out and height increased */}
+              <img
+                src="/assets/Home/yorkmars.jpg"
+                alt="Yorkmars Logo"
+                className="h-16 w-auto self-start" // self-start aligns it to the top of the flex container
+              />
+
+              {/* 2. New container for all the text */}
+              <div className="flex-grow">
+                {/* Main Title Line */}
+                <h1 className="text-lg font-bold text-gray-800 tracking-tight">
+                  <span>Yorkmars (Cambodia) Garment MFG Co., LTD | </span>
+                  <span>យូកម៉ាស (ខេមបូឌា) ហ្គាមេន អឹមអេហ្វជី ខូអិលធីឌី |</span>
+                  <span> 溢泰 (柬埔寨) 製衣廠有限公司 </span>
+                  <span className="font-light text-gray-400 mx-2">|</span>
+                  <span>{activeSection}</span>
+                  {user && (
+                    <>
+                      <span className="font-light text-gray-400 mx-2">|</span>
+                      <span>{user.emp_id}</span>
+                    </>
+                  )}
+                </h1>
+
+                {/* Sub-line with Address */}
+                <p className="text-xs text-gray-500 mt-1">
+                  {" "}
+                  {/* mt-1 adds a small space below the title */}
+                  #0287, PLOV LUM, PHUM TRAPRAING CHHREY, SANGKAT KAKAB, KHAN
+                  PORSENCHHEY | Tel: (855) 23 866 416/417, Fax:(855) 866 418.
+                </p>
+              </div>
+            </div>
+
+            {/* Right side: User Info (Unchanged) */}
+            {/* Right side: New User Info Block */}
+            {user && (
+              <div className="flex flex-shrink-0 flex-col items-center justify-center border-l border-gray-200 bg-gray-50 p-2 w-40">
+                {/* Conditional rendering for the photo */}
+                {user.face_photo ? (
+                  <img
+                    src={user.face_photo}
+                    alt={user.eng_name}
+                    className="h-8 w-8 rounded-full object-cover shadow-md border-2 border-white"
+                  />
+                ) : (
+                  // Fallback if no photo is available
+                  <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center border-2 border-white shadow-md">
+                    <User className="h-8 w-8 text-gray-500" />
+                  </div>
+                )}
+
+                {/* Job Title */}
+                <p className="text-xs font-semibold text-gray-700 mt-2 text-center break-words">
+                  {user.emp_id === "YM6702" || user.emp_id === "YM7903"
+                    ? "Developer - YQMS"
+                    : user.job_title || "N/A"}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* --- END OF NEW HEADER --- */}
+
+        {/* <h1 className="text-2xl font-bold mb-4 text-center text-gray-800">
           {activeSection}
-        </h1>
+        </h1> */}
 
         {/* Common Filter Pane for QC2 Sections */}
         {[

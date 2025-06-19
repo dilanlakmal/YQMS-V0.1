@@ -1817,7 +1817,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
                   <span className="font-medium">{t("qc2In.printing_method")}</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:flex space-x-1 md:space-x-2">
-                  <button
+                  {/* <button
                     onClick={() => setPrintMethod("repair")}
                     className={`p-1 text-sm rounded border ${printMethod === "repair" ? "bg-blue-600" : "bg-gray-700"}`}
                   >
@@ -1828,7 +1828,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
                     className={`p-1 text-sm rounded border ${printMethod === "garment" ? "bg-blue-600" : "bg-gray-700"}`}
                   >
                     {t("qc2In.garment")}
-                  </button>
+                  </button> */}
                   <button
                     onClick={() => setPrintMethod("bundle")}
                     className={`p-1 text-sm rounded border ${printMethod === "bundle" ? "bg-blue-600" : "bg-gray-700"}`}
@@ -1963,7 +1963,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
                       <span className="font-medium">{t("qc2In.printing_method")}</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:flex space-x-1 md:space-x-2">
-                      <button
+                      {/* <button
                         onClick={() => setPrintMethod("repair")}
                         className={`p-1 text-sm rounded border ${printMethod === "repair" ? "bg-blue-600" : "bg-gray-700"}`}
                       >
@@ -1974,7 +1974,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
                         className={`p-1 text-sm rounded border ${printMethod === "garment" ? "bg-blue-600" : "bg-gray-700"}`}
                       >
                         {t("qc2In.garment")}
-                      </button>
+                      </button> */}
                       <button
                         onClick={() => setPrintMethod("bundle")}
                         className={`p-1 text-sm rounded border ${printMethod === "bundle" ? "bg-blue-600" : "bg-gray-700"}`}
@@ -2028,8 +2028,7 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
        <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-gradient-to-r from-slate-50 to-gray-100 shadow-lg py-4 px-4 md:py-5 md:px-6">
           <PageTitle />
-        </header>
-        {!inDefectWindow && (
+          {!inDefectWindow && (
           <div className="border-b border-gray-300 mb-6 px-4">
             <nav className="-mb-px flex space-x-4 sm:space-x-6 justify-center" aria-label="Tabs">
               {Object.entries(tabDetails).map(([tabKey, { labelKey, icon: IconComponent }]) => (
@@ -2049,6 +2048,8 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
             </nav>
           </div>
         )}
+        </header>
+        
         <div className="flex-grow overflow-y-auto bg-gray-50 p-4">
           {/* {activeTab === "edit" && <EditInspection />} */}
           {activeTab === "return" && <DefectNames />}

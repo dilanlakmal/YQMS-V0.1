@@ -44,6 +44,7 @@ const OPAPage = () => {
     taskNo: "",
     department: "",
     custStyle: "",
+    lineNo: ""
   });
 
   useEffect(() => {
@@ -413,6 +414,12 @@ const OPAPage = () => {
       if (filters.taskNo && String(record.task_no_opa ?? '').toLowerCase() !== String(filters.taskNo).toLowerCase()) return false;
       if (filters.department && String(record.department ?? '').toLowerCase() !== String(filters.department).toLowerCase()) return false;
       if (filters.custStyle && String(record.custStyle ?? '').toLowerCase() !== String(filters.custStyle).toLowerCase()) return false;
+      if (
+        filters.lineNo &&
+        String(record.lineNo ?? "").toLowerCase() !==
+          String(filters.lineNo).toLowerCase()
+      )
+        return false;
 
       return true;
     });

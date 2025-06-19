@@ -10,6 +10,18 @@ import { Eye } from "lucide-react";
 import RovingReportFilterPane from "./RovingReportFilterPane";
 import RovingReportDetailView from "./RovingReportDetailView";
 
+// Helper function to determine Buyer based on mo_no (must match backend)
+const getBuyerFromMoNumber = (moNo) => {
+  if (!moNo) return "Other";
+  if (moNo.includes("COM")) return "MWW";
+  if (moNo.includes("CO")) return "Costco";
+  if (moNo.includes("AR")) return "Aritzia";
+  if (moNo.includes("RT")) return "Reitmans";
+  if (moNo.includes("AF")) return "ANF";
+  if (moNo.includes("NT")) return "STORI";
+  return "Other";
+};
+
 const RovingReport = () => {
   // Filter states
   const [startDate, setStartDate] = useState(new Date()); // Default to today

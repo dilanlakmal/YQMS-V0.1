@@ -135,6 +135,13 @@ function Home() {
           description: "Modify Defect & Measurements.",
           version: '0.1',
         },
+        {
+          path: "/yqms",
+          roles: ["Admin", "YQMS"], // Matches "YQMS" role
+          image: "assets/Home/yqms.png",
+          title: t("home.yqms"),
+          description: "YQMS Project Management"
+        }
       ]
     },
     {

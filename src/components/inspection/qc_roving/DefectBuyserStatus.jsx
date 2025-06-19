@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import i18next from 'i18next';
 import Swal from 'sweetalert2';
 import { Loader2, Save, AlertTriangle, Trash2 } from 'lucide-react';
+import RovingDefectAdd from "./RovingDefectAdd";
 
 const DefectBuyerStatus = () => {
   const { t } = useTranslation();
@@ -97,6 +98,11 @@ const DefectBuyerStatus = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Handler to be called from child component
+  const handleDefectAdded = () => {
+    fetchData(); // Simply re-fetch all data
+  };
 
   useEffect(() => {
     const handleLanguageChanged = (lng) => {
@@ -279,6 +285,8 @@ const DefectBuyerStatus = () => {
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6 text-center">
           {t('defectBuyerStatus.title', 'Manage Defect Statuses by Buyer')}
         </h1>
+        {/* --- NEW COMPONENT HERE --- */}
+        <RovingDefectAdd onDefectAdded={handleDefectAdded} />
         {error && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md flex items-center">
             <AlertTriangle size={20} className="mr-2" />

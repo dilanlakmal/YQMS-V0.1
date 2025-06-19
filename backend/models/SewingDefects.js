@@ -7,7 +7,7 @@ const sewingDefectsSchema = new mongoose.Schema(
     english: { type: String, required: true },
     khmer: { type: String, required: true },
     chinese: { type: String, required: true },
-    image: { type: String, required: true },
+    image: { type: String },
     repair: { type: String, required: true },
     categoryEnglish: { type: String, required: true },
     categoryKhmer: { type: String, required: true },

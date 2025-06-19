@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 
 const DefectPrint = ({ bluetoothRef, printMethod }) => {
   const { t } = useTranslation();
-  const [mode, setMode] = useState("repair"); // "repair", "garment", or "bundle"
+  const [mode, setMode] = useState("bundle"); // "repair", "garment", or "bundle"
   const [defectCards, setDefectCards] = useState([]);
   const [searchMoNo, setSearchMoNo] = useState("");
   const [searchPackageNo, setSearchPackageNo] = useState("");
@@ -242,7 +242,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
               {t("defectPrint.mode")}
             </label>
             <div className="flex space-x-2">
-              <button
+              {/* <button
                 onClick={() => setMode("repair")}
                 className={`p-2 rounded border ${
                   mode === "repair" ? "bg-blue-600 text-white" : "bg-gray-200"
@@ -257,7 +257,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                 }`}
               >
                 {t("qc2In.garment")}
-              </button>
+              </button> */}
               <button
                 onClick={() => setMode("bundle")}
                 className={`p-2 rounded border ${

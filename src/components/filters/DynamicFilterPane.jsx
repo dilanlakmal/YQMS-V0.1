@@ -20,14 +20,16 @@ const DynamicFilterPane = ({
     moNo: '',
     taskNo: '',
     department: '',
-    custStyle: '',
+    // custStyle: '',
+    lineNo: "" 
   });
 
   const [taskNoOptions, setTaskNoOptions] = useState([]);
   const [moNoOptions, setMoNoOptions] = useState([]);
   const [packageNoOptions, setPackageNoOptions] = useState([]);
   const [departmentOptions, setDepartmentOptions] = useState([]);
-  const [custStyleOptions, setCustStyleOptions] = useState([]);
+  // const [custStyleOptions, setCustStyleOptions] = useState([]);
+  const [lineNoOptions, setLineNoOptions] = useState([]);
   const [qcIdOptions, setQcIdOptions] = useState([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
@@ -41,7 +43,8 @@ const DynamicFilterPane = ({
         moNo: initialFilters.moNo || '',
         taskNo: initialFilters.taskNo || '',
         department: initialFilters.department || '',
-        custStyle: initialFilters.custStyle || '',
+        // custStyle: initialFilters.custStyle || '',
+        lineNo: initialFilters.lineNo || '',
       });
     }
   }, [initialFilters]);
@@ -64,7 +67,10 @@ const DynamicFilterPane = ({
         setMoNoOptions(data.moNos?.map(mo => ({ value: mo, label: mo })) || []);
         setPackageNoOptions(data.packageNos?.map(pn => ({ value: pn, label: pn })) || []);
         setDepartmentOptions(data.departments?.map(dept => ({ value: dept, label: dept })) || []);
-        setCustStyleOptions(data.custStyles?.map(style => ({ value: style, label: style })) || []);
+        // setCustStyleOptions(data.custStyles?.map(style => ({ value: style, label: style })) || []);
+         setLineNoOptions(
+          data.lineNos?.map((ln) => ({ value: ln, label: ln })) || []
+        ); 
         setQcIdOptions(data.qcIds?.map(id => ({ value: id, label: id })) || []);
       } catch (error) {
          console.error("Error fetching filter options:", error);
@@ -73,7 +79,8 @@ const DynamicFilterPane = ({
         setMoNoOptions([]);
         setPackageNoOptions([]);
         setDepartmentOptions([]);
-        setCustStyleOptions([]);
+        // setCustStyleOptions([]);
+         setLineNoOptions([]);
         setQcIdOptions([]);
       } finally {
         setLoadingOptions(false);
@@ -114,7 +121,8 @@ const DynamicFilterPane = ({
       moNo: initialFilters?.moNo || '',
       taskNo: initialFilters?.taskNo || '',
       department: initialFilters?.department || '',
-      custStyle: initialFilters?.custStyle || '',
+      // custStyle: initialFilters?.custStyle || '',
+      lineNo: initialFilters?.lineNo || "",
     };
     setLocalFilters(resetState);
     if (onApplyFilters) {
@@ -291,7 +299,7 @@ const DynamicFilterPane = ({
 
           {/* Customer Style (Style No) */}
           <div className="flex flex-col">
-            <label htmlFor="custStyleFilter" className="text-xs font-medium text-gray-600 mb-1">
+            {/* <label htmlFor="custStyleFilter" className="text-xs font-medium text-gray-600 mb-1">
               {t('filters.cust_style', 'Style No')}
             </label>
             <Select
@@ -302,6 +310,29 @@ const DynamicFilterPane = ({
               isClearable
               isSearchable
               placeholder={t('filters.select_cust_style', 'Style No')}
+              styles={selectStyles}
+              isLoading={loadingOptions}
+            /> */}
+            <label
+              htmlFor="lineNoFilter"
+              className="text-xs font-medium text-gray-600 mb-1"
+            >
+              {t("filters.line_no", "Line No")}
+            </label>
+            <Select
+              id="lineNoFilter"
+              options={lineNoOptions}
+              value={
+                lineNoOptions.find(
+                  (option) => option.value === localFilters.lineNo
+                ) || null
+              }
+              onChange={(selectedOption) =>
+                handleSelectChange("lineNo", selectedOption)
+              }
+              isClearable
+              isSearchable
+              placeholder={t("filters.select_line_no", "Line No")}
               styles={selectStyles}
               isLoading={loadingOptions}
             />

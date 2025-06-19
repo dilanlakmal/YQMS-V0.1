@@ -5,7 +5,7 @@ const qc2OrderDataSchema = new mongoose.Schema(
     bundle_random_id: { type: String, required: true, unique: true },
     bundle_id: { type: String, required: true },
     package_no: Number,
-    task_no_order: { type: Number, default: 52 },
+    task_no: { type: Number, required: true }, // Updated from task_no_order
     date: { type: String, required: true },
     department: { type: String, required: true },
     selectedMono: { type: String, required: true },
