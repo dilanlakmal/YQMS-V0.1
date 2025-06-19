@@ -472,7 +472,7 @@ const RovingData = ({ refreshTrigger }) => {
                           case 'Reject-Minor-M': 
                             return "bg-red-100 hover:bg-red-200";
                           case 'Reject': 
-                          case 'Reject-Major-s': 
+                          case 'Reject-Major-S': 
                           case 'Reject-Minor-S':
                             return "bg-yellow-100 hover:bg-yellow-200"; 
                           case 'Pass':
