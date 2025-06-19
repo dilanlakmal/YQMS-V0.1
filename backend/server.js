@@ -1620,10 +1620,10 @@ async function syncCutPanelOrders() {
     if (records.length > 0) {
       const bulkOps = records.map((row) => ({
         updateOne: {
-          filter: { TxnNo: row.TxnNo, StyleNo: row.StyleNo }, // Using compound key
+          filter: { TxnNo: row.TxnNo },
           update: {
             $set: {
-              /* ... your document mapping ... */ StyleNo: row.StyleNo,
+              StyleNo: row.StyleNo,
               TxnDate: row.TxnDate ? new Date(row.TxnDate) : null,
               TxnNo: row.TxnNo,
               Buyer: row.Buyer,

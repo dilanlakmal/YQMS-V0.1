@@ -10,7 +10,7 @@ const MarkerRatioSchema = new mongoose.Schema({
 const CutPanelOrdersSchema = new mongoose.Schema({
   StyleNo: { type: String, required: true },
   TxnDate: { type: Date },
-  TxnNo: { type: String },
+  TxnNo: { type: String, unique: true, required: true },
   Buyer: { type: String },
   Color: { type: String },
   SpreadTable: { type: String },
