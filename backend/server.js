@@ -2791,6 +2791,27 @@ app.delete("/api/qc2-defects/:id/image", async (req, res) => {
   }
 });
 
+/* -------------------------------------
+   NEW End Point - QC2 Defect Categories
+------------------------------------- */
+
+// GET - Fetch all unique QC2 defect categories
+app.get("/api/qc2-defect-categories", async (req, res) => {
+  try {
+    // Use the distinct() method to get a unique list of values from the specified field
+    const categories = await QC2Defects.distinct("categoryEnglish");
+
+    // The result is an array of strings, e.g., ["Fabric", "Workmanship", ...]
+    // We sort them alphabetically for a consistent order in the UI.
+    res.json(categories.sort());
+  } catch (error) {
+    console.error("Error fetching QC2 defect categories:", error);
+    res
+      .status(500)
+      .json({ message: "Server error fetching defect categories" });
+  }
+});
+
 /* ------------------------------
    End Points - dt_orders
 ------------------------------ */

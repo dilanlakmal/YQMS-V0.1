@@ -1,23 +1,21 @@
-//---This component manages the entire collapsible sidebar, including language selection, filters, sorting, and printer controls.---//
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ArrowLeft,
   Menu,
-  Languages,
   Filter,
   Tag,
   ArrowUpDown,
   Printer,
-  Paperclip
+  Paperclip,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18next from "i18next";
 import BluetoothComponent from "../../forms/Bluetooth";
+import { API_BASE_URL } from "../../../../config"; // Import your API base URL
 
 const QC2InspectionSidebar = ({
-  language,
-  handleLanguageChange,
   defectTypeFilter,
   setDefectTypeFilter,
   categoryFilter,
@@ -36,17 +34,36 @@ const QC2InspectionSidebar = ({
   const [menuClicked, setMenuClicked] = useState(false);
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
 
-  const categoryOptions = [
-    "fabric",
-    "workmanship",
-    "cleanliness",
-    "embellishment",
-    "measurement",
-    "washing",
-    "finishing",
-    "miscellaneous"
-  ];
+  // --- NEW STATE for fetching categories ---
+  const [categoryOptions, setCategoryOptions] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [categoriesError, setCategoriesError] = useState(null);
+
   const defectTypes = ["all", "common", "type1", "type2"];
+
+  // --- NEW useEffect to fetch categories ---
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc2-defect-categories`
+        );
+        if (!response.ok) {
+          throw new Error("Failed to fetch categories.");
+        }
+        const data = await response.json();
+        setCategoryOptions(data);
+        setCategoriesError(null);
+      } catch (err) {
+        setCategoriesError(err.message);
+        setCategoryOptions([]);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+    fetchCategories();
+  }, []); // Empty array ensures this runs once on mount
 
   const handleMenuClick = () => {
     setNavOpen(!navOpen);
@@ -59,26 +76,50 @@ const QC2InspectionSidebar = ({
     setNavOpen(true);
   };
 
+  const CategoryFilterUI = () => (
+    <>
+      <div className="flex items-center mt-4 mb-1">
+        <Tag className="w-5 h-5 mr-1" />
+        <span className="font-medium">{t("ana.category")}</span>
+      </div>
+      {categoriesLoading && (
+        <Loader2 className="w-5 h-5 animate-spin mx-auto my-2" />
+      )}
+      {categoriesError && (
+        <AlertCircle
+          className="w-5 h-5 text-red-500 mx-auto my-2"
+          title={categoriesError}
+        />
+      )}
+      {!categoriesLoading && !categoriesError && (
+        <div className="grid grid-cols-2 gap-1">
+          {categoryOptions.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => {
+                setCategoryFilter(
+                  cat.toLowerCase() === categoryFilter ? "" : cat.toLowerCase()
+                );
+                setDefectTypeFilter("all");
+              }}
+              className={`p-1 text-sm rounded border capitalize ${
+                categoryFilter === cat.toLowerCase()
+                  ? "bg-blue-600"
+                  : "bg-gray-700"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+
   const ExpandedMenu = () => (
     <>
-      {/* Languages Section */}
-      <div className="flex items-center mb-1">
-        <Languages className="w-5 h-5 mr-1" />
-        <span className="font-medium">{t("qc2In.language")}</span>
-      </div>
-      <select
-        value={language}
-        onChange={handleLanguageChange}
-        className="w-full p-1 text-black rounded"
-      >
-        <option value="english">{t("languages.en")}</option>
-        <option value="khmer">{t("languages.kh")}</option>
-        <option value="chinese">{t("languages.ch")}</option>
-        <option value="all">{t("qc2In.all_languages")}</option>
-      </select>
-
       {/* Defect Type Filter */}
-      <div className="flex items-center mt-4 mb-1">
+      <div className="flex items-center mb-1">
         <Filter className="w-5 h-5 mr-1" />
         <span className="font-medium">{t("preview.defect_type")}</span>
       </div>
@@ -103,29 +144,8 @@ const QC2InspectionSidebar = ({
         ))}
       </div>
 
-      {/* Category Filter */}
-      <div className="flex items-center mt-4 mb-1">
-        <Tag className="w-5 h-5 mr-1" />
-        <span className="font-medium">{t("ana.category")}</span>
-      </div>
-      <div className="grid grid-cols-2 gap-1">
-        {categoryOptions.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => {
-              setCategoryFilter(cat === categoryFilter ? "" : cat);
-              setDefectTypeFilter("all");
-            }}
-            className={`p-1 text-sm rounded border ${
-              categoryFilter === cat ? "bg-blue-600" : "bg-gray-700"
-            }`}
-          >
-            {currentLanguage === "en"
-              ? t(`qc2In.${cat}`).toUpperCase()
-              : t(`qc2In.${cat}`)}
-          </button>
-        ))}
-      </div>
+      {/* Category Filter - Now uses dynamic data */}
+      <CategoryFilterUI />
 
       {/* Sort Section */}
       <div className="flex items-center mt-4 mb-1">
@@ -141,9 +161,7 @@ const QC2InspectionSidebar = ({
             ? "A-Z"
             : sortOption === "alphaDesc"
             ? "Z-A"
-            : sortOption === "countDesc"
-            ? "Count (High-Low)"
-            : "Select Sort"}
+            : "Count (High-Low)"}
         </button>
         {sortDropdownOpen && (
           <div className="absolute z-10 mt-1 w-full bg-white text-black rounded shadow p-2">
@@ -221,12 +239,6 @@ const QC2InspectionSidebar = ({
 
   const CollapsedMenu = () => (
     <div className="space-y-6">
-      <button
-        className="flex justify-center w-full"
-        onClick={() => handleIconClick("language")}
-      >
-        <Languages className="w-5 h-5" />
-      </button>
       <button
         className="flex justify-center w-full"
         onClick={() => handleIconClick("defectType")}
