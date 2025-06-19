@@ -4,12 +4,18 @@ import {
   ArrowLeft,
   ArrowUpDown,
   CheckCircle,
+  ClipboardCheck,
+  Clock,         
+  CalendarDays, 
+  Database,      
+  Edit3,  
   Eye,
   Filter,
   Loader2,
   Menu,
   Printer,
   QrCode,
+  StickyNote,
   Tag,
   XCircle,
   Languages,
@@ -169,6 +175,11 @@ const QC2InspectionPage = () => {
     }
     return () => clearInterval(timer);
   }, [passBundleCountdown, isPassingBundle]); // Add isPassingBundle as dependency
+
+   useEffect(() => { // For PageTitle clock
+    const timerId = setInterval(() => setCurrentDate(new Date()), 1000);
+    return () => clearInterval(timerId);
+  }, []);
 
   const generateDefectId = () => {
     return Math.random().toString(36).substring(2, 12).toUpperCase();
@@ -1637,8 +1648,40 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
     }
   }, [language]);
 
+   const PageTitle = useCallback(() => (
+    <div className="text-center"> {/* No outer padding here, it's handled by the header wrapper */}
+      <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
+        Yorkmars (Cambodia) Garment MFG Co., LTD
+      </h1>
+      {/* Combined User Details and Date/Time Line */}
+      <p className="text-xs sm:text-sm text-slate-600 mt-0.5 md:mt-1 flex flex-wrap justify-center items-center gap-x-1.5">
+        <span>{t("qc2In.header_title", "QC2 Inspection")}</span>
+        {user && (
+          <>
+            <span className="text-slate-400">|</span>
+            <span className="text-slate-600">{`${user.job_title || "Operator"} | ${user.emp_id}`}</span>
+          </>
+        )}
+        <span className="text-slate-400">|</span>
+        <CalendarDays className="w-3.5 h-3.5 text-slate-500" />
+        <span className="text-slate-700">{currentDate.toLocaleDateString()}</span>
+        <span className="text-slate-400">|</span>
+        <Clock className="w-3.5 h-3.5 text-slate-500" />
+        <span className="text-slate-700">{currentDate.toLocaleTimeString()}</span>
+      </p>
+    </div>
+  ), [t, user, currentDate]);
+
+  const tabDetails = React.useMemo(() => ({
+    first: { labelKey: "qc2In.inspection", icon: ClipboardCheck },
+    data: { labelKey: "qc2In.edit_inspection", icon: Edit3 },
+    return: { labelKey: "defIm.defect_name", icon: Tag },
+    // data: { labelKey: "bundle.data", icon: Database },
+    "defect-cards": { labelKey: "bundle.reprint", icon: StickyNote },
+  }), []); 
+
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-slate-100">
       <div
         className={`${
           navOpen ? "w-80 md:w-72" : "w-16"
@@ -1982,53 +2025,45 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
       <div style={{ position: 'absolute', left: '-9999px' }}>
         <BluetoothComponent ref={bluetoothRef} />
       </div>
-      <div className={`${navOpen ? "w-3/4" : "w-11/12"} flex flex-col`}>
+       <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="bg-gradient-to-r from-slate-50 to-gray-100 shadow-lg py-4 px-4 md:py-5 md:px-6">
+          <PageTitle />
+        </header>
         {!inDefectWindow && (
-          <div className="bg-gray-200 p-2">
-            <div className="flex space-x-4">
-              {["first", "edit", "return", "data", "defect-cards"].map(
-                (tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-3 py-2 rounded ${
-                      activeTab === tab
-                        ? "bg-blue-600 text-white"
-                        : "bg-white text-black"
+          <div className="border-b border-gray-300 mb-6 px-4">
+            <nav className="-mb-px flex space-x-4 sm:space-x-6 justify-center" aria-label="Tabs">
+              {Object.entries(tabDetails).map(([tabKey, { labelKey, icon: IconComponent }]) => (
+                <button
+                  key={tabKey}
+                  onClick={() => setActiveTab(tabKey)}
+                  className={`group inline-flex items-center py-3 px-4 border-b-2 font-semibold text-sm focus:outline-none transition-all duration-200 ease-in-out rounded-t-lg
+                    ${activeTab === tabKey
+                      ? "border-indigo-600 text-indigo-700 bg-indigo-50 shadow-sm"
+                      : "border-transparent text-gray-500 hover:text-indigo-700 hover:border-indigo-300 hover:bg-gray-50"
                     }`}
-                  >
-                    {tab === "first"
-                      ? t("qc2In.inspection")
-                      : tab === "edit"
-                      ? t("qc2In.edit_inspection")
-                      : tab === "return"
-                      ? t("defIm.defect_name")
-                      : tab === "data"
-                      ? t("bundle.data")
-                      : t("qc2In.defect_card")}
-                  </button>
-                )
-              )}
-            </div>
+                >
+                  <IconComponent className={`mr-2 h-5 w-5 ${activeTab === tabKey ? "text-indigo-600" : "text-gray-400 group-hover:text-indigo-500"}`} />
+                  {t(labelKey)}
+                </button>
+              ))}
+            </nav>
           </div>
         )}
-        {activeTab === "edit" && <EditInspection />}
-        {activeTab === "return" && <DefectNames />}
-        {activeTab === "data" && <QC2Data />}
-        {activeTab === "defect-cards" && (
-          <DefectPrint bluetoothRef={bluetoothRef} printMethod={printMethod} />
-        )}
-        <div className="flex-grow overflow-hidden bg-gray-50">
-          {activeTab !== "first" ? (
-            <div className="h-full flex items-center justify-center">
-              {/* <p className="text-gray-500">Coming Soon</p> */}
-            </div>
-          ) : (
+        <div className="flex-grow overflow-y-auto bg-gray-50 p-4">
+          {/* {activeTab === "edit" && <EditInspection />} */}
+          {activeTab === "return" && <DefectNames />}
+          {activeTab === "data" && <QC2Data />}
+          {activeTab === "defect-cards" && (
+            <DefectPrint bluetoothRef={bluetoothRef} printMethod={printMethod} />
+          )}
+
+          {/* Content for the 'first' tab (inspection/scanner or defect window) */}
+          {activeTab === "first" && (
             <>
               {!inDefectWindow ? (
-                <div className="flex flex-col items-center justify-center h-full p-4">
+                <div className="flex flex-col items-center justify-center h-full">
                   {scanning && (
-                    <div className="w-full max-w-2xl h-96">
+                    <div className="bg-white shadow-xl rounded-xl p-4 sm:p-6 w-full max-w-2xl">
                       <Scanner
                         onScanSuccess={handleScanSuccess}
                         // onScanError={(err) => setError(err)}
@@ -2440,6 +2475,12 @@ const handleDefectStatusToggle = (garmentNumber, defectName) => {
                 </>
               )}
             </>
+          )}
+          {/* Fallback for any other unhandled tabs when !inDefectWindow */}
+          {!inDefectWindow && activeTab !== "first" && !["edit", "return", "data", "defect-cards"].includes(activeTab) && (
+            <div className="h-full flex items-center justify-center">
+              <p className="text-gray-500">Content for {activeTab} tab.</p>
+            </div>
           )}
         </div>
       </div>

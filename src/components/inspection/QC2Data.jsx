@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { API_BASE_URL } from "../../../config";
 import { useTranslation } from "react-i18next";
+import EditModal from "../forms/EditInspectionData";
 
 const QC2Data = () => {
   const {t} = useTranslation();
@@ -8,13 +9,17 @@ const QC2Data = () => {
   const [searchMoNo, setSearchMoNo] = useState("");
   const [searchPackageNo, setSearchPackageNo] = useState("");
   const [searchEmpId, setSearchEmpId] = useState("");
+  const [searchLineNo, setSearchLineNo] = useState("");
   const [moNoOptions, setMoNoOptions] = useState([]);
   const [packageNoOptions, setPackageNoOptions] = useState([]);
   const [empIdOptions, setEmpIdOptions] = useState([]);
+  const [lineNoOptions, setLineNoOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage, setRecordsPerPage] = useState(50);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedDataForEdit, setSelectedDataForEdit] = useState(null);
 
   useEffect(() => {
     fetchFilterOptions();
@@ -25,18 +30,18 @@ const QC2Data = () => {
     fetchDataCards(currentPage, recordsPerPage);
   }, [currentPage, recordsPerPage]);
 
-  const fetchDataCards = async (page, limit, filters = {}) => {
+const fetchDataCards = async (page, limit) => {
     try {
       setLoading(true);
       let url = `${API_BASE_URL}/api/qc2-inspection-pass-bundle/search?page=${page}&limit=${limit}`;
       const hasSearchParams =
-        filters.moNo || filters.packageNo || filters.empId;
+        searchMoNo.trim() || searchPackageNo.trim() || searchEmpId.trim() || searchLineNo.trim();
 
       if (hasSearchParams) {
         const params = new URLSearchParams();
-        if (filters.moNo) params.append("moNo", filters.moNo);
-        if (filters.packageNo) {
-          const packageNo = Number(filters.packageNo);
+        if (searchMoNo.trim()) params.append("moNo", searchMoNo.trim());
+        if (searchPackageNo.trim()) {
+          const packageNo = Number(searchPackageNo.trim());
           if (isNaN(packageNo)) {
             alert("Package No must be a number");
             setLoading(false);
@@ -44,15 +49,16 @@ const QC2Data = () => {
           }
           params.append("package_no", packageNo.toString());
         }
-        if (filters.empId) params.append("emp_id_inspection", filters.empId);
+        if (searchEmpId.trim()) params.append("emp_id_inspection", searchEmpId.trim());
+        if (searchLineNo.trim()) params.append("lineNo", searchLineNo.trim());
         url += `&${params.toString()}`;
       }
 
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch data cards");
       const { data, total } = await response.json();
-      setDataCards(data);
-      setTotalRecords(total);
+      setDataCards(data || []);
+      setTotalRecords(total || 0);
     } catch (error) {
       console.error("Error fetching data cards:", error);
       setDataCards([]);
@@ -71,30 +77,95 @@ const QC2Data = () => {
       setMoNoOptions(data.moNo || []);
       setPackageNoOptions(data.package_no || []);
       setEmpIdOptions(data.emp_id_inspection || []);
+      setLineNoOptions(data.lineNo || []);
     } catch (error) {
       console.error("Error fetching filter options:", error);
+      setLineNoOptions([]);
     }
   };
 
   const handleSearch = () => {
     setCurrentPage(1);
-    fetchDataCards(1, recordsPerPage, {
-      moNo: searchMoNo,
-      packageNo: searchPackageNo,
-      empId: searchEmpId,
-    });
+    fetchDataCards(1, recordsPerPage);
   };
 
   const handleResetFilters = () => {
     setSearchMoNo("");
     setSearchPackageNo("");
     setSearchEmpId("");
+    setSearchLineNo("");
     setCurrentPage(1);
-    fetchDataCards(1, recordsPerPage, { moNo: "", packageNo: "", empId: "" });
+    fetchDataCards(1, recordsPerPage);
   };
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
+    };
+
+  const handleEdit = (cardData) => {
+    setSelectedDataForEdit(cardData);
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedDataForEdit(null);
+  };
+
+  const handleSaveEdit = async (updatedData) => {
+    if (!selectedDataForEdit) return;
+    try {
+      setLoading(true);
+
+      const totalDefectCount = updatedData.rejectGarments.reduce(
+        (total, garment) =>
+          total +
+          garment.defects.reduce((sum, defect) => sum + defect.count, 0),
+        0
+      );
+
+      const defectCounts = {};
+      updatedData.rejectGarments.forEach((garment) => {
+        garment.defects.forEach((defect) => {
+          defectCounts[defect.name] =
+            (defectCounts[defect.name] || 0) + defect.count;
+        });
+      });
+
+      const defectArray = Object.entries(defectCounts).map(
+        ([defectName, totalCount]) => ({ defectName, totalCount })
+      );
+
+      const dataToUpdate = {
+        ...updatedData,
+        defectQty: totalDefectCount,
+        defectArray,
+        totalRejects: updatedData.rejectGarments.length,
+      };
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${selectedDataForEdit.bundle_random_id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dataToUpdate),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to save data");
+      }
+
+      alert("Data updated successfully!");
+      handleCloseEditModal();
+      fetchDataCards(currentPage, recordsPerPage); // Refresh data for the current view
+    } catch (error) {
+      console.error("Error saving data:", error);
+      alert(error.message || "Failed to save data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRecordsPerPageChange = (e) => {
@@ -108,7 +179,7 @@ const QC2Data = () => {
     <div className="p-6 h-full flex flex-col bg-gray-100">
       {/* Search Filters */}
       <div className="bg-white p-4 rounded-lg shadow-md mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div>
             <label className="block mb-1 text-sm font-semibold text-gray-700">
              {t("bundle.mono")}
@@ -163,7 +234,25 @@ const QC2Data = () => {
               ))}
             </datalist>
           </div>
-          <div className="flex items-end gap-2">
+          <div>
+            <label className="block mb-1 text-sm font-semibold text-gray-700">
+            {t("bundle.line_no")}
+            </label>
+            <input
+              type="text"
+              value={searchLineNo}
+              onChange={(e) => setSearchLineNo(e.target.value)}
+              placeholder={t("bundle.search_line_no", "Search Line No")}
+              list="lineNoList"
+              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
+            />
+            <datalist id="lineNoList">
+              {lineNoOptions.map((option) => (
+                <option key={option} value={option} />
+              ))}
+            </datalist>
+          </div>
+          <div className="flex items-end gap-2 sm:col-span-2 md:col-span-1 lg:col-span-1">
             <button
               onClick={handleSearch}
               disabled={loading}
@@ -277,6 +366,9 @@ const QC2Data = () => {
             <table className="w-full border-collapse">
               <thead className="bg-gray-200 sticky top-0 z-10">
                 <tr>
+                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
+                    {t("userL.action")}
+                  </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                   {t("bundle.mono")}
                   </th>
@@ -291,6 +383,9 @@ const QC2Data = () => {
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                   {t("bundle.package_no")}
+                  </th>
+                  <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
+                  {t("bundle.line_no")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                   {t("bundle.emp_id")}
@@ -323,7 +418,15 @@ const QC2Data = () => {
               </thead>
               <tbody className="overflow-y-auto">
                 {dataCards.map((card) => (
-                  <tr key={card.bundle_id} className="hover:bg-gray-50">
+                  <tr key={card.bundle_id || card._id} className="hover:bg-gray-50">
+                    <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                      <button
+                        onClick={() => handleEdit(card)}
+                        className="px-2 py-1.5 text-xs font-medium text-gray-700 border border-blue-800 bg-blue-200 rounded-md hover:bg-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                      >
+                        {t("bundle.edit")}
+                      </button>
+                    </td>
                     <td className="py-2 px-4 border-b border-gray-200 text-sm">
                       {card.moNo}
                     </td>
@@ -338,6 +441,9 @@ const QC2Data = () => {
                     </td>
                     <td className="py-2 px-4 border-b border-gray-200 text-sm">
                       {card.package_no}
+                    </td>
+                     <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                      {card.lineNo}
                     </td>
                     <td className="py-2 px-4 border-b border-gray-200 text-sm">
                       {card.emp_id_inspection}
@@ -380,6 +486,14 @@ const QC2Data = () => {
             </table>
           </div>
         </div>
+      )}
+      {isEditModalOpen && (
+        <EditModal
+          isOpen={isEditModalOpen}
+          onClose={handleCloseEditModal}
+          data={selectedDataForEdit}
+          onSave={handleSaveEdit}
+        />
       )}
     </div>
   );
