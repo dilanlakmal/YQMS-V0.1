@@ -31,6 +31,7 @@ import createQC2ReworksModel from "./models/qc2_rework.js";
 import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
 import createSubconFactoryModel from "./models/SubconFactory.js";
 import createQC2DefectsModel from "./models/QC2DefectsModel.js";
+import createQC2WorkersDataModel from "./models/QC2WorkersData.js";
 
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
 import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
@@ -228,6 +229,7 @@ const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
 const SubconFactory = createSubconFactoryModel(ymProdConnection);
 const QC2Defects = createQC2DefectsModel(ymProdConnection);
+const QC2WorkersData = createQC2WorkersDataModel(ymProdConnection);
 
 const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
 const SewingDefects = createSewingDefectsModel(ymProdConnection);
@@ -5195,81 +5197,143 @@ app.put(
   }
 );
 
-// // Helper function to generate garment_defect_id
-// const generateGarmentDefectId = () => {
-//   return Math.floor(1000000000 + Math.random() * 9000000000).toString();
-// };
+/* ------------------------------
+   QC2 - Workers Scan Data Tracking
+------------------------------ */
 
-// old endpoint ---
-// app.put(
-//   "/api/qc2-inspection-pass-bundle/:bundle_random_id",
-//   async (req, res) => {
-//     try {
-//       const { bundle_random_id } = req.params;
-//       const { updateOperations, arrayFilters } = req.body || {};
+app.post("/api/qc2-workers-data/log-scan", async (req, res) => {
+  try {
+    const { qc_id, moNo, taskNo, qty, random_id } = req.body;
 
-//       let updateData = req.body;
-//       if (updateOperations) {
-//         updateData = updateOperations;
-//       }
+    if (!qc_id || !moNo || !taskNo || qty === undefined || !random_id) {
+      return res.status(400).json({ message: "Missing required fields." });
+    }
 
-//       const updateOperationsFinal = {};
-//       if (updateData.$set) {
-//         updateOperationsFinal.$set = updateData.$set;
-//       }
-//       if (updateData.$push) {
-//         updateOperationsFinal.$push = updateData.$push;
-//       }
-//       if (updateData.$inc) {
-//         updateOperationsFinal.$inc = updateData.$inc;
-//       }
-//       if (!updateData.$set && !updateData.$push && !updateData.$inc) {
-//         updateOperationsFinal.$set = updateData;
-//       }
+    const inspection_date = new Date().toLocaleDateString("en-US");
 
-//       // Ensure totalRejectGarment_Var remains unchanged when updating printArray
-//       if (updateOperationsFinal.$set?.printArray) {
-//         updateOperationsFinal.$set.printArray =
-//           updateOperationsFinal.$set.printArray.map((printEntry) => ({
-//             ...printEntry,
-//             totalRejectGarment_Var:
-//               printEntry.totalRejectGarment_Var ||
-//               printEntry.totalRejectGarmentCount // Preserve or initialize
-//           }));
-//       }
+    // --- FIX: Conditional Duplicate Check ---
+    // Only check for duplicates if it's an Order Card (taskNo 54)
+    if (taskNo === 54) {
+      const workerData = await QC2WorkersData.findOne({
+        qc_id,
+        inspection_date
+      });
 
-//       const options = {
-//         new: true,
-//         runValidators: true
-//       };
-//       if (arrayFilters) {
-//         options.arrayFilters = arrayFilters;
-//       }
+      // If a record for the worker exists today, check if this Order Card has already been scanned.
+      if (
+        workerData &&
+        workerData.dailyData.some(
+          (d) => d.random_id === random_id && d.taskNo === 54
+        )
+      ) {
+        return res.status(200).json({
+          message: "You have already scanned this Order Card today.",
+          data: workerData
+        });
+      }
+    }
+    // If taskNo is 84 (Defect Card), we skip this check and always allow the entry.
 
-//       const updatedRecord = await QC2InspectionPassBundle.findOneAndUpdate(
-//         { bundle_random_id },
-//         updateOperationsFinal,
-//         options
-//       );
+    // Find the current document to correctly calculate the next 'no'
+    const currentWorkerData = await QC2WorkersData.findOne({
+      qc_id,
+      inspection_date
+    });
+    const dailyDataNo = currentWorkerData
+      ? currentWorkerData.dailyData.length + 1
+      : 1;
 
-//       if (!updatedRecord) {
-//         return res.status(404).json({ error: "Record not found" });
-//       }
+    // Determine which quantity to increment based on the task number
+    const qtyIncrementField =
+      taskNo === 54 ? "totalQtyTask54" : "totalQtyTask84";
 
-//       io.emit("qc2_data_updated");
-//       res.json({
-//         message: "Inspection pass bundle updated successfully",
-//         data: updatedRecord
-//       });
-//     } catch (error) {
-//       console.error("Error updating inspection pass bundle:", error);
-//       res.status(500).json({
-//         message: "Failed to update inspection pass bundle",
-//         error: error.message
-//       });
-//     }
-//   }
-// );
+    // Use findOneAndUpdate with upsert to create or update the document
+    const updatedWorkerData = await QC2WorkersData.findOneAndUpdate(
+      { qc_id, inspection_date },
+      {
+        $inc: {
+          totalCheckedQty: qty,
+          [qtyIncrementField]: qty
+        },
+        $push: {
+          dailyData: {
+            no: dailyDataNo,
+            moNo,
+            taskNo,
+            qty,
+            random_id
+          }
+        }
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    res.status(200).json({
+      message: "Worker scan data logged successfully.",
+      data: updatedWorkerData
+    });
+  } catch (error) {
+    console.error("Error logging worker scan data:", error);
+    res.status(500).json({ message: "Server error logging scan data." });
+  }
+});
+
+/* ------------------------------
+   QC2 - Fetch Worker's Daily Data
+------------------------------ */
+
+// This endpoint fetches today's summary and detailed data for a specific QC worker.
+app.get("/api/qc2-workers-data/today/:qc_id", async (req, res) => {
+  try {
+    const { qc_id } = req.params;
+    if (!qc_id) {
+      return res.status(400).json({ message: "QC ID is required." });
+    }
+
+    const inspection_date = new Date().toLocaleDateString("en-US");
+
+    const workerData = await QC2WorkersData.findOne({
+      qc_id,
+      inspection_date
+    }).lean();
+
+    if (!workerData) {
+      // If no data exists for today, return a default empty structure.
+      return res.json({
+        totalCheckedQty: 0,
+        totalQtyTask54: 0,
+        totalQtyTask84: 0,
+        dailyData: []
+      });
+    }
+
+    // Group daily data by MO Number for the popup view
+    const moSummary = workerData.dailyData.reduce((acc, item) => {
+      if (!acc[item.moNo]) {
+        acc[item.moNo] = {
+          moNo: item.moNo,
+          totalQty: 0,
+          task54Qty: 0,
+          task84Qty: 0
+        };
+      }
+      acc[item.moNo].totalQty += item.qty;
+      if (item.taskNo === 54) {
+        acc[item.moNo].task54Qty += item.qty;
+      } else if (item.taskNo === 84) {
+        acc[item.moNo].task84Qty += item.qty;
+      }
+      return acc;
+    }, {});
+
+    workerData.moSummary = Object.values(moSummary);
+
+    res.json(workerData);
+  } catch (error) {
+    console.error("Error fetching today's worker data:", error);
+    res.status(500).json({ message: "Server error fetching worker data." });
+  }
+});
 
 // Filter Pane for Live Dashboard - EndPoints
 app.get("/api/qc2-inspection-pass-bundle/filter-options", async (req, res) => {

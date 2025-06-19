@@ -6,14 +6,13 @@ import {
   Tag,
   ArrowUpDown,
   Printer,
-  Paperclip,
   Loader2,
   AlertCircle
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18next from "i18next";
 import BluetoothComponent from "../../forms/Bluetooth";
-import { API_BASE_URL } from "../../../../config"; // Import your API base URL
+import { API_BASE_URL } from "../../../../config";
 
 const QC2InspectionSidebar = ({
   defectTypeFilter,
@@ -22,8 +21,6 @@ const QC2InspectionSidebar = ({
   setCategoryFilter,
   sortOption,
   setSortOption,
-  printMethod,
-  setPrintMethod,
   bluetoothRef,
   isBluetoothConnected
 }) => {
@@ -34,14 +31,12 @@ const QC2InspectionSidebar = ({
   const [menuClicked, setMenuClicked] = useState(false);
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
 
-  // --- NEW STATE for fetching categories ---
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoriesError, setCategoriesError] = useState(null);
 
   const defectTypes = ["all", "common", "type1", "type2"];
 
-  // --- NEW useEffect to fetch categories ---
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -63,7 +58,7 @@ const QC2InspectionSidebar = ({
       }
     };
     fetchCategories();
-  }, []); // Empty array ensures this runs once on mount
+  }, []);
 
   const handleMenuClick = () => {
     setNavOpen(!navOpen);
@@ -202,38 +197,6 @@ const QC2InspectionSidebar = ({
         <span className="font-medium">{t("qc2In.printer")}</span>
       </div>
       <BluetoothComponent ref={bluetoothRef} />
-
-      {/* Printing Method Section */}
-      <div className="flex items-center mt-4 mb-1">
-        <Paperclip className="w-5 h-5 mr-1" />
-        <span className="font-medium">{t("qc2In.printing_method")}</span>
-      </div>
-      <div className="flex space-x-1">
-        <button
-          onClick={() => setPrintMethod("repair")}
-          className={`flex-1 p-1 text-sm rounded border ${
-            printMethod === "repair" ? "bg-blue-600" : "bg-gray-700"
-          }`}
-        >
-          {t("qc2In.repair")}
-        </button>
-        <button
-          onClick={() => setPrintMethod("garment")}
-          className={`flex-1 p-1 text-sm rounded border ${
-            printMethod === "garment" ? "bg-blue-600" : "bg-gray-700"
-          }`}
-        >
-          {t("qc2In.garment")}
-        </button>
-        <button
-          onClick={() => setPrintMethod("bundle")}
-          className={`flex-1 p-1 text-sm rounded border ${
-            printMethod === "bundle" ? "bg-blue-600" : "bg-gray-700"
-          }`}
-        >
-          {t("qc2In.bundle")}
-        </button>
-      </div>
     </>
   );
 
@@ -264,12 +227,6 @@ const QC2InspectionSidebar = ({
         <Printer
           className={`w-5 h-5 ${isBluetoothConnected ? "text-green-500" : ""}`}
         />
-      </button>
-      <button
-        className="flex justify-center w-full"
-        onClick={() => handleIconClick("printingMethod")}
-      >
-        <Paperclip className="w-5 h-5" />
       </button>
     </div>
   );
