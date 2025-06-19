@@ -12,7 +12,6 @@ const QC2InspectionActions = ({
   selectedGarment,
   rejectedGarmentNumbers,
   qrCodesData,
-  printMethod,
   isPassingBundle,
   rejectedOnce,
   passBundleCountdown,
@@ -37,24 +36,25 @@ const QC2InspectionActions = ({
       selectedGarment &&
       rejectedGarmentNumbers.has(selectedGarment));
 
+  // --- Simplified the `isPassDisabled` logic. ---
+
   const isPassDisabled =
     isPassingBundle ||
     (isReturnInspection
       ? hasDefects || rejectedOnce
       : (hasDefects && !rejectedOnce) ||
-        (rejectedOnce &&
-          (printMethod === "garment" || printMethod === "bundle") &&
-          qrCodesData.garment.length === 0) ||
+        // Check if there are rejected garments that require a QR code to be generated.
+        (rejectedOnce && qrCodesData.bundle.length === 0) ||
         printing);
+
+  // --- Simplified `passButtonClass` logic. ---
+  // The complex check for `qrCodesData.garment[0]?.checkedQty` is removed.
 
   const passButtonClass = isPassDisabled
     ? "bg-gray-300 cursor-not-allowed"
-    : totalPass <
-        (isReturnInspection
-          ? qrCodesData.garment[0]?.checkedQty || 0
-          : qrCodesData.garment[0]?.checkedQty || 0) && defectQty > 0
-    ? "bg-yellow-500 hover:bg-yellow-600"
-    : "bg-green-600 hover:bg-green-700";
+    : defectQty > 0
+    ? "bg-yellow-500 hover:bg-yellow-600" // If there are defects, button is yellow
+    : "bg-green-600 hover:bg-green-700"; // If no defects, button is green
 
   return (
     <>
@@ -72,11 +72,12 @@ const QC2InspectionActions = ({
           {t("qc2In.reject_garment")}
         </button>
         {!isReturnInspection && (
+          // --- FIX: Logic now only depends on `qrCodesData.bundle`. ---
           <button
             onClick={() => setShowQRPreview(true)}
-            disabled={qrCodesData[printMethod].length === 0}
+            disabled={qrCodesData.bundle.length === 0}
             className={`p-2 md:p-2 rounded ${
-              qrCodesData[printMethod].length === 0
+              qrCodesData.bundle.length === 0
                 ? "bg-gray-300 cursor-not-allowed"
                 : "bg-blue-600 hover:bg-blue-700 text-white"
             }`}
@@ -87,8 +88,7 @@ const QC2InspectionActions = ({
         )}
       </div>
 
-      {/* Placeholder for the Dashboard which will be passed as a child */}
-      {/* The dashboard component is rendered between left and right actions in the parent */}
+      {/* Placeholder for the Dashboard */}
 
       {/* Right-side Actions */}
       <div className="w-1/6 h-32 flex flex-col justify-center items-center space-y-2">
@@ -116,14 +116,15 @@ const QC2InspectionActions = ({
             </button>
             <button
               onClick={handlePrintQRCode}
+              // --- Logic now only depends on `qrCodesData.bundle`. ---
               disabled={
                 !isBluetoothConnected ||
-                qrCodesData[printMethod].length === 0 ||
+                qrCodesData.bundle.length === 0 ||
                 printing
               }
               className={`p-2 md:p-2 rounded ${
                 !isBluetoothConnected ||
-                qrCodesData[printMethod].length === 0 ||
+                qrCodesData.bundle.length === 0 ||
                 printing
                   ? "bg-gray-300 cursor-not-allowed"
                   : "bg-blue-600 hover:bg-blue-700 text-white"

@@ -24,6 +24,7 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
     defectArray: [
       {
         defectName: { type: String, required: true },
+        defectCode: { type: Number, required: true },
         totalCount: { type: Number, required: true }
       }
     ],
@@ -33,6 +34,7 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
         defects: [
           {
             name: { type: String, required: true },
+            code: { type: Number, required: true },
             count: { type: Number, required: true },
             repair: { type: String, required: true }
           }
@@ -43,14 +45,7 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
     ],
     inspection_time: {
       type: String
-      // validate: {
-      //   validator: function (v) {
-      //     return v === undefined || v === null || /^\d{2}:\d{2}:\d{2}$/.test(v);
-      //   },
-      //   message: (props) =>
-      //     `${props.value} is not a valid time format! Use HH:MM:SS.`,
-      // },
-    }, // "HH:MM:SS"
+    },
     inspection_date: { type: String, required: true }, // "MM/DD/YYYY"
     emp_id_inspection: { type: String, required: true },
     eng_name_inspection: { type: String, required: true },
@@ -77,6 +72,7 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
                 repairDefectArray: [
                   {
                     name: { type: String, required: true },
+                    code: { type: Number, required: true },
                     count: { type: Number, required: true }
                   }
                 ]
@@ -90,6 +86,7 @@ const qc2InspectionPassBundleSchema = new mongoose.Schema(
             defects: [
               {
                 name: { type: String, required: true },
+                code: { type: Number, required: true },
                 count: { type: Number, required: true },
                 repair: { type: String, required: true }
               }
