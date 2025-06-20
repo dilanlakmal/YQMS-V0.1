@@ -1,19 +1,13 @@
-/* ------------------------------
-   Import Required Libraries/Models
------------------------------- */
-
 import bcrypt from "bcrypt";
 import bodyParser from "body-parser";
 import cors from "cors";
 import express from "express";
 import fs from "fs";
-import https from "https"; // Import https for HTTPS server
-//import http from "http"; // Import http for Socket.io
+import https from "https"; 
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import multer from "multer";
 import path from "path";
-import { Server } from "socket.io"; // Import Socket.io
 import { fileURLToPath } from "url";
 import createIroningModel from "./models/Ironing.js";
 import createRoleModel from "./models/Role.js";
@@ -74,6 +68,7 @@ import createAuditCheckPointModel from "./models/AuditCheckPoint.js";
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
 import { promises as fsPromises } from "fs";
+import { Server as SocketIO } from "socket.io";
 
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "./config.js";
@@ -86,42 +81,26 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 5001;
+const PORT = 5000;
 
 /* ------------------------------
    for HTTPS
 ------------------------------ */
 
-// Load SSL certificates
-const privateKey = fs.readFileSync(
-  "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.14.32-key.pem",
-  //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175-key.pem",
-  //"/usr/local/share/ca-certificates/yorkmars.key",
-  "utf8"
-);
-const certificate = fs.readFileSync(
-  "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.14.32.pem",
-  //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175.pem",
-  //"/usr/local/share/ca-certificates/yorkmars.crt",
-  "utf8"
-);
-
-const credentials = {
-  key: privateKey,
-  cert: certificate
+const options = {
+   key: fs.readFileSync(path.resolve(path.dirname(__filename), '192.167.8.235-key.pem')),
+  cert: fs.readFileSync(path.resolve(path.dirname(__filename), '192.167.8.235.pem'))
 };
 
-// Create HTTPS server
-const server = https.createServer(credentials, app);
-
+export const server = https.createServer(options, app);
 // Initialize Socket.io
-const io = new Server(server, {
+export const io = new SocketIO(server, {
   cors: {
-    origin: "https://192.167.14.32:3001", //"https://192.165.2.175:3001", //"https://localhost:3001"
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    origin: ["https://192.167.8.235:3001", "http://localhost:3001", "https://localhost:3001"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
-  }
+    credentials: true,
+  },
 });
 
 app.use("/storage", express.static(path.join(__dirname, "public/storage")));
@@ -133,58 +112,25 @@ app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 //app.use(cors());
 app.use(bodyParser.json());
 
+const allowedOrigins = ["https://192.167.8.235:3001", "http://localhost:3001", "https://localhost:3001"];
 app.use(
   cors({
-    origin: "https://192.167.14.32:3001", //["http://localhost:3001", "https://localhost:3001"],
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+        return callback(new Error(msg), false);
+      }
+      return callback(null, true);
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
   })
 );
 
+
 app.options("*", cors());
-
-// // Define allowed origins for CORS
-// const allowedOrigins = [
-//   "https://192.167.14.32:3001", // Your deployed frontend
-//   "https://localhost:3001", // For local HTTPS development
-//   "http://localhost:3001" // For local HTTP development
-// ];
-
-// // --- Middleware Setup ---
-
-// // 1. Configure CORS
-// app.use(
-//   cors({
-//     origin: function (origin, callback) {
-//       // Allow requests with no origin (like mobile apps or curl requests)
-//       if (!origin) return callback(null, true);
-//       if (allowedOrigins.indexOf(origin) === -1) {
-//         const msg =
-//           "The CORS policy for this site does not allow access from the specified Origin.";
-//         return callback(new Error(msg), false);
-//       }
-//       return callback(null, true);
-//     },
-//     methods: ["GET", "POST", "PUT", "DELETE"],
-//     allowedHeaders: ["Content-Type", "Authorization"],
-//     credentials: true
-//   })
-// );
-
-// // 2. Configure Body Parsers (only need to do this once)
-// app.use(bodyParser.json({ limit: "50mb" }));
-// app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
-
-// // 3. Serve static files
-// app.use("/storage", express.static(path.join(__dirname, "public/storage")));
-// app.use("/public", express.static(path.join(__dirname, "../public")));
-
-// // 4. Set default Content-Type header
-// app.use((req, res, next) => {
-//   res.setHeader("Content-Type", "application/json; charset=utf-8");
-//   next();
-// });
 
 const ymProdConnection = mongoose.createConnection(
   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
