@@ -8,7 +8,6 @@ import {
   Printer,
   Loader2,
   AlertCircle,
-  Paperclip,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18next from "i18next";
@@ -94,10 +93,10 @@ const QC2InspectionSidebar = ({
         <div className="grid grid-cols-2 gap-1">
           {categoryOptions.map((cat) => (
             <button
-                key={cat._id}
+              key={cat}
               onClick={() => {
                 setCategoryFilter(
-                  cat.english.toLowerCase() === categoryFilter ? "" : cat.english.toLowerCase()
+                  cat.toLowerCase() === categoryFilter ? "" : cat.toLowerCase()
                 );
                 setDefectTypeFilter("all");
               }}
@@ -105,7 +104,7 @@ const QC2InspectionSidebar = ({
                 categoryFilter === cat.toLowerCase()
                   ? "bg-blue-600"
                   : "bg-gray-700"
-                }`}
+              }`}
             >
               {cat}
             </button>

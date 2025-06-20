@@ -1222,6 +1222,7 @@ const QC2InspectionPage = () => {
         setSortOption={setSortOption}
         bluetoothRef={bluetoothRef}
         isBluetoothConnected={isBluetoothConnected}
+        language={language} // Pass the current display language
       />
       <div style={{ position: "absolute", left: "-9999px" }}>
         <BluetoothComponent ref={bluetoothRef} />
