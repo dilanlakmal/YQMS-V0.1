@@ -7041,6 +7041,8 @@ app.post("/api/repair-tracking", async (req, res) => {
                 ? "Not Checked"
                 : updatedItem.status === "OK"
                 ? "Fail"
+                : updatedItem.status === "B-Grade"
+                ? "Fail"
                 : "OK";
           }
           return {
@@ -7132,28 +7134,27 @@ app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
     const rt = repairTracking[0];
 
     rt.repairArray = rt.repairArray.map((item) => {
-      if (item.garmentNumber === garmentNumber) {
-        if (
-          isRejecting &&
-          failedDefects.some((fd) => fd.name === item.defectName)
-        ) {
-          item.status = "Fail";
-          item.repair_date = null;
-          item.repair_time = null;
-          item.pass_bundle = "Fail";
-        } else if (isRejecting) {
-          // If rejecting but not in failedDefectIds, don't change status or pass_bundle
-        } else {
-          item.status = "OK";
-          const now = new Date();
-          item.repair_date = now.toLocaleDateString("en-US");
-          item.repair_time = now.toLocaleTimeString("en-US", { hour12: false });
-          // Only set pass_bundle to "Pass" if not rejecting
-          item.pass_bundle = "Pass";
-        }
-      }
-      return item;
-    });
+  if (item.garmentNumber === garmentNumber) {
+    if (
+      isRejecting &&
+      failedDefects.some((fd) => fd.name === item.defectName)
+    ) {
+      item.status = "Fail";
+      item.repair_date = null;
+      item.repair_time = null;
+      item.pass_bundle = "Fail";
+    } 
+    // If rejecting but not in failedDefects, do nothing
+  }
+
+  // New condition: If status is B-Grade, pass_bundle must be Fail
+  if (item.status === "B-Grade") {
+    item.pass_bundle = "Fail";
+  }
+
+  return item;
+});
+
 
     await rt.save();
     res.status(200).json({ message: "Updated successfully" });

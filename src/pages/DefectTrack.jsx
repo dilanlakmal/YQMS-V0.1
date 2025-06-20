@@ -27,6 +27,7 @@ const DefectTrack = () => {
   const [language, setLanguage] = useState("khmer");
   const [showScanner, setShowScanner] = useState(true);
   const [tempOkDefects, setTempOkDefects] = useState([]);
+  const [tempBGradeDefects, setTempBGradeDefects] = useState([]);
 
   const onScanSuccess = async (decodedText) => {
     setLoading(true);
@@ -60,6 +61,7 @@ const DefectTrack = () => {
       setScannedData(mappedData);
       setShowScanner(false);
       setTempOkDefects([]);
+      setTempBGradeDefects([]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -115,9 +117,7 @@ const DefectTrack = () => {
   };
 
   const handleOkClick = async (garmentNumber, defectName) => {
-    try {
-      setLoading(true);
-      setTempOkDefects((prev) => [...prev, { garmentNumber, defectName }]);
+    // Update scannedData to set status to "OK"
       setScannedData((prev) => {
         const updatedGarments = prev.garments.map((garment) => {
           if (garment.garmentNumber === garmentNumber) {
@@ -149,16 +149,63 @@ const DefectTrack = () => {
         });
         return { ...prev, garments: updatedGarments };
       });
-    } catch (error) {
-      setError(error.message);
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: error.message
+
+    // Add to tempOkDefects and remove from tempBGradeDefects
+    setTempOkDefects((prev) => {
+      if (!prev.some(d => d.garmentNumber === garmentNumber && d.defectName === defectName)) {
+        return [...prev, { garmentNumber, defectName }];
+      }
+      return prev;
+    });
+    setTempBGradeDefects((prev) =>
+      prev.filter(d => !(d.garmentNumber === garmentNumber && d.defectName === defectName))
+    );
+  };
+
+  const handleBGradeClick = async (garmentNumber, defectName) => {
+    // Update scannedData to set status to "B-Grade"
+      setScannedData((prev) => {
+        const updatedGarments = prev.garments.map((garment) => {
+          if (garment.garmentNumber === garmentNumber) {
+            const updatedDefects = garment.defects.map((defect) => {
+              if (defect.name === defectName) {
+                const now = new Date();
+                return {
+                  ...defect,
+                  status: "B-Grade",
+                  repair_date: now.toLocaleDateString("en-US", {
+                    month: "2-digit",
+                    day: "2-digit",
+                    year: "numeric"
+                  }),
+                  repair_time: now.toLocaleTimeString("en-US", {
+                    hour12: false,
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit"
+                  }),
+                  garmentNumber: garment.garmentNumber
+                };
+              }
+              return defect;
+            });
+            return { ...garment, defects: updatedDefects };
+          }
+          return garment;
+        });
+        return { ...prev, garments: updatedGarments };
       });
-    } finally {
-      setLoading(false);
-    }
+
+    // Add to tempBGradeDefects and remove from tempOkDefects
+    setTempBGradeDefects((prev) => {
+      if (!prev.some(d => d.garmentNumber === garmentNumber && d.defectName === defectName)) {
+        return [...prev, { garmentNumber, defectName }];
+      }
+      return prev;
+    });
+    setTempOkDefects((prev) =>
+      prev.filter(d => !(d.garmentNumber === garmentNumber && d.defectName === defectName))
+    );
   };
 
   const handleSave = async () => {
@@ -202,12 +249,12 @@ const DefectTrack = () => {
       }
       for (const garment of scannedData.garments) {
         for (const defect of garment.defects) {
-          if (defect.status === "OK") {
+          if (defect.status === "OK" || defect.status === "B-Grade") {
             await updateDefectStatusInRepairTracking(
               scannedData.defect_print_id,
               garment.garmentNumber,
               defect.name,
-              "OK"
+              defect.status
             );
           }
         }
@@ -220,6 +267,7 @@ const DefectTrack = () => {
       setScannedData(null);
       setShowScanner(true);
       setTempOkDefects([]);
+      setTempBGradeDefects([]);
     } catch (err) {
       setError(err.message);
       Swal.fire({
@@ -244,6 +292,7 @@ const DefectTrack = () => {
         setScannedData(null);
         setShowScanner(true);
         setTempOkDefects([]);
+        setTempBGradeDefects([]);
       }
     });
   };
@@ -274,6 +323,14 @@ const DefectTrack = () => {
 
   const isDefectTemporarilyOk = (garmentNumber, defectName) => {
     return tempOkDefects.some(
+      (tempDefect) =>
+        tempDefect.garmentNumber === garmentNumber &&
+        tempDefect.defectName === defectName
+    );
+  };
+
+  const isDefectTemporarilyBGrade = (garmentNumber, defectName) => {
+    return tempBGradeDefects.some(
       (tempDefect) =>
         tempDefect.garmentNumber === garmentNumber &&
         tempDefect.defectName === defectName
@@ -373,8 +430,12 @@ const DefectTrack = () => {
                     garment.defects
                       .filter(
                         (defect) =>
-                          defect.status !== "OK" ||
-                          isDefectTemporarilyOk(
+                          (defect.status !== "OK" && defect.status !== "B-Grade") ||
+                          isDefectTemporarilyOk( // Keep if temporarily OK
+                            garment.garmentNumber,
+                            defect.name
+                          ) ||
+                          isDefectTemporarilyBGrade( // Keep if temporarily B-Grade
                             garment.garmentNumber,
                             defect.name
                           )
@@ -385,6 +446,8 @@ const DefectTrack = () => {
                           className={
                             defect.status === "OK"
                               ? "bg-green-100"
+                              : defect.status === "B-Grade"
+                              ? "bg-yellow-100" // Example: yellow for B-Grade
                               : "hover:bg-gray-100"
                           }
                         >
@@ -401,7 +464,7 @@ const DefectTrack = () => {
                             {defect.count}
                           </TableCell>
                           <TableCell className="px-2 py-1 text-sm text-gray-700 border border-gray-200">
-                            <div className="flex justify-center">
+                            <div className="flex justify-center space-x-2">
                               <button
                                 onClick={() =>
                                   handleOkClick(
@@ -409,25 +472,30 @@ const DefectTrack = () => {
                                     defect.name
                                   )
                                 }
-                                disabled={
-                                  defect.status === "OK" &&
-                                  !isDefectTemporarilyOk(
-                                    garment.garmentNumber,
-                                    defect.name
-                                  )
-                                }
+                                // disabled prop removed to allow changing selection
                                 className={`px-4 py-2 rounded ${
-                                  isDefectTemporarilyOk(
-                                    garment.garmentNumber,
-                                    defect.name
-                                  )
-                                    ? "bg-green-600"
-                                    : defect.status === "OK"
+                                  defect.status === "OK" // Style based on current defect status
                                     ? "bg-green-600"
                                     : "bg-gray-400"
                                 } text-white`}
                               >
                                 OK
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleBGradeClick(
+                                    garment.garmentNumber,
+                                    defect.name
+                                  )
+                                }
+                                // disabled prop removed to allow changing selection
+                                className={`px-4 py-2 rounded ${
+                                  defect.status === "B-Grade" // Style based on current defect status
+                                    ? "bg-yellow-500" // Active B-Grade color
+                                    : "bg-gray-400"   // Default/inactive color
+                                } text-white`}
+                              >
+                                B-Grade
                               </button>
                             </div>
                           </TableCell>
