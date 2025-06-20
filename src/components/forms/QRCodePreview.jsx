@@ -13,7 +13,7 @@ export default function QRCodePreview({
   const data = Array.isArray(qrData) ? qrData : [];
 
   useEffect(() => {
-    console.log("QRCodePreview Data:", data);
+    // console.log("QRCodePreview Data:", data);
     data.forEach((item, index) => {
       console.log(`Item ${index}:`, item);
       console.log(

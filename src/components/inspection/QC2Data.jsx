@@ -1,34 +1,44 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { API_BASE_URL } from "../../../config";
+import { useTranslation } from "react-i18next";
+import { FaFilter, FaTimes, FaChevronDown, FaChevronUp, FaCalendarAlt } from "react-icons/fa";
+import EditModal from "../forms/EditInspectionData";
+import { useAuth } from "../authentication/AuthContext"; 
+import DatePicker from "react-datepicker"; 
+import "react-datepicker/dist/react-datepicker.css";
 
 const QC2Data = () => {
+  const {t} = useTranslation();
+  const { user } = useAuth();
   const [dataCards, setDataCards] = useState([]);
   const [searchMoNo, setSearchMoNo] = useState("");
+  const getTodayDateString = () => new Date().toISOString().split("T")[0];
   const [searchPackageNo, setSearchPackageNo] = useState("");
   const [searchEmpId, setSearchEmpId] = useState("");
+  const [searchLineNo, setSearchLineNo] = useState("");
   const [moNoOptions, setMoNoOptions] = useState([]);
   const [packageNoOptions, setPackageNoOptions] = useState([]);
   const [empIdOptions, setEmpIdOptions] = useState([]);
+  const [lineNoOptions, setLineNoOptions] = useState([]);
+  const [searchDate, setSearchDate] = useState(getTodayDateString());
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage, setRecordsPerPage] = useState(50);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedDataForEdit, setSelectedDataForEdit] = useState(null);
+  const [showFilters, setShowFilters] = useState(true); // State for filter pane visibility
+  const isInitialLoad = useRef(true); // To manage initial fetch
+  // State and ref for Emp ID focus/blur workaround to show all datalist options
+  const [empIdPreFocusValue, setEmpIdPreFocusValue] = useState(null);
+  const justFocusedEmpId = useRef(false);
 
-  useEffect(() => {
-    fetchFilterOptions();
-    fetchDataCards(1, recordsPerPage);
-  }, []);
-
-  useEffect(() => {
-    fetchDataCards(currentPage, recordsPerPage);
-  }, [currentPage, recordsPerPage]);
-
-  const fetchDataCards = async (page, limit, filters = {}) => {
+const fetchDataCards = async (page, limit, filters = {}) => {
     try {
       setLoading(true);
       let url = `${API_BASE_URL}/api/qc2-inspection-pass-bundle/search?page=${page}&limit=${limit}`;
       const hasSearchParams =
-        filters.moNo || filters.packageNo || filters.empId;
+        filters.moNo || filters.packageNo || filters.empId || filters.lineNo || filters.date;
 
       if (hasSearchParams) {
         const params = new URLSearchParams();
@@ -43,14 +53,16 @@ const QC2Data = () => {
           params.append("package_no", packageNo.toString());
         }
         if (filters.empId) params.append("emp_id_inspection", filters.empId);
+        if (filters.lineNo) params.append("lineNo", filters.lineNo); // Added lineNo to params
+        if (filters.date) params.append("date", filters.date);
         url += `&${params.toString()}`;
       }
 
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch data cards");
-      const { data, total } = await response.json();
-      setDataCards(data);
-      setTotalRecords(total);
+      const responseData = await response.json();
+      setDataCards(Array.isArray(responseData.data) ? responseData.data : []);
+      setTotalRecords(Number.isInteger(responseData.total) ? responseData.total : 0);
     } catch (error) {
       console.error("Error fetching data cards:", error);
       setDataCards([]);
@@ -66,33 +78,235 @@ const QC2Data = () => {
       );
       if (!response.ok) throw new Error("Failed to fetch filter options");
       const data = await response.json();
-      setMoNoOptions(data.moNo || []);
-      setPackageNoOptions(data.package_no || []);
-      setEmpIdOptions(data.emp_id_inspection || []);
+      setMoNoOptions(Array.isArray(data.moNo) ? data.moNo : []);
+      setPackageNoOptions(Array.isArray(data.package_no) ? data.package_no : []);
+      setEmpIdOptions(Array.isArray(data.emp_id_inspection) ? data.emp_id_inspection : []);
+      setLineNoOptions(Array.isArray(data.lineNo) ? data.lineNo : []);
     } catch (error) {
       console.error("Error fetching filter options:", error);
+      setMoNoOptions([]);
+      setPackageNoOptions([]);
+      setEmpIdOptions([]);
+      setLineNoOptions([]);
     }
   };
 
-  const handleSearch = () => {
-    setCurrentPage(1);
-    fetchDataCards(1, recordsPerPage, {
-      moNo: searchMoNo,
-      packageNo: searchPackageNo,
-      empId: searchEmpId,
-    });
+  // Debounce utility function
+  const debounce = (func, delay) => {
+    let timeoutId;
+    return (...args) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        func.apply(this, args);
+      }, delay);
+    };
   };
+
+  const applyFiltersAndFetch = useCallback((isInitialOrReset = false) => {
+    const filtersToApply = {
+      moNo: searchMoNo.trim(),
+      packageNo: searchPackageNo.trim(),
+      empId: searchEmpId.trim(),
+      lineNo: searchLineNo.trim(),
+      date: searchDate,
+    };
+
+    if (isInitialOrReset) {
+      isInitialLoad.current = true; // Signal to pagination useEffect
+    }
+
+    if (currentPage !== 1) {
+      setCurrentPage(1); // This will trigger the pagination useEffect
+    } else {
+      // If already on page 1, fetch directly
+      fetchDataCards(1, recordsPerPage, filtersToApply);
+    }
+ }, [searchMoNo, searchPackageNo, searchEmpId, searchLineNo, searchDate, currentPage, recordsPerPage, setCurrentPage]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedApplyFilters = useCallback(debounce(applyFiltersAndFetch, 700), [applyFiltersAndFetch]);
+
+  // Effect for initial load and filter options
+  useEffect(() => {
+    fetchFilterOptions();
+    if (user?.emp_id) {
+      setSearchEmpId(user.emp_id); // Set default empId
+    }
+    // searchDate is already defaulted by useState
+    applyFiltersAndFetch(true);
+  }, [user]); // Empty dependency array for initial load
+
+  // Effect for filter input changes
+  useEffect(() => {
+    if (isInitialLoad.current) {
+      return;
+    }
+    debouncedApplyFilters();
+   }, [searchMoNo, searchPackageNo, searchEmpId, searchLineNo, searchDate, debouncedApplyFilters]);
+
+  // Effect for pagination
+  useEffect(() => {
+    if (isInitialLoad.current && currentPage === 1) {
+      isInitialLoad.current = false; 
+      return; 
+    }
+    isInitialLoad.current = false;
+    const filtersToApply = {
+      moNo: searchMoNo.trim(),
+      packageNo: searchPackageNo.trim(),
+      empId: searchEmpId.trim(),
+      lineNo: searchLineNo.trim(),
+      date: searchDate,
+    };
+    fetchDataCards(currentPage, recordsPerPage, filtersToApply);
+  }, [currentPage, recordsPerPage]); 
 
   const handleResetFilters = () => {
     setSearchMoNo("");
     setSearchPackageNo("");
-    setSearchEmpId("");
-    setCurrentPage(1);
-    fetchDataCards(1, recordsPerPage, { moNo: "", packageNo: "", empId: "" });
+    if (user?.emp_id) { // Reset to default logged-in user ID
+      setSearchEmpId(user.emp_id);
+    } else {
+      setSearchEmpId("");
+    }
+    setSearchLineNo("");
+    setSearchDate(getTodayDateString());
+    applyFiltersAndFetch(true);
   };
 
+  // Handlers for Emp ID input to show all datalist options on focus
+  const handleEmpIdFocus = (event) => {
+    // Only clear and store if there's a value, otherwise ensure preFocus is null
+    if (event.target.value !== "") {
+      setEmpIdPreFocusValue(event.target.value);
+      setSearchEmpId(""); // Clear the input to show all datalist options
+      justFocusedEmpId.current = true; // Mark that focus handler initiated the clear
+    } else {
+      setEmpIdPreFocusValue(null); // Ensure no stale preFocusValue if field is already empty
+      justFocusedEmpId.current = false; // Not a focus-initiated clear
+    }
+  };
+
+  const handleEmpIdChange = (e) => {
+    justFocusedEmpId.current = false; // User is typing/selecting, overrides focus-initiated clear
+    setSearchEmpId(e.target.value);
+  };
+
+  const handleEmpIdBlur = () => {
+    // If:
+    // 1. The input is currently empty.
+    // 2. The emptiness was due to the onFocus handler clearing it (justFocusedEmpId.current is true).
+    // 3. There was a value before focus (empIdPreFocusValue is not null).
+    // Then, restore the pre-focus value.
+    if (searchEmpId === "" && justFocusedEmpId.current && empIdPreFocusValue) {
+      setSearchEmpId(empIdPreFocusValue);
+    }
+    justFocusedEmpId.current = false; // Reset flag for next interaction
+    setEmpIdPreFocusValue(null);    // Clear stored pre-focus value
+  };
+
+  const formatDateForDisplay = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "N/A"; // Check if date is valid
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are zero-based
+      const year = date.getFullYear();
+      return `${month}/${day}/${year}`;
+    } catch (error) {
+      return "N/A";
+    }
+  };
+
+  const parseDateForPicker = (dateString) => {
+    if (!dateString) return null;
+    if (dateString instanceof Date) return dateString; // Already a Date object
+    // Expect YYYY-MM-DD
+    const parts = dateString.split("-");
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+      const day = parseInt(parts[2], 10);
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) return new Date(year, month, day);
+    }
+    return null; // Invalid date string
+  };
+  
   const handlePageChange = (page) => {
     setCurrentPage(page);
+    };
+
+  const handleEdit = (cardData) => {
+    setSelectedDataForEdit(cardData);
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedDataForEdit(null);
+  };
+
+  const handleSaveEdit = async (updatedData) => {
+    if (!selectedDataForEdit) return;
+    try {
+      setLoading(true);
+
+      const totalDefectCount = updatedData.rejectGarments.reduce(
+        (total, garment) =>
+          total +
+          garment.defects.reduce((sum, defect) => sum + defect.count, 0),
+        0
+      );
+
+      const defectCounts = {};
+      updatedData.rejectGarments.forEach((garment) => {
+        garment.defects.forEach((defect) => {
+          defectCounts[defect.name] =
+            (defectCounts[defect.name] || 0) + defect.count;
+        });
+      });
+
+      const defectArray = Object.entries(defectCounts).map(
+        ([defectName, totalCount]) => ({ defectName, totalCount })
+      );
+
+      const dataToUpdate = {
+        ...updatedData,
+        defectQty: totalDefectCount,
+        defectArray,
+        totalRejects: updatedData.rejectGarments.length,
+      };
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc2-inspection-pass-bundle/${selectedDataForEdit.bundle_random_id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dataToUpdate),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to save data");
+      }
+
+      alert("Data updated successfully!");
+      handleCloseEditModal();
+      fetchDataCards(currentPage, recordsPerPage, { // Pass current filters
+        moNo: searchMoNo.trim(),
+        packageNo: searchPackageNo.trim(),
+        empId: searchEmpId.trim(),
+        lineNo: searchLineNo.trim(),
+        date: searchDate,
+      }); 
+    } catch (error) {
+      console.error("Error saving data:", error);
+      alert(error.message || "Failed to save data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRecordsPerPageChange = (e) => {
@@ -104,95 +318,151 @@ const QC2Data = () => {
 
   return (
     <div className="p-6 h-full flex flex-col bg-gray-100">
-      {/* Search Filters */}
-      <div className="bg-white p-4 rounded-lg shadow-md mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block mb-1 text-sm font-semibold text-gray-700">
-              MO No
-            </label>
-            <input
-              type="text"
-              value={searchMoNo}
-              onChange={(e) => setSearchMoNo(e.target.value)}
-              placeholder="Search MO No"
-              list="moNoList"
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-            />
-            <datalist id="moNoList">
-              {moNoOptions.map((option) => (
-                <option key={option} value={option} />
-              ))}
-            </datalist>
-          </div>
-          <div>
-            <label className="block mb-1 text-sm font-semibold text-gray-700">
-              Package No
-            </label>
-            <input
-              type="text"
-              value={searchPackageNo}
-              onChange={(e) => setSearchPackageNo(e.target.value)}
-              placeholder="Search Package No"
-              list="packageNoList"
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-            />
-            <datalist id="packageNoList">
-              {packageNoOptions.map((option) => (
-                <option key={option} value={option} />
-              ))}
-            </datalist>
-          </div>
-          <div>
-            <label className="block mb-1 text-sm font-semibold text-gray-700">
-              EMP ID
-            </label>
-            <input
-              type="text"
-              value={searchEmpId}
-              onChange={(e) => setSearchEmpId(e.target.value)}
-              placeholder="Search EMP ID"
-              list="empIdList"
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-            />
-            <datalist id="empIdList">
-              {empIdOptions.map((option) => (
-                <option key={option} value={option} />
-              ))}
-            </datalist>
-          </div>
-          <div className="flex items-end gap-2">
+      <div className={`bg-white rounded-xl shadow-xl p-4 mb-6 ${!showFilters ? "pb-1" : ""}`}>
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-base md:text-lg font-semibold text-gray-700 flex items-center">
+            <FaFilter className="mr-2 text-indigo-600" />
+            {t("qc2Data.filtersTitle", "Filters")} 
+          </h2>
+          <div className="flex items-center space-x-2">
             <button
-              onClick={handleSearch}
-              disabled={loading}
-              className={`w-full py-2 px-4 rounded-md text-white font-semibold transition duration-200 ${
-                loading
-                  ? "bg-blue-400 cursor-not-allowed"
-                  : "bg-blue-600 hover:bg-blue-700"
-              }`}
+              type="button"
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center text-xs md:text-sm text-indigo-600 hover:text-indigo-800 font-medium p-1.5 rounded-md hover:bg-indigo-50 transition-colors"
+              aria-label={
+                showFilters
+                  ? t("qc2Data.hideFilters", "Hide Filters")
+                  : t("qc2Data.showFilters", "Show Filters")
+              }
             >
-              {loading ? "Searching..." : "Apply"}
+              {showFilters ? <FaChevronUp size={14} /> : <FaChevronDown size={14} />}
+              <span className="ml-1">
+                {showFilters
+                  ? t("qc2Data.hideFilters", "Hide Filters")
+                  : t("qc2Data.showFilters", "Show Filters")}
+              </span>
             </button>
-            <button
-              onClick={handleResetFilters}
-              disabled={loading}
-              className={`w-full py-2 px-4 rounded-md text-white font-semibold transition duration-200 ${
-                loading
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-gray-600 hover:bg-gray-700"
-              }`}
-            >
-              Reset
-            </button>
+            {showFilters && ( 
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="p-1.5 text-gray-800  bg-red-100 hover:text-gary-900 brder rounded-md hover:bg-red-400 transition-colors"
+                title={t("defectPrint.clearFilters", "Clear Filters")}
+              >
+                Clear
+              </button> 
+            )}
           </div>
         </div>
+
+        {showFilters && (
+           <form onSubmit={(e) => { e.preventDefault();  }} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-1 transition-all duration-300 ease-in-out">
+           
+            <div className="flex flex-col">
+              <label htmlFor="filterDateQC2" className="text-xs font-medium text-gray-600 mb-1 flex items-center">
+                <FaCalendarAlt className="mr-1.5 text-gray-400" />
+                {t("filters.date", "Date")}
+              </label>
+              <DatePicker
+                selected={parseDateForPicker(searchDate)}
+                onChange={(date) => setSearchDate(date ? date.toISOString().split("T")[0] : "")}
+                dateFormat="yyyy-MM-dd"
+                className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                id="filterDateQC2"
+                placeholderText={t("filters.select_date", "Select date")}
+                popperClassName="datepicker-popper-above-header z-50"
+              />
+            </div>
+            
+            <div className="flex flex-col">
+              <label htmlFor="moNoFilterQC2" className="text-xs font-medium text-gray-600 mb-1">
+               {t("bundle.mono")}
+              </label>
+              <input
+                id="moNoFilterQC2"
+                type="text"
+                value={searchMoNo}
+                onChange={(e) => setSearchMoNo(e.target.value)}
+                placeholder={t("bundle.search_mono")}
+                list="moNoListQC2"
+                className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+              />
+              <datalist id="moNoListQC2">
+                {moNoOptions.map((option) => (
+                  <option key={`mo-${option}`} value={option} />
+                ))}
+              </datalist>
+            </div>
+           
+            <div className="flex flex-col">
+              <label htmlFor="packageNoFilterQC2" className="text-xs font-medium text-gray-600 mb-1">
+              {t("bundle.package_no")}
+              </label>
+              <input
+                id="packageNoFilterQC2"
+                type="text"
+                value={searchPackageNo}
+                onChange={(e) => setSearchPackageNo(e.target.value)}
+                placeholder={t("defectPrint.search_package")}
+                list="packageNoListQC2"
+                className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+              />
+              <datalist id="packageNoListQC2">
+                {packageNoOptions.map((option) => (
+                  <option key={`pkg-${option}`} value={option} />
+                ))}
+              </datalist>
+            </div>
+          
+            <div className="flex flex-col">
+              <label htmlFor="empIdFilterQC2" className="text-xs font-medium text-gray-600 mb-1">
+              {t("bundle.emp_id")}
+              </label>
+              <input
+                id="empIdFilterQC2"
+                type="text"
+                value={searchEmpId}
+                onChange={handleEmpIdChange}
+                onFocus={handleEmpIdFocus}
+                onBlur={handleEmpIdBlur}
+                placeholder={t("set.search_emp_id")}
+                list="empIdListQC2"
+                className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+              />
+              <datalist id="empIdListQC2">
+                {empIdOptions.map((option) => (
+                  <option key={`emp-${option}`} value={option} />
+                ))}
+              </datalist>
+            </div>
+          
+            <div className="flex flex-col">
+              <label htmlFor="lineNoFilterQC2" className="text-xs font-medium text-gray-600 mb-1">
+              {t("bundle.line_no")}
+              </label>
+              <input
+                id="lineNoFilterQC2"
+                type="text"
+                value={searchLineNo}
+                onChange={(e) => setSearchLineNo(e.target.value)}
+                placeholder={t("bundle.search_line_no", "Search Line No")}
+                list="lineNoListQC2"
+                className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+              />
+              <datalist id="lineNoListQC2">
+                {lineNoOptions.map((option) => (
+                  <option key={`ln-${option}`} value={option} />
+                ))}
+              </datalist>
+            </div>
+          </form>
+        )}
       </div>
 
-      {/* Records Per Page and Pagination */}
       <div className="mb-4 text-sm text-gray-700">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2">
-            <label className="font-semibold">Records per page:</label>
+            <label className="font-semibold">{t("downDa.record_per")}:</label>
             <select
               value={recordsPerPage}
               onChange={handleRecordsPerPageChange}
@@ -205,7 +475,7 @@ const QC2Data = () => {
               ))}
             </select>
           </div>
-          <div>Total Records: {totalRecords}</div>
+          <div>{t("downDa.total_record")}: {totalRecords}</div>
         </div>
         <div className="flex justify-between items-center">
           <button
@@ -255,7 +525,7 @@ const QC2Data = () => {
             disabled={currentPage === totalPages || loading}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition duration-200"
           >
-            Next
+            {t("userL.next")}
           </button>
         </div>
       </div>
@@ -267,7 +537,7 @@ const QC2Data = () => {
         </div>
       ) : dataCards.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          No data cards found
+         {t("previewMode.no_data_card")}
         </div>
       ) : (
         <div className="flex-grow overflow-auto bg-white rounded-lg shadow-md">
@@ -275,53 +545,70 @@ const QC2Data = () => {
             <table className="w-full border-collapse">
               <thead className="bg-gray-200 sticky top-0 z-10">
                 <tr>
-                  <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    MO No
+                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
+                    {t("userL.action")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Cust. Style
+                  {t("bundle.mono")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Color
+                  {t("bundle.customer_style")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Size
+                  {t("bundle.color")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Package No
+                  {t("bundle.size")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    EMP ID
+                  {t("bundle.package_no")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    EMP Name
+                    {t("qc2In.taskNo", "Task No")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Inspection Time
+                  {t("bundle.line_no")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Inspection Date
+                  {t("bundle.emp_id")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Checked Qty
+                  {t("previewMode.emp_name")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Total Pass
+                  {t("previewMode.inspection_time")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Total Rejects
+                  {t("previewMode.inspection_date")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Defects Qty
+                  {t("ana.checked_qty")}
                   </th>
                   <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                    Defect Details
+                  {t("dash.total_pass")}
+                  </th>
+                  <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
+                  {t("dash.total_rejects")}
+                  </th>
+                  <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
+                  {t("dash.defects_qty")}
+                  </th>
+                  <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
+                  {t("preview.defect_details")}
                   </th>
                 </tr>
               </thead>
               <tbody className="overflow-y-auto">
                 {dataCards.map((card) => (
-                  <tr key={card.bundle_id} className="hover:bg-gray-50">
+                  <tr key={card.bundle_id || card._id} className="hover:bg-gray-50">
+                    <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                      <button
+                        onClick={() => handleEdit(card)}
+                        className="px-2 py-1.5 text-xs font-medium text-gray-700 border border-blue-800 bg-blue-200 rounded-md hover:bg-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                      >
+                        {t("bundle.edit")}
+                      </button>
+                    </td>
                     <td className="py-2 px-4 border-b border-gray-200 text-sm">
                       {card.moNo}
                     </td>
@@ -338,6 +625,12 @@ const QC2Data = () => {
                       {card.package_no}
                     </td>
                     <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                      {card.taskNo || "N/A"}
+                    </td>
+                     <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                      {card.lineNo}
+                    </td>
+                    <td className="py-2 px-4 border-b border-gray-200 text-sm">
                       {card.emp_id_inspection}
                     </td>
                     <td className="py-2 px-4 border-b border-gray-200 text-sm">
@@ -347,7 +640,7 @@ const QC2Data = () => {
                       {card.inspection_time}
                     </td>
                     <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                      {card.inspection_date}
+                      {formatDateForDisplay(card.inspection_date)}
                     </td>
                     <td className="py-2 px-4 border-b border-gray-200 text-sm">
                       {card.checkedQty}
@@ -378,6 +671,14 @@ const QC2Data = () => {
             </table>
           </div>
         </div>
+      )}
+      {isEditModalOpen && (
+        <EditModal
+          isOpen={isEditModalOpen}
+          onClose={handleCloseEditModal}
+          data={selectedDataForEdit}
+          onSave={handleSaveEdit}
+        />
       )}
     </div>
   );

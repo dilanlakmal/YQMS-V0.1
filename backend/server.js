@@ -81,7 +81,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 5000;
+const PORT = 5001;
 
 /* ------------------------------
    for HTTPS
@@ -5567,18 +5567,18 @@ app.put("/api/qc2-inspection-pass-bundle/:id", async (req, res) => {
   const updateData = req.body;
 
   try {
-    console.log(`Received request to update record with ID: ${id}`);
-    console.log(`Update Data: ${JSON.stringify(updateData)}`);
+    // console.log(`Received request to update record with ID: ${id}`);
+    // console.log(`Update Data: ${JSON.stringify(updateData)}`);
     const updatedRecord = await QC2InspectionPassBundle.findByIdAndUpdate(
       id,
       updateData,
       { new: true }
     );
     if (!updatedRecord) {
-      console.log(`Record with ID: ${id} not found`);
+      // console.log(`Record with ID: ${id} not found`);
       return res.status(404).send({ message: "Record not found" });
     }
-    console.log(`Record with ID: ${id} updated successfully`);
+    // console.log(`Record with ID: ${id} updated successfully`);
     res.send(updatedRecord);
   } catch (error) {
     console.error("Error updating record:", error);
@@ -7250,7 +7250,7 @@ app.post(
       if (hasChanges) {
         repairTracking.repairArray = updatedRepairArray;
         await repairTracking.save();
-        console.log("Updated Repair Array:", updatedRepairArray);
+        // console.log("Updated Repair Array:", updatedRepairArray);
         res.status(200).json({ message: "Defect status updated successfully" });
       } else {
         res.status(200).json({ message: "No changes were made" });
@@ -12888,7 +12888,7 @@ app.post("/users", async (req, res) => {
       password
     } = req.body;
 
-    console.log("Request body:", req.body);
+    // console.log("Request body:", req.body);
 
     // >>> NEW: Check if a user with the same name already exists (case-insensitive)
     const existingUserByName = await UserMain.findOne({
@@ -13043,7 +13043,7 @@ app.post("/api/login", async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: "Invalid username or password" });
     }
-    console.log("User Details", user);
+    // console.log("User Details", user);
 
     const isPasswordValid = await bcrypt.compare(
       password.trim(),
@@ -13072,8 +13072,8 @@ app.post("/api/login", async (req, res) => {
       { expiresIn: "30d" }
     );
 
-    console.log("Access Token:", accessToken);
-    console.log("Refresh Token:", refreshToken);
+    // console.log("Access Token:", accessToken);
+    // console.log("Refresh Token:", refreshToken);
 
     res.status(200).json({
       message: "Login successful",
@@ -14398,7 +14398,7 @@ app.delete("/api/delete-measurement-record", async (req, res) => {
       .findOne({ Order_No: moNo }, { projection: { _id: 1 } });
 
     if (!order) {
-      console.log("Order not found for MO No:", moNo);
+      // console.log("Order not found for MO No:", moNo);
       return res
         .status(404)
         .json({ error: `Order not found for MO No: ${moNo}` });
@@ -14415,7 +14415,7 @@ app.delete("/api/delete-measurement-record", async (req, res) => {
       });
 
     if (result.deletedCount === 0) {
-      console.log("No measurement record found for:", { styleId, referenceNo });
+      // console.log("No measurement record found for:", { styleId, referenceNo });
       return res.status(404).json({
         error: `No measurement record found for reference_no: ${referenceNo}`
       });

@@ -2,20 +2,19 @@
 
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { ClipboardCheck, Eye, Redo, Database, Tag } from "lucide-react";
+import { ClipboardCheck, Redo, Database, Tag } from "lucide-react";
 
 const QC2InspectionTabs = ({ activeTab, setActiveTab }) => {
   const { t } = useTranslation();
 
   const tabIcons = {
     first: <ClipboardCheck />,
-    edit: <Eye />,
     return: <Redo />,
     data: <Database />,
     "defect-cards": <Tag />
   };
 
-  const tabs = ["first", "edit", "return", "data", "defect-cards"];
+  const tabs = ["first", "return", "data", "defect-cards"];
 
   return (
     <div className="mt-4 border-b border-gray-300">
