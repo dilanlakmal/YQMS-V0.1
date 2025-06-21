@@ -1,5 +1,3 @@
-//---This component renders the detailed table for return inspections.---//
-
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {

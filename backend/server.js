@@ -64,6 +64,7 @@ import createEMBDefectModel from "./models/EMBdefect.js";
 import createEMBReportModel from "./models/EMBReport.js";
 
 import createAuditCheckPointModel from "./models/AuditCheckPoint.js";
+import createBGradeModel from "./models/BGradeDefects.js";
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
@@ -215,6 +216,7 @@ const SCCFUOperator = createSCCFUOperatorModel(ymProdConnection);
 const SCCElasticOperator = createSCCElasticOperatorModel(ymProdConnection);
 
 const AuditCheckPoint = createAuditCheckPointModel(ymProdConnection);
+const BGrade = createBGradeModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -7040,10 +7042,10 @@ app.post("/api/repair-tracking", async (req, res) => {
               updatedItem.status === "Fail"
                 ? "Not Checked"
                 : updatedItem.status === "OK"
-                ? "Fail"
+                ? "Pass"
                 : updatedItem.status === "B-Grade"
                 ? "Fail"
-                : "OK";
+                : "Fail";
           }
           return {
             ...item,
@@ -7103,7 +7105,7 @@ app.post("/api/repair-tracking", async (req, res) => {
               ? "Not Checked"
               : item.status === "OK"
               ? "Fail"
-              : "OK"
+              : "Not Checked"
         }))
       });
       await newRecord.save();
@@ -7236,7 +7238,7 @@ app.post(
                   ? now.toLocaleTimeString("en-US", { hour12: false })
                   : null,
               // pass_bundle: status === "OK" ? "Pass" : status === "Fail" ? "Fail" : item.pass_bundle
-              pass_bundle: status === "OK" ? "Pass" : item.pass_bundle
+              pass_bundle: status === "OK" ? "Fail" : item.pass_bundle
             };
           }
         }
@@ -7265,6 +7267,35 @@ app.post(
     }
   }
 );
+
+/* ------------------------------
+   QC2 - B-Grade Defects
+------------------------------ */
+
+app.post("/api/b-grade-tracking", async (req, res) => {
+  try {
+    const { defect_print_id, bGradeArray } = req.body;
+
+    if (!defect_print_id || !bGradeArray || bGradeArray.length === 0) {
+      return res
+        .status(400)
+        .json({ msg: "Missing required fields or empty bGradeArray." });
+    }
+
+    // Find a document by its defect_print_id and update it.
+    // If it doesn't exist, create a new one (upsert: true).
+    const updatedDoc = await BGrade.findOneAndUpdate(
+      { defect_print_id: defect_print_id },
+      { $set: req.body },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    res.json(updatedDoc);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server Error");
+  }
+});
 
 /* ------------------------------
    QC2 - Reworks

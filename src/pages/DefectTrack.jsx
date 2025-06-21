@@ -210,59 +210,102 @@ const DefectTrack = () => {
 
   const handleSave = async () => {
     if (!scannedData) return;
-    const repairArray = [];
-    scannedData.garments.forEach((garment) => {
-      garment.defects.forEach((defect) => {
-        repairArray.push({
-          defectName: defect.name,
-          defectCount: defect.count,
-          repairGroup: defect.repair,
-          status: defect.status || "Fail",
-          repair_date: defect.repair_date || "",
-          repair_time: defect.repair_time || "",
-          garmentNumber: garment.garmentNumber
-        });
-      });
+    const allDefectsArray = scannedData.garments.flatMap((garment) =>
+      garment.defects.map((defect) => ({
+        defectName: defect.name,
+        defectCount: defect.count,
+        repairGroup: defect.repair,
+        status: defect.status || "Fail",
+        repair_date: defect.repair_date || "",
+        repair_time: defect.repair_time || "",
+        garmentNumber: garment.garmentNumber
+      }))
+    );
+
+    // The backend for repair-tracking expects 'pass_bundle' instead of 'status',
+    // and 'OK' is not a valid enum value for 'pass_bundle'.
+    // We need to map 'OK' to 'Pass' and ensure other statuses are valid enum values.
+    const repairTrackingPayloadArray = allDefectsArray.map((defect) => {
+      const { status, ...restOfDefect } = defect; // Destructure to omit 'status'
+      let mappedPassBundleStatus;
+      if (status === "B-Grade") {
+        mappedPassBundleStatus = "B-Grade"; // Assuming "B-Grade" is a valid enum value
+      } else {
+        mappedPassBundleStatus = "Fail"; // Assuming "Fail" is a valid enum value for other cases
+      }
+      return {
+        ...restOfDefect, // Include all other properties from the original defect
+        pass_bundle: mappedPassBundleStatus // Add/override pass_bundle with the mapped value
+      };
     });
+
+    const bGradeDefectsArray = allDefectsArray.filter(
+      (defect) => defect.status === "B-Grade"
+    );
     try {
-      const response = await fetch(`${API_BASE_URL}/api/repair-tracking`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          defect_print_id: scannedData.defect_print_id,
-          package_no: scannedData.package_no,
-          moNo: scannedData.moNo,
-          custStyle: scannedData.custStyle,
-          color: scannedData.color,
-          size: scannedData.size,
-          lineNo: scannedData.lineNo,
-          department: scannedData.department,
-          buyer: scannedData.buyer,
-          factory: scannedData.factory,
-          sub_con: scannedData.sub_con,
-          sub_con_factory: scannedData.sub_con_factory,
-          repairArray
-        })
-      });
-      if (!response.ok) {
-        throw new Error("Failed to save repair tracking");
+      const commonPayload = {
+        defect_print_id: scannedData.defect_print_id,
+        package_no: scannedData.package_no,
+        moNo: scannedData.moNo,
+        custStyle: scannedData.custStyle,
+        color: scannedData.color,
+        size: scannedData.size,
+        lineNo: scannedData.lineNo,
+        department: scannedData.department,
+        buyer: scannedData.buyer,
+        factory: scannedData.factory,
+        sub_con: scannedData.sub_con,
+        sub_con_factory: scannedData.sub_con_factory
+      };
+
+      const repairTrackingPromise = fetch(
+        `${API_BASE_URL}/api/repair-tracking`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...commonPayload,
+            repairArray: repairTrackingPayloadArray
+          })
+        }
+      );
+
+      const bGradeTrackingPromise =
+        bGradeDefectsArray.length > 0
+          ? fetch(`${API_BASE_URL}/api/b-grade-tracking`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...commonPayload,
+                bGradeArray: bGradeDefectsArray
+              })
+            })
+          : Promise.resolve({ ok: true });
+
+      const [repairResponse, bGradeResponse] = await Promise.all([
+        repairTrackingPromise,
+        bGradeTrackingPromise
+      ]);
+
+      if (!repairResponse.ok) {
+        const errorText = await repairResponse.text();
+        throw new Error(`Failed to save repair tracking: ${errorText}`);
+      }
+      if (!bGradeResponse.ok) {
+        const errorText = await bGradeResponse.text();
+        throw new Error(`Failed to save B-Grade tracking: ${errorText}`);
       }
       for (const garment of scannedData.garments) {
         for (const defect of garment.defects) {
           if (defect.status === "OK" || defect.status === "B-Grade") {
-            await updateDefectStatusInRepairTracking(
-              scannedData.defect_print_id,
-              garment.garmentNumber,
-              defect.name,
-              defect.status
-            );
+            await updateDefectStatusInRepairTracking(scannedData.defect_print_id, garment.garmentNumber, defect.name, defect.status);
           }
         }
       }
       Swal.fire({
         icon: "success",
         title: "Success",
-        text: "Repair tracking saved successfully!"
+         text: "Data saved successfully!"
       });
       setScannedData(null);
       setShowScanner(true);

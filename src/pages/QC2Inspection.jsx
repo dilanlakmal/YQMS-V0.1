@@ -76,6 +76,7 @@ const QC2InspectionPage = () => {
   const [locallyRejectedDefects, setLocallyRejectedDefects] = useState(
     new Set()
   );
+  const [bGradingGarment, setBGradingGarment] = useState(null);
   const [defectsData, setDefectsData] = useState([]);
   const [defectsLoading, setDefectsLoading] = useState(true);
   const [defectsError, setDefectsError] = useState(null);
@@ -487,10 +488,11 @@ const QC2InspectionPage = () => {
           (entry) =>
             entry.defect_print_id === defect_print_id && !entry.isCompleted
         );
-        if (!printEntry)
+        if (!printEntry){
           throw new Error(
             "This defect card is already completed or does not exist"
           );
+        }
 
         await logWorkerScan({
           qc_id: user.emp_id,
@@ -499,6 +501,43 @@ const QC2InspectionPage = () => {
           qty: printEntry.totalRejectGarmentCount || 0,
           random_id: defect_print_id
         });
+
+         const trackingResponse = await fetch(
+          `${API_BASE_URL}/api/defect-track/${defect_print_id}`
+        );
+        if (!trackingResponse.ok)
+          throw new Error("Failed to fetch defect tracking details");
+        const trackingData = await trackingResponse.json();
+
+        const rejectedGarmentsInInspection =
+          printEntry.re_return_garment?.map((g) => g.garment.garmentNumber) ||
+          [];
+
+        const filteredGarments = trackingData.garments
+          .filter(
+            (garment) =>
+              !rejectedGarmentsInInspection.includes(garment.garmentNumber) &&
+              !garment.defects.some((defect) => defect.status === "B-Grade") &&
+              garment.defects.some((defect) => defect.pass_bundle !== "Pass")
+          )
+          .map((garment) => ({
+            ...garment,
+            defects: garment.defects
+              .filter((d) => d.pass_bundle !== "Pass")
+              .map((defect) => {
+                const defectEntry = defectsData.find(
+                  (d) => d.english === defect.name
+                );
+                return {
+                  ...defect,
+                  displayName: defectEntry
+                    ? defectEntry[language] || defect.name
+                    : defect.name
+                };
+              })
+          }));
+
+        const adjustedTotalRejectGarmentCount = filteredGarments.length;
 
         const maxInspectionNo =
           (printEntry.repairGarmentsDefects?.length > 0
@@ -510,9 +549,12 @@ const QC2InspectionPage = () => {
         const newSessionData = {
           bundleData,
           printEntry,
-          totalRejectGarmentCount: printEntry.totalRejectGarmentCount,
-          initialTotalPass: printEntry.totalRejectGarmentCount,
-          sessionTotalPass: printEntry.totalRejectGarmentCount,
+          // totalRejectGarmentCount: printEntry.totalRejectGarmentCount,
+          // initialTotalPass: printEntry.totalRejectGarmentCount,
+          // sessionTotalPass: printEntry.totalRejectGarmentCount,
+          totalRejectGarmentCount: adjustedTotalRejectGarmentCount,
+          initialTotalPass: adjustedTotalRejectGarmentCount,
+          sessionTotalPass: adjustedTotalRejectGarmentCount,
           sessionTotalRejects: 0,
           sessionDefectsQty: 0,
           sessionRejectedGarments: [],
@@ -520,24 +562,18 @@ const QC2InspectionPage = () => {
         };
         setSessionData(newSessionData);
         setBundleData(bundleData);
-        setTotalPass(printEntry.totalRejectGarmentCount);
+        setTotalPass(adjustedTotalRejectGarmentCount);
         setTotalRejects(0);
         setTotalRepair(bundleData.totalRepair);
         setIsReturnInspection(true);
         setInDefectWindow(true);
         setScanning(false);
         setError(null);
-        const trackingResponse = await fetch(
-          `${API_BASE_URL}/api/defect-track/${defect_print_id}`
-        );
-        if (!trackingResponse.ok)
-          throw new Error("Failed to fetch defect tracking details");
-        const trackingData = await trackingResponse.json();
-        setDefectTrackingDetails(trackingData);
+        setDefectTrackingDetails({ ...trackingData, garments: filteredGarments });
         const initialStatuses = {};
         const initialLockedDefects = new Set();
         const initialRejectedGarmentDefects = new Set();
-        trackingData.garments.forEach((garment) => {
+       filteredGarments.forEach((garment) => {
           garment.defects.forEach((defect) => {
             const key = `${garment.garmentNumber}-${defect.name}`;
             initialStatuses[key] = defect.status || "Fail";
@@ -556,7 +592,78 @@ const QC2InspectionPage = () => {
         setScanning(false);
       }
     },
-    [user, fetchWorkerStats]
+    [user, fetchWorkerStats, defectsData, language]
+  );
+
+  const handleBGradeGarment = useCallback(
+    async (garmentNumber) => {
+      if (!sessionData || !defectTrackingDetails) return;
+      setBGradingGarment(garmentNumber);
+      try {
+        const { defect_print_id } = sessionData.printEntry;
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc2-repair-tracking/b-grade-garment`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ defect_print_id, garmentNumber })
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to mark garment as B-Grade: ${errorText}`);
+        }
+
+        // Update local state to reflect the change immediately
+        setDefectTrackingDetails((prev) => {
+          if (!prev) return null;
+          const updatedGarments = prev.garments.filter(
+            (g) => g.garmentNumber !== garmentNumber
+          );
+          return { ...prev, garments: updatedGarments };
+        });
+
+        setSessionData((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            sessionTotalPass: prev.sessionTotalPass - 1,
+            sessionTotalRejects: prev.sessionTotalRejects + 1,
+            totalRejectGarmentCount: prev.totalRejectGarmentCount - 1,
+            sessionRejectedGarments: [
+              ...prev.sessionRejectedGarments,
+              {
+                garmentNumber: garmentNumber,
+                repairDefectArray: [
+                  { name: "B-Grade", count: 1, code: "BGRADE" }
+                ],
+                totalDefectCount: 1
+              }
+            ]
+          };
+        });
+
+        setTotalPass((prev) => prev - 1);
+        setTotalRejects((prev) => prev + 1);
+
+        Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: `Garment ${garmentNumber} has been marked as B-Grade.`
+        });
+      } catch (err) {
+        setError(`Error marking garment as B-Grade: ${err.message}`);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: `Failed to mark garment as B-Grade: ${err.message}`
+        });
+      } finally {
+        setBGradingGarment(null);
+      }
+    },
+    [sessionData, defectTrackingDetails]
   );
 
   const handleDefectStatusToggle = (garmentNumber, defectName) => {
@@ -1167,26 +1274,7 @@ const QC2InspectionPage = () => {
     setLanguage(event.target.value);
   };
 
-  useEffect(() => {
-    if (defectTrackingDetails && defectsData.length > 0) {
-      const updatedDetails = {
-        ...defectTrackingDetails,
-        garments: defectTrackingDetails.garments.map((garment) => ({
-          ...garment,
-          defects: garment.defects.map((defect) => {
-            const defectEntry = defectsData.find(
-              (d) => d.english === defect.name
-            );
-            const displayName = defectEntry
-              ? defectEntry[language] || defectEntry.english
-              : defect.name;
-            return { ...defect, displayName };
-          })
-        }))
-      };
-      setDefectTrackingDetails(updatedDetails);
-    }
-  }, [language, defectsData, defectTrackingDetails]);
+  
 
   useEffect(() => {
     setShowDefectBoxes(!isReturnInspection);
@@ -1306,6 +1394,8 @@ const QC2InspectionPage = () => {
                 handleDefectStatusToggle={handleDefectStatusToggle}
                 rejectedGarmentDefects={rejectedGarmentDefects}
                 showDefectBoxes={showDefectBoxes}
+                handleBGradeGarment={handleBGradeGarment}
+                bGradingGarment={bGradingGarment}
                 tempDefects={tempDefects}
                 setTempDefects={setTempDefects}
                 activeFilter={activeFilter}
