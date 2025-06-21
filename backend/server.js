@@ -82,7 +82,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 5001;
+const PORT = 5000;
 
 /* ------------------------------
    for HTTPS
@@ -7296,6 +7296,209 @@ app.post("/api/b-grade-tracking", async (req, res) => {
     res.status(500).send("Server Error");
   }
 });
+
+app.post('/api/b-grade-defect/accept', async (req, res) => {
+  const { bundle_random_id, defect_print_id, acceptedGarmentNumbers } =
+    req.body;
+
+  // Basic validation
+  if (
+    !bundle_random_id ||
+    !defect_print_id ||
+    !Array.isArray(acceptedGarmentNumbers)
+  ) {
+    return res.status(400).json({ message: "Missing or invalid parameters." });
+  }
+
+  if (acceptedGarmentNumbers.length === 0) {
+    return res.status(400).json({ message: "No garments were accepted." });
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // 1. Update counts in qc2_inspection_pass_bundle
+    const bundle = await QC2InspectionPassBundle.findOne({ bundle_random_id }).session(
+      session
+    );
+    if (!bundle) {
+      throw new Error(`Bundle with ID ${bundle_random_id} not found.`);
+    }
+
+    const acceptedCount = acceptedGarmentNumbers.length;
+    bundle.totalPass += acceptedCount;
+    bundle.totalRepair = Math.max(0, bundle.totalRepair - acceptedCount); // Prevent negative count
+    await bundle.save({ session });
+
+    // 2. Update defect status in repair-tracking
+    const repairDoc = await QC2RepairTracking.findOne({ defect_print_id }).session(
+      session
+    );
+    if (!repairDoc) {
+      throw new Error(`Repair document with ID ${defect_print_id} not found.`);
+    }
+
+    repairDoc.garments.forEach((garment) => {
+      if (acceptedGarmentNumbers.includes(garment.garmentNumber)) {
+        garment.defects.forEach((defect) => {
+          if (defect.status === "B-Grade") {
+            defect.status = "B-Grade-Accepted"; // Mark as processed
+          }
+        });
+      }
+    });
+    await repairDoc.save({ session });
+
+    await session.commitTransaction();
+    res.status(200).json({ message: "B-Grade garments processed successfully." });
+  } catch (error) {
+    await session.abortTransaction();
+    console.error("Error accepting B-Grade garments:", error);
+    res.status(500).json({ message: "Failed to process request.", error: error.message });
+  } finally {
+    session.endSession();
+  }
+});
+
+app.put('/api/b-grade-tracking/update-confirmation', async (req, res) => {
+  const { bundle_random_id, defect_print_id, updates } = req.body;
+
+  if (!bundle_random_id || !defect_print_id || !updates || !Array.isArray(updates) || updates.length === 0) {
+    return res.status(400).json({ message: "Missing required fields. The 'updates' array cannot be empty." });
+  }
+
+  try {
+    const operations = updates.map(update => ({
+      updateOne: {
+        filter: {
+          bundle_random_id,
+          defect_print_id,
+          'garments.garmentNumber': update.garmentNumber,
+        },
+        update: {
+          $set: { 'garments.$.confirmation': update.confirmation },
+        },
+      },
+    }));
+
+    const result = await BGrade.bulkWrite(operations);
+
+    if (result.modifiedCount === 0) {
+      const docExists = await BGrade.exists({ bundle_random_id, defect_print_id });
+      if (!docExists) {
+        return res.status(404).json({ message: `B-Grade document not found.` });
+      } else {
+        return res.status(404).json({ message: 'No matching garments found to update within the specified B-Grade document.' });
+      }
+    }
+    res.status(200).json({
+      message: "B-Grade confirmations processed successfully.",
+      documentsModified: result.modifiedCount
+    });
+
+  } catch (error) {
+    console.error("Error updating B-Grade confirmations:", error);
+    res.status(500).json({ message: "Server error while updating confirmations.", error: error.message });
+  }
+});
+
+app.put('/:defect_print_id', async (req, res) => {
+  try {
+    const { defect_print_id } = req.params;
+    const { updates } = req.body; // The 'updates' array from your frontend
+
+    if (!updates || !Array.isArray(updates)) {
+      return res.status(400).json({ message: 'Request body must contain an "updates" array.' });
+    }
+
+    // Find the parent BGradeTracking document using the ID from the URL
+    const bGradeTrackingDoc = await BGrade.findOne({ defect_print_id: defect_print_id });
+
+    if (!bGradeTrackingDoc) {
+      return res.status(404).json({ message: `B-Grade tracking document with defect_print_id ${defect_print_id} not found.` });
+    }
+
+    let wasModified = false;
+    // Loop through the updates sent from the frontend (e.g., [{ garmentNumber: 'G1', confirmation: 'B-Grade_Rejected' }])
+    updates.forEach(update => {
+      // Find all defects in the bGradeArray that match the garmentNumber
+      bGradeTrackingDoc.bGradeArray.forEach(defectInDoc => {
+        if (defectInDoc.garmentNumber === update.garmentNumber) {
+          // Update the confirmation status based on the payload
+          defectInDoc.confirmation = update.confirmation;
+          wasModified = true;
+        }
+      });
+    });
+
+    // If any changes were made, mark the array as modified and save the document
+    if (wasModified) {
+      // This is crucial! It tells Mongoose that the nested bGradeArray has been changed.
+      bGradeTrackingDoc.markModified('bGradeArray');
+      await bGradeTrackingDoc.save();
+    }
+
+    res.status(200).json({ message: 'B-Grade confirmation status updated successfully.' });
+
+  } catch (error) {
+    console.error('Error updating B-Grade confirmation:', error);
+    res.status(500).json({ message: 'Server error while updating B-Grade confirmation.' });
+  }
+});
+
+app.post('/', async (req, res) => {
+  try {
+    const { defect_print_id, bGradeArray, updates } = req.body;
+
+    // --- UPDATE LOGIC ---
+    // If the payload contains an 'updates' array, it's an update request from BGradeDefect.jsx
+    if (updates && defect_print_id) {
+      const bGradeDoc = await BGrade.findOne({ defect_print_id: defect_print_id });
+
+      if (!bGradeDoc) {
+        return res.status(404).json({ message: `B-Grade record with defect_print_id ${defect_print_id} not found for update.` });
+      }
+
+      // Apply the confirmation updates to the garments within the document's bGradeArray
+      updates.forEach(update => {
+        bGradeDoc.bGradeArray.forEach(defectInDoc => {
+          if (defectInDoc.garmentNumber === update.garmentNumber) {
+            defectInDoc.confirmation = update.confirmation;
+          }
+        });
+      });
+
+      // Mark the array as modified for Mongoose to detect the changes
+      bGradeDoc.markModified('bGradeArray');
+      await bGradeDoc.save();
+      
+      return res.status(200).json({ message: 'B-Grade confirmation updated successfully.' });
+    }
+
+    // --- CREATE LOGIC ---
+    // If the payload contains a 'bGradeArray', it's a create request from DefectTrack.jsx
+    if (bGradeArray) {
+      // Using findOneAndUpdate with 'upsert: true' is a robust way to handle this.
+      // It will create the document if it doesn't exist, or update it if it does.
+      const newBGradeDoc = await BGrade.findOneAndUpdate(
+        { defect_print_id: defect_print_id }, // find a document with this filter
+        req.body, // document to insert or update
+        { new: true, upsert: true, setDefaultsOnInsert: true } // options: return the new doc, create if it doesn't exist, and apply schema defaults
+      );
+
+      return res.status(201).json({ message: 'B-Grade tracking data saved successfully.', data: newBGradeDoc });
+    }
+
+    // If the payload is invalid
+    return res.status(400).json({ message: 'Invalid payload. Request must include either an "updates" or "bGradeArray" property.' });
+
+  } catch (error) {
+    console.error('Error in POST /api/b-grade-tracking:', error);
+    res.status(500).json({ message: 'Server error while processing B-Grade request.' });
+  }
+});
+
 
 /* ------------------------------
    QC2 - Reworks
@@ -20852,5 +21055,5 @@ app.get("/api/users/search", async (req, res) => {
 
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`HTTPS Server is running on https://localhost:${PORT}`);
+  console.log(`✅ HTTPS Server is running on https://localhost:${PORT}`);
 });

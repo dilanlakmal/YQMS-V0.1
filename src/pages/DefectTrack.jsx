@@ -239,7 +239,7 @@ const DefectTrack = () => {
       };
     });
 
-    const bGradeDefectsArray = allDefectsArray.filter(
+    const bGradeDefectsArray = allDefectsArray.filter(  
       (defect) => defect.status === "B-Grade"
     );
     try {

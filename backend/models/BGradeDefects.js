@@ -8,7 +8,7 @@ const BGradeDefectSchema = new mongoose.Schema({
   status: { type: String, default: "B-Grade" },
   repair_date: { type: String },
   repair_time: { type: String },
-  confirmation: { type: String, default: "B-Grade" },
+  confirmation: { type: String, default: "B-Grade", enum: ["B-Grade", "B-Grade_Accept", "B-Grade_Rejected"] },
 });
 
 const BGradeTrackingSchema = new mongoose.Schema(

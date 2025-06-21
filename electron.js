@@ -124,3 +124,22 @@
 // app.on("window-all-closed", () => {
 //   if (process.platform !== "darwin") app.quit();
 // });
+
+
+// In your preload script (e.g., electron/preload.js)
+const { contextBridge, ipcRenderer } = require("electron");
+
+// Expose a safe, limited API to the renderer process (your React app)
+contextBridge.exposeInMainWorld("electron", {
+  ipcRenderer: {
+    send: (channel, data) => {
+      // Whitelist channels to prevent security risks.
+      // Only allow sending on the 'log-to-main' channel.
+      const validChannels = ["log-to-main"];
+      if (validChannels.includes(channel)) {
+        ipcRenderer.send(channel, data);
+      }
+    }
+    // You can also expose ipcRenderer.on here if you need two-way communication
+  }
+});

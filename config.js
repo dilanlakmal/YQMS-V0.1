@@ -7,4 +7,4 @@ else if (typeof process !== 'undefined' && typeof process.env === 'object' && pr
   determinedApiBaseUrl = process.env.VITE_API_BASE_URL;
 }
 
-export const API_BASE_URL = determinedApiBaseUrl || "https://192.167.8.235:5001";
+export const API_BASE_URL = determinedApiBaseUrl || "https://192.167.8.235:5000";
