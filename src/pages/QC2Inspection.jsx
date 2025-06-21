@@ -4395,11 +4395,15 @@ const QC2InspectionPage = () => {
             "This defect card is already completed or does not exist"
           );
 
+        // The `totalRejectGarmentCount` from the server is now the source of truth.
+        // It has already been decremented if any items were marked as B-Grade.
+        const currentRejectCount = printEntry.totalRejectGarmentCount || 0;
+
         await logWorkerScan({
           qc_id: user.emp_id,
           moNo: bundleData.moNo,
           taskNo: 84,
-          qty: printEntry.totalRejectGarmentCount || 0,
+          qty: currentRejectCount, // Log the current, possibly adjusted, count
           random_id: defect_print_id
         });
 
@@ -4410,35 +4414,52 @@ const QC2InspectionPage = () => {
               )
             : 1) || 1;
         const inspectionNo = maxInspectionNo + 1;
+
         const newSessionData = {
           bundleData,
           printEntry,
-          totalRejectGarmentCount: printEntry.totalRejectGarmentCount,
-          initialTotalPass: printEntry.totalRejectGarmentCount,
-          sessionTotalPass: printEntry.totalRejectGarmentCount,
+          totalRejectGarmentCount: currentRejectCount,
+          initialTotalPass: currentRejectCount,
+          sessionTotalPass: currentRejectCount,
           sessionTotalRejects: 0,
           sessionDefectsQty: 0,
           sessionRejectedGarments: [],
           inspectionNo
         };
+
         setSessionData(newSessionData);
         setBundleData(bundleData);
-        setTotalPass(printEntry.totalRejectGarmentCount);
+        setTotalPass(currentRejectCount); // Set Total Pass to the correct initial value
         setTotalRejects(0);
         setTotalRepair(bundleData.totalRepair);
         setIsReturnInspection(true);
         setInDefectWindow(true);
         setScanning(false);
         setError(null);
+
         const trackingResponse = await fetch(
           `${API_BASE_URL}/api/defect-track/${defect_print_id}`
         );
         if (!trackingResponse.ok)
           throw new Error("Failed to fetch defect tracking details");
         const trackingData = await trackingResponse.json();
-        setDefectTrackingDetails(trackingData);
-        const initialStatuses = {};
+
+        // --- NEW: Identify B-Grade garments to lock them in the UI ---
+        const bGradeGarmentNumbers = new Set();
         const initialLockedDefects = new Set();
+        trackingData.garments.forEach((garment) => {
+          if (garment.defects.some((d) => d.status === "B Grade")) {
+            bGradeGarmentNumbers.add(garment.garmentNumber);
+            garment.defects.forEach((defect) => {
+              initialLockedDefects.add(
+                `${garment.garmentNumber}-${defect.name}`
+              );
+            });
+          }
+        });
+
+        // Mark remaining 'Fail' garments as locked
+        const initialStatuses = {};
         const initialRejectedGarmentDefects = new Set();
         trackingData.garments.forEach((garment) => {
           garment.defects.forEach((defect) => {
@@ -4450,6 +4471,8 @@ const QC2InspectionPage = () => {
             }
           });
         });
+
+        setDefectTrackingDetails(trackingData);
         setRepairStatuses(initialStatuses);
         setLockedDefects(initialLockedDefects);
         setRejectedGarmentDefects(initialRejectedGarmentDefects);
@@ -4459,7 +4482,7 @@ const QC2InspectionPage = () => {
         setScanning(false);
       }
     },
-    [user, fetchWorkerStats]
+    [user, logWorkerScan]
   );
 
   const handleDefectStatusToggle = (garmentNumber, defectName) => {
@@ -4591,16 +4614,16 @@ const QC2InspectionPage = () => {
     passBundleStatus
   ) => {
     try {
-      let finalPassBundleStatus = passBundleStatus;
-      if (status === "OK" && passBundleStatus !== "Pass") {
-        finalPassBundleStatus = "Pass";
-      }
+      // let finalPassBundleStatus = passBundleStatus;
+      // if (status === "OK" && passBundleStatus !== "Pass") {
+      //   finalPassBundleStatus = "Pass";
+      // }
       const payload = {
         defect_print_id,
         garmentNumber,
         defectName,
         status,
-        pass_bundle: finalPassBundleStatus
+        pass_bundle: passBundleStatus //finalPassBundleStatus
       };
       const response = await fetch(
         `${API_BASE_URL}/api/qc2-repair-tracking/update-defect-status-by-name`,
