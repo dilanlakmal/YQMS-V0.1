@@ -26,7 +26,7 @@ import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
 import createSubconFactoryModel from "./models/SubconFactory.js";
 import createQC2DefectsModel from "./models/QC2DefectsModel.js";
 import createQC2WorkersDataModel from "./models/QC2WorkersData.js";
-
+import createQC2BGradeModel from "./models/QC2BGrade.js";
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
 import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
 import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
@@ -177,7 +177,7 @@ const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
 const SubconFactory = createSubconFactoryModel(ymProdConnection);
 const QC2Defects = createQC2DefectsModel(ymProdConnection);
 const QC2WorkersData = createQC2WorkersDataModel(ymProdConnection);
-
+const QC2BGrade = createQC2BGradeModel(ymProdConnection);
 const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
 const SewingDefects = createSewingDefectsModel(ymProdConnection);
 const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection);
@@ -7023,63 +7023,89 @@ app.post("/api/repair-tracking", async (req, res) => {
       repairArray
     } = req.body;
 
-    // Check if a record already exists
-    let existingRecord = await QC2RepairTracking.findOne({ defect_print_id });
+    // // Check if a record already exists
+    // let existingRecord = await QC2RepairTracking.findOne({ defect_print_id });
 
-    if (existingRecord) {
-      // Update existing record
-      existingRecord.repairArray = existingRecord.repairArray.map((item) => {
-        const updatedItem = repairArray.find(
-          (newItem) =>
-            newItem.defectName === item.defectName &&
-            newItem.garmentNumber === item.garmentNumber
-        );
-        if (updatedItem) {
-          // Determine if pass_bundle needs to be updated
-          let newPassBundle = item.pass_bundle;
-          if (updatedItem.status !== item.status) {
-            newPassBundle =
-              updatedItem.status === "Fail"
-                ? "Not Checked"
-                : updatedItem.status === "OK"
-                ? "Pass"
-                : updatedItem.status === "B-Grade"
-                ? "Fail"
-                : "Fail";
-          }
-          return {
-            ...item,
-            status: updatedItem.status,
-            repair_date: updatedItem.repair_date,
-            repair_time: updatedItem.repair_time,
-            pass_bundle: newPassBundle
-          };
-        }
-        return item;
-      });
+    // if (existingRecord) {
+    //   // Update existing record
+    //   existingRecord.repairArray = existingRecord.repairArray.map((item) => {
+    //     const updatedItem = repairArray.find(
+    //       (newItem) =>
+    //         newItem.defectName === item.defectName &&
+    //         newItem.garmentNumber === item.garmentNumber
+    //     );
+    //     if (updatedItem) {
+    //       // Determine if pass_bundle needs to be updated
+    //       let newPassBundle = item.pass_bundle;
+    //       if (updatedItem.status !== item.status) {
+    //         newPassBundle =
+    //           updatedItem.status === "Fail"
+    //             ? "Not Checked"
+    //             : updatedItem.status === "OK"
+    //             ? "Pass"
+    //             : updatedItem.status === "B-Grade"
+    //             ? "Fail"
+    //             : "Fail";
+    //       }
+    //       return {
+    //         ...item,
+    //         status: updatedItem.status,
+    //         repair_date: updatedItem.repair_date,
+    //         repair_time: updatedItem.repair_time,
+    //         pass_bundle: newPassBundle
+    //       };
+    //     }
+    //     return item;
+    //   });
 
-      //Add new items
-      const newItems = repairArray.filter(
-        (newItem) =>
-          !existingRecord.repairArray.some(
-            (existingItem) =>
-              existingItem.defectName === newItem.defectName &&
-              existingItem.garmentNumber === newItem.garmentNumber
-          )
-      );
+    //   //Add new items
+    //   const newItems = repairArray.filter(
+    //     (newItem) =>
+    //       !existingRecord.repairArray.some(
+    //         (existingItem) =>
+    //           existingItem.defectName === newItem.defectName &&
+    //           existingItem.garmentNumber === newItem.garmentNumber
+    //       )
+    //   );
 
-      if (newItems.length > 0) {
-        existingRecord.repairArray.push(...newItems);
-      }
+    //   if (newItems.length > 0) {
+    //     existingRecord.repairArray.push(...newItems);
+    //   }
 
-      await existingRecord.save();
-      res.status(200).json({
-        message: "Repair tracking updated successfully",
-        data: existingRecord
-      });
-    } else {
-      // Create new record
-      const newRecord = new QC2RepairTracking({
+    //   await existingRecord.save();
+    //   res.status(200).json({
+    //     message: "Repair tracking updated successfully",
+    //     data: existingRecord
+    //   });
+    // } else {
+    //   // Create new record
+    //   const newRecord = new QC2RepairTracking({
+
+    if (!defect_print_id || !repairArray) {
+      return res
+        .status(400)
+        .json({ message: "Missing defect_print_id or repairArray." });
+    }
+
+    const now = new Date();
+
+    // 1. Enhance the incoming array with correct timestamps based on status
+    const enhancedRepairArray = repairArray.map((item) => ({
+      ...item,
+      repair_date:
+        item.status === "OK" ? now.toLocaleDateString("en-US") : null,
+      repair_time:
+      item.status === "OK"
+          ? now.toLocaleTimeString("en-US", { hour12: false })
+          : null
+    }));
+
+    // 2. Use a single, atomic operation to update or create the document
+    const updatedRecord = await QC2RepairTracking.findOneAndUpdate(
+      { defect_print_id }, // Query: Find the document by its unique ID
+      {
+        // Update payload:
+        $set: {
         package_no,
         moNo,
         custStyle,
@@ -7091,29 +7117,40 @@ app.post("/api/repair-tracking", async (req, res) => {
         factory,
         sub_con,
         sub_con_factory,
-        defect_print_id,
-        repairArray: repairArray.map((item) => ({
-          defectName: item.defectName,
-          defectCount: item.defectCount,
-          repairGroup: item.repairGroup,
-          garmentNumber: item.garmentNumber,
-          status: item.status || "Fail",
-          repair_date: item.repair_date || "",
-          repair_time: item.repair_time || "",
-          pass_bundle:
-            item.status === "Fail"
-              ? "Not Checked"
-              : item.status === "OK"
-              ? "Fail"
-              : "Not Checked"
-        }))
-      });
-      await newRecord.save();
-      res.status(201).json({
+      //   defect_print_id,
+      //   repairArray: repairArray.map((item) => ({
+      //     defectName: item.defectName,
+      //     defectCount: item.defectCount,
+      //     repairGroup: item.repairGroup,
+      //     garmentNumber: item.garmentNumber,
+      //     status: item.status || "Fail",
+      //     repair_date: item.repair_date || "",
+      //     repair_time: item.repair_time || "",
+      //     pass_bundle:
+      //       item.status === "Fail"
+      //         ? "Not Checked"
+      //         : item.status === "OK"
+      //         ? "Fail"
+      //         : "Not Checked"
+      //   }))
+      // });
+      // await newRecord.save();
+      // res.status(201).json({
+      repairArray: enhancedRepairArray // Replace the entire array with our enhanced one
+        },
+        $setOnInsert: { defect_print_id } // If creating, ensure defect_print_id is set
+      },
+      {
+        new: true, // Return the updated document
+        upsert: true // Create the document if it doesn't exist
+      }
+    );
+        res.status(200).json({
         message: "Repair tracking saved successfully",
-        data: newRecord
+        // data: newRecord
+        data: updatedRecord
       });
-    }
+    // }
   } catch (error) {
     console.error("Error saving/updating repair tracking:", error);
     res.status(500).json({
@@ -7125,42 +7162,71 @@ app.post("/api/repair-tracking", async (req, res) => {
 
 // Endpoint to update defect status for a rejected garment
 app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
-  const { defect_print_id, garmentNumber, failedDefects, isRejecting } =
-    req.body;
+  // const { defect_print_id, garmentNumber, failedDefects, isRejecting } =
+  //   req.body;
+  const { defect_print_id, garmentNumber, failedDefects } = req.body;
   try {
-    const repairTracking = await QC2RepairTracking.find({ defect_print_id });
-    if (!repairTracking || repairTracking.length == 0) {
-      return res.status(404).json({ message: "Repair tracking not found" });
+    // const repairTracking = await QC2RepairTracking.find({ defect_print_id });
+    // if (!repairTracking || repairTracking.length == 0) {
+    //   return res.status(404).json({ message: "Repair tracking not found" });
+    if (!failedDefects || failedDefects.length === 0) {
+      return res.status(400).json({ message: "No failed defects provided." });
     }
 
-    const rt = repairTracking[0];
+//     const rt = repairTracking[0];
 
-    rt.repairArray = rt.repairArray.map((item) => {
-  if (item.garmentNumber === garmentNumber) {
-    if (
-      isRejecting &&
-      failedDefects.some((fd) => fd.name === item.defectName)
-    ) {
-      item.status = "Fail";
-      item.repair_date = null;
-      item.repair_time = null;
-      item.pass_bundle = "Fail";
-    } 
-    // If rejecting but not in failedDefects, do nothing
-  }
+//     rt.repairArray = rt.repairArray.map((item) => {
+//   if (item.garmentNumber === garmentNumber) {
+//     if (
+//       isRejecting &&
+//       failedDefects.some((fd) => fd.name === item.defectName)
+//     ) {
+//       item.status = "Fail";
+//       item.repair_date = null;
+//       item.repair_time = null;
+//       item.pass_bundle = "Fail";
+//     } 
+//     // If rejecting but not in failedDefects, do nothing
+//   }
 
-  // New condition: If status is B-Grade, pass_bundle must be Fail
-  if (item.status === "B-Grade") {
-    item.pass_bundle = "Fail";
-  }
+//   // New condition: If status is B-Grade, pass_bundle must be Fail
+//   if (item.status === "B-Grade") {
+//     item.pass_bundle = "Fail";
+//   }
 
-  return item;
-});
+//   return item;
+// });
 
 
-    await rt.save();
+//     await rt.save();
+const defectNamesToFail = failedDefects.map((d) => d.name);
+
+    const result = await QC2RepairTracking.updateOne(
+      { defect_print_id },
+      {
+        $set: {
+          "repairArray.$[elem].status": "Fail",
+          "repairArray.$[elem].repair_date": null,
+          "repairArray.$[elem].repair_time": null,
+          "repairArray.$[elem].pass_bundle": "Fail"
+        }
+      },
+      {
+        arrayFilters: [
+          {
+            "elem.garmentNumber": garmentNumber,
+            "elem.defectName": { $in: defectNamesToFail }
+          }
+        ]
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Repair tracking not found" });
+    }
     res.status(200).json({ message: "Updated successfully" });
   } catch (error) {
+    console.error("Error updating re-rejected garment status:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -7170,25 +7236,37 @@ app.post(
   "/api/qc2-repair-tracking/update-pass-bundle-status",
   async (req, res) => {
     try {
-      const { defect_print_id, pass_bundle } = req.body;
+      // const { defect_print_id, pass_bundle } = req.body;
 
-      const repairTracking = await QC2RepairTracking.findOne({
-        defect_print_id
-      });
+      // const repairTracking = await QC2RepairTracking.findOne({
+      //   defect_print_id
+      // });
 
-      if (!repairTracking) {
+      // if (!repairTracking) {
+      const { defect_print_id } = req.body;
+      const result = await QC2RepairTracking.updateOne(
+        { defect_print_id }, // Find the document
+        { $set: { "repairArray.$[elem].pass_bundle": "Pass" } }, // The update to apply
+        {
+          // This filter tells MongoDB to only apply the update to elements where status is "OK"
+          arrayFilters: [{ "elem.status": "OK" }],
+          new: true
+        }
+      );
+
+      if (result.matchedCount === 0) {
         return res.status(404).json({ message: "Repair tracking not found" });
       }
 
-      const updatedRepairArray = repairTracking.repairArray.map((item) => {
-        return {
-          ...item.toObject(),
-          pass_bundle: item.status === "OK" ? "Pass" : item.pass_bundle
-        };
-      });
+      // const updatedRepairArray = repairTracking.repairArray.map((item) => {
+      //   return {
+      //     ...item.toObject(),
+      //     pass_bundle: item.status === "OK" ? "Pass" : item.pass_bundle
+      //   };
+      // });
 
-      repairTracking.repairArray = updatedRepairArray;
-      await repairTracking.save();
+      // repairTracking.repairArray = updatedRepairArray;
+      // await repairTracking.save();
 
       res
         .status(200)
@@ -7207,57 +7285,87 @@ app.post(
 app.post(
   "/api/qc2-repair-tracking/update-defect-status-by-name",
   async (req, res) => {
-    const { defect_print_id, garmentNumber, defectName, status } = req.body;
-    try {
-      const repairTracking = await QC2RepairTracking.findOne({
-        defect_print_id
-      });
-      if (!repairTracking) {
-        console.error(
-          `No repair tracking found for defect_print_id: ${defect_print_id}`
-        ); // Add this line
-        return res.status(404).json({ message: "Repair tracking not found" });
-      }
+    // const { defect_print_id, garmentNumber, defectName, status } = req.body;
+    // try {
+    //   const repairTracking = await QC2RepairTracking.findOne({
+    //     defect_print_id
+    //   });
+    //   if (!repairTracking) {
+    //     console.error(
+    //       `No repair tracking found for defect_print_id: ${defect_print_id}`
+    //     ); // Add this line
+    //     return res.status(404).json({ message: "Repair tracking not found" });
+    //   }
 
-      // Find the specific defect and update it
-      const updatedRepairArray = repairTracking.repairArray.map((item) => {
-        if (
-          item.garmentNumber === garmentNumber &&
-          item.defectName === defectName
-        ) {
-          const shouldUpdate = item.status !== status;
-          if (shouldUpdate) {
+    //   // Find the specific defect and update it
+    //   const updatedRepairArray = repairTracking.repairArray.map((item) => {
+    //     if (
+    //       item.garmentNumber === garmentNumber &&
+    //       item.defectName === defectName
+    //     ) {
+    //       const shouldUpdate = item.status !== status;
+    //       if (shouldUpdate) {
+    const { defect_print_id, garmentNumber, defectName, status, pass_bundle } =
+      req.body;
+    try {
             const now = new Date();
-            return {
-              ...item,
-              status: status,
-              repair_date:
+
+              // ...item,
+              // status: status,
+              // repair_date:
+              const updatePayload = {
+              "repairArray.$.status": status,
+               "repairArray.$.repair_date":
                 status === "OK" ? now.toLocaleDateString("en-US") : null,
-              repair_time:
+              // repair_time:
+              "repairArray.$.repair_time":
                 status === "OK"
                   ? now.toLocaleTimeString("en-US", { hour12: false })
                   : null,
-              // pass_bundle: status === "OK" ? "Pass" : status === "Fail" ? "Fail" : item.pass_bundle
-              pass_bundle: status === "OK" ? "Fail" : item.pass_bundle
-            };
-          }
-        }
-        return item;
-      });
-      // Check if any changes were made
-      const hasChanges = repairTracking.repairArray.some((item, index) => {
-        return (
-          JSON.stringify(item) !== JSON.stringify(updatedRepairArray[index])
-        );
-      });
-      if (hasChanges) {
-        repairTracking.repairArray = updatedRepairArray;
-        await repairTracking.save();
+               // pass_bundle: status === "OK" ? "Pass" : status === "Fail" ? "Fail" : item.pass_bundle
+      //         pass_bundle: status === "OK" ? "Fail" : item.pass_bundle
+      //       };
+      //     }
+      //   }
+      //   return item;
+      // });
+      // // Check if any changes were made
+      // const hasChanges = repairTracking.repairArray.some((item, index) => {
+      //   return (
+      //     JSON.stringify(item) !== JSON.stringify(updatedRepairArray[index])
+      //   );
+      // });
+      // if (hasChanges) {
+      //   repairTracking.repairArray = updatedRepairArray;
+      //   await repairTracking.save();
         // console.log("Updated Repair Array:", updatedRepairArray);
-        res.status(200).json({ message: "Defect status updated successfully" });
-      } else {
-        res.status(200).json({ message: "No changes were made" });
+        "repairArray.$.pass_bundle": pass_bundle // Pass this directly from the frontend
+      };
+
+      // This is the atomic update. It finds the document AND the array element and updates it in one go.
+      const result = await QC2RepairTracking.updateOne(
+        {
+          defect_print_id,
+          "repairArray.garmentNumber": garmentNumber,
+          "repairArray.defectName": defectName
+        },
+        { $set: updatePayload }
+      );
+
+      if (result.matchedCount === 0) {
+        return res
+          .status(404)
+          .json({ message: "Repair tracking or specific defect not found." });
       }
+
+      if (result.modifiedCount === 0) {
+        return res.status(200).json({ message: "No changes were needed." });
+      }
+
+        res.status(200).json({ message: "Defect status updated successfully" });
+      // } else {
+      //   res.status(200).json({ message: "No changes were made" });
+      // }
     } catch (error) {
       console.error("Error updating defect status:", error);
       res.status(500).json({
@@ -7272,28 +7380,108 @@ app.post(
    QC2 - B-Grade Defects
 ------------------------------ */
 
-app.post("/api/b-grade-tracking", async (req, res) => {
-  try {
-    const { defect_print_id, bGradeArray } = req.body;
+// app.post("/api/b-grade-tracking", async (req, res) => {
+//   try {
+//     const { defect_print_id, bGradeArray } = req.body;
 
-    if (!defect_print_id || !bGradeArray || bGradeArray.length === 0) {
-      return res
-        .status(400)
-        .json({ msg: "Missing required fields or empty bGradeArray." });
+//     if (!defect_print_id || !bGradeArray || bGradeArray.length === 0) {
+//       return res
+//         .status(400)
+//         .json({ msg: "Missing required fields or empty bGradeArray." });
+//     }
+
+//     // Find a document by its defect_print_id and update it.
+//     // If it doesn't exist, create a new one (upsert: true).
+//     const updatedDoc = await BGrade.findOneAndUpdate(
+//       { defect_print_id: defect_print_id },
+//       { $set: req.body },
+//       { new: true, upsert: true, setDefaultsOnInsert: true }
+//     );
+
+//     res.json(updatedDoc);
+//   } catch (err) {
+//     console.error(err.message);
+//     res.status(500).send("Server Error");
+//   }
+// });
+
+// --- NEW ENDPOINT: To save or update B-Grade garment data ---
+
+app.post("/api/qc2-bgrade", async (req, res) => {
+  try {
+    const { defect_print_id, garmentData, headerData } = req.body;
+
+    if (!defect_print_id || !garmentData || !headerData) {
+      return res.status(400).json({ message: "Missing required data." });
     }
 
-    // Find a document by its defect_print_id and update it.
-    // If it doesn't exist, create a new one (upsert: true).
-    const updatedDoc = await BGrade.findOneAndUpdate(
-      { defect_print_id: defect_print_id },
-      { $set: req.body },
+    // First, check if this garment is already in the B-Grade document to prevent duplicates
+    const existingBGrade = await QC2BGrade.findOne({
+      defect_print_id,
+      "bgradeArray.garmentNumber": garmentData.garmentNumber
+    });
+
+    if (existingBGrade) {
+      return res.status(200).json({
+        message: "This garment has already been marked as B-Grade.",
+        data: existingBGrade
+      });
+    }
+
+    const updateOperations = {
+      $setOnInsert: headerData, // Set header data only when creating a new document
+      $push: { bgradeArray: garmentData } // Always add the new garment to the array
+    };
+
+    // Conditionally increment the new `totalBgradeQty` field.
+    // The default `leader_status` in your schema is "B Grade", so this will work for new entries.
+    if (garmentData.leader_status !== "Not B Grade") {
+      updateOperations.$inc = { totalBgradeQty: 1 };
+    }
+
+    // If not a duplicate, proceed with saving and decrementing
+    const bGradeRecord = await QC2BGrade.findOneAndUpdate(
+      { defect_print_id },
+      updateOperations, // Use the new, more complex update object
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
-    res.json(updatedDoc);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server Error");
+    // --- THIS IS THE CRUCIAL NEW LOGIC ---
+    // After successfully saving the B-Grade record, decrement the count in the main inspection document
+    await QC2InspectionPassBundle.updateOne(
+      { "printArray.defect_print_id": defect_print_id },
+      {
+        $inc: {
+          "printArray.$.totalRejectGarmentCount": -1,
+          "printArray.$.totalRejectGarment_Var": -1 // Also decrement the static variable
+        }
+      }
+    );
+
+    res.status(200).json({
+      message: "B-Grade garment recorded successfully.",
+      data: bGradeRecord
+    });
+  } catch (error) {
+    console.error("Error saving B-Grade data:", error);
+    res.status(500).json({ message: "Server error saving B-Grade data." });
+  }
+});
+
+// --- NEW ENDPOINT: To fetch B-Grade data by defect_print_id ---
+
+app.get("/api/qc2-bgrade/by-defect-id/:defect_print_id", async (req, res) => {
+  try {
+    const { defect_print_id } = req.params;
+    const bGradeData = await QC2BGrade.findOne({ defect_print_id }).lean();
+
+    if (!bGradeData) {
+      return res.status(404).json({ message: "No B-Grade records found." });
+    }
+    res.json(bGradeData);
+  } catch (error) {
+    console.error("Error fetching B-Grade data by defect ID:", error);
+    res.status(500).json({ message: "Server error." });
   }
 });
 
