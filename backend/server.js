@@ -12,6 +12,7 @@ import https from "https"; // Import https for HTTPS server
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import multer from "multer";
+import sharp from "sharp";
 import path from "path";
 import { Server } from "socket.io"; // Import Socket.io
 import { fileURLToPath } from "url";
@@ -9229,90 +9230,82 @@ const sanitize = (input) => {
 };
 
 // --------------------------------------------------------------------------
-// Roving Image Upload
+// Roving Image Upload (MODIFIED FOR PERFORMANCE)
 // --------------------------------------------------------------------------
 
-// 1. Use memoryStorage. This is simple and reliable.
+// 1. Use memoryStorage to handle the file in memory.
 const rovingStorage = multer.memoryStorage();
 
-// 2. Configure the multer instance with only the file filter and limits.
+// 2. Configure the multer instance.
 const rovingUpload = multer({
   storage: rovingStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i;
-    if (allowedMimeTypes.test(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)"), false);
-    }
-  }
+  limits: { fileSize: 25 * 1024 * 1024 } // Increase limit to 25MB for uncompressed files
 });
 
-// 3. The main endpoint with all logic inside.
+// 3. The main endpoint, now with sharp processing.
 app.post(
   "/api/roving/upload-roving-image",
-  rovingUpload.single("imageFile"), // This just prepares req.file in memory
+  rovingUpload.single("imageFile"),
   async (req, res) => {
     try {
-      // --- All data is now guaranteed to be available here ---
+      // --- Validation ---
       const { imageType, date, lineNo, moNo, operationId } = req.body;
       const imageFile = req.file;
 
-      // --- Validation ---
       if (!imageFile) {
         return res.status(400).json({
           success: false,
-          message: "No image file provided or file type is not allowed."
+          message: "No image file provided."
         });
       }
 
       if (!imageType || !date || !lineNo || !moNo || !operationId) {
         return res.status(400).json({
           success: false,
-          message: "Missing required metadata fields."
+          message: "Missing required metadata fields for image."
         });
       }
 
-      // --- File Saving Logic ---
-
-      // Define the single, absolute destination path
+      // --- File Saving Logic with Sharp ---
       const qcinlineUploadPath = path.join(
         __dirname,
         "public",
         "storage",
-        "qcinline"
+        "qcinline" // existing path is preserved
       );
-      await fsPromises.mkdir(qcinlineUploadPath, { recursive: true });
+      // await fsPromises.mkdir(qcinlineUploadPath, { recursive: true });
 
-      // Sanitize all parts of the filename
+      // Sanitize metadata for the filename (existing logic is good)
       const sanitizedImageType = sanitize(imageType.toUpperCase());
       const sanitizedDate = sanitize(date);
       const sanitizedLineNo = sanitize(lineNo);
       const sanitizedMoNo = sanitize(moNo);
       const sanitizedOperationId = sanitize(operationId);
-      const fileExtension = path.extname(imageFile.originalname);
 
-      // Construct a prefix that includes the image type
+      // Construct the unique prefix
       const imagePrefix = `${sanitizedImageType}_${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
 
-      // Find the next available index for the filename
-      let existingImageCount = 0;
+      // Find the next available index for this prefix
       const filesInDir = await fsPromises.readdir(qcinlineUploadPath);
-      filesInDir.forEach((f) => {
-        if (f.startsWith(imagePrefix)) {
-          existingImageCount++;
-        }
-      });
-
+      const existingImageCount = filesInDir.filter((f) =>
+        f.startsWith(imagePrefix)
+      ).length;
       const imageIndex = existingImageCount + 1;
-      const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
 
-      // Define the full path to save the file
-      const fullFilePath = path.join(qcinlineUploadPath, newFilename);
+      // Create the new filename with a .webp extension
+      const newFilename = `${imagePrefix}${imageIndex}.webp`;
+      const finalDiskPath = path.join(qcinlineUploadPath, newFilename);
 
-      // Write the file from memory to the disk
-      await fsPromises.writeFile(fullFilePath, imageFile.buffer);
+      // Process the image from memory buffer with sharp and save to disk
+      await sharp(imageFile.buffer)
+        .resize({
+          width: 1024,
+          height: 1024,
+          fit: "inside",
+          withoutEnlargement: true
+        })
+        .webp({ quality: 80 })
+        .toFile(finalDiskPath);
 
       // Construct the public URL for the client
       const publicUrl = `${API_BASE_URL}/storage/qcinline/${newFilename}`;
@@ -9329,8 +9322,6 @@ app.post(
           success: false,
           message: `File upload error: ${error.message}`
         });
-      } else if (error.message.includes("Images Only!")) {
-        return res.status(400).json({ success: false, message: error.message });
       }
       res.status(500).json({
         success: false,
@@ -9339,6 +9330,118 @@ app.post(
     }
   }
 );
+
+// // --------------------------------------------------------------------------
+// // Roving Image Upload
+// // --------------------------------------------------------------------------
+
+// // 1. Use memoryStorage. This is simple and reliable.
+// const rovingStorage = multer.memoryStorage();
+
+// // 2. Configure the multer instance with only the file filter and limits.
+// const rovingUpload = multer({
+//   storage: rovingStorage,
+//   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+//   fileFilter: (req, file, cb) => {
+//     const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i;
+//     if (allowedMimeTypes.test(file.mimetype)) {
+//       cb(null, true);
+//     } else {
+//       cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)"), false);
+//     }
+//   }
+// });
+
+// // 3. The main endpoint with all logic inside.
+// app.post(
+//   "/api/roving/upload-roving-image",
+//   rovingUpload.single("imageFile"), // This just prepares req.file in memory
+//   async (req, res) => {
+//     try {
+//       // --- All data is now guaranteed to be available here ---
+//       const { imageType, date, lineNo, moNo, operationId } = req.body;
+//       const imageFile = req.file;
+
+//       // --- Validation ---
+//       if (!imageFile) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "No image file provided or file type is not allowed."
+//         });
+//       }
+
+//       if (!imageType || !date || !lineNo || !moNo || !operationId) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Missing required metadata fields."
+//         });
+//       }
+
+//       // --- File Saving Logic ---
+
+//       // Define the single, absolute destination path
+//       const qcinlineUploadPath = path.join(
+//         __dirname,
+//         "public",
+//         "storage",
+//         "qcinline"
+//       );
+//       await fsPromises.mkdir(qcinlineUploadPath, { recursive: true });
+
+//       // Sanitize all parts of the filename
+//       const sanitizedImageType = sanitize(imageType.toUpperCase());
+//       const sanitizedDate = sanitize(date);
+//       const sanitizedLineNo = sanitize(lineNo);
+//       const sanitizedMoNo = sanitize(moNo);
+//       const sanitizedOperationId = sanitize(operationId);
+//       const fileExtension = path.extname(imageFile.originalname);
+
+//       // Construct a prefix that includes the image type
+//       const imagePrefix = `${sanitizedImageType}_${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
+
+//       // Find the next available index for the filename
+//       let existingImageCount = 0;
+//       const filesInDir = await fsPromises.readdir(qcinlineUploadPath);
+//       filesInDir.forEach((f) => {
+//         if (f.startsWith(imagePrefix)) {
+//           existingImageCount++;
+//         }
+//       });
+
+//       const imageIndex = existingImageCount + 1;
+//       const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
+
+//       // Define the full path to save the file
+//       const fullFilePath = path.join(qcinlineUploadPath, newFilename);
+
+//       // Write the file from memory to the disk
+//       await fsPromises.writeFile(fullFilePath, imageFile.buffer);
+
+//       // Construct the public URL for the client
+//       const publicUrl = `${API_BASE_URL}/storage/qcinline/${newFilename}`;
+
+//       res.json({
+//         success: true,
+//         filePath: publicUrl,
+//         filename: newFilename
+//       });
+//     } catch (error) {
+//       console.error("Error in /api/roving/upload-roving-image:", error);
+//       if (error instanceof multer.MulterError) {
+//         return res.status(400).json({
+//           success: false,
+//           message: `File upload error: ${error.message}`
+//         });
+//       } else if (error.message.includes("Images Only!")) {
+//         return res.status(400).json({ success: false, message: error.message });
+//       }
+//       res.status(500).json({
+//         success: false,
+//         message: "Server error during image processing."
+//       });
+//     }
+//   }
+// );
 
 /* ------------------------------
   USERS ENDPOINTS ---- Reporting
@@ -11194,7 +11297,7 @@ app.post("/api/save-measurement-point", async (req, res) => {
     if (error.code === 11000) {
       // Handle duplicate key errors more gracefully
       // You might need to check which field caused the duplicate error
-      // For now, a generic message. Your schema should have unique indexes defined.
+      // For now, a generic message. schema should have unique indexes defined.
       return res.status(409).json({
         message:
           "Failed to save: Duplicate entry for a unique field (e.g., MO + Panel + Point Name + Index).",
@@ -11620,60 +11723,56 @@ app.get("/api/cutting-issues", async (req, res) => {
 
 // --- Multer Configuration for Cutting Images ---
 
-// 1. Use memoryStorage to handle the file in memory first.
+// MODIFIED: Use memoryStorage to handle the file in memory for processing.
 const cuttingMemoryStorage = multer.memoryStorage();
-
-// 2. Configure multer with the new storage, file filter, and limits.
 const cutting_upload = multer({
   storage: cuttingMemoryStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ["image/jpeg", "image/png"];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only JPEG and PNG images are allowed"), false);
-    }
-  }
+  limits: { fileSize: 25 * 1024 * 1024 } // Increased limit to 25MB to handle uncompressed files from client
 });
 
-// --- Image Upload Endpoint ---
+// --- Image Upload Endpoint (MODIFIED) ---
 app.post(
   "/api/upload-cutting-image",
   cutting_upload.single("image"), // This uses the memory storage config
   async (req, res) => {
     try {
-      const imageFile = req.file;
-
-      if (!imageFile) {
+      if (!req.file) {
         return res.status(400).json({
           success: false,
-          message: "No file uploaded or file type is not allowed."
+          message: "No file uploaded."
         });
       }
 
-      // --- File Saving Logic ---
+      // --- File Saving Logic with Sharp ---
       const cuttingUploadPath = path.join(
         __dirname,
         "public",
         "storage",
-        "cutting"
+        "cutting" // Your existing path is preserved
       );
-      //await fs.promises.mkdir(cuttingUploadPath, { recursive: true });
+      // Ensure the directory exists
+      // await fs.promises.mkdir(cuttingUploadPath, { recursive: true });
 
-      // Create a unique filename
-      const fileExtension = path.extname(imageFile.originalname);
+      // Create a unique filename, saving as .webp
       const newFilename = `cutting-${Date.now()}-${Math.round(
         Math.random() * 1e9
-      )}${fileExtension}`;
+      )}.webp`;
 
-      // Define the full path and write the file from buffer
-      const fullFilePath = path.join(cuttingUploadPath, newFilename);
-      await fs.promises.writeFile(fullFilePath, imageFile.buffer);
+      const finalDiskPath = path.join(cuttingUploadPath, newFilename);
+
+      // Use sharp to process the image from buffer
+      await sharp(req.file.buffer)
+        .resize({
+          width: 1024,
+          height: 1024,
+          fit: "inside",
+          withoutEnlargement: true
+        })
+        .webp({ quality: 80 }) // Convert to efficient WebP format
+        .toFile(finalDiskPath);
 
       // --- URL Construction ---
-      // IMPORTANT: Return a RELATIVE path. The frontend will add the base URL.
-      // This is the most flexible pattern.
+      // Return the relative path, which is what your frontend expects
       const relativeUrl = `/storage/cutting/${newFilename}`;
 
       res.status(200).json({ success: true, url: relativeUrl });
@@ -11692,6 +11791,81 @@ app.post(
     }
   }
 );
+
+// // --- Multer Configuration for Cutting Images ---
+
+// // 1. Use memoryStorage to handle the file in memory first.
+// const cuttingMemoryStorage = multer.memoryStorage();
+
+// // 2. Configure multer with the new storage, file filter, and limits.
+// const cutting_upload = multer({
+//   storage: cuttingMemoryStorage,
+//   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+//   fileFilter: (req, file, cb) => {
+//     const allowedTypes = ["image/jpeg", "image/png"];
+//     if (allowedTypes.includes(file.mimetype)) {
+//       cb(null, true);
+//     } else {
+//       cb(new Error("Only JPEG and PNG images are allowed"), false);
+//     }
+//   }
+// });
+
+// // --- Image Upload Endpoint ---
+// app.post(
+//   "/api/upload-cutting-image",
+//   cutting_upload.single("image"), // This uses the memory storage config
+//   async (req, res) => {
+//     try {
+//       const imageFile = req.file;
+
+//       if (!imageFile) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "No file uploaded or file type is not allowed."
+//         });
+//       }
+
+//       // --- File Saving Logic ---
+//       const cuttingUploadPath = path.join(
+//         __dirname,
+//         "public",
+//         "storage",
+//         "cutting"
+//       );
+//       //await fs.promises.mkdir(cuttingUploadPath, { recursive: true });
+
+//       // Create a unique filename
+//       const fileExtension = path.extname(imageFile.originalname);
+//       const newFilename = `cutting-${Date.now()}-${Math.round(
+//         Math.random() * 1e9
+//       )}${fileExtension}`;
+
+//       // Define the full path and write the file from buffer
+//       const fullFilePath = path.join(cuttingUploadPath, newFilename);
+//       await fs.promises.writeFile(fullFilePath, imageFile.buffer);
+
+//       // --- URL Construction ---
+//       // IMPORTANT: Return a RELATIVE path. The frontend will add the base URL.
+//       // This is the most flexible pattern.
+//       const relativeUrl = `/storage/cutting/${newFilename}`;
+
+//       res.status(200).json({ success: true, url: relativeUrl });
+//     } catch (error) {
+//       console.error("Error in /api/upload-cutting-image:", error);
+//       if (error instanceof multer.MulterError) {
+//         return res.status(400).json({
+//           success: false,
+//           message: `File upload error: ${error.message}`
+//         });
+//       }
+//       res.status(500).json({
+//         success: false,
+//         message: "Server error during image processing."
+//       });
+//     }
+//   }
+// );
 
 /* ------------------------------
   Cutting Trend Analysis ENDPOINTS
@@ -15286,42 +15460,105 @@ app.delete("/api/scc/emb-defects/:id", async (req, res) => {
    End Points - SCC HT/FU
 ------------------------------ */
 
-// Multer setup for SCC image uploads
 // 1. Define the absolute destination path and ensure the directory exists
 const sccUploadPath = path.join(__dirname, "public", "storage", "scc_images");
-//fs.mkdirSync(sccUploadPath, { recursive: true }); // Creates the directory if it doesn't exist
+//fs.mkdirSync(sccUploadPath, { recursive: true }); // Make sure directory exists
 
-// 2. Update the multer storage configuration
-const sccImageStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // Use the absolute path variable here
-    cb(null, sccUploadPath);
-  },
-  filename: (req, file, cb) => {
-    // This logic is complex and specific, so we keep it as is.
-    const { imageType, inspectionDate } = req.body;
-    const datePart = inspectionDate
-      ? inspectionDate.replace(/\//g, "-")
-      : new Date().toISOString().split("T")[0];
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const filename = `${
-      imageType || "sccimage"
-    }-${datePart}-${uniqueSuffix}${path.extname(file.originalname)}`;
-    cb(null, filename);
-  }
+// 2. MODIFIED: Use memoryStorage to process the image buffer in RAM before saving
+const sccMemoryStorage = multer.memoryStorage();
+const sccUpload = multer({
+  storage: sccMemoryStorage,
+  limits: { fileSize: 25 * 1024 * 1024 } // Optional: Add a limit (e.g., 25MB) to prevent very large files
 });
 
-const sccUpload = multer({ storage: sccImageStorage });
+// 3. MODIFIED: Update the endpoint to process the image with sharp and save it
+app.post(
+  "/api/scc/upload-image",
+  sccUpload.single("imageFile"),
+  async (req, res) => {
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No file uploaded." });
+    }
 
-app.post("/api/scc/upload-image", sccUpload.single("imageFile"), (req, res) => {
-  if (!req.file) {
-    return res
-      .status(400)
-      .json({ success: false, message: "No file uploaded." });
+    try {
+      // Generate a unique filename (your existing logic is good)
+      const { imageType, inspectionDate } = req.body;
+      const datePart = inspectionDate
+        ? inspectionDate.replace(/\//g, "-")
+        : new Date().toISOString().split("T")[0];
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+
+      // We will save as .webp for the best compression and web performance
+      const newFilename = `${
+        imageType || "sccimage"
+      }-${datePart}-${uniqueSuffix}.webp`;
+      const finalDiskPath = path.join(sccUploadPath, newFilename);
+
+      // Use sharp to process the image from the buffer
+      await sharp(req.file.buffer)
+        .resize({
+          width: 1024,
+          height: 1024,
+          fit: "inside",
+          withoutEnlargement: true
+        }) // Resize to max 1024px, don't enlarge small images
+        .webp({ quality: 80 }) // Convert to WebP format with 80% quality
+        .toFile(finalDiskPath); // Save the processed image to disk
+
+      // The public URL that the frontend will use to display the image
+      const publicUrlPath = `${API_BASE_URL}/storage/scc_images/${newFilename}`;
+      res.json({
+        success: true,
+        filePath: publicUrlPath,
+        filename: newFilename
+      });
+    } catch (error) {
+      console.error("Error processing or saving image:", error);
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to process uploaded image." });
+    }
   }
-  const filePath = `${API_BASE_URL}/storage/scc_images/${req.file.filename}`;
-  res.json({ success: true, filePath: filePath, filename: req.file.filename });
-});
+);
+
+// // Multer setup for SCC image uploads
+// // 1. Define the absolute destination path and ensure the directory exists
+// const sccUploadPath = path.join(__dirname, "public", "storage", "scc_images");
+// //fs.mkdirSync(sccUploadPath, { recursive: true }); // Creates the directory if it doesn't exist
+
+// // 2. Update the multer storage configuration
+// const sccImageStorage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     // Use the absolute path variable here
+//     cb(null, sccUploadPath);
+//   },
+//   filename: (req, file, cb) => {
+//     // This logic is complex and specific, so we keep it as is.
+//     const { imageType, inspectionDate } = req.body;
+//     const datePart = inspectionDate
+//       ? inspectionDate.replace(/\//g, "-")
+//       : new Date().toISOString().split("T")[0];
+//     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+//     const filename = `${
+//       imageType || "sccimage"
+//     }-${datePart}-${uniqueSuffix}${path.extname(file.originalname)}`;
+//     cb(null, filename);
+//   }
+// });
+
+// const sccUpload = multer({ storage: sccImageStorage });
+
+// app.post("/api/scc/upload-image", sccUpload.single("imageFile"), (req, res) => {
+//   if (!req.file) {
+//     return res
+//       .status(400)
+//       .json({ success: false, message: "No file uploaded." });
+//   }
+//   const filePath = `${API_BASE_URL}/storage/scc_images/${req.file.filename}`;
+//   res.json({ success: true, filePath: filePath, filename: req.file.filename });
+// });
 
 // Helper function to format date to MM/DD/YYYY
 const formatDateToMMDDYYYY = (dateInput) => {
