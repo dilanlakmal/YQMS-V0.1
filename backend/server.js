@@ -7001,6 +7001,7 @@ app.get("/api/qc2-bgrade/by-defect-id/:defect_print_id", async (req, res) => {
 ------------------------------ */
 
 // 1. Fetch Defect Data by defect_print_id
+
 app.get("/api/defect-track/:defect_print_id", async (req, res) => {
   try {
     const { defect_print_id } = req.params;
@@ -7191,48 +7192,6 @@ app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
   }
 });
 
-// app.post("/api/qc2-repair-tracking/update-defect-status", async (req, res) => {
-//   const { defect_print_id, garmentNumber, failedDefects, isRejecting } =
-//     req.body;
-//   try {
-//     const repairTracking = await QC2RepairTracking.find({ defect_print_id });
-//     if (!repairTracking || repairTracking.length == 0) {
-//       return res.status(404).json({ message: "Repair tracking not found" });
-//     }
-
-//     const rt = repairTracking[0];
-
-//     rt.repairArray = rt.repairArray.map((item) => {
-//       if (item.garmentNumber === garmentNumber) {
-//         if (
-//           isRejecting &&
-//           failedDefects.some((fd) => fd.name === item.defectName)
-//         ) {
-//           item.status = "Fail";
-//           item.repair_date = null;
-//           item.repair_time = null;
-//           item.pass_bundle = "Fail";
-//         } else if (isRejecting) {
-//           // If rejecting but not in failedDefectIds, don't change status or pass_bundle
-//         } else {
-//           item.status = "OK";
-//           const now = new Date();
-//           item.repair_date = now.toLocaleDateString("en-US");
-//           item.repair_time = now.toLocaleTimeString("en-US", { hour12: false });
-//           // Only set pass_bundle to "Pass" if not rejecting
-//           item.pass_bundle = "Pass";
-//         }
-//       }
-//       return item;
-//     });
-
-//     await rt.save();
-//     res.status(200).json({ message: "Updated successfully" });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// });
-
 // Endpoint to update pass_bundle status for all garments
 app.post(
   "/api/qc2-repair-tracking/update-pass-bundle-status",
@@ -7304,7 +7263,6 @@ app.post(
 //   }
 // );
 
-// Endpoint to update defect status by defect name and garment number
 // Endpoint to update defect status by defect name and garment number (ATOMIC VERSION)
 app.post(
   "/api/qc2-repair-tracking/update-defect-status-by-name",
@@ -7355,69 +7313,251 @@ app.post(
   }
 );
 
-// app.post(
-//   "/api/qc2-repair-tracking/update-defect-status-by-name",
-//   async (req, res) => {
-//     const { defect_print_id, garmentNumber, defectName, status } = req.body;
-//     try {
-//       const repairTracking = await QC2RepairTracking.findOne({
-//         defect_print_id
-//       });
-//       if (!repairTracking) {
-//         console.error(
-//           `No repair tracking found for defect_print_id: ${defect_print_id}`
-//         ); // Add this line
-//         return res.status(404).json({ message: "Repair tracking not found" });
-//       }
+// B grade confirmation endpoint -- need to update;
 
-//       // Find the specific defect and update it
-//       const updatedRepairArray = repairTracking.repairArray.map((item) => {
-//         if (
-//           item.garmentNumber === garmentNumber &&
-//           item.defectName === defectName
-//         ) {
-//           const shouldUpdate = item.status !== status;
-//           if (shouldUpdate) {
-//             const now = new Date();
-//             return {
-//               ...item,
-//               status: status,
-//               repair_date:
-//                 status === "OK" ? now.toLocaleDateString("en-US") : null,
-//               repair_time:
-//                 status === "OK"
-//                   ? now.toLocaleTimeString("en-US", { hour12: false })
-//                   : null,
-//               // pass_bundle: status === "OK" ? "Pass" : status === "Fail" ? "Fail" : item.pass_bundle
-//               pass_bundle: status === "OK" ? "Pass" : item.pass_bundle
-//             };
-//           }
-//         }
-//         return item;
-//       });
-//       // Check if any changes were made
-//       const hasChanges = repairTracking.repairArray.some((item, index) => {
-//         return (
-//           JSON.stringify(item) !== JSON.stringify(updatedRepairArray[index])
-//         );
-//       });
-//       if (hasChanges) {
-//         repairTracking.repairArray = updatedRepairArray;
-//         await repairTracking.save();
-//         console.log("Updated Repair Array:", updatedRepairArray);
-//         res.status(200).json({ message: "Defect status updated successfully" });
-//       } else {
-//         res.status(200).json({ message: "No changes were made" });
-//       }
-//     } catch (error) {
-//       console.error("Error updating defect status:", error);
-//       res.status(500).json({
-//         message: "Failed to update defect status",
-//         error: error.message
-//       });
-//     }
-//   }
-// );
+app.post("/api/b-grade-defect/accept", async (req, res) => {
+  const { bundle_random_id, defect_print_id, acceptedGarmentNumbers } =
+    req.body;
+
+  // Basic validation
+  if (
+    !bundle_random_id ||
+    !defect_print_id ||
+    !Array.isArray(acceptedGarmentNumbers)
+  ) {
+    return res.status(400).json({ message: "Missing or invalid parameters." });
+  }
+
+  if (acceptedGarmentNumbers.length === 0) {
+    return res.status(400).json({ message: "No garments were accepted." });
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // 1. Update counts in qc2_inspection_pass_bundle
+    const bundle = await QC2InspectionPassBundle.findOne({
+      bundle_random_id
+    }).session(session);
+    if (!bundle) {
+      throw new Error(`Bundle with ID ${bundle_random_id} not found.`);
+    }
+
+    const acceptedCount = acceptedGarmentNumbers.length;
+    bundle.totalPass += acceptedCount;
+    bundle.totalRepair = Math.max(0, bundle.totalRepair - acceptedCount); // Prevent negative count
+    await bundle.save({ session });
+
+    // 2. Update defect status in repair-tracking
+    const repairDoc = await QC2RepairTracking.findOne({
+      defect_print_id
+    }).session(session);
+    if (!repairDoc) {
+      throw new Error(`Repair document with ID ${defect_print_id} not found.`);
+    }
+
+    repairDoc.garments.forEach((garment) => {
+      if (acceptedGarmentNumbers.includes(garment.garmentNumber)) {
+        garment.defects.forEach((defect) => {
+          if (defect.status === "B-Grade") {
+            defect.status = "B-Grade-Accepted"; // Mark as processed
+          }
+        });
+      }
+    });
+    await repairDoc.save({ session });
+
+    await session.commitTransaction();
+    res
+      .status(200)
+      .json({ message: "B-Grade garments processed successfully." });
+  } catch (error) {
+    await session.abortTransaction();
+    console.error("Error accepting B-Grade garments:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to process request.", error: error.message });
+  } finally {
+    session.endSession();
+  }
+});
+
+app.put("/api/b-grade-tracking/update-confirmation", async (req, res) => {
+  const { bundle_random_id, defect_print_id, updates } = req.body;
+
+  if (
+    !bundle_random_id ||
+    !defect_print_id ||
+    !updates ||
+    !Array.isArray(updates) ||
+    updates.length === 0
+  ) {
+    return res.status(400).json({
+      message: "Missing required fields. The 'updates' array cannot be empty."
+    });
+  }
+
+  try {
+    const operations = updates.map((update) => ({
+      updateOne: {
+        filter: {
+          bundle_random_id,
+          defect_print_id,
+          "garments.garmentNumber": update.garmentNumber
+        },
+        update: {
+          $set: { "garments.$.confirmation": update.confirmation }
+        }
+      }
+    }));
+
+    const result = await BGrade.bulkWrite(operations);
+
+    if (result.modifiedCount === 0) {
+      const docExists = await BGrade.exists({
+        bundle_random_id,
+        defect_print_id
+      });
+      if (!docExists) {
+        return res.status(404).json({ message: `B-Grade document not found.` });
+      } else {
+        return res.status(404).json({
+          message:
+            "No matching garments found to update within the specified B-Grade document."
+        });
+      }
+    }
+    res.status(200).json({
+      message: "B-Grade confirmations processed successfully.",
+      documentsModified: result.modifiedCount
+    });
+  } catch (error) {
+    console.error("Error updating B-Grade confirmations:", error);
+    res.status(500).json({
+      message: "Server error while updating confirmations.",
+      error: error.message
+    });
+  }
+});
+
+app.put("/:defect_print_id", async (req, res) => {
+  try {
+    const { defect_print_id } = req.params;
+    const { updates } = req.body; // The 'updates' array from your frontend
+
+    if (!updates || !Array.isArray(updates)) {
+      return res
+        .status(400)
+        .json({ message: 'Request body must contain an "updates" array.' });
+    }
+
+    // Find the parent BGradeTracking document using the ID from the URL
+    const bGradeTrackingDoc = await BGrade.findOne({
+      defect_print_id: defect_print_id
+    });
+
+    if (!bGradeTrackingDoc) {
+      return res.status(404).json({
+        message: `B-Grade tracking document with defect_print_id ${defect_print_id} not found.`
+      });
+    }
+
+    let wasModified = false;
+    // Loop through the updates sent from the frontend (e.g., [{ garmentNumber: 'G1', confirmation: 'B-Grade_Rejected' }])
+    updates.forEach((update) => {
+      // Find all defects in the bGradeArray that match the garmentNumber
+      bGradeTrackingDoc.bGradeArray.forEach((defectInDoc) => {
+        if (defectInDoc.garmentNumber === update.garmentNumber) {
+          // Update the confirmation status based on the payload
+          defectInDoc.confirmation = update.confirmation;
+          wasModified = true;
+        }
+      });
+    });
+
+    // If any changes were made, mark the array as modified and save the document
+    if (wasModified) {
+      // This is crucial! It tells Mongoose that the nested bGradeArray has been changed.
+      bGradeTrackingDoc.markModified("bGradeArray");
+      await bGradeTrackingDoc.save();
+    }
+
+    res
+      .status(200)
+      .json({ message: "B-Grade confirmation status updated successfully." });
+  } catch (error) {
+    console.error("Error updating B-Grade confirmation:", error);
+    res
+      .status(500)
+      .json({ message: "Server error while updating B-Grade confirmation." });
+  }
+});
+
+app.post("/", async (req, res) => {
+  try {
+    const { defect_print_id, bGradeArray, updates } = req.body;
+
+    // --- UPDATE LOGIC ---
+    // If the payload contains an 'updates' array, it's an update request from BGradeDefect.jsx
+    if (updates && defect_print_id) {
+      const bGradeDoc = await BGrade.findOne({
+        defect_print_id: defect_print_id
+      });
+
+      if (!bGradeDoc) {
+        return res.status(404).json({
+          message: `B-Grade record with defect_print_id ${defect_print_id} not found for update.`
+        });
+      }
+
+      // Apply the confirmation updates to the garments within the document's bGradeArray
+      updates.forEach((update) => {
+        bGradeDoc.bGradeArray.forEach((defectInDoc) => {
+          if (defectInDoc.garmentNumber === update.garmentNumber) {
+            defectInDoc.confirmation = update.confirmation;
+          }
+        });
+      });
+
+      // Mark the array as modified for Mongoose to detect the changes
+      bGradeDoc.markModified("bGradeArray");
+      await bGradeDoc.save();
+
+      return res
+        .status(200)
+        .json({ message: "B-Grade confirmation updated successfully." });
+    }
+
+    // --- CREATE LOGIC ---
+    // If the payload contains a 'bGradeArray', it's a create request from DefectTrack.jsx
+    if (bGradeArray) {
+      // Using findOneAndUpdate with 'upsert: true' is a robust way to handle this.
+      // It will create the document if it doesn't exist, or update it if it does.
+      const newBGradeDoc = await BGrade.findOneAndUpdate(
+        { defect_print_id: defect_print_id }, // find a document with this filter
+        req.body, // document to insert or update
+        { new: true, upsert: true, setDefaultsOnInsert: true } // options: return the new doc, create if it doesn't exist, and apply schema defaults
+      );
+
+      return res.status(201).json({
+        message: "B-Grade tracking data saved successfully.",
+        data: newBGradeDoc
+      });
+    }
+
+    // If the payload is invalid
+    return res.status(400).json({
+      message:
+        'Invalid payload. Request must include either an "updates" or "bGradeArray" property.'
+    });
+  } catch (error) {
+    console.error("Error in POST /api/b-grade-tracking:", error);
+    res
+      .status(500)
+      .json({ message: "Server error while processing B-Grade request." });
+  }
+});
 
 /* ------------------------------
    QC2 - Reworks
@@ -14960,6 +15100,8 @@ app.delete("/api/scc/scratch-defects/:id", async (req, res) => {
 /* ------------------------------
    End Points - EMB Defects
 ------------------------------ */
+
+// GET - Fetch all EMB defects
 app.get("/api/scc/emb-defects", async (req, res) => {
   try {
     const defects = await EMBDefect.find({}).sort({ no: 1 }).lean();
@@ -14970,14 +15112,42 @@ app.get("/api/scc/emb-defects", async (req, res) => {
   }
 });
 
+// POST - Add a new EMB defect
 app.post("/api/scc/emb-defects", async (req, res) => {
   try {
     const { no, defectNameEng, defectNameKhmer, defectNameChine } = req.body;
+
+    // --- Added validation from your example ---
+    if (no === undefined || no === null || !defectNameEng || !defectNameKhmer) {
+      return res.status(400).json({
+        message: "Defect No, English Name, and Khmer Name are required."
+      });
+    }
+    if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Defect No must be a positive number." });
+    }
+
+    const existingDefectByNo = await EMBDefect.findOne({ no: Number(no) });
+    if (existingDefectByNo) {
+      return res
+        .status(409)
+        .json({ message: `EMB Defect No '${no}' already exists.` });
+    }
+    const existingDefectByName = await EMBDefect.findOne({ defectNameEng });
+    if (existingDefectByName) {
+      return res.status(409).json({
+        message: `EMB Defect name (English) '${defectNameEng}' already exists.`
+      });
+    }
+    // --- End of validation ---
+
     const newDefect = new EMBDefect({
-      no,
+      no: Number(no),
       defectNameEng,
       defectNameKhmer,
-      defectNameChine
+      defectNameChine: defectNameChine || ""
     });
     await newDefect.save();
     res
@@ -14989,11 +15159,128 @@ app.post("/api/scc/emb-defects", async (req, res) => {
         message: "Duplicate entry. Defect No or Name might already exist."
       });
     }
+    console.error("Error adding EMB defect:", error);
     res
       .status(500)
       .json({ message: "Failed to add EMB defect", error: error.message });
   }
 });
+
+// PUT - Update an existing EMB defect by ID
+app.put("/api/scc/emb-defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { no, defectNameEng, defectNameKhmer, defectNameChine } = req.body;
+
+    if (no === undefined || no === null || !defectNameEng || !defectNameKhmer) {
+      return res.status(400).json({
+        message:
+          "Defect No, English Name, and Khmer Name are required for update."
+      });
+    }
+    if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Defect No must be a positive number." });
+    }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid EMB defect ID format." });
+    }
+
+    const existingDefectByNo = await EMBDefect.findOne({
+      no: Number(no),
+      _id: { $ne: id }
+    });
+    if (existingDefectByNo) {
+      return res.status(409).json({
+        message: `EMB Defect No '${no}' already exists for another defect.`
+      });
+    }
+    const existingDefectByName = await EMBDefect.findOne({
+      defectNameEng,
+      _id: { $ne: id }
+    });
+    if (existingDefectByName) {
+      return res.status(409).json({
+        message: `EMB Defect name (English) '${defectNameEng}' already exists for another defect.`
+      });
+    }
+
+    const updatedDefect = await EMBDefect.findByIdAndUpdate(
+      id,
+      {
+        no: Number(no),
+        defectNameEng,
+        defectNameKhmer,
+        defectNameChine: defectNameChine || ""
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedDefect) {
+      return res.status(404).json({ message: "EMB Defect not found." });
+    }
+    res.status(200).json({
+      message: "EMB defect updated successfully",
+      defect: updatedDefect
+    });
+  } catch (error) {
+    console.error("Error updating EMB defect:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Update failed due to duplicate EMB Defect No or Name."
+      });
+    }
+    res
+      .status(500)
+      .json({ message: "Failed to update EMB defect", error: error.message });
+  }
+});
+
+// DELETE - Delete an EMB defect by ID
+app.delete("/api/scc/emb-defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid EMB defect ID format." });
+    }
+    const deletedDefect = await EMBDefect.findByIdAndDelete(id);
+    if (!deletedDefect) {
+      return res.status(404).json({ message: "EMB Defect not found." });
+    }
+    res.status(200).json({ message: "EMB defect deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting EMB defect:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to delete EMB defect", error: error.message });
+  }
+});
+
+// app.post("/api/scc/emb-defects", async (req, res) => {
+//   try {
+//     const { no, defectNameEng, defectNameKhmer, defectNameChine } = req.body;
+//     const newDefect = new EMBDefect({
+//       no,
+//       defectNameEng,
+//       defectNameKhmer,
+//       defectNameChine
+//     });
+//     await newDefect.save();
+//     res
+//       .status(201)
+//       .json({ message: "EMB defect added successfully", defect: newDefect });
+//   } catch (error) {
+//     if (error.code === 11000) {
+//       return res.status(409).json({
+//         message: "Duplicate entry. Defect No or Name might already exist."
+//       });
+//     }
+//     res
+//       .status(500)
+//       .json({ message: "Failed to add EMB defect", error: error.message });
+//   }
+// });
 
 /* ------------------------------
    End Points - SCC HT/FU
@@ -15303,13 +15590,11 @@ app.get("/api/scc/fu-first-output", async (req, res) => {
 // 2. `GET /api/scc/get-first-output-specs` (Updated)
 app.get("/api/scc/get-first-output-specs", async (req, res) => {
   try {
-    const { moNo, color, inspectionDate } = req.query;
-    if (!moNo || !color || !inspectionDate) {
-      return res
-        .status(400)
-        .json({ message: "MO No, Color, and Inspection Date are required." });
+    const { moNo, color } = req.query;
+    if (!moNo || !color) {
+      return res.status(400).json({ message: "MO No and Color are required." });
     }
-    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+    //const formattedDate = formatDateToMMDDYYYY(inspectionDate);
 
     let specs = null;
     const processRecord = (record) => {
@@ -15376,8 +15661,7 @@ app.get("/api/scc/get-first-output-specs", async (req, res) => {
     // Try HT First Output
     const htRecord = await HTFirstOutput.findOne({
       moNo,
-      color,
-      inspectionDate: formattedDate
+      color
     }).lean();
     specs = processRecord(htRecord);
 
@@ -15385,8 +15669,7 @@ app.get("/api/scc/get-first-output-specs", async (req, res) => {
     if (!specs) {
       const fuRecord = await FUFirstOutput.findOne({
         moNo,
-        color,
-        inspectionDate: formattedDate
+        color
       }).lean();
       specs = processRecord(fuRecord);
     }

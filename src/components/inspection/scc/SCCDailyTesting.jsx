@@ -292,7 +292,7 @@ const SCCDailyTesting = ({
   }, [formData.moNo]);
 
   const fetchStandardSpecs = useCallback(async () => {
-    if (!formData.moNo || !formData.color || !formData.inspectionDate) return;
+    if (!formData.moNo || !formData.color) return;
     setSpecsLoading(true);
     try {
       const response = await axios.get(
@@ -300,8 +300,7 @@ const SCCDailyTesting = ({
         {
           params: {
             moNo: formData.moNo,
-            color: formData.color,
-            inspectionDate: new Date(formData.inspectionDate).toISOString()
+            color: formData.color
           }
         }
       );
@@ -325,7 +324,7 @@ const SCCDailyTesting = ({
       setSpecsLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.moNo, formData.color, formData.inspectionDate, t]); // Removed onFormDataChange
+  }, [formData.moNo, formData.color, t]); // Removed onFormDataChange
 
   useEffect(() => {
     const fetchDailyTestingRecordOrSpecs = async () => {

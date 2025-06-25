@@ -20,22 +20,22 @@ const initialDefectState = {
   no: null,
   defectNameEng: "",
   defectNameKhmer: "",
-  defectNameChinese: ""
+  defectNameChinese: "" // Keep this consistent
 };
 
-// --- Input Base Styles (can be moved to a shared util if used elsewhere) ---
 const inputBaseStyle = "block w-full text-sm rounded-md shadow-sm";
 const inputNormalStyle = `${inputBaseStyle} border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3`;
 
 const DefectSection = ({
-  defectType, // 'ht' or 'scratch'
+  defectType,
   titleKey,
   addFormTitleKey,
   addNewKey,
   defectsList,
   fetchDefects,
   apiEndpointSuffix,
-  t
+  t,
+  chineseFieldName // New prop to handle different field names
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(null);
@@ -45,7 +45,7 @@ const DefectSection = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [newDefect, setNewDefect] = useState({ ...initialDefectState });
-  const [showSection, setShowSection] = useState(true); // To toggle section visibility
+  const [showSection, setShowSection] = useState(true);
 
   const handleInputChange = (e, field, id = null) => {
     const { value } = e.target;
@@ -63,10 +63,10 @@ const DefectSection = ({
     setEditRowId(defect._id);
     setEditedDefect({
       ...defect,
-      defectNameChinese: defect.defectNameChinese || "",
+      [chineseFieldName]: defect[chineseFieldName] || "",
       isChanged: false
     });
-    setShowAddForm(false); // Close add form if editing
+    setShowAddForm(false);
   };
 
   const handleCancelEdit = () => {
@@ -83,7 +83,7 @@ const DefectSection = ({
       Swal.fire({
         icon: "warning",
         title: t("scc.missingInformation"),
-        text: t(`${defectType}Defects.validation.fillRequired`)
+        text: t(`${defectType}.validation.fillRequired`)
       });
       return;
     }
@@ -93,7 +93,7 @@ const DefectSection = ({
         no: Number(editedDefect.no),
         defectNameEng: editedDefect.defectNameEng,
         defectNameKhmer: editedDefect.defectNameKhmer,
-        defectNameChinese: editedDefect.defectNameChinese || ""
+        [chineseFieldName]: editedDefect[chineseFieldName] || ""
       };
       await axios.put(
         `${API_BASE_URL}/api/scc/${apiEndpointSuffix}/${id}`,
@@ -102,19 +102,17 @@ const DefectSection = ({
       Swal.fire({
         icon: "success",
         title: t("scc.success"),
-        text: t(`${defectType}Defects.updatedSuccess`)
+        text: t(`${defectType}.updatedSuccess`)
       });
       setEditRowId(null);
       setEditedDefect({});
-      fetchDefects(); // Refresh parent list
+      fetchDefects();
     } catch (error) {
       console.error(`Error updating ${defectType} defect:`, error);
       Swal.fire({
         icon: "error",
         title: t("scc.error"),
-        text:
-          error.response?.data?.message ||
-          t(`${defectType}Defects.failedToUpdate`)
+        text: error.response?.data?.message || t(`${defectType}.failedToUpdate`)
       });
     } finally {
       setIsSaving(null);
@@ -131,7 +129,7 @@ const DefectSection = ({
       Swal.fire({
         icon: "warning",
         title: t("scc.missingInformation"),
-        text: t(`${defectType}Defects.validation.fillRequiredNew`)
+        text: t(`${defectType}.validation.fillRequiredNew`)
       });
       return;
     }
@@ -141,13 +139,13 @@ const DefectSection = ({
         no: Number(newDefect.no),
         defectNameEng: newDefect.defectNameEng,
         defectNameKhmer: newDefect.defectNameKhmer,
-        defectNameChinese: newDefect.defectNameChinese || ""
+        [chineseFieldName]: newDefect.defectNameChinese || ""
       };
       await axios.post(`${API_BASE_URL}/api/scc/${apiEndpointSuffix}`, payload);
       Swal.fire({
         icon: "success",
         title: t("scc.success"),
-        text: t(`${defectType}Defects.addedSuccess`)
+        text: t(`${defectType}.addedSuccess`)
       });
       setNewDefect({ ...initialDefectState });
       setShowAddForm(false);
@@ -157,8 +155,7 @@ const DefectSection = ({
       Swal.fire({
         icon: "error",
         title: t("scc.error"),
-        text:
-          error.response?.data?.message || t(`${defectType}Defects.failedToAdd`)
+        text: error.response?.data?.message || t(`${defectType}.failedToAdd`)
       });
     } finally {
       setIsSaving(null);
@@ -168,7 +165,7 @@ const DefectSection = ({
   const handleDelete = async (id) => {
     Swal.fire({
       title: t("scc.confirmDeleteTitle"),
-      text: t(`${defectType}Defects.confirmDeleteMsg`),
+      text: t(`${defectType}.confirmDeleteMsg`),
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
@@ -185,7 +182,7 @@ const DefectSection = ({
           Swal.fire({
             icon: "success",
             title: t("scc.deleted"),
-            text: t(`${defectType}Defects.deletedSuccess`)
+            text: t(`${defectType}.deletedSuccess`)
           });
           fetchDefects();
         } catch (error) {
@@ -194,8 +191,7 @@ const DefectSection = ({
             icon: "error",
             title: t("scc.error"),
             text:
-              error.response?.data?.message ||
-              t(`${defectType}Defects.failedToDelete`)
+              error.response?.data?.message || t(`${defectType}.failedToDelete`)
           });
         } finally {
           setIsDeleting(null);
@@ -210,8 +206,8 @@ const DefectSection = ({
       String(defect.no).includes(searchLower) ||
       defect.defectNameEng.toLowerCase().includes(searchLower) ||
       defect.defectNameKhmer.toLowerCase().includes(searchLower) ||
-      (defect.defectNameChinese &&
-        defect.defectNameChinese.toLowerCase().includes(searchLower))
+      (defect[chineseFieldName] &&
+        defect[chineseFieldName].toLowerCase().includes(searchLower))
     );
   });
 
@@ -291,7 +287,6 @@ const DefectSection = ({
           </button>
         )}
       </div>
-
       {showSection && (
         <>
           {showAddForm && (
@@ -304,30 +299,30 @@ const DefectSection = ({
                   null,
                   "no",
                   newDefect.no,
-                  `${defectType}Defects.defectNo`,
-                  `${defectType}Defects.defectNoPlaceholder`,
+                  `${defectType}.defectNo`,
+                  `${defectType}.defectNoPlaceholder`,
                   "number"
                 )}
                 {renderLabeledInputField(
                   null,
                   "defectNameEng",
                   newDefect.defectNameEng,
-                  `${defectType}Defects.defectNameEng`,
-                  `${defectType}Defects.defectNameEngPlaceholder`
+                  `${defectType}.defectNameEng`,
+                  `${defectType}.defectNameEngPlaceholder`
                 )}
                 {renderLabeledInputField(
                   null,
                   "defectNameKhmer",
                   newDefect.defectNameKhmer,
-                  `${defectType}Defects.defectNameKhmer`,
-                  `${defectType}Defects.defectNameKhmerPlaceholder`
+                  `${defectType}.defectNameKhmer`,
+                  `${defectType}.defectNameKhmerPlaceholder`
                 )}
                 {renderLabeledInputField(
                   null,
                   "defectNameChinese",
                   newDefect.defectNameChinese,
-                  `${defectType}Defects.defectNameChinese`,
-                  `${defectType}Defects.defectNameChinesePlaceholder`,
+                  `${defectType}.defectNameChinese`,
+                  `${defectType}.defectNameChinesePlaceholder`,
                   "text",
                   true
                 )}
@@ -348,7 +343,6 @@ const DefectSection = ({
               </div>
             </div>
           )}
-
           <div className="mb-4">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -356,39 +350,34 @@ const DefectSection = ({
               </div>
               <input
                 type="text"
-                placeholder={t(`${defectType}Defects.searchPlaceholder`)}
+                placeholder={t(`${defectType}.searchPlaceholder`)}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className={`${inputNormalStyle} pl-10 py-2 w-full sm:w-auto sm:min-w-[300px]`}
               />
             </div>
           </div>
-
           {isLoading ? (
             <div className="flex justify-center items-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-              <p className="ml-3 text-gray-600">
-                {t(`${defectType}Defects.loading`)}
-              </p>
+              <p className="ml-3 text-gray-600">{t(`${defectType}.loading`)}</p>
             </div>
           ) : (
             <div className="overflow-x-auto shadow-md rounded-lg max-h-[60vh]">
-              {" "}
-              {/* Adjusted max-h */}
               <table className="min-w-full w-max border-collapse">
                 <thead className="sticky top-0 z-10 bg-gray-100 text-xs uppercase text-gray-700">
                   <tr>
                     <th className="px-3 py-3 border-b border-r border-gray-300 whitespace-nowrap">
-                      {t(`${defectType}Defects.defectNo`)}
+                      {t(`${defectType}.defectNo`)}
                     </th>
                     <th className="px-3 py-3 border-b border-r border-gray-300 whitespace-nowrap">
-                      {t(`${defectType}Defects.defectNameEng`)}
+                      {t(`${defectType}.defectNameEng`)}
                     </th>
                     <th className="px-3 py-3 border-b border-r border-gray-300 whitespace-nowrap">
-                      {t(`${defectType}Defects.defectNameKhmer`)}
+                      {t(`${defectType}.defectNameKhmer`)}
                     </th>
                     <th className="px-3 py-3 border-b border-r border-gray-300 whitespace-nowrap">
-                      {t(`${defectType}Defects.defectNameChinese`)}
+                      {t(`${defectType}.defectNameChinese`)}
                     </th>
                     <th className="px-3 py-3 border-b border-gray-300 whitespace-nowrap text-center">
                       {t("scc.actions")}
@@ -433,8 +422,8 @@ const DefectSection = ({
                               <input
                                 {...commonInputProps(
                                   defect._id,
-                                  "defectNameChinese",
-                                  editedDefect.defectNameChinese,
+                                  chineseFieldName,
+                                  editedDefect[chineseFieldName],
                                   "text",
                                   true
                                 )}
@@ -472,7 +461,7 @@ const DefectSection = ({
                               {defect.defectNameKhmer}
                             </td>
                             <td className="px-3 py-2 border-r border-gray-300 text-xs whitespace-nowrap">
-                              {defect.defectNameChinese || "-"}
+                              {defect[chineseFieldName] || "-"}
                             </td>
                             <td className="px-3 py-2 border-gray-300 text-center whitespace-nowrap">
                               <button
@@ -507,11 +496,10 @@ const DefectSection = ({
                           size={32}
                           className="mx-auto mb-2 text-gray-400"
                         />
-                        {t(`${defectType}Defects.noDefectsFound`)}
+                        {t(`${defectType}.noDefectsFound`)}
                         {searchTerm && (
                           <span className="block text-sm">
-                            {" "}
-                            {t(`${defectType}Defects.tryDifferentSearch`)}
+                            {t(`${defectType}.tryDifferentSearch`)}
                           </span>
                         )}
                       </td>
@@ -531,6 +519,7 @@ const SCCDefectsModifyAdd = () => {
   const { t } = useTranslation();
   const [htDefects, setHtDefects] = useState([]);
   const [scratchDefects, setScratchDefects] = useState([]);
+  const [embDefects, setEmbDefects] = useState([]); // *** 1. ADD NEW STATE FOR EMB DEFECTS ***
 
   const fetchHtDefects = useCallback(async () => {
     try {
@@ -564,31 +553,62 @@ const SCCDefectsModifyAdd = () => {
     }
   }, [t]);
 
+  // *** 2. ADD NEW FETCH FUNCTION FOR EMB DEFECTS ***
+  const fetchEmbDefects = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/scc/emb-defects`);
+      setEmbDefects(response.data.map((d) => ({ ...d, isChanged: false })));
+    } catch (error) {
+      console.error("Error fetching EMB defects:", error);
+      Swal.fire({
+        icon: "error",
+        title: t("scc.error"),
+        text: t("sccEmbDefects.failedToFetch")
+      });
+      setEmbDefects([]);
+    }
+  }, [t]);
+
   useEffect(() => {
     fetchHtDefects();
     fetchScratchDefects();
-  }, [fetchHtDefects, fetchScratchDefects]);
+    fetchEmbDefects(); // *** 3. CALL THE NEW FETCH FUNCTION ***
+  }, [fetchHtDefects, fetchScratchDefects, fetchEmbDefects]);
 
   return (
     <div>
       <DefectSection
-        defectType="scc" // Corresponds to "sccDefects" in i18n
+        defectType="sccDefects" // Matches i18n key
         titleKey="sccDefects.manageTitle"
         addFormTitleKey="sccDefects.addNewFormTitle"
         addNewKey="sccDefects.addNew"
         defectsList={htDefects}
         fetchDefects={fetchHtDefects}
-        apiEndpointSuffix="defects" // /api/scc/defects
+        apiEndpointSuffix="defects"
+        chineseFieldName="defectNameChinese"
         t={t}
       />
       <DefectSection
-        defectType="sccScratch" // Corresponds to "sccScratchDefects" in i18n
+        defectType="sccScratchDefects" // Matches i18n key
         titleKey="sccScratchDefects.manageTitle"
         addFormTitleKey="sccScratchDefects.addNewFormTitle"
         addNewKey="sccScratchDefects.addNew"
         defectsList={scratchDefects}
         fetchDefects={fetchScratchDefects}
-        apiEndpointSuffix="scratch-defects" // /api/scc/scratch-defects
+        apiEndpointSuffix="scratch-defects"
+        chineseFieldName="defectNameChinese"
+        t={t}
+      />
+      {/* *** 4. ADD NEW DEFECT SECTION FOR EMB *** */}
+      <DefectSection
+        defectType="sccEmbDefects" // New i18n key
+        titleKey="sccEmbDefects.manageTitle"
+        addFormTitleKey="sccEmbDefects.addNewFormTitle"
+        addNewKey="sccEmbDefects.addNew"
+        defectsList={embDefects}
+        fetchDefects={fetchEmbDefects}
+        apiEndpointSuffix="emb-defects"
+        chineseFieldName="defectNameChine" // Use the correct field name from your schema
         t={t}
       />
     </div>
