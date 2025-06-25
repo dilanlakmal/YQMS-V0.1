@@ -29,7 +29,8 @@
     "download_data": "下载数据",
     "live_dashboard": "实时仪表板",
     "systemadmin": "System Administration",
-    "yqms": "YQMS"
+    "yqms": "YQMS",
+    "b-grade_defects": "B-grade defects"
   },
 
   "nav": {
@@ -1103,6 +1104,38 @@
     "machineRegisteredSuccess": "机器已成功用于弹性报告。",
     "slotInspectionSubmittedSuccess": "弹性检查已成功提交时间段。"
   },
+
+  "sccEmbDefects": {
+    "manageTitle": "管理EMB疵点",
+    "addNew": "新增疵点",
+    "cancelAdd": "取消新增",
+    "addNewFormTitle": "新增EMB疵点",
+    "defectNo": "疵点编号",
+    "defectNameEng": "疵点名称 (英文)",
+    "defectNameKhmer": "疵点名称 (柬文)",
+    "defectNameChinese": "疵点名称 (中文) (选填)",
+    "defectNoPlaceholder": "输入疵点编号",
+    "defectNameEngPlaceholder": "输入英文名称",
+    "defectNameKhmerPlaceholder": "输入柬文名称",
+    "defectNameChinesePlaceholder": "输入中文名称 (选填)",
+    "searchPlaceholder": "按编号或名称搜索...",
+    "loading": "正在加载EMB疵点...",
+    "noDefectsFound": "未找到EMB疵点。",
+    "tryDifferentSearch": "请尝试调整您的搜索词。",
+    "validation": {
+      "fillRequired": "疵点编号、英文名称和柬文名称为必填项。",
+      "fillRequiredNew": "疵点编号必须是正数。英文和柬文名称为必填项。"
+    },
+    "updatedSuccess": "EMB疵点更新成功。",
+    "failedToUpdate": "更新EMB疵点失败。",
+    "addedSuccess": "EMB疵点新增成功。",
+    "failedToAdd": "新增EMB疵点失败。",
+    "confirmDeleteMsg": "您将无法撤销此EMB疵点",
+    "deletedSuccess": "EMB疵点已删除。",
+    "failedToDelete": "删除EMB疵点失败。",
+    "failedToFetch": "获取EMB疵点失败。"
+  },
+
   "qaAudit": {
     "pageTitle": "QA 审核",
     "tabs": {

@@ -9,10 +9,10 @@ const QC2InspectionPageTitle = ({ user }) => {
   return (
     <div className="text-center">
       <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
-        {t("qc2In.title", "QC2 Inspection")}
+        Yorkmars (Cambodia) Garment MFG Co., LTD
       </h1>
       <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-0.5 md:mt-1">
-        Yorkmars (Cambodia) Garment MFG Co., LTD
+        {t("qc2In.title", "QC2 Inspection")}
         {user && ` | ${user.job_title || "Operator"} | ${user.emp_id}`}
       </p>
     </div>

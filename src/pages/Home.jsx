@@ -205,6 +205,13 @@ function Home() {
           image: "assets/Home/qc2.png",
           title: t("home.qc2_inspection"),
           description: "QC2 Inspection Check Point."
+        },
+        {
+          path: "/b-grade-defect",
+          roles: ["Admin", "QC2 Inspection"], // Matches "QC2 Inspection" role
+          image: "assets/Home/bgrade.png",
+          title: t("home.b-grade_defect"),
+          description: "B-Grade defects Check Point."
         }
       ]
     },

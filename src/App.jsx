@@ -34,6 +34,7 @@ import SystemAdmin from "./pages/SystemAdmin.jsx";
 import SCCPage from "./pages/SCC.jsx";
 import QAInspectionEvaluation from "./pages/QAInspectionEvaluation.jsx";
 import YQMSProject from "./pages/YQMSProject.jsx";
+import BGradeDefect from "./pages/BGradeDefect.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -357,6 +358,7 @@ function AppContent() {
               <Route path="/packing" element={<PackingPage />} />
               <Route path="/qc2-inspection" element={<QC2InspectionPage />} />
               <Route path="/download-data" element={<DownloadData />} />
+              <Route path="/b-grade-defect" element={<BGradeDefect />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

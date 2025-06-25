@@ -29,7 +29,8 @@
     "download_data": "ទាញយកទិន្នន័យ",
     "live_dashboard": "ផ្ទាំងគ្រប់គ្រងផ្ទាល់",
     "systemadmin": "System Administration",
-    "yqms": "YQMS"
+    "yqms": "YQMS",
+    "b-grade_defects": "B-grade defects"
   },
 
   "nav": {
@@ -1263,6 +1264,37 @@
     "deletedSuccess": "បញ្ហាតេស្តឆ្កូតបានលុបដោយជោគជ័យ។",
     "failedToDelete": "បរាជ័យក្នុងការលុបបញ្ហាតេស្តឆ្កូត។",
     "failedToFetch": "បរាជ័យក្នុងការទាញយកបញ្ហាតេស្តឆ្កូត។"
+  },
+
+  "sccEmbDefects": {
+    "manageTitle": "គ្រប់គ្រងបញ្ហា EMB",
+    "addNew": "បន្ថែមបញ្ហាថ្មី",
+    "cancelAdd": "បោះបង់ការបន្ថែម",
+    "addNewFormTitle": "បន្ថែមបញ្ហា EMB ថ្មី",
+    "defectNo": "លេខបញ្ហា",
+    "defectNameEng": "ឈ្មោះបញ្ហា (អង់គ្លេស)",
+    "defectNameKhmer": "ឈ្មោះបញ្ហា (ខ្មែរ)",
+    "defectNameChinese": "ឈ្មោះបញ្ហា (ចិន) (បើមាន)",
+    "defectNoPlaceholder": "បញ្ចូលលេខបញ្ហា",
+    "defectNameEngPlaceholder": "បញ្ចូលឈ្មោះអង់គ្លេស",
+    "defectNameKhmerPlaceholder": "បញ្ចូលឈ្មោះខ្មែរ",
+    "defectNameChinesePlaceholder": "បញ្ចូលឈ្មោះចិន (បើមាន)",
+    "searchPlaceholder": "ស្វែងរកតាមលេខ ឬឈ្មោះ...",
+    "loading": "កំពុងទាញយកបញ្ហា EMB...",
+    "noDefectsFound": "រកមិនឃើញបញ្ហា EMB ទេ។",
+    "tryDifferentSearch": "ព្យាយាមកែសម្រួលពាក្យស្វែងរករបស់អ្នក។",
+    "validation": {
+      "fillRequired": "ត្រូវបំពេញលេខបញ្ហា ឈ្មោះអង់គ្លេស និងឈ្មោះខ្មែរ។",
+      "fillRequiredNew": "លេខបញ្ហាត្រូវតែជាលេខវិជ្ជមាន។ ឈ្មោះអង់គ្លេស និងខ្មែរត្រូវតែបំពេញ។"
+    },
+    "updatedSuccess": "បានធ្វើបច្ចុប្បន្នភាពបញ្ហា EMB ដោយជោគជ័យ។",
+    "failedToUpdate": "ការធ្វើបច្ចុប្បន្នភាពបញ្ហា EMB បានបរាជ័យ។",
+    "addedSuccess": "បានបន្ថែមបញ្ហា EMB ដោយជោគជ័យ។",
+    "failedToAdd": "ការបន្ថែមបញ្ហា EMB បានបរាជ័យ។",
+    "confirmDeleteMsg": "អ្នកនឹងមិនអាចមិនធ្វើវិញបានទេ!",
+    "deletedSuccess": "បញ្ហា EMB ត្រូវបានលុប។",
+    "failedToDelete": "ការលុបបញ្ហា EMB បានបរាជ័យ។",
+    "failedToFetch": "ការទាញយកបញ្ហា EMB បានបរាជ័យ។"
   },
 
   "systemAdmin": {

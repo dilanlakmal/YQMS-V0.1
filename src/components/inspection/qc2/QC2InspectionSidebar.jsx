@@ -62,6 +62,10 @@ const QC2InspectionSidebar = ({
 
   const handleMenuClick = () => {
     setNavOpen(!navOpen);
+    if (!navOpen) {
+      // If opening the nav via menu icon
+      setSelectedFeature(null); // Reset selected feature to show all
+    }
     setMenuClicked(true);
   };
 
@@ -113,90 +117,108 @@ const QC2InspectionSidebar = ({
 
   const ExpandedMenu = () => (
     <>
-      {/* Defect Type Filter */}
-      <div className="flex items-center mb-1">
-        <Filter className="w-5 h-5 mr-1" />
-        <span className="font-medium">{t("preview.defect_type")}</span>
-      </div>
-      <div className="grid grid-cols-2 gap-1">
-        {defectTypes.map((type) => (
-          <button
-            key={type}
-            onClick={() => {
-              setDefectTypeFilter(type);
-              setCategoryFilter("");
-            }}
-            className={`p-1 text-sm rounded border ${
-              defectTypeFilter === type && !categoryFilter
-                ? "bg-blue-600"
-                : "bg-gray-700"
-            }`}
-          >
-            {currentLanguage === "en"
-              ? t(`qc2In.${type}`).toUpperCase()
-              : t(`qc2In.${type}`)}
-          </button>
-        ))}
-      </div>
-
-      {/* Category Filter - Now uses dynamic data */}
-      <CategoryFilterUI />
-
-      {/* Sort Section */}
-      <div className="flex items-center mt-4 mb-1">
-        <ArrowUpDown className="w-5 h-5 mr-1" />
-        <span className="font-medium">{t("qc2In.sort")}</span>
-      </div>
-      <div className="relative">
-        <button
-          onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
-          className="w-full p-1 rounded bg-gray-700 text-left text-sm"
-        >
-          {sortOption === "alphaAsc"
-            ? "A-Z"
-            : sortOption === "alphaDesc"
-            ? "Z-A"
-            : "Count (High-Low)"}
-        </button>
-        {sortDropdownOpen && (
-          <div className="absolute z-10 mt-1 w-full bg-white text-black rounded shadow p-2">
-            <button
-              onClick={() => {
-                setSortOption("alphaAsc");
-                setSortDropdownOpen(false);
-              }}
-              className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
-            >
-              A-Z
-            </button>
-            <button
-              onClick={() => {
-                setSortOption("alphaDesc");
-                setSortDropdownOpen(false);
-              }}
-              className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
-            >
-              Z-A
-            </button>
-            <button
-              onClick={() => {
-                setSortOption("countDesc");
-                setSortDropdownOpen(false);
-              }}
-              className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
-            >
-              Count (High-Low)
-            </button>
+      {(menuClicked ||
+        selectedFeature === "defectType" ||
+        !selectedFeature) && (
+        <>
+          {/* Defect Type Filter */}
+          <div className="flex items-center mb-1">
+            <Filter className="w-5 h-5 mr-1" />
+            <span className="font-medium">{t("preview.defect_type")}</span>
           </div>
-        )}
-      </div>
+          <div className="grid grid-cols-2 gap-1">
+            {defectTypes.map((type) => (
+              <button
+                key={type}
+                onClick={() => {
+                  setDefectTypeFilter(type);
+                  setCategoryFilter("");
+                }}
+                className={`p-1 text-sm rounded border ${
+                  defectTypeFilter === type && !categoryFilter
+                    ? "bg-blue-600"
+                    : "bg-gray-700"
+                }`}
+              >
+                {currentLanguage === "en"
+                  ? t(`qc2In.${type}`).toUpperCase()
+                  : t(`qc2In.${type}`)}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
-      {/* Printer Section */}
-      <div className="flex items-center mt-4 mb-1">
-        <Printer className="w-5 h-5 mr-1" />
-        <span className="font-medium">{t("qc2In.printer")}</span>
-      </div>
-      <BluetoothComponent ref={bluetoothRef} />
+      {(menuClicked || selectedFeature === "category" || !selectedFeature) && (
+        <>
+          {/* Category Filter - Now uses dynamic data */}
+          <CategoryFilterUI />
+        </>
+      )}
+
+      {(menuClicked || selectedFeature === "sort" || !selectedFeature) && (
+        <>
+          {/* Sort Section */}
+          <div className="flex items-center mt-4 mb-1">
+            <ArrowUpDown className="w-5 h-5 mr-1" />
+            <span className="font-medium">{t("qc2In.sort")}</span>
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+              className="w-full p-1 rounded bg-gray-700 text-left text-sm"
+            >
+              {sortOption === "alphaAsc"
+                ? "A-Z"
+                : sortOption === "alphaDesc"
+                ? "Z-A"
+                : "Count (High-Low)"}
+            </button>
+            {sortDropdownOpen && (
+              <div className="absolute z-10 mt-1 w-full bg-white text-black rounded shadow p-2">
+                <button
+                  onClick={() => {
+                    setSortOption("alphaAsc");
+                    setSortDropdownOpen(false);
+                  }}
+                  className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
+                >
+                  A-Z
+                </button>
+                <button
+                  onClick={() => {
+                    setSortOption("alphaDesc");
+                    setSortDropdownOpen(false);
+                  }}
+                  className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
+                >
+                  Z-A
+                </button>
+                <button
+                  onClick={() => {
+                    setSortOption("countDesc");
+                    setSortDropdownOpen(false);
+                  }}
+                  className="block w-full text-left px-2 py-1 hover:bg-gray-200 text-sm"
+                >
+                  Count (High-Low)
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {(menuClicked || selectedFeature === "printer" || !selectedFeature) && (
+        <>
+          {/* Printer Section */}
+          <div className="flex items-center mt-4 mb-1">
+            <Printer className="w-5 h-5 mr-1" />
+            <span className="font-medium">{t("qc2In.printer")}</span>
+          </div>
+          <BluetoothComponent ref={bluetoothRef} />
+        </>
+      )}
     </>
   );
 
