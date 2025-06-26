@@ -7359,6 +7359,170 @@ app.post("/api/b-grade-defects/process-decisions", async (req, res) => {
 });
 
 /* ------------------------------
+   B-Grade Stock Page Endpoints
+------------------------------ */
+
+// ENDPOINT 1: Fetch B-Grade Stock Data based on filters
+app.post("/api/b-grade-stock", async (req, res) => {
+  try {
+    const { date, moNo, lineNo, packageNo, color, size, department } = req.body;
+
+    // --- Build the main query filter ---
+    const matchFilter = {
+      // Only include documents that have a positive B-Grade quantity
+      totalBgradeQty: { $gt: 0 }
+    };
+
+    if (date) {
+      // The 'createdAt' field is automatically added by `timestamps: true`
+      // and is a proper ISODate, which is better for date range queries.
+      const startDate = new Date(date);
+      startDate.setHours(0, 0, 0, 0);
+
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+
+      matchFilter.createdAt = {
+        $gte: startDate,
+        $lte: endDate
+      };
+    }
+
+    if (moNo) matchFilter.moNo = moNo;
+    if (lineNo) matchFilter.lineNo = lineNo;
+    if (packageNo) matchFilter.package_no = Number(packageNo);
+    if (color) matchFilter.color = color;
+    if (size) matchFilter.size = size;
+    if (department) matchFilter.department = department;
+
+    const bGradeStock = await QC2BGrade.aggregate([
+      // Stage 1: Initial filtering based on user's criteria
+      { $match: matchFilter },
+
+      // Stage 2: Deconstruct the bgradeArray to process each garment individually
+      { $unwind: "$bgradeArray" },
+
+      // Stage 3: Filter out garments that are marked as "Not B Grade"
+      { $match: { "bgradeArray.leader_status": "B Grade" } },
+
+      // Stage 4: Group the valid B-Grade garments back by their parent document ID
+      {
+        $group: {
+          _id: "$_id", // Group by the original document ID
+          // Bring the header fields along
+          moNo: { $first: "$moNo" },
+          package_no: { $first: "$package_no" },
+          lineNo: { $first: "$lineNo" },
+          color: { $first: "$color" },
+          size: { $first: "$size" },
+          // Re-assemble the array of valid B-Grade garments
+          bgradeArray: { $push: "$bgradeArray" }
+        }
+      },
+
+      // Stage 5: Calculate the B-Grade Qty for each document (which is the size of the filtered array)
+      {
+        $project: {
+          moNo: 1,
+          package_no: 1,
+          lineNo: 1,
+          color: 1,
+          size: 1,
+          bGradeQty: { $size: "$bgradeArray" },
+          // We now call it defectDetails to match the frontend table's expectation
+          defectDetails: "$bgradeArray",
+          _id: 0
+        }
+      },
+
+      // Sort the final results
+      { $sort: { package_no: 1, moNo: 1 } }
+    ]);
+
+    res.json(bGradeStock);
+  } catch (error) {
+    console.error("Error fetching B-Grade stock:", error);
+    res
+      .status(500)
+      .json({ message: "Server error fetching B-Grade stock data." });
+  }
+});
+
+// ENDPOINT 2: Fetch distinct filter options based on a selected date
+app.get("/api/b-grade-stock/filter-options", async (req, res) => {
+  try {
+    const { date } = req.query;
+
+    if (!date) {
+      return res
+        .status(400)
+        .json({ message: "A date is required to fetch filter options." });
+    }
+
+    const startDate = new Date(date);
+    startDate.setUTCHours(0, 0, 0, 0);
+
+    const endDate = new Date(date);
+    endDate.setUTCHours(23, 59, 59, 999);
+
+    // Filter for documents on the selected date that have B-Grade items
+    const matchFilter = {
+      createdAt: { $gte: startDate, $lte: endDate },
+      totalBgradeQty: { $gt: 0 }
+    };
+
+    // Use an aggregation pipeline to get all distinct values in one DB call
+    const [filterOptions] = await QC2BGrade.aggregate([
+      { $match: matchFilter },
+      {
+        $group: {
+          _id: null,
+          moNos: { $addToSet: "$moNo" },
+          lineNos: { $addToSet: "$lineNo" },
+          packageNos: { $addToSet: "$package_no" },
+          colors: { $addToSet: "$color" },
+          sizes: { $addToSet: "$size" },
+          departments: { $addToSet: "$department" }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          moNos: 1,
+          lineNos: 1,
+          packageNos: 1,
+          colors: 1,
+          sizes: 1,
+          departments: 1
+        }
+      }
+    ]);
+
+    // If no records found for that date, return empty arrays
+    if (!filterOptions) {
+      return res.json({
+        moNos: [],
+        lineNos: [],
+        packageNos: [],
+        colors: [],
+        sizes: [],
+        departments: []
+      });
+    }
+
+    // Sort the arrays before sending
+    for (const key in filterOptions) {
+      filterOptions[key].sort();
+    }
+
+    res.json(filterOptions);
+  } catch (error) {
+    console.error("Error fetching B-Grade filter options:", error);
+    res.status(500).json({ message: "Server error fetching filter options." });
+  }
+});
+
+/* ------------------------------
    QC2 - Reworks
 ------------------------------ */
 

@@ -30,7 +30,8 @@
     "live_dashboard": "Live Dashboard",
     "systemadmin": "System Administration",
     "yqms": "YQMS",
-    "b-grade_defect": "B-Grade Defects"
+    "b-grade_defect": "B-Grade Defects",
+    "b-grade_stock": "B-Grade Stock"
   },
 
   "nav": {

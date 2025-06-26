@@ -188,6 +188,11 @@ export default function Navbar({ onLogout }) {
           path: "/b-grade-defect",
           title: t("home.b-grade_defect"),
           requiredRoles: ["Super Admin", "Admin", "QC2 Inspection"]
+        },
+        {
+          path: "/b-grade-stcok",
+          title: t("home.b-grade_stock"),
+          requiredRoles: ["Super Admin", "Admin", "QC2 Inspection"]
         }
       ]
     },
