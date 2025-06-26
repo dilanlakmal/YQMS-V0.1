@@ -72,7 +72,7 @@
   "pack": {
     "header": "Packing Process Scanner",
     "card": "Scan the QR code on the bundle to record packing details",
-    "packing_id": "Packing ID",
+    "packing_id": "Card Type",
     "pass_qty": "Pass Qty (Pack)"
   },
 
