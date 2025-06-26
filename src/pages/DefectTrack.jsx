@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { API_BASE_URL } from "../../config";
 import Swal from "sweetalert2";
 import QrCodeScannerRepair from "../components/forms/QrCodeScannerRepair";
@@ -19,9 +19,17 @@ import {
   Box,
   CircularProgress
 } from "@mui/material";
-import { CheckCircle, AlertTriangle, Ban } from "lucide-react";
+import {
+  CheckCircle,
+  AlertTriangle,
+  Ban,
+  CalendarDays,
+  Clock
+} from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const DefectTrack = () => {
+  const { t } = useTranslation(); // Add translation hook
   const { user, loading: authLoading } = useAuth();
   const [scannedData, setScannedData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -29,6 +37,13 @@ const DefectTrack = () => {
   const [language, setLanguage] = useState("khmer");
   const [showScanner, setShowScanner] = useState(true);
   const [defectsMasterList, setDefectsMasterList] = useState([]);
+  const [currentTime, setCurrentTime] = useState(new Date()); // Add currentTime state
+
+  // Add useEffect for the clock
+  useEffect(() => {
+    const timerId = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timerId);
+  }, []);
 
   // This useEffect to fetch master defects is correct and unchanged.
   useEffect(() => {
@@ -44,6 +59,35 @@ const DefectTrack = () => {
     };
     fetchAllDefects();
   }, []);
+
+  // Create the PageTitle component, exactly like in Packing.jsx
+  const PageTitle = useCallback(
+    () => (
+      <div className="text-center">
+        <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
+          Yorkmars (Cambodia) Garment MFG Co., LTD
+        </h1>
+        <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-0.5 md:mt-1">
+          {t("defectTrack.header", "Repair Tracking")}{" "}
+          {/* Using a new translation key */}
+          {user && ` | ${user.job_title || "Operator"} | ${user.emp_id}`}
+        </p>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1 flex flex-wrap justify-center items-center">
+          <span className="mx-1.5 text-slate-400">|</span>
+          <CalendarDays className="w-3.5 h-3.5 mr-1 text-slate-500" />
+          <span className="text-slate-700">
+            {currentTime.toLocaleDateString()}
+          </span>
+          <span className="mx-1.5 text-slate-400">|</span>
+          <Clock className="w-3.5 h-3.5 mr-1 text-slate-500" />
+          <span className="text-slate-700">
+            {currentTime.toLocaleTimeString()}
+          </span>
+        </p>
+      </div>
+    ),
+    [t, user, currentTime]
+  );
 
   // This function is correct and unchanged.
   const onScanSuccess = async (decodedText) => {
@@ -303,9 +347,9 @@ const DefectTrack = () => {
           p: 3
         }}
       >
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 text-center">
-          Repair Tracking
-        </h1>
+        {/* Render the PageTitle component here */}
+        <PageTitle />
+
         {showScanner && (
           <div className="text-center mb-4">
             <QrCodeScannerRepair
