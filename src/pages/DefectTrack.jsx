@@ -133,43 +133,63 @@ const DefectTrack = () => {
     setLoading(true);
 
     try {
-      // Correctly identify garments that have at least one B-Grade defect
-      const bGradeGarments = scannedData.garments.filter((g) =>
-        g.defects.some((d) => d.status === "B Grade")
+      // 1. Fetch the bundle_random_id needed for the B-Grade record.
+
+      const bundleResponse = await fetch(
+        `${API_BASE_URL}/api/qc2-inspection-pass-bundle-by-defect-print-id/${scannedData.defect_print_id}`
       );
+      if (!bundleResponse.ok) {
+        // If this fails, we can still proceed with saving repair tracking, but we'll warn the user.
+        console.warn(
+          "Could not find the parent inspection bundle. B-Grade records will not be created."
+        );
+      } else {
+        const bundleData = await bundleResponse.json();
+        const bundle_random_id = bundleData.bundle_random_id;
 
-      for (const garment of bGradeGarments) {
-        const now = new Date();
-        const garmentDataForBGrade = {
-          garmentNumber: garment.garmentNumber,
-          record_date: now.toLocaleDateString("en-US"),
-          record_time: now.toLocaleTimeString("en-US", { hour12: false }),
-          defectDetails: garment.defects.map((d) => ({
-            defectName: d.name,
-            defectCount: d.count,
-            status: d.status
-          }))
-        };
+        // 2. Identify garments that have at least one 'B Grade' defect.
+        const bGradeGarments = scannedData.garments.filter((g) =>
+          g.defects.some((d) => d.status === "B Grade")
+        );
 
-        const headerData = {
-          package_no: scannedData.package_no,
-          moNo: scannedData.moNo,
-          custStyle: scannedData.custStyle,
-          color: scannedData.color,
-          size: scannedData.size,
-          lineNo: scannedData.lineNo,
-          department: scannedData.department
-        };
+        // 3. Loop through them and send a request for EACH new B-Grade garment.
+        for (const garment of bGradeGarments) {
+          const now = new Date();
+          const garmentDataForBGrade = {
+            garmentNumber: garment.garmentNumber,
+            record_date: now.toLocaleDateString("en-US"),
+            record_time: now.toLocaleTimeString("en-US", { hour12: false }),
+            defectDetails: garment.defects.map((d) => ({
+              defectName: d.name,
+              defectCount: d.count,
+              status: d.status
+            }))
+          };
 
-        await fetch(`${API_BASE_URL}/api/qc2-bgrade`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            defect_print_id: scannedData.defect_print_id,
-            garmentData: garmentDataForBGrade,
-            headerData
-          })
-        });
+          if (garmentDataForBGrade.defectDetails.length === 0) continue;
+
+          const headerData = {
+            package_no: scannedData.package_no,
+            moNo: scannedData.moNo,
+            custStyle: scannedData.custStyle,
+            color: scannedData.color,
+            size: scannedData.size,
+            lineNo: scannedData.lineNo,
+            department: scannedData.department
+          };
+
+          // This calls original B-Grade endpoint with the new ID.
+          await fetch(`${API_BASE_URL}/api/qc2-bgrade`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              defect_print_id: scannedData.defect_print_id,
+              bundle_random_id: bundle_random_id, // Pass the ID here
+              garmentData: garmentDataForBGrade,
+              headerData
+            })
+          });
+        }
       }
 
       const repairArray = scannedData.garments.flatMap((garment) =>

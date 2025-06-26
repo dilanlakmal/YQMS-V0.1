@@ -32,7 +32,7 @@ const UserStatsCard = ({ user, apiBaseUrl, stats, className = "" }) => {
     const lowerLabel = label ? label.toLowerCase() : "";
     if (
       lowerLabel.includes("defect") ||
-      lowerLabel.includes("t84") || // Ironing defect
+      lowerLabel.includes("t85") || // Ironing defect
       lowerLabel.includes("t101") || // Washing defect
       lowerLabel.includes("t103") || // OPA defect
       lowerLabel.includes("t104") || // OPA defect
