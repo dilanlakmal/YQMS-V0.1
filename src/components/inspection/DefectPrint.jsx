@@ -514,7 +514,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
               </datalist>
             </div>
 
-            <div className="flex flex-col">
+            {/* <div className="flex flex-col">
               <label htmlFor="taskNoFilter" className="text-xs font-medium text-gray-600 mb-1">
                 {t("qc2In.taskNo", "Task No")}
               </label>
@@ -532,7 +532,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                   <option key={option} value={option} />
                 ))}
               </datalist>
-            </div>
+            </div> */}
 
             {/* New Employee ID Filter */}
             <div className="flex flex-col">
@@ -707,9 +707,9 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                         {t("bundle.action")}
                       </th>
-                      <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
+                      {/* <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                         {t("qc2In.taskNo", "Task No")}
-                      </th>
+                      </th> */}
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                         {t("qc2In.date", "Date")}
                       </th>
@@ -790,9 +790,9 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                             <Printer className="inline" />
                           </button>
                         </td>
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {/* <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           {card.taskNo || "N/A"}
-                        </td>
+                        </td> */}
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           {formatDateForDisplay(card.inspection_date) || "N/A"}
                         </td>
