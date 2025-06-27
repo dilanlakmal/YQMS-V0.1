@@ -378,11 +378,20 @@ const fetchDataCards = async (page, limit, filters = {}) => {
             <div className="flex flex-col">
               <label htmlFor="filterDateQC2" className="text-xs font-medium text-gray-600 mb-1 flex items-center">
                 <FaCalendarAlt className="mr-1.5 text-gray-400" />
-                {t("filters.date", "Date")}
+                {t("filters.date", "Date")} 
               </label>
               <DatePicker
-                selected={parseDateForPicker(searchDate)}
-                onChange={(date) => setSearchDate(date ? date.toISOString().split("T")[0] : "")}
+                selected={parseDateForPicker(searchDate)} 
+                onChange={(date) => {
+                  if (date) {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0'); // getMonth is 0-indexed
+                    const day = String(date.getDate()).padStart(2, '0');
+                    setSearchDate(`${year}-${month}-${day}`);
+                  } else {
+                    setSearchDate("");
+                  }
+                }}
                 dateFormat="MM/dd/yyyy"
                 className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
                 id="filterDateQC2"
