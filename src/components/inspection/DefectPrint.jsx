@@ -3,9 +3,12 @@ import { FaFilter, FaTimes, FaChevronDown, FaChevronUp, FaCalendarAlt } from "re
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { API_BASE_URL } from "../../../config";
 import QRCodePreview from "../forms/QRCodePreview";
+import { useAuth } from "../authentication/AuthContext"; // Import useAuth
 import { useTranslation } from "react-i18next";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+
+
 
 
 const DefectPrint = ({ bluetoothRef, printMethod }) => {
@@ -16,12 +19,17 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
   const [searchPackageNo, setSearchPackageNo] = useState("");
   const [searchRepairGroup, setSearchRepairGroup] = useState("");
   const getTodayDateString = () => new Date().toISOString().split("T")[0];
+  const { user } = useAuth(); // Use the auth hook
   const [searchDate, setSearchDate] = useState(getTodayDateString());
   const [searchTaskNo, setSearchTaskNo] = useState("");
   const [searchStatus, setSearchStatus] = useState("both");
   const [moNoOptions, setMoNoOptions] = useState([]);
   const [packageNoOptions, setPackageNoOptions] = useState([]);
   const [repairGroupOptions, setRepairGroupOptions] = useState([]);
+  const [searchEmpId, setSearchEmpId] = useState(""); // New state for Employee ID
+  const [searchLineNo, setSearchLineNo] = useState(""); // New state for Line No
+  const [empIdOptions, setEmpIdOptions] = useState([]); // New state for Emp ID options
+  const [lineNoOptions, setLineNoOptions] = useState([]); // New state for Line No options
   const [taskNoOptions, setTaskNoOptions] = useState([]);
   const [selectedCard, setSelectedCard] = useState(null);
   const [showQRPreview, setShowQRPreview] = useState(false);
@@ -32,20 +40,24 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
   const [recordsPerPage, setRecordsPerPage] = useState(50);
   const [totalRecords, setTotalRecords] = useState(0);
   const [repairTrackingDetails, setRepairTrackingDetails] = useState({});
-  const isInitialOrModeChange = useRef(true); // To manage initial fetches and mode changes
+  // const isInitialOrModeChange = useRef(true); // To manage initial fetches and mode changes
+  const [empIdPreFocusValue, setEmpIdPreFocusValue] = useState(null); // For datalist workaround
+  const justFocusedEmpId = useRef(false); // For datalist workaround
 
   const fetchDefectCards = async (page, limit, filters = {}) => {
     try {
       setLoading(true);
       let url =
         mode === "repair"
-          ? `${API_BASE_URL}/api/qc2-defect-print/search?page=${page}&limit=${limit}`
-          : `${API_BASE_URL}/api/qc2-inspection-pass-bundle/search?page=${page}&limit=${limit}`;
+          ? `${API_BASE_URL}/api/qc2-defect-print/search?page=${page}&limit=${limit}` : `${API_BASE_URL}/api/qc2-inspection-pass-bundle/search?page=${page}&limit=${limit}`;
       const hasSearchParams =
         filters.moNo ||
         filters.packageNo ||
         filters.repair ||
-        filters.status || filters.date || filters.taskNo;
+        filters.status || 
+        filters.taskNo || 
+        filters.empId || 
+        filters.lineNo;
 
       if (hasSearchParams) {
         const params = new URLSearchParams();
@@ -60,8 +72,10 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
           params.append("package_no", packageNo.toString());
         }
         if (filters.repair) params.append("repair", filters.repair);
-        if (filters.date) params.append("date", filters.date);
         if (filters.taskNo) params.append("taskNo", filters.taskNo);
+        if (filters.empId) params.append("emp_id_inspection", filters.empId); // Add emp_id_inspection filter
+        if (filters.lineNo) params.append("line_no", filters.lineNo); // Corrected param name to snake_case
+        if (filters.status && mode === 'bundle') params.append("status", filters.status);
         url += `&${params.toString()}`;
       }
 
@@ -69,7 +83,16 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
       if (!response.ok) throw new Error(`Failed to fetch ${mode} cards`);
       const responseData = await response.json();
 
-      const data = Array.isArray(responseData.data) ? responseData.data : [];
+      let data = Array.isArray(responseData.data) ? responseData.data : [];
+
+      // Per your request, filtering for the date is now done on the client-side.
+      // This avoids sending the date to the backend API.
+      if (filters.date) {
+        const [year, month, day] = filters.date.split('-');
+        const formattedSearchDate = `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
+        data = data.filter(card => card.inspection_date === formattedSearchDate);
+      }
+
       const total = Number.isInteger(responseData.total)
         ? responseData.total
         : 0;
@@ -101,17 +124,13 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                 rejectGarmentsLength: bundle.rejectGarments?.length || 0,
                 taskNo: bundle.taskNo, // Assuming taskNo is available on bundle
                 inspection_date: bundle.inspection_date, // Assuming inspection_date is available on bundle
+                lineNo: bundle.lineNo, // Add lineNo
+                emp_id_inspection: bundle.emp_id_inspection, // Add emp_id_inspection
               }))
-              .filter((card) =>
-                filters.status === "both"
-                  ? true
-                  : filters.status === "inProgress"
-                  ? card.totalRejectGarments > 0
-                  : card.totalRejectGarments === 0
-              ) || []
+              || [] // Return empty array if printArray is nullish
         );
         setDefectCards(bundleQrCards);
-        setTotalRecords(bundleQrCards.length);
+        setTotalRecords(total); // Use total from API for correct pagination
         // Fetch repair tracking details for each bundle card
       
         bundleQrCards.forEach((card) => {
@@ -141,16 +160,20 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
       setPackageNoOptions(
         Array.isArray(data.package_no) ? data.package_no : []
       );
-      setTaskNoOptions(Array.isArray(data.taskNo) ? data.taskNo : []);
       setRepairGroupOptions(
         mode === "repair" && Array.isArray(data.repair) ? data.repair : []
       );
+      setEmpIdOptions(Array.isArray(data.emp_id_inspection) ? data.emp_id_inspection : []); // Set Emp ID options
+      setLineNoOptions(Array.isArray(data.lineNo) ? data.lineNo : []); // Set Line No options
+      setTaskNoOptions(Array.isArray(data.taskNo) ? data.taskNo : []); // Moved this line here
     } catch (error) {
       console.error(`Error fetching ${mode} search options:`, error);
       setMoNoOptions([]);
       setTaskNoOptions([]);
       setPackageNoOptions([]);
       setRepairGroupOptions([]);
+      setEmpIdOptions([]); // Clear on error
+      setLineNoOptions([]); // Clear on error
     }
   };
 
@@ -186,65 +209,77 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
     };
   };
 
-  const applyFiltersAndFetch = useCallback((isModeChange = false) => {
+  const applyFiltersAndFetch = useCallback(() => {
     const filtersToApply = {
       moNo: searchMoNo.trim(),
       packageNo: searchPackageNo.trim(),
       repair: mode === "repair" ? searchRepairGroup.trim() : undefined,
       date: searchDate,
       taskNo: searchTaskNo.trim(),
+      empId: searchEmpId.trim(), // Add empId to filters
+      lineNo: searchLineNo.trim(), // Add lineNo to filters
       status: mode === "bundle" ? searchStatus : undefined,
     };
 
-    if (currentPage !== 1) {
+     if (currentPage !== 1) {// Only reset page if not a mode change and not already on page 1
       setCurrentPage(1); // This will trigger the pagination useEffect
     } else {
       // If already on page 1, fetch directly
       fetchDefectCards(1, recordsPerPage, filtersToApply);
     }
     // If it's a mode change, the pagination useEffect needs to know not to fetch again for page 1
-    if (isModeChange) {
-      isInitialOrModeChange.current = true;
-    }
-  }, [searchMoNo, searchPackageNo, searchRepairGroup, searchDate, searchTaskNo, searchStatus, mode, currentPage, recordsPerPage, setCurrentPage /* fetchDefectCards could be added if it were stable */]);
+    // if (isModeChange) {
+    //   isInitialOrModeChange.current = true;
+    // }
+  }, [searchMoNo, searchPackageNo, searchRepairGroup, searchDate, searchTaskNo, searchStatus, searchEmpId, searchLineNo, mode, currentPage, recordsPerPage, setCurrentPage]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedApplyFilters = useCallback(debounce(applyFiltersAndFetch, 700), [applyFiltersAndFetch]);
 
-  // Effect for mode change
+  // Effect for mode change and initial load
+  const isFirstRender = useRef(true);
   useEffect(() => {
     fetchFilterOptions();
-    applyFiltersAndFetch(true); // true indicates it's a mode change
-  }, [mode]); // applyFiltersAndFetch is not added here to avoid re-triggering if its internals change due to other state updates. Mode is the primary trigger.
+    if (user?.emp_id) { // Set default empId on initial load or mode change
+      setSearchEmpId(user.emp_id);
+    }
+    // Initial fetch with default values
+    fetchDefectCards(1, recordsPerPage, {
+      moNo: "",
+      packageNo: "",
+      repair: mode === "repair" ? "" : undefined,
+      date: getTodayDateString(),
+      taskNo: "",
+      empId: user?.emp_id || "",
+      lineNo: "",
+      status: mode === "bundle" ? "both" : undefined,
+    });
+  }, [mode, user, recordsPerPage]);
 
   // Effect for filter input changes (excluding mode, currentPage, recordsPerPage)
   useEffect(() => {
-    if (isInitialOrModeChange.current) {
-      // Skip the very first run or run immediately after mode change, as applyFiltersAndFetch was called by mode useEffect
-      // isInitialOrModeChange.current will be set to false by pagination useEffect after it runs once post-mode-change
-      return;
+     if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return; // Skip initial render
     }
-    debouncedApplyFilters();
-  }, [searchMoNo, searchPackageNo, searchRepairGroup, searchDate, searchTaskNo, searchStatus, debouncedApplyFilters]);
+    debouncedApplyFilters(); // Trigger debounced fetch
+  }, [searchMoNo, searchPackageNo, searchRepairGroup, searchDate, searchTaskNo, searchStatus, searchEmpId, searchLineNo, debouncedApplyFilters]);
 
   // Effect for pagination (currentPage or recordsPerPage changes)
   useEffect(() => {
-    if (isInitialOrModeChange.current && currentPage === 1) {
-      isInitialOrModeChange.current = false; // Allow subsequent pagination/filter effects
-      return; // Skip if mode/filter change just fetched for page 1
-    }
-    isInitialOrModeChange.current = false; // Reset flag if it was true for some other reason
-
+    // This effect runs whenever pagination or filters change.
     const filtersToApply = {
       moNo: searchMoNo.trim(),
       packageNo: searchPackageNo.trim(),
       repair: mode === "repair" ? searchRepairGroup.trim() : undefined,
       date: searchDate,
       taskNo: searchTaskNo.trim(),
+      empId: searchEmpId.trim(),
+      lineNo: searchLineNo.trim(),
       status: mode === "bundle" ? searchStatus : undefined,
     };
     fetchDefectCards(currentPage, recordsPerPage, filtersToApply);
-  }, [currentPage, recordsPerPage]); // search states are implicitly used by constructing filtersToApply
+  }, [currentPage, recordsPerPage, searchMoNo, searchPackageNo, searchRepairGroup, searchDate, searchTaskNo, searchStatus, searchEmpId, searchLineNo, mode]);
 
   const handleResetFilters = () => {
     setSearchMoNo("");
@@ -252,12 +287,53 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
     setSearchRepairGroup("");
     setSearchDate(getTodayDateString());
     setSearchTaskNo("");
+    setSearchEmpId(user?.emp_id || ""); // Reset to default or empty
+    setSearchLineNo(""); // Reset Line No
     setSearchStatus("both");
     // After resetting states, trigger a search which will reset to page 1 and fetch with empty filters
     // We call applyFiltersAndFetch directly here, not the debounced one, for immediate reset.
-    isInitialOrModeChange.current = true; // Signal that a reset is happening
-    applyFiltersAndFetch(true); // Treat reset like a mode change for fetch logic
+    setCurrentPage(1); // Reset page to 1
+    // Explicitly call fetchDefectCards with reset filters to ensure immediate update
+    fetchDefectCards(1, recordsPerPage, {
+      moNo: "",
+      packageNo: "",
+      repair: mode === "repair" ? "" : undefined,
+      date: getTodayDateString(),
+      taskNo: "",
+      empId: user?.emp_id || "",
+      lineNo: "",
+      status: mode === "bundle" ? "both" : undefined,
+    });
   };
+
+  // Handlers for Emp ID input to show all datalist options (copied from QC2Data.jsx)
+  const handleEmpIdFocus = (event) => {
+    // Only clear and store if there's a value, otherwise ensure preFocus is null
+    if (event.target.value !== "") {
+      setEmpIdPreFocusValue(event.target.value);
+      setSearchEmpId(""); // Clear the input to show all datalist options
+      justFocusedEmpId.current = true; // Mark that focus handler initiated the clear
+    } else {
+      setEmpIdPreFocusValue(null); // Ensure no stale preFocusValue if field is already empty
+      justFocusedEmpId.current = false; // Not a focus-initiated clear
+    }
+  };
+
+  const handleEmpIdChange = (e) => {
+    justFocusedEmpId.current = false; // User is typing/selecting, overrides focus-initiated clear
+    setSearchEmpId(e.target.value);
+  };
+
+  const handleEmpIdBlur = () => {
+    // If: 1. The input is currently empty. 2. The emptiness was due to the onFocus handler clearing it. 3. There was a value before focus.
+    // Then, restore the pre-focus value.
+    if (searchEmpId === "" && justFocusedEmpId.current && empIdPreFocusValue) {
+      setSearchEmpId(empIdPreFocusValue);
+    }
+    justFocusedEmpId.current = false; // Reset flag for next interaction
+    setEmpIdPreFocusValue(null);    // Clear stored pre-focus value
+  };
+
   const formatTime12Hour = (timeString) => {
     if (!timeString) return "N/A"; // Handle empty cases
   
@@ -372,7 +448,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
         </div>
 
         {showFilters && (
-          <form onSubmit={(e) => { e.preventDefault(); }} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mb-1 transition-all duration-300 ease-in-out">
+          <form onSubmit={(e) => { e.preventDefault(); }} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3 md:gap-4 mb-1 transition-all duration-300 ease-in-out">
            <div className="flex flex-col">
               <label htmlFor="filterDate" className="text-xs font-medium text-gray-600 mb-1 flex items-center">
                 <FaCalendarAlt className="mr-1.5 text-gray-400" />
@@ -381,7 +457,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
               <DatePicker
                 selected={parseDateForPicker(searchDate)}
                 onChange={(date) => setSearchDate(date ? date.toISOString().split("T")[0] : "")}
-                dateFormat="yyyy-MM-dd"
+                dateFormat="MM/dd/YYYY"
                 className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
                 id="filterDate"
                 placeholderText={t("filters.select_date", "Select date")}
@@ -445,6 +521,50 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
               <datalist id="taskNoList">
                 {taskNoOptions.map((option) => (
                   <option key={option} value={option} />
+                ))}
+              </datalist>
+            </div>
+
+            {/* New Employee ID Filter */}
+            <div className="flex flex-col">
+              <label htmlFor="empIdFilter" className="text-xs font-medium text-gray-600 mb-1">
+                {t("bundle.emp_id")}
+              </label>
+              <input
+                id="empIdFilter"
+                type="text"
+                value={searchEmpId}
+                onChange={handleEmpIdChange}
+                onFocus={handleEmpIdFocus}
+                onBlur={handleEmpIdBlur}
+                placeholder={t("set.search_emp_id")}
+                list="empIdList"
+                className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+              />
+              <datalist id="empIdList">
+                {empIdOptions.map((option) => (
+                  <option key={`emp-${option}`} value={option} />
+                ))}
+              </datalist>
+            </div>
+
+            {/* New Line No Filter */}
+            <div className="flex flex-col">
+              <label htmlFor="lineNoFilter" className="text-xs font-medium text-gray-600 mb-1">
+                {t("bundle.line_no")}
+              </label>
+              <input
+                id="lineNoFilter"
+                type="text"
+                value={searchLineNo}
+                onChange={(e) => setSearchLineNo(e.target.value)}
+                placeholder={t("bundle.search_line_no", "Search Line No")}
+                list="lineNoList"
+                className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+              />
+              <datalist id="lineNoList">
+                {lineNoOptions.map((option) => (
+                  <option key={`ln-${option}`} value={option} />
                 ))}
               </datalist>
             </div>
@@ -576,16 +696,22 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                         {t("bundle.package_no")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
+                        {t("bundle.action")}
+                      </th>
+                      <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                         {t("qc2In.taskNo", "Task No")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                         {t("qc2In.date", "Date")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        {t("defectPrint.status")}
+                        {t("bundle.line_no")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        {t("bundle.action")}
+                        {t("bundle.emp_id")}
+                      </th>
+                      <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
+                        {t("defectPrint.status")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                         {t("bundle.mono")}
@@ -637,25 +763,6 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                           {card.package_no || "N/A"}
                         </td>
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {card.taskNo || "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {formatDateForDisplay(card.inspection_date) || "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          <span
-                            className={`inline-block px-2 py-1 rounded-full text-white text-sm ${
-                              card.totalRejectGarments > 0
-                                ? "bg-yellow-500"
-                                : "bg-green-500"
-                            }`}
-                          >
-                            {card.totalRejectGarments > 0
-                              ? "In Progress"
-                              : "Completed"}
-                          </span>
-                        </td>
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           <button
                             onClick={() => handlePreviewQR(card)}
                             className="text-blue-500 hover:text-blue-700 mr-2"
@@ -674,6 +781,32 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                             <Printer className="inline" />
                           </button>
                         </td>
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          {card.taskNo || "N/A"}
+                        </td>
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          {formatDateForDisplay(card.inspection_date) || "N/A"}
+                        </td>
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          {card.lineNo || "N/A"}
+                        </td>
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          {card.emp_id_inspection || "N/A"}
+                        </td>
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          <span
+                            className={`inline-block px-2 py-1 rounded-full text-white text-sm ${
+                              card.totalRejectGarments > 0
+                                ? "bg-yellow-500"
+                                : "bg-green-500"
+                            }`}
+                          >
+                            {card.totalRejectGarments > 0
+                              ? "In Progress"
+                              : "Completed"}
+                          </span>
+                        </td>
+                        
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           {card.moNo || "N/A"}
                         </td>

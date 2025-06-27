@@ -64,7 +64,7 @@ import createEMBDefectModel from "./models/EMBdefect.js";
 import createEMBReportModel from "./models/EMBReport.js";
 
 import createAuditCheckPointModel from "./models/AuditCheckPoint.js";
-import createBGradeModel from "./models/BGradeDefects.js";
+
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
@@ -216,7 +216,6 @@ const SCCFUOperator = createSCCFUOperatorModel(ymProdConnection);
 const SCCElasticOperator = createSCCElasticOperatorModel(ymProdConnection);
 
 const AuditCheckPoint = createAuditCheckPointModel(ymProdConnection);
-const BGrade = createBGradeModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -2214,6 +2213,7 @@ const normalizeDateString = (dateStr) => {
       // Attempt to reformat if it looks like YYYY-MM-DD or DD-MM-YYYY
       if (parts[0].length === 4) return `${parts[1]}/${parts[2]}/${parts[0]}`; // YYYY/MM/DD -> MM/DD/YYYY
       if (parts[2].length === 4) return `${parts[0]}/${parts[1]}/${parts[2]}`; // DD/MM/YYYY -> MM/DD/YYYY
+      if (parts[3].length === 4) return `${parts[2]}/${parts[1]}/${parts[0]}`; // MM/DD/YYYY -> MM/DD/YYYY
     }
     return dateStr; // Fallback
   }
@@ -5450,13 +5450,6 @@ const escapeRegExp = (string) => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // Escapes . * + ? ^ $ { } ( ) | [ ] \
 };
 
-// Helper function to normalize date strings (remove leading zeros for consistency)
-// const normalizeDateString = (dateStr) => {
-//   if (!dateStr) return null;
-//   const [month, day, year] = dateStr.split("/");
-//   return `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
-// };
-
 // GET endpoint to fetch all inspection records
 app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
   try {
@@ -5464,6 +5457,9 @@ app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
       moNo,
       package_no,
       emp_id_inspection,
+      line_no, // Added
+      taskNo,  // Added
+      date, 
       startDate,
       endDate,
       color,
@@ -5486,10 +5482,22 @@ app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
       match.emp_id_inspection = {
         $regex: new RegExp(emp_id_inspection.trim(), "i")
       };
+
+      if (line_no) {
+      match.lineNo = line_no;
+    }
+    // Handle taskNo from query, matching against the 'taskNo' field in the database
+    if (taskNo) {
+      match.taskNo = taskNo;
+    }
     if (color) match.color = color;
     if (size) match.size = size;
     if (department) match.department = department;
 
+    if (date) {
+       if (date) match.inspection_date = normalizeDateString(date);
+      
+    } 
     if (startDate || endDate) {
       match.inspection_date = {};
       if (startDate)
@@ -5526,9 +5534,10 @@ app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
 
 app.get("/api/qc2-defect-print/search", async (req, res) => {
   try {
-    const { moNo, package_no, repair, page = 1, limit = 50 } = req.query;
+    const { moNo, package_no, repair,date, page = 1, limit = 50 } = req.query;
     let match = {};
     if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+    if (date) match.inspection_date = normalizeDateString(date);
     if (package_no) {
       const packageNoNumber = Number(package_no);
       if (isNaN(packageNoNumber))
@@ -7570,10 +7579,10 @@ app.put('/api/b-grade-tracking/update-confirmation', async (req, res) => {
       },
     }));
 
-    const result = await BGrade.bulkWrite(operations);
+    const result = await QC2BGrade.bulkWrite(operations);
 
     if (result.modifiedCount === 0) {
-      const docExists = await BGrade.exists({ bundle_random_id, defect_print_id });
+      const docExists = await QC2BGrade.exists({ bundle_random_id, defect_print_id });
       if (!docExists) {
         return res.status(404).json({ message: `B-Grade document not found.` });
       } else {
@@ -7601,7 +7610,7 @@ app.put('/:defect_print_id', async (req, res) => {
     }
 
     // Find the parent BGradeTracking document using the ID from the URL
-    const bGradeTrackingDoc = await BGrade.findOne({ defect_print_id: defect_print_id });
+    const bGradeTrackingDoc = await QC2BGrade.findOne({ defect_print_id: defect_print_id });
 
     if (!bGradeTrackingDoc) {
       return res.status(404).json({ message: `B-Grade tracking document with defect_print_id ${defect_print_id} not found.` });
@@ -7642,7 +7651,7 @@ app.post('/', async (req, res) => {
     // --- UPDATE LOGIC ---
     // If the payload contains an 'updates' array, it's an update request from BGradeDefect.jsx
     if (updates && defect_print_id) {
-      const bGradeDoc = await BGrade.findOne({ defect_print_id: defect_print_id });
+      const bGradeDoc = await QC2BGrade.findOne({ defect_print_id: defect_print_id });
 
       if (!bGradeDoc) {
         return res.status(404).json({ message: `B-Grade record with defect_print_id ${defect_print_id} not found for update.` });
@@ -7669,7 +7678,7 @@ app.post('/', async (req, res) => {
     if (bGradeArray) {
       // Using findOneAndUpdate with 'upsert: true' is a robust way to handle this.
       // It will create the document if it doesn't exist, or update it if it does.
-      const newBGradeDoc = await BGrade.findOneAndUpdate(
+      const newBGradeDoc = await QC2BGrade.findOneAndUpdate(
         { defect_print_id: defect_print_id }, // find a document with this filter
         req.body, // document to insert or update
         { new: true, upsert: true, setDefaultsOnInsert: true } // options: return the new doc, create if it doesn't exist, and apply schema defaults

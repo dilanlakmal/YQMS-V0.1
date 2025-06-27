@@ -28,7 +28,7 @@ const QC2Data = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedDataForEdit, setSelectedDataForEdit] = useState(null);
   const [showFilters, setShowFilters] = useState(true); // State for filter pane visibility
-  const isInitialLoad = useRef(true); // To manage initial fetch
+  const isFirstRender = useRef(true); // To manage initial fetch and prevent effects on mount
   // State and ref for Emp ID focus/blur workaround to show all datalist options
   const [empIdPreFocusValue, setEmpIdPreFocusValue] = useState(null);
   const justFocusedEmpId = useRef(false);
@@ -38,7 +38,7 @@ const fetchDataCards = async (page, limit, filters = {}) => {
       setLoading(true);
       let url = `${API_BASE_URL}/api/qc2-inspection-pass-bundle/search?page=${page}&limit=${limit}`;
       const hasSearchParams =
-        filters.moNo || filters.packageNo || filters.empId || filters.lineNo || filters.date;
+        filters.moNo || filters.packageNo || filters.empId || filters.lineNo; // Date filter is now handled on the client-side
 
       if (hasSearchParams) {
         const params = new URLSearchParams();
@@ -54,14 +54,24 @@ const fetchDataCards = async (page, limit, filters = {}) => {
         }
         if (filters.empId) params.append("emp_id_inspection", filters.empId);
         if (filters.lineNo) params.append("lineNo", filters.lineNo); // Added lineNo to params
-        if (filters.date) params.append("date", filters.date);
         url += `&${params.toString()}`;
       }
 
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch data cards");
       const responseData = await response.json();
-      setDataCards(Array.isArray(responseData.data) ? responseData.data : []);
+
+      let fetchedData = Array.isArray(responseData.data) ? responseData.data : [];
+
+      // Per your request, filtering for the date is now done on the client-side.
+      // This avoids sending the date to the backend API.
+      if (filters.date) {
+        const [year, month, day] = filters.date.split('-');
+        const formattedSearchDate = `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
+        fetchedData = fetchedData.filter(card => card.inspection_date === formattedSearchDate);
+      }
+
+      setDataCards(fetchedData);
       setTotalRecords(Number.isInteger(responseData.total) ? responseData.total : 0);
     } catch (error) {
       console.error("Error fetching data cards:", error);
@@ -102,7 +112,7 @@ const fetchDataCards = async (page, limit, filters = {}) => {
     };
   };
 
-  const applyFiltersAndFetch = useCallback((isInitialOrReset = false) => {
+  const applyFiltersAndFetch = useCallback(() => {
     const filtersToApply = {
       moNo: searchMoNo.trim(),
       packageNo: searchPackageNo.trim(),
@@ -110,10 +120,6 @@ const fetchDataCards = async (page, limit, filters = {}) => {
       lineNo: searchLineNo.trim(),
       date: searchDate,
     };
-
-    if (isInitialOrReset) {
-      isInitialLoad.current = true; // Signal to pagination useEffect
-    }
 
     if (currentPage !== 1) {
       setCurrentPage(1); // This will trigger the pagination useEffect
@@ -132,25 +138,28 @@ const fetchDataCards = async (page, limit, filters = {}) => {
     if (user?.emp_id) {
       setSearchEmpId(user.emp_id); // Set default empId
     }
-    // searchDate is already defaulted by useState
-    applyFiltersAndFetch(true);
-  }, [user]); // Empty dependency array for initial load
+    // Initial fetch with default values
+    fetchDataCards(1, recordsPerPage, {
+      moNo: "",
+      packageNo: "",
+      empId: user?.emp_id || "",
+      lineNo: "",
+      date: getTodayDateString(),
+    });
+  }, [user, recordsPerPage]);
 
   // Effect for filter input changes
   useEffect(() => {
-    if (isInitialLoad.current) {
-      return;
+    if (isFirstRender.current) {
+      isFirstRender.current = false; // Set to false after first render
+      return; // Skip applying filters on initial mount
     }
     debouncedApplyFilters();
    }, [searchMoNo, searchPackageNo, searchEmpId, searchLineNo, searchDate, debouncedApplyFilters]);
 
   // Effect for pagination
   useEffect(() => {
-    if (isInitialLoad.current && currentPage === 1) {
-      isInitialLoad.current = false; 
-      return; 
-    }
-    isInitialLoad.current = false;
+    if (isFirstRender.current && currentPage === 1) return;
     const filtersToApply = {
       moNo: searchMoNo.trim(),
       packageNo: searchPackageNo.trim(),
@@ -159,7 +168,7 @@ const fetchDataCards = async (page, limit, filters = {}) => {
       date: searchDate,
     };
     fetchDataCards(currentPage, recordsPerPage, filtersToApply);
-  }, [currentPage, recordsPerPage]); 
+  }, [currentPage, recordsPerPage, searchMoNo, searchPackageNo, searchEmpId, searchLineNo, searchDate]);
 
   const handleResetFilters = () => {
     setSearchMoNo("");
@@ -171,7 +180,15 @@ const fetchDataCards = async (page, limit, filters = {}) => {
     }
     setSearchLineNo("");
     setSearchDate(getTodayDateString());
-    applyFiltersAndFetch(true);
+    setCurrentPage(1); // Reset page to 1
+    // Explicitly call fetchDataCards with reset filters to ensure immediate update
+    fetchDataCards(1, recordsPerPage, {
+      moNo: "",
+      packageNo: "",
+      empId: user?.emp_id || "",
+      lineNo: "",
+      date: getTodayDateString(),
+    });
   };
 
   // Handlers for Emp ID input to show all datalist options on focus
@@ -366,7 +383,7 @@ const fetchDataCards = async (page, limit, filters = {}) => {
               <DatePicker
                 selected={parseDateForPicker(searchDate)}
                 onChange={(date) => setSearchDate(date ? date.toISOString().split("T")[0] : "")}
-                dateFormat="yyyy-MM-dd"
+                dateFormat="MM/dd/yyyy"
                 className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
                 id="filterDateQC2"
                 placeholderText={t("filters.select_date", "Select date")}
