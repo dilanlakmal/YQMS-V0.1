@@ -90,7 +90,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
       if (filters.date) {
         const [year, month, day] = filters.date.split('-');
         const formattedSearchDate = `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
-        data = data.filter(card => card.inspection_date === formattedSearchDate);
+        data = data.filter(card => card.inspection_date && card.inspection_date === formattedSearchDate);
       }
 
       const total = Number.isInteger(responseData.total)

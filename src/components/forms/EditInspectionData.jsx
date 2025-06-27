@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { allDefects } from "../../constants/defects"; // Adjust the path as necessary
+import { API_BASE_URL } from "../../../config";
+import i18next from "i18next";
+import Swal from 'sweetalert2'; // Import SweetAlert2
 
 const EditModal = ({ isOpen, onClose, data, onSave }) => {
   const [garmentNumber, setGarmentNumber] = useState("");
@@ -7,9 +9,55 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
   const [color, setColor] = useState("");
   const [size, setSize] = useState("");
   const [rejectGarments, setRejectGarments] = useState([]);
+  const [defectsList, setDefectsList] = useState([]);
   const [selectedDefect, setSelectedDefect] = useState("");
   const [selectedGarment, setSelectedGarment] = useState("");
-  const [language, setLanguage] = useState("english");
+  const [isLoading, setIsLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
+    const mapI18nLangToDisplayLang = (lang) => {
+    if (lang.startsWith("kh")) return "kh";
+    if (lang.startsWith("ch") || lang.startsWith("zh")) return "ch";
+    return "en";
+  };
+  const [defectDisplayLanguage, setDefectDisplayLanguage] = useState(
+    mapI18nLangToDisplayLang(i18next.language)
+  );
+
+  useEffect(() => {
+    const fetchDefects = async () => {
+      setIsLoading(true);
+      setFetchError(null);
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/qc2-defects`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
+        const defects = await response.json();
+        setDefectsList(defects);
+      } catch (error) {
+        console.error("Failed to fetch defects:", error);
+        if (error instanceof SyntaxError) {
+          setFetchError("Failed to parse server response. Check API endpoint.");
+        } else {
+          setFetchError(error.message);
+          Swal.fire({ // Display error SweetAlert for fetch failures
+            icon: 'error',
+            title: 'Error!',
+            text: `Failed to fetch defects: ${error.message}`,
+            confirmButtonText: 'OK'
+          });
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchDefects();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (data) {
@@ -23,7 +71,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
 
   const handleAddDefect = () => {
     if (selectedDefect && selectedGarment) {
-      const defect = allDefects.find((d) => d.english === selectedDefect);
+      const defect = defectsList.find((d) => d.english === selectedDefect);
       if (defect) {
         const garmentIndex = rejectGarments.findIndex(
           (garment) => garment.garment_defect_id === selectedGarment
@@ -31,6 +79,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
         if (garmentIndex !== -1) {
           const newRejectGarments = [...rejectGarments];
           newRejectGarments[garmentIndex].defects.push({
+            code: defect.code,
             name: defect.english,
             count: 0,
             repair: defect.repair,
@@ -65,7 +114,7 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
     setRejectGarments(newRejectGarments);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const updatedData = {
       moNo: garmentNumber,
       package_no: packageNo,
@@ -73,22 +122,69 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
       size: size,
       rejectGarments: rejectGarments,
     };
-    onSave(updatedData);
-    onClose();
+
+    try {
+      await onSave(updatedData); // Await the onSave prop, assuming it's async
+      Swal.fire({ // Display success SweetAlert
+        icon: 'success',
+        title: 'Success!',
+        text: 'Inspection data saved successfully.',
+        showConfirmButton: false,
+        timer: 1500
+      });
+      onClose(); // Close modal only on successful save
+    } catch (error) {
+      console.error("Error during save operation:", error);
+      Swal.fire({ // Display error SweetAlert for save failures
+        icon: 'error',
+        title: 'Save Error!',
+        text: `Failed to save data: ${error.message || 'An unknown error occurred.'}`,
+        confirmButtonText: 'OK'
+      });
+    }
   };
 
-  const getDefectName = (defectName) => {
-    const defect = allDefects.find((d) => d.english === defectName);
-    if (!defect) return defectName;
-    switch (language) {
-      case "khmer":
-        return defect.khmer;
-      case "chinese":
-        return defect.chinese;
+  useEffect(() => {
+      const handleGlobalLanguageChanged = (lng) => {
+        setDefectDisplayLanguage(mapI18nLangToDisplayLang(lng));
+      };
+      i18next.on("languageChanged", handleGlobalLanguageChanged);
+      // Initial sync
+      setDefectDisplayLanguage(mapI18nLangToDisplayLang(i18next.language));
+      return () => {
+        i18next.off("languageChanged", handleGlobalLanguageChanged);
+      };
+    }, []);
+
+  //   const getDefectName = (defectName) => {
+  //   const defect = defectsList.find((d) => d.english === defectName);
+  //   if (!defect) return defectName;
+  //   switch (language) {
+  //     case "khmer":
+  //       return defect.khmer;
+  //     case "chinese":
+  //       return defect.chinese;
+  //     default:
+  //       return defect.english;
+  //   }
+  // };
+
+  const getDefectNameForDisplay = (defect) => {
+    // Renamed for clarity
+    if (!defect) return "N/A";
+    switch (
+      defectDisplayLanguage // Use defectDisplayLanguage state
+    ) {
+      case "kh":
+        return defect.khmer || defect.english;
+      case "ch":
+        return defect.chinese || defect.english;
+      case "en":
       default:
         return defect.english;
     }
   };
+
 
   if (!isOpen) return null;
 
@@ -155,15 +251,6 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
         <div className="mb-4">
           <h3 className="text-lg md:text-xl font-semibold mb-2">Defects</h3>
           <div className="flex flex-col md:flex-row items-center mb-4 space-y-2 md:space-y-0 md:space-x-2">
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="border p-2 rounded w-full md:w-1/5"
-            >
-              <option value="english">English</option>
-              <option value="khmer">Khmer</option>
-              <option value="chinese">Chinese</option>
-            </select>
             <div className="flex flex-row w-full space-x-2">
               <select
                 value={selectedGarment}
@@ -180,14 +267,21 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
               <select
                 value={selectedDefect}
                 onChange={(e) => setSelectedDefect(e.target.value)}
-                className="border p-2 rounded w-full md:w-1/2"
+                className="border p-2 rounded w-full md:w-1/2 disabled:bg-gray-200"
+                disabled={isLoading || fetchError}
               >
-                <option value="">Select a defect</option>
-                {allDefects.map((defect) => (
-                  <option key={defect.code} value={defect.english}>
-                    {getDefectName(defect.english)}
-                  </option>
-                ))}
+                {isLoading && <option>Loading defects...</option>}
+                {fetchError && <option>Error loading defects</option>}
+                {!isLoading && !fetchError && (
+                  <>
+                    <option value="">Select a defect</option>
+                    {defectsList.map((defect) => (
+                      <option key={defect.code} value={defect.english}>
+                        {getDefectNameForDisplay(defect)}
+                      </option>
+                    ))}
+                  </>
+                )}
               </select>
             </div>
             <button
@@ -197,6 +291,9 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
               Add Defect
             </button>
           </div>
+          {fetchError && (
+            <p className="text-red-500 text-sm mt-2">Error: {fetchError}</p>
+          )}
 
           {/* Defects Table */}
           <div className="overflow-x-auto max-h-64">
@@ -226,9 +323,13 @@ const EditModal = ({ isOpen, onClose, data, onSave }) => {
                     >
                       <td className="py-2 px-4 border-b border-gray-200 text-sm">
                         G.{garmentIndex + 1}
-                      </td>
+                      </td> 
                       <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                        {getDefectName(defect.name)}
+                        {getDefectNameForDisplay(
+                          defectsList.find((d) => d.code === defect.code) || {
+                            english: defect.name,
+                          }
+                        )}
                       </td>
                       <td className="py-2 px-4 border-b border-gray-200 text-sm">
                         <div className="flex items-center justify-center space-x-2">

@@ -18,10 +18,12 @@ const EditInspection = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage] = useState(50);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [masterDefects, setMasterDefects] = useState([]); // New state for master defect list
 
   useEffect(() => {
     fetchFilterOptions();
     fetchDataCards(1);
+    fetchMasterDefects(); // Fetch master defects on initial load
   }, []);
 
   const fetchDataCards = async (page) => {
@@ -81,6 +83,19 @@ const EditInspection = () => {
     }
   };
 
+  // New function to fetch master defect list
+  const fetchMasterDefects = async () => {
+    try {
+      // Assuming an API endpoint that returns a list of all defects with their codes
+      const response = await fetch(`${API_BASE_URL}/api/qc2-defects`);
+      if (!response.ok) throw new Error("Failed to fetch master defects");
+      const data = await response.json();
+      setMasterDefects(data);
+    } catch (error) {
+      console.error("Error fetching master defects:", error);
+    }
+  };
+
   const handleSearch = () => {
     fetchDataCards(1);
   };
@@ -111,26 +126,78 @@ const EditInspection = () => {
         0
       );
 
-      const defectCounts = {};
+      // Build a robust, case-insensitive lookup map for defect codes.
+      const defectCodeLookup = new Map();
+
+      // 1. Populate from masterDefects (most authoritative source)
+      masterDefects.forEach(d => {
+        if (d.name && d.code) { // Use 'name' for lookup key (assuming API returns 'name' for English)
+          defectCodeLookup.set(d.name.trim().toLowerCase(), d.code);
+        }
+      });
+
+      // 2. Populate from selectedData.defectArray (for any custom or older defects not in master, but present in the original bundle data)
+      selectedData.defectArray?.forEach(d => {
+        if (d.defectName && d.defectCode) {
+          const key = d.defectName.trim().toLowerCase();
+          if (!defectCodeLookup.has(key)) { // Only add if not already present from master
+            defectCodeLookup.set(key, d.defectCode);
+          }
+        }
+      });
+
+      // 3. Populate from selectedData.rejectGarments (similar to above, for individual garment defects)
+      selectedData.rejectGarments?.forEach(g => g.defects.forEach(d => {
+        if (d.name && d.code) {
+          const key = d.name.trim().toLowerCase();
+          if (!defectCodeLookup.has(key)) { // Only add if not already present from master or defectArray
+            defectCodeLookup.set(key, d.code);
+          }
+        }
+      }));
+
+      // Patch rejectGarments and build the summary `defectArray` correctly.
+      const defectSummary = {};
+      let validationError = null;
       updatedData.rejectGarments.forEach((garment) => {
         garment.defects.forEach((defect) => {
-          defectCounts[defect.name] =
-            (defectCounts[defect.name] || 0) + defect.count;
+          if (validationError || !defect.name) return; // Stop if error found or no defect name
+          const trimmedDefectName = defect.name.trim();
+
+          // If code is missing, try to add it from our lookup.
+          if (!defect.code) {
+            defect.code = defectCodeLookup.get(trimmedDefectName.toLowerCase());
+          }
+
+          // If code is still missing, it's a new defect we can't resolve. Stop the process.
+          if (!defect.code) {
+            validationError = `Cannot save: Defect "${trimmedDefectName}" is missing a required code.`;
+            return;
+          }
+
+          // Aggregate defects for the summary array, preserving the code.
+          if (!defectSummary[trimmedDefectName]) {
+            defectSummary[trimmedDefectName] = { totalCount: 0, defectCode: defect.code };
+          }
+          defectSummary[trimmedDefectName].totalCount += defect.count;
         });
       });
 
-      const defectArray = Object.entries(defectCounts).map(
-        ([defectName, totalCount]) => ({
-          defectName,
-          totalCount
-        })
+      if (validationError) throw new Error(validationError);
+
+      const defectArray = Object.entries(defectSummary).map(
+        ([defectName, { totalCount, defectCode }]) => ({ defectName, totalCount, defectCode }) // Ensure defectCode is passed
       );
+      
+      // Destructure to exclude IDs from the payload.
+      const { _id, bundle_id, bundle_random_id, ...restOfSelectedData } = selectedData;
 
       const dataToUpdate = {
+        ...restOfSelectedData,
         ...updatedData,
         defectQty: totalDefectCount,
         defectArray,
-        totalRejects: updatedData.rejectGarments.length
+        totalRejects: updatedData.rejectGarments.length,
       };
 
       const response = await fetch(
@@ -376,6 +443,7 @@ const EditInspection = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         data={selectedData}
+        masterDefects={masterDefects}
         onSave={handleSave}
       />
     </div>

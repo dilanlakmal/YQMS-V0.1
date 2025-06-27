@@ -27,9 +27,9 @@ const QC2Data = () => {
   const [totalRecords, setTotalRecords] = useState(0);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedDataForEdit, setSelectedDataForEdit] = useState(null);
-  const [showFilters, setShowFilters] = useState(true); // State for filter pane visibility
-  const isFirstRender = useRef(true); // To manage initial fetch and prevent effects on mount
-  // State and ref for Emp ID focus/blur workaround to show all datalist options
+  const [showFilters, setShowFilters] = useState(true); 
+  const isFirstRender = useRef(true); 
+  const [masterDefects, setMasterDefects] = useState([]); // New state for master defect list
   const [empIdPreFocusValue, setEmpIdPreFocusValue] = useState(null);
   const justFocusedEmpId = useRef(false);
 
@@ -68,7 +68,7 @@ const fetchDataCards = async (page, limit, filters = {}) => {
       if (filters.date) {
         const [year, month, day] = filters.date.split('-');
         const formattedSearchDate = `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
-        fetchedData = fetchedData.filter(card => card.inspection_date === formattedSearchDate);
+        fetchedData = fetchedData.filter(card => card.inspection_date && card.inspection_date === formattedSearchDate);
       }
 
       setDataCards(fetchedData);
@@ -98,6 +98,20 @@ const fetchDataCards = async (page, limit, filters = {}) => {
       setPackageNoOptions([]);
       setEmpIdOptions([]);
       setLineNoOptions([]);
+    }
+  };
+
+  // New function to fetch master defect list
+  const fetchMasterDefects = async () => {
+    try {
+      // Assuming an API endpoint that returns a list of all defects with their codes
+      const response = await fetch(`${API_BASE_URL}/api/qc2-defects`);
+      if (!response.ok) throw new Error("Failed to fetch master defects");
+      const data = await response.json();
+      setMasterDefects(data);
+    } catch (error) {
+      console.error("Error fetching master defects:", error);
+      // Optionally, display an error message to the user
     }
   };
 
@@ -146,6 +160,7 @@ const fetchDataCards = async (page, limit, filters = {}) => {
       lineNo: "",
       date: getTodayDateString(),
     });
+    fetchMasterDefects(); // Fetch master defects on initial load
   }, [user, recordsPerPage]);
 
   // Effect for filter input changes
@@ -275,21 +290,79 @@ const fetchDataCards = async (page, limit, filters = {}) => {
           garment.defects.reduce((sum, defect) => sum + defect.count, 0),
         0
       );
+  
+      // Build a robust, case-insensitive lookup map for defect codes.
+      const defectCodeLookup = new Map();
 
-      const defectCounts = {};
+      // 1. Populate from masterDefects (most authoritative source)
+      masterDefects.forEach(d => {
+        if (d.name && d.code) { // Use 'name' for lookup key (assuming API returns 'name' for English)
+          defectCodeLookup.set(d.name.trim().toLowerCase(), d.code);
+        }
+      });
+  
+      // 2. Populate from selectedDataForEdit.defectArray (for any custom or older defects not in master, but present in the original bundle data)
+      selectedDataForEdit.defectArray?.forEach(d => {
+        if (d.defectName && d.defectCode) {
+          const key = d.defectName.trim().toLowerCase();
+          if (!defectCodeLookup.has(key)) { // Only add if not already present from master
+            defectCodeLookup.set(key, d.defectCode);
+          }
+        }
+      });
+
+      // 3. Populate from selectedDataForEdit.rejectGarments (similar to above, for individual garment defects)
+      selectedDataForEdit.rejectGarments?.forEach(g => g.defects.forEach(d => {
+        if (d.name && d.code) {
+          const key = d.name.trim().toLowerCase();
+          if (!defectCodeLookup.has(key)) { // Only add if not already present from master or defectArray
+            defectCodeLookup.set(key, d.code);
+          }
+        }
+      }));
+
+      // Patch rejectGarments and build the summary `defectArray` correctly.
+      const defectSummary = {};
+      let validationError = null;
       updatedData.rejectGarments.forEach((garment) => {
         garment.defects.forEach((defect) => {
-          defectCounts[defect.name] =
-            (defectCounts[defect.name] || 0) + defect.count;
+          if (validationError || !defect.name) return; // Stop if error found or no defect name
+          const trimmedDefectName = defect.name.trim();
+
+          // If code is missing, try to add it from our lookup.
+          if (!defect.code) {
+            defect.code = defectCodeLookup.get(trimmedDefectName.toLowerCase());
+          }
+
+          // If code is still missing, it's a new defect we can't resolve. Stop the process.
+          if (!defect.code) {
+            validationError = `Cannot save: Defect "${trimmedDefectName}" is missing a required code.`;
+            return;
+          }
+
+          // Aggregate defects for the summary array, preserving the code.
+          if (!defectSummary[trimmedDefectName]) {
+            defectSummary[trimmedDefectName] = { totalCount: 0, defectCode: defect.code };
+          }
+          defectSummary[trimmedDefectName].totalCount += defect.count;
         });
       });
 
-      const defectArray = Object.entries(defectCounts).map(
-        ([defectName, totalCount]) => ({ defectName, totalCount })
+      if (validationError) throw new Error(validationError);
+  
+      const defectArray = Object.entries(defectSummary).map(
+        ([defectName, { totalCount, defectCode }]) => ({ defectName, totalCount, defectCode })
       );
 
+      // Destructure selectedDataForEdit to exclude IDs, as they are used in the URL
+      // and should not be sent in the request body for an update.
+      const { _id, bundle_id, bundle_random_id, ...restOfSelectedData } = selectedDataForEdit;
+
+      // Start with all original data to ensure all fields are present,
+      // then apply updates from the modal, and finally add calculated fields.
       const dataToUpdate = {
-        ...updatedData,
+        ...restOfSelectedData, // Include all original fields except the IDs
+        ...updatedData, // Override with updated fields from the modal
         defectQty: totalDefectCount,
         defectArray,
         totalRejects: updatedData.rejectGarments.length,
@@ -309,15 +382,18 @@ const fetchDataCards = async (page, limit, filters = {}) => {
         throw new Error(errorData.message || "Failed to save data");
       }
 
-      alert("Data updated successfully!");
-      handleCloseEditModal();
-      fetchDataCards(currentPage, recordsPerPage, { // Pass current filters
+      
+      handleCloseEditModal(); // Close the modal first
+
+      // Re-fetch data with the currently applied filters
+      const currentFilters = {
         moNo: searchMoNo.trim(),
         packageNo: searchPackageNo.trim(),
         empId: searchEmpId.trim(),
         lineNo: searchLineNo.trim(),
         date: searchDate,
-      }); 
+      };
+      fetchDataCards(currentPage, recordsPerPage, currentFilters); // Refresh data for the current view
     } catch (error) {
       console.error("Error saving data:", error);
       alert(error.message || "Failed to save data. Please try again.");
@@ -703,6 +779,7 @@ const fetchDataCards = async (page, limit, filters = {}) => {
           isOpen={isEditModalOpen}
           onClose={handleCloseEditModal}
           data={selectedDataForEdit}
+          masterDefects={masterDefects}
           onSave={handleSaveEdit}
         />
       )}

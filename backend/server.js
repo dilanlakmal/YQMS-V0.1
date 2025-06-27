@@ -144,14 +144,14 @@ const ymEcoConnection = mongoose.createConnection(
 );
 
 ymProdConnection.on("connected", () =>
-  console.log("Connected to ym_prod database in 192.167.1.10:29000...")
+  console.log("✅ Connected to ym_prod database in 192.167.1.10:29000...")
 );
-ymProdConnection.on("error", (err) => console.error("unexpected error:", err));
+ymProdConnection.on("error", (err) => console.error("❌ unexpected error:", err));
 
 ymEcoConnection.on("connected", () =>
-  console.log("Connected to ym_eco_board database in 192.167.1.10:29000...")
+  console.log("✅ Connected to ym_eco_board database in 192.167.1.10:29000...")
 );
-ymEcoConnection.on("error", (err) => console.error("unexpected error:", err));
+ymEcoConnection.on("error", (err) => console.error("❌ unexpected error:", err));
 
 // Define model on connections
 
@@ -5578,8 +5578,8 @@ app.put("/api/qc2-inspection-pass-bundle/:id", async (req, res) => {
   const updateData = req.body;
 
   try {
-    // console.log(`Received request to update record with ID: ${id}`);
-    // console.log(`Update Data: ${JSON.stringify(updateData)}`);
+    console.log(`Received request to update record with ID: ${id}`);
+    console.log(`Update Data: ${JSON.stringify(updateData)}`);
     const updatedRecord = await QC2InspectionPassBundle.findByIdAndUpdate(
       id,
       updateData,
