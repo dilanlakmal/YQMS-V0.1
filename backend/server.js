@@ -34,6 +34,8 @@ import createSubconFactoryModel from "./models/SubconFactory.js";
 import createQC2DefectsModel from "./models/QC2DefectsModel.js";
 import createQC2WorkersDataModel from "./models/QC2WorkersData.js";
 import createQC2BGradeModel from "./models/QC2BGrade.js";
+import createQC2TaskModel from "./models/QC2Task.js";
+import createIEWorkerTaskModel from "./models/IEWorkerTask.js";
 
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
 import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
@@ -191,6 +193,8 @@ const SubconFactory = createSubconFactoryModel(ymProdConnection);
 const QC2Defects = createQC2DefectsModel(ymProdConnection);
 const QC2WorkersData = createQC2WorkersDataModel(ymProdConnection);
 const QC2BGrade = createQC2BGradeModel(ymProdConnection);
+const QC2Task = createQC2TaskModel(ymProdConnection);
+const IEWorkerTask = createIEWorkerTaskModel(ymProdConnection);
 
 const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
 const SewingDefects = createSewingDefectsModel(ymProdConnection);
@@ -2772,6 +2776,113 @@ app.get("/api/qc2-defect-categories", async (req, res) => {
     res
       .status(500)
       .json({ message: "Server error fetching defect categories" });
+  }
+});
+
+/* ------------------------------
+   IE - Task No Allocation Endpoints
+------------------------------ */
+
+// GET - Fetch all tasks with filtering
+// server.js
+
+// UPDATED - GET - Fetch all tasks with filtering AND pagination
+app.post("/api/ie/tasks", async (req, res) => {
+  try {
+    const {
+      department,
+      productType,
+      processName,
+      taskNo,
+      page = 1,
+      limit = 10
+    } = req.body;
+    const filter = {};
+
+    if (department) filter.department = department;
+    if (productType) filter.productType = productType;
+    if (processName)
+      filter.processName = { $regex: new RegExp(processName, "i") };
+    if (taskNo) filter.taskNo = Number(taskNo);
+
+    const skip = (page - 1) * limit;
+
+    const tasks = await QC2Task.find(filter)
+      .sort({ record_no: 1 })
+      .skip(skip)
+      .limit(limit);
+
+    const totalTasks = await QC2Task.countDocuments(filter);
+
+    res.json({
+      tasks,
+      totalPages: Math.ceil(totalTasks / limit),
+      currentPage: page
+    });
+  } catch (error) {
+    console.error("Error fetching IE tasks:", error);
+    res.status(500).json({ message: "Server error fetching tasks." });
+  }
+});
+
+// GET - Fetch distinct values for filters
+app.get("/api/ie/tasks/filter-options", async (req, res) => {
+  try {
+    const [departments, productTypes, processNames] = await Promise.all([
+      QC2Task.distinct("department"),
+      QC2Task.distinct("productType"),
+      QC2Task.distinct("processName")
+    ]);
+    res.json({
+      departments: departments.sort(),
+      productTypes: productTypes.sort(),
+      processNames: processNames.sort()
+    });
+  } catch (error) {
+    console.error("Error fetching task filter options:", error);
+    res.status(500).json({ message: "Server error fetching filter options." });
+  }
+});
+
+// PUT - Update a task by its ID
+app.put("/api/ie/tasks/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { taskNo } = req.body;
+
+    if (taskNo === undefined || isNaN(Number(taskNo))) {
+      return res.status(400).json({ message: "A valid Task No is required." });
+    }
+
+    const updatedTask = await QC2Task.findByIdAndUpdate(
+      id,
+      { taskNo: Number(taskNo) },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedTask) {
+      return res.status(404).json({ message: "Task not found." });
+    }
+    res.json({ message: "Task updated successfully", task: updatedTask });
+  } catch (error) {
+    console.error("Error updating task:", error);
+    res.status(500).json({ message: "Server error updating task." });
+  }
+});
+
+// DELETE - Delete a task by its ID
+app.delete("/api/ie/tasks/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedTask = await QC2Task.findByIdAndDelete(id);
+
+    if (!deletedTask) {
+      return res.status(404).json({ message: "Task not found." });
+    }
+    res.json({ message: "Task deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting task:", error);
+    res.status(500).json({ message: "Server error deleting task." });
   }
 });
 
@@ -5561,6 +5672,10 @@ app.put("/api/qc2-inspection-pass-bundle/:id", async (req, res) => {
 });
 
 // Endpoint to get summary data
+
+// CORRECTED Endpoint to get summary data with all new fields and correct logic
+// FINAL CORRECTED Endpoint to get summary data with all fields calculated correctly
+
 app.get("/api/qc2-inspection-summary", async (req, res) => {
   try {
     const {
@@ -5572,9 +5687,10 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
       size,
       department,
       buyer,
-      lineNo // Add Line No
+      lineNo
     } = req.query;
 
+    // --- Filter logic (This part is correct and remains unchanged) ---
     let match = {};
     if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
     if (emp_id_inspection)
@@ -5587,15 +5703,19 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
     if (lineNo) match.lineNo = lineNo.trim();
-    //if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
 
-    // Normalize and convert dates to Date objects for proper comparison
     if (startDate || endDate) {
-      match.$expr = match.$expr || {}; // Initialize $expr if not present
-      match.$expr.$and = match.$expr.$and || [];
-
+      match.$expr = match.$expr || { $and: [] };
+      const parseDate = (dateStr) => {
+        const [month, day, year] = dateStr.split("/");
+        return new Date(
+          `${year}-${month.padStart(2, "0")}-${day.padStart(
+            2,
+            "0"
+          )}T00:00:00.000Z`
+        );
+      };
       if (startDate) {
-        const normalizedStartDate = normalizeDateString(startDate);
         match.$expr.$and.push({
           $gte: [
             {
@@ -5604,17 +5724,11 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
                 format: "%m/%d/%Y"
               }
             },
-            {
-              $dateFromString: {
-                dateString: normalizedStartDate,
-                format: "%m/%d/%Y"
-              }
-            }
+            parseDate(startDate)
           ]
         });
       }
       if (endDate) {
-        const normalizedEndDate = normalizeDateString(endDate);
         match.$expr.$and.push({
           $lte: [
             {
@@ -5623,49 +5737,59 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
                 format: "%m/%d/%Y"
               }
             },
-            {
-              $dateFromString: {
-                dateString: normalizedEndDate,
-                format: "%m/%d/%Y"
-              }
-            }
+            parseDate(endDate)
           ]
         });
       }
     }
 
     const data = await QC2InspectionPassBundle.aggregate([
+      // Stage 1: Match documents based on user's filters
       { $match: match },
+
+      // Stage 2: Group all matching documents to get the final totals for all fields.
       {
         $group: {
           _id: null,
-          checkedQty: { $sum: "$checkedQty" },
+          totalGarments: { $sum: "$checkedQty" },
           totalPass: { $sum: "$totalPass" },
           totalRejects: { $sum: "$totalRejects" },
           defectsQty: { $sum: "$defectQty" },
+
+          // Repair Left is the sum of the `totalRepair`
+          totalRepair: { $sum: "$totalRepair" },
+
+          // B-Grade Qty calculation
+          sumOfAllRejects: { $sum: "$totalRejects" },
+          sumOfAllVar: { $sum: { $sum: "$printArray.totalRejectGarment_Var" } },
+
           totalBundles: { $sum: 1 }
         }
       },
+
+      // Stage 3: Project the final shape, calculate B-Grade Qty, and rates
       {
         $project: {
           _id: 0,
-          checkedQty: 1,
+          totalGarments: 1,
           totalPass: 1,
           totalRejects: 1,
+          totalRepair: 1,
           defectsQty: 1,
+          bGradeQty: { $subtract: ["$sumOfAllRejects", "$sumOfAllVar"] },
           totalBundles: 1,
           defectRate: {
             $cond: [
-              { $eq: ["$checkedQty", 0] },
+              { $eq: ["$totalGarments", 0] },
               0,
-              { $divide: ["$defectsQty", "$checkedQty"] }
+              { $divide: ["$defectsQty", "$totalGarments"] }
             ]
           },
           defectRatio: {
             $cond: [
-              { $eq: ["$checkedQty", 0] },
+              { $eq: ["$totalGarments", 0] },
               0,
-              { $divide: ["$totalRejects", "$checkedQty"] }
+              { $divide: ["$totalRejects", "$totalGarments"] }
             ]
           }
         }
@@ -5675,10 +5799,13 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     if (data.length > 0) {
       res.json(data[0]);
     } else {
+      // Return a default object with all fields if no data is found
       res.json({
-        checkedQty: 0,
+        totalGarments: 0,
         totalPass: 0,
         totalRejects: 0,
+        totalRepair: 0,
+        bGradeQty: 0,
         defectsQty: 0,
         totalBundles: 0,
         defectRate: 0,
@@ -5690,6 +5817,135 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch summary data" });
   }
 });
+
+// app.get("/api/qc2-inspection-summary", async (req, res) => {
+//   try {
+//     const {
+//       moNo,
+//       emp_id_inspection,
+//       startDate,
+//       endDate,
+//       color,
+//       size,
+//       department,
+//       buyer,
+//       lineNo // Add Line No
+//     } = req.query;
+
+//     let match = {};
+//     if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+//     if (emp_id_inspection)
+//       match.emp_id_inspection = {
+//         $regex: new RegExp(emp_id_inspection.trim(), "i")
+//       };
+//     if (color) match.color = color;
+//     if (size) match.size = size;
+//     if (department) match.department = department;
+//     if (buyer)
+//       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+//     if (lineNo) match.lineNo = lineNo.trim();
+//     //if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
+
+//     // Normalize and convert dates to Date objects for proper comparison
+//     if (startDate || endDate) {
+//       match.$expr = match.$expr || {}; // Initialize $expr if not present
+//       match.$expr.$and = match.$expr.$and || [];
+
+//       if (startDate) {
+//         const normalizedStartDate = normalizeDateString(startDate);
+//         match.$expr.$and.push({
+//           $gte: [
+//             {
+//               $dateFromString: {
+//                 dateString: "$inspection_date",
+//                 format: "%m/%d/%Y"
+//               }
+//             },
+//             {
+//               $dateFromString: {
+//                 dateString: normalizedStartDate,
+//                 format: "%m/%d/%Y"
+//               }
+//             }
+//           ]
+//         });
+//       }
+//       if (endDate) {
+//         const normalizedEndDate = normalizeDateString(endDate);
+//         match.$expr.$and.push({
+//           $lte: [
+//             {
+//               $dateFromString: {
+//                 dateString: "$inspection_date",
+//                 format: "%m/%d/%Y"
+//               }
+//             },
+//             {
+//               $dateFromString: {
+//                 dateString: normalizedEndDate,
+//                 format: "%m/%d/%Y"
+//               }
+//             }
+//           ]
+//         });
+//       }
+//     }
+//     const data = await QC2InspectionPassBundle.aggregate([
+//       { $match: match },
+//       {
+//         $group: {
+//           _id: null,
+//           checkedQty: { $sum: "$checkedQty" },
+//           totalPass: { $sum: "$totalPass" },
+//           totalRejects: { $sum: "$totalRejects" },
+//           defectsQty: { $sum: "$defectQty" },
+//           totalBundles: { $sum: 1 }
+//         }
+//       },
+//       {
+//         $project: {
+//           _id: 0,
+//           checkedQty: 1,
+//           totalPass: 1,
+//           totalRejects: 1,
+//           defectsQty: 1,
+//           totalBundles: 1,
+//           defectRate: {
+//             $cond: [
+//               { $eq: ["$checkedQty", 0] },
+//               0,
+//               { $divide: ["$defectsQty", "$checkedQty"] }
+//             ]
+//           },
+//           defectRatio: {
+//             $cond: [
+//               { $eq: ["$checkedQty", 0] },
+//               0,
+//               { $divide: ["$totalRejects", "$checkedQty"] }
+//             ]
+//           }
+//         }
+//       }
+//     ]);
+
+//     if (data.length > 0) {
+//       res.json(data[0]);
+//     } else {
+//       res.json({
+//         checkedQty: 0,
+//         totalPass: 0,
+//         totalRejects: 0,
+//         defectsQty: 0,
+//         totalBundles: 0,
+//         defectRate: 0,
+//         defectRatio: 0
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Error fetching summary data:", error);
+//     res.status(500).json({ error: "Failed to fetch summary data" });
+//   }
+// });
 
 // Endpoint to get summaries per MO No with dynamic grouping
 
@@ -7333,7 +7589,7 @@ app.post("/api/b-grade-defects/process-decisions", async (req, res) => {
       $inc: {
         totalPass: garmentsChangedToNotBGrade,
         // We also need to find the correct printArray element to decrement its Var count
-        "printArray.$[elem].totalRejectGarment_Var": -garmentsChangedToNotBGrade
+        "printArray.$[elem].totalRejectGarment_Var": garmentsChangedToNotBGrade
       }
     };
     const options = {
@@ -21152,6 +21408,118 @@ app.get("/api/users/search", async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to search for users", error: err.message });
+  }
+});
+
+/* ------------------------------
+   IE - Worker Assignment Endpoints (Corrected for Cross-Database)
+------------------------------ */
+
+// GET - Fetch distinct values for all filters (ONLY from active workers in ym_eco_board)
+app.get("/api/ie/worker-assignment/filter-options", async (req, res) => {
+  try {
+    const workingStatusFilter = { working_status: "Working" };
+    const [empIds, empCodes, departments, sections, jobTitles, taskNos] =
+      await Promise.all([
+        UserMain.distinct("emp_id", workingStatusFilter),
+        UserMain.distinct("emp_code", workingStatusFilter),
+        UserMain.distinct("dept_name", workingStatusFilter),
+        UserMain.distinct("sect_name", workingStatusFilter),
+        UserMain.distinct("job_title", workingStatusFilter),
+        QC2Task.distinct("taskNo")
+      ]);
+    res.json({
+      empIds: empIds.filter(Boolean).sort(),
+      empCodes: empCodes.filter(Boolean).sort(),
+      departments: departments.filter(Boolean).sort(),
+      sections: sections.filter(Boolean).sort(),
+      jobTitles: jobTitles.filter(Boolean).sort(),
+      taskNos: taskNos.filter(Boolean).sort((a, b) => a - b)
+    });
+  } catch (error) {
+    console.error("Error fetching worker assignment filter options:", error);
+    res.status(500).json({ message: "Server error fetching filter options." });
+  }
+});
+
+// POST - Fetch paginated and filtered worker data (from users collection ONLY)
+app.post("/api/ie/worker-assignment/workers", async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 12,
+      emp_id,
+      emp_code,
+      dept_name,
+      sect_name,
+      job_title
+    } = req.body;
+    let filter = { working_status: "Working" };
+    if (emp_id) filter.emp_id = emp_id;
+    if (emp_code) filter.emp_code = emp_code;
+    if (dept_name) filter.dept_name = dept_name;
+    if (sect_name) filter.sect_name = sect_name;
+    if (job_title) filter.job_title = job_title;
+
+    const skip = (page - 1) * limit;
+    const totalUsers = await UserMain.countDocuments(filter);
+    const workers = await UserMain.find(filter)
+      .select(
+        "emp_id emp_code eng_name kh_name job_title dept_name sect_name face_photo"
+      )
+      .sort({ emp_id: 1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    res.json({
+      workers,
+      totalPages: Math.ceil(totalUsers / limit),
+      currentPage: Number(page),
+      totalUsers
+    });
+  } catch (error) {
+    console.error("Error fetching workers:", error);
+    res.status(500).json({ message: "Server error fetching workers." });
+  }
+});
+
+// *** NEW ENDPOINT ***
+// GET - Fetch ALL assigned tasks from the ie_worker_tasks collection
+app.get("/api/ie/worker-assignment/all-tasks", async (req, res) => {
+  try {
+    const allAssignedTasks = await IEWorkerTask.find({}).lean();
+    res.json(allAssignedTasks);
+  } catch (error) {
+    console.error("Error fetching all worker tasks:", error);
+    res
+      .status(500)
+      .json({ message: "Server error fetching all assigned tasks." });
+  }
+});
+
+// PUT - Update a worker's assigned tasks (This endpoint is correct and remains unchanged)
+app.put("/api/ie/worker-assignment/tasks/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const { tasks, emp_code } = req.body;
+    if (!Array.isArray(tasks)) {
+      return res
+        .status(400)
+        .json({ message: "Tasks must be an array of numbers." });
+    }
+    const updatedWorkerTask = await IEWorkerTask.findOneAndUpdate(
+      { emp_id },
+      { $set: { tasks, emp_code } },
+      { new: true, upsert: true, runValidators: true }
+    );
+    res.json({
+      message: "Worker tasks updated successfully",
+      data: updatedWorkerTask
+    });
+  } catch (error) {
+    console.error("Error updating worker tasks:", error);
+    res.status(500).json({ message: "Server error updating tasks." });
   }
 });
 
