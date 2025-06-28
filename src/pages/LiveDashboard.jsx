@@ -58,6 +58,8 @@ const LiveDashboard = () => {
     checkedQty: 0,
     totalPass: 0,
     totalRejects: 0,
+    totalRepair: 0, // Added
+    bGradeQty: 0, // Added
     defectsQty: 0,
     totalBundles: 0,
     defectRate: 0,
@@ -92,9 +94,12 @@ const LiveDashboard = () => {
       console.error("Error fetching summary data:", error);
       // Reset summary data to default values on error
       setSummaryData({
-        checkedQty: 0,
+        totalGarments: 0,
+        //checkedQty: 0,
         totalPass: 0,
         totalRejects: 0,
+        totalRepair: 0, // Added
+        bGradeQty: 0, // Added
         defectsQty: 0,
         totalBundles: 0,
         defectRate: 0,
@@ -287,20 +292,6 @@ const LiveDashboard = () => {
     filtersRef.current = filters;
   }, [moNo, color, size, department, empId, startDate, endDate, buyer, lineNo]);
 
-  // useEffect(() => {
-  //   filtersRef.current = {
-  //     moNo,
-  //     color,
-  //     size,
-  //     department,
-  //     emp_id_inspection: empId,
-  //     startDate: startDate ? formatDate(startDate) : null,
-  //     endDate: endDate ? formatDate(endDate) : null,
-  //     buyer,
-  //     lineNo
-  //   };
-  // }, [moNo, color, size, department, empId, startDate, endDate, buyer, lineNo]);
-
   // Socket.io connection
   useEffect(() => {
     const socket = io(`${API_BASE_URL}`, {
@@ -326,10 +317,10 @@ const LiveDashboard = () => {
 
   // Summary Cards Component (Common for all tabs)
   const SummaryCards = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-4 mb-6">
       <SummaryCard
-        title="Checked Qty"
-        value={summaryData.checkedQty}
+        title="Total Garments"
+        value={summaryData.totalGarments}
         icon="checkCircle"
       />
       <SummaryCard
@@ -338,9 +329,19 @@ const LiveDashboard = () => {
         icon="checkCircle"
       />
       <SummaryCard
-        title="Total Rejects"
+        title="Initial Rejects"
         value={summaryData.totalRejects}
         icon="xCircle"
+      />
+      <SummaryCard
+        title="Repair Left"
+        value={summaryData.totalRepair}
+        icon="wrench"
+      />
+      <SummaryCard
+        title="B Grade Qty"
+        value={summaryData.bGradeQty}
+        icon="alertTriangle"
       />
       <SummaryCard
         title="Defects Qty"

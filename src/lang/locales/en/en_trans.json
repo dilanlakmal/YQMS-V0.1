@@ -31,7 +31,8 @@
     "systemadmin": "System Administration",
     "yqms": "YQMS",
     "b-grade_defect": "B-Grade Defects",
-    "b-grade_stock": "B-Grade Stock"
+    "b-grade_stock": "B-Grade Stock",
+    "ieadmin": "IE Administration"
   },
 
   "nav": {
@@ -948,7 +949,11 @@
     "missingInfo": "Missing Information",
     "confirmDeleteTitle": "Are you sure?",
     "confirmDeleteText": "This action cannot be undone.",
-    "yesDelete": "Yes, delete it!"
+    "yesDelete": "Yes, delete it!",
+    "filters": "Filters",
+    "delete": "Delete",
+    "clear": "Clear",
+    "saved": "Saved!"
   },
 
   "editGar": {
@@ -1802,6 +1807,79 @@
       "isCommon": "Common?",
       "image": "Image",
       "actions": "Actions"
+    }
+  },
+  "ie": {
+    "nav": {
+      "title": "IE Dashboard",
+      "collapse": "Collapse Menu",
+      "expand": "Expand Menu",
+      "task_no": "Task No",
+      "worker_assignment": "Worker Assignment",
+      "data": {
+        "title": "Data",
+        "bundle": "Bundle Generation",
+        "washing": "Washing",
+        "opa": "OPA",
+        "ironing": "Ironing",
+        "qc2": "QC2 Inspection",
+        "packing": "Packing",
+        "rework": "Rework Tracing",
+        "b_grade": "B-Grade Stock"
+      },
+      "toggle_theme": "Toggle Theme",
+      "dark_mode": "Dark Mode",
+      "light_mode": "Light Mode"
+    },
+    "content": {
+      "title": "Content for:",
+      "placeholder": "The component for this section will be built here."
+    },
+    "worker_assignment": {
+      "page_title": "Worker Assignment",
+      "users_found": "user(s) found",
+      "select_tasks": "Select Tasks...",
+      "filter_emp_id": "Emp ID",
+      "filter_emp_code": "Emp Code",
+      "filter_dept": "Department",
+      "filter_sect": "Section",
+      "filter_job": "Job Title",
+      "filter_task": "Has Task No",
+      "table": {
+        "emp_id": "Emp ID",
+        "photo": "Photo",
+        "emp_code": "Emp Code",
+        "eng_name": "Eng Name",
+        "kh_name": "Khmer Name",
+        "job_title": "Job Title",
+        "dept": "Department",
+        "sect": "Section",
+        "tasks": "Assigned Tasks",
+        "action": "Action"
+      }
+    },
+    "task": {
+      "filter": {
+        "page_title": "Task No Adjustment",
+        "department": "Department",
+        "productType": "Product Type",
+        "processName": "Process Name",
+        "taskNo": "Task No..."
+      },
+      "table": {
+        "department": "Department",
+        "productType": "Product Type",
+        "processName": "Process Name",
+        "taskNo": "Task No",
+        "action": "Action"
+      },
+      "save_success": "Task updated successfully!",
+      "save_error": "Failed to update task",
+      "delete_confirm_title": "Are you sure?",
+      "delete_confirm_text": "You won't be able to revert this!",
+      "delete_confirm_button": "Yes, delete it!",
+      "delete_success_title": "Deleted!",
+      "delete_error_title": "Error!"
     }
   }
 }

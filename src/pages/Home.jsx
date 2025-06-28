@@ -120,6 +120,13 @@ function Home() {
           description: "Modify Defect & Measurements"
         },
         {
+          path: "/ieadmin",
+          roles: ["Admin", "IE", "System Administration"], // Matches "System Administration" role
+          image: "assets/Home/ie.png",
+          title: t("home.ieadmin"),
+          description: "IE System Administration"
+        },
+        {
           path: "/yqms",
           roles: ["Admin", "YQMS"], // Matches "YQMS" role
           image: "assets/Home/yqms.png",
