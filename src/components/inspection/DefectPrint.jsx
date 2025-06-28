@@ -1,7 +1,15 @@
 import { Eye, Printer } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { FaFilter, FaTimes, FaChevronDown, FaChevronUp, FaCalendarAlt } from "react-icons/fa"; // Added FaCalendarAlt
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { API_BASE_URL } from "../../../config";
 import QRCodePreview from "../forms/QRCodePreview";
+import { useAuth } from "../authentication/AuthContext"; // Import useAuth
+import { useTranslation } from "react-i18next";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+
+
+
 
 const DefectPrint = ({ bluetoothRef, printMethod }) => {
   const { t } = useTranslation();
@@ -10,10 +18,19 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
   const [searchMoNo, setSearchMoNo] = useState("");
   const [searchPackageNo, setSearchPackageNo] = useState("");
   const [searchRepairGroup, setSearchRepairGroup] = useState("");
+  const getTodayDateString = () => new Date().toISOString().split("T")[0];
+  const { user } = useAuth(); // Use the auth hook
+  const [searchDate, setSearchDate] = useState(getTodayDateString());
+  const [searchTaskNo, setSearchTaskNo] = useState("");
   const [searchStatus, setSearchStatus] = useState("both");
   const [moNoOptions, setMoNoOptions] = useState([]);
   const [packageNoOptions, setPackageNoOptions] = useState([]);
   const [repairGroupOptions, setRepairGroupOptions] = useState([]);
+  const [searchEmpId, setSearchEmpId] = useState(""); // New state for Employee ID
+  const [searchLineNo, setSearchLineNo] = useState(""); // New state for Line No
+  const [empIdOptions, setEmpIdOptions] = useState([]); // New state for Emp ID options
+  const [lineNoOptions, setLineNoOptions] = useState([]); // New state for Line No options
+  const [taskNoOptions, setTaskNoOptions] = useState([]);
   const [selectedCard, setSelectedCard] = useState(null);
   const [showQRPreview, setShowQRPreview] = useState(false);
   const [showFilters, setShowFilters] = useState(true); // State for filter pane visibility
@@ -22,15 +39,10 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage, setRecordsPerPage] = useState(50);
   const [totalRecords, setTotalRecords] = useState(0);
-
-  useEffect(() => {
-    fetchFilterOptions();
-    fetchDefectCards(1, recordsPerPage);
-  }, [mode]);
-
-  useEffect(() => {
-    fetchDefectCards(currentPage, recordsPerPage);
-  }, [currentPage, recordsPerPage]);
+  const [repairTrackingDetails, setRepairTrackingDetails] = useState({});
+  // const isInitialOrModeChange = useRef(true); // To manage initial fetches and mode changes
+  const [empIdPreFocusValue, setEmpIdPreFocusValue] = useState(null); // For datalist workaround
+  const justFocusedEmpId = useRef(false); // For datalist workaround
 
   const fetchDefectCards = async (page, limit, filters = {}) => {
     try {
@@ -39,7 +51,13 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
         mode === "repair"
           ? `${API_BASE_URL}/api/qc2-defect-print/search?page=${page}&limit=${limit}` : `${API_BASE_URL}/api/qc2-inspection-pass-bundle/search?page=${page}&limit=${limit}`;
       const hasSearchParams =
-        filters.moNo || filters.packageNo || filters.repair || filters.status;
+        filters.moNo ||
+        filters.packageNo ||
+        filters.repair ||
+        filters.status || 
+        filters.taskNo || 
+        filters.empId || 
+        filters.lineNo;
 
       if (hasSearchParams) {
         const params = new URLSearchParams();
@@ -54,6 +72,10 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
           params.append("package_no", packageNo.toString());
         }
         if (filters.repair) params.append("repair", filters.repair);
+        if (filters.taskNo) params.append("taskNo", filters.taskNo);
+        if (filters.empId) params.append("emp_id_inspection", filters.empId); // Add emp_id_inspection filter
+        if (filters.lineNo) params.append("line_no", filters.lineNo); // Corrected param name to snake_case
+        if (filters.status && mode === 'bundle') params.append("status", filters.status);
         url += `&${params.toString()}`;
       }
 
@@ -61,8 +83,16 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
       if (!response.ok) throw new Error(`Failed to fetch ${mode} cards`);
       const responseData = await response.json();
 
-      // Safeguard: Ensure data and total are defined
-      const data = Array.isArray(responseData.data) ? responseData.data : [];
+      let data = Array.isArray(responseData.data) ? responseData.data : [];
+
+      // Per your request, filtering for the date is now done on the client-side.
+      // This avoids sending the date to the backend API.
+      if (filters.date) {
+        const [year, month, day] = filters.date.split('-');
+        const formattedSearchDate = `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
+        data = data.filter(card => card.inspection_date && card.inspection_date === formattedSearchDate);
+      }
+
       const total = Number.isInteger(responseData.total)
         ? responseData.total
         : 0;
@@ -92,17 +122,20 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                 defect_print_id: print.defect_print_id,
                 isCompleted: print.isCompleted || false,
                 rejectGarmentsLength: bundle.rejectGarments?.length || 0,
+                taskNo: bundle.taskNo, // Assuming taskNo is available on bundle
+                inspection_date: bundle.inspection_date, // Assuming inspection_date is available on bundle
+                lineNo: bundle.lineNo, // Add lineNo
+                emp_id_inspection: bundle.emp_id_inspection, // Add emp_id_inspection
               }))
-              .filter((card) =>
-                filters.status === "both"
-                  ? true
-                  : filters.status === "inProgress"
-                  ? card.totalRejectGarments > 0
-                  : card.totalRejectGarments === 0
-              ) || []
+              || [] // Return empty array if printArray is nullish
         );
         setDefectCards(bundleQrCards);
-        setTotalRecords(bundleQrCards.length); // Total reflects filtered bundle cards
+        setTotalRecords(total); // Use total from API for correct pagination
+        // Fetch repair tracking details for each bundle card
+      
+        bundleQrCards.forEach((card) => {
+          fetchRepairTracking(card.defect_print_id);
+        });
       }
     } catch (error) {
       console.error(`Error fetching ${mode} cards:`, error);
@@ -127,7 +160,6 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
       setPackageNoOptions(
         Array.isArray(data.package_no) ? data.package_no : []
       );
-      setTaskNoOptions(Array.isArray(data.taskNo) ? data.taskNo : []);
       setRepairGroupOptions(
         mode === "repair" && Array.isArray(data.repair) ? data.repair : []
       );
@@ -145,25 +177,201 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
     }
   };
 
-  const handleSearch = () => {
-    setCurrentPage(1);
-    fetchDefectCards(1, recordsPerPage, {
+  async function fetchRepairTracking(defect_print_id) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/defect-track/${defect_print_id}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      const data = await response.json();
+      // console.log(data);
+      setRepairTrackingDetails((prev) => ({
+        ...prev,
+        [defect_print_id]: data,
+      }));
+    } catch (error) {
+      console.error("Error fetching repair tracking:", error);
+      setRepairTrackingDetails((prev) => ({
+        ...prev,
+        [defect_print_id]: null,
+      }));
+    }
+  }
+
+  // Debounce utility function
+  const debounce = (func, delay) => {
+    let timeoutId;
+    return (...args) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        func.apply(this, args);
+      }, delay);
+    };
+  };
+
+  const applyFiltersAndFetch = useCallback(() => {
+    const filtersToApply = {
       moNo: searchMoNo.trim(),
       packageNo: searchPackageNo.trim(),
       repair: mode === "repair" ? searchRepairGroup.trim() : undefined,
+      date: searchDate,
+      taskNo: searchTaskNo.trim(),
+      empId: searchEmpId.trim(), // Add empId to filters
+      lineNo: searchLineNo.trim(), // Add lineNo to filters
       status: mode === "bundle" ? searchStatus : undefined,
+    };
+
+     if (currentPage !== 1) {// Only reset page if not a mode change and not already on page 1
+      setCurrentPage(1); // This will trigger the pagination useEffect
+    } else {
+      // If already on page 1, fetch directly
+      fetchDefectCards(1, recordsPerPage, filtersToApply);
+    }
+    // If it's a mode change, the pagination useEffect needs to know not to fetch again for page 1
+    // if (isModeChange) {
+    //   isInitialOrModeChange.current = true;
+    // }
+  }, [searchMoNo, searchPackageNo, searchRepairGroup, searchDate, searchTaskNo, searchStatus, searchEmpId, searchLineNo, mode, currentPage, recordsPerPage, setCurrentPage]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedApplyFilters = useCallback(debounce(applyFiltersAndFetch, 700), [applyFiltersAndFetch]);
+
+  // Effect for mode change and initial load
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    fetchFilterOptions();
+    if (user?.emp_id) { // Set default empId on initial load or mode change
+      setSearchEmpId(user.emp_id);
+    }
+    // Initial fetch with default values
+    fetchDefectCards(1, recordsPerPage, {
+      moNo: "",
+      packageNo: "",
+      repair: mode === "repair" ? "" : undefined,
+      date: getTodayDateString(),
+      taskNo: "",
+      empId: user?.emp_id || "",
+      lineNo: "",
+      status: mode === "bundle" ? "both" : undefined,
     });
-  };
+  }, [mode, user, recordsPerPage]);
+
+  // Effect for filter input changes (excluding mode, currentPage, recordsPerPage)
+  useEffect(() => {
+     if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return; // Skip initial render
+    }
+    debouncedApplyFilters(); // Trigger debounced fetch
+  }, [searchMoNo, searchPackageNo, searchRepairGroup, searchDate, searchTaskNo, searchStatus, searchEmpId, searchLineNo, debouncedApplyFilters]);
+
+  // Effect for pagination (currentPage or recordsPerPage changes)
+  useEffect(() => {
+    // This effect runs whenever pagination or filters change.
+    const filtersToApply = {
+      moNo: searchMoNo.trim(),
+      packageNo: searchPackageNo.trim(),
+      repair: mode === "repair" ? searchRepairGroup.trim() : undefined,
+      date: searchDate,
+      taskNo: searchTaskNo.trim(),
+      empId: searchEmpId.trim(),
+      lineNo: searchLineNo.trim(),
+      status: mode === "bundle" ? searchStatus : undefined,
+    };
+    fetchDefectCards(currentPage, recordsPerPage, filtersToApply);
+  }, [currentPage, recordsPerPage, searchMoNo, searchPackageNo, searchRepairGroup, searchDate, searchTaskNo, searchStatus, searchEmpId, searchLineNo, mode]);
 
   const handleResetFilters = () => {
     setSearchMoNo("");
     setSearchPackageNo("");
     setSearchRepairGroup("");
+    setSearchDate(getTodayDateString());
+    setSearchTaskNo("");
+    setSearchEmpId(user?.emp_id || ""); // Reset to default or empty
+    setSearchLineNo(""); // Reset Line No
     setSearchStatus("both");
-    setCurrentPage(1);
-    fetchDefectCards(1, recordsPerPage, {});
+    // After resetting states, trigger a search which will reset to page 1 and fetch with empty filters
+    // We call applyFiltersAndFetch directly here, not the debounced one, for immediate reset.
+    setCurrentPage(1); // Reset page to 1
+    // Explicitly call fetchDefectCards with reset filters to ensure immediate update
+    fetchDefectCards(1, recordsPerPage, {
+      moNo: "",
+      packageNo: "",
+      repair: mode === "repair" ? "" : undefined,
+      date: getTodayDateString(),
+      taskNo: "",
+      empId: user?.emp_id || "",
+      lineNo: "",
+      status: mode === "bundle" ? "both" : undefined,
+    });
   };
 
+  // Handlers for Emp ID input to show all datalist options (copied from QC2Data.jsx)
+  const handleEmpIdFocus = (event) => {
+    // Only clear and store if there's a value, otherwise ensure preFocus is null
+    if (event.target.value !== "") {
+      setEmpIdPreFocusValue(event.target.value);
+      setSearchEmpId(""); // Clear the input to show all datalist options
+      justFocusedEmpId.current = true; // Mark that focus handler initiated the clear
+    } else {
+      setEmpIdPreFocusValue(null); // Ensure no stale preFocusValue if field is already empty
+      justFocusedEmpId.current = false; // Not a focus-initiated clear
+    }
+  };
+
+  const handleEmpIdChange = (e) => {
+    justFocusedEmpId.current = false; // User is typing/selecting, overrides focus-initiated clear
+    setSearchEmpId(e.target.value);
+  };
+
+  const handleEmpIdBlur = () => {
+    // If: 1. The input is currently empty. 2. The emptiness was due to the onFocus handler clearing it. 3. There was a value before focus.
+    // Then, restore the pre-focus value.
+    if (searchEmpId === "" && justFocusedEmpId.current && empIdPreFocusValue) {
+      setSearchEmpId(empIdPreFocusValue);
+    }
+    justFocusedEmpId.current = false; // Reset flag for next interaction
+    setEmpIdPreFocusValue(null);    // Clear stored pre-focus value
+  };
+
+  const formatTime12Hour = (timeString) => {
+    if (!timeString) return "N/A"; // Handle empty cases
+  
+    const [hours, minutes] = timeString.split(":").map(Number); // Convert to numbers
+    const ampm = hours >= 12 ? "PM" : "AM"; // Determine AM/PM
+    const formattedHours = hours % 12 || 12; // Convert 0 to 12 for AM/PM format
+  
+    return `${formattedHours}:${String(minutes).padStart(2, "0")} ${ampm}`; // Format properly
+  };
+
+  const formatDateForDisplay = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "N/A"; // Check if date is valid
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are zero-based
+      const year = date.getFullYear();
+      return `${month}/${day}/${year}`;
+    } catch (error) {
+      console.error("Error formatting date:", dateString, error);
+      return "N/A";
+    }
+  };
+
+  const parseDateForPicker = (dateString) => {
+    if (!dateString) return null;
+    if (dateString instanceof Date) return dateString; // Already a Date object
+    // Expect YYYY-MM-DD
+    const parts = dateString.split("-");
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+      const day = parseInt(parts[2], 10);
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) return new Date(year, month, day);
+    }
+    return null; // Invalid date string
+  };
   const handlePreviewQR = (card) => {
     setSelectedCard(card);
     setShowQRPreview(true);
@@ -178,11 +386,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
     try {
       setPrintDisabled(true);
       setTimeout(() => setPrintDisabled(false), 5000);
-      if (mode === "repair") {
-        await bluetoothRef.current.printDefectData(card);
-      } else if (mode === "garment") {
-        await bluetoothRef.current.printGarmentDefectData(card);
-      } else if (mode === "bundle") {
+       if (mode === "bundle") {
         await bluetoothRef.current.printBundleDefectData(card);
       }
       alert("QR code printed successfully!");
@@ -205,80 +409,114 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
 
   return (
     <div className="p-6 h-full flex flex-col bg-gray-100">
-      {/* Mode Selection and Filters */}
-      <div className="bg-white p-4 rounded-lg shadow-md mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="col-span-1">
-            <label className="block mb-1 text-sm font-semibold text-gray-700">
-              Mode
-            </label>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setMode("repair")}
-                className={`p-2 rounded border ${
-                  mode === "repair" ? "bg-blue-600 text-white" : "bg-gray-200"
-                }`}
-              >
-                By Repair
-              </button>
+      <div className={`bg-white rounded-xl shadow-xl p-4 mb-6 ${!showFilters ? "pb-1" : ""}`}>
+        <div className="flex justify-between items-center mb-3"> 
+          <h2 className="text-base md:text-lg font-semibold text-gray-700 flex items-center"> 
+            <FaFilter className="mr-2 text-indigo-600" />
+            {t("defectPrint.filtersTitle", "Filters")}
+          </h2>
+          <div className="flex items-center space-x-2"> 
+            <button
+              type="button" // Specify type for button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center text-xs md:text-sm text-indigo-600 hover:text-indigo-800 font-medium p-1.5 rounded-md hover:bg-indigo-50 transition-colors" // Styled like DynamicFilterPane toggle
+              aria-label={
+                showFilters
+                  ? t("defectPrint.hideFilters", "Hide Filters")
+                  : t("defectPrint.showFilters", "Show Filters")
+              }
+            >
+              
+              {showFilters ? <FaChevronUp size={14} /> : <FaChevronDown size={14} />}
+              <span className="ml-1"> 
+                {showFilters
+                  ? t("defectPrint.hideFilters", "Hide Filters")
+                  : t("defectPrint.showFilters", "Show Filters")}
+              </span>
+            </button>
+            {showFilters && ( 
               <button
                 type="button"
                 onClick={handleResetFilters}
                 className="p-1.5 text-gray-800  bg-red-100 hover:text-gary-900 brder rounded-md hover:bg-red-500 transition-colors"
                 title={t("defectPrint.clearFilters", "Clear Filters")}
               >
-                By Garment
-              </button>
-              <button
-                onClick={() => setMode("bundle")}
-                className={`p-2 rounded border ${
-                  mode === "bundle" ? "bg-blue-600 text-white" : "bg-gray-200"
-                }`}
-              >
-                By Bundle
-              </button>
+                Clear
+              </button> 
+            )}
+          </div>
+        </div>
+
+        {showFilters && (
+          <form onSubmit={(e) => { e.preventDefault(); }} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3 md:gap-4 mb-1 transition-all duration-300 ease-in-out">
+           <div className="flex flex-col">
+              <label htmlFor="filterDate" className="text-xs font-medium text-gray-600 mb-1 flex items-center">
+                <FaCalendarAlt className="mr-1.5 text-gray-400" />
+                {t("filters.date", "Date")}
+              </label> 
+              <DatePicker 
+                selected={parseDateForPicker(searchDate)} 
+                onChange={(date) => {
+                  if (date) {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0'); // getMonth is 0-indexed
+                    const day = String(date.getDate()).padStart(2, '0');
+                    setSearchDate(`${year}-${month}-${day}`);
+                  } else {
+                    setSearchDate("");
+                  }
+                }}
+                dateFormat="MM/dd/yyyy"
+                className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                id="filterDate"
+                placeholderText={t("filters.select_date", "Select date")}
+                popperClassName="datepicker-popper-above-header z-50"
+              />
             </div>
-          </div>
-          <div>
-            <label className="block mb-1 text-sm font-semibold text-gray-700">
-              MO No
-            </label>
-            <input
-              type="text"
-              value={searchMoNo}
-              onChange={(e) => setSearchMoNo(e.target.value)}
-              placeholder="Search MO No"
-              list="moNoList"
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-            />
-            <datalist id="moNoList">
-              {moNoOptions.map((option) => (
-                <option key={option} value={option} />
-              ))}
-            </datalist>
-          </div>
-          <div>
-            <label className="block mb-1 text-sm font-semibold text-gray-700">
-              Package No
-            </label>
-            <input
-              type="text"
-              value={searchPackageNo}
-              onChange={(e) => setSearchPackageNo(e.target.value)}
-              placeholder="Search Package No"
-              list="packageNoList"
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-            />
-            <datalist id="packageNoList">
-              {packageNoOptions.map((option) => (
-                <option key={option} value={option} />
-              ))}
-            </datalist>
-          </div>
-          {mode === "repair" && (
-            <div>
-              <label className="block mb-1 text-sm font-semibold text-gray-700">
-                Repair Group
+            
+            <div className="flex flex-col"> 
+              <label htmlFor="moNoFilter" className="text-xs font-medium text-gray-600 mb-1"> 
+                {t("bundle.mono")}
+              </label>
+              <input
+                id="moNoFilter" 
+                type="text"
+                value={searchMoNo}
+                onChange={(e) => setSearchMoNo(e.target.value)}
+                placeholder={t("bundle.search_mono")}
+                list="moNoList"
+                className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm" // Styled input
+              />
+              <datalist id="moNoList">
+                {moNoOptions.map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
+            </div>
+            
+            <div className="flex flex-col"> 
+              <label htmlFor="packageNoFilter" className="text-xs font-medium text-gray-600 mb-1"> 
+                {t("bundle.package_no")}
+              </label>
+              <input
+                id="packageNoFilter" // Added ID for label association
+                type="text"
+                value={searchPackageNo}
+                onChange={(e) => setSearchPackageNo(e.target.value)}
+                placeholder={t("defectPrint.search_package")}
+                list="packageNoList"
+                className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm" // Styled input
+              />
+              <datalist id="packageNoList">
+                {packageNoOptions.map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
+            </div>
+
+            {/* <div className="flex flex-col">
+              <label htmlFor="taskNoFilter" className="text-xs font-medium text-gray-600 mb-1">
+                {t("qc2In.taskNo", "Task No")}
               </label>
               <input
                 id="taskNoFilter"
@@ -318,74 +556,55 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                 ))}
               </datalist>
             </div>
-          )}
-          {mode === "bundle" && (
-            <div>
-              <label className="block mb-1 text-sm font-semibold text-gray-700">
-                Status
+
+            {/* New Line No Filter */}
+            <div className="flex flex-col">
+              <label htmlFor="lineNoFilter" className="text-xs font-medium text-gray-600 mb-1">
+                {t("bundle.line_no")}
               </label>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setSearchStatus("inProgress")}
-                  className={`p-2 rounded border ${
-                    searchStatus === "inProgress"
-                      ? "bg-yellow-600 text-white"
-                      : "bg-gray-200"
-                  }`}
-                >
-                  In Progress
-                </button>
-                <button
-                  onClick={() => setSearchStatus("completed")}
-                  className={`p-2 rounded border ${
-                    searchStatus === "completed"
-                      ? "bg-green-600 text-white"
-                      : "bg-gray-200"
-                  }`}
-                >
-                  Completed
-                </button>
-                <button
-                  onClick={() => setSearchStatus("both")}
-                  className={`p-2 rounded border ${
-                    searchStatus === "both"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200"
-                  }`}
-                >
-                  Both
-                </button>
-              </div>
+              <input
+                id="lineNoFilter"
+                type="text"
+                value={searchLineNo}
+                onChange={(e) => setSearchLineNo(e.target.value)}
+                placeholder={t("bundle.search_line_no", "Search Line No")}
+                list="lineNoList"
+                className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+              />
+              <datalist id="lineNoList">
+                {lineNoOptions.map((option) => (
+                  <option key={`ln-${option}`} value={option} />
+                ))}
+              </datalist>
             </div>
-          )}
-          <div className="flex items-end gap-2">
-            <button
-              onClick={handleSearch}
-              disabled={loading}
-              className={`w-full py-2 px-4 rounded-md text-white font-semibold transition duration-200 ${
-                loading
-                  ? "bg-blue-400 cursor-not-allowed"
-                  : "bg-blue-600 hover:bg-blue-700"
-              }`}
-            >
-              {loading ? "Searching..." : "Apply"}
-            </button>
-            <button
-              onClick={handleResetFilters}
-              disabled={loading}
-              className={`w-full py-2 px-4 rounded-md text-white font-semibold transition duration-200 ${
-                loading
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-gray-600 hover:bg-gray-700"
-              }`}
-            >
-              Reset
-            </button>
-          </div>
-        </div>
+            
+            {mode === "bundle" && (
+              <div className="flex flex-col"> 
+                <label htmlFor="statusFilter" className="text-xs font-medium text-gray-600 mb-1"> {/* Styled label and added htmlFor */}
+                  {t("defectPrint.status")}
+                </label>
+                  <select
+                    value={searchStatus}
+                    id="statusFilter"
+                    onChange={(e) => setSearchStatus(e.target.value)}
+                    className="w-full px-3 py-1.5 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm" // Styled select
+                  >
+                    <option value="both">{t("defectPrint.both", "Both")}</option>
+                    <option value="inProgress">
+                      {t("defectPrint.in_progress", "In Progress")}
+                    </option>
+                    <option value="completed">
+                      {t("defectPrint.completed", "Completed")}
+                    </option>
+                  </select>
+                </div>
+              )}
+          </form>
+          
+        )}
       </div>
 
-      {/* Records Per Page and Pagination */}
+     
       <div className="mb-4 text-sm text-gray-700">
         <div className="flex justify-between items-center mb-2">
           
@@ -403,7 +622,8 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
               ))}
             </select>
           </div>
-          <div>Total Records: {totalRecords}</div>
+          
+          <div>{t("downDa.total_record")}: {totalRecords}</div>
         </div>
         <div className="flex justify-between items-center">
           <button
@@ -458,7 +678,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
         </div>
       </div>
 
-      {/* Table */}
+      
       {loading ? (
         <div className="flex justify-center items-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -479,13 +699,13 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
             <table className="w-full border-collapse">
               <thead className="bg-gray-200 sticky top-0 z-10">
                 <tr>
-                  {mode === "repair" ? (
+                  { mode === "bundle" ? (
                     <>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                         {t("bundle.package_no")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Package No
+                        {t("bundle.action")}
                       </th>
                       {/* <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                         {t("qc2In.taskNo", "Task No")}
@@ -494,31 +714,28 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                         {t("qc2In.date", "Date")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Cust. Style
+                        {t("bundle.line_no")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Color
+                        {t("bundle.emp_id")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Size
+                        {t("defectPrint.status")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Repair Group
+                        {t("bundle.mono")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Defect Count
+                        {t("bundle.customer_style")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Defect Details
+                        {t("bundle.color")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Action
+                        {t("bundle.size")}
                       </th>
-                    </>
-                  ) : mode === "garment" ? (
-                    <>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Package No
+                        {t("defectPrint.checked")}
                       </th>
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
                         {t("defectPrint.defectsN")}
@@ -530,52 +747,29 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                         {t("defectPrint.reworking")}
                       </th> */}
                       <th className="py-3 px-4 border-b border-gray-300 font-semibold text-sm text-gray-700">
-                        Print Details
+                        {t("preview.defect_details")}
+                        <div className="flex justify-between text-xs mt-1 border-t border-gray-300 pt-1">
+                          <span className="w-1/6 border-r border-l border-gray-300 font-semibold text-sm text-gray-700">Station</span>
+                          <span className="w-1/6 border-r border-gray-300 font-semibold text-sm text-gray-700">Defect name</span>
+                          <span className="w-1/6 border-r border-gray-300 font-semibold text-sm text-gray-700">Count</span>
+                          <span className="w-1/6 border-r border-gray-300 font-semibold text-sm text-gray-700">Status</span>
+                          <span className="w-1/6 border-r border-gray-300 font-semibold text-sm text-gray-700">Repair Date</span>
+                          <span className="w-1/6 border-r border-gray-300 font-semibold text-sm text-gray-700">Repair Time</span>
+                        </div>
                       </th>
                     </>
                   ) : null}
                 </tr>
               </thead>
               <tbody className="overflow-y-auto">
-                {mode === "repair"
+                { mode === "bundle"
                   ? defectCards.map((card) => (
-                      <tr key={card.defect_id} className="hover:bg-gray-50">
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {card.factory || "N/A"}
-                        </td>
+                      <tr
+                        key={card.defect_print_id}
+                        className="hover:bg-gray-50"
+                      >
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           {card.package_no || "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {card.moNo || "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {card.custStyle || "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {card.color || "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {card.size || "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {card.repair || "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {card.count_print || "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {card.defects && Array.isArray(card.defects)
-                            ? card.defects.map((defect) => (
-                                <div
-                                  key={defect.defectName}
-                                  className="flex justify-between text-sm"
-                                >
-                                  <span>{defect.defectName}:</span>
-                                  <span>{defect.count}</span>
-                                </div>
-                              ))
-                            : "No defects"}
                         </td>
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           <button
@@ -596,97 +790,17 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                             <Printer className="inline" />
                           </button>
                         </td>
-                      </tr>
-                    ))
-                  : mode === "garment"
-                  ? defectCards.flatMap((card) =>
-                      (card.rejectGarments &&
-                      Array.isArray(card.rejectGarments) &&
-                      card.rejectGarments.length > 0
-                        ? card.rejectGarments
-                        : []
-                      ).map((garment) => (
-                        <tr
-                          key={`${card.bundle_id}-${garment.garment_defect_id}`}
-                          className="hover:bg-gray-50"
-                        >
-                          <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                            {card.package_no || "N/A"}
-                          </td>
-                          <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                            {card.moNo || "N/A"}
-                          </td>
-                          <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                            {card.custStyle || "N/A"}
-                          </td>
-                          <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                            {card.color || "N/A"}
-                          </td>
-                          <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                            {card.size || "N/A"}
-                          </td>
-                          <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                            {garment.totalCount || "N/A"}
-                          </td>
-                          <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                            {garment.defects && Array.isArray(garment.defects)
-                              ? garment.defects.map((defect) => (
-                                  <div
-                                    key={defect.name}
-                                    className="flex justify-between text-sm"
-                                  >
-                                    <span>{defect.name}:</span>
-                                    <span>{defect.count}</span>
-                                  </div>
-                                ))
-                              : "No defects"}
-                          </td>
-                          <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                            <button
-                              onClick={() =>
-                                handlePreviewQR({
-                                  ...card,
-                                  rejectGarments: [garment],
-                                })
-                              }
-                              className="text-blue-500 hover:text-blue-700 mr-2"
-                            >
-                              <Eye className="inline" />
-                            </button>
-                            <button
-                              onClick={() =>
-                                handlePrintQR({
-                                  ...card,
-                                  rejectGarments: [garment],
-                                })
-                              }
-                              disabled={printDisabled}
-                              className={`text-blue-500 hover:text-blue-700 ${
-                                printDisabled
-                                  ? "opacity-50 cursor-not-allowed"
-                                  : ""
-                              }`}
-                            >
-                              <Printer className="inline" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )
-                  : mode === "bundle"
-                  ? defectCards.map((card) => (
-                      <tr
-                        key={card.defect_print_id}
-                        className="hover:bg-gray-50"
-                      >
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {card.package_no || "N/A"}
-                        </td>
-                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                        {/* <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           {card.taskNo || "N/A"}
-                        </td>
+                        </td> */}
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           {formatDateForDisplay(card.inspection_date) || "N/A"}
+                        </td>
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          {card.lineNo || "N/A"}
+                        </td>
+                        <td className="py-2 px-4 border-b border-gray-200 text-sm">
+                          {card.emp_id_inspection || "N/A"}
                         </td>
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
                           <span
@@ -729,29 +843,46 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
                             : card.totalRejectGarments || "N/A"}
                         </td> */}
                         <td className="py-2 px-4 border-b border-gray-200 text-sm">
-                          {card.printData && Array.isArray(card.printData)
-                            ? card.printData.flatMap((garment) =>
-                                garment.defects &&
-                                Array.isArray(garment.defects) ? (
-                                  garment.defects.map((defect) => (
-                                    <div
-                                      key={`${garment.garmentNumber}-${defect.name}`}
-                                      className="text-sm"
-                                    >
-                                      ({garment.garmentNumber}) {defect.name}:{" "}
-                                      {defect.count}
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div
-                                    key={garment.garmentNumber}
-                                    className="text-sm"
+                          {repairTrackingDetails[card.defect_print_id] === undefined ? (
+                            <div>Loading...</div>
+                          ) : repairTrackingDetails[card.defect_print_id] === null ? (
+                            <div>Error loading details</div>
+                          ) : repairTrackingDetails[card.defect_print_id].garments && repairTrackingDetails[card.defect_print_id].garments.length > 0 ? (
+                            repairTrackingDetails[card.defect_print_id].garments.map((garment, garmentIndex) => (
+                              garment.defects.map((defect, defectIndex) => (
+                                <div
+                                    key={`${garmentIndex}-${defectIndex}`}
+                                    className={`flex justify-between text-xs mb-1 py-2 px-4 rounded-md 
+                                      ${
+                                        defect.status === "OK"
+                                          ? "bg-green-100" // Light Green background
+                                          : defect.status === "Not Repaired"
+                                          ? "bg-yellow-100" // Light Yellow background
+                                          : "bg-red-100" // Light Red background
+                                      }`}
                                   >
-                                    ({garment.garmentNumber}) No defects
-                                  </div>
-                                )
-                              )
-                            : "No print data"}
+                                   <span className="w-1/6 py-2 px-4 border-r border-l border-gray-200 text-sm">{defect.repair || "N/A"}</span>
+                                  <span className="w-1/6 py-2 px-4 border-r border-gray-200 text-sm">{defect.name || "N/A"}</span>
+                                  <span className="w-1/6 py-2 px-4 border-r border-gray-200 text-sm text-center">{defect.count || "N/A"}</span>
+                                  <span
+                                        className={`w-1/6 py-2 px-4 inline-block items-center text-xs font-medium text-center rounded-md ${
+                                          defect.status === "OK"
+                                            ? "bg-green-400"
+                                            : defect.status === "Not Repaired"
+                                            ? "bg-yellow-400"
+                                            : "bg-red-400"
+                                        }`}
+                                      >
+                                        {defect.status || "N/A"}
+                                      </span>
+                                  <span className="w-1/6 py-2 px-4 border-r border-gray-200 text-sm">{defect.repair_date || "N/A"}</span>
+                                  <span className="w-1/6 py-2 px-4 border-r border-gray-200 text-sm">{formatTime12Hour(defect.repair_time) || "N/A"}</span>
+                                </div>
+                              ))
+                            ))
+                          ) : (
+                            <div>No details</div>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -770,8 +901,7 @@ const DefectPrint = ({ bluetoothRef, printMethod }) => {
         mode={
           mode === "repair"
             ? "inspection"
-            : mode === "garment"
-            ? "garment"
+           
             : "bundle"
         }
       />
