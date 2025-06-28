@@ -29,7 +29,9 @@
     "download_data": "Download Data",
     "live_dashboard": "Live Dashboard",
     "systemadmin": "System Administration",
-    "yqms": "YQMS"
+    "yqms": "YQMS",
+    "b-grade_defect": "B-Grade Defects",
+    "b-grade_stock": "B-Grade Stock"
   },
 
   "nav": {
@@ -71,7 +73,7 @@
   "pack": {
     "header": "Packing Process Scanner",
     "card": "Scan the QR code on the bundle to record packing details",
-    "packing_id": "Packing ID",
+    "packing_id": "Card Type",
     "pass_qty": "Pass Qty (Pack)"
   },
 
@@ -1435,6 +1437,37 @@
     "deletedSuccess": "Scratch Test Defect has been deleted.",
     "failedToDelete": "Failed to delete Scratch Test defect.",
     "failedToFetch": "Failed to fetch Scratch Test defects."
+  },
+
+  "sccEmbDefects": {
+    "manageTitle": "Manage EMB Defects",
+    "addNew": "Add New Defect",
+    "cancelAdd": "Cancel Add",
+    "addNewFormTitle": "Add New EMB Defect",
+    "defectNo": "Defect No.",
+    "defectNameEng": "Defect Name (EN)",
+    "defectNameKhmer": "Defect Name (KH)",
+    "defectNameChinese": "Defect Name (CH) (Optional)",
+    "defectNoPlaceholder": "Enter Defect No.",
+    "defectNameEngPlaceholder": "Enter English Name",
+    "defectNameKhmerPlaceholder": "Enter Khmer Name",
+    "defectNameChinesePlaceholder": "Enter Chinese Name (Optional)",
+    "searchPlaceholder": "Search by No. or name...",
+    "loading": "Loading EMB defects...",
+    "noDefectsFound": "No EMB defects found.",
+    "tryDifferentSearch": "Try adjusting your search terms.",
+    "validation": {
+      "fillRequired": "Defect No., English Name, and Khmer Name are required.",
+      "fillRequiredNew": "Defect No. must be a positive number. English and Khmer names are required."
+    },
+    "updatedSuccess": "EMB Defect updated successfully.",
+    "failedToUpdate": "Failed to update EMB defect.",
+    "addedSuccess": "EMB Defect added successfully.",
+    "failedToAdd": "Failed to add EMB defect.",
+    "confirmDeleteMsg": "You won't be able to revert this EMB defect!",
+    "deletedSuccess": "EMB Defect has been deleted.",
+    "failedToDelete": "Failed to delete EMB defect.",
+    "failedToFetch": "Failed to fetch EMB defects."
   },
 
   "systemAdmin": {

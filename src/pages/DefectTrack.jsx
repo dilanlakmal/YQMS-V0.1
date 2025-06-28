@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { API_BASE_URL } from "../../config";
 import Swal from "sweetalert2";
 import QrCodeScannerRepair from "../components/forms/QrCodeScannerRepair";
@@ -19,9 +19,17 @@ import {
   Box,
   CircularProgress
 } from "@mui/material";
-import { CheckCircle, AlertTriangle, Ban } from "lucide-react";
+import {
+  CheckCircle,
+  AlertTriangle,
+  Ban,
+  CalendarDays,
+  Clock
+} from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const DefectTrack = () => {
+  const { t } = useTranslation(); // Add translation hook
   const { user, loading: authLoading } = useAuth();
   const [scannedData, setScannedData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -29,6 +37,13 @@ const DefectTrack = () => {
   const [language, setLanguage] = useState("khmer");
   const [showScanner, setShowScanner] = useState(true);
   const [defectsMasterList, setDefectsMasterList] = useState([]);
+  const [currentTime, setCurrentTime] = useState(new Date()); // Add currentTime state
+
+  // Add useEffect for the clock
+  useEffect(() => {
+    const timerId = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timerId);
+  }, []);
 
   // This useEffect to fetch master defects is correct and unchanged.
   useEffect(() => {
@@ -44,6 +59,35 @@ const DefectTrack = () => {
     };
     fetchAllDefects();
   }, []);
+
+  // Create the PageTitle component, exactly like in Packing.jsx
+  const PageTitle = useCallback(
+    () => (
+      <div className="text-center">
+        <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
+          Yorkmars (Cambodia) Garment MFG Co., LTD
+        </h1>
+        <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-0.5 md:mt-1">
+          {t("defectTrack.header", "Repair Tracking")}{" "}
+          {/* Using a new translation key */}
+          {user && ` | ${user.job_title || "Operator"} | ${user.emp_id}`}
+        </p>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1 flex flex-wrap justify-center items-center">
+          <span className="mx-1.5 text-slate-400">|</span>
+          <CalendarDays className="w-3.5 h-3.5 mr-1 text-slate-500" />
+          <span className="text-slate-700">
+            {currentTime.toLocaleDateString()}
+          </span>
+          <span className="mx-1.5 text-slate-400">|</span>
+          <Clock className="w-3.5 h-3.5 mr-1 text-slate-500" />
+          <span className="text-slate-700">
+            {currentTime.toLocaleTimeString()}
+          </span>
+        </p>
+      </div>
+    ),
+    [t, user, currentTime]
+  );
 
   // This function is correct and unchanged.
   const onScanSuccess = async (decodedText) => {
@@ -133,43 +177,63 @@ const DefectTrack = () => {
     setLoading(true);
 
     try {
-      // Correctly identify garments that have at least one B-Grade defect
-      const bGradeGarments = scannedData.garments.filter((g) =>
-        g.defects.some((d) => d.status === "B Grade")
+      // 1. Fetch the bundle_random_id needed for the B-Grade record.
+
+      const bundleResponse = await fetch(
+        `${API_BASE_URL}/api/qc2-inspection-pass-bundle-by-defect-print-id/${scannedData.defect_print_id}`
       );
+      if (!bundleResponse.ok) {
+        // If this fails, we can still proceed with saving repair tracking, but we'll warn the user.
+        console.warn(
+          "Could not find the parent inspection bundle. B-Grade records will not be created."
+        );
+      } else {
+        const bundleData = await bundleResponse.json();
+        const bundle_random_id = bundleData.bundle_random_id;
 
-      for (const garment of bGradeGarments) {
-        const now = new Date();
-        const garmentDataForBGrade = {
-          garmentNumber: garment.garmentNumber,
-          record_date: now.toLocaleDateString("en-US"),
-          record_time: now.toLocaleTimeString("en-US", { hour12: false }),
-          defectDetails: garment.defects.map((d) => ({
-            defectName: d.name,
-            defectCount: d.count,
-            status: d.status
-          }))
-        };
+        // 2. Identify garments that have at least one 'B Grade' defect.
+        const bGradeGarments = scannedData.garments.filter((g) =>
+          g.defects.some((d) => d.status === "B Grade")
+        );
 
-        const headerData = {
-          package_no: scannedData.package_no,
-          moNo: scannedData.moNo,
-          custStyle: scannedData.custStyle,
-          color: scannedData.color,
-          size: scannedData.size,
-          lineNo: scannedData.lineNo,
-          department: scannedData.department
-        };
+        // 3. Loop through them and send a request for EACH new B-Grade garment.
+        for (const garment of bGradeGarments) {
+          const now = new Date();
+          const garmentDataForBGrade = {
+            garmentNumber: garment.garmentNumber,
+            record_date: now.toLocaleDateString("en-US"),
+            record_time: now.toLocaleTimeString("en-US", { hour12: false }),
+            defectDetails: garment.defects.map((d) => ({
+              defectName: d.name,
+              defectCount: d.count,
+              status: d.status
+            }))
+          };
 
-        await fetch(`${API_BASE_URL}/api/qc2-bgrade`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            defect_print_id: scannedData.defect_print_id,
-            garmentData: garmentDataForBGrade,
-            headerData
-          })
-        });
+          if (garmentDataForBGrade.defectDetails.length === 0) continue;
+
+          const headerData = {
+            package_no: scannedData.package_no,
+            moNo: scannedData.moNo,
+            custStyle: scannedData.custStyle,
+            color: scannedData.color,
+            size: scannedData.size,
+            lineNo: scannedData.lineNo,
+            department: scannedData.department
+          };
+
+          // This calls original B-Grade endpoint with the new ID.
+          await fetch(`${API_BASE_URL}/api/qc2-bgrade`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              defect_print_id: scannedData.defect_print_id,
+              bundle_random_id: bundle_random_id, // Pass the ID here
+              garmentData: garmentDataForBGrade,
+              headerData
+            })
+          });
+        }
       }
 
       const repairArray = scannedData.garments.flatMap((garment) =>
@@ -283,9 +347,9 @@ const DefectTrack = () => {
           p: 3
         }}
       >
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 text-center">
-          Repair Tracking
-        </h1>
+        {/* Render the PageTitle component here */}
+        <PageTitle />
+
         {showScanner && (
           <div className="text-center mb-4">
             <QrCodeScannerRepair

@@ -209,9 +209,16 @@ function Home() {
         {
           path: "/b-grade-defect",
           roles: ["Admin", "QC2 Inspection"], // Matches "QC2 Inspection" role
-          image: "assets/Home/qc2.png",
+          image: "assets/Home/bgrade.png",
           title: t("home.b-grade_defect"),
           description: "B-Grade defects Check Point."
+        },
+        {
+          path: "/b-grade-stcok",
+          roles: ["Admin", "QC2 Inspection"], // Matches "QC2 Inspection" role
+          image: "assets/Home/bgrade.png",
+          title: t("home.b-grade_stock"),
+          description: "B-Grade Stock."
         }
       ]
     },

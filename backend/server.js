@@ -7,6 +7,7 @@ import https from "https";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import multer from "multer";
+import sharp from "sharp";
 import path from "path";
 import { fileURLToPath } from "url";
 import createIroningModel from "./models/Ironing.js";
@@ -4080,178 +4081,161 @@ app.get("/api/opa-records/distinct-filters", async (req, res) => {
 //    End Points - Packing
 // ------------------------------ */
 
-// New Endpoint to Get Bundle by Random ID (from qc2_inspection_pass_bundle for order cards)
-app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
-  try {
-    const randomId = req.params.randomId.trim(); // Trim to avoid whitespace issues
-    console.log("Searching for bundle_random_id:", randomId);
+// ENDPOINT 1: Get data for a scanned card (Order or Defect) and check for uniqueness.
+// This is the primary endpoint the scanner will call.
+app.post("/api/packing/get-scan-data", async (req, res) => {
+  const { randomId, taskNo } = req.body;
 
-    // First, check qc2_inspection_pass_bundle for order card
-    const bundle = await QC2InspectionPassBundle.findOne({
-      bundle_random_id: randomId,
-      "printArray.isCompleted": false // Ensure bundle is not completed
+  if (!randomId || !taskNo) {
+    return res
+      .status(400)
+      .json({ message: "Card ID and Task No are required." });
+  }
+
+  // --- TASK-SPECIFIC UNIQUENESS CHECK ---
+  // The unique ID for a packing operation is the card's ID combined with the task number.
+  const uniquePackingId = `${randomId}-${taskNo}`;
+  const existingScan = await Packing.findOne({
+    packing_bundle_id: uniquePackingId
+  });
+
+  if (existingScan) {
+    return res.status(409).json({
+      message: `This card has already been scanned for Task No ${taskNo}.`
+    }); // 409 Conflict
+  }
+
+  try {
+    // First, check if the ID corresponds to an Order Card by looking for bundle_random_id.
+    let inspectionDoc = await QC2InspectionPassBundle.findOne({
+      bundle_random_id: randomId
     });
 
-    if (!bundle) {
-      return res
-        .status(404)
-        .json({ error: "This bundle has not been inspected yet" });
+    if (inspectionDoc) {
+      // --- It's an ORDER CARD ---
+      // Calculate packing quantity as per the new logic.
+      const packingQty =
+        (inspectionDoc.checkedQty || 0) - (inspectionDoc.totalRejects || 0);
+
+      const responseData = {
+        isDefectCard: false,
+        bundle_id: inspectionDoc.bundle_id,
+        bundle_random_id: inspectionDoc.bundle_random_id,
+        package_no: inspectionDoc.package_no,
+        moNo: inspectionDoc.moNo,
+        custStyle: inspectionDoc.custStyle,
+        buyer: inspectionDoc.buyer,
+        color: inspectionDoc.color,
+        size: inspectionDoc.size,
+        lineNo: inspectionDoc.lineNo,
+        department: inspectionDoc.department,
+        factory: inspectionDoc.factory,
+        country: inspectionDoc.country,
+        sub_con: inspectionDoc.sub_con,
+        sub_con_factory: inspectionDoc.sub_con_factory,
+        count: packingQty,
+        passQtyPacking: packingQty
+      };
+      return res.json(responseData);
     }
 
-    // Use the first printArray entry (assuming one bundle_random_id per document for simplicity)
-    const printData = bundle.printArray.find(
-      (item) => item.isCompleted === false
-    );
-    if (!printData) {
-      return res
-        .status(404)
-        .json({ error: "No active print data found for this bundle" });
-    }
-
-    const formattedData = {
-      bundle_id: bundle.bundle_id,
-      bundle_random_id: bundle.bundle_random_id,
-      package_no: bundle.package_no, // Include package_no
-      moNo: bundle.moNo,
-      selectedMono: bundle.moNo,
-      custStyle: bundle.custStyle,
-      buyer: bundle.buyer,
-      color: bundle.color,
-      size: bundle.size,
-      factory: bundle.factory || "N/A",
-      country: bundle.country || "N/A",
-      lineNo: bundle.lineNo,
-      department: bundle.department,
-      count: bundle.totalPass, // Use totalPass as checkedQty for order cards
-      totalBundleQty: 1, // Set hardcoded as 1 for order card
-      emp_id_inspection: bundle.emp_id_inspection,
-      inspection_date: bundle.inspection_date,
-      inspection_time: bundle.inspection_time,
-      sub_con: bundle.sub_con,
-      sub_con_factory: bundle.sub_con_factory
-    };
-
-    res.json(formattedData);
-  } catch (error) {
-    console.error("Error fetching bundle:", error);
-    res.status(500).json({ error: "Failed to fetch bundle" });
-  }
-});
-
-// Check if Packing record exists (updated for task_no 62)
-app.get("/api/check-packing-exists/:bundleId", async (req, res) => {
-  try {
-    const record = await Packing.findOne({
-      packing_bundle_id: req.params.bundleId // No change needed here, but ensure it matches task_no 62 in Packing.jsx
-    });
-    res.json({ exists: !!record });
-  } catch (error) {
-    res.status(500).json({ error: "Error checking record" });
-  }
-});
-
-// New endpoint to get the last Packing record ID for a specific emp_id (no change needed)
-app.get("/api/last-packing-record-id/:emp_id", async (req, res) => {
-  try {
-    const { emp_id } = req.params;
-    const lastRecord = await Packing.findOne(
-      { emp_id_packing: emp_id }, // Filter by emp_id_packing
-      {},
-      { sort: { packing_record_id: -1 } } // Sort descending to get the highest ID
-    );
-    const lastRecordId = lastRecord ? lastRecord.packing_record_id : 0; // Start at 0 if no records exist
-    res.json({ lastRecordId });
-  } catch (error) {
-    console.error("Error fetching last Packing record ID:", error);
-    res.status(500).json({ error: "Failed to fetch last Packing record ID" });
-  }
-});
-
-// Modified endpoint to fetch defect card data from qc2_inspection_pass_bundle with defect_print_id (updated for task_no 62)
-app.get("/api/check-defect-card/:defectPrintId", async (req, res) => {
-  try {
-    const { defectPrintId } = req.params;
-    console.log(`Searching for defect_print_id: "${defectPrintId}"`); // Debug log
-
-    const defectRecord = await QC2InspectionPassBundle.findOne({
-      "printArray.defect_print_id": defectPrintId,
-      "printArray.isCompleted": false
+    // If not an Order Card, check if it's a Defect Card.
+    inspectionDoc = await QC2InspectionPassBundle.findOne({
+      "printArray.defect_print_id": randomId
     });
 
-    if (!defectRecord) {
-      console.log(
-        `No record found for defect_print_id: "${defectPrintId}" with isCompleted: false`
+    if (inspectionDoc) {
+      // --- It's a DEFECT CARD ---
+      const printEntry = inspectionDoc.printArray.find(
+        (p) => p.defect_print_id === randomId
       );
-      return res.status(404).json({ message: "Defect card not found" });
+      if (!printEntry) {
+        return res
+          .status(404)
+          .json({ message: "Defect card data not found within the bundle." });
+      }
+
+      // Calculate packing quantity for defect card.
+      const packingQty =
+        (inspectionDoc.totalRejects || 0) -
+        (printEntry.totalRejectGarment_Var || 0);
+
+      const responseData = {
+        isDefectCard: true,
+        defect_print_id: printEntry.defect_print_id,
+        bundle_id: inspectionDoc.bundle_id,
+        bundle_random_id: inspectionDoc.bundle_random_id,
+        package_no: inspectionDoc.package_no,
+        moNo: inspectionDoc.moNo,
+        custStyle: inspectionDoc.custStyle,
+        buyer: inspectionDoc.buyer,
+        color: inspectionDoc.color,
+        size: inspectionDoc.size,
+        lineNo: inspectionDoc.lineNo,
+        department: inspectionDoc.department,
+        factory: inspectionDoc.factory,
+        country: inspectionDoc.country,
+        sub_con: inspectionDoc.sub_con,
+        sub_con_factory: inspectionDoc.sub_con_factory,
+        count: packingQty,
+        passQtyPacking: packingQty
+      };
+      return res.json(responseData);
     }
 
-    const printData = defectRecord.printArray.find(
-      (item) => item.defect_print_id === defectPrintId
-    );
-    if (!printData) {
-      console.log(
-        `printData not found for defect_print_id: "${defectPrintId}" in document: ${defectRecord._id}`
-      );
-      return res
-        .status(404)
-        .json({ message: "Defect print ID not found in printArray" });
-    }
-
-    const formattedData = {
-      defect_print_id: printData.defect_print_id,
-      totalRejectGarmentCount: printData.totalRejectGarmentCount,
-      totalRejectGarment_Var: printData.totalRejectGarment_Var, // Use totalRejectGarment_Var for defect cards
-      package_no: defectRecord.package_no, // Include package_no
-      moNo: defectRecord.moNo,
-      selectedMono: defectRecord.moNo,
-      custStyle: defectRecord.custStyle,
-      buyer: defectRecord.buyer,
-      color: defectRecord.color,
-      size: defectRecord.size,
-      factory: defectRecord.factory,
-      country: defectRecord.country,
-      lineNo: defectRecord.lineNo,
-      department: defectRecord.department,
-      count: printData.totalRejectGarment_Var, // Use totalRejectGarment_Var as count for defect cards
-      totalBundleQty: 1, // Set hardcoded as 1 for defect card
-      emp_id_inspection: defectRecord.emp_id_inspection,
-      inspection_date: defectRecord.inspection_date,
-      inspection_time: defectRecord.inspection_time,
-      sub_con: defectRecord.sub_con,
-      sub_con_factory: defectRecord.sub_con_factory,
-      bundle_id: defectRecord.bundle_id,
-      bundle_random_id: defectRecord.bundle_random_id
-    };
-
-    res.json(formattedData);
+    // If the ID is not found in either context, it's invalid.
+    return res.status(404).json({
+      message: "Invalid QR Code. Not found as an Order Card or a Defect Card."
+    });
   } catch (error) {
-    console.error("Error checking defect card:", error);
-    res.status(500).json({ message: error.message });
+    console.error("Error fetching packing scan data:", error);
+    res.status(500).json({ message: "Server error fetching data." });
   }
 });
 
-// Save Packing record (no change needed, but ensure task_no is 62 in Packing.jsx)
-app.post("/api/save-packing", async (req, res) => {
+// ENDPOINT 2: Save a new packing record. This remains simple.
+app.post("/api/packing/save-record", async (req, res) => {
   try {
-    const newRecord = new Packing(req.body);
+    const newRecordData = req.body;
+
+    if (!newRecordData.packing_bundle_id) {
+      return res
+        .status(400)
+        .json({ message: "packing_bundle_id is required." });
+    }
+
+    const existingScan = await Packing.findOne({
+      packing_bundle_id: newRecordData.packing_bundle_id
+    });
+    if (existingScan) {
+      return res.status(409).json({
+        message: `This card has already been scanned for Task No ${newRecordData.task_no_packing}.`
+      });
+    }
+
+    const newRecord = new Packing(newRecordData);
     await newRecord.save();
-    res.status(201).json({ message: "Record saved successfully" });
+
+    res
+      .status(201)
+      .json({ message: "Packing record saved successfully", data: newRecord });
   } catch (error) {
-    if (error.code === 11000) {
-      res.status(400).json({ error: "Duplicate record found" });
-    } else {
-      res.status(500).json({ error: "Failed to save record" });
-    }
+    console.error("Error saving packing record:", error);
+    res.status(500).json({ message: "Failed to save packing record." });
   }
 });
 
-//For Data tab display records in a table (no change needed)
-app.get("/api/packing-records", async (req, res) => {
+// ENDPOINT 3: Get all packing records for the data table.
+app.get("/api/packing/get-all-records", async (req, res) => {
   try {
-    const records = await Packing.find();
+    const records = await Packing.find().sort({
+      packing_updated_date: -1,
+      packing_update_time: -1
+    });
     res.json(records);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch Packing records" });
+    console.error("Error fetching packing records:", error);
+    res.status(500).json({ message: "Failed to fetch packing records." });
   }
 });
 
@@ -6940,9 +6924,94 @@ app.get("/api/users/:emp_id", async (req, res) => {
 });
 
 /* ------------------------------
+   QC2 - B-Grade Tracking
+------------------------------ */
+
+// --- NEW ENDPOINT: To save or update B-Grade garment data ---
+
+app.post("/api/qc2-bgrade", async (req, res) => {
+  try {
+    const { defect_print_id, garmentData, headerData } = req.body;
+
+    if (!defect_print_id || !garmentData || !headerData) {
+      return res.status(400).json({ message: "Missing required data." });
+    }
+
+    // First, check if this garment is already in the B-Grade document to prevent duplicates
+    const existingBGrade = await QC2BGrade.findOne({
+      defect_print_id,
+      "bgradeArray.garmentNumber": garmentData.garmentNumber
+    });
+
+    if (existingBGrade) {
+      return res.status(200).json({
+        message: "This garment has already been marked as B-Grade.",
+        data: existingBGrade
+      });
+    }
+
+    const updateOperations = {
+      $setOnInsert: headerData, // Set header data only when creating a new document
+      $push: { bgradeArray: garmentData } // Always add the new garment to the array
+    };
+
+    // Conditionally increment the new `totalBgradeQty` field.
+    // The default `leader_status` in your schema is "B Grade", so this will work for new entries.
+    if (garmentData.leader_status !== "Not B Grade") {
+      updateOperations.$inc = { totalBgradeQty: 1 };
+    }
+
+    // If not a duplicate, proceed with saving and decrementing
+    const bGradeRecord = await QC2BGrade.findOneAndUpdate(
+      { defect_print_id },
+      updateOperations, // Use the new, more complex update object
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    // --- THIS IS THE CRUCIAL NEW LOGIC ---
+    // After successfully saving the B-Grade record, decrement the count in the main inspection document
+    await QC2InspectionPassBundle.updateOne(
+      { "printArray.defect_print_id": defect_print_id },
+      {
+        $inc: {
+          "printArray.$.totalRejectGarmentCount": -1,
+          "printArray.$.totalRejectGarment_Var": -1 // Also decrement the static variable
+        }
+      }
+    );
+
+    res.status(200).json({
+      message: "B-Grade garment recorded successfully.",
+      data: bGradeRecord
+    });
+  } catch (error) {
+    console.error("Error saving B-Grade data:", error);
+    res.status(500).json({ message: "Server error saving B-Grade data." });
+  }
+});
+
+// --- NEW ENDPOINT: To fetch B-Grade data by defect_print_id ---
+
+app.get("/api/qc2-bgrade/by-defect-id/:defect_print_id", async (req, res) => {
+  try {
+    const { defect_print_id } = req.params;
+    const bGradeData = await QC2BGrade.findOne({ defect_print_id }).lean();
+
+    if (!bGradeData) {
+      return res.status(404).json({ message: "No B-Grade records found." });
+    }
+    res.json(bGradeData);
+  } catch (error) {
+    console.error("Error fetching B-Grade data by defect ID:", error);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+/* ------------------------------
    QC2 - Repair Tracking
 ------------------------------ */
 // 1. Fetch Defect Data by defect_print_id
+
 app.get("/api/defect-track/:defect_print_id", async (req, res) => {
   try {
     const { defect_print_id } = req.params;
@@ -7290,7 +7359,45 @@ app.post(
   }
 );
 
+// app.post(
+//   "/api/qc2-repair-tracking/update-pass-bundle-status",
+//   async (req, res) => {
+//     try {
+//       const { defect_print_id, pass_bundle } = req.body;
+
+//       const repairTracking = await QC2RepairTracking.findOne({
+//         defect_print_id
+//       });
+
+//       if (!repairTracking) {
+//         return res.status(404).json({ message: "Repair tracking not found" });
+//       }
+
+//       const updatedRepairArray = repairTracking.repairArray.map((item) => {
+//         return {
+//           ...item.toObject(),
+//           pass_bundle: item.status === "OK" ? "Pass" : item.pass_bundle
+//         };
+//       });
+
+//       repairTracking.repairArray = updatedRepairArray;
+//       await repairTracking.save();
+
+//       res
+//         .status(200)
+//         .json({ message: "pass_bundle status updated successfully" });
+//     } catch (error) {
+//       console.error("Error updating pass_bundle status:", error);
+//       res.status(500).json({
+//         message: "Failed to update pass_bundle status",
+//         error: error.message
+//       });
+//     }
+//   }
+// );
+
 // Endpoint to update defect status by defect name and garment number
+// Endpoint to update defect status by defect name and garment number (ATOMIC VERSION)
 app.post(
   "/api/qc2-repair-tracking/update-defect-status-by-name",
   async (req, res) => {
@@ -7385,317 +7492,69 @@ app.post(
   }
 );
 
-/* ------------------------------
-   QC2 - B-Grade Defects
------------------------------- */
+// app.post(
+//   "/api/qc2-repair-tracking/update-defect-status-by-name",
+//   async (req, res) => {
+//     const { defect_print_id, garmentNumber, defectName, status } = req.body;
+//     try {
+//       const repairTracking = await QC2RepairTracking.findOne({
+//         defect_print_id
+//       });
+//       if (!repairTracking) {
+//         console.error(
+//           `No repair tracking found for defect_print_id: ${defect_print_id}`
+//         ); // Add this line
+//         return res.status(404).json({ message: "Repair tracking not found" });
+//       }
 
-// app.post("/api/b-grade-tracking", async (req, res) => {
-//   try {
-//     const { defect_print_id, bGradeArray } = req.body;
-
-//     if (!defect_print_id || !bGradeArray || bGradeArray.length === 0) {
-//       return res
-//         .status(400)
-//         .json({ msg: "Missing required fields or empty bGradeArray." });
+//       // Find the specific defect and update it
+//       const updatedRepairArray = repairTracking.repairArray.map((item) => {
+//         if (
+//           item.garmentNumber === garmentNumber &&
+//           item.defectName === defectName
+//         ) {
+//           const shouldUpdate = item.status !== status;
+//           if (shouldUpdate) {
+//             const now = new Date();
+//             return {
+//               ...item,
+//               status: status,
+//               repair_date:
+//                 status === "OK" ? now.toLocaleDateString("en-US") : null,
+//               repair_time:
+//                 status === "OK"
+//                   ? now.toLocaleTimeString("en-US", { hour12: false })
+//                   : null,
+//               // pass_bundle: status === "OK" ? "Pass" : status === "Fail" ? "Fail" : item.pass_bundle
+//               pass_bundle: status === "OK" ? "Pass" : item.pass_bundle
+//             };
+//           }
+//         }
+//         return item;
+//       });
+//       // Check if any changes were made
+//       const hasChanges = repairTracking.repairArray.some((item, index) => {
+//         return (
+//           JSON.stringify(item) !== JSON.stringify(updatedRepairArray[index])
+//         );
+//       });
+//       if (hasChanges) {
+//         repairTracking.repairArray = updatedRepairArray;
+//         await repairTracking.save();
+//         console.log("Updated Repair Array:", updatedRepairArray);
+//         res.status(200).json({ message: "Defect status updated successfully" });
+//       } else {
+//         res.status(200).json({ message: "No changes were made" });
+//       }
+//     } catch (error) {
+//       console.error("Error updating defect status:", error);
+//       res.status(500).json({
+//         message: "Failed to update defect status",
+//         error: error.message
+//       });
 //     }
-
-//     // Find a document by its defect_print_id and update it.
-//     // If it doesn't exist, create a new one (upsert: true).
-//     const updatedDoc = await BGrade.findOneAndUpdate(
-//       { defect_print_id: defect_print_id },
-//       { $set: req.body },
-//       { new: true, upsert: true, setDefaultsOnInsert: true }
-//     );
-
-//     res.json(updatedDoc);
-//   } catch (err) {
-//     console.error(err.message);
-//     res.status(500).send("Server Error");
 //   }
-// });
-
-// --- NEW ENDPOINT: To save or update B-Grade garment data ---
-
-app.post("/api/qc2-bgrade", async (req, res) => {
-  try {
-    const { defect_print_id, garmentData, headerData } = req.body;
-
-    if (!defect_print_id || !garmentData || !headerData) {
-      return res.status(400).json({ message: "Missing required data." });
-    }
-
-    // First, check if this garment is already in the B-Grade document to prevent duplicates
-    const existingBGrade = await QC2BGrade.findOne({
-      defect_print_id,
-      "bgradeArray.garmentNumber": garmentData.garmentNumber
-    });
-
-    if (existingBGrade) {
-      return res.status(200).json({
-        message: "This garment has already been marked as B-Grade.",
-        data: existingBGrade
-      });
-    }
-
-    const updateOperations = {
-      $setOnInsert: headerData, // Set header data only when creating a new document
-      $push: { bgradeArray: garmentData } // Always add the new garment to the array
-    };
-
-    // Conditionally increment the new `totalBgradeQty` field.
-    // The default `leader_status` in your schema is "B Grade", so this will work for new entries.
-    if (garmentData.leader_status !== "Not B Grade") {
-      updateOperations.$inc = { totalBgradeQty: 1 };
-    }
-
-    // If not a duplicate, proceed with saving and decrementing
-    const bGradeRecord = await QC2BGrade.findOneAndUpdate(
-      { defect_print_id },
-      updateOperations, // Use the new, more complex update object
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
-
-    // --- THIS IS THE CRUCIAL NEW LOGIC ---
-    // After successfully saving the B-Grade record, decrement the count in the main inspection document
-    await QC2InspectionPassBundle.updateOne(
-      { "printArray.defect_print_id": defect_print_id },
-      {
-        $inc: {
-          "printArray.$.totalRejectGarmentCount": -1,
-          "printArray.$.totalRejectGarment_Var": -1 // Also decrement the static variable
-        }
-      }
-    );
-
-    res.status(200).json({
-      message: "B-Grade garment recorded successfully.",
-      data: bGradeRecord
-    });
-  } catch (error) {
-    console.error("Error saving B-Grade data:", error);
-    res.status(500).json({ message: "Server error saving B-Grade data." });
-  }
-});
-
-// --- NEW ENDPOINT: To fetch B-Grade data by defect_print_id ---
-
-app.get("/api/qc2-bgrade/by-defect-id/:defect_print_id", async (req, res) => {
-  try {
-    const { defect_print_id } = req.params;
-    const bGradeData = await QC2BGrade.findOne({ defect_print_id }).lean();
-
-    if (!bGradeData) {
-      return res.status(404).json({ message: "No B-Grade records found." });
-    }
-    res.json(bGradeData);
-  } catch (error) {
-    console.error("Error fetching B-Grade data by defect ID:", error);
-    res.status(500).json({ message: "Server error." });
-  }
-});
-
-app.post('/api/b-grade-defect/accept', async (req, res) => {
-  const { bundle_random_id, defect_print_id, acceptedGarmentNumbers } =
-    req.body;
-
-  // Basic validation
-  if (
-    !bundle_random_id ||
-    !defect_print_id ||
-    !Array.isArray(acceptedGarmentNumbers)
-  ) {
-    return res.status(400).json({ message: "Missing or invalid parameters." });
-  }
-
-  if (acceptedGarmentNumbers.length === 0) {
-    return res.status(400).json({ message: "No garments were accepted." });
-  }
-
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
-    // 1. Update counts in qc2_inspection_pass_bundle
-    const bundle = await QC2InspectionPassBundle.findOne({ bundle_random_id }).session(
-      session
-    );
-    if (!bundle) {
-      throw new Error(`Bundle with ID ${bundle_random_id} not found.`);
-    }
-
-    const acceptedCount = acceptedGarmentNumbers.length;
-    bundle.totalPass += acceptedCount;
-    bundle.totalRepair = Math.max(0, bundle.totalRepair - acceptedCount); // Prevent negative count
-    await bundle.save({ session });
-
-    // 2. Update defect status in repair-tracking
-    const repairDoc = await QC2RepairTracking.findOne({ defect_print_id }).session(
-      session
-    );
-    if (!repairDoc) {
-      throw new Error(`Repair document with ID ${defect_print_id} not found.`);
-    }
-
-    repairDoc.garments.forEach((garment) => {
-      if (acceptedGarmentNumbers.includes(garment.garmentNumber)) {
-        garment.defects.forEach((defect) => {
-          if (defect.status === "B-Grade") {
-            defect.status = "B-Grade-Accepted"; // Mark as processed
-          }
-        });
-      }
-    });
-    await repairDoc.save({ session });
-
-    await session.commitTransaction();
-    res.status(200).json({ message: "B-Grade garments processed successfully." });
-  } catch (error) {
-    await session.abortTransaction();
-    console.error("Error accepting B-Grade garments:", error);
-    res.status(500).json({ message: "Failed to process request.", error: error.message });
-  } finally {
-    session.endSession();
-  }
-});
-
-app.put('/api/b-grade-tracking/update-confirmation', async (req, res) => {
-  const { bundle_random_id, defect_print_id, updates } = req.body;
-
-  if (!bundle_random_id || !defect_print_id || !updates || !Array.isArray(updates) || updates.length === 0) {
-    return res.status(400).json({ message: "Missing required fields. The 'updates' array cannot be empty." });
-  }
-
-  try {
-    const operations = updates.map(update => ({
-      updateOne: {
-        filter: {
-          bundle_random_id,
-          defect_print_id,
-          'garments.garmentNumber': update.garmentNumber,
-        },
-        update: {
-          $set: { 'garments.$.confirmation': update.confirmation },
-        },
-      },
-    }));
-
-    const result = await QC2BGrade.bulkWrite(operations);
-
-    if (result.modifiedCount === 0) {
-      const docExists = await QC2BGrade.exists({ bundle_random_id, defect_print_id });
-      if (!docExists) {
-        return res.status(404).json({ message: `B-Grade document not found.` });
-      } else {
-        return res.status(404).json({ message: 'No matching garments found to update within the specified B-Grade document.' });
-      }
-    }
-    res.status(200).json({
-      message: "B-Grade confirmations processed successfully.",
-      documentsModified: result.modifiedCount
-    });
-
-  } catch (error) {
-    console.error("Error updating B-Grade confirmations:", error);
-    res.status(500).json({ message: "Server error while updating confirmations.", error: error.message });
-  }
-});
-
-app.put('/:defect_print_id', async (req, res) => {
-  try {
-    const { defect_print_id } = req.params;
-    const { updates } = req.body; // The 'updates' array from your frontend
-
-    if (!updates || !Array.isArray(updates)) {
-      return res.status(400).json({ message: 'Request body must contain an "updates" array.' });
-    }
-
-    // Find the parent BGradeTracking document using the ID from the URL
-    const bGradeTrackingDoc = await QC2BGrade.findOne({ defect_print_id: defect_print_id });
-
-    if (!bGradeTrackingDoc) {
-      return res.status(404).json({ message: `B-Grade tracking document with defect_print_id ${defect_print_id} not found.` });
-    }
-
-    let wasModified = false;
-    // Loop through the updates sent from the frontend (e.g., [{ garmentNumber: 'G1', confirmation: 'B-Grade_Rejected' }])
-    updates.forEach(update => {
-      // Find all defects in the bGradeArray that match the garmentNumber
-      bGradeTrackingDoc.bGradeArray.forEach(defectInDoc => {
-        if (defectInDoc.garmentNumber === update.garmentNumber) {
-          // Update the confirmation status based on the payload
-          defectInDoc.confirmation = update.confirmation;
-          wasModified = true;
-        }
-      });
-    });
-
-    // If any changes were made, mark the array as modified and save the document
-    if (wasModified) {
-      // This is crucial! It tells Mongoose that the nested bGradeArray has been changed.
-      bGradeTrackingDoc.markModified('bGradeArray');
-      await bGradeTrackingDoc.save();
-    }
-
-    res.status(200).json({ message: 'B-Grade confirmation status updated successfully.' });
-
-  } catch (error) {
-    console.error('Error updating B-Grade confirmation:', error);
-    res.status(500).json({ message: 'Server error while updating B-Grade confirmation.' });
-  }
-});
-
-app.post('/', async (req, res) => {
-  try {
-    const { defect_print_id, bGradeArray, updates } = req.body;
-
-    // --- UPDATE LOGIC ---
-    // If the payload contains an 'updates' array, it's an update request from BGradeDefect.jsx
-    if (updates && defect_print_id) {
-      const bGradeDoc = await QC2BGrade.findOne({ defect_print_id: defect_print_id });
-
-      if (!bGradeDoc) {
-        return res.status(404).json({ message: `B-Grade record with defect_print_id ${defect_print_id} not found for update.` });
-      }
-
-      // Apply the confirmation updates to the garments within the document's bGradeArray
-      updates.forEach(update => {
-        bGradeDoc.bGradeArray.forEach(defectInDoc => {
-          if (defectInDoc.garmentNumber === update.garmentNumber) {
-            defectInDoc.confirmation = update.confirmation;
-          }
-        });
-      });
-
-      // Mark the array as modified for Mongoose to detect the changes
-      bGradeDoc.markModified('bGradeArray');
-      await bGradeDoc.save();
-      
-      return res.status(200).json({ message: 'B-Grade confirmation updated successfully.' });
-    }
-
-    // --- CREATE LOGIC ---
-    // If the payload contains a 'bGradeArray', it's a create request from DefectTrack.jsx
-    if (bGradeArray) {
-      // Using findOneAndUpdate with 'upsert: true' is a robust way to handle this.
-      // It will create the document if it doesn't exist, or update it if it does.
-      const newBGradeDoc = await QC2BGrade.findOneAndUpdate(
-        { defect_print_id: defect_print_id }, // find a document with this filter
-        req.body, // document to insert or update
-        { new: true, upsert: true, setDefaultsOnInsert: true } // options: return the new doc, create if it doesn't exist, and apply schema defaults
-      );
-
-      return res.status(201).json({ message: 'B-Grade tracking data saved successfully.', data: newBGradeDoc });
-    }
-
-    // If the payload is invalid
-    return res.status(400).json({ message: 'Invalid payload. Request must include either an "updates" or "bGradeArray" property.' });
-
-  } catch (error) {
-    console.error('Error in POST /api/b-grade-tracking:', error);
-    res.status(500).json({ message: 'Server error while processing B-Grade request.' });
-  }
-});
-
+// );
 
 /* ------------------------------
    QC2 - Reworks
@@ -9367,90 +9226,82 @@ const sanitize = (input) => {
 };
 
 // --------------------------------------------------------------------------
-// Roving Image Upload
+// Roving Image Upload (MODIFIED FOR PERFORMANCE)
 // --------------------------------------------------------------------------
 
-// 1. Use memoryStorage. This is simple and reliable.
+// 1. Use memoryStorage to handle the file in memory.
 const rovingStorage = multer.memoryStorage();
 
-// 2. Configure the multer instance with only the file filter and limits.
+// 2. Configure the multer instance.
 const rovingUpload = multer({
   storage: rovingStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedMimeTypes = /^image\/(jpeg|pjpeg|png|gif)$/i;
-    if (allowedMimeTypes.test(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)"), false);
-    }
-  }
+  limits: { fileSize: 25 * 1024 * 1024 } // Increase limit to 25MB for uncompressed files
 });
 
-// 3. The main endpoint with all logic inside.
+// 3. The main endpoint, now with sharp processing.
 app.post(
   "/api/roving/upload-roving-image",
-  rovingUpload.single("imageFile"), // This just prepares req.file in memory
+  rovingUpload.single("imageFile"),
   async (req, res) => {
     try {
-      // --- All data is now guaranteed to be available here ---
+      // --- Validation ---
       const { imageType, date, lineNo, moNo, operationId } = req.body;
       const imageFile = req.file;
 
-      // --- Validation ---
       if (!imageFile) {
         return res.status(400).json({
           success: false,
-          message: "No image file provided or file type is not allowed."
+          message: "No image file provided."
         });
       }
 
       if (!imageType || !date || !lineNo || !moNo || !operationId) {
         return res.status(400).json({
           success: false,
-          message: "Missing required metadata fields."
+          message: "Missing required metadata fields for image."
         });
       }
 
-      // --- File Saving Logic ---
-
-      // Define the single, absolute destination path
+      // --- File Saving Logic with Sharp ---
       const qcinlineUploadPath = path.join(
         __dirname,
         "public",
         "storage",
-        "qcinline"
+        "qcinline" // existing path is preserved
       );
-      await fsPromises.mkdir(qcinlineUploadPath, { recursive: true });
+      // await fsPromises.mkdir(qcinlineUploadPath, { recursive: true });
 
-      // Sanitize all parts of the filename
+      // Sanitize metadata for the filename (existing logic is good)
       const sanitizedImageType = sanitize(imageType.toUpperCase());
       const sanitizedDate = sanitize(date);
       const sanitizedLineNo = sanitize(lineNo);
       const sanitizedMoNo = sanitize(moNo);
       const sanitizedOperationId = sanitize(operationId);
-      const fileExtension = path.extname(imageFile.originalname);
 
-      // Construct a prefix that includes the image type
+      // Construct the unique prefix
       const imagePrefix = `${sanitizedImageType}_${sanitizedDate}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedOperationId}_`;
 
-      // Find the next available index for the filename
-      let existingImageCount = 0;
+      // Find the next available index for this prefix
       const filesInDir = await fsPromises.readdir(qcinlineUploadPath);
-      filesInDir.forEach((f) => {
-        if (f.startsWith(imagePrefix)) {
-          existingImageCount++;
-        }
-      });
-
+      const existingImageCount = filesInDir.filter((f) =>
+        f.startsWith(imagePrefix)
+      ).length;
       const imageIndex = existingImageCount + 1;
-      const newFilename = `${imagePrefix}${imageIndex}${fileExtension}`;
 
-      // Define the full path to save the file
-      const fullFilePath = path.join(qcinlineUploadPath, newFilename);
+      // Create the new filename with a .webp extension
+      const newFilename = `${imagePrefix}${imageIndex}.webp`;
+      const finalDiskPath = path.join(qcinlineUploadPath, newFilename);
 
-      // Write the file from memory to the disk
-      await fsPromises.writeFile(fullFilePath, imageFile.buffer);
+      // Process the image from memory buffer with sharp and save to disk
+      await sharp(imageFile.buffer)
+        .resize({
+          width: 1024,
+          height: 1024,
+          fit: "inside",
+          withoutEnlargement: true
+        })
+        .webp({ quality: 80 })
+        .toFile(finalDiskPath);
 
       // Construct the public URL for the client
       const publicUrl = `${API_BASE_URL}/storage/qcinline/${newFilename}`;
@@ -9467,8 +9318,6 @@ app.post(
           success: false,
           message: `File upload error: ${error.message}`
         });
-      } else if (error.message.includes("Images Only!")) {
-        return res.status(400).json({ success: false, message: error.message });
       }
       res.status(500).json({
         success: false,
@@ -10750,81 +10599,6 @@ app.get("/api/roving-pairing/report-data", async (req, res) => {
   }
 });
 
-// // --- Endpoint to get aggregated data for the report table ---
-// app.get("/api/roving-pairing/report-data", async (req, res) => {
-//   try {
-//     const { date, qcId, operatorId, lineNo, moNo } = req.query;
-
-//     if (!date) {
-//       return res.status(400).json({ message: "Date is required." });
-//     }
-
-//     // Build the initial match pipeline stage
-//     const matchPipeline = { inspection_date: date };
-//     if (qcId) matchPipeline.emp_id = qcId;
-//     if (lineNo) matchPipeline.lineNo = lineNo;
-//     if (moNo) matchPipeline.moNo = moNo;
-
-//     const pipeline = [
-//       { $match: matchPipeline },
-//       { $unwind: "$pairingData" } // Deconstruct the pairingData array
-//     ];
-
-//     // If an operatorId is specified, add another match stage
-//     if (operatorId) {
-//       pipeline.push({
-//         $match: { "pairingData.operator_emp_id": operatorId }
-//       });
-//     }
-
-//     // Group the data by operator to create one row per operator
-//     pipeline.push({
-//       $group: {
-//         //_id: "$pairingData.operator_emp_id", // Group by Operator ID
-//         _id: {
-//           // Group by a composite key to separate rows if operator works on different MO/Lines
-//           operatorId: "$pairingData.operator_emp_id",
-//           lineNo: "$lineNo",
-//           moNo: "$moNo"
-//         },
-//         operatorName: { $first: "$pairingData.operator_eng_name" }, // Get the operator's name
-//         inspections: {
-//           // Push each inspection's data into an array for this operator
-//           $push: {
-//             rep_name: "$pairingData.inspection_rep_name",
-//             accessoryComplete: "$pairingData.accessoryComplete",
-//             totalSummary: "$pairingData.totalSummary"
-//           }
-//         }
-//       }
-//     });
-
-//     // Add a final projection stage to format the output nicely
-//     pipeline.push({
-//       $project: {
-//         _id: 0, // Exclude the default _id
-//         operatorId: "$_id.opId",
-//         lineNo: "$_id.line",
-//         moNo: "$_id.mo",
-//         operatorName: "$operatorName",
-//         inspections: "$inspections"
-//       }
-//     });
-
-//     // Add a sorting stage
-//     pipeline.push({ $sort: { lineNo: 1, moNo: 1, operatorId: 1 } });
-
-//     const reportData = await QCRovingPairing.aggregate(pipeline);
-
-//     res.json(reportData);
-//   } catch (error) {
-//     console.error("Error fetching report data for Roving Pairing:", error);
-//     res
-//       .status(500)
-//       .json({ message: "Failed to fetch report data.", error: error.message });
-//   }
-// });
-
 /* ------------------------------
    Cutting Report ENDPOINTS
 ------------------------------ */
@@ -11332,7 +11106,7 @@ app.post("/api/save-measurement-point", async (req, res) => {
     if (error.code === 11000) {
       // Handle duplicate key errors more gracefully
       // You might need to check which field caused the duplicate error
-      // For now, a generic message. Your schema should have unique indexes defined.
+      // For now, a generic message. schema should have unique indexes defined.
       return res.status(409).json({
         message:
           "Failed to save: Duplicate entry for a unique field (e.g., MO + Panel + Point Name + Index).",
@@ -11758,60 +11532,56 @@ app.get("/api/cutting-issues", async (req, res) => {
 
 // --- Multer Configuration for Cutting Images ---
 
-// 1. Use memoryStorage to handle the file in memory first.
+// MODIFIED: Use memoryStorage to handle the file in memory for processing.
 const cuttingMemoryStorage = multer.memoryStorage();
-
-// 2. Configure multer with the new storage, file filter, and limits.
 const cutting_upload = multer({
   storage: cuttingMemoryStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ["image/jpeg", "image/png"];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only JPEG and PNG images are allowed"), false);
-    }
-  }
+  limits: { fileSize: 25 * 1024 * 1024 } // Increased limit to 25MB to handle uncompressed files from client
 });
 
-// --- Image Upload Endpoint ---
+// --- Image Upload Endpoint (MODIFIED) ---
 app.post(
   "/api/upload-cutting-image",
   cutting_upload.single("image"), // This uses the memory storage config
   async (req, res) => {
     try {
-      const imageFile = req.file;
-
-      if (!imageFile) {
+      if (!req.file) {
         return res.status(400).json({
           success: false,
-          message: "No file uploaded or file type is not allowed."
+          message: "No file uploaded."
         });
       }
 
-      // --- File Saving Logic ---
+      // --- File Saving Logic with Sharp ---
       const cuttingUploadPath = path.join(
         __dirname,
         "public",
         "storage",
-        "cutting"
+        "cutting" // Your existing path is preserved
       );
-      //await fs.promises.mkdir(cuttingUploadPath, { recursive: true });
+      // Ensure the directory exists
+      // await fs.promises.mkdir(cuttingUploadPath, { recursive: true });
 
-      // Create a unique filename
-      const fileExtension = path.extname(imageFile.originalname);
+      // Create a unique filename, saving as .webp
       const newFilename = `cutting-${Date.now()}-${Math.round(
         Math.random() * 1e9
-      )}${fileExtension}`;
+      )}.webp`;
 
-      // Define the full path and write the file from buffer
-      const fullFilePath = path.join(cuttingUploadPath, newFilename);
-      await fs.promises.writeFile(fullFilePath, imageFile.buffer);
+      const finalDiskPath = path.join(cuttingUploadPath, newFilename);
+
+      // Use sharp to process the image from buffer
+      await sharp(req.file.buffer)
+        .resize({
+          width: 1024,
+          height: 1024,
+          fit: "inside",
+          withoutEnlargement: true
+        })
+        .webp({ quality: 80 }) // Convert to efficient WebP format
+        .toFile(finalDiskPath);
 
       // --- URL Construction ---
-      // IMPORTANT: Return a RELATIVE path. The frontend will add the base URL.
-      // This is the most flexible pattern.
+      // Return the relative path, which is what your frontend expects
       const relativeUrl = `/storage/cutting/${newFilename}`;
 
       res.status(200).json({ success: true, url: relativeUrl });
@@ -15238,6 +15008,8 @@ app.delete("/api/scc/scratch-defects/:id", async (req, res) => {
 /* ------------------------------
    End Points - EMB Defects
 ------------------------------ */
+
+// GET - Fetch all EMB defects
 app.get("/api/scc/emb-defects", async (req, res) => {
   try {
     const defects = await EMBDefect.find({}).sort({ no: 1 }).lean();
@@ -15248,14 +15020,42 @@ app.get("/api/scc/emb-defects", async (req, res) => {
   }
 });
 
+// POST - Add a new EMB defect
 app.post("/api/scc/emb-defects", async (req, res) => {
   try {
     const { no, defectNameEng, defectNameKhmer, defectNameChine } = req.body;
+
+    // --- Added validation from your example ---
+    if (no === undefined || no === null || !defectNameEng || !defectNameKhmer) {
+      return res.status(400).json({
+        message: "Defect No, English Name, and Khmer Name are required."
+      });
+    }
+    if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Defect No must be a positive number." });
+    }
+
+    const existingDefectByNo = await EMBDefect.findOne({ no: Number(no) });
+    if (existingDefectByNo) {
+      return res
+        .status(409)
+        .json({ message: `EMB Defect No '${no}' already exists.` });
+    }
+    const existingDefectByName = await EMBDefect.findOne({ defectNameEng });
+    if (existingDefectByName) {
+      return res.status(409).json({
+        message: `EMB Defect name (English) '${defectNameEng}' already exists.`
+      });
+    }
+    // --- End of validation ---
+
     const newDefect = new EMBDefect({
-      no,
+      no: Number(no),
       defectNameEng,
       defectNameKhmer,
-      defectNameChine
+      defectNameChine: defectNameChine || ""
     });
     await newDefect.save();
     res
@@ -15267,52 +15067,195 @@ app.post("/api/scc/emb-defects", async (req, res) => {
         message: "Duplicate entry. Defect No or Name might already exist."
       });
     }
+    console.error("Error adding EMB defect:", error);
     res
       .status(500)
       .json({ message: "Failed to add EMB defect", error: error.message });
   }
 });
 
+// PUT - Update an existing EMB defect by ID
+app.put("/api/scc/emb-defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { no, defectNameEng, defectNameKhmer, defectNameChine } = req.body;
+
+    if (no === undefined || no === null || !defectNameEng || !defectNameKhmer) {
+      return res.status(400).json({
+        message:
+          "Defect No, English Name, and Khmer Name are required for update."
+      });
+    }
+    if (isNaN(parseInt(no)) || parseInt(no) <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Defect No must be a positive number." });
+    }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid EMB defect ID format." });
+    }
+
+    const existingDefectByNo = await EMBDefect.findOne({
+      no: Number(no),
+      _id: { $ne: id }
+    });
+    if (existingDefectByNo) {
+      return res.status(409).json({
+        message: `EMB Defect No '${no}' already exists for another defect.`
+      });
+    }
+    const existingDefectByName = await EMBDefect.findOne({
+      defectNameEng,
+      _id: { $ne: id }
+    });
+    if (existingDefectByName) {
+      return res.status(409).json({
+        message: `EMB Defect name (English) '${defectNameEng}' already exists for another defect.`
+      });
+    }
+
+    const updatedDefect = await EMBDefect.findByIdAndUpdate(
+      id,
+      {
+        no: Number(no),
+        defectNameEng,
+        defectNameKhmer,
+        defectNameChine: defectNameChine || ""
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedDefect) {
+      return res.status(404).json({ message: "EMB Defect not found." });
+    }
+    res.status(200).json({
+      message: "EMB defect updated successfully",
+      defect: updatedDefect
+    });
+  } catch (error) {
+    console.error("Error updating EMB defect:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Update failed due to duplicate EMB Defect No or Name."
+      });
+    }
+    res
+      .status(500)
+      .json({ message: "Failed to update EMB defect", error: error.message });
+  }
+});
+
+// DELETE - Delete an EMB defect by ID
+app.delete("/api/scc/emb-defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid EMB defect ID format." });
+    }
+    const deletedDefect = await EMBDefect.findByIdAndDelete(id);
+    if (!deletedDefect) {
+      return res.status(404).json({ message: "EMB Defect not found." });
+    }
+    res.status(200).json({ message: "EMB defect deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting EMB defect:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to delete EMB defect", error: error.message });
+  }
+});
+
+// app.post("/api/scc/emb-defects", async (req, res) => {
+//   try {
+//     const { no, defectNameEng, defectNameKhmer, defectNameChine } = req.body;
+//     const newDefect = new EMBDefect({
+//       no,
+//       defectNameEng,
+//       defectNameKhmer,
+//       defectNameChine
+//     });
+//     await newDefect.save();
+//     res
+//       .status(201)
+//       .json({ message: "EMB defect added successfully", defect: newDefect });
+//   } catch (error) {
+//     if (error.code === 11000) {
+//       return res.status(409).json({
+//         message: "Duplicate entry. Defect No or Name might already exist."
+//       });
+//     }
+//     res
+//       .status(500)
+//       .json({ message: "Failed to add EMB defect", error: error.message });
+//   }
+// });
+
 /* ------------------------------
    End Points - SCC HT/FU
 ------------------------------ */
 
-// Multer setup for SCC image uploads
 // 1. Define the absolute destination path and ensure the directory exists
 const sccUploadPath = path.join(__dirname, "public", "storage", "scc_images");
-//fs.mkdirSync(sccUploadPath, { recursive: true }); // Creates the directory if it doesn't exist
+//fs.mkdirSync(sccUploadPath, { recursive: true }); // Make sure directory exists
 
-// 2. Update the multer storage configuration
-const sccImageStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // Use the absolute path variable here
-    cb(null, sccUploadPath);
-  },
-  filename: (req, file, cb) => {
-    // This logic is complex and specific, so we keep it as is.
-    const { imageType, inspectionDate } = req.body;
-    const datePart = inspectionDate
-      ? inspectionDate.replace(/\//g, "-")
-      : new Date().toISOString().split("T")[0];
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const filename = `${
-      imageType || "sccimage"
-    }-${datePart}-${uniqueSuffix}${path.extname(file.originalname)}`;
-    cb(null, filename);
-  }
+// 2. MODIFIED: Use memoryStorage to process the image buffer in RAM before saving
+const sccMemoryStorage = multer.memoryStorage();
+const sccUpload = multer({
+  storage: sccMemoryStorage,
+  limits: { fileSize: 25 * 1024 * 1024 } // Optional: Add a limit (e.g., 25MB) to prevent very large files
 });
 
-const sccUpload = multer({ storage: sccImageStorage });
+// 3. MODIFIED: Update the endpoint to process the image with sharp and save it
+app.post(
+  "/api/scc/upload-image",
+  sccUpload.single("imageFile"),
+  async (req, res) => {
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No file uploaded." });
+    }
 
-app.post("/api/scc/upload-image", sccUpload.single("imageFile"), (req, res) => {
-  if (!req.file) {
-    return res
-      .status(400)
-      .json({ success: false, message: "No file uploaded." });
+    try {
+      // Generate a unique filename (your existing logic is good)
+      const { imageType, inspectionDate } = req.body;
+      const datePart = inspectionDate
+        ? inspectionDate.replace(/\//g, "-")
+        : new Date().toISOString().split("T")[0];
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+
+      // We will save as .webp for the best compression and web performance
+      const newFilename = `${
+        imageType || "sccimage"
+      }-${datePart}-${uniqueSuffix}.webp`;
+      const finalDiskPath = path.join(sccUploadPath, newFilename);
+
+      // Use sharp to process the image from the buffer
+      await sharp(req.file.buffer)
+        .resize({
+          width: 1024,
+          height: 1024,
+          fit: "inside",
+          withoutEnlargement: true
+        }) // Resize to max 1024px, don't enlarge small images
+        .webp({ quality: 80 }) // Convert to WebP format with 80% quality
+        .toFile(finalDiskPath); // Save the processed image to disk
+
+      // The public URL that the frontend will use to display the image
+      const publicUrlPath = `${API_BASE_URL}/storage/scc_images/${newFilename}`;
+      res.json({
+        success: true,
+        filePath: publicUrlPath,
+        filename: newFilename
+      });
+    } catch (error) {
+      console.error("Error processing or saving image:", error);
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to process uploaded image." });
+    }
   }
-  const filePath = `${API_BASE_URL}/storage/scc_images/${req.file.filename}`;
-  res.json({ success: true, filePath: filePath, filename: req.file.filename });
-});
+);
 
 // Helper function to format date to MM/DD/YYYY
 const formatDateToMMDDYYYY = (dateInput) => {
@@ -15581,13 +15524,11 @@ app.get("/api/scc/fu-first-output", async (req, res) => {
 // 2. `GET /api/scc/get-first-output-specs` (Updated)
 app.get("/api/scc/get-first-output-specs", async (req, res) => {
   try {
-    const { moNo, color, inspectionDate } = req.query;
-    if (!moNo || !color || !inspectionDate) {
-      return res
-        .status(400)
-        .json({ message: "MO No, Color, and Inspection Date are required." });
+    const { moNo, color } = req.query;
+    if (!moNo || !color) {
+      return res.status(400).json({ message: "MO No and Color are required." });
     }
-    const formattedDate = formatDateToMMDDYYYY(inspectionDate);
+    //const formattedDate = formatDateToMMDDYYYY(inspectionDate);
 
     let specs = null;
     const processRecord = (record) => {
@@ -15654,8 +15595,7 @@ app.get("/api/scc/get-first-output-specs", async (req, res) => {
     // Try HT First Output
     const htRecord = await HTFirstOutput.findOne({
       moNo,
-      color,
-      inspectionDate: formattedDate
+      color
     }).lean();
     specs = processRecord(htRecord);
 
@@ -15663,8 +15603,7 @@ app.get("/api/scc/get-first-output-specs", async (req, res) => {
     if (!specs) {
       const fuRecord = await FUFirstOutput.findOne({
         moNo,
-        color,
-        inspectionDate: formattedDate
+        color
       }).lean();
       specs = processRecord(fuRecord);
     }
