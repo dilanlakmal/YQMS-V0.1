@@ -52,6 +52,8 @@ import Register from "./pages/Auth/Register";
 import { AuthProvider } from "./components/authentication/AuthContext.jsx";
 import { BluetoothProvider } from "./components/context/BluetoothContext.jsx";
 import { FormDataProvider } from "./components/context/FormDataContext";
+import { ThemeProvider } from "./components/context/ThemeContext";
+
 import CuttingPage from "./pages/Cutting.jsx";
 
 import QAAudit from "./pages/QAAudit.jsx";
@@ -319,7 +321,7 @@ function AppContent() {
               />
               <Route path="/user-list" element={<UserList />} />
               <Route path="/role-management" element={<RoleManagement />} />
-              <Route path="/settings" element={<Setting />} />
+              <Route path="/super-admin-assign" element={<Setting />} />
               <Route path="/profile" element={<Profile />} />
               <Route
                 path="/analytics"
@@ -377,11 +379,13 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <FormDataProvider>
-          <BluetoothProvider>
-            <AppContent />
-          </BluetoothProvider>
-        </FormDataProvider>
+        <ThemeProvider>
+          <FormDataProvider>
+            <BluetoothProvider>
+              <AppContent />
+            </BluetoothProvider>
+          </FormDataProvider>
+        </ThemeProvider>
       </AuthProvider>
     </Router>
   );

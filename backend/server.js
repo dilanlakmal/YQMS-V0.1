@@ -98,13 +98,13 @@ const PORT = 5001;
 
 // Load SSL certificates
 const privateKey = fs.readFileSync(
-  "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.14.32-key.pem",
+  "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.12.162-key.pem",
   //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175-key.pem",
   //"/usr/local/share/ca-certificates/yorkmars.key",
   "utf8"
 );
 const certificate = fs.readFileSync(
-  "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.14.32.pem",
+  "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.12.162.pem",
   //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175.pem",
   //"/usr/local/share/ca-certificates/yorkmars.crt",
   "utf8"
@@ -121,7 +121,7 @@ const server = https.createServer(credentials, app);
 // Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: "https://192.167.14.32:3001", //"https://192.165.2.175:3001", //"https://localhost:3001"
+    origin: "https://192.167.12.162:3001", //"https://192.165.2.175:3001", //"https://localhost:3001"
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
@@ -139,7 +139,7 @@ app.use(bodyParser.json());
 
 app.use(
   cors({
-    origin: "https://192.167.14.32:3001", //["http://localhost:3001", "https://localhost:3001"],
+    origin: "https://192.167.12.162:3001", //["http://localhost:3001", "https://localhost:3001"],
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
@@ -3045,27 +3045,59 @@ app.get("/api/total-bundle-qty/:mono", async (req, res) => {
   }
 });
 
-// Endpoint to get total garments count for a specific MONo, Color, and Size
+// Endpoint to get total garments count for a specific MONo, Color, Size, and Type
 app.get("/api/total-garments-count/:mono/:color/:size", async (req, res) => {
   try {
     const { mono, color, size } = req.params;
+    const { type } = req.query; // Get type from query string, e.g., ?type=end
+
+    // Validate type parameter
+    if (!type || !["end", "repack"].includes(type)) {
+      return res
+        .status(400)
+        .json({ message: "A valid type ('end' or 'repack') is required." });
+    }
 
     const totalCount = await QC2OrderData.aggregate([
-      { $match: { selectedMono: mono, color: color, size: size } },
+      // Add the new 'type' field to the match criteria
+      { $match: { selectedMono: mono, color: color, size: size, type: type } },
       {
         $group: {
           _id: null,
-          totalCount: { $sum: "$count" } // Sum the count field
+          totalCount: { $sum: "$count" }
         }
       }
     ]);
 
-    res.json({ totalCount: totalCount[0]?.totalCount || 0 }); // Return total count or 0
+    res.json({ totalCount: totalCount[0]?.totalCount || 0 });
   } catch (error) {
     console.error("Error fetching total garments count:", error);
     res.status(500).json({ error: "Failed to fetch total garments count" });
   }
 });
+
+// // Endpoint to get total garments count for a specific MONo, Color, and Size
+
+// app.get("/api/total-garments-count/:mono/:color/:size", async (req, res) => {
+//   try {
+//     const { mono, color, size } = req.params;
+
+//     const totalCount = await QC2OrderData.aggregate([
+//       { $match: { selectedMono: mono, color: color, size: size } },
+//       {
+//         $group: {
+//           _id: null,
+//           totalCount: { $sum: "$count" } // Sum the count field
+//         }
+//       }
+//     ]);
+
+//     res.json({ totalCount: totalCount[0]?.totalCount || 0 }); // Return total count or 0
+//   } catch (error) {
+//     console.error("Error fetching total garments count:", error);
+//     res.status(500).json({ error: "Failed to fetch total garments count" });
+//   }
+// });
 
 // This endpoint is unused
 async function fetchOrderDetails(mono) {
@@ -3109,21 +3141,17 @@ async function fetchOrderDetails(mono) {
    End Points - qc2_orderdata
 ------------------------------ */
 
-// Generate a random ID for the bundle
 const generateRandomId = async () => {
   let randomId;
   let isUnique = false;
-
   while (!isUnique) {
     randomId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
     const existing = await QC2OrderData.findOne({ bundle_random_id: randomId });
     if (!existing) isUnique = true;
   }
-
   return randomId;
 };
 
-// Save bundle data to MongoDB
 app.post("/api/save-bundle-data", async (req, res) => {
   try {
     const { bundleData } = req.body;
@@ -3132,32 +3160,37 @@ app.post("/api/save-bundle-data", async (req, res) => {
     }
     const savedRecords = [];
 
-    // Save each bundle record
-    for (const bundle of bundleData) {
-      // Basic validation for required fields from the new logic
-      if (!bundle.task_no) {
-        return res
-          .status(400)
-          .json({ message: "Task No is a required field." });
+    // Since all bundles in a single generation request are the same, we only need to calculate the starting package_no once.
+    const firstBundle = bundleData[0];
+    if (!firstBundle.task_no || !firstBundle.type) {
+      return res
+        .status(400)
+        .json({ message: "Task No and Type are required fields." });
+    }
+
+    let package_no_counter = 1;
+
+    if (firstBundle.type === "end") {
+      const lastEndBundle = await QC2OrderData.findOne({
+        selectedMono: firstBundle.selectedMono,
+        color: firstBundle.color,
+        size: firstBundle.size,
+        type: "end"
+      }).sort({ package_no: -1 });
+
+      if (lastEndBundle) {
+        package_no_counter = lastEndBundle.package_no + 1;
       }
-      // Get current package number for this MONo-Color-Size combination
-      const packageCount = await QC2OrderData.countDocuments({
-        selectedMono: bundle.selectedMono
-        //color: bundle.color,
-        //size: bundle.size,
-      });
+    }
 
+    for (const bundle of bundleData) {
       const randomId = await generateRandomId();
-
       const now = new Date();
-
-      // Format timestamps
       const updated_date_seperator = now.toLocaleDateString("en-US", {
         month: "2-digit",
         day: "2-digit",
         year: "numeric"
       });
-
       const updated_time_seperator = now.toLocaleTimeString("en-US", {
         hour12: false,
         hour: "2-digit",
@@ -3167,29 +3200,21 @@ app.post("/api/save-bundle-data", async (req, res) => {
 
       const newBundle = new QC2OrderData({
         ...bundle,
-        package_no: packageCount + 1,
+        package_no: package_no_counter, // Use the calculated package number
         bundle_random_id: randomId,
-        factory: bundle.factory || "N/A", // Handle null factory
-        custStyle: bundle.custStyle || "N/A", // Handle null custStyle
-        country: bundle.country || "N/A", // Handle null country
-        department: bundle.department,
-        sub_con: bundle.sub_con || "No",
-        sub_con_factory:
-          bundle.sub_con === "Yes" ? bundle.sub_con_factory || "" : "N/A",
+        bundle_id: `${bundle.date}:${bundle.lineNo}:${bundle.selectedMono}:${bundle.color}:${bundle.size}:${package_no_counter}`,
         updated_date_seperator,
-        updated_time_seperator,
-        // Ensure user fields are included
-        emp_id: bundle.emp_id,
-        eng_name: bundle.eng_name,
-        kh_name: bundle.kh_name || "",
-        job_title: bundle.job_title || "",
-        dept_name: bundle.dept_name,
-        sect_name: bundle.sect_name || ""
+        updated_time_seperator
       });
+
       await newBundle.save();
       savedRecords.push(newBundle);
+
+      // If type is 'end', increment package_no for the next bundle in the same batch. For 'repack', it stays 1.
+      if (bundle.type === "end") {
+        package_no_counter++;
+      }
     }
-    // const savedRecords = await QC2OrderData.insertMany(bundleData);
 
     res.status(201).json({
       message: "Bundle data saved successfully",
@@ -3197,12 +3222,91 @@ app.post("/api/save-bundle-data", async (req, res) => {
     });
   } catch (error) {
     console.error("Error saving bundle data:", error);
-    res.status(500).json({
-      message: "Failed to save bundle data",
-      error: error.message
-    });
+    res
+      .status(500)
+      .json({ message: "Failed to save bundle data", error: error.message });
   }
 });
+
+// app.post("/api/save-bundle-data", async (req, res) => {
+//   try {
+//     const { bundleData } = req.body;
+//     if (!bundleData || !Array.isArray(bundleData)) {
+//       return res.status(400).json({ message: "Invalid bundle data format." });
+//     }
+//     const savedRecords = [];
+
+//     // Save each bundle record
+//     for (const bundle of bundleData) {
+//       // Basic validation for required fields from the new logic
+//       if (!bundle.task_no) {
+//         return res
+//           .status(400)
+//           .json({ message: "Task No is a required field." });
+//       }
+//       // Get current package number for this MONo-Color-Size combination
+//       const packageCount = await QC2OrderData.countDocuments({
+//         selectedMono: bundle.selectedMono
+//         //color: bundle.color,
+//         //size: bundle.size,
+//       });
+
+//       const randomId = await generateRandomId();
+
+//       const now = new Date();
+
+//       // Format timestamps
+//       const updated_date_seperator = now.toLocaleDateString("en-US", {
+//         month: "2-digit",
+//         day: "2-digit",
+//         year: "numeric"
+//       });
+
+//       const updated_time_seperator = now.toLocaleTimeString("en-US", {
+//         hour12: false,
+//         hour: "2-digit",
+//         minute: "2-digit",
+//         second: "2-digit"
+//       });
+
+//       const newBundle = new QC2OrderData({
+//         ...bundle,
+//         package_no: packageCount + 1,
+//         bundle_random_id: randomId,
+//         factory: bundle.factory || "N/A", // Handle null factory
+//         custStyle: bundle.custStyle || "N/A", // Handle null custStyle
+//         country: bundle.country || "N/A", // Handle null country
+//         department: bundle.department,
+//         sub_con: bundle.sub_con || "No",
+//         sub_con_factory:
+//           bundle.sub_con === "Yes" ? bundle.sub_con_factory || "" : "N/A",
+//         updated_date_seperator,
+//         updated_time_seperator,
+//         // Ensure user fields are included
+//         emp_id: bundle.emp_id,
+//         eng_name: bundle.eng_name,
+//         kh_name: bundle.kh_name || "",
+//         job_title: bundle.job_title || "",
+//         dept_name: bundle.dept_name,
+//         sect_name: bundle.sect_name || ""
+//       });
+//       await newBundle.save();
+//       savedRecords.push(newBundle);
+//     }
+//     // const savedRecords = await QC2OrderData.insertMany(bundleData);
+
+//     res.status(201).json({
+//       message: "Bundle data saved successfully",
+//       data: savedRecords
+//     });
+//   } catch (error) {
+//     console.error("Error saving bundle data:", error);
+//     res.status(500).json({
+//       message: "Failed to save bundle data",
+//       error: error.message
+//     });
+//   }
+// });
 
 /* ------------------------------
    Bundle Registration Data Edit
@@ -3242,10 +3346,6 @@ app.get("/api/bundle-data/distinct-filters", async (req, res) => {
       QC2OrderData.distinct("lineNo"),
       QC2OrderData.distinct("task_no")
     ]);
-    // const distinctMonos = await QC2OrderData.distinct("selectedMono");
-    // const distinctBuyers = await QC2OrderData.distinct("buyer");
-    // const distinctQcIds = await QC2OrderData.distinct("emp_id"); // Assuming emp_id is QC ID
-    // const distinctLineNos = await QC2OrderData.distinct("lineNo");
 
     res.json({
       monos: distinctMonos.sort(),
@@ -3332,7 +3432,6 @@ app.get("/api/filtered-bundle-data", async (req, res) => {
     // Calculate aggregated stats based on ALL filtered records (not just the current page)
     // This might be resource-intensive if the filtered set is very large.
     // Consider if stats should also be paginated or if an approximation is okay for large sets.
-    // For now, calculating on the full filtered set.
 
     // --- New Stats Aggregation ---
     const statsPipeline = [
@@ -3381,19 +3480,6 @@ app.get("/api/filtered-bundle-data", async (req, res) => {
       bundleCountByTask
     };
 
-    // let totalGarmentQty = 0;
-    // let uniqueStyles = new Set();
-
-    // allFilteredRecordsForStats.forEach((record) => {
-    //   totalGarmentQty += record.count || 0;
-    //   if (record.selectedMono) {
-    //     uniqueStyles.add(record.selectedMono);
-    //   }
-    // });
-
-    // const totalBundlesFromStats = allFilteredRecordsForStats.length; // This is the true total bundles for the filter
-    // const totalStyles = uniqueStyles.size;
-
     res.json({
       records,
       stats,
@@ -3404,41 +3490,21 @@ app.get("/api/filtered-bundle-data", async (req, res) => {
         limit: limitNum
       }
     });
-
-    // res.json({
-    //   records,
-    //   stats: {
-    //     totalGarmentQty,
-    //     totalBundles: totalBundlesFromStats, // Use count from all filtered records for stats
-    //     totalStyles
-    //   },
-    //   pagination: {
-    //     currentPage: pageNum,
-    //     totalPages: Math.ceil(totalRecords / limitNum),
-    //     totalRecords: totalRecords, // Total records matching the filter
-    //     limit: limitNum
-    //   }
-    // });
   } catch (error) {
     console.error("Error fetching filtered bundle data:", error);
     res.status(500).json({ message: "Failed to fetch filtered bundle data" });
   }
 });
 
-// Ensure your existing /api/user-batches is either removed or updated if it's now redundant
-// For simplicity, I'll assume the new /api/filtered-bundle-data replaces the primary need of /api/user-batches for this component.
-// If /api/user-batches is used elsewhere with just emp_id, keep it.
-// Otherwise, you can deprecate it in favor of the more flexible filtered endpoint.
-// For now, I'm keeping it as it might be used by the main BundleRegistration page for other purposes.
+// Ensure existing /api/user-batches is either removed or updated if it's now redundant
+
 app.get("/api/user-batches", async (req, res) => {
   try {
     const { emp_id } = req.query;
     if (!emp_id) {
       return res.status(400).json({ message: "emp_id is required" });
     }
-    // If you want this to also use the normalized date string for 'date' field
-    // you'd need to adjust how 'date' is stored or queried here too.
-    // For now, assuming it matches as is or 'date' field is not used for filtering here.
+
     const batches = await QC2OrderData.find({ emp_id }).sort({
       updated_date_seperator: -1,
       updated_time_seperator: -1
@@ -3449,20 +3515,6 @@ app.get("/api/user-batches", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch user batches" });
   }
 });
-
-// //For Data tab display records in a table
-// app.get("/api/user-batches", async (req, res) => {
-//   try {
-//     const { emp_id } = req.query;
-//     if (!emp_id) {
-//       return res.status(400).json({ message: "emp_id is required" });
-//     }
-//     const batches = await QC2OrderData.find({ emp_id });
-//     res.json(batches);
-//   } catch (error) {
-//     res.status(500).json({ message: "Failed to fetch user batches" });
-//   }
-// });
 
 /* ------------------------------
    End Points - Reprint - qc2_orderdata
@@ -3620,7 +3672,7 @@ app.get("/api/bundle-by-random-id/:randomId", async (req, res) => {
   }
 });
 
-// Check if bundle_id already exists and get the largest number
+// Endpoint to check if a bundle ID already exists
 app.post("/api/check-bundle-id", async (req, res) => {
   try {
     const { date, lineNo, selectedMono, color, size } = req.body;
@@ -4369,7 +4421,6 @@ app.get("/api/packing-records/distinct-filters", async (req, res) => {
     const [
       distinctTaskNos,
       moNosFromMoNoField,
-      moNosFromSelectedMonoField,
       distinctPackageNos,
       distinctDepartments,
       distinctLineNos, // ADDED
@@ -4377,24 +4428,18 @@ app.get("/api/packing-records/distinct-filters", async (req, res) => {
     ] = await Promise.all([
       Packing.distinct("task_no_packing").exec(),
       Packing.distinct("moNo").exec(),
-      Packing.distinct("selectedMono").exec(),
       Packing.distinct("package_no").exec(),
       Packing.distinct("department").exec(),
       Packing.distinct("lineNo").exec(), // ADDED: Fetch distinct line numbers
       Packing.distinct("emp_id_packing").exec() // ADDED: Fetch distinct QC IDs
     ]);
 
-    // Combine MO numbers from two different fields and get unique values
-    const combinedMoNos = [
-      ...new Set([...moNosFromMoNoField, ...moNosFromSelectedMonoField])
-    ];
-
     // Send the cleaned and sorted data in the JSON response
     res.json({
       taskNos: distinctTaskNos
         .filter((item) => item != null)
         .sort((a, b) => a - b),
-      moNos: combinedMoNos.filter((item) => item != null).sort(),
+      moNos: distinctMoNos.filter((item) => item != null).sort(),
       packageNos: distinctPackageNos
         .filter((item) => item != null)
         .sort((a, b) => a - b),
@@ -21520,6 +21565,347 @@ app.put("/api/ie/worker-assignment/tasks/:emp_id", async (req, res) => {
   } catch (error) {
     console.error("Error updating worker tasks:", error);
     res.status(500).json({ message: "Server error updating tasks." });
+  }
+});
+
+/* ------------------------------
+   IE - BULK Worker Assignment Endpoints
+------------------------------ */
+
+// POST - Assign tasks to all workers with a specific job title
+app.post("/api/ie/bulk-assignment/by-job-title", async (req, res) => {
+  const { job_title, tasks } = req.body;
+
+  if (!job_title || !Array.isArray(tasks)) {
+    return res
+      .status(400)
+      .json({ message: "Job title and a tasks array are required." });
+  }
+
+  try {
+    const workersToUpdate = await UserMain.find(
+      { job_title: job_title, working_status: "Working" },
+      "emp_id emp_code"
+    ).lean();
+
+    if (workersToUpdate.length === 0) {
+      return res.status(404).json({
+        message: `No active workers found with job title: ${job_title}`
+      });
+    }
+
+    const bulkOps = workersToUpdate.map((worker) => ({
+      updateOne: {
+        filter: { emp_id: worker.emp_id },
+        update: {
+          $set: {
+            emp_code: worker.emp_code,
+            tasks: tasks
+          }
+        },
+        upsert: true
+      }
+    }));
+
+    const result = await IEWorkerTask.bulkWrite(bulkOps);
+
+    res.json({
+      message: "Bulk assignment completed successfully.",
+      ...result
+    });
+  } catch (error) {
+    console.error("Error during bulk worker assignment:", error);
+    res.status(500).json({ message: "Server error during bulk assignment." });
+  }
+});
+
+// **** COMPLETELY REBUILT AND CORRECTED GET ENDPOINT ****
+// GET - Fetch data for the bulk assignment summary table
+app.get("/api/ie/bulk-assignment/summary", async (req, res) => {
+  try {
+    // The collection name for the UserMain model. Mongoose defaults to pluralizing the model name.
+    // If your UserMain model's collection is named differently, change "users" below.
+    const usersCollectionName = "users";
+
+    const summary = await IEWorkerTask.aggregate([
+      // Stage 1: Start from the tasks collection, which ONLY has assigned workers.
+      // This is the key to the fix.
+
+      // Stage 2: Lookup details for each worker from the main users collection.
+      {
+        $lookup: {
+          from: usersCollectionName, // The actual collection name for UserMain
+          localField: "emp_id",
+          foreignField: "emp_id",
+          as: "workerDetails"
+        }
+      },
+
+      // Stage 3: De-construct the workerDetails array. If a worker in tasks doesn't exist
+      // in the users collection anymore, this will correctly discard them.
+      {
+        $unwind: "$workerDetails"
+      },
+
+      // Stage 4: Only include workers who are currently "Working".
+      {
+        $match: {
+          "workerDetails.working_status": "Working"
+        }
+      },
+
+      // Stage 5: Group the results by the job title found in the worker's details.
+      {
+        $group: {
+          _id: "$workerDetails.job_title",
+          workers: {
+            $push: {
+              emp_id: "$emp_id",
+              face_photo: "$workerDetails.face_photo",
+              eng_name: "$workerDetails.eng_name",
+              tasks: "$tasks" // Get tasks from the original ie_worker_tasks document
+            }
+          }
+        }
+      },
+
+      // Stage 6: Format the output for the frontend.
+      {
+        $project: {
+          _id: 0,
+          jobTitle: "$_id",
+          workers: 1
+        }
+      },
+
+      { $sort: { jobTitle: 1 } }
+    ]);
+
+    res.json(summary);
+  } catch (error) {
+    console.error("Error fetching bulk assignment summary:", error);
+    res.status(500).json({ message: "Server error fetching summary." });
+  }
+});
+
+/* -------------------------------------------
+   IE - QC2 Role Management Endpoints (NEW & CORRECTED)
+------------------------------------------- */
+
+// Helper function to map page identifiers to keywords in processName
+const getProcessKeywordForPage = (pageIdentifier) => {
+  const keywordMap = {
+    "bundle-registration": "bundle",
+    washing: "washing",
+    opa: "opa",
+    ironing: "ironing",
+    packing: "packing", // The keyword remains the same
+    "qc2-inspection": "qc2"
+  };
+  return keywordMap[pageIdentifier.toLowerCase()];
+};
+
+// GET - Check if a specific user has access to a page based on their assigned tasks.
+app.get("/api/ie/role-management/access-check", async (req, res) => {
+  try {
+    const { emp_id, page } = req.query;
+
+    if (!emp_id || !page) {
+      return res
+        .status(400)
+        .json({ message: "Employee ID and page identifier are required." });
+    }
+
+    // Step 1: Check for Super Admin / Admin roles in the 'role_management' collection.
+    // We use findOne with an $or condition to see if the user exists in either role.
+    const adminCheck = await RoleManagment.findOne({
+      $or: [
+        { role: "Super Admin", "users.emp_id": emp_id },
+        { role: "Admin", "users.emp_id": emp_id }
+      ]
+    });
+
+    // If adminCheck finds a document, it means the user is an Admin or Super Admin.
+    if (adminCheck) {
+      return res.json({ hasAccess: true });
+    }
+
+    // If not an admin, proceed with the task-based check as before.
+    const keyword = getProcessKeywordForPage(page);
+    if (!keyword) {
+      return res.json({ hasAccess: false }); // Not an admin and page is not IE-controlled
+    }
+
+    // const keyword = getProcessKeywordForPage(page);
+    // if (!keyword) {
+    //   return res.status(400).json({ message: "Invalid page identifier." });
+    // }
+
+    // *** THE FIX IS HERE ***
+    // Conditionally build the regex based on the keyword.
+    let processNameFilter;
+    if (keyword.toLowerCase() === "packing") {
+      // For 'packing', use word boundaries (\b) to match it as a whole word.
+      processNameFilter = { $regex: `\\b${keyword}\\b`, $options: "i" };
+    } else {
+      // For all other keywords, use the original substring match.
+      processNameFilter = { $regex: keyword, $options: "i" };
+    }
+
+    // Step 1: Find all unique task numbers using the correct filter.
+    const requiredTasksResult = await QC2Task.aggregate([
+      { $match: { processName: processNameFilter } },
+      { $group: { _id: null, taskNos: { $addToSet: "$taskNo" } } }
+    ]);
+
+    const requiredTaskNos =
+      requiredTasksResult.length > 0 ? requiredTasksResult[0].taskNos : [];
+    if (requiredTaskNos.length === 0) {
+      return res.json({ hasAccess: false });
+    }
+
+    const workerTask = await IEWorkerTask.findOne({ emp_id }).lean();
+    const userTasks = workerTask ? workerTask.tasks : [];
+    if (userTasks.length === 0) {
+      return res.json({ hasAccess: false });
+    }
+
+    const hasOverlap = userTasks.some((task) => requiredTaskNos.includes(task));
+    res.json({ hasAccess: hasOverlap });
+  } catch (error) {
+    console.error("Error during IE access check:", error);
+    res.status(500).json({ message: "Server error during access check." });
+  }
+});
+
+// GET - Get a summary of which users have access to each managed page.
+app.get("/api/ie/role-management/summary", async (req, res) => {
+  try {
+    const pages = [
+      { id: "bundle-registration", name: "Bundle Registration" },
+      { id: "washing", name: "Washing" },
+      { id: "opa", name: "OPA" },
+      { id: "ironing", name: "Ironing" },
+      { id: "packing", name: "Packing" },
+      { id: "qc2-inspection", name: "QC2 Inspection" }
+    ];
+
+    const fullSummary = [];
+
+    for (const page of pages) {
+      const keyword = getProcessKeywordForPage(page.id);
+
+      // *** THE FIX IS HERE ***
+      // Apply the same conditional regex logic in the summary endpoint.
+      let processNameFilter;
+      if (keyword.toLowerCase() === "packing") {
+        processNameFilter = { $regex: `\\b${keyword}\\b`, $options: "i" };
+      } else {
+        processNameFilter = { $regex: keyword, $options: "i" };
+      }
+
+      // Get required task numbers for the page using the correct filter.
+      const requiredTasksResult = await QC2Task.aggregate([
+        { $match: { processName: processNameFilter } },
+        { $group: { _id: null, taskNos: { $addToSet: "$taskNo" } } }
+      ]);
+      const requiredTaskNos =
+        requiredTasksResult.length > 0 ? requiredTasksResult[0].taskNos : [];
+
+      let usersWithAccess = [];
+      if (requiredTaskNos.length > 0) {
+        usersWithAccess = await IEWorkerTask.aggregate([
+          { $match: { tasks: { $in: requiredTaskNos } } },
+          {
+            $lookup: {
+              from: "users",
+              localField: "emp_id",
+              foreignField: "emp_id",
+              as: "details"
+            }
+          },
+          { $unwind: "$details" },
+          { $match: { "details.working_status": "Working" } },
+          {
+            $project: {
+              _id: 0,
+              emp_id: "$emp_id",
+              eng_name: "$details.eng_name",
+              face_photo: "$details.face_photo",
+              job_title: "$details.job_title",
+              tasks: "$tasks"
+            }
+          },
+          { $sort: { emp_id: 1 } }
+        ]);
+      }
+
+      fullSummary.push({
+        pageName: page.name,
+        requiredTasks: requiredTaskNos.sort((a, b) => a - b),
+        users: usersWithAccess
+      });
+    }
+
+    res.json(fullSummary);
+  } catch (error) {
+    console.error("Error fetching IE role summary:", error);
+    res.status(500).json({ message: "Server error fetching IE role summary." });
+  }
+});
+
+/* -------------------------------------------
+   IE - Task No Finder Endpoints (NEW)
+------------------------------------------- */
+
+// GET - Fetch all unique task numbers for a given department
+app.get("/api/ie/tasks-by-department", async (req, res) => {
+  try {
+    const { department } = req.query;
+    if (!department) {
+      return res.status(400).json({ message: "Department query is required." });
+    }
+
+    const taskNos = await QC2Task.distinct("taskNo", { department });
+
+    res.json(taskNos.sort((a, b) => a - b));
+  } catch (error) {
+    console.error("Error fetching tasks by department:", error);
+    res.status(500).json({ message: "Server error fetching tasks." });
+  }
+});
+
+// GET - Fetch a user's task access rights (Admin status or assigned tasks)
+app.get("/api/ie/user-task-access/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    if (!emp_id) {
+      return res.status(400).json({ message: "Employee ID is required." });
+    }
+
+    // Check for Super Admin or Admin role first
+    const adminCheck = await RoleManagment.findOne({
+      $or: [
+        { role: "Super Admin", "users.emp_id": emp_id },
+        { role: "Admin", "users.emp_id": emp_id }
+      ]
+    });
+
+    if (adminCheck) {
+      // User is an admin, has access to all tasks
+      return res.json({ isAdmin: true, assignedTasks: [] });
+    }
+
+    // If not an admin, find their specific tasks
+    const workerTask = await IEWorkerTask.findOne({ emp_id }).lean();
+
+    res.json({
+      isAdmin: false,
+      assignedTasks: workerTask ? workerTask.tasks : []
+    });
+  } catch (error) {
+    console.error("Error fetching user task access:", error);
+    res.status(500).json({ message: "Server error fetching user access." });
   }
 });
 

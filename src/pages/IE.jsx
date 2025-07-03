@@ -7,6 +7,9 @@ import { Menu } from "lucide-react";
 // --- STEP 1: Import the new component you want to display ---
 import IETaskNoAllocation from "../components/inspection/ie/IETaskNoAllocation";
 import IEWorkerAssignment from "../components/inspection/ie/IEWorkerAssignment";
+import IEBulkWorkerAssignment from "../components/inspection/ie/IEBulkWorkerAssignment";
+import IERoleManagement from "../components/inspection/ie/IERoleManagement";
+
 const IEPage = () => {
   const { t } = useTranslation();
   const [isNavOpen, setIsNavOpen] = useState(true);
@@ -20,6 +23,12 @@ const IEPage = () => {
 
       case "Worker Assignment":
         return <IEWorkerAssignment />;
+
+      case "Bulk Assignment":
+        return <IEBulkWorkerAssignment />;
+
+      case "Role Management":
+        return <IERoleManagement />;
 
       case "Bundle Generation":
         // Placeholder for another future component

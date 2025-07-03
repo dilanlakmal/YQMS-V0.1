@@ -4,7 +4,13 @@ const qc2OrderDataSchema = new mongoose.Schema(
   {
     bundle_random_id: { type: String, required: true, unique: true },
     bundle_id: { type: String, required: true },
-    package_no: Number,
+    type: {
+      type: String,
+      enum: ["end", "repack"],
+      required: true,
+      default: "end"
+    },
+    package_no: { type: Number, required: true }, // Make package_no required
     task_no: { type: Number, required: true }, // Updated from task_no_order
     date: { type: String, required: true },
     department: { type: String, required: true },
@@ -154,6 +160,15 @@ const qc2OrderDataSchema = new mongoose.Schema(
   },
   { collection: "qc2_orderdata" }
 );
+
+// Add a compound index to optimize queries for finding the last package_no
+qc2OrderDataSchema.index({
+  selectedMono: 1,
+  color: 1,
+  size: 1,
+  type: 1,
+  package_no: -1
+});
 
 export default (connection) =>
   connection.model("qc2_orderdata", qc2OrderDataSchema);

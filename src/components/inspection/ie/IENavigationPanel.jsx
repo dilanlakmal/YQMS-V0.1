@@ -14,7 +14,8 @@ import {
   AlertTriangle,
   Menu,
   Sun,
-  Moon
+  Moon,
+  Shield
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useIETheme } from "./IEThemeContext";
@@ -179,6 +180,21 @@ const IENavigationPanel = ({
             label={t("ie.nav.worker_assignment", "Worker Assignment")}
             isActive={activeSection === "Worker Assignment"}
             onClick={() => handleNavClick("Worker Assignment")}
+            isNavOpen={isNavOpen}
+          />
+
+          <NavLink
+            icon={<Users />}
+            label={t("ie.nav.bulk_assignment", "Bulk Assignment")}
+            isActive={activeSection === "Bulk Assignment"}
+            onClick={() => handleNavClick("Bulk Assignment")}
+            isNavOpen={isNavOpen}
+          />
+          <NavLink
+            icon={<Shield />}
+            label={t("ie.nav.role_management", "Role Management")}
+            isActive={activeSection === "Role Management"}
+            onClick={() => handleNavClick("Role Management")}
             isNavOpen={isNavOpen}
           />
 
