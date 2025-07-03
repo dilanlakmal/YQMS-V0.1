@@ -37,6 +37,7 @@ import YQMSProject from "./pages/YQMSProject.jsx";
 import BGradeDefect from "./pages/BGradeDefect.jsx";
 import BGradeStock from "./pages/BGradeStock.jsx";
 import IEPage from "./pages/IE.jsx";
+import UploadWashingSpecs from "./pages/UploadWashingSpecs.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -365,6 +366,10 @@ function AppContent() {
               <Route path="/b-grade-defect" element={<BGradeDefect />} />
               <Route path="/b-grade-stcok" element={<BGradeStock />} />
               <Route path="/ieadmin" element={<IEPage />} />
+              <Route
+                path="/upload-beforewash-specs"
+                element={<UploadWashingSpecs />}
+              />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

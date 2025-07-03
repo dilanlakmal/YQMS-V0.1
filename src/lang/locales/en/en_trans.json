@@ -32,7 +32,8 @@
     "yqms": "YQMS",
     "b-grade_defect": "B-Grade Defects",
     "b-grade_stock": "B-Grade Stock",
-    "ieadmin": "IE Administration"
+    "ieadmin": "IE Administration",
+    "upload_beforewash_specs": "Upload Specs"
   },
 
   "nav": {
