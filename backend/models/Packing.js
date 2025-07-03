@@ -11,7 +11,7 @@ const packingSchema = new mongoose.Schema(
     bundle_id: String,
     bundle_random_id: String, // Added to store bundle_random_id from qc2_inspection_pass_bundle
     department: String,
-    selectedMono: String,
+    moNo: String,
     custStyle: String,
     buyer: String,
     country: String,
@@ -29,7 +29,7 @@ const packingSchema = new mongoose.Schema(
     kh_name_packing: String, // Added for user tracking
     job_title_packing: String, // Added for user tracking
     dept_name_packing: String, // Added for user tracking
-    sect_name_packing: String, // Added for user tracking
+    sect_name_packing: String // Added for user tracking
   },
   { collection: "packing" }
 );

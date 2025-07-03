@@ -14,7 +14,7 @@
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
-  "proxy": "https://192.167.14.32:5001",
+  "proxy": "https://192.167.12.162:5001",
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",

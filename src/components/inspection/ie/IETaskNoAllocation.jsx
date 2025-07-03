@@ -198,7 +198,7 @@ const IETaskNoAllocation = () => {
 
   const tableHeaders = useMemo(
     () => [
-      { key: "department", label: t("ie.task.table.department", "Department") },
+      { key: "department", label: t("ie.task.table.department", "Page Name") },
       {
         key: "productType",
         label: t("ie.task.table.productType", "Product Type")
