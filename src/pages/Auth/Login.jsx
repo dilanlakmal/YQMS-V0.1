@@ -157,7 +157,7 @@ function Login({ onLogin }) {
           </div>
           <div className="flex justify-center items-center mb-8">
             <img
-              src={`/IMG/logo.jpg`}
+              src={`/assets/Home/YQMSLogo.png`}
               alt="Loading"
               className="h-32 w-32 rounded-full"
             />
@@ -232,12 +232,14 @@ function Login({ onLogin }) {
               </Link>
             </div>
             <div className="text-center">
+              <center>
               <button
                 type="submit"
                 className="w-40 h-15 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Log in
               </button>
+              </center>
             </div>
             <p className="text-center text-s text-gray-600">
               Don't have an account?{" "}
