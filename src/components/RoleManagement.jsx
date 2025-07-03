@@ -1,6 +1,6 @@
 import axios from "axios";
-import { X } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { X, ShieldCheck, Users as UsersIcon, Tag } from "lucide-react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
 import { API_BASE_URL } from "../../config";
 import jsPDF from "jspdf";
@@ -21,6 +21,9 @@ export default function RoleManagement() {
   const [userRoles, setUserRoles] = useState([]);
   const [filterRole, setFilterRole] = useState(""); // State for role filter in User Roles tab
 
+  const [ieRoleSummary, setIeRoleSummary] = useState([]);
+  const [loadingIeRoles, setLoadingIeRoles] = useState(false);
+
   useEffect(() => {
     fetchRoles();
     fetchJobTitles();
@@ -28,6 +31,27 @@ export default function RoleManagement() {
       fetchUserRoles();
     }
   }, [user?.emp_id]);
+
+  const fetchIeRoleSummary = useCallback(async () => {
+    setLoadingIeRoles(true);
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/ie/role-management/summary`
+      );
+      setIeRoleSummary(response.data);
+    } catch (error) {
+      console.error("Error fetching IE role summary:", error);
+      setError("Failed to fetch IE process access roles.");
+    } finally {
+      setLoadingIeRoles(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "ie-roles") {
+      fetchIeRoleSummary();
+    }
+  }, [activeTab, fetchIeRoleSummary]);
 
   const fetchUserRoles = async () => {
     try {
@@ -266,6 +290,16 @@ export default function RoleManagement() {
               Add/Update Role
             </button>
             <button
+              onClick={() => setActiveTab("ie-roles")}
+              className={`${
+                activeTab === "ie-roles"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              IE Process Access
+            </button>
+            <button
               onClick={() => setActiveTab("user-roles")}
               className={`${
                 activeTab === "user-roles"
@@ -421,6 +455,66 @@ export default function RoleManagement() {
               {isEditing ? "Update" : "Add"}
             </button>
           </div>
+        </div>
+      ) : activeTab === "ie-roles" ? (
+        <div className="bg-white rounded-lg shadow-md p-6 space-y-6">
+          <h2 className="text-xl font-semibold text-gray-800">
+            IE Process Access Summary
+          </h2>
+          <p className="text-sm text-gray-600">
+            This section is read-only. Access is granted by assigning workers to
+            specific Task Numbers in the IE dashboard.
+          </p>
+          {loadingIeRoles ? (
+            <p>Loading...</p>
+          ) : (
+            ieRoleSummary.map((section) => (
+              <div key={section.pageName} className="border-t pt-4">
+                <h3 className="text-lg font-bold text-indigo-700 flex items-center mb-3">
+                  <ShieldCheck className="w-5 h-5 mr-2" /> {section.pageName}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="md:col-span-1">
+                    <label className="block text-sm font-medium text-gray-700 flex items-center mb-2">
+                      <Tag className="w-4 h-4 mr-2" />
+                      Required Tasks
+                    </label>
+                    <div className="flex flex-wrap gap-1">
+                      {section.requiredTasks.length > 0 ? (
+                        section.requiredTasks.map((task) => (
+                          <span
+                            key={task}
+                            className="bg-blue-100 text-blue-800 text-xs font-mono px-2 py-1 rounded-full"
+                          >
+                            {task}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-gray-500">None</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 flex items-center mb-2">
+                      <UsersIcon className="w-4 h-4 mr-2" />
+                      Users with Access ({section.users.length})
+                    </label>
+                    <div className="flex flex-wrap gap-4 p-2 border rounded-md min-h-[60px]">
+                      {section.users.length > 0 ? (
+                        section.users.map((u) => (
+                          <UserCard key={u.emp_id} user={u} />
+                        ))
+                      ) : (
+                        <span className="text-xs text-gray-500 self-center">
+                          No users have access.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       ) : (
         // Enhanced "User Roles" Tab

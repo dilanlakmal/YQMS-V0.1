@@ -170,7 +170,9 @@
     "filter_by_mono_placeholder_ends": "Filter by MONo (ends with)",
     "showing_records": "Showing {{count}} of {{total}} records",
     "showing_records_paginated": "Showing records",
-    "task_no": "Task No"
+    "task_no": "Task No",
+    "end": "End",
+    "repack": "Repack"
   },
 
   "defIm": {
@@ -1861,13 +1863,13 @@
     "task": {
       "filter": {
         "page_title": "Task No Adjustment",
-        "department": "Department",
+        "department": "Page Name",
         "productType": "Product Type",
         "processName": "Process Name",
         "taskNo": "Task No..."
       },
       "table": {
-        "department": "Department",
+        "department": "Page Name",
         "productType": "Product Type",
         "processName": "Process Name",
         "taskNo": "Task No",
