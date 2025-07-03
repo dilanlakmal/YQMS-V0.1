@@ -28,6 +28,7 @@ import createSubconFactoryModel from "./models/SubconFactory.js";
 import createQC2DefectsModel from "./models/QC2DefectsModel.js";
 import createQC2WorkersDataModel from "./models/QC2WorkersData.js";
 import createQC2BGradeModel from "./models/QC2BGrade.js";
+
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
 import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
 import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
@@ -90,15 +91,15 @@ const PORT = 5000;
 ------------------------------ */
 
 const options = {
-   key: fs.readFileSync(path.resolve(path.dirname(__filename), '192.167.8.235-key.pem')),
-  cert: fs.readFileSync(path.resolve(path.dirname(__filename), '192.167.8.235.pem'))
+   key: fs.readFileSync(path.resolve(path.dirname(__filename), '192.167.12.85-key.pem')),
+  cert: fs.readFileSync(path.resolve(path.dirname(__filename), '192.167.12.85.pem'))
 };
 
 export const server = https.createServer(options, app);
 // Initialize Socket.io
 export const io = new SocketIO(server, {
   cors: {
-    origin: ["https://192.167.8.235:3001", "http://localhost:3001", "https://localhost:3001"],
+    origin: ["https://192.167.12.85:3001", "http://localhost:3001", "https://localhost:3001"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -114,7 +115,7 @@ app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 //app.use(cors());
 app.use(bodyParser.json());
 
-const allowedOrigins = ["https://192.167.8.235:3001", "http://localhost:3001", "https://localhost:3001"];
+const allowedOrigins = ["https://192.167.12.85:3001", "http://localhost:3001", "https://localhost:3001"];
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -179,6 +180,7 @@ const SubconFactory = createSubconFactoryModel(ymProdConnection);
 const QC2Defects = createQC2DefectsModel(ymProdConnection);
 const QC2WorkersData = createQC2WorkersDataModel(ymProdConnection);
 const QC2BGrade = createQC2BGradeModel(ymProdConnection);
+
 const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
 const SewingDefects = createSewingDefectsModel(ymProdConnection);
 const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection);
@@ -2760,6 +2762,113 @@ app.get("/api/qc2-defect-categories", async (req, res) => {
     res
       .status(500)
       .json({ message: "Server error fetching defect categories" });
+  }
+});
+
+/* ------------------------------
+   IE - Task No Allocation Endpoints
+------------------------------ */
+
+// GET - Fetch all tasks with filtering
+// server.js
+
+// UPDATED - GET - Fetch all tasks with filtering AND pagination
+app.post("/api/ie/tasks", async (req, res) => {
+  try {
+    const {
+      department,
+      productType,
+      processName,
+      taskNo,
+      page = 1,
+      limit = 10
+    } = req.body;
+    const filter = {};
+
+    if (department) filter.department = department;
+    if (productType) filter.productType = productType;
+    if (processName)
+      filter.processName = { $regex: new RegExp(processName, "i") };
+    if (taskNo) filter.taskNo = Number(taskNo);
+
+    const skip = (page - 1) * limit;
+
+    const tasks = await QC2Task.find(filter)
+      .sort({ record_no: 1 })
+      .skip(skip)
+      .limit(limit);
+
+    const totalTasks = await QC2Task.countDocuments(filter);
+
+    res.json({
+      tasks,
+      totalPages: Math.ceil(totalTasks / limit),
+      currentPage: page
+    });
+  } catch (error) {
+    console.error("Error fetching IE tasks:", error);
+    res.status(500).json({ message: "Server error fetching tasks." });
+  }
+});
+
+// GET - Fetch distinct values for filters
+app.get("/api/ie/tasks/filter-options", async (req, res) => {
+  try {
+    const [departments, productTypes, processNames] = await Promise.all([
+      QC2Task.distinct("department"),
+      QC2Task.distinct("productType"),
+      QC2Task.distinct("processName")
+    ]);
+    res.json({
+      departments: departments.sort(),
+      productTypes: productTypes.sort(),
+      processNames: processNames.sort()
+    });
+  } catch (error) {
+    console.error("Error fetching task filter options:", error);
+    res.status(500).json({ message: "Server error fetching filter options." });
+  }
+});
+
+// PUT - Update a task by its ID
+app.put("/api/ie/tasks/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { taskNo } = req.body;
+
+    if (taskNo === undefined || isNaN(Number(taskNo))) {
+      return res.status(400).json({ message: "A valid Task No is required." });
+    }
+
+    const updatedTask = await QC2Task.findByIdAndUpdate(
+      id,
+      { taskNo: Number(taskNo) },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedTask) {
+      return res.status(404).json({ message: "Task not found." });
+    }
+    res.json({ message: "Task updated successfully", task: updatedTask });
+  } catch (error) {
+    console.error("Error updating task:", error);
+    res.status(500).json({ message: "Server error updating task." });
+  }
+});
+
+// DELETE - Delete a task by its ID
+app.delete("/api/ie/tasks/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedTask = await QC2Task.findByIdAndDelete(id);
+
+    if (!deletedTask) {
+      return res.status(404).json({ message: "Task not found." });
+    }
+    res.json({ message: "Task deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting task:", error);
+    res.status(500).json({ message: "Server error deleting task." });
   }
 });
 
@@ -5582,6 +5691,10 @@ app.put("/api/qc2-inspection-pass-bundle/:id", async (req, res) => {
 });
 
 // Endpoint to get summary data
+
+// CORRECTED Endpoint to get summary data with all new fields and correct logic
+// FINAL CORRECTED Endpoint to get summary data with all fields calculated correctly
+
 app.get("/api/qc2-inspection-summary", async (req, res) => {
   try {
     const {
@@ -5593,9 +5706,10 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
       size,
       department,
       buyer,
-      lineNo // Add Line No
+      lineNo
     } = req.query;
 
+    // --- Filter logic (This part is correct and remains unchanged) ---
     let match = {};
     if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
     if (emp_id_inspection)
@@ -5608,15 +5722,19 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     if (buyer)
       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
     if (lineNo) match.lineNo = lineNo.trim();
-    //if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
 
-    // Normalize and convert dates to Date objects for proper comparison
     if (startDate || endDate) {
-      match.$expr = match.$expr || {}; // Initialize $expr if not present
-      match.$expr.$and = match.$expr.$and || [];
-
+      match.$expr = match.$expr || { $and: [] };
+      const parseDate = (dateStr) => {
+        const [month, day, year] = dateStr.split("/");
+        return new Date(
+          `${year}-${month.padStart(2, "0")}-${day.padStart(
+            2,
+            "0"
+          )}T00:00:00.000Z`
+        );
+      };
       if (startDate) {
-        const normalizedStartDate = normalizeDateString(startDate);
         match.$expr.$and.push({
           $gte: [
             {
@@ -5625,17 +5743,11 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
                 format: "%m/%d/%Y"
               }
             },
-            {
-              $dateFromString: {
-                dateString: normalizedStartDate,
-                format: "%m/%d/%Y"
-              }
-            }
+            parseDate(startDate)
           ]
         });
       }
       if (endDate) {
-        const normalizedEndDate = normalizeDateString(endDate);
         match.$expr.$and.push({
           $lte: [
             {
@@ -5644,12 +5756,7 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
                 format: "%m/%d/%Y"
               }
             },
-            {
-              $dateFromString: {
-                dateString: normalizedEndDate,
-                format: "%m/%d/%Y"
-              }
-            }
+            parseDate(endDate)
           ]
         });
       }
@@ -5662,37 +5769,52 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     // }
 
     const data = await QC2InspectionPassBundle.aggregate([
+      // Stage 1: Match documents based on user's filters
       { $match: match },
+
+      // Stage 2: Group all matching documents to get the final totals for all fields.
       {
         $group: {
           _id: null,
-          checkedQty: { $sum: "$checkedQty" },
+          totalGarments: { $sum: "$checkedQty" },
           totalPass: { $sum: "$totalPass" },
           totalRejects: { $sum: "$totalRejects" },
           defectsQty: { $sum: "$defectQty" },
+
+          // Repair Left is the sum of the `totalRepair`
+          totalRepair: { $sum: "$totalRepair" },
+
+          // B-Grade Qty calculation
+          sumOfAllRejects: { $sum: "$totalRejects" },
+          sumOfAllVar: { $sum: { $sum: "$printArray.totalRejectGarment_Var" } },
+
           totalBundles: { $sum: 1 }
         }
       },
+
+      // Stage 3: Project the final shape, calculate B-Grade Qty, and rates
       {
         $project: {
           _id: 0,
-          checkedQty: 1,
+          totalGarments: 1,
           totalPass: 1,
           totalRejects: 1,
+          totalRepair: 1,
           defectsQty: 1,
+          bGradeQty: { $subtract: ["$sumOfAllRejects", "$sumOfAllVar"] },
           totalBundles: 1,
           defectRate: {
             $cond: [
-              { $eq: ["$checkedQty", 0] },
+              { $eq: ["$totalGarments", 0] },
               0,
-              { $divide: ["$defectsQty", "$checkedQty"] }
+              { $divide: ["$defectsQty", "$totalGarments"] }
             ]
           },
           defectRatio: {
             $cond: [
-              { $eq: ["$checkedQty", 0] },
+              { $eq: ["$totalGarments", 0] },
               0,
-              { $divide: ["$totalRejects", "$checkedQty"] }
+              { $divide: ["$totalRejects", "$totalGarments"] }
             ]
           }
         }
@@ -5702,10 +5824,13 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     if (data.length > 0) {
       res.json(data[0]);
     } else {
+      // Return a default object with all fields if no data is found
       res.json({
-        checkedQty: 0,
+        totalGarments: 0,
         totalPass: 0,
         totalRejects: 0,
+        totalRepair: 0,
+        bGradeQty: 0,
         defectsQty: 0,
         totalBundles: 0,
         defectRate: 0,
@@ -5717,6 +5842,135 @@ app.get("/api/qc2-inspection-summary", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch summary data" });
   }
 });
+
+// app.get("/api/qc2-inspection-summary", async (req, res) => {
+//   try {
+//     const {
+//       moNo,
+//       emp_id_inspection,
+//       startDate,
+//       endDate,
+//       color,
+//       size,
+//       department,
+//       buyer,
+//       lineNo // Add Line No
+//     } = req.query;
+
+//     let match = {};
+//     if (moNo) match.moNo = { $regex: new RegExp(moNo.trim(), "i") };
+//     if (emp_id_inspection)
+//       match.emp_id_inspection = {
+//         $regex: new RegExp(emp_id_inspection.trim(), "i")
+//       };
+//     if (color) match.color = color;
+//     if (size) match.size = size;
+//     if (department) match.department = department;
+//     if (buyer)
+//       match.buyer = { $regex: new RegExp(escapeRegExp(buyer.trim()), "i") };
+//     if (lineNo) match.lineNo = lineNo.trim();
+//     //if (lineNo) match.lineNo = { $regex: new RegExp(lineNo.trim(), "i") }; // Add Line No filter
+
+//     // Normalize and convert dates to Date objects for proper comparison
+//     if (startDate || endDate) {
+//       match.$expr = match.$expr || {}; // Initialize $expr if not present
+//       match.$expr.$and = match.$expr.$and || [];
+
+//       if (startDate) {
+//         const normalizedStartDate = normalizeDateString(startDate);
+//         match.$expr.$and.push({
+//           $gte: [
+//             {
+//               $dateFromString: {
+//                 dateString: "$inspection_date",
+//                 format: "%m/%d/%Y"
+//               }
+//             },
+//             {
+//               $dateFromString: {
+//                 dateString: normalizedStartDate,
+//                 format: "%m/%d/%Y"
+//               }
+//             }
+//           ]
+//         });
+//       }
+//       if (endDate) {
+//         const normalizedEndDate = normalizeDateString(endDate);
+//         match.$expr.$and.push({
+//           $lte: [
+//             {
+//               $dateFromString: {
+//                 dateString: "$inspection_date",
+//                 format: "%m/%d/%Y"
+//               }
+//             },
+//             {
+//               $dateFromString: {
+//                 dateString: normalizedEndDate,
+//                 format: "%m/%d/%Y"
+//               }
+//             }
+//           ]
+//         });
+//       }
+//     }
+//     const data = await QC2InspectionPassBundle.aggregate([
+//       { $match: match },
+//       {
+//         $group: {
+//           _id: null,
+//           checkedQty: { $sum: "$checkedQty" },
+//           totalPass: { $sum: "$totalPass" },
+//           totalRejects: { $sum: "$totalRejects" },
+//           defectsQty: { $sum: "$defectQty" },
+//           totalBundles: { $sum: 1 }
+//         }
+//       },
+//       {
+//         $project: {
+//           _id: 0,
+//           checkedQty: 1,
+//           totalPass: 1,
+//           totalRejects: 1,
+//           defectsQty: 1,
+//           totalBundles: 1,
+//           defectRate: {
+//             $cond: [
+//               { $eq: ["$checkedQty", 0] },
+//               0,
+//               { $divide: ["$defectsQty", "$checkedQty"] }
+//             ]
+//           },
+//           defectRatio: {
+//             $cond: [
+//               { $eq: ["$checkedQty", 0] },
+//               0,
+//               { $divide: ["$totalRejects", "$checkedQty"] }
+//             ]
+//           }
+//         }
+//       }
+//     ]);
+
+//     if (data.length > 0) {
+//       res.json(data[0]);
+//     } else {
+//       res.json({
+//         checkedQty: 0,
+//         totalPass: 0,
+//         totalRejects: 0,
+//         defectsQty: 0,
+//         totalBundles: 0,
+//         defectRate: 0,
+//         defectRatio: 0
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Error fetching summary data:", error);
+//     res.status(500).json({ error: "Failed to fetch summary data" });
+//   }
+// });
 
 // Endpoint to get summaries per MO No with dynamic grouping
 
@@ -7492,69 +7746,252 @@ app.post(
   }
 );
 
-// app.post(
-//   "/api/qc2-repair-tracking/update-defect-status-by-name",
-//   async (req, res) => {
-//     const { defect_print_id, garmentNumber, defectName, status } = req.body;
-//     try {
-//       const repairTracking = await QC2RepairTracking.findOne({
-//         defect_print_id
-//       });
-//       if (!repairTracking) {
-//         console.error(
-//           `No repair tracking found for defect_print_id: ${defect_print_id}`
-//         ); // Add this line
-//         return res.status(404).json({ message: "Repair tracking not found" });
-//       }
+// B grade confirmation endpoint -- need to update;
+// Endpoint to PROCESS leader decisions (Accept / Not B Grade)
+// This endpoint is completely separate and handles the leader's actions.
+// server.js
 
-//       // Find the specific defect and update it
-//       const updatedRepairArray = repairTracking.repairArray.map((item) => {
-//         if (
-//           item.garmentNumber === garmentNumber &&
-//           item.defectName === defectName
-//         ) {
-//           const shouldUpdate = item.status !== status;
-//           if (shouldUpdate) {
-//             const now = new Date();
-//             return {
-//               ...item,
-//               status: status,
-//               repair_date:
-//                 status === "OK" ? now.toLocaleDateString("en-US") : null,
-//               repair_time:
-//                 status === "OK"
-//                   ? now.toLocaleTimeString("en-US", { hour12: false })
-//                   : null,
-//               // pass_bundle: status === "OK" ? "Pass" : status === "Fail" ? "Fail" : item.pass_bundle
-//               pass_bundle: status === "OK" ? "Pass" : item.pass_bundle
-//             };
-//           }
-//         }
-//         return item;
-//       });
-//       // Check if any changes were made
-//       const hasChanges = repairTracking.repairArray.some((item, index) => {
-//         return (
-//           JSON.stringify(item) !== JSON.stringify(updatedRepairArray[index])
-//         );
-//       });
-//       if (hasChanges) {
-//         repairTracking.repairArray = updatedRepairArray;
-//         await repairTracking.save();
-//         console.log("Updated Repair Array:", updatedRepairArray);
-//         res.status(200).json({ message: "Defect status updated successfully" });
-//       } else {
-//         res.status(200).json({ message: "No changes were made" });
-//       }
-//     } catch (error) {
-//       console.error("Error updating defect status:", error);
-//       res.status(500).json({
-//         message: "Failed to update defect status",
-//         error: error.message
-//       });
-//     }
-//   }
-// );
+// --- CORRECTED ENDPOINT for B-Grade Leader Decisions (WITHOUT TRANSACTION) ---
+// This removes the `mongoose.startSession()` call that is causing the timeout.
+app.post("/api/b-grade-defects/process-decisions", async (req, res) => {
+  const { defect_print_id, decisions } = req.body;
+
+  if (!defect_print_id || !decisions || !Object.keys(decisions).length) {
+    return res.status(400).json({ message: "Missing required data." });
+  }
+
+  try {
+    // NOTE: We are NOT starting a session here.
+
+    // Step 1: Find the B-Grade document to get its bundle_random_id.
+    const bGradeDoc = await QC2BGrade.findOne({ defect_print_id });
+    if (!bGradeDoc) {
+      throw new Error(
+        `B-Grade document not found for defect ID: ${defect_print_id}`
+      );
+    }
+
+    let garmentsChangedToNotBGrade = 0;
+
+    // Step 2: Update the bGradeDoc based on decisions.
+    bGradeDoc.bgradeArray.forEach((garment) => {
+      const garmentNumberStr = String(garment.garmentNumber);
+      if (
+        decisions[garmentNumberStr] === "Not B Grade" &&
+        garment.leader_status === "B Grade"
+      ) {
+        garment.leader_status = "Not B Grade";
+        garmentsChangedToNotBGrade++;
+      }
+    });
+
+    if (garmentsChangedToNotBGrade === 0) {
+      return res
+        .status(200)
+        .json({ message: "No changes to 'Not B-Grade' were made." });
+    }
+
+    // Step 3: Update counts and save the B-Grade document.
+    bGradeDoc.totalBgradeQty -= garmentsChangedToNotBGrade;
+    bGradeDoc.markModified("bgradeArray");
+    // We save this document first.
+    await bGradeDoc.save();
+
+    // Step 4: Find and update the Inspection document.
+    // This is the second, separate database operation.
+    const filter = { bundle_random_id: bGradeDoc.bundle_random_id };
+    const update = {
+      $inc: {
+        totalPass: garmentsChangedToNotBGrade,
+        // We also need to find the correct printArray element to decrement its Var count
+        "printArray.$[elem].totalRejectGarment_Var": -garmentsChangedToNotBGrade
+      }
+    };
+    const options = {
+      arrayFilters: [{ "elem.defect_print_id": defect_print_id }]
+    };
+
+    await QC2InspectionPassBundle.updateOne(filter, update, options);
+
+    // If both operations succeed, send a success response.
+    res.status(200).json({
+      message: "B-Grade decisions processed successfully."
+    });
+  } catch (error) {
+    // If either operation fails, this catch block will be triggered.
+    console.error("Error processing B-Grade decisions:", error);
+    // Note: Since this is not a transaction, the first save might have succeeded
+    // while the second one failed. This is the trade-off.
+    res.status(500).json({
+      message: "An error occurred while processing the request.",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   B-Grade Stock Page Endpoints
+------------------------------ */
+
+// ENDPOINT 1: Fetch B-Grade Stock Data based on filters
+app.post("/api/b-grade-stock", async (req, res) => {
+  try {
+    const { date, moNo, lineNo, packageNo, color, size, department } = req.body;
+
+    // --- Build the main query filter ---
+    const matchFilter = {
+      // Only include documents that have a positive B-Grade quantity
+      totalBgradeQty: { $gt: 0 }
+    };
+
+    if (date) {
+      // The 'createdAt' field is automatically added by `timestamps: true`
+      // and is a proper ISODate, which is better for date range queries.
+      const startDate = new Date(date);
+      startDate.setHours(0, 0, 0, 0);
+
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+
+      matchFilter.createdAt = {
+        $gte: startDate,
+        $lte: endDate
+      };
+    }
+
+    if (moNo) matchFilter.moNo = moNo;
+    if (lineNo) matchFilter.lineNo = lineNo;
+    if (packageNo) matchFilter.package_no = Number(packageNo);
+    if (color) matchFilter.color = color;
+    if (size) matchFilter.size = size;
+    if (department) matchFilter.department = department;
+
+    const bGradeStock = await QC2BGrade.aggregate([
+      // Stage 1: Initial filtering based on user's criteria
+      { $match: matchFilter },
+
+      // Stage 2: Deconstruct the bgradeArray to process each garment individually
+      { $unwind: "$bgradeArray" },
+
+      // Stage 3: Filter out garments that are marked as "Not B Grade"
+      { $match: { "bgradeArray.leader_status": "B Grade" } },
+
+      // Stage 4: Group the valid B-Grade garments back by their parent document ID
+      {
+        $group: {
+          _id: "$_id", // Group by the original document ID
+          // Bring the header fields along
+          moNo: { $first: "$moNo" },
+          package_no: { $first: "$package_no" },
+          lineNo: { $first: "$lineNo" },
+          color: { $first: "$color" },
+          size: { $first: "$size" },
+          // Re-assemble the array of valid B-Grade garments
+          bgradeArray: { $push: "$bgradeArray" }
+        }
+      },
+
+      // Stage 5: Calculate the B-Grade Qty for each document (which is the size of the filtered array)
+      {
+        $project: {
+          moNo: 1,
+          package_no: 1,
+          lineNo: 1,
+          color: 1,
+          size: 1,
+          bGradeQty: { $size: "$bgradeArray" },
+          // We now call it defectDetails to match the frontend table's expectation
+          defectDetails: "$bgradeArray",
+          _id: 0
+        }
+      },
+
+      // Sort the final results
+      { $sort: { package_no: 1, moNo: 1 } }
+    ]);
+
+    res.json(bGradeStock);
+  } catch (error) {
+    console.error("Error fetching B-Grade stock:", error);
+    res
+      .status(500)
+      .json({ message: "Server error fetching B-Grade stock data." });
+  }
+});
+
+// ENDPOINT 2: Fetch distinct filter options based on a selected date
+app.get("/api/b-grade-stock/filter-options", async (req, res) => {
+  try {
+    const { date } = req.query;
+
+    if (!date) {
+      return res
+        .status(400)
+        .json({ message: "A date is required to fetch filter options." });
+    }
+
+    const startDate = new Date(date);
+    startDate.setUTCHours(0, 0, 0, 0);
+
+    const endDate = new Date(date);
+    endDate.setUTCHours(23, 59, 59, 999);
+
+    // Filter for documents on the selected date that have B-Grade items
+    const matchFilter = {
+      createdAt: { $gte: startDate, $lte: endDate },
+      totalBgradeQty: { $gt: 0 }
+    };
+
+    // Use an aggregation pipeline to get all distinct values in one DB call
+    const [filterOptions] = await QC2BGrade.aggregate([
+      { $match: matchFilter },
+      {
+        $group: {
+          _id: null,
+          moNos: { $addToSet: "$moNo" },
+          lineNos: { $addToSet: "$lineNo" },
+          packageNos: { $addToSet: "$package_no" },
+          colors: { $addToSet: "$color" },
+          sizes: { $addToSet: "$size" },
+          departments: { $addToSet: "$department" }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          moNos: 1,
+          lineNos: 1,
+          packageNos: 1,
+          colors: 1,
+          sizes: 1,
+          departments: 1
+        }
+      }
+    ]);
+
+    // If no records found for that date, return empty arrays
+    if (!filterOptions) {
+      return res.json({
+        moNos: [],
+        lineNos: [],
+        packageNos: [],
+        colors: [],
+        sizes: [],
+        departments: []
+      });
+    }
+
+    // Sort the arrays before sending
+    for (const key in filterOptions) {
+      filterOptions[key].sort();
+    }
+
+    res.json(filterOptions);
+  } catch (error) {
+    console.error("Error fetching B-Grade filter options:", error);
+    res.status(500).json({ message: "Server error fetching filter options." });
+  }
+});
 
 /* ------------------------------
    QC2 - Reworks
@@ -21186,6 +21623,118 @@ app.get("/api/users/search", async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to search for users", error: err.message });
+  }
+});
+
+/* ------------------------------
+   IE - Worker Assignment Endpoints (Corrected for Cross-Database)
+------------------------------ */
+
+// GET - Fetch distinct values for all filters (ONLY from active workers in ym_eco_board)
+app.get("/api/ie/worker-assignment/filter-options", async (req, res) => {
+  try {
+    const workingStatusFilter = { working_status: "Working" };
+    const [empIds, empCodes, departments, sections, jobTitles, taskNos] =
+      await Promise.all([
+        UserMain.distinct("emp_id", workingStatusFilter),
+        UserMain.distinct("emp_code", workingStatusFilter),
+        UserMain.distinct("dept_name", workingStatusFilter),
+        UserMain.distinct("sect_name", workingStatusFilter),
+        UserMain.distinct("job_title", workingStatusFilter),
+        QC2Task.distinct("taskNo")
+      ]);
+    res.json({
+      empIds: empIds.filter(Boolean).sort(),
+      empCodes: empCodes.filter(Boolean).sort(),
+      departments: departments.filter(Boolean).sort(),
+      sections: sections.filter(Boolean).sort(),
+      jobTitles: jobTitles.filter(Boolean).sort(),
+      taskNos: taskNos.filter(Boolean).sort((a, b) => a - b)
+    });
+  } catch (error) {
+    console.error("Error fetching worker assignment filter options:", error);
+    res.status(500).json({ message: "Server error fetching filter options." });
+  }
+});
+
+// POST - Fetch paginated and filtered worker data (from users collection ONLY)
+app.post("/api/ie/worker-assignment/workers", async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 12,
+      emp_id,
+      emp_code,
+      dept_name,
+      sect_name,
+      job_title
+    } = req.body;
+    let filter = { working_status: "Working" };
+    if (emp_id) filter.emp_id = emp_id;
+    if (emp_code) filter.emp_code = emp_code;
+    if (dept_name) filter.dept_name = dept_name;
+    if (sect_name) filter.sect_name = sect_name;
+    if (job_title) filter.job_title = job_title;
+
+    const skip = (page - 1) * limit;
+    const totalUsers = await UserMain.countDocuments(filter);
+    const workers = await UserMain.find(filter)
+      .select(
+        "emp_id emp_code eng_name kh_name job_title dept_name sect_name face_photo"
+      )
+      .sort({ emp_id: 1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    res.json({
+      workers,
+      totalPages: Math.ceil(totalUsers / limit),
+      currentPage: Number(page),
+      totalUsers
+    });
+  } catch (error) {
+    console.error("Error fetching workers:", error);
+    res.status(500).json({ message: "Server error fetching workers." });
+  }
+});
+
+// *** NEW ENDPOINT ***
+// GET - Fetch ALL assigned tasks from the ie_worker_tasks collection
+app.get("/api/ie/worker-assignment/all-tasks", async (req, res) => {
+  try {
+    const allAssignedTasks = await IEWorkerTask.find({}).lean();
+    res.json(allAssignedTasks);
+  } catch (error) {
+    console.error("Error fetching all worker tasks:", error);
+    res
+      .status(500)
+      .json({ message: "Server error fetching all assigned tasks." });
+  }
+});
+
+// PUT - Update a worker's assigned tasks (This endpoint is correct and remains unchanged)
+app.put("/api/ie/worker-assignment/tasks/:emp_id", async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    const { tasks, emp_code } = req.body;
+    if (!Array.isArray(tasks)) {
+      return res
+        .status(400)
+        .json({ message: "Tasks must be an array of numbers." });
+    }
+    const updatedWorkerTask = await IEWorkerTask.findOneAndUpdate(
+      { emp_id },
+      { $set: { tasks, emp_code } },
+      { new: true, upsert: true, runValidators: true }
+    );
+    res.json({
+      message: "Worker tasks updated successfully",
+      data: updatedWorkerTask
+    });
+  } catch (error) {
+    console.error("Error updating worker tasks:", error);
+    res.status(500).json({ message: "Server error updating tasks." });
   }
 });
 
