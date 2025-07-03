@@ -615,7 +615,12 @@ export default function Navbar({ onLogout }) {
         items: [
           { path: "/Fabric", roles: ["Fabric"], title: t("home.fabric") },
           { path: "/cutting", roles: ["Cutting"], title: t("home.cutting") },
-          { path: "/scc", roles: ["SCC"], title: t("SCC") }
+          { path: "/scc", roles: ["SCC"], title: t("SCC") },
+          {
+            path: "/upload-beforewash-specs",
+            roles: ["Washing Clerk"],
+            title: t("home.upload_beforewash_specs")
+          }
         ]
       },
       {

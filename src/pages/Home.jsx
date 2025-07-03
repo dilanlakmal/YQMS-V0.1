@@ -503,6 +503,13 @@ function Home() {
             image: "assets/Home/bundle.avif",
             title: t("SCC"),
             description: "Spreading & Cutting"
+          },
+          {
+            path: "/upload-beforewash-specs",
+            roles: ["Washing Clerk"],
+            image: "assets/Home/uploadspecs.png",
+            title: t("home.upload_beforewash_specs"),
+            description: "Upload Beforewash Specs"
           }
         ]
       },
