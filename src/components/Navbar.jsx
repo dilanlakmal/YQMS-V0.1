@@ -534,6 +534,8 @@ import { useAuth } from "./authentication/AuthContext";
 import { useTheme } from "./context/ThemeContext";
 import { API_BASE_URL } from "../../config";
 import LanguageSwitcher from "../components/layout/LangSwitch";
+import YQMSAIChatBox from "../pages/YQMSAIChatBox";
+
 import {
   Layers,
   Settings,
@@ -549,7 +551,8 @@ import {
   Menu,
   X,
   TerminalSquare,
-  UserPlus
+  UserPlus,
+  Bot
 } from "lucide-react";
 
 export default function Navbar({ onLogout }) {
@@ -568,6 +571,8 @@ export default function Navbar({ onLogout }) {
   const [accessMap, setAccessMap] = useState({});
   const profileMenuRef = useRef(null);
   const navRef = useRef(null);
+
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const navStructure = useMemo(
     () => [
@@ -645,8 +650,13 @@ export default function Navbar({ onLogout }) {
           { path: "/audit", roles: ["QA Audit"], title: "Audit" },
           {
             path: "/final-inspection",
-            roles: ["QA Audit"],
+            roles: ["QA"],
             title: "Final Inspection"
+          },
+          {
+            path: "/qc-accuracy",
+            roles: ["QA"],
+            title: "QC Accuracy"
           }
         ]
       },
@@ -888,6 +898,16 @@ export default function Navbar({ onLogout }) {
             {/* Right Side: Actions */}
             <div className="flex items-center space-x-2 sm:space-x-3">
               <LanguageSwitcher />
+              {/* --- ADD THE AI BOT BUTTON HERE --- */}
+              <button
+                onClick={() => setIsChatOpen((prev) => !prev)}
+                className="p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors relative"
+                aria-label="Open AI Chat"
+              >
+                <Bot className="w-5 h-5" />
+                {/* Optional: Add a notification dot */}
+                {/* <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-900" /> */}
+              </button>
               <button
                 onClick={toggleTheme}
                 className="p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors"
@@ -1016,6 +1036,8 @@ export default function Navbar({ onLogout }) {
           </div>
         </div>
       </div>
+      {/* --- RENDER THE CHATBOX CONDITIONALLY --- */}
+      {isChatOpen && <YQMSAIChatBox onClose={() => setIsChatOpen(false)} />}
     </>
   );
 }
