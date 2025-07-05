@@ -62,7 +62,8 @@ const UploadWashingSpecs = () => {
 
           workbook.SheetNames.forEach((sheetName) => {
             // Process only sheets that look like K1, K2, etc.
-            if (sheetName.match(/^K\d+$/i)) {
+            if (sheetName.match(/^K([a-z]+|\d+)$/i)) {
+              //if (sheetName.match(/^K\d+$/i))
               const worksheet = workbook.Sheets[sheetName];
               const json_data = utils.sheet_to_json(worksheet, {
                 header: 1,

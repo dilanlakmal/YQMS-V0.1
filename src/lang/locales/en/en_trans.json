@@ -1491,6 +1491,7 @@
     "qc2Defects": "QC2 Defects",
     "sccOperators": "SCC Operators",
     "auditCheckpointsTab": "Audit Checkpoints",
+    "qadefects": "QA Defects",
     "contentComingSoon": "This section is under development. Content will be available soon."
   },
   "sccOperators": {

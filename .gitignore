@@ -36,3 +36,12 @@ dist-ssr
 # Ignore all content within the public storage directory.
 # handles all image upload folders in frontend
 public/storage/
+
+
+# ==================================
+#      AI Service API
+# ==================================
+# Ignore API Keys.
+# Ignore the .env file inside the ai_service folder and the virtual environment.
+/ai_service/.env
+/ai_service/venv

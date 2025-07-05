@@ -556,8 +556,15 @@ function Home() {
             description: "QA Audit Check Point"
           },
           {
+            path: "/qc-accuracy",
+            roles: ["QA"],
+            image: "assets/Home/qc-accuracy.png",
+            title: "QC Accuracy",
+            description: "QA Random Checks"
+          },
+          {
             path: "/final-inspection",
-            roles: ["QA Audit"],
+            roles: ["QA"],
             image: "assets/Home/qafinal.png",
             title: "Final Inspection",
             description: "QA Final Inspection"
