@@ -3,7 +3,13 @@ import { useTranslation } from "react-i18next";
 import { PlusCircle } from "lucide-react";
 import DefectRow from "./DefectRow";
 
-const DefectInputTable = ({ defects, setDefects, availableDefects, buyer }) => {
+const DefectInputTable = ({
+  defects,
+  setDefects,
+  availableDefects,
+  buyer,
+  uploadMetadata
+}) => {
   const { t } = useTranslation();
 
   const handleAddPcs = () => {
@@ -16,6 +22,7 @@ const DefectInputTable = ({ defects, setDefects, availableDefects, buyer }) => {
         defectCode: null,
         qty: 1,
         type: null,
+        imageUrl: "", // Add imageUrl
         tempId: Date.now()
       }
     ]);
@@ -24,7 +31,14 @@ const DefectInputTable = ({ defects, setDefects, availableDefects, buyer }) => {
   const handleAddDefectToPcs = (pcsNo) => {
     setDefects([
       ...defects,
-      { pcsNo, defectCode: null, qty: 1, type: null, tempId: Date.now() }
+      {
+        pcsNo,
+        defectCode: null,
+        qty: 1,
+        type: null,
+        imageUrl: "",
+        tempId: Date.now()
+      }
     ]);
   };
 
@@ -98,6 +112,10 @@ const DefectInputTable = ({ defects, setDefects, availableDefects, buyer }) => {
               <th scope="col" className="p-3 w-40">
                 {t("qcAccuracy.type", "Type")}
               </th>
+              {/* --- NEW IMAGE HEADER --- */}
+              <th scope="col" className="p-3 w-24 text-center">
+                {t("qcAccuracy.image", "Image")}
+              </th>
               <th scope="col" className="p-3 w-20 text-center">
                 {t("qcAccuracy.action", "Action")}
               </th>
@@ -138,6 +156,7 @@ const DefectInputTable = ({ defects, setDefects, availableDefects, buyer }) => {
                         buyer={buyer}
                         onUpdate={handleUpdate}
                         onDelete={handleDelete}
+                        uploadMetadata={uploadMetadata} // Pass metadata down
                       />
                     );
                   })}

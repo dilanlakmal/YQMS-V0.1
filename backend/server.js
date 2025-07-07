@@ -22257,6 +22257,86 @@ app.post("/api/qa-defects/buyer-statuses", async (req, res) => {
    ENDPOINTS FOR QC ACCURACY PAGE
 ===================================================================== */
 
+// --- Helper function for sanitizing filenames (if not already defined globally) ---
+// const sanitize = (input) => {
+//   if (typeof input !== "string") input = String(input);
+//   let sane = input.replace(/[^a-zA-Z0-9-._]/g, "_");
+//   if (sane === "." || sane === "..") return "_";
+//   return sane;
+// };
+
+// --- FIX #2: NEW IMAGE UPLOAD ENDPOINT FOR QA ACCURACY ---
+const qaAccuracyStorage = multer.memoryStorage();
+const qaAccuracyUpload = multer({
+  storage: qaAccuracyStorage,
+  limits: { fileSize: 25 * 1024 * 1024 }
+});
+
+app.post(
+  "/api/qa-accuracy/upload-image",
+  qaAccuracyUpload.single("imageFile"),
+  async (req, res) => {
+    try {
+      const { imageType, moNo, qcId, date } = req.body;
+      const imageFile = req.file;
+
+      if (!imageFile) {
+        return res
+          .status(400)
+          .json({ success: false, message: "No image file provided." });
+      }
+      if (!imageType || !moNo || !qcId || !date) {
+        return res.status(400).json({
+          success: false,
+          message: "Missing required metadata for image."
+        });
+      }
+
+      // Define the target path for QA Accuracy images
+      const qaAccuracyUploadPath = path.join(
+        __dirname,
+        "public",
+        "storage",
+        "qa_accuracy"
+      );
+      // Ensure the directory exists
+      await fsPromises.mkdir(qaAccuracyUploadPath, { recursive: true });
+
+      // Sanitize metadata for a unique and safe filename
+      const sanitizedImageType = sanitize(imageType); // 'defect' or 'additional'
+      const sanitizedMoNo = sanitize(moNo);
+      const sanitizedQcId = sanitize(qcId);
+      const sanitizedDate = sanitize(date.split("T")[0]); // Use YYYY-MM-DD part of date
+
+      const imagePrefix = `${sanitizedImageType}_${sanitizedMoNo}_${sanitizedDate}_${sanitizedQcId}_`;
+
+      const newFilename = `${imagePrefix}${Date.now()}.webp`;
+      const finalDiskPath = path.join(qaAccuracyUploadPath, newFilename);
+
+      // Process and save the image using sharp
+      await sharp(imageFile.buffer)
+        .resize({
+          width: 1024,
+          height: 1024,
+          fit: "inside",
+          withoutEnlargement: true
+        })
+        .webp({ quality: 80 })
+        .toFile(finalDiskPath);
+
+      const publicUrl = `${API_BASE_URL}/storage/qa_accuracy/${newFilename}`;
+
+      res.json({ success: true, filePath: publicUrl });
+    } catch (error) {
+      console.error("Error in /api/qa-accuracy/upload-image:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error during image processing."
+      });
+    }
+  }
+);
+
 // GET - Fetch all QA defects for the dropdown (lightweight version)
 app.get("/api/qa-defects-list", async (req, res) => {
   try {

@@ -11,8 +11,16 @@ import EmpQRCodeScanner from "../qc_roving/EmpQRCodeScanner";
 import AQLDisplay from "./AQLDisplay";
 import DefectInputTable from "./DefectInputTable";
 import AccuracyResult from "./AccuracyResult";
+import QAAdditionalImageUpload from "./QAAdditionalImageUpload";
 import { calculateAccuracy, getAqlDetails } from "./aqlHelper";
-import { QrCode, Loader2, Save, Lock } from "lucide-react";
+import {
+  QrCode,
+  Loader2,
+  Save,
+  Lock,
+  MessageSquare,
+  ImageIcon
+} from "lucide-react";
 
 const QAInspectionForm = () => {
   const { t } = useTranslation();
@@ -20,7 +28,7 @@ const QAInspectionForm = () => {
 
   // Form State
   const [reportDate, setReportDate] = useState(new Date());
-  const [reportType, setReportType] = useState("First Output");
+  const [reportType, setReportType] = useState("Inline Sewing");
   const [scannedQc, setScannedQc] = useState(null);
   const [moNo, setMoNo] = useState(null);
   const [selectedColors, setSelectedColors] = useState([]);
@@ -38,6 +46,10 @@ const QAInspectionForm = () => {
   const [sizeOptions, setSizeOptions] = useState([]);
   const [allDefectsList, setAllDefectsList] = useState([]);
   const [defects, setDefects] = useState([]);
+
+  // --- NEW STATE FOR REMARKS AND ADDITIONAL IMAGES ---
+  const [remarks, setRemarks] = useState("");
+  const [extraImages, setExtraImages] = useState([]);
 
   useEffect(() => {
     if (reportType === "First Output") {
@@ -218,13 +230,19 @@ const QAInspectionForm = () => {
           defectNameKh: d.defectNameKh,
           defectNameCh: d.defectNameCh,
           qty: d.qty,
-          type: d.type
+          type: d.type,
+          imageUrl: d.imageUrl || "" // Include the imageUrl
         }))
         .filter((d) => d.defectCode),
       totalDefectPoints,
       qcAccuracy: accuracy,
       grade,
-      result // <-- Add result to the payload
+      result, // <-- Add result to the payload
+      // --- ADD NEW FIELDS TO PAYLOAD ---
+      remarks,
+      extraImages: extraImages.filter(
+        (s) => s.sectionName && s.imageUrls.length > 0
+      )
     };
 
     try {
@@ -243,6 +261,8 @@ const QAInspectionForm = () => {
       setLineNo("");
       setTableNo("");
       setDefects([]);
+      setRemarks(""); // Reset remarks
+      setExtraImages([]); // Reset extra images
       // Reset checkedQty to its default based on the current reportType
       setCheckedQty(reportType === "First Output" ? 5 : 20);
     } catch (error) {
@@ -455,6 +475,7 @@ const QAInspectionForm = () => {
           setDefects={setDefects}
           availableDefects={allDefectsList}
           buyer={determinedBuyer}
+          uploadMetadata={{ moNo: moNo?.value, qcId: user?.emp_id }} // Pass metadata
         />
         {!isHeaderComplete && (
           <div className="absolute inset-0 bg-gray-400/30 dark:bg-gray-900/50 flex items-center justify-center rounded-lg backdrop-blur-sm">
@@ -472,6 +493,43 @@ const QAInspectionForm = () => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* --- NEW REMARKS SECTION --- */}
+      <div className="mt-6">
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          <MessageSquare size={20} /> {t("qcAccuracy.remarks", "Remarks")}{" "}
+          (Optional)
+        </h3>
+        <div className="relative mt-2">
+          <textarea
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+            maxLength={250}
+            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700"
+            rows="3"
+            placeholder={t(
+              "qcAccuracy.remarksPlaceholder",
+              "Enter any additional comments here..."
+            )}
+          ></textarea>
+          <span className="absolute bottom-2 right-2 text-xs text-gray-500">
+            {remarks.length} / 250
+          </span>
+        </div>
+      </div>
+
+      {/* --- NEW ADDITIONAL IMAGES SECTION --- */}
+      <div className="mt-6">
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          <ImageIcon size={20} />{" "}
+          {t("qcAccuracy.additionalImages", "Additional Images")} (Optional)
+        </h3>
+        <QAAdditionalImageUpload
+          sections={extraImages}
+          setSections={setExtraImages}
+          uploadMetadata={{ moNo: moNo?.value, qcId: user?.emp_id }}
+        />
       </div>
 
       <AccuracyResult

@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Minus, Trash2, RotateCcw } from "lucide-react";
 import Select from "react-select";
+import QAImageUpload from "./QAImageUpload";
 
 const DefectRow = ({
   defect,
@@ -9,7 +10,8 @@ const DefectRow = ({
   availableDefects,
   buyer,
   onUpdate,
-  onDelete
+  onDelete,
+  uploadMetadata // Pass metadata for uploads
 }) => {
   const { t, i18n } = useTranslation();
 
@@ -64,6 +66,10 @@ const DefectRow = ({
 
   const clearDefect = () => {
     onUpdate(rowIndex, "clear", null);
+  };
+
+  const handleImageChange = (imageUrl) => {
+    onUpdate(rowIndex, "imageUrl", imageUrl);
   };
 
   const reactSelectStyles = {
@@ -190,6 +196,16 @@ const DefectRow = ({
           ))}
         </select>
       </td>
+
+      {/* --- NEW IMAGE COLUMN --- */}
+      <td className="p-2 border-r dark:border-gray-600 w-24 text-center">
+        <QAImageUpload
+          imageUrl={defect.imageUrl || ""}
+          onImageChange={handleImageChange}
+          uploadMetadata={uploadMetadata}
+        />
+      </td>
+
       <td className="p-2 text-center">
         <button
           onClick={() => onDelete(rowIndex)}

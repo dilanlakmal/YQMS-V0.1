@@ -24,18 +24,7 @@ dist-ssr
 *.sw?
 
 
-# ==================================
-#      BACKEND SPECIFIC IGNORES
-# ==================================
-# Ignore the user-uploaded content directory inside the backend folder.
-# all image upload folders (cutting, scc, etc.)
-/backend/public/storage/
 
-
-# --- USER UPLOADED CONTENT ---
-# Ignore all content within the public storage directory.
-# handles all image upload folders in frontend
-public/storage/
 
 
 # ==================================
