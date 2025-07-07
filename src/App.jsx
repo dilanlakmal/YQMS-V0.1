@@ -57,6 +57,8 @@ import { ThemeProvider } from "./components/context/ThemeContext";
 
 import CuttingPage from "./pages/Cutting.jsx";
 
+import QCAccuracy from "./pages/QCAccuracy.jsx";
+
 import QAAudit from "./pages/QAAudit.jsx";
 
 export const BluetoothContext = createContext(null);
@@ -366,6 +368,7 @@ function AppContent() {
               <Route path="/b-grade-defect" element={<BGradeDefect />} />
               <Route path="/b-grade-stcok" element={<BGradeStock />} />
               <Route path="/ieadmin" element={<IEPage />} />
+              <Route path="/qc-accuracy" element={<QCAccuracy />} />
               <Route
                 path="/upload-beforewash-specs"
                 element={<UploadWashingSpecs />}
