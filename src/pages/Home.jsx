@@ -503,6 +503,13 @@ function Home() {
             image: "assets/Home/bundle.avif",
             title: t("SCC"),
             description: "Spreading & Cutting"
+          },
+          {
+            path: "/qcWashing",
+            roles: ["QC Washing"],
+            image: "assets/Home/bundle.avif",
+            title: t("home.qcWashing"),
+            description: "Washing Report"
           }
         ]
       },

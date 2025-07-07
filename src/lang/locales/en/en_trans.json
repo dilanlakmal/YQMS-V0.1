@@ -32,7 +32,8 @@
     "yqms": "YQMS",
     "b-grade_defect": "B-Grade Defects",
     "b-grade_stock": "B-Grade Stock",
-    "ieadmin": "IE Administration"
+    "ieadmin": "IE Administration",
+    "qcWashing": "QC Washing"
   },
 
   "nav": {
@@ -1490,6 +1491,7 @@
     "qc2Defects": "QC2 Defects",
     "sccOperators": "SCC Operators",
     "auditCheckpointsTab": "Audit Checkpoints",
+    "qcWashingTab": "QC Washing",
     "contentComingSoon": "This section is under development. Content will be available soon."
   },
   "sccOperators": {

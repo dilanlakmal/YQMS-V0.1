@@ -27,6 +27,7 @@ import CuttingInspectionManage from "../components/inspection/cutting/CuttingIns
 import SCCOperatorsManage from "../components/inspection/scc/SCCOperatorsManage";
 import RovingMasterDataManage from "../components/inspection/qc_roving/RovingMasterDataManage";
 import QC2DefectsAddModify from "../components/inspection/qc2/QC2DefectsAddModify";
+import QCWashing from "../components/inspection/qcWashing/admin/qcWashingModify";
 
 // Placeholder components for other tabs
 const PlaceholderComponent = ({ titleKey, contentKey }) => {
@@ -113,6 +114,13 @@ const SystemAdmin = () => {
         labelKey: "systemAdmin.auditCheckpointsTab", // You'll need to add this translation key
         icon: <CheckSquare size={18} />, // Example Icon
         component: <AuditCheckPoints />
+      },
+      {
+        // New Tab for QC Washing
+        id: "qcWashing",
+        labelKey: "systemAdmin.qcWashingTab", // You'll need to add this translation key
+        icon: <CheckSquare size={18} />, // Example Icon
+        component: <QCWashing />
       }
     ],
     [] // t is not needed here as labelKey strings are static. If they were dynamic like t('some.key'), then t would be a dependency.
