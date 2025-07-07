@@ -52,11 +52,22 @@ export const defectTypeWeights = {
 };
 
 export const calculateAccuracy = (defects, totalCheckedQty, reportType) => {
-  if (!defects || defects.length === 0) {
-    return { accuracy: 100, grade: "A", totalDefectPoints: 0 };
-  }
   if (totalCheckedQty <= 0) {
-    return { accuracy: 0, grade: "D", totalDefectPoints: 0 };
+    return {
+      accuracy: 0,
+      grade: "D",
+      totalDefectPoints: 0,
+      result: "Fail"
+    };
+  }
+
+  if (!defects || defects.length === 0) {
+    return {
+      accuracy: 100,
+      grade: "A",
+      totalDefectPoints: 0,
+      result: "Pass"
+    };
   }
 
   const totalDefectPoints = defects.reduce((sum, defect) => {
@@ -67,9 +78,10 @@ export const calculateAccuracy = (defects, totalCheckedQty, reportType) => {
   const accuracy = (1 - totalDefectPoints / totalCheckedQty) * 100;
   const finalAccuracy = Math.max(0, accuracy);
 
-  let grade = "D";
+  // --- START OF MODIFICATION ---
 
-  // Apply grading logic based on reportType
+  // Determine Grade (This logic remains for detailed reporting if needed)
+  let grade = "D";
   if (reportType === "First Output") {
     if (finalAccuracy === 100) grade = "A";
     else if (finalAccuracy >= 80) grade = "B";
@@ -83,9 +95,53 @@ export const calculateAccuracy = (defects, totalCheckedQty, reportType) => {
     else grade = "D";
   }
 
+  // Determine Pass/Fail Result based ONLY on the accuracy score
+  const result = finalAccuracy >= 95 ? "Pass" : "Fail";
+
   return {
     accuracy: parseFloat(finalAccuracy.toFixed(2)),
-    grade,
-    totalDefectPoints: parseFloat(totalDefectPoints.toFixed(1))
+    grade, // Kept for potential detailed reports
+    totalDefectPoints: parseFloat(totalDefectPoints.toFixed(2)),
+    result // The new, simple Pass/Fail result
   };
+  // --- END OF MODIFICATION ---
 };
+
+// export const calculateAccuracy = (defects, totalCheckedQty, reportType) => {
+//   if (!defects || defects.length === 0) {
+//     return { accuracy: 100, grade: "A", totalDefectPoints: 0 };
+//   }
+//   if (totalCheckedQty <= 0) {
+//     return { accuracy: 0, grade: "D", totalDefectPoints: 0 };
+//   }
+
+//   const totalDefectPoints = defects.reduce((sum, defect) => {
+//     const weight = defectTypeWeights[defect.type] || 0;
+//     return sum + defect.qty * weight;
+//   }, 0);
+
+//   const accuracy = (1 - totalDefectPoints / totalCheckedQty) * 100;
+//   const finalAccuracy = Math.max(0, accuracy);
+
+//   let grade = "D";
+
+//   // Apply grading logic based on reportType
+//   if (reportType === "First Output") {
+//     if (finalAccuracy === 100) grade = "A";
+//     else if (finalAccuracy >= 80) grade = "B";
+//     else if (finalAccuracy >= 70) grade = "C";
+//     else grade = "D";
+//   } else {
+//     // Standard grading for other types
+//     if (finalAccuracy >= 95) grade = "A";
+//     else if (finalAccuracy >= 92.5) grade = "B";
+//     else if (finalAccuracy >= 90) grade = "C";
+//     else grade = "D";
+//   }
+
+//   return {
+//     accuracy: parseFloat(finalAccuracy.toFixed(2)),
+//     grade,
+//     totalDefectPoints: parseFloat(totalDefectPoints.toFixed(1))
+//   };
+// };

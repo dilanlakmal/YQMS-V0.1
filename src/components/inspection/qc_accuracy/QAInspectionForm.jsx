@@ -12,7 +12,7 @@ import AQLDisplay from "./AQLDisplay";
 import DefectInputTable from "./DefectInputTable";
 import AccuracyResult from "./AccuracyResult";
 import { calculateAccuracy, getAqlDetails } from "./aqlHelper";
-import { QrCode, Loader2, Save } from "lucide-react";
+import { QrCode, Loader2, Save, Lock } from "lucide-react";
 
 const QAInspectionForm = () => {
   const { t } = useTranslation();
@@ -152,26 +152,42 @@ const QAInspectionForm = () => {
     return "Other";
   }, [moNo]);
 
+  // --- FORM VALIDATION LOGIC ---
+  const isFormInvalid = useMemo(() => {
+    // Check if any required field is empty or invalid
+    const hasInvalidDefects =
+      defects.length === 0 || defects.every((d) => !d.defectCode);
+    const lineOrTableMissing =
+      reportType === "Inline Finishing" ? !tableNo : !lineNo;
+
+    return (
+      !scannedQc ||
+      !moNo ||
+      selectedColors.length === 0 ||
+      lineOrTableMissing ||
+      hasInvalidDefects
+    );
+  }, [scannedQc, moNo, selectedColors, reportType, lineNo, tableNo, defects]);
+
+  // --- LOGIC TO DISABLE DEFECT TABLE ---
+  const isHeaderComplete = useMemo(() => {
+    return moNo && reportType && checkedQty > 0;
+  }, [moNo, reportType, checkedQty]);
+
   const handleFinishInspection = async () => {
-    if (!scannedQc || !user) {
+    // Validation is now handled by the disabled button, but we keep this as a backup
+    if (isFormInvalid) {
       Swal.fire(
-        t("qcAccuracy.validation.scanQcFirst"),
-        t("qcAccuracy.validation.scanQcFirstDetail"),
-        "warning"
-      );
-      return;
-    }
-    if (!moNo?.value) {
-      Swal.fire(
-        t("qcAccuracy.validation.selectMo"),
-        t("qcAccuracy.validation.selectMoDetail"),
+        t("qcAccuracy.validation.incompleteForm"),
+        t("qcAccuracy.validation.incompleteFormDetail"),
         "warning"
       );
       return;
     }
 
     setIsSubmitting(true);
-    const { accuracy, grade, totalDefectPoints } = calculateAccuracy(
+    // --- GET `result` AND ADD TO PAYLOAD ---
+    const { accuracy, grade, totalDefectPoints, result } = calculateAccuracy(
       defects,
       checkedQty,
       reportType
@@ -207,7 +223,8 @@ const QAInspectionForm = () => {
         .filter((d) => d.defectCode),
       totalDefectPoints,
       qcAccuracy: accuracy,
-      grade
+      grade,
+      result // <-- Add result to the payload
     };
 
     try {
@@ -217,12 +234,17 @@ const QAInspectionForm = () => {
         t("qcAccuracy.submission.successText"),
         "success"
       );
-      setDefects([]);
+      // --- RESET FORM STATE (KEEPING DATE & TYPE) ---
       setScannedQc(null);
       setMoNo(null);
       setMoNoSearch("");
       setSelectedColors([]);
       setSelectedSizes([]);
+      setLineNo("");
+      setTableNo("");
+      setDefects([]);
+      // Reset checkedQty to its default based on the current reportType
+      setCheckedQty(reportType === "First Output" ? 5 : 20);
     } catch (error) {
       console.error("Error submitting report:", error);
       Swal.fire(
@@ -235,7 +257,7 @@ const QAInspectionForm = () => {
     }
   };
 
-  // *** FIX #2 START: Create a single, corrected style object for react-select ***
+  // *** Create a single, corrected style object for react-select ***
   const reactSelectStyles = {
     control: (base) => ({
       ...base,
@@ -282,11 +304,10 @@ const QAInspectionForm = () => {
     }),
     placeholder: (base) => ({ ...base, color: "var(--color-text-secondary)" })
   };
-  // *** FIX #2 END ***
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
         <div>
           <label className="text-sm font-medium">
             {t("qcAccuracy.reportType", "Report Type")}
@@ -427,12 +448,31 @@ const QAInspectionForm = () => {
 
       <AQLDisplay checkedQty={checkedQty} />
 
-      <DefectInputTable
-        defects={defects}
-        setDefects={setDefects}
-        availableDefects={allDefectsList}
-        buyer={determinedBuyer}
-      />
+      {/* --- WRAP DEFECT TABLE TO APPLY DISABLED STATE --- */}
+      <div className="relative">
+        <DefectInputTable
+          defects={defects}
+          setDefects={setDefects}
+          availableDefects={allDefectsList}
+          buyer={determinedBuyer}
+        />
+        {!isHeaderComplete && (
+          <div className="absolute inset-0 bg-gray-400/30 dark:bg-gray-900/50 flex items-center justify-center rounded-lg backdrop-blur-sm">
+            <div className="text-center p-4 bg-white/70 dark:bg-gray-800/70 rounded-lg shadow-xl">
+              <Lock className="mx-auto h-8 w-8 text-gray-600 dark:text-gray-400" />
+              <p className="mt-2 font-semibold text-gray-700 dark:text-gray-200">
+                {t(
+                  "qcAccuracy.validation.completeHeaderFirst",
+                  "Please complete header details first"
+                )}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                (MO No, Checked Qty)
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       <AccuracyResult
         defects={defects}
@@ -441,11 +481,10 @@ const QAInspectionForm = () => {
       />
 
       <div className="mt-8 flex justify-end">
+        {/* --- APPLY VALIDATION TO BUTTON'S DISABLED PROP --- */}
         <button
           onClick={handleFinishInspection}
-          disabled={
-            isSubmitting || defects.filter((d) => d.defectCode).length === 0
-          } // Disable if no valid defects are added
+          disabled={isSubmitting || isFormInvalid}
           className="flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? <Loader2 className="animate-spin" /> : <Save />}
