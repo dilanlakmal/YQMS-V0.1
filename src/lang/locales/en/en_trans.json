@@ -1885,5 +1885,55 @@
       "delete_success_title": "Deleted!",
       "delete_error_title": "Error!"
     }
+  },
+  "qcAccuracy": {
+    "title": "QC Accuracy Inspection",
+    "reportType": "Report Type",
+    "date": "Date",
+    "scanQcQr": "Scan QC Inspector QR",
+    "reScan": "Re-Scan",
+    "scan": "Scan",
+    "moNo": "MO No",
+    "searchMo": "Search MO...",
+    "color": "Color",
+    "size": "Size (Optional)",
+    "tableNo": "Table No",
+    "lineNo": "Line No",
+    "select": "Select...",
+    "totalCheckedQty": "Total Checked Qty",
+    "aqlSamplingPlan": "AQL Sampling Plan",
+    "codeLetter": "Code Letter",
+    "sampleSize": "Sample Size",
+    "accept": "Accept (Ac)",
+    "reject": "Reject (Re)",
+    "defectDetails": "Defect Details",
+    "addPcs": "Add Pcs",
+    "pcsNo": "Pcs No",
+    "defectName": "Defect Name",
+    "qty": "Qty",
+    "type": "Type",
+    "action": "Action",
+    "noDefectsAdded": "No defects added. Click \"Add Pcs\" to start.",
+    "selectDefect": "Select Defect...",
+    "selectADefectFirst": "Select a defect",
+    "qcAccuracyResult": "QC Accuracy Result",
+    "totalDefectPoints": "Total Defect Points",
+    "accuracy": "Accuracy",
+    "grade": "Grade",
+    "finishInspection": "Finish Inspection",
+    "validation": {
+      "scanQcFirst": "Please scan the QC inspector QR code."
+    },
+    "submission": {
+      "successTitle": "Success!",
+      "successText": "QC Accuracy report has been saved successfully.",
+      "errorTitle": "Submission Failed",
+      "errorText": "Could not save the report. Please try again."
+    }
+  },
+  "classifications": {
+    "minor": "Minor",
+    "major": "Major",
+    "critical": "Critical"
   }
 }

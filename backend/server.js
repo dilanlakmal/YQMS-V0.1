@@ -75,6 +75,7 @@ import createEMBDefectModel from "./models/EMBdefect.js";
 import createEMBReportModel from "./models/EMBReport.js";
 
 import createQADefectsModel from "./models/QADefectsModel.js";
+import createQCAccuracyReportModel from "./models/QCAccuracyReportModel.js";
 
 import createAuditCheckPointModel from "./models/AuditCheckPoint.js";
 
@@ -232,6 +233,7 @@ const EMBDefect = createEMBDefectModel(ymProdConnection);
 const EMBReport = createEMBReportModel(ymProdConnection);
 
 const QADefectsModel = createQADefectsModel(ymProdConnection);
+const QCAccuracyReportModel = createQCAccuracyReportModel(ymProdConnection);
 
 // Define new SCC Operator models on ymProdConnection
 const SCCHTOperator = createSCCHTOperatorModel(ymProdConnection);
@@ -22248,6 +22250,59 @@ app.post("/api/qa-defects/buyer-statuses", async (req, res) => {
       message: "Failed to update QA defect buyer statuses",
       error: error.message
     });
+  }
+});
+
+/* =====================================================================
+   ENDPOINTS FOR QC ACCURACY PAGE
+===================================================================== */
+
+// GET - Fetch all QA defects for the dropdown (lightweight version)
+app.get("/api/qa-defects-list", async (req, res) => {
+  try {
+    const defects = await QADefectsModel.find({})
+      .sort({ code: 1 })
+      .select("code english khmer chinese statusByBuyer") // Select only necessary fields
+      .lean();
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching QA defects list:", error);
+    res.status(500).json({ message: "Server error fetching QA defects list" });
+  }
+});
+
+// POST - Save a new QC Accuracy Inspection Report
+app.post("/api/qc-accuracy-reports", async (req, res) => {
+  try {
+    // Basic validation
+    const requiredFields = [
+      "reportDate",
+      "qcInspector",
+      "scannedQc",
+      "reportType",
+      "moNo",
+      "totalCheckedQty"
+    ];
+    for (const field of requiredFields) {
+      if (!req.body[field]) {
+        return res
+          .status(400)
+          .json({ message: `Missing required field: ${field}` });
+      }
+    }
+
+    const newReport = new QCAccuracyReportModel(req.body);
+    await newReport.save();
+
+    res.status(201).json({
+      message: "QC Accuracy report saved successfully!",
+      report: newReport
+    });
+  } catch (error) {
+    console.error("Error saving QC Accuracy report:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to save report", error: error.message });
   }
 });
 
