@@ -22281,7 +22281,8 @@ app.post("/api/qc-accuracy-reports", async (req, res) => {
       "scannedQc",
       "reportType",
       "moNo",
-      "totalCheckedQty"
+      "totalCheckedQty",
+      "result"
     ];
     for (const field of requiredFields) {
       if (!req.body[field]) {

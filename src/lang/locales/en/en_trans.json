@@ -1887,7 +1887,7 @@
     }
   },
   "qcAccuracy": {
-    "title": "QC Accuracy Inspection",
+    "title": "QA Random Inspection",
     "reportType": "Report Type",
     "date": "Date",
     "scanQcQr": "Scan QC Inspector QR",

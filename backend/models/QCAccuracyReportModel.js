@@ -44,7 +44,8 @@ const qcAccuracyReportSchema = new mongoose.Schema(
     defects: [DefectDetailSchema],
     totalDefectPoints: { type: Number, required: true },
     qcAccuracy: { type: Number, required: true },
-    grade: { type: String, enum: ["A", "B", "C", "D"], required: true }
+    grade: { type: String, enum: ["A", "B", "C", "D"], required: true },
+    result: { type: String, enum: ["Pass", "Fail"], required: true }
   },
   {
     collection: "qc_accuracy_reports",

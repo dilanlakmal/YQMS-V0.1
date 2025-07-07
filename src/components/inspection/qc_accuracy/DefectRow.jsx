@@ -71,25 +71,59 @@ const DefectRow = ({
       ...base,
       backgroundColor: "var(--color-bg-secondary)",
       borderColor: "var(--color-border)",
-      boxShadow: "none"
+      boxShadow: "none",
+      "&:hover": {
+        borderColor: "var(--color-border-hover)"
+      }
     }),
     singleValue: (base) => ({ ...base, color: "var(--color-text-primary)" }),
     input: (base) => ({ ...base, color: "var(--color-text-primary)" }),
     menu: (base) => ({
       ...base,
-      backgroundColor: "var(--color-bg-secondary)",
+      backgroundColor: "var(--color-bg-secondary)", // Sets the main dropdown background
       zIndex: 50
     }),
     menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-    option: (base, state) => ({
+    option: (base, { isFocused, isSelected }) => ({
       ...base,
-      backgroundColor: state.isFocused
+      // This logic correctly sets the background for each option state
+      backgroundColor: isSelected
+        ? "var(--color-bg-accent-active)"
+        : isFocused
         ? "var(--color-bg-accent)"
-        : "transparent",
+        : "var(--color-bg-secondary)", // Use the menu's background color by default
       color: "var(--color-text-primary)",
-      "&:active": { backgroundColor: "var(--color-bg-accent-active)" }
-    })
+      ":active": {
+        backgroundColor: "var(--color-bg-accent-active)"
+      }
+    }),
+    placeholder: (base) => ({ ...base, color: "var(--color-text-secondary)" })
   };
+
+  // const reactSelectStyles = {
+  //   control: (base) => ({
+  //     ...base,
+  //     backgroundColor: "var(--color-bg-secondary)",
+  //     borderColor: "var(--color-border)",
+  //     boxShadow: "none"
+  //   }),
+  //   singleValue: (base) => ({ ...base, color: "var(--color-text-primary)" }),
+  //   input: (base) => ({ ...base, color: "var(--color-text-primary)" }),
+  //   menu: (base) => ({
+  //     ...base,
+  //     backgroundColor: "var(--color-bg-secondary)",
+  //     zIndex: 50
+  //   }),
+  //   menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  //   option: (base, state) => ({
+  //     ...base,
+  //     backgroundColor: state.isFocused
+  //       ? "var(--color-bg-accent)"
+  //       : "transparent",
+  //     color: "var(--color-text-primary)",
+  //     "&:active": { backgroundColor: "var(--color-bg-accent-active)" }
+  //   })
+  // };
 
   return (
     <tr className="dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700">
