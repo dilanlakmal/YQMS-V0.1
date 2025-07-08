@@ -2261,7 +2261,6 @@ app.get("/api/sewing-defects", async (req, res) => {
 app.get("/api/users/search-by-empid", async (req, res) => {
   try {
     const searchTerm = req.query.term;
-    // console.log(`[API /api/users/search-by-empid] Received search term: "${searchTerm}"`);
 
     if (!searchTerm || searchTerm.trim() === "") {
       return res
@@ -2274,8 +2273,6 @@ app.get("/api/users/search-by-empid", async (req, res) => {
 
     const query = {
       $or: [
-        // Prioritize exact match for emp_id if the term looks like a full ID
-        // This isn't perfect, but helps if user types full ID
         { emp_id: trimmedSearchTerm }, // Try exact match first
         { emp_id: { $regex: escapedSearchTerm, $options: "i" } },
         { eng_name: { $regex: escapedSearchTerm, $options: "i" } }
@@ -2284,13 +2281,12 @@ app.get("/api/users/search-by-empid", async (req, res) => {
 
     const users = await UserMain.find(
       query,
-      "emp_id eng_name face_photo" // _id is included by default
+      "emp_id eng_name face_photo" 
     )
       .limit(10) // Limit results
       .lean();
 
-    // console.log(`[API /api/users/search-by-empid] Found ${users.length} users.`);
-    res.json(users); // Send the array (even if empty)
+    res.json(users); 
   } catch (error) {
     console.error(
       "[API /api/users/search-by-empid] Error searching users:",
@@ -2329,10 +2325,7 @@ const getBuyerFromMoNumber = (moNo) => {
 /* ------------------------------
    End Points - Measurement Data In qcWashing
 ------------------------------ */
-
-
-
-// Get order details by order number
+// Get order details by order number with saved color data
 app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
   const { orderNo } = req.params;
   const collection = ymEcoConnection.db.collection("dt_orders");
@@ -2344,7 +2337,7 @@ app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
       return res.status(404).json({ success: false, message: `Order '${orderNo}' not found.` });
     }
 
-    // Extract color names from OrderColors array
+    // Extract all available colors from OrderColors array
     const colorSet = new Set();
     orders.forEach(order => {
       if (order.OrderColors && Array.isArray(order.OrderColors)) {
@@ -2355,14 +2348,30 @@ app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
         });
       }
     });
-    const colors = Array.from(colorSet);
+    const availableColors = Array.from(colorSet);
     
     const orderQty = orders.reduce((sum, order) => sum + (order.TotalQty || 0), 0);
     const buyerName = getBuyerFromMoNumber(orderNo);
 
+    // Check for saved colors in QCWashing collection
+    let savedColors = [];
+    let defaultColor = availableColors[0] || '';
+    
+    try {
+      const savedData = await QCWashing.findOne({ orderNo: orderNo });
+      if (savedData && savedData.colors && savedData.colors.length > 0) {
+        savedColors = savedData.colors.map(c => c.colorName);
+        defaultColor = savedColors[0]; // Use first saved color as default
+      }
+    } catch (err) {
+      console.log('No saved color data found, using available colors');
+    }
+
     res.json({
       success: true,
-      colors,
+      colors: availableColors, // All available colors from dt_orders
+      savedColors: savedColors, // Colors that have saved data
+      defaultColor: defaultColor, // Default color to select
       orderQty,
       buyer: buyerName,
     });
@@ -2379,9 +2388,7 @@ app.get('/api/qc-washing/order-sizes/:orderNo/:color', async (req, res) => {
   const collection = ymEcoConnection.db.collection("dt_orders");
 
   try {
-    // console.log(`Fetching sizes for order: ${orderNo}, color: ${color}`);
     const orders = await collection.find({ Order_No: orderNo }).toArray();
-    // console.log(`Found ${orders.length} orders`);
 
     if (!orders || orders.length === 0) {
       return res.status(404).json({ success: false, message: `Order '${orderNo}' not found.` });
@@ -2389,22 +2396,18 @@ app.get('/api/qc-washing/order-sizes/:orderNo/:color', async (req, res) => {
 
     const sizes = new Set();
     orders.forEach(order => {
-      // console.log('Order colors:', order.OrderColors?.length || 0);
       if (order.OrderColors && Array.isArray(order.OrderColors)) {
         const matchingColor = order.OrderColors.find(c => 
           c.Color.toLowerCase() === color.toLowerCase()
         );
-        // console.log('Matching color found:', !!matchingColor);
         
         if (matchingColor && matchingColor.OrderQty) {
-          // console.log('OrderQty entries:', matchingColor.OrderQty.length);
           matchingColor.OrderQty.forEach(entry => {
             const sizeName = Object.keys(entry)[0];
             const quantity = entry[sizeName];
             if (quantity > 0) {
               const cleanSize = sizeName.split(";")[0].trim();
               sizes.add(cleanSize);
-              // console.log(`Added size: ${cleanSize} (qty: ${quantity})`);
             }
           });
         }
@@ -2412,7 +2415,6 @@ app.get('/api/qc-washing/order-sizes/:orderNo/:color', async (req, res) => {
     });
 
     const sizesArray = Array.from(sizes);
-    // console.log('Final sizes array:', sizesArray);
     res.json({ success: true, sizes: sizesArray });
 
   } catch (error) {
@@ -2427,7 +2429,6 @@ app.get('/api/qc-washing/measurement-specs/:orderNo/:color', async (req, res) =>
   const collection = ymEcoConnection.db.collection("dt_orders");
   
   try {
-    // console.log(`Fetching measurement specs for order: ${orderNo}, color: ${color}`);
     const orders = await collection.find({ Order_No: orderNo }).toArray();
     
     if (!orders || orders.length === 0) {
@@ -2435,7 +2436,6 @@ app.get('/api/qc-washing/measurement-specs/:orderNo/:color', async (req, res) =>
     }
 
     const order = orders[0];
-    // console.log('Order structure:', JSON.stringify(order, null, 2));
     
     // Extract measurement specifications from different possible locations
     let measurementSpecs = [];
@@ -2457,7 +2457,6 @@ app.get('/api/qc-washing/measurement-specs/:orderNo/:color', async (req, res) =>
       }
     }
     
-    // console.log('Found measurement specs:', measurementSpecs);
     
     const beforeWashSpecs = [];
     const afterWashSpecs = [];
@@ -2539,9 +2538,7 @@ app.get('/api/qc-washing/measurement-specs/:orderNo/:color', async (req, res) =>
       afterWashSpecs.push(...group);
     });
     
-    // console.log('Final beforeWashSpecs:', beforeWashSpecs);
-    // console.log('Final a/fterWashSpecs:', afterWashSpecs);
-    
+
     // If no measurement data found, provide default specifications
     if (beforeWashSpecs.length === 0 && afterWashSpecs.length === 0) {
       const defaultSpecs = [
@@ -2577,135 +2574,6 @@ app.get('/api/qc-washing/measurement-specs/:orderNo/:color', async (req, res) =>
     res.status(500).json({ success: false, message: 'Server error while fetching measurement specs.' });
   }
 });
-
-// Auto-save data
-// app.post('/api/qc-washing/auto-save', async (req, res) => {
-//   try {
-//     const { formData, inspectionData, processData, defectData, addedDefects, uploadedImages, comment, signatures, userId } = req.body;
-    
-//     const autoSaveData = {
-//       orderNo: formData.orderNo || formData.style,
-//       color: {
-//         orderDetails: {
-//           orderQty: formData.orderQty,
-//           color: formData.color,
-//           washingType: formData.washingType,
-//           daily: formData.firstOutput || formData.inline,
-//           buyer: formData.buyer,
-//           factoryName: formData.factoryName,
-//           inspector: {
-//             engName: formData.agreedBy || signatures.agreedBy,
-//             empId: userId
-//           }
-//         },
-//         inspectionDetails: {
-//           checkedPoints: inspectionData.map(item => ({
-//             pointName: item.checkedList,
-//             approvedDate: item.approvedDate,
-//             condition: item.na ? 'N/A' : 'Active',
-//             remark: item.remark,
-//             temp: processData.temperature,
-//             time: processData.time,
-//             chemical: processData.chemical
-//           })),
-//           parameters: defectData.map(item => ({
-//             parameterName: item.parameter,
-//             status: item.ok ? 'ok' : 'no',
-//             qty: item.qty,
-//             remark: item.remark,
-//             checkboxes: item.checkboxes || {}
-//           }))
-//         },
-//         defectDetails: {
-//           checkedQty: formData.checkedQty,
-//           washQty: formData.washQty,
-//           defects: addedDefects.map(defect => ({
-//             defectName: defect.defectName,
-//             defectQty: defect.qty
-//           })),
-//           defectImages: uploadedImages.map(img => img.name),
-//           comment: comment
-//         }
-//       },
-//       isAutoSave: true,
-//       userId: userId,
-//       savedAt: new Date(),
-//       status: 'auto-saved'
-//     };
-
-//     const existingAutoSave = await QCWashing.findOne({ 
-//       orderNo: autoSaveData.orderNo, 
-//       isAutoSave: true, 
-//       userId: userId 
-//     });
-
-//     let result;
-//     if (existingAutoSave) {
-//       result = await QCWashing.findByIdAndUpdate(existingAutoSave._id, autoSaveData, { new: true });
-//     } else {
-//       result = await QCWashing.create(autoSaveData);
-//     }
-
-//     res.json({ success: true, id: result._id, message: 'Data auto-saved successfully' });
-//   } catch (error) {
-//     console.error('Auto-save error:', error);
-//     res.status(500).json({ success: false, message: 'Auto-save failed' });
-//   }
-// });
-
-// Load saved data
-// app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
-//   try {
-//     const { orderNo } = req.params;
-//     const savedData = await QCWashing.findOne({ 
-//       orderNo: orderNo, 
-//       isAutoSave: true 
-//     }).sort({ savedAt: -1 });
-
-//     if (savedData) {
-//       const formData = {
-//         date: savedData.date,
-//         orderNo: savedData.orderNo,
-//         style: savedData.orderNo,
-//         orderQty: savedData.color.orderDetails.orderQty,
-//         color: savedData.color.orderDetails.color,
-//         washingType: savedData.color.orderDetails.washingType,
-//         buyer: savedData.color.orderDetails.buyer,
-//         factoryName: savedData.color.orderDetails.factoryName,
-//         checkedQty: savedData.color.defectDetails.checkedQty,
-//         washQty: savedData.color.defectDetails.washQty
-//       };
-
-//       res.json({ 
-//         success: true, 
-//         savedData: {
-//           _id: savedData._id,
-//           formData: formData,
-//           inspectionData: savedData.color.inspectionDetails.checkedPoints,
-//           defectData: savedData.color.inspectionDetails.parameters,
-//           addedDefects: savedData.color.defectDetails.defects,
-//           comment: savedData.color.defectDetails.comment,
-//           savedAt: savedData.savedAt
-//         }
-//       });
-//     } else {
-//       res.json({ success: false, message: 'No saved data found' });
-//     }
-//   } catch (error) {
-//     console.error('Load saved data error:', error);
-//     res.status(500).json({ success: false, message: 'Failed to load saved data' });
-//   }
-// });
-
-// Clear auto-save
-// app.delete('/api/qc-washing/clear-auto-save/:id', async (req, res) => {
-//   try {
-//     await QCWashing.findByIdAndDelete(req.params.id);
-//     res.json({ success: true, message: 'Auto-save data cleared' });
-//   } catch (error) {
-//     res.status(500).json({ success: false, message: 'Failed to clear auto-save data' });
-//   }
-// });
 
 // Get order details by order number
 app.get('/api/qc-washing/order-details-by-order/:orderNo', async (req, res) => {
@@ -2765,7 +2633,7 @@ app.post('/api/qc-washing/save-size', async (req, res) => {
       return (measValue >= minAllowed && measValue <= maxAllowed) ? 'pass' : 'fail';
     };
     
-    // Process measurement data with validation
+  
     const sizeKey = `size_${sizeData.size}`;
     const measurementData = {
       size: sizeData.size,
@@ -2780,11 +2648,10 @@ app.post('/api/qc-washing/save-size', async (req, res) => {
     // Add validation results
     Object.keys(sizeData.measurements || {}).forEach(cellKey => {
       const measurement = sizeData.measurements[cellKey];
-      // Extract specs and tolerance from measurement specs (you'll need to pass this data)
       measurementData.results[cellKey] = {
         value: measurement.decimal,
         fraction: measurement.fraction,
-        result: 'pass' // Default, should be calculated based on tolerance
+        result: 'pass'
       };
     });
     
@@ -2804,7 +2671,7 @@ app.get('/api/qc-washing/saved-sizes/:orderNo/:color', async (req, res) => {
     const { orderNo, color } = req.params;
     const qcRecord = await QCWashing.findOne({ orderNo: orderNo, isAutoSave: true });
     
-    if (qcRecord && qcRecord.color.measurementDetails) {
+    if (qcRecord && qcRecord.color && qcRecord.color.measurementDetails) {
       const savedSizes = [];
       qcRecord.color.measurementDetails.forEach((value, key) => {
         if (key.startsWith('size_')) {
@@ -2901,49 +2768,135 @@ app.post('/api/qc-washing/submit', async (req, res) => {
   }
 });
 
-// AQL data endpoint
-// app.post('/api/aql-chart/find', async (req, res) => {
-//   try {
-//     const { type, level, orderNo, lotSize } = req.body;
+// Auto-save data with color-specific handling
+app.post('/api/qc-washing/auto-save-color', async (req, res) => {
+  try {
+    const { orderNo, colorName, formData, inspectionData, processData, defectData, addedDefects, uploadedImages, comment, signatures, measurementDetails, userId } = req.body;
     
-//     // Simple AQL calculation based on lot size
-//     let sampleSize, acceptedDefect, rejectedDefect;
+    // Find existing record or create new one
+    let qcRecord = await QCWashing.findOne({ orderNo: orderNo });
     
-//     if (lotSize <= 50) {
-//       sampleSize = 13;
-//       acceptedDefect = 1;
-//       rejectedDefect = 2;
-//     } else if (lotSize <= 150) {
-//       sampleSize = 32;
-//       acceptedDefect = 2;
-//       rejectedDefect = 3;
-//     } else if (lotSize <= 500) {
-//       sampleSize = 80;
-//       acceptedDefect = 3;
-//       rejectedDefect = 4;
-//     } else if (lotSize <= 1200) {
-//       sampleSize = 125;
-//       acceptedDefect = 5;
-//       rejectedDefect = 6;
-//     } else {
-//       sampleSize = 200;
-//       acceptedDefect = 7;
-//       rejectedDefect = 8;
-//     }
+    if (!qcRecord) {
+      qcRecord = new QCWashing({
+        orderNo: orderNo,
+        isAutoSave: true,
+        userId: userId,
+        status: 'auto-saved',
+        colors: []
+      });
+    }
     
-//     res.json({
-//       success: true,
-//       aqlData: {
-//         sampleSize,
-//         acceptedDefect,
-//         rejectedDefect
-//       }
-//     });
-//   } catch (error) {
-//     console.error('AQL calculation error:', error);
-//     res.status(500).json({ success: false, message: 'Failed to calculate AQL data' });
-//   }
-// });
+    // Find or create color entry
+    let colorEntry = qcRecord.colors?.find(c => c.colorName === colorName);
+    
+    if (!colorEntry) {
+      if (!qcRecord.colors) qcRecord.colors = [];
+      colorEntry = {
+        colorName: colorName,
+        orderDetails: {},
+        inspectionDetails: {},
+        defectDetails: {},
+        measurementDetails: []
+      };
+      qcRecord.colors.push(colorEntry);
+    }
+    
+    // Update color-specific data
+    colorEntry.orderDetails = {
+      orderQty: formData.orderQty,
+      color: formData.color,
+      washingType: formData.washingType,
+      daily: formData.firstOutput || formData.inline,
+      buyer: formData.buyer,
+      factoryName: formData.factoryName,
+      inspector: {
+        engName: formData.agreedBy || signatures?.agreedBy,
+        empId: userId
+      }
+    };
+    
+    colorEntry.inspectionDetails = {
+      checkedPoints: inspectionData?.map(item => ({
+        pointName: item.checkedList,
+        approvedDate: item.approvedDate,
+        condition: item.na ? 'N/A' : 'Active',
+        remark: item.remark
+      })) || [],
+      temp: processData?.temperature,
+      time: processData?.time,
+      chemical: processData?.chemical,
+      parameters: defectData?.map(item => ({
+        parameterName: item.parameter,
+        status: item.ok ? 'ok' : 'no',
+        qty: item.qty,
+        remark: item.remark,
+        checkboxes: item.checkboxes || {}
+      })) || []
+    };
+    
+    colorEntry.defectDetails = {
+      checkedQty: formData.checkedQty,
+      washQty: formData.washQty,
+      defects: addedDefects?.map(defect => ({
+        defectName: defect.defectName,
+        defectQty: defect.qty
+      })) || [],
+      defectImages: uploadedImages?.map(img => img.name) || [],
+      comment: comment
+    };
+    
+    colorEntry.measurementDetails = measurementDetails || [];
+    
+    qcRecord.savedAt = new Date();
+    await qcRecord.save();
+
+    res.json({ success: true, id: qcRecord._id, message: 'Color data auto-saved successfully' });
+  } catch (error) {
+    console.error('Auto-save color error:', error);
+    res.status(500).json({ success: false, message: 'Auto-save failed' });
+  }
+});
+
+// Load color-specific data
+app.get('/api/qc-washing/load-color-data/:orderNo/:color', async (req, res) => {
+  try {
+    const { orderNo, color } = req.params;
+    const qcRecord = await QCWashing.findOne({ orderNo: orderNo });
+    
+    if (qcRecord && qcRecord.colors) {
+      const colorData = qcRecord.colors.find(c => c.colorName === color);
+      
+      if (colorData) {
+        res.json({ success: true, colorData: colorData });
+      } else {
+        res.json({ success: false, message: 'Color data not found' });
+      }
+    } else {
+      res.json({ success: false, message: 'No saved data found' });
+    }
+  } catch (error) {
+    console.error('Load color data error:', error);
+    res.status(500).json({ success: false, message: 'Failed to load color data' });
+  }
+});
+
+// Get all saved colors for an order
+app.get('/api/qc-washing/saved-colors/:orderNo', async (req, res) => {
+  try {
+    const { orderNo } = req.params;
+    const qcRecord = await QCWashing.findOne({ orderNo: orderNo });
+    
+    if (qcRecord && qcRecord.colors) {
+      const savedColors = qcRecord.colors.map(c => c.colorName);
+      res.json({ success: true, savedColors: savedColors });
+    } else {
+      res.json({ success: true, savedColors: [] });
+    }
+  } catch (error) {
+    console.error('Get saved colors error:', error);
+    res.status(500).json({ success: false, message: 'Failed to get saved colors' });
+  }
+});
 
 // Auto-save data - compare and update only if different
 app.post('/api/qc-washing/auto-save', async (req, res) => {
@@ -3128,97 +3081,28 @@ app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
   }
 });
 
-// Clear auto-save after submission
-// app.delete('/api/qc-washing/clear-auto-save/:id', async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     await QCWashing.findByIdAndDelete(id);
-//     res.json({ success: true, message: 'Auto-save cleared successfully' });
-//   } catch (error) {
-//     console.error('Clear auto-save error:', error);
-//     res.status(500).json({ success: false, message: 'Failed to clear auto-save' });
-//   }
-// });
+// Load submitted data
+app.get('/api/qc-washing/load-submitted/:orderNo', async (req, res) => {
+  try {
+    const { orderNo } = req.params;
+    const submittedData = await QCWashing.findOne({ 
+      orderNo: orderNo, 
+      status: 'submitted' 
+    }).sort({ submittedAt: -1 });
 
-// Get order sizes
-// app.get('/api/qc-washing/order-sizes/:orderNo/:color', async (req, res) => {
-//   try {
-//     const { orderNo, color } = req.params;
-//     // Mock data - replace with actual database query
-//     const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-//     res.json({ success: true, sizes });
-//   } catch (error) {
-//     console.error('Get order sizes error:', error);
-//     res.status(500).json({ success: false, message: 'Failed to get order sizes' });
-//   }
-// });
-
-// Get measurement specs
-// app.get('/api/qc-washing/measurement-specs/:orderNo/:color', async (req, res) => {
-//   try {
-//     const { orderNo, color } = req.params;
-//     // Mock data - replace with actual database query
-//     const afterWashSpecs = [
-//       {
-//         MeasurementPointEngName: 'Chest Width',
-//         Specs: '20.0',
-//         ToleranceMinus: '0.5',
-//         TolerancePlus: '0.5'
-//       },
-//       {
-//         MeasurementPointEngName: 'Body Length',
-//         Specs: '28.0',
-//         ToleranceMinus: '0.5',
-//         TolerancePlus: '0.5'
-//       },
-//       {
-//         MeasurementPointEngName: 'Sleeve Length',
-//         Specs: '8.0',
-//         ToleranceMinus: '0.3',
-//         TolerancePlus: '0.3'
-//       }
-//     ];
-    
-//     const afterWashGrouped = {
-//       'NA': afterWashSpecs
-//     };
-    
-//     res.json({ 
-//       success: true, 
-//       afterWashSpecs,
-//       afterWashGrouped,
-//       beforeWashSpecs: [],
-//       beforeWashGrouped: {}
-//     });
-//   } catch (error) {
-//     console.error('Get measurement specs error:', error);
-//     res.status(500).json({ success: false, message: 'Failed to get measurement specs' });
-//   }
-// });
-
-// omment || '',
-//           measurementDetails: savedData.color?.measurementDetails || [],
-//           savedAt: savedData.savedAt
-//         }
-//       });
-//     } else {
-//       res.json({ success: false, message: 'No saved data found' });
-//     }
-//   } catch (error) {
-//     console.error('Load saved data error:', error);
-//     res.status(500).json({ success: false, message: 'Failed to load saved data' });
-//   }
-// });
-
-// Clear auto-save
-// app.delete('/api/qc-washing/clear-auto-save/:id', async (req, res) => {
-//   try {
-//     await QCWashing.findByIdAndDelete(req.params.id);
-//     res.json({ success: true, message: 'Auto-save data cleared' });
-//   } catch (error) {
-//     res.status(500).json({ success: false, message: 'Failed to clear auto-save data' });
-//   }
-// });
+    if (submittedData) {
+      res.json({ 
+        success: true, 
+        data: submittedData
+      });
+    } else {
+      res.json({ success: false, message: 'No submitted data found' });
+    }
+  } catch (error) {
+    console.error('Load submitted data error:', error);
+    res.status(500).json({ success: false, message: 'Failed to load submitted data' });
+  }
+});
 
 // Get order numbers
 app.get('/api/qc-washing/order-numbers', async (req, res) => {
@@ -3331,40 +3215,6 @@ app.delete('/api/qc-washing-checklist/:id', async (req, res) => {
     res.status(500).json({ message: 'Failed to delete check list item', error: error.message });
     }
 });
-
-// Search styles (placeholder - implement based on your existing data)
-// app.get('/styles/search/:searchTerm', async (req, res) => {
-//   try {
-//     const { searchTerm } = req.params;
-//     const styles = await QCWashing.find({ 
-//       orderNo: { $regex: searchTerm, $options: 'i' } 
-//     }).distinct('orderNo');
-//     res.json({ success: true, styles: styles });
-//   } catch (error) {
-//     res.status(500).json({ success: false, message: 'Failed to search styles' });
-//   }
-// });
-
-// Get order details by style (placeholder - implement based on your existing data)
-// app.get('/order-details-by-style/:styleNo', async (req, res) => {
-//   try {
-//     const { styleNo } = req.params;
-//     const orderData = await QCWashing.findOne({ orderNo: styleNo });
-    
-//     if (orderData) {
-//       res.json({
-//         success: true,
-//         colors: [orderData.color.orderDetails.color],
-//         orderQty: orderData.color.orderDetails.orderQty,
-//         buyer: orderData.color.orderDetails.buyer
-//       });
-//     } else {
-//       res.json({ success: false, message: 'Style not found' });
-//     }
-//   } catch (error) {
-//     res.status(500).json({ success: false, message: 'Failed to fetch style details' });
-//   }
-// });
 
 
 // =================================================================

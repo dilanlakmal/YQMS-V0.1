@@ -25,7 +25,8 @@ const QCWashingSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  color: {
+  colors: [{
+    colorName: String,
     orderDetails: {
       orderQty: String,
       color: String,
@@ -33,7 +34,7 @@ const QCWashingSchema = new mongoose.Schema({
         type: String,
         default: 'Normal Wash'
       },
-      daily: Boolean,
+      daily: String,
       buyer: String,
       factoryName: String,
       inspector: {
@@ -97,7 +98,7 @@ const QCWashingSchema = new mongoose.Schema({
       measurements: mongoose.Schema.Types.Mixed,
       savedAt: Date
     }]
-  },
+  }],
   isAutoSave: {
     type: Boolean,
     default: false

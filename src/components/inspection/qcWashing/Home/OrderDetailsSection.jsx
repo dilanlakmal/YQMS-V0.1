@@ -64,10 +64,9 @@ const OrderDetailsSection = ({
               value={formData.color}
               onChange={(e) => handleInputChange('color', e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500"
-              disabled={colorOptions.length === 0}
             >
               <option value="">-- Select Color --</option>
-              {colorOptions.map((color) => (
+              {colorOptions && colorOptions.map((color) => (
                 <option key={color} value={color}>{color}</option>
               ))}
             </select>
@@ -91,7 +90,7 @@ const OrderDetailsSection = ({
               <label className="flex items-center">
                 <input 
                   type="checkbox" 
-                  checked={formData.firstOutput}
+                  checked={formData.firstOutput === true || formData.firstOutput === 'First Output'}
                   onChange={(e) => handleInputChange('firstOutput', e.target.checked)}
                   className="mr-2"
                 />
@@ -100,7 +99,7 @@ const OrderDetailsSection = ({
               <label className="flex items-center">
                 <input 
                   type="checkbox" 
-                  checked={formData.inline}
+                  checked={formData.inline === true || formData.inline === 'Inline'}
                   onChange={(e) => handleInputChange('inline', e.target.checked)}
                   className="mr-2"
                 />
