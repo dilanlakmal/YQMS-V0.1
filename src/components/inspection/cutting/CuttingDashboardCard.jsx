@@ -1,29 +1,40 @@
+// src/components/inspection/cutting/CuttingDashboardCard.jsx
 import React from "react";
 import { useTheme } from "../../context/ThemeContext";
 
-/**
- * A helper function to determine the card's styling based on rules and values.
- * This keeps the main component's JSX clean.
- */
+// --- MODIFICATION 1: UPDATE THE HELPER FUNCTION ---
+// We need to add a 'card' background color property to our special palettes.
 const getCardStyles = (rule, value, theme) => {
-  // Define color palettes
   const palettes = {
     green:
       theme === "dark"
         ? {
-            card: "bg-green-900/40",
+            card: "bg-green-900/40", // Added this line
             icon: "bg-green-500/30",
             text: "text-green-300"
           }
-        : { card: "bg-green-50", icon: "bg-green-100", text: "text-green-600" },
+        : {
+            card: "bg-green-50", // Added this line
+            icon: "bg-green-100",
+            text: "text-green-600"
+          },
     red:
       theme === "dark"
-        ? { card: "bg-red-900/40", icon: "bg-red-500/30", text: "text-red-300" }
-        : { card: "bg-red-50", icon: "bg-red-100", text: "text-red-600" },
+        ? {
+            card: "bg-red-900/40", // Added this line
+            icon: "bg-red-500/30",
+            text: "text-red-300"
+          }
+        : {
+            card: "bg-red-50", // Added this line
+            icon: "bg-red-100",
+            text: "text-red-600"
+          },
+    // The default palette does NOT get a 'card' property. This is intentional.
     default:
       theme === "dark"
-        ? { card: "bg-gray-800", icon: "bg-gray-700", text: "text-blue-400" }
-        : { card: "bg-white", icon: "bg-blue-100", text: "text-blue-600" }
+        ? { icon: "bg-gray-700", text: "text-blue-400" }
+        : { icon: "bg-blue-100", text: "text-blue-600" }
   };
 
   switch (rule) {
@@ -37,12 +48,12 @@ const getCardStyles = (rule, value, theme) => {
         // Orange shades
         return theme === "dark"
           ? {
-              card: "bg-orange-900/40",
+              card: "bg-orange-900/40", // Added this line
               icon: "bg-orange-500/30",
               text: "text-orange-300"
             }
           : {
-              card: "bg-orange-50",
+              card: "bg-orange-50", // Added this line
               icon: "bg-orange-100",
               text: "text-orange-600"
             };
@@ -53,8 +64,9 @@ const getCardStyles = (rule, value, theme) => {
       return palettes.default;
   }
 };
+// --- END OF MODIFICATION 1 ---
 
-const CuttingDashboardCard = ({
+const StatMiniCard = ({
   icon,
   title,
   value,
@@ -66,34 +78,88 @@ const CuttingDashboardCard = ({
   const formattedValue =
     typeof value === "number"
       ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
-      : value || "0";
+      : value || (typeof value === "number" ? "0" : "N/A");
 
-  // Get the dynamic styles based on the rule and value
   const styles = getCardStyles(colorRule, value, theme);
 
   return (
+    // --- MODIFICATION 2: APPLY THE CONDITIONAL BACKGROUND ---
+    // The background color is now determined by the color rule.
+    // If a special rule is active (styles.card exists), we use it.
+    // Otherwise, we fall back to the standard gray background.
     <div
-      className={`p-4 rounded-lg shadow-md flex items-center space-x-4 h-24 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${styles.card}`}
+      className={`p-3 rounded-lg flex items-start space-x-3 h-24 ${
+        styles.card
+          ? styles.card
+          : theme === "dark"
+          ? "bg-gray-700/50"
+          : "bg-gray-50"
+      }`}
     >
-      <div className={`p-3 rounded-full ${styles.icon}`}>
-        <span className={styles.text}>{icon}</span>
+      {/* --- END OF MODIFICATION 2 --- */}
+
+      {/* Icon with its colored background - a slight top margin for better vertical alignment */}
+      <div
+        className={`flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full mt-1 ${styles.icon}`}
+      >
+        <span className={styles.text}>
+          {React.cloneElement(icon, { size: 18 })}
+        </span>
       </div>
-      <div className="flex-1">
-        <h3
-          className={`text-xs font-semibold uppercase tracking-wider ${
+
+      {/* The rest of the component remains the same */}
+      <div className="flex-1 min-w-0 flex flex-col h-full justify-between">
+        <h4
+          className={`text-[10px] font-semibold uppercase tracking-wider leading-tight ${
             theme === "dark" ? "text-gray-400" : "text-gray-500"
           }`}
         >
           {title}
-        </h3>
+        </h4>
         <p
-          className={`text-2xl font-bold ${
+          className={`text-lg font-bold ${
             theme === "dark" ? "text-gray-100" : "text-gray-800"
           }`}
+          title={formattedValue}
         >
           {formattedValue}
-          {unit && <span className="text-lg ml-1">{unit}</span>}
+          {unit && <span className="text-sm ml-1 font-medium">{unit}</span>}
         </p>
+      </div>
+    </div>
+  );
+};
+
+const CuttingDashboardCard = ({ title, stats = [] }) => {
+  const { theme } = useTheme();
+
+  return (
+    <div
+      className={`rounded-xl shadow-lg p-4 flex flex-col h-full ${
+        theme === "dark" ? "bg-[#1f2937]" : "bg-white"
+      }`}
+    >
+      <h3
+        className={`text-base font-bold mb-3 ${
+          theme === "dark" ? "text-gray-200" : "text-gray-900"
+        }`}
+      >
+        {title}
+      </h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {stats.length > 0 ? (
+          stats.map((stat) =>
+            stat ? <StatMiniCard key={stat.title} {...stat} /> : null
+          )
+        ) : (
+          <p
+            className={`col-span-full text-center py-8 ${
+              theme === "dark" ? "text-gray-400" : "text-gray-600"
+            }`}
+          >
+            No data available.
+          </p>
+        )}
       </div>
     </div>
   );

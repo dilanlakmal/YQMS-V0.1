@@ -13,9 +13,7 @@ import {
 import { useTheme } from "../../context/ThemeContext";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
-/**
- * CustomTooltip: Displays detailed information (Pcs, Pass, Reject) on hover.
- */
+// Reusable helper components (These are correct and do not need changes)
 const CustomTooltip = ({ active, payload, label }) => {
   const { theme } = useTheme();
   if (active && payload && payload.length) {
@@ -47,9 +45,6 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-/**
- * CustomYAxisTick: Renders the MO Number labels.
- */
 const CustomYAxisTick = (props) => {
   const { x, y, payload } = props;
   const { theme } = useTheme();
@@ -71,19 +66,13 @@ const CustomYAxisTick = (props) => {
   );
 };
 
-/**
- * Helper function to determine the bar color based on pass rate.
- */
 const getBarColor = (passRate) => {
-  if (passRate >= 98) return "#48BB78"; // Tailwind's green-400
-  if (passRate >= 95) return "#F6AD55"; // Tailwind's orange-300
-  if (passRate >= 90) return "#ED8936"; // Tailwind's orange-400
-  return "#F56565"; // Tailwind's red-400
+  if (passRate >= 98) return "#48BB78";
+  if (passRate >= 95) return "#F6AD55";
+  if (passRate >= 90) return "#ED8936";
+  return "#F56565";
 };
 
-/**
- * A dedicated component for the color legend.
- */
 const ColorLegend = () => {
   const { theme } = useTheme();
   const textColor = theme === "dark" ? "text-gray-300" : "text-gray-600";
@@ -118,7 +107,7 @@ const ColorLegend = () => {
 };
 
 /**
- * The main HorizontalBarChart component, with conditional coloring, legend, and data labels.
+ * The main HorizontalBarChart component with a FIXED-HEIGHT, SCROLLABLE container.
  */
 const HorizontalBarChart = ({
   data,
@@ -130,6 +119,11 @@ const HorizontalBarChart = ({
 }) => {
   const { theme } = useTheme();
   const labelColor = theme === "dark" ? "#E2E8F0" : "#1A202C";
+
+  // --- NEW SIZING LOGIC FOR SCROLLABLE CHART ---
+  const rowHeight = 60; // The fixed height for each row in the chart.
+  const chartHeight = data.length * rowHeight; // Calculate the total height needed for all bars.
+  const minChartHeight = 300; // The minimum height of the scrollable area.
 
   const getButtonClass = (buttonType) => {
     const baseClass =
@@ -144,13 +138,14 @@ const HorizontalBarChart = ({
   };
 
   return (
+    // The outer container has a FIXED height.
     <div
-      className={`p-4 rounded-lg shadow-md h-full flex flex-col ${
+      className={`p-4 rounded-lg shadow-md h-[450px] flex flex-col ${
         theme === "dark" ? "bg-gray-800" : "bg-white"
       }`}
     >
-      {/* Chart Header with Title and Controls */}
-      <div className="flex justify-between items-center mb-4">
+      {/* Chart Header (Unchanged) */}
+      <div className="flex justify-between items-center mb-4 flex-shrink-0">
         <h3
           className={`text-lg font-semibold ${
             theme === "dark" ? "text-white" : "text-gray-800"
@@ -199,20 +194,22 @@ const HorizontalBarChart = ({
       </div>
 
       {/* Flex layout for Legend and Chart */}
-      <div className="flex-grow flex">
-        {/* Legend Area */}
+      <div className="flex-grow flex overflow-hidden">
         <div className="flex-shrink-0 w-48">
           <ColorLegend />
         </div>
 
-        {/* Chart Area */}
-        <div className="flex-grow">
-          <ResponsiveContainer width="100%" height="100%">
+        {/* *** NEW: SCROLLABLE INNER CONTAINER *** */}
+        <div className="flex-grow overflow-y-auto pr-2">
+          {/* The ResponsiveContainer now lives inside the scrollable div */}
+          <ResponsiveContainer
+            width="100%"
+            height={Math.max(chartHeight, minChartHeight)}
+          >
             <BarChart
               data={data}
               layout="vertical"
-              margin={{ top: 5, right: 80, left: 20, bottom: 20 }}
-              barCategoryGap="40%"
+              margin={{ top: 5, right: 80, left: 30, bottom: 20 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -227,20 +224,23 @@ const HorizontalBarChart = ({
                 tickLine={false}
                 width={100}
                 tick={<CustomYAxisTick />}
+                interval={0} // Ensure all ticks are rendered
               />
               <Tooltip
                 content={<CustomTooltip />}
                 cursor={{ fill: "rgba(113, 128, 150, 0.2)" }}
               />
-              <Bar dataKey="passRate" barSize={25} radius={[0, 4, 4, 0]}>
-                {/* Render a <Cell> for each bar to apply conditional color */}
+              <Bar
+                dataKey="passRate"
+                barSize={30} // Now a fixed, professional size
+                radius={[0, 4, 4, 0]}
+              >
                 {data.map((entry, index) => (
                   <Cell
                     key={`cell-${index}`}
                     fill={getBarColor(entry.passRate)}
                   />
                 ))}
-                {/* Use the reliable built-in formatter for the data label */}
                 <LabelList
                   dataKey="passRate"
                   position="right"

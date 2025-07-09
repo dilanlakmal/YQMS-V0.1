@@ -159,7 +159,7 @@ const TrendLineChart = ({ data, title }) => {
 
   return (
     <div
-      className={`p-4 rounded-lg shadow-md h-full flex flex-col ${
+      className={`p-4 rounded-lg shadow-md h-[450px] flex flex-col ${
         theme === "dark" ? "bg-gray-800" : "bg-white"
       }`}
     >
