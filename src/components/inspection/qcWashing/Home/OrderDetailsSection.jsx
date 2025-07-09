@@ -72,7 +72,6 @@ const OrderDetailsSection = ({
               ))}
             </select>
           </div>
-         
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium">Washing Type:</label>
             <select 

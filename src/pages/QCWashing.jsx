@@ -8,33 +8,33 @@ import Swal from "sweetalert2";
 import DefectDetailsSection from "../components/inspection/qcWashing/Home/DefectDetailsSection";
 import MeasurementDetailsSection from "../components/inspection/qcWashing/Home/MeasurementDetailsSection";
 import SummaryCard from "../components/inspection/qcWashing/Home/SummaryCard";
-import imageCompression from 'browser-image-compression';
+import imageCompression from "browser-image-compression";
 
 const QCWashingPage = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
-  
+
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
-    orderNo: '',
-    style: '',
-    orderQty: '',
-    checkedQty: '',
-    color: '',
-    washQty: '',
-    washingType: 'Normal Wash',
-    firstOutput: '',
-    inline: '',
-    daily: '',
-    buyer: '',
-    factoryName: 'YM',
-    reportType: 'Before Wash',
-    result: '',
-    aqlSampleSize: '',
-    aqlAcceptedDefect: '',
-    aqlRejectedDefect: ''
+    date: new Date().toISOString().split("T")[0],
+    orderNo: "",
+    style: "",
+    orderQty: "",
+    checkedQty: "",
+    color: "",
+    washQty: "",
+    washingType: "Normal Wash",
+    firstOutput: "",
+    inline: "",
+    daily: "",
+    buyer: "",
+    factoryName: "YM",
+    reportType: "Before Wash",
+    result: "",
+    aqlSampleSize: "",
+    aqlAcceptedDefect: "",
+    aqlRejectedDefect: "",
   });
-  
+
   const [subFactories, setSubFactories] = useState([]);
   const [colorOptions, setColorOptions] = useState([]);
   const [styleSuggestions, setStyleSuggestions] = useState([]);
@@ -42,44 +42,105 @@ const QCWashingPage = () => {
   const [filteredOrderNumbers, setFilteredOrderNumbers] = useState([]);
   const [masterChecklist, setMasterChecklist] = useState([]);
   const [inspectionData, setInspectionData] = useState([]);
-  
+
   const [processData, setProcessData] = useState({
-    temperature: '',
-    time: '',
-    chemical: ''
+    temperature: "",
+    time: "",
+    chemical: "",
   });
-  
+
   const [defectData, setDefectData] = useState([
-    { parameter: 'Color Shade 01', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-    { parameter: 'Color Shade 02', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-    { parameter: 'Color Shade 03', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-    { parameter: 'Hand Feel', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-    { parameter: 'Effect', ok: true, no: false, qty: '', defectPercent: '', remark: '', checkboxes: { All: false, A: false, B: false, C: false, D: false, E: false, F: false, G: false, H: false, I: false, J: false } },
-    { parameter: 'Measurement', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-    { parameter: 'Appearance', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-    
+    {
+      parameter: "Color Shade 01",
+      ok: true,
+      no: false,
+      qty: "",
+      defectPercent: "",
+      remark: "",
+    },
+    {
+      parameter: "Color Shade 02",
+      ok: true,
+      no: false,
+      qty: "",
+      defectPercent: "",
+      remark: "",
+    },
+    {
+      parameter: "Color Shade 03",
+      ok: true,
+      no: false,
+      qty: "",
+      defectPercent: "",
+      remark: "",
+    },
+    {
+      parameter: "Hand Feel",
+      ok: true,
+      no: false,
+      qty: "",
+      defectPercent: "",
+      remark: "",
+    },
+    {
+      parameter: "Effect",
+      ok: true,
+      no: false,
+      qty: "",
+      defectPercent: "",
+      remark: "",
+      checkboxes: {
+        All: false,
+        A: false,
+        B: false,
+        C: false,
+        D: false,
+        E: false,
+        F: false,
+        G: false,
+        H: false,
+        I: false,
+        J: false,
+      },
+    },
+    {
+      parameter: "Measurement",
+      ok: true,
+      no: false,
+      qty: "",
+      defectPercent: "",
+      remark: "",
+    },
+    {
+      parameter: "Appearance",
+      ok: true,
+      no: false,
+      qty: "",
+      defectPercent: "",
+      remark: "",
+    },
   ]);
-  
+
   // State for new Defect Details section
   const [defectOptions, setDefectOptions] = useState([]);
   const [addedDefects, setAddedDefects] = useState([]);
-  const [selectedDefect, setSelectedDefect] = useState('');
-  const [defectQty, setDefectQty] = useState('');
+  const [selectedDefect, setSelectedDefect] = useState("");
+  const [defectQty, setDefectQty] = useState("");
   const [uploadedImages, setUploadedImages] = useState([]);
   const imageInputRef = useRef(null);
 
-  const [comment, setComment] = useState('');
+  const [comment, setComment] = useState("");
   const [signatures, setSignatures] = useState({
-    agreedBy: '',
-    reportedBy: '',
-    reportedTo: ''
+    agreedBy: "",
+    reportedBy: "",
+    reportedTo: "",
   });
-  
+
   const [sectionVisibility, setSectionVisibility] = useState({
     orderDetails: true,
     inspectionData: false,
     defectDetails: false,
-    measurementDetails: false
+    measurementDetails: false,
   });
 
   // Auto-save states
@@ -87,19 +148,19 @@ const QCWashingPage = () => {
   const [lastSaved, setLastSaved] = useState(null);
   const autoSaveTimeoutRef = useRef(null);
   const [isDataLoading, setIsDataLoading] = useState(false);
-  
+
   // Measurement tracking
   const [savedSizes, setSavedSizes] = useState([]);
   const [measurementData, setMeasurementData] = useState({
     beforeWash: [],
-    afterWash: []
+    afterWash: [],
   });
   const [showMeasurementTable, setShowMeasurementTable] = useState(true);
-  
+
   const toggleSection = (section) => {
-    setSectionVisibility(prev => ({
+    setSectionVisibility((prev) => ({
       ...prev,
-      [section]: !prev[section]
+      [section]: !prev[section],
     }));
   };
 
@@ -112,7 +173,7 @@ const QCWashingPage = () => {
 
   // Auto-save effect
   useEffect(() => {
-     // Prevent auto-saving while data is being loaded for a new order number.
+    // Prevent auto-saving while data is being loaded for a new order number.
     if (isDataLoading) {
       return;
     }
@@ -130,12 +191,21 @@ const QCWashingPage = () => {
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [formData, inspectionData, processData, defectData, addedDefects, comment, signatures, measurementData, isDataLoading]);
+  }, [
+    formData,
+    inspectionData,
+    processData,
+    defectData,
+    addedDefects,
+    comment,
+    signatures,
+    measurementData,
+    isDataLoading,
+  ]);
 
   // Load saved data when order number changes
   useEffect(() => {
     if (formData.orderNo) {
-      // Clear any pending auto-save before loading new data
       if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
       loadSavedData(formData.orderNo);
     }
@@ -159,18 +229,22 @@ const QCWashingPage = () => {
 
   // Calculate checked qty when AQL data is loaded and wash qty exists
   useEffect(() => {
-    if ((formData.inline === 'Inline' || formData.daily === 'Inline') && formData.aqlSampleSize && formData.washQty) {
+    if (
+      (formData.inline === "Inline" || formData.daily === "Inline") &&
+      formData.aqlSampleSize &&
+      formData.washQty
+    ) {
       calculateCheckedQty(formData.washQty);
     }
   }, [formData.aqlSampleSize, formData.inline, formData.daily]);
 
   const initializeInspectionData = (checklist = []) => {
     if (!Array.isArray(checklist)) return [];
-    return checklist.map(item => ({
+    return checklist.map((item) => ({
       checkedList: item.name,
-      approvedDate: '',
+      approvedDate: "",
       na: false,
-      remark: ''
+      remark: "",
     }));
   };
 
@@ -181,7 +255,7 @@ const QCWashingPage = () => {
       setMasterChecklist(data);
       setInspectionData(initializeInspectionData(data));
     } catch (error) {
-      console.error('Error fetching washing checklist:', error);
+      console.error("Error fetching washing checklist:", error);
     }
   };
 
@@ -191,7 +265,7 @@ const QCWashingPage = () => {
       const data = await response.json();
       setSubFactories(data);
     } catch (error) {
-      console.error('Error fetching factories:', error);
+      console.error("Error fetching factories:", error);
     }
   };
 
@@ -201,20 +275,22 @@ const QCWashingPage = () => {
       const data = await response.json();
       setDefectOptions(data);
     } catch (error) {
-      console.error('Error fetching washing defects:', error);
+      console.error("Error fetching washing defects:", error);
     }
-  }
+  };
 
   const fetchOrderNumbers = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/order-numbers`);
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/order-numbers`
+      );
       const data = await response.json();
       if (data.success) {
         setOrderNumbers(data.orderNumbers || []);
         setFilteredOrderNumbers(data.orderNumbers || []);
       }
     } catch (error) {
-      console.error('Error fetching order numbers:', error);
+      console.error("Error fetching order numbers:", error);
     }
   };
 
@@ -223,7 +299,7 @@ const QCWashingPage = () => {
       setFilteredOrderNumbers(orderNumbers);
       return;
     }
-    const filtered = orderNumbers.filter(orderNo => 
+    const filtered = orderNumbers.filter((orderNo) =>
       orderNo.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredOrderNumbers(filtered);
@@ -236,7 +312,9 @@ const QCWashingPage = () => {
     }
     try {
       // You may need to create this endpoint on your backend.
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/styles/search/${searchTerm}`);
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/styles/search/${searchTerm}`
+      );
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -246,7 +324,7 @@ const QCWashingPage = () => {
         }
       }
     } catch (error) {
-      console.error('Error fetching matching styles:', error);
+      console.error("Error fetching matching styles:", error);
       setStyleSuggestions([]);
     }
   };
@@ -255,11 +333,11 @@ const QCWashingPage = () => {
     if (!styleNo) {
       // Clear related fields if styleNo is cleared
       setColorOptions([]);
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        color: '',
-        orderQty: '',
-        buyer: ''
+        color: "",
+        orderQty: "",
+        buyer: "",
       }));
       setStyleSuggestions([]);
       return;
@@ -267,35 +345,45 @@ const QCWashingPage = () => {
 
     try {
       setIsDataLoading(true);
-      
+
       // Always fetch available colors from dt_order first
-      let response = await fetch(`${API_BASE_URL}/api/qc-washing/order-details-by-style/${styleNo}`);
+      let response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/order-details-by-style/${styleNo}`
+      );
       let orderData = await response.json();
 
       // If not found by style, try to fetch by order number
       if (!orderData.success) {
-        response = await fetch(`${API_BASE_URL}/api/qc-washing/order-details-by-order/${styleNo}`);
+        response = await fetch(
+          `${API_BASE_URL}/api/qc-washing/order-details-by-order/${styleNo}`
+        );
         orderData = await response.json();
       }
 
       if (orderData.success) {
         // Always set available colors
         setColorOptions(orderData.colors || []);
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          orderQty: orderData.orderQty || '',
-          buyer: orderData.buyer || '',
+          orderQty: orderData.orderQty || "",
+          buyer: orderData.buyer || "",
           // Only set color if not already set (to preserve existing selection)
-          color: prev.color || (orderData.colors && orderData.colors.length > 0 ? orderData.colors[0] : '')
+          color:
+            prev.color ||
+            (orderData.colors && orderData.colors.length > 0
+              ? orderData.colors[0]
+              : ""),
         }));
       }
-      
+
       // Then check if saved data exists in qcWashing collection
-      const qcWashingResponse = await fetch(`${API_BASE_URL}/api/qc-washing/load-saved/${styleNo}`);
-      
+      const qcWashingResponse = await fetch(
+        `${API_BASE_URL}/api/qc-washing/load-saved/${styleNo}`
+      );
+
       if (qcWashingResponse.ok) {
         const qcWashingData = await qcWashingResponse.json();
-        
+
         if (qcWashingData.success && qcWashingData.savedData) {
           // Load existing qcWashing data but keep the colors from dt_order
           loadSavedData(styleNo);
@@ -303,13 +391,15 @@ const QCWashingPage = () => {
           return;
         }
       }
-      
+
       // If no qcWashing data found, check submitted data
-      const submittedResponse = await fetch(`${API_BASE_URL}/api/qc-washing/load-submitted/${styleNo}`);
-      
+      const submittedResponse = await fetch(
+        `${API_BASE_URL}/api/qc-washing/load-submitted/${styleNo}`
+      );
+
       if (submittedResponse.ok) {
         const submittedData = await submittedResponse.json();
-        
+
         if (submittedData.success && submittedData.data) {
           // Load existing submitted data but keep the colors from dt_order
           loadSavedData(styleNo);
@@ -317,132 +407,215 @@ const QCWashingPage = () => {
           return;
         }
       }
-      
+
       // Handle case when no existing data found
       if (!orderData.success) {
         // Handle API-level errors (e.g., style not found)
-        throw new Error(orderData.message || 'Style/Order not found');
+        throw new Error(orderData.message || "Style/Order not found");
       }
     } catch (error) {
-      console.error('Error fetching order details:', error);
-      Swal.fire('Error', `Could not fetch details for: ${styleNo}. Please check the Style No or Order No.`, 'error');
+      console.error("Error fetching order details:", error);
+      Swal.fire(
+        "Error",
+        `Could not fetch details for: ${styleNo}. Please check the Style No or Order No.`,
+        "error"
+      );
       setColorOptions([]);
-      setFormData(prev => ({ ...prev, color: '', orderQty: '', buyer: '' }));
+      setFormData((prev) => ({ ...prev, color: "", orderQty: "", buyer: "" }));
     } finally {
       setIsDataLoading(false);
     }
   };
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => {
+    setFormData((prev) => {
       const newState = { ...prev, [field]: value };
       // When one checkbox is checked, uncheck the other and set daily field as string
-      if (field === 'firstOutput') {
-        newState.inline = '';
-        newState.daily = value; // Set 'daily' to the string value ('First Output' or '')
-      } else if (field === 'inline') {
-        newState.firstOutput = '';
-        newState.daily = value; // Set 'daily' to the string value ('Inline' or '')
-      } else if (field === 'daily') {
-        if (value === 'First Output') {
-          newState.firstOutput = 'First Output';
-          newState.inline = '';
-        } else if (value === 'Inline') {
-          newState.inline = 'Inline';
-          newState.firstOutput = '';
+      if (field === "firstOutput") {
+        newState.inline = "";
+        newState.daily = value;
+      } else if (field === "inline") {
+        newState.firstOutput = "";
+        newState.daily = value;
+      } else if (field === "daily") {
+        if (value === "First Output") {
+          newState.firstOutput = "First Output";
+          newState.inline = "";
+        } else if (value === "Inline") {
+          newState.inline = "Inline";
+          newState.firstOutput = "";
         }
       }
-      
+
       // Handle color change - reset color-specific data
-      if (field === 'color' && value !== prev.color) {
-        // Reset color-specific data when color changes
+      if (field === "color" && value !== prev.color) {
         setInspectionData(initializeInspectionData(masterChecklist));
-        setProcessData({ temperature: '', time: '', chemical: '' });
+        setProcessData({ temperature: "", time: "", chemical: "" });
         setDefectData([
-          { parameter: 'Color Shade 01', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-          { parameter: 'Color Shade 02', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-          { parameter: 'Color Shade 03', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-          { parameter: 'Hand Feel', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-          { parameter: 'Effect', ok: true, no: false, qty: '', defectPercent: '', remark: '', checkboxes: { All: false, A: false, B: false, C: false, D: false, E: false, F: false, G: false, H: false, I: false, J: false } },
-          { parameter: 'Measurement', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-          { parameter: 'Appearance', ok: true, no: false, qty: '', defectPercent: '', remark: '' }
+          {
+            parameter: "Color Shade 01",
+            ok: true,
+            no: false,
+            qty: "",
+            defectPercent: "",
+            remark: "",
+          },
+          {
+            parameter: "Color Shade 02",
+            ok: true,
+            no: false,
+            qty: "",
+            defectPercent: "",
+            remark: "",
+          },
+          {
+            parameter: "Color Shade 03",
+            ok: true,
+            no: false,
+            qty: "",
+            defectPercent: "",
+            remark: "",
+          },
+          {
+            parameter: "Hand Feel",
+            ok: true,
+            no: false,
+            qty: "",
+            defectPercent: "",
+            remark: "",
+          },
+          {
+            parameter: "Effect",
+            ok: true,
+            no: false,
+            qty: "",
+            defectPercent: "",
+            remark: "",
+            checkboxes: {
+              All: false,
+              A: false,
+              B: false,
+              C: false,
+              D: false,
+              E: false,
+              F: false,
+              G: false,
+              H: false,
+              I: false,
+              J: false,
+            },
+          },
+          {
+            parameter: "Measurement",
+            ok: true,
+            no: false,
+            qty: "",
+            defectPercent: "",
+            remark: "",
+          },
+          {
+            parameter: "Appearance",
+            ok: true,
+            no: false,
+            qty: "",
+            defectPercent: "",
+            remark: "",
+          },
         ]);
         setAddedDefects([]);
-        setComment('');
+        setComment("");
         setMeasurementData({ beforeWash: [], afterWash: [] });
         setSavedSizes([]);
-        
-        // Load saved data for the new color if exists
+
         if (value && (prev.orderNo || prev.style)) {
-          setTimeout(() => loadColorSpecificData(prev.orderNo || prev.style, value), 100);
+          setTimeout(
+            () => loadColorSpecificData(prev.orderNo || prev.style, value),
+            100
+          );
         }
       }
-      
+
       return newState;
     });
-    
+
     // Handle async operations after state update
-    if (field === 'inline' && value && (formData.orderNo || formData.style) && formData.washQty) {
-     setTimeout(() => fetchAQLData(formData.washQty), 100);
+    if (
+      field === "inline" &&
+      value &&
+      (formData.orderNo || formData.style) &&
+      formData.washQty
+    ) {
+      setTimeout(() => fetchAQLData(formData.washQty), 100);
     }
-    if (field === 'washQty' && value) {
+    if (field === "washQty" && value) {
       setTimeout(() => {
-        if (formData.inline === 'Inline' || formData.daily === 'Inline') {
-           fetchAQLData(value);
+        if (formData.inline === "Inline" || formData.daily === "Inline") {
+          fetchAQLData(value);
           calculateCheckedQty(value);
         }
       }, 100);
     }
-  
   };
 
   // Fetch AQL data for inline daily field
   const fetchAQLData = async (washQty) => {
     if (!washQty) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/aql-chart/find`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lotSize: parseInt(washQty) || 0,
-        })
-      });
-      
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/aql-chart/find`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lotSize: parseInt(washQty) || 0,
+          }),
+        }
+      );
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `Request failed with status ${response.status}` }));
-        console.error('AQL API Error:', errorData.message || 'Unknown error');
-        // Clear previous AQL data to avoid showing stale info
-        setFormData(prev => ({
+        const errorData = await response
+          .json()
+          .catch(() => ({
+            message: `Request failed with status ${response.status}`,
+          }));
+        console.error("AQL API Error:", errorData.message || "Unknown error");
+        setFormData((prev) => ({
           ...prev,
-          aqlSampleSize: '',
-          aqlAcceptedDefect: '',
-          aqlRejectedDefect: ''
+          aqlSampleSize: "",
+          aqlAcceptedDefect: "",
+          aqlRejectedDefect: "",
         }));
         return;
       }
 
       const data = await response.json();
       if (data.success && data.aqlData) {
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
           aqlSampleSize: data.aqlData.sampleSize.toString(),
           aqlAcceptedDefect: data.aqlData.acceptedDefect.toString(),
-          aqlRejectedDefect: data.aqlData.rejectedDefect.toString()
+          aqlRejectedDefect: data.aqlData.rejectedDefect.toString(),
         }));
       } else {
-        console.warn('AQL data not found:', data.message || 'No AQL chart found for the given criteria.');
+        console.warn(
+          "AQL data not found:",
+          data.message || "No AQL chart found for the given criteria."
+        );
       }
     } catch (error) {
-      console.error('Error fetching AQL data:', error);
+      console.error("Error fetching AQL data:", error);
     }
   };
 
   // Calculate checked qty based on wash qty and AQL data
   const calculateCheckedQty = (washQty) => {
     setTimeout(() => {
-      setFormData(prev => {
+      setFormData((prev) => {
         if (prev.aqlSampleSize && washQty) {
-          const checkedQty = Math.min(parseInt(washQty), parseInt(prev.aqlSampleSize));
+          const checkedQty = Math.min(
+            parseInt(washQty),
+            parseInt(prev.aqlSampleSize)
+          );
           return { ...prev, checkedQty: checkedQty.toString() };
         }
         return prev;
@@ -451,64 +624,79 @@ const QCWashingPage = () => {
   };
 
   const handleInspectionChange = (index, field, value) => {
-    setInspectionData(prev => prev.map((item, i) => 
-      i === index ? { ...item, [field]: value } : item
-    ));
+    setInspectionData((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    );
   };
 
   const handleDefectChange = (index, field, value) => {
-    setDefectData(prev => prev.map((item, i) => {
-      if (i === index) {
-        if (field === 'ok' && value) {
-          return { ...item, ok: true, no: false, qty: '', defectPercent: '' };
-        } else if (field === 'no' && value) {
-          return { ...item, ok: false, no: true };
+    setDefectData((prev) =>
+      prev.map((item, i) => {
+        if (i === index) {
+          if (field === "ok" && value) {
+            return { ...item, ok: true, no: false, qty: "", defectPercent: "" };
+          } else if (field === "no" && value) {
+            return { ...item, ok: false, no: true };
+          }
+          return { ...item, [field]: value };
         }
-        return { ...item, [field]: value };
-      }
-      return item;
-    }));
+        return item;
+      })
+    );
   };
 
   const handleCheckboxChange = (index, checkbox, value) => {
-    setDefectData(prev => prev.map((item, i) => 
-      i === index ? { ...item, checkboxes: { ...item.checkboxes, [checkbox]: value } } : item
-    ));
+    setDefectData((prev) =>
+      prev.map((item, i) =>
+        i === index
+          ? { ...item, checkboxes: { ...item.checkboxes, [checkbox]: value } }
+          : item
+      )
+    );
   };
 
   const handleAddDefect = () => {
     if (!selectedDefect || !defectQty) {
-      Swal.fire('Incomplete', 'Please select a defect and enter a quantity.', 'warning');
+      Swal.fire(
+        "Incomplete",
+        "Please select a defect and enter a quantity.",
+        "warning"
+      );
       return;
     }
 
-    const defectExists = addedDefects.some(d => d.defectId === selectedDefect);
+    const defectExists = addedDefects.some(
+      (d) => d.defectId === selectedDefect
+    );
     if (defectExists) {
-      Swal.fire('Duplicate', 'This defect has already been added.', 'error');
+      Swal.fire("Duplicate", "This defect has already been added.", "error");
       return;
     }
 
-    const defectDetails = defectOptions.find(d => d._id === selectedDefect);
-    setAddedDefects(prev => [...prev, {
-      defectId: defectDetails._id,
-      defectName: defectDetails.english,
-      qty: parseInt(defectQty, 10)
-    }]);
+    const defectDetails = defectOptions.find((d) => d._id === selectedDefect);
+    setAddedDefects((prev) => [
+      ...prev,
+      {
+        defectId: defectDetails._id,
+        defectName: defectDetails.english,
+        qty: parseInt(defectQty, 10),
+      },
+    ]);
 
     // Reset inputs
-    setSelectedDefect('');
-    setDefectQty('');
+    setSelectedDefect("");
+    setDefectQty("");
   };
 
   const handleDeleteDefect = (defectId) => {
-    setAddedDefects(prev => prev.filter(d => d.defectId !== defectId));
+    setAddedDefects((prev) => prev.filter((d) => d.defectId !== defectId));
   };
 
   // Auto-save functionality - always save data for editing
   const autoSaveData = async () => {
     if (!formData.orderNo && !formData.style) return;
-    if (!formData.color) return; // Require color to save
-    
+    if (!formData.color) return;
+
     try {
       const saveData = {
         orderNo: formData.orderNo || formData.style,
@@ -519,21 +707,33 @@ const QCWashingPage = () => {
         processData,
         defectData,
         addedDefects,
-        uploadedImages: uploadedImages.map(img => ({ name: img.name, preview: img.preview })),
+        uploadedImages: uploadedImages.map((img) => ({
+          name: img.name,
+          preview: img.preview,
+        })),
         comment,
         measurementDetails: [
-          ...measurementData.beforeWash.map(item => ({ ...item, washType: 'beforeWash' })),
-          ...measurementData.afterWash.map(item => ({ ...item, washType: 'afterWash' }))
+          ...measurementData.beforeWash.map((item) => ({
+            ...item,
+            washType: "beforeWash",
+          })),
+          ...measurementData.afterWash.map((item) => ({
+            ...item,
+            washType: "afterWash",
+          })),
         ],
         savedAt: new Date().toISOString(),
-        userId: user?.emp_id
+        userId: user?.emp_id,
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/auto-save-color`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(saveData)
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/auto-save-color`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(saveData),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -543,288 +743,337 @@ const QCWashingPage = () => {
       if (result.success) {
         setAutoSaveId(result.id);
         setLastSaved(new Date());
-        console.log('Auto-saved successfully for color:', formData.color);
+        console.log("Auto-saved successfully for color:", formData.color);
       } else {
-        console.error('Auto-save failed:', result.message);
+        console.error("Auto-save failed:", result.message);
       }
     } catch (error) {
-      console.error('Auto-save failed:', error);
+      console.error("Auto-save failed:", error);
     }
   };
 
   // Load color-specific data
   const loadColorSpecificData = async (orderNo, color) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/load-color-data/${orderNo}/${color}`);
-      
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/load-color-data/${orderNo}/${color}`
+      );
+
       if (response.ok) {
         const data = await response.json();
-        
+
         if (data.success && data.colorData) {
           const colorData = data.colorData;
-          
+
           // Set inspection data
           if (colorData.inspectionDetails?.checkedPoints) {
-            const transformedInspectionData = colorData.inspectionDetails.checkedPoints.map(point => ({
-              checkedList: point.pointName,
-              approvedDate: point.approvedDate || '',
-              na: point.condition === 'N/A',
-              remark: point.remark || ''
-            }));
+            const transformedInspectionData =
+              colorData.inspectionDetails.checkedPoints.map((point) => ({
+                checkedList: point.pointName,
+                approvedDate: point.approvedDate || "",
+                na: point.condition === "N/A",
+                remark: point.remark || "",
+              }));
             setInspectionData(transformedInspectionData);
           }
-          
+
           // Set process data
           if (colorData.inspectionDetails) {
             setProcessData({
-              temperature: colorData.inspectionDetails.temp || '',
-              time: colorData.inspectionDetails.time || '',
-              chemical: colorData.inspectionDetails.chemical || ''
+              temperature: colorData.inspectionDetails.temp || "",
+              time: colorData.inspectionDetails.time || "",
+              chemical: colorData.inspectionDetails.chemical || "",
             });
           }
-          
+
           // Set defect data
           if (colorData.inspectionDetails?.parameters) {
-            const transformedDefectData = colorData.inspectionDetails.parameters.map(param => ({
-              parameter: param.parameterName,
-              ok: param.status === 'ok',
-              no: param.status === 'no',
-              qty: param.qty || '',
-              remark: param.remark || '',
-              checkboxes: param.checkboxes || {}
-            }));
+            const transformedDefectData =
+              colorData.inspectionDetails.parameters.map((param) => ({
+                parameter: param.parameterName,
+                ok: param.status === "ok",
+                no: param.status === "no",
+                qty: param.qty || "",
+                remark: param.remark || "",
+                checkboxes: param.checkboxes || {},
+              }));
             setDefectData(transformedDefectData);
           }
-          
+
           // Set added defects
           if (colorData.defectDetails?.defects) {
-            const transformedAddedDefects = colorData.defectDetails.defects.map(defect => ({
-              defectId: defect._id || '',
-              defectName: defect.defectName,
-              qty: defect.defectQty
-            }));
+            const transformedAddedDefects = colorData.defectDetails.defects.map(
+              (defect) => ({
+                defectId: defect._id || "",
+                defectName: defect.defectName,
+                qty: defect.defectQty,
+              })
+            );
             setAddedDefects(transformedAddedDefects);
           }
-          
+
           // Set comment and measurement data
-          setComment(colorData.defectDetails?.comment || '');
-          const loadedMeasurements = colorData.measurementDetails; // This is now an array
+          setComment(colorData.defectDetails?.comment || "");
+          const loadedMeasurements = colorData.measurementDetails;
           if (Array.isArray(loadedMeasurements)) {
-            const beforeWash = loadedMeasurements.filter(m => m.washType === 'beforeWash');
-            const afterWash = loadedMeasurements.filter(m => m.washType === 'afterWash');
+            const beforeWash = loadedMeasurements.filter(
+              (m) => m.washType === "beforeWash"
+            );
+            const afterWash = loadedMeasurements.filter(
+              (m) => m.washType === "afterWash"
+            );
             setMeasurementData({ beforeWash, afterWash });
           } else if (loadedMeasurements && loadedMeasurements.beforeWash) {
-            // Backwards compatibility for old data structure
             setMeasurementData(loadedMeasurements);
           } else {
             setMeasurementData({ beforeWash: [], afterWash: [] });
           }
-          console.log('Loaded color-specific data for:', orderNo, color);
+          console.log("Loaded color-specific data for:", orderNo, color);
         }
       }
     } catch (error) {
-      console.error('Error loading color-specific data:', error);
+      console.error("Error loading color-specific data:", error);
     }
   };
 
   // Load saved data - check both auto-save and submitted records
   const loadSavedData = async (orderNo) => {
     try {
-      // First try to load auto-saved data
-      const autoSaveResponse = await fetch(`${API_BASE_URL}/api/qc-washing/load-saved/${orderNo}`);
-      
+      const autoSaveResponse = await fetch(
+        `${API_BASE_URL}/api/qc-washing/load-saved/${orderNo}`
+      );
+
       if (autoSaveResponse.ok) {
         const autoSaveData = await autoSaveResponse.json();
-        
+
         if (autoSaveData.success && autoSaveData.savedData) {
           const saved = autoSaveData.savedData;
-          
-          // Set form data
-          setFormData(prev => ({ 
-            ...prev, 
+
+          setFormData((prev) => ({
+            ...prev,
             ...saved.formData,
-            date: saved.formData.date ? saved.formData.date.split('T')[0] : new Date().toISOString().split('T')[0]
+            date: saved.formData.date
+              ? saved.formData.date.split("T")[0]
+              : new Date().toISOString().split("T")[0],
+            // Ensure order details fields are populated from saved data
+            orderNo: saved.formData.orderNo || prev.orderNo,
+            style: saved.formData.style || saved.formData.orderNo || prev.style,
+            orderQty: saved.formData.orderQty || prev.orderQty,
+            buyer: saved.formData.buyer || prev.buyer,
+            color: saved.formData.color || prev.color,
+            washingType: saved.formData.washingType || prev.washingType,
+            washQty: saved.formData.washQty || prev.washQty,
+            checkedQty: saved.formData.checkedQty || prev.checkedQty,
+            factoryName: saved.formData.factoryName || prev.factoryName,
+            reportType: saved.formData.reportType || prev.reportType,
+            firstOutput: saved.formData.firstOutput || prev.firstOutput,
+            inline: saved.formData.inline || prev.inline,
+            daily: saved.formData.daily || prev.daily,
+            result: saved.formData.result || prev.result,
+            aqlSampleSize: saved.formData.aqlSampleSize || prev.aqlSampleSize,
+            aqlAcceptedDefect:
+              saved.formData.aqlAcceptedDefect || prev.aqlAcceptedDefect,
+            aqlRejectedDefect:
+              saved.formData.aqlRejectedDefect || prev.aqlRejectedDefect,
           }));
-          
-          // Merge saved color with existing color options
+
           if (saved.formData.color) {
-            setColorOptions(prev => {
+            setColorOptions((prev) => {
               if (!prev.includes(saved.formData.color)) {
                 return [...prev, saved.formData.color];
               }
               return prev;
             });
           }
-          
-          // Set inspection data with proper structure
+
           if (saved.inspectionData && saved.inspectionData.length > 0) {
             setInspectionData(saved.inspectionData);
-            } else if (masterChecklist.length > 0) {
+          } else if (masterChecklist.length > 0) {
             setInspectionData(initializeInspectionData(masterChecklist));
           }
-          
-          // Set process data
+
           if (saved.processData) {
             setProcessData(saved.processData);
           }
-          
-          // Set defect data with proper structure
+
           if (saved.defectData && saved.defectData.length > 0) {
             setDefectData(saved.defectData);
           }
-          
-          // Set added defects
+
           if (saved.addedDefects) {
             setAddedDefects(saved.addedDefects);
           }
-          
-          // Set comment
-          setComment(saved.comment || '');
-          
+
+          setComment(saved.comment || "");
+
           // Set measurement data
-          const measurementDetails = saved.measurementDetails; // This is now an array
+          const measurementDetails = saved.measurementDetails;
           if (Array.isArray(measurementDetails)) {
-            const beforeWash = measurementDetails.filter(m => m.washType === 'beforeWash');
-            const afterWash = measurementDetails.filter(m => m.washType === 'afterWash');
+            const beforeWash = measurementDetails.filter(
+              (m) => m.washType === "beforeWash"
+            );
+            const afterWash = measurementDetails.filter(
+              (m) => m.washType === "afterWash"
+            );
             setMeasurementData({ beforeWash, afterWash });
           } else if (measurementDetails && measurementDetails.beforeWash) {
-            // Backwards compatibility for old data structure
             setMeasurementData(measurementDetails);
           } else {
             setMeasurementData({ beforeWash: [], afterWash: [] });
           }
           setShowMeasurementTable(true);
-          
+
           setAutoSaveId(saved._id);
           if (saved.savedAt) {
             setLastSaved(new Date(saved.savedAt));
           }
-          
-          console.log('Loaded auto-saved data for order:', orderNo);
+
+          console.log("Loaded auto-saved data for order:", orderNo);
           return;
         }
       }
- 
+
       // If no auto-save found, try to load submitted data
-      const submittedResponse = await fetch(`${API_BASE_URL}/api/qc-washing/load-submitted/${orderNo}`);
-      
+      const submittedResponse = await fetch(
+        `${API_BASE_URL}/api/qc-washing/load-submitted/${orderNo}`
+      );
+
       if (submittedResponse.ok) {
         const submittedData = await submittedResponse.json();
-        
+
         if (submittedData.success && submittedData.data) {
           const saved = submittedData.data;
-          
-          // Set form data
-          const dailyValue = saved.color?.orderDetails?.daily || '';
-          setFormData(prev => ({ 
-            ...prev, 
-            date: saved.date ? saved.date.split('T')[0] : new Date().toISOString().split('T')[0],
+
+          const dailyValue = saved.color?.orderDetails?.daily || "";
+          setFormData((prev) => ({
+            ...prev,
+            date: saved.date
+              ? saved.date.split("T")[0]
+              : new Date().toISOString().split("T")[0],
             orderNo: saved.orderNo,
             style: saved.orderNo,
-            orderQty: saved.color?.orderDetails?.orderQty || '',
-            color: saved.color?.orderDetails?.color || '',
-            washingType: saved.color?.orderDetails?.washingType || 'Normal Wash',
-            firstOutput: dailyValue === 'First Output' ? 'First Output' : '',
-            inline: dailyValue === 'Inline' ? 'Inline' : '',
-            buyer: saved.color?.orderDetails?.buyer || '',
-            factoryName: saved.color?.orderDetails?.factoryName || 'YM',
-            checkedQty: saved.color?.defectDetails?.checkedQty || '',
-            washQty: saved.color?.defectDetails?.washQty || ''
+            orderQty: saved.color?.orderDetails?.orderQty || prev.orderQty,
+            color: saved.color?.orderDetails?.color || prev.color,
+            washingType:
+              saved.color?.orderDetails?.washingType || "Normal Wash",
+            firstOutput: dailyValue === "First Output" ? "First Output" : "",
+            inline: dailyValue === "Inline" ? "Inline" : "",
+            daily: dailyValue || prev.daily,
+            buyer: saved.color?.orderDetails?.buyer || prev.buyer,
+            factoryName: saved.color?.orderDetails?.factoryName || "YM",
+            checkedQty:
+              saved.color?.defectDetails?.checkedQty || prev.checkedQty,
+            washQty: saved.color?.defectDetails?.washQty || prev.washQty,
+            reportType:
+              saved.color?.orderDetails?.reportType || prev.reportType,
+            result: saved.color?.orderDetails?.result || prev.result,
+            aqlSampleSize:
+              saved.color?.orderDetails?.aqlSampleSize || prev.aqlSampleSize,
+            aqlAcceptedDefect:
+              saved.color?.orderDetails?.aqlAcceptedDefect ||
+              prev.aqlAcceptedDefect,
+            aqlRejectedDefect:
+              saved.color?.orderDetails?.aqlRejectedDefect ||
+              prev.aqlRejectedDefect,
           }));
-          
+
           // Merge saved color with existing color options
           if (saved.color?.orderDetails?.color) {
-            setColorOptions(prev => {
+            setColorOptions((prev) => {
               if (!prev.includes(saved.color.orderDetails.color)) {
                 return [...prev, saved.color.orderDetails.color];
               }
               return prev;
             });
           }
-          
-          // Transform and set inspection data
-          const transformedInspectionData = saved.color?.inspectionDetails?.checkedPoints?.map(point => ({
-            checkedList: point.pointName,
-            approvedDate: point.approvedDate || '',
-            na: point.condition === 'N/A',
-            remark: point.remark || ''
-          })) || [];
-          
+
+          const transformedInspectionData =
+            saved.color?.inspectionDetails?.checkedPoints?.map((point) => ({
+              checkedList: point.pointName,
+              approvedDate: point.approvedDate || "",
+              na: point.condition === "N/A",
+              remark: point.remark || "",
+            })) || [];
+
           if (transformedInspectionData.length > 0) {
             setInspectionData(transformedInspectionData);
-            } else if (masterChecklist.length > 0) {
+          } else if (masterChecklist.length > 0) {
             setInspectionData(initializeInspectionData(masterChecklist));
           }
-          
-          // Set process data
+
           setProcessData({
-            temperature: saved.color?.inspectionDetails?.temp || '',
-            time: saved.color?.inspectionDetails?.time || '',
-            chemical: saved.color?.inspectionDetails?.chemical || ''
+            temperature: saved.color?.inspectionDetails?.temp || "",
+            time: saved.color?.inspectionDetails?.time || "",
+            chemical: saved.color?.inspectionDetails?.chemical || "",
           });
-          
-          // Transform and set defect data
-          const transformedDefectData = saved.color?.inspectionDetails?.parameters?.map(param => ({
-            parameter: param.parameterName,
-            ok: param.status === 'ok',
-            no: param.status === 'no',
-            qty: param.qty || '',
-            remark: param.remark || '',
-            checkboxes: param.checkboxes || {}
-          })) || [];
-          
+
+          const transformedDefectData =
+            saved.color?.inspectionDetails?.parameters?.map((param) => ({
+              parameter: param.parameterName,
+              ok: param.status === "ok",
+              no: param.status === "no",
+              qty: param.qty || "",
+              remark: param.remark || "",
+              checkboxes: param.checkboxes || {},
+            })) || [];
+
           if (transformedDefectData.length > 0) {
             setDefectData(transformedDefectData);
           }
-          
-          // Transform and set added defects
-          const transformedAddedDefects = saved.color?.defectDetails?.defects?.map(defect => ({
-            defectId: defect._id || '',
-            defectName: defect.defectName,
-            qty: defect.defectQty
-          })) || [];
-          
+
+          const transformedAddedDefects =
+            saved.color?.defectDetails?.defects?.map((defect) => ({
+              defectId: defect._id || "",
+              defectName: defect.defectName,
+              qty: defect.defectQty,
+            })) || [];
+
           setAddedDefects(transformedAddedDefects);
-          setComment(saved.color?.defectDetails?.comment || '');
+          setComment(saved.color?.defectDetails?.comment || "");
           const measurementDetails = saved.color?.measurementDetails; // This is now an array
           if (Array.isArray(measurementDetails)) {
-            const beforeWash = measurementDetails.filter(m => m.washType === 'beforeWash');
-            const afterWash = measurementDetails.filter(m => m.washType === 'afterWash');
+            const beforeWash = measurementDetails.filter(
+              (m) => m.washType === "beforeWash"
+            );
+            const afterWash = measurementDetails.filter(
+              (m) => m.washType === "afterWash"
+            );
             setMeasurementData({ beforeWash, afterWash });
           } else if (measurementDetails && measurementDetails.beforeWash) {
-            // Backwards compatibility for old data structure
             setMeasurementData(measurementDetails);
           } else {
             setMeasurementData({ beforeWash: [], afterWash: [] });
           }
           setShowMeasurementTable(true);
-          
-          console.log('Loaded submitted data for order:', orderNo);
+
+          console.log("Loaded submitted data for order:", orderNo);
         }
       }
     } catch (error) {
-      console.error('Error loading saved data:', error);
+      console.error("Error loading saved data:", error);
     }
   };
 
   // Load saved measurement sizes
   const loadSavedSizes = async (orderNo, color) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${color}`);
-      
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${color}`
+      );
+
       if (!response.ok) {
         setSavedSizes([]);
         return;
       }
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         setSavedSizes(data.savedSizes || []);
-        console.log('Loaded saved sizes:', data.savedSizes);
+        console.log("Loaded saved sizes:", data.savedSizes);
       }
     } catch (error) {
-      console.error('Error loading saved sizes:', error);
+      console.error("Error loading saved sizes:", error);
       setSavedSizes([]);
     }
   };
@@ -832,40 +1081,46 @@ const QCWashingPage = () => {
   // Handle measurement size save with nested structure
   const handleSizeSubmit = async (transformedSizeData) => {
     try {
-      // Determine which wash type to save to based on current reportType
-      const washType = formData.reportType === 'Before Wash' ? 'beforeWash' : 'afterWash';
-      
-      // Add to measurement data immediately
-      setMeasurementData(prev => {
+      const washType =
+        formData.reportType === "Before Wash" ? "beforeWash" : "afterWash";
+
+      setMeasurementData((prev) => {
         const currentArray = prev[washType];
-        const existingIndex = currentArray.findIndex(item => item.size === transformedSizeData.size);
-        
+        const existingIndex = currentArray.findIndex(
+          (item) => item.size === transformedSizeData.size
+        );
+
         if (existingIndex >= 0) {
           const updated = [...currentArray];
           updated[existingIndex] = transformedSizeData;
           return { ...prev, [washType]: updated };
         } else {
-          return { ...prev, [washType]: [...currentArray, transformedSizeData] };
+          return {
+            ...prev,
+            [washType]: [...currentArray, transformedSizeData],
+          };
         }
       });
-      
-      setSavedSizes(prev => {
+
+      setSavedSizes((prev) => {
         if (!prev.includes(transformedSizeData.size)) {
           return [...prev, transformedSizeData.size];
         }
         return prev;
       });
-      
-      // Always show measurement table for next size selection
+
       setShowMeasurementTable(true);
-      
-      Swal.fire('Success', `Size data saved successfully to ${formData.reportType}!`, 'success');
-      
-      // Trigger auto-save to include the new measurement data
+
+      Swal.fire(
+        "Success",
+        `Size data saved successfully to ${formData.reportType}!`,
+        "success"
+      );
+
       setTimeout(() => autoSaveData(), 500);
     } catch (error) {
-      console.error('Error saving size:', error);
-      Swal.fire('Error', 'Failed to save size data', 'error');
+      console.error("Error saving size:", error);
+      Swal.fire("Error", "Failed to save size data", "error");
     }
   };
 
@@ -873,61 +1128,66 @@ const QCWashingPage = () => {
   const handleMeasurementEdit = (size = null) => {
     setShowMeasurementTable(true);
     if (size) {
-      // Remove the size from saved sizes to allow editing
-      setSavedSizes(prev => prev.filter(s => s !== size));
-      // Remove from current wash type measurement data to allow re-entry
-      const washType = formData.reportType === 'Before Wash' ? 'beforeWash' : 'afterWash';
-      setMeasurementData(prev => ({
+      setSavedSizes((prev) => prev.filter((s) => s !== size));
+      const washType =
+        formData.reportType === "Before Wash" ? "beforeWash" : "afterWash";
+      setMeasurementData((prev) => ({
         ...prev,
-        [washType]: prev[washType].filter(item => item.size !== size)
+        [washType]: prev[washType].filter((item) => item.size !== size),
       }));
     }
   };
 
   // Handle measurement value changes for auto-save
   const handleMeasurementChange = (newMeasurementValues) => {
-    // Trigger auto-save when measurement values change
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
     autoSaveTimeoutRef.current = setTimeout(() => {
       autoSaveData();
-    }, 2000); // Auto-save after 2 seconds of measurement input
+    }, 2000);
   };
-    const handleRemoveImage = (index) => {
-    setUploadedImages(prev => prev.filter((_, i) => i !== index));
+  const handleRemoveImage = (index) => {
+    setUploadedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleImageChange = async (e) => {
     const files = Array.from(e.target.files);
     if (uploadedImages.length + files.length > 5) {
-      Swal.fire('Limit Exceeded', 'You can only upload a maximum of 5 images.', 'warning');
+      Swal.fire(
+        "Limit Exceeded",
+        "You can only upload a maximum of 5 images.",
+        "warning"
+      );
       return;
     }
 
     const options = {
-      maxSizeMB: 0.5, // Compress to max 500KB
+      maxSizeMB: 0.5,
       maxWidthOrHeight: 1024,
       useWebWorker: true,
     };
 
     Swal.fire({
-      title: 'Compressing images...',
-      text: 'Please wait.',
+      title: "Compressing images...",
+      text: "Please wait.",
       allowOutsideClick: false,
       didOpen: () => {
         Swal.showLoading();
-      }
+      },
     });
 
     for (const file of files) {
       try {
         const compressedFile = await imageCompression(file, options);
         const preview = URL.createObjectURL(compressedFile);
-        setUploadedImages(prev => [...prev, { file: compressedFile, preview, name: compressedFile.name }]);
+        setUploadedImages((prev) => [
+          ...prev,
+          { file: compressedFile, preview, name: compressedFile.name },
+        ]);
       } catch (error) {
-        console.error('Image compression failed:', error);
-        Swal.fire('Error', 'Failed to compress image.', 'error');
+        console.error("Image compression failed:", error);
+        Swal.fire("Error", "Failed to compress image.", "error");
       }
     }
     Swal.close();
@@ -951,14 +1211,13 @@ const QCWashingPage = () => {
         <PageTitle />
       </header>
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-6">
-        
-        <SummaryCard 
+        <SummaryCard
           measurementData={measurementData}
           showMeasurementTable={showMeasurementTable}
           reportType={formData.reportType}
         />
-        
-        <OrderDetailsSection 
+
+        <OrderDetailsSection
           formData={formData}
           handleInputChange={handleInputChange}
           fetchOrderDetailsByStyle={fetchOrderDetailsByStyle}
@@ -966,7 +1225,7 @@ const QCWashingPage = () => {
           subFactories={subFactories}
           user={user}
           isVisible={sectionVisibility.orderDetails}
-          onToggle={() => toggleSection('orderDetails')}
+          onToggle={() => toggleSection("orderDetails")}
           styleSuggestions={styleSuggestions}
           fetchMatchingStyles={fetchMatchingStyles}
           setStyleSuggestions={setStyleSuggestions}
@@ -974,7 +1233,7 @@ const QCWashingPage = () => {
           filterOrderNumbers={filterOrderNumbers}
         />
 
-        <InspectionDataSection 
+        <InspectionDataSection
           inspectionData={inspectionData}
           handleInspectionChange={handleInspectionChange}
           processData={processData}
@@ -983,10 +1242,10 @@ const QCWashingPage = () => {
           handleDefectChange={handleDefectChange}
           handleCheckboxChange={handleCheckboxChange}
           isVisible={sectionVisibility.inspectionData}
-          onToggle={() => toggleSection('inspectionData')}
+          onToggle={() => toggleSection("inspectionData")}
         />
 
-        <DefectDetailsSection 
+        <DefectDetailsSection
           formData={formData}
           handleInputChange={handleInputChange}
           defectOptions={defectOptions}
@@ -1001,15 +1260,15 @@ const QCWashingPage = () => {
           comment={comment}
           setComment={setComment}
           isVisible={sectionVisibility.defectDetails}
-          onToggle={() => toggleSection('defectDetails')}
+          onToggle={() => toggleSection("defectDetails")}
         />
 
-        <MeasurementDetailsSection 
+        <MeasurementDetailsSection
           orderNo={formData.orderNo || formData.style}
           color={formData.color}
           reportType={formData.reportType}
           isVisible={sectionVisibility.measurementDetails}
-          onToggle={() => toggleSection('measurementDetails')}
+          onToggle={() => toggleSection("measurementDetails")}
           savedSizes={savedSizes}
           onSizeSubmit={handleSizeSubmit}
           measurementData={measurementData}
@@ -1026,54 +1285,121 @@ const QCWashingPage = () => {
         )}
 
         <div className="flex justify-end space-x-4">
-          <button 
+          <button
             className="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
             onClick={() => {
               // Reset form but keep auto-saved data available
               if (autoSaveId) {
                 Swal.fire({
-                  title: 'Reset Form?',
-                  text: 'This will clear all current data. Auto-saved data will remain available.',
-                  icon: 'warning',
+                  title: "Reset Form?",
+                  text: "This will clear all current data. Auto-saved data will remain available.",
+                  icon: "warning",
                   showCancelButton: true,
-                  confirmButtonText: 'Reset'
+                  confirmButtonText: "Reset",
                 }).then((result) => {
                   if (result.isConfirmed) {
-                    // Reset all states to initial values
                     setFormData({
-                      date: new Date().toISOString().split('T')[0],
-                      orderNo: '',
-                      style: '',
-                      orderQty: '',
-                      checkedQty: '',
-                      color: '',
-                      washQty: '',
-                      washingType: 'Normal Wash',
+                      date: new Date().toISOString().split("T")[0],
+                      orderNo: "",
+                      style: "",
+                      orderQty: "",
+                      checkedQty: "",
+                      color: "",
+                      washQty: "",
+                      washingType: "Normal Wash",
                       firstOutput: false,
                       inline: false,
-                      daily: '',
-                      buyer: '',
-                      factoryName: 'YM',
-                      result: '',
-                      aqlSampleSize: '',
-                      aqlAcceptedDefect: '',
-                      aqlRejectedDefect: ''
+                      daily: "",
+                      buyer: "",
+                      factoryName: "YM",
+                      result: "",
+                      aqlSampleSize: "",
+                      aqlAcceptedDefect: "",
+                      aqlRejectedDefect: "",
                     });
-                    setInspectionData(initializeInspectionData(masterChecklist));
-                    setProcessData({ temperature: '', time: '', chemical: '' });
+                    setInspectionData(
+                      initializeInspectionData(masterChecklist)
+                    );
+                    setProcessData({ temperature: "", time: "", chemical: "" });
                     setDefectData([
-                      { parameter: 'Color Shade 01', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-                      { parameter: 'Color Shade 02', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-                      { parameter: 'Color Shade 03', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-                      { parameter: 'Hand Feel', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-                      { parameter: 'Effect', ok: true, no: false, qty: '', defectPercent: '', remark: '', checkboxes: { All: false, A: false, B: false, C: false, D: false, E: false, F: false, G: false, H: false, I: false, J: false } },
-                      { parameter: 'Measurement', ok: true, no: false, qty: '', defectPercent: '', remark: '' },
-                      { parameter: 'Appearance', ok: true, no: false, qty: '', defectPercent: '', remark: '' }
+                      {
+                        parameter: "Color Shade 01",
+                        ok: true,
+                        no: false,
+                        qty: "",
+                        defectPercent: "",
+                        remark: "",
+                      },
+                      {
+                        parameter: "Color Shade 02",
+                        ok: true,
+                        no: false,
+                        qty: "",
+                        defectPercent: "",
+                        remark: "",
+                      },
+                      {
+                        parameter: "Color Shade 03",
+                        ok: true,
+                        no: false,
+                        qty: "",
+                        defectPercent: "",
+                        remark: "",
+                      },
+                      {
+                        parameter: "Hand Feel",
+                        ok: true,
+                        no: false,
+                        qty: "",
+                        defectPercent: "",
+                        remark: "",
+                      },
+                      {
+                        parameter: "Effect",
+                        ok: true,
+                        no: false,
+                        qty: "",
+                        defectPercent: "",
+                        remark: "",
+                        checkboxes: {
+                          All: false,
+                          A: false,
+                          B: false,
+                          C: false,
+                          D: false,
+                          E: false,
+                          F: false,
+                          G: false,
+                          H: false,
+                          I: false,
+                          J: false,
+                        },
+                      },
+                      {
+                        parameter: "Measurement",
+                        ok: true,
+                        no: false,
+                        qty: "",
+                        defectPercent: "",
+                        remark: "",
+                      },
+                      {
+                        parameter: "Appearance",
+                        ok: true,
+                        no: false,
+                        qty: "",
+                        defectPercent: "",
+                        remark: "",
+                      },
                     ]);
                     setAddedDefects([]);
                     setUploadedImages([]);
-                    setComment('');
-                    setSignatures({ agreedBy: '', reportedBy: '', reportedTo: '' });
+                    setComment("");
+                    setSignatures({
+                      agreedBy: "",
+                      reportedBy: "",
+                      reportedTo: "",
+                    });
                     setMeasurementData({ beforeWash: [], afterWash: [] });
                     setShowMeasurementTable(true);
                   }
@@ -1083,7 +1409,7 @@ const QCWashingPage = () => {
           >
             Reset
           </button>
-          <button 
+          <button
             className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
             onClick={async () => {
               try {
@@ -1100,36 +1426,52 @@ const QCWashingPage = () => {
                   comment,
                   signatures,
                   measurementDetails: [
-                    ...measurementData.beforeWash.map(item => ({ ...item, washType: 'beforeWash' })),
-                    ...measurementData.afterWash.map(item => ({ ...item, washType: 'afterWash' }))
+                    ...measurementData.beforeWash.map((item) => ({
+                      ...item,
+                      washType: "beforeWash",
+                    })),
+                    ...measurementData.afterWash.map((item) => ({
+                      ...item,
+                      washType: "afterWash",
+                    })),
                   ],
                   submittedAt: new Date().toISOString(),
-                  userId: user?.emp_id
+                  userId: user?.emp_id,
                 };
 
-                const response = await fetch(`${API_BASE_URL}/api/qc-washing/submit`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(submitData)
-                });
+                const response = await fetch(
+                  `${API_BASE_URL}/api/qc-washing/submit`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(submitData),
+                  }
+                );
 
                 const result = await response.json();
                 if (result.success) {
-                  Swal.fire('Success', 'QC Washing data submitted successfully!', 'success');
-                  // Auto-save is automatically cleared by backend on submit
+                  Swal.fire(
+                    "Success",
+                    "QC Washing data submitted successfully!",
+                    "success"
+                  );
                   setAutoSaveId(null);
                   setLastSaved(null);
-                  
+
                   // Reset form after successful submission
                   setTimeout(() => {
                     window.location.reload();
                   }, 1500);
                 } else {
-                  Swal.fire('Error', result.message || 'Failed to submit data', 'error');
+                  Swal.fire(
+                    "Error",
+                    result.message || "Failed to submit data",
+                    "error"
+                  );
                 }
               } catch (error) {
-                console.error('Submit error:', error);
-                Swal.fire('Error', 'Failed to submit data', 'error');
+                console.error("Submit error:", error);
+                Swal.fire("Error", "Failed to submit data", "error");
               }
             }}
           >
