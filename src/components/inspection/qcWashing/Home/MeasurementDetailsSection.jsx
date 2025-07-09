@@ -45,14 +45,33 @@ const [hideUnselectedRowsBySize, setHideUnselectedRowsBySize] = useState({});
         const cellKey = `${size}-${tableType}-${specIndex}-${pcIndex}`;
         const measurementValue = measurements?.[cellKey];
         
+        // Determine the pass/fail result based on the same logic as the UI
+        let result = '';
+        if (measurementValue && typeof measurementValue.decimal === 'number') {
+          const measuredDeviation = measurementValue.decimal;
+          const tolMinus = spec.ToleranceMinus || '0';
+          const tolPlus = spec.TolerancePlus || '0';
+          const tolMinusValue = fractionToDecimal(tolMinus);
+          const tolPlusValue = fractionToDecimal(tolPlus);
+
+          if (!isNaN(tolMinusValue) && !isNaN(tolPlusValue)) {
+            if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
+              result = 'pass';
+            } else {
+              result = 'fail';
+            }
+          }
+        }
+        
         measurementPoints.push({
           pointName: spec.MeasurementPointEngName || `Point ${specIndex + 1}`,
-          value: measurementValue?.decimal || measurementValue?.fraction || '',
+          value: measurementValue?.decimal ?? (measurementValue?.fraction || ''),
           specs: spec.Specs?.fraction || spec.Specs || '-',
           toleranceMinus: spec.ToleranceMinus || '0',
           tolerancePlus: spec.TolerancePlus || '0',
           specIndex: specIndex,
-          isFullColumn: fullColumns?.[pcIndex] || false
+          isFullColumn: fullColumns?.[pcIndex] || false,
+          result: result,
         });
       });
       
@@ -432,10 +451,27 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                       {[...Array(qty)].map((_, i) => {
                         const cellKey = `${size}-before-${index}-${i}`;
                         const value = measurementValues[cellKey];
+                        let cellColorClass = 'bg-transparent';
+
+                        if (value && typeof value.decimal === 'number') {
+                          const measuredDeviation = value.decimal;
+                          const tolMinusValue = fractionToDecimal(tolMinus);
+                          const tolPlusValue = fractionToDecimal(tolPlus);
+
+                          if (!isNaN(tolMinusValue) && !isNaN(tolPlusValue)) {
+                            // The deviation should be within the tolerance range.
+                            if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
+                              cellColorClass = 'bg-green-200'; // Pass
+                            } else {
+                              cellColorClass = 'bg-red-200'; // Fail
+                            }
+                          }
+                        }
+
                         return (
-                          <td key={`measurement-input-${index}-${i}`} className="border border-gray-300 px-2 py-1 text-center">
-                            <input 
-                              type="text" 
+                          <td key={`measurement-input-${index}-${i}`} className={`border border-gray-300 px-2 py-1 text-center ${cellColorClass}`}>
+                            <input
+                              type="text"
                               value={value?.fraction || ''}
                               readOnly
                               onClick={() => setCurrentCell({ size, table: 'before', rowIndex: index, colIndex: i }) || setShowNumPad(true)}

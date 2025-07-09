@@ -29,7 +29,7 @@ const QCWashingPage = () => {
     buyer: '',
     factoryName: 'YM',
     reportType: 'Before Wash',
-    result: 'pass',
+    result: '',
     aqlSampleSize: '',
     aqlAcceptedDefect: '',
     aqlRejectedDefect: ''
@@ -95,7 +95,7 @@ const QCWashingPage = () => {
     afterWash: []
   });
   const [showMeasurementTable, setShowMeasurementTable] = useState(true);
-
+  
   const toggleSection = (section) => {
     setSectionVisibility(prev => ({
       ...prev,
@@ -953,10 +953,9 @@ const QCWashingPage = () => {
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-6">
         
         <SummaryCard 
-          inspectionData={inspectionData}
-          defectData={defectData}
           measurementData={measurementData}
           showMeasurementTable={showMeasurementTable}
+          reportType={formData.reportType}
         />
         
         <OrderDetailsSection 
@@ -1055,7 +1054,7 @@ const QCWashingPage = () => {
                       daily: '',
                       buyer: '',
                       factoryName: 'YM',
-                      result: 'pass',
+                      result: '',
                       aqlSampleSize: '',
                       aqlAcceptedDefect: '',
                       aqlRejectedDefect: ''
