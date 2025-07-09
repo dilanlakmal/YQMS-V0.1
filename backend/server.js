@@ -22567,7 +22567,16 @@ app.get("/api/cutting-dashboard-data", async (req, res) => {
     if (color) match.color = color;
     if (qcId) match.cutting_emp_id = qcId;
 
-    preMatchPipeline.push({ $match: match });
+    //preMatchPipeline.push({ $match: match });
+    if (Object.keys(match).length > 0) {
+      preMatchPipeline.push({ $match: match });
+    }
+
+    // Pipeline to count the total number of reports (documents) found
+    const reportCountPipeline = [
+      ...preMatchPipeline,
+      { $count: "totalReports" }
+    ];
 
     // The rest of the pipelines now start with the correctly filtered data
     const kpiBasePipeline = [
@@ -22727,12 +22736,14 @@ app.get("/api/cutting-dashboard-data", async (req, res) => {
       }
     ];
 
-    const [kpiBaseResult, unwindResult] = await Promise.all([
+    const [kpiBaseResult, unwindResult, reportCountResult] = await Promise.all([
       CuttingInspection.aggregate(kpiBasePipeline),
-      CuttingInspection.aggregate(unwindPipeline)
+      CuttingInspection.aggregate(unwindPipeline),
+      CuttingInspection.aggregate(reportCountPipeline)
     ]);
 
     const defaultKpis = {
+      totalInspectedReports: 0,
       totalInspectionQty: 0,
       totalPcs: 0,
       totalPass: 0,
@@ -22748,7 +22759,8 @@ app.get("/api/cutting-dashboard-data", async (req, res) => {
     const kpis = {
       ...defaultKpis,
       ...(kpiBaseResult[0] || {}),
-      ...(unwindResult[0]?.kpis[0] || {})
+      ...(unwindResult[0]?.kpis[0] || {}),
+      totalInspectedReports: reportCountResult[0]?.totalReports || 0 // <-- Add the count result
     };
     delete kpis._id;
 
