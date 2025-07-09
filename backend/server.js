@@ -76,6 +76,7 @@ import createEMBReportModel from "./models/EMBReport.js";
 
 import createQADefectsModel from "./models/QADefectsModel.js";
 import createQCAccuracyReportModel from "./models/QCAccuracyReportModel.js";
+import createQAStandardDefectsModel from "./models/QAStandardDefectsModel.js";
 
 import createAuditCheckPointModel from "./models/AuditCheckPoint.js";
 
@@ -234,6 +235,7 @@ const EMBReport = createEMBReportModel(ymProdConnection);
 
 const QADefectsModel = createQADefectsModel(ymProdConnection);
 const QCAccuracyReportModel = createQCAccuracyReportModel(ymProdConnection);
+const QAStandardDefectsModel = createQAStandardDefectsModel(ymProdConnection);
 
 // Define new SCC Operator models on ymProdConnection
 const SCCHTOperator = createSCCHTOperatorModel(ymProdConnection);
@@ -22250,6 +22252,100 @@ app.post("/api/qa-defects/buyer-statuses", async (req, res) => {
       message: "Failed to update QA defect buyer statuses",
       error: error.message
     });
+  }
+});
+
+/* =====================================================================
+   ENDPOINTS FOR QA STANDARD DEFECTS
+===================================================================== */
+
+// --- FIX #2: NEW CRUD ENDPOINTS ---
+
+// GET all standard defects
+app.get("/api/qa-standard-defects", async (req, res) => {
+  try {
+    const defects = await QAStandardDefectsModel.find({}).sort({ code: 1 });
+    res.json(defects);
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        message: "Error fetching standard defects",
+        error: error.message
+      });
+  }
+});
+
+// GET next available code
+app.get("/api/qa-standard-defects/next-code", async (req, res) => {
+  try {
+    const lastDefect = await QAStandardDefectsModel.findOne().sort({
+      code: -1
+    });
+    const nextCode = lastDefect ? lastDefect.code + 1 : 1;
+    res.json({ nextCode });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error fetching next code", error: error.message });
+  }
+});
+
+// POST a new standard defect
+app.post("/api/qa-standard-defects", async (req, res) => {
+  try {
+    const newDefect = new QAStandardDefectsModel(req.body);
+    await newDefect.save();
+    res.status(201).json(newDefect);
+  } catch (error) {
+    res
+      .status(400)
+      .json({
+        message: "Error creating standard defect",
+        error: error.message
+      });
+  }
+});
+
+// PUT (Update) a standard defect
+app.put("/api/qa-standard-defects/:id", async (req, res) => {
+  try {
+    const updatedDefect = await QAStandardDefectsModel.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+    if (!updatedDefect) {
+      return res.status(404).json({ message: "Defect not found" });
+    }
+    res.json(updatedDefect);
+  } catch (error) {
+    res
+      .status(400)
+      .json({
+        message: "Error updating standard defect",
+        error: error.message
+      });
+  }
+});
+
+// DELETE a standard defect
+app.delete("/api/qa-standard-defects/:id", async (req, res) => {
+  try {
+    const deletedDefect = await QAStandardDefectsModel.findByIdAndDelete(
+      req.params.id
+    );
+    if (!deletedDefect) {
+      return res.status(404).json({ message: "Defect not found" });
+    }
+    res.status(200).json({ message: "Defect deleted successfully" });
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        message: "Error deleting standard defect",
+        error: error.message
+      });
   }
 });
 
