@@ -6,11 +6,12 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
   // Calculate measurement points only
   let measurementPoints = 0;
   let measurementPass = 0;
+  let currentMeasurements = [];
 
   if (measurementData && typeof measurementData === "object") {
     // Determine which wash type to show based on reportType
     const washType = reportType === 'Before Wash' ? 'beforeWash' : 'afterWash';
-    const currentMeasurements = measurementData[washType] || [];
+    currentMeasurements = measurementData[washType] || [];
 
     currentMeasurements.forEach((data) => {
       if (data.pcs && Array.isArray(data.pcs)) {
@@ -64,12 +65,13 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-6">
       <h2 className="text-lg font-semibold text-gray-800 mb-4">
-        Measurement Summary
+        Measurement Summary -{" "}
+        <span className="text-indigo-600">{reportType}</span>
       </h2>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {/* Total Measurement Points */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
           <div className="text-2xl font-bold text-blue-600">
             {totalCheckedPoints}
           </div>
@@ -104,24 +106,14 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
       </div>
 
       {/* Measurement Details Breakdown */}
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-        <div className="bg-gray-50 rounded p-3">
+      <div className="mt-6 text-sm">
+        <div className="bg-gray-100 rounded-lg p-3">
           <div className="font-medium text-gray-700">
-            Before Wash Measurements
+            Breakdown for {reportType}
           </div>
-          <div className="text-gray-600">
-            {measurementData.beforeWash ? measurementData.beforeWash.length : 0}{" "}
-            sizes measured
-          </div>
-        </div>
-
-        <div className="bg-gray-50 rounded p-3">
-          <div className="font-medium text-gray-700">
-            After Wash Measurements
-          </div>
-          <div className="text-gray-600">
-            {measurementData.afterWash ? measurementData.afterWash.length : 0}{" "}
-            sizes measured
+          <div className="text-gray-600 mt-1">
+            - {currentMeasurements.length} sizes measured
+            <br />- {totalCheckedPoints} total measurement points checked
           </div>
         </div>
       </div>
