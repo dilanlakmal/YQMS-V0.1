@@ -26,7 +26,7 @@ const DefectDetailsSection = ({
 
   let defectStatus = 'N/A';
   let statusColorClass = 'bg-gray-100 text-gray-800';
-  if (formData.inline && formData.aqlAcceptedDefect) {
+  if ((formData.inline === 'Inline' || formData.daily === 'Inline') && formData.aqlAcceptedDefect) {
     const acceptedDefectCount = parseInt(formData.aqlAcceptedDefect, 10);
     if (!isNaN(acceptedDefectCount)) {
       if (totalDefects <= acceptedDefectCount) {
@@ -131,18 +131,19 @@ const DefectDetailsSection = ({
             <div className="flex items-center space-x-4">
               <label className="w-28 text-sm font-medium">Checked Qty:</label>
               <input 
-                type="number" 
-                value={formData.checkedQty}
-                onChange={(e) => handleInputChange('checkedQty', e.target.value)}
-                className="flex-1 px-3 py-2 border rounded-md"
+                type="text" 
+                value={formData.checkedQty || ''}
+                readOnly
+                className="flex-1 px-3 py-2 border rounded-md bg-gray-100 cursor-not-allowed"
+                placeholder="Auto-calculated when Inline is selected"
               />
             </div>
            
             {/* AQL Information Display */}
-          {formData.inline && (formData.aqlSampleSize || formData.aqlAcceptedDefect || formData.aqlRejectedDefect) && (
+          {(formData.inline === 'Inline' || formData.daily === 'Inline') && (formData.aqlSampleSize || formData.aqlAcceptedDefect || formData.aqlRejectedDefect) && (
             <div className="md:col-span-2 bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-blue-800 mb-2">AQL Information (Level II, AQL 1.0)</h3>
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-4 gap-4 text-sm">
                 <div>
                   <span className="font-medium text-blue-700">Sample Size:</span>
                   <span className="ml-2 text-blue-900">{formData.aqlSampleSize || 'N/A'}</span>
@@ -155,16 +156,16 @@ const DefectDetailsSection = ({
                   <span className="font-medium text-blue-700">Rejected Defect:</span>
                   <span className="ml-2 text-blue-900">{formData.aqlRejectedDefect || 'N/A'}</span>
                 </div>
-              </div>
-            </div>
-          )}
-          </div>
-                          <div>
+                <div>
                   <span className="font-medium text-blue-700">Status:</span>
                   <span className={`ml-2 px-2 py-1 rounded-full text-xs font-bold ${statusColorClass}`}>
                     {defectStatus}
                   </span>
                 </div>
+              </div>
+            </div>
+          )}
+          </div>
 
 
           <div className="p-4 border rounded-lg bg-gray-50">

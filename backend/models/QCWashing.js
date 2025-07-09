@@ -76,6 +76,12 @@ const QCWashingSchema = new mongoose.Schema({
     measurementDetails: [{
       size: String,
       qty: Number,
+      washType: {
+        type: String,
+        enum: ['beforeWash', 'afterWash'],
+        required: true
+      },
+    
       pcs: [{
         pcNumber: Number,
         measurementPoints: [{

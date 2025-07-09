@@ -30,7 +30,7 @@
 - **Port**: 5000
 - **Database**: MongoDB (localhost:27017/yqms)
 - **Collection**: qcWashing
-- **API Base URL**: http://192.167.12.85:5000
+- **API Base URL**: https://192.167.12.85:5000
 
 ## Available Endpoints
 - POST `/api/qc-washing/auto-save` - Auto-save form data

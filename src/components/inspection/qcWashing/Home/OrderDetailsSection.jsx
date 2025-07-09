@@ -29,12 +29,13 @@ const OrderDetailsSection = ({
       {isVisible && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex items-center space-x-4">
-            <label className="w-20 text-sm font-medium">Style:</label>
+            <label className="w-20 text-sm font-medium">Oeder No:</label>
             <input 
               type="text" 
-              value={formData.style}
-              onChange={(e) => handleInputChange('style', e.target.value)}
-              onBlur={() => fetchOrderDetailsByStyle(formData.style)}
+              value={formData.orderNo}
+              onChange={(e) => handleInputChange('orderNo', e.target.value)}
+              onBlur={() => fetchOrderDetailsByStyle(formData.orderNo)}
+              placeholder="Enter Order No and click away"
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500"
             />
           </div>
@@ -91,7 +92,7 @@ const OrderDetailsSection = ({
                 <input 
                   type="checkbox" 
                   checked={formData.firstOutput === true || formData.firstOutput === 'First Output'}
-                  onChange={(e) => handleInputChange('firstOutput', e.target.checked)}
+                  onChange={(e) => handleInputChange('firstOutput', e.target.checked ? 'First Output' : '')}
                   className="mr-2"
                 />
                 First Output
@@ -100,7 +101,7 @@ const OrderDetailsSection = ({
                 <input 
                   type="checkbox" 
                   checked={formData.inline === true || formData.inline === 'Inline'}
-                  onChange={(e) => handleInputChange('inline', e.target.checked)}
+                  onChange={(e) => handleInputChange('inline', e.target.checked ? 'Inline' : '')}
                   className="mr-2"
                 />
                 Inline
@@ -130,7 +131,19 @@ const OrderDetailsSection = ({
                 <option key={index} value={factory.factory}>{factory.factory}</option>
               ))}
             </select>
-          </div>  
+          </div>
+
+          <div className="flex items-center space-x-4">
+            <label className="w-20 text-sm font-medium">Report Type:</label>
+            <select
+              value={formData.reportType || 'Before Wash'}
+              onChange={(e) => handleInputChange('reportType', e.target.value)}
+              className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="Before Wash">Before Wash</option>
+              <option value="After Wash">After Wash</option>
+            </select>
+          </div>
         </div>
       )}
     </div>

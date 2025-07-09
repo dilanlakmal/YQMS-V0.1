@@ -119,6 +119,7 @@ app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 
 //app.use(cors());
 app.use(bodyParser.json());
+app.use(express.json());
 
 const allowedOrigins = ["https://192.167.12.85:3001", "http://localhost:3001", "https://localhost:3001"];
 app.use(
@@ -2325,8 +2326,49 @@ const getBuyerFromMoNumber = (moNo) => {
 /* ------------------------------
    End Points - Measurement Data In qcWashing
 ------------------------------ */
+// Get order details by style number
+app.get('/api/qc-washing/order-details-by-style/:styleNo', async (req, res) => {
+  const { styleNo } = req.params;
+  const collection = ymEcoConnection.db.collection("dt_orders");
+
+  try {
+    const orders = await collection.find({ Order_No: styleNo }).toArray();
+
+    if (!orders || orders.length === 0) {
+      return res.status(404).json({ success: false, message: `Style '${styleNo}' not found.` });
+    }
+
+    // Extract all available colors from OrderColors array
+    const colorSet = new Set();
+    orders.forEach(order => {
+      if (order.OrderColors && Array.isArray(order.OrderColors)) {
+        order.OrderColors.forEach(colorObj => {
+          if (colorObj && colorObj.Color) {
+            colorSet.add(colorObj.Color);
+          }
+        });
+      }
+    });
+    const availableColors = Array.from(colorSet);
+    
+    const orderQty = orders.reduce((sum, order) => sum + (order.TotalQty || 0), 0);
+    const buyerName = getBuyerFromMoNumber(styleNo);
+
+    res.json({
+      success: true,
+      colors: availableColors,
+      orderQty,
+      buyer: buyerName,
+    });
+
+  } catch (error) {
+    console.error(`Error fetching order details for style ${styleNo}:`, error);
+    res.status(500).json({ success: false, message: 'Server error while fetching order details.' });
+  }
+});
+
 // Get order details by order number with saved color data
-app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
+app.get('/api/qc-washing/order-details-by-order/:orderNo', async (req, res) => {
   const { orderNo } = req.params;
   const collection = ymEcoConnection.db.collection("dt_orders");
 
@@ -23482,71 +23524,57 @@ app.put('/api/qc-washing/update/:recordId', async (req, res) => {
   }
 });
 
-// Find AQL data for QC Washing
-// app.post('/api/aql-chart/find', async (req, res) => {
-//   try {
-//     const { type, level, lotSize } = req.body;
-    
-//     // Find AQL chart data based on criteria
-//     const aqlData = await AQLChart.findOne({
-//       type: type,
-//       level: level,
-//       lotSize : lotSize,
-//       // Add any order-specific matching logic here if needed
-//     });
-    
-//     if (aqlData) {
-//       res.json({ success: true, aqlData: aqlData });
-//     } else {
-//       res.json({ success: false, message: 'AQL data not found' });
-//     }
-//   } catch (error) {
-//     console.error('Error finding AQL data:', error);
-//     res.status(500).json({ success: false, message: 'Failed to find AQL data' });
-//   }
-// });
-
 // AQL data endpoint
-app.post('/api/aql-chart/find', async (req, res) => {
+app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
   try {
-    const { type, level, orderNo, lotSize } = req.body;
-    
-    // Simple AQL calculation based on lot size
-    let sampleSize, acceptedDefect, rejectedDefect;
-    
-    if (lotSize <= 50) {
-      sampleSize = 13;
-      acceptedDefect = 1;
-      rejectedDefect = 2;
-    } else if (lotSize <= 150) {
-      sampleSize = 32;
-      acceptedDefect = 2;
-      rejectedDefect = 3;
-    } else if (lotSize <= 500) {
-      sampleSize = 80;
-      acceptedDefect = 3;
-      rejectedDefect = 4;
-    } else if (lotSize <= 1200) {
-      sampleSize = 125;
-      acceptedDefect = 5;
-      rejectedDefect = 6;
-    } else {
-      sampleSize = 200;
-      acceptedDefect = 7;
-      rejectedDefect = 8;
+    const { lotSize } = req.body;
+
+    if (!lotSize || isNaN(lotSize)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Lot size (wash Qty) is required and must be a number." });
     }
+    const lotSizeNum = parseInt(lotSize, 10);
+
+    // Find the AQL chart document where the lot size falls within the defined range.
+    const aqlChart = await AQLChart.findOne({
+      Type: "General", // Hardcoded as per requirement
+      Level: "II",     // Hardcoded as per requirement
+      "LotSize.min": { $lte: lotSizeNum },
+      $or: [
+        { "LotSize.max": { $gte: lotSizeNum } },
+        { "LotSize.max": null } // Handles ranges with no upper limit
+      ]
+    }).lean();
+
+    if (!aqlChart) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No AQL chart found for the given lot size." });
+    }
+
+    // Find the specific AQL entry for level 1.0 within the document.
+    const aqlEntry = aqlChart.AQL.find(aql => aql.level === 1.0);
+
+    if (!aqlEntry) {
+      return res
+        .status(404)
+        .json({ success: false, message: "AQL level 1.0 not found for the matching chart." });
+    }
+
+    // Respond with the data in the format expected by the frontend.
     
     res.json({
       success: true,
       aqlData: {
-        sampleSize,
-        acceptedDefect,
-        rejectedDefect
+        sampleSize: aqlChart.SampleSize,
+        acceptedDefect: aqlEntry.AcceptDefect,
+        rejectedDefect: aqlEntry.RejectDefect
       }
     });
   } catch (error) {
     console.error('AQL calculation error:', error);
-    res.status(500).json({ success: false, message: 'Failed to calculate AQL data' });
+    res.status(500).json({ success: false, message: 'Server error while fetching AQL details.' });
   }
 });
 

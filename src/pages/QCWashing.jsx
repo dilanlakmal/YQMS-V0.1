@@ -28,6 +28,7 @@ const QCWashingPage = () => {
     daily: '',
     buyer: '',
     factoryName: 'YM',
+    reportType: 'Before Wash',
     result: 'pass',
     aqlSampleSize: '',
     aqlAcceptedDefect: '',
@@ -89,7 +90,10 @@ const QCWashingPage = () => {
   
   // Measurement tracking
   const [savedSizes, setSavedSizes] = useState([]);
-  const [measurementData, setMeasurementData] = useState([]);
+  const [measurementData, setMeasurementData] = useState({
+    beforeWash: [],
+    afterWash: []
+  });
   const [showMeasurementTable, setShowMeasurementTable] = useState(true);
 
   const toggleSection = (section) => {
@@ -155,10 +159,10 @@ const QCWashingPage = () => {
 
   // Calculate checked qty when AQL data is loaded and wash qty exists
   useEffect(() => {
-    if (formData.inline === 'Inline' && formData.aqlSampleSize && formData.washQty) {
+    if ((formData.inline === 'Inline' || formData.daily === 'Inline') && formData.aqlSampleSize && formData.washQty) {
       calculateCheckedQty(formData.washQty);
     }
-  }, [formData.aqlSampleSize, formData.inline]);
+  }, [formData.aqlSampleSize, formData.inline, formData.daily]);
 
   const initializeInspectionData = (checklist = []) => {
     if (!Array.isArray(checklist)) return [];
@@ -333,17 +337,20 @@ const QCWashingPage = () => {
     setFormData(prev => {
       const newState = { ...prev, [field]: value };
       // When one checkbox is checked, uncheck the other and set daily field as string
-      if (field === 'firstOutput' && value) {
+      if (field === 'firstOutput') {
         newState.inline = '';
-        newState.daily = 'First Output'; // Set daily as string
-      } else if (field === 'firstOutput' && !value) {
-        newState.daily = newState.inline || ''; // Keep inline value or empty
-      }
-      if (field === 'inline' && value) {
+        newState.daily = value; // Set 'daily' to the string value ('First Output' or '')
+      } else if (field === 'inline') {
         newState.firstOutput = '';
-        newState.daily = 'Inline'; // Set daily as string
-      } else if (field === 'inline' && !value) {
-        newState.daily = newState.firstOutput || ''; // Keep firstOutput value or empty
+        newState.daily = value; // Set 'daily' to the string value ('Inline' or '')
+      } else if (field === 'daily') {
+        if (value === 'First Output') {
+          newState.firstOutput = 'First Output';
+          newState.inline = '';
+        } else if (value === 'Inline') {
+          newState.inline = 'Inline';
+          newState.firstOutput = '';
+        }
       }
       
       // Handle color change - reset color-specific data
@@ -362,7 +369,7 @@ const QCWashingPage = () => {
         ]);
         setAddedDefects([]);
         setComment('');
-        setMeasurementData([]);
+        setMeasurementData({ beforeWash: [], afterWash: [] });
         setSavedSizes([]);
         
         // Load saved data for the new color if exists
@@ -375,33 +382,45 @@ const QCWashingPage = () => {
     });
     
     // Handle async operations after state update
-    if (field === 'inline' && value === 'Inline' && (formData.orderNo || formData.style) && formData.washQty) {
-      setTimeout(() => fetchAQLData(formData.orderNo || formData.style, formData.washQty), 100);
+    if (field === 'inline' && value && (formData.orderNo || formData.style) && formData.washQty) {
+     setTimeout(() => fetchAQLData(formData.washQty), 100);
     }
     if (field === 'washQty' && value) {
       setTimeout(() => {
-        if (formData.inline === 'Inline') {
-          fetchAQLData(formData.orderNo || formData.style, value);
+        if (formData.inline === 'Inline' || formData.daily === 'Inline') {
+           fetchAQLData(value);
           calculateCheckedQty(value);
         }
       }, 100);
     }
+  
   };
 
   // Fetch AQL data for inline daily field
-  const fetchAQLData = async (orderNo, washQty) => {
+  const fetchAQLData = async (washQty) => {
+    if (!washQty) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/aql-chart/find`, {
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/aql-chart/find`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'general',
-          level: 'II',
-          orderNo: orderNo,
-          lotSize: parseInt(washQty) || 0
+          lotSize: parseInt(washQty) || 0,
         })
       });
       
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: `Request failed with status ${response.status}` }));
+        console.error('AQL API Error:', errorData.message || 'Unknown error');
+        // Clear previous AQL data to avoid showing stale info
+        setFormData(prev => ({
+          ...prev,
+          aqlSampleSize: '',
+          aqlAcceptedDefect: '',
+          aqlRejectedDefect: ''
+        }));
+        return;
+      }
+
       const data = await response.json();
       if (data.success && data.aqlData) {
         setFormData(prev => ({
@@ -410,6 +429,8 @@ const QCWashingPage = () => {
           aqlAcceptedDefect: data.aqlData.acceptedDefect.toString(),
           aqlRejectedDefect: data.aqlData.rejectedDefect.toString()
         }));
+      } else {
+        console.warn('AQL data not found:', data.message || 'No AQL chart found for the given criteria.');
       }
     } catch (error) {
       console.error('Error fetching AQL data:', error);
@@ -500,8 +521,10 @@ const QCWashingPage = () => {
         addedDefects,
         uploadedImages: uploadedImages.map(img => ({ name: img.name, preview: img.preview })),
         comment,
-        signatures,
-        measurementDetails: measurementData,
+        measurementDetails: [
+          ...measurementData.beforeWash.map(item => ({ ...item, washType: 'beforeWash' })),
+          ...measurementData.afterWash.map(item => ({ ...item, washType: 'afterWash' }))
+        ],
         savedAt: new Date().toISOString(),
         userId: user?.emp_id
       };
@@ -585,8 +608,17 @@ const QCWashingPage = () => {
           
           // Set comment and measurement data
           setComment(colorData.defectDetails?.comment || '');
-          setMeasurementData(colorData.measurementDetails || []);
-          
+          const loadedMeasurements = colorData.measurementDetails; // This is now an array
+          if (Array.isArray(loadedMeasurements)) {
+            const beforeWash = loadedMeasurements.filter(m => m.washType === 'beforeWash');
+            const afterWash = loadedMeasurements.filter(m => m.washType === 'afterWash');
+            setMeasurementData({ beforeWash, afterWash });
+          } else if (loadedMeasurements && loadedMeasurements.beforeWash) {
+            // Backwards compatibility for old data structure
+            setMeasurementData(loadedMeasurements);
+          } else {
+            setMeasurementData({ beforeWash: [], afterWash: [] });
+          }
           console.log('Loaded color-specific data for:', orderNo, color);
         }
       }
@@ -650,8 +682,17 @@ const QCWashingPage = () => {
           setComment(saved.comment || '');
           
           // Set measurement data
-          const measurementDetails = saved.measurementDetails || [];
-          setMeasurementData(measurementDetails);
+          const measurementDetails = saved.measurementDetails; // This is now an array
+          if (Array.isArray(measurementDetails)) {
+            const beforeWash = measurementDetails.filter(m => m.washType === 'beforeWash');
+            const afterWash = measurementDetails.filter(m => m.washType === 'afterWash');
+            setMeasurementData({ beforeWash, afterWash });
+          } else if (measurementDetails && measurementDetails.beforeWash) {
+            // Backwards compatibility for old data structure
+            setMeasurementData(measurementDetails);
+          } else {
+            setMeasurementData({ beforeWash: [], afterWash: [] });
+          }
           setShowMeasurementTable(true);
           
           setAutoSaveId(saved._id);
@@ -745,7 +786,17 @@ const QCWashingPage = () => {
           
           setAddedDefects(transformedAddedDefects);
           setComment(saved.color?.defectDetails?.comment || '');
-          setMeasurementData(saved.color?.measurementDetails || []);
+          const measurementDetails = saved.color?.measurementDetails; // This is now an array
+          if (Array.isArray(measurementDetails)) {
+            const beforeWash = measurementDetails.filter(m => m.washType === 'beforeWash');
+            const afterWash = measurementDetails.filter(m => m.washType === 'afterWash');
+            setMeasurementData({ beforeWash, afterWash });
+          } else if (measurementDetails && measurementDetails.beforeWash) {
+            // Backwards compatibility for old data structure
+            setMeasurementData(measurementDetails);
+          } else {
+            setMeasurementData({ beforeWash: [], afterWash: [] });
+          }
           setShowMeasurementTable(true);
           
           console.log('Loaded submitted data for order:', orderNo);
@@ -781,15 +832,20 @@ const QCWashingPage = () => {
   // Handle measurement size save with nested structure
   const handleSizeSubmit = async (transformedSizeData) => {
     try {
+      // Determine which wash type to save to based on current reportType
+      const washType = formData.reportType === 'Before Wash' ? 'beforeWash' : 'afterWash';
+      
       // Add to measurement data immediately
       setMeasurementData(prev => {
-        const existingIndex = prev.findIndex(item => item.size === transformedSizeData.size);
+        const currentArray = prev[washType];
+        const existingIndex = currentArray.findIndex(item => item.size === transformedSizeData.size);
+        
         if (existingIndex >= 0) {
-          const updated = [...prev];
+          const updated = [...currentArray];
           updated[existingIndex] = transformedSizeData;
-          return updated;
+          return { ...prev, [washType]: updated };
         } else {
-          return [...prev, transformedSizeData];
+          return { ...prev, [washType]: [...currentArray, transformedSizeData] };
         }
       });
       
@@ -803,7 +859,7 @@ const QCWashingPage = () => {
       // Always show measurement table for next size selection
       setShowMeasurementTable(true);
       
-      Swal.fire('Success', 'Size data saved successfully!', 'success');
+      Swal.fire('Success', `Size data saved successfully to ${formData.reportType}!`, 'success');
       
       // Trigger auto-save to include the new measurement data
       setTimeout(() => autoSaveData(), 500);
@@ -819,8 +875,12 @@ const QCWashingPage = () => {
     if (size) {
       // Remove the size from saved sizes to allow editing
       setSavedSizes(prev => prev.filter(s => s !== size));
-      // Remove from measurement data to allow re-entry
-      setMeasurementData(prev => prev.filter(item => item.size !== size));
+      // Remove from current wash type measurement data to allow re-entry
+      const washType = formData.reportType === 'Before Wash' ? 'beforeWash' : 'afterWash';
+      setMeasurementData(prev => ({
+        ...prev,
+        [washType]: prev[washType].filter(item => item.size !== size)
+      }));
     }
   };
 
@@ -946,8 +1006,9 @@ const QCWashingPage = () => {
         />
 
         <MeasurementDetailsSection 
-          orderNo={formData.style}
+          orderNo={formData.orderNo || formData.style}
           color={formData.color}
+          reportType={formData.reportType}
           isVisible={sectionVisibility.measurementDetails}
           onToggle={() => toggleSection('measurementDetails')}
           savedSizes={savedSizes}
@@ -989,8 +1050,8 @@ const QCWashingPage = () => {
                       color: '',
                       washQty: '',
                       washingType: 'Normal Wash',
-                      firstOutput: '',
-                      inline: '',
+                      firstOutput: false,
+                      inline: false,
                       daily: '',
                       buyer: '',
                       factoryName: 'YM',
@@ -1014,7 +1075,7 @@ const QCWashingPage = () => {
                     setUploadedImages([]);
                     setComment('');
                     setSignatures({ agreedBy: '', reportedBy: '', reportedTo: '' });
-                    setMeasurementData([]);
+                    setMeasurementData({ beforeWash: [], afterWash: [] });
                     setShowMeasurementTable(true);
                   }
                 });
@@ -1039,7 +1100,10 @@ const QCWashingPage = () => {
                   uploadedImages,
                   comment,
                   signatures,
-                  measurementDetails: measurementData,
+                  measurementDetails: [
+                    ...measurementData.beforeWash.map(item => ({ ...item, washType: 'beforeWash' })),
+                    ...measurementData.afterWash.map(item => ({ ...item, washType: 'afterWash' }))
+                  ],
                   submittedAt: new Date().toISOString(),
                   userId: user?.emp_id
                 };

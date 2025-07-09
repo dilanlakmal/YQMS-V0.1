@@ -10,9 +10,10 @@ const MeasurementDetailsSection = ({
   onToggle,
   savedSizes = [],
   onSizeSubmit,
-  measurementData = [],
+  measurementData = { beforeWash: [], afterWash: [] },
   showMeasurementTable = true,
-  onMeasurementEdit
+  onMeasurementEdit,
+  reportType
 }) => {
   const [sizes, setSizes] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
@@ -29,8 +30,10 @@ const [hideUnselectedRowsBySize, setHideUnselectedRowsBySize] = useState({});
   const [currentCell, setCurrentCell] = useState({ size: null, table: null, rowIndex: null, colIndex: null });
   const [measurementValues, setMeasurementValues] = useState({});
 
+  const currentWashMeasurements = (reportType === 'Before Wash' ? measurementData.beforeWash : measurementData.afterWash) || [];
+
   // Transform measurement data into nested structure
-  const transformMeasurementData = (size, qty, measurements, selectedRows, fullColumns, measurementSpecs) => {
+  const transformMeasurementData = (size, qty, measurements, selectedRows, fullColumns, measurementSpecs, tableType) => {
     const pcs = [];
     for (let pcIndex = 0; pcIndex < qty; pcIndex++) {
       const measurementPoints = [];
@@ -39,7 +42,7 @@ const [hideUnselectedRowsBySize, setHideUnselectedRowsBySize] = useState({});
         const isRowSelected = selectedRows?.[specIndex] ?? true;
         if (!isRowSelected) return;
         
-        const cellKey = `${size}-after-${specIndex}-${pcIndex}`;
+        const cellKey = `${size}-${tableType}-${specIndex}-${pcIndex}`;
         const measurementValue = measurements?.[cellKey];
         
         measurementPoints.push({
@@ -65,7 +68,7 @@ const [hideUnselectedRowsBySize, setHideUnselectedRowsBySize] = useState({});
       pcs: pcs,
       selectedRows: selectedRows,
       fullColumns: fullColumns,
-      measurements: measurements
+      measurements: measurements,
     };
   };
 
@@ -318,8 +321,9 @@ const toggleSelectAllRows = (size, checked, tableType) => {
         </h4>
         
         {/* K1 Sheet - Before Wash */}
-        {/* <div className="bg-blue-50 p-4 rounded-lg mb-4">
-          <h5 className="text-sm font-medium mb-3">K1 - Before Wash</h5>
+        {reportType === 'Before Wash' && (
+          <div className="bg-blue-50 p-4 rounded-lg mb-4">
+          <h5 className="text-sm font-medium mb-3">Before Wash</h5>
           
           {Object.keys(measurementSpecs.beforeWashGrouped).length > 1 && (
             <div className="flex space-x-2 mb-3">
@@ -447,10 +451,13 @@ const toggleSelectAllRows = (size, checked, tableType) => {
               </tbody>
             </table>
           </div>
-        </div> */}
+        </div>
+        )}
 
         {/* K2 Sheet - After Wash */}
-        <div className="flex justify-end mb-2">
+        {reportType === 'After Wash' && (
+          <>
+            <div className="flex justify-end mb-2">
             <button
               onClick={() =>
                 setHideUnselectedRowsBySize(prev => ({
@@ -463,8 +470,8 @@ const toggleSelectAllRows = (size, checked, tableType) => {
               {hideUnselectedRowsBySize[size] ? 'Show All' : 'Hide Unselected'}
             </button>
           </div>
-        <div className="bg-white p-4 rounded-lg mb-4">
-          <h5 className="text-sm font-medium mb-3">K2 - After Wash</h5>
+        <div className="bg-green-50 p-4 rounded-lg mb-4">
+          <h5 className="text-sm font-medium mb-3">After Wash</h5>
           
           {Object.keys(measurementSpecs.afterWashGrouped).length > 1 && (
             <div className="flex space-x-2 mb-3">
@@ -601,6 +608,8 @@ const toggleSelectAllRows = (size, checked, tableType) => {
             </table>
           </div>
         </div>
+          </>
+        )}
       </div>
     );
   };
@@ -773,13 +782,13 @@ const toggleSelectAllRows = (size, checked, tableType) => {
           )}
 
           {/* Show saved measurement data */}
-          {measurementData.length > 0 && (
+          {currentWashMeasurements.length > 0 && (
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Saved Measurement Data</h3>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-                {measurementData.map((data, index) => (
+                {currentWashMeasurements.map((data, index) => (
                   <div key={`saved-${index}`} className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div className="flex justify-between items-center mb-2">
                       <h4 className="font-medium text-gray-800">Size: {data.size} (Qty: {data.qty})</h4>
@@ -822,9 +831,13 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                         <div className="mt-4 flex justify-end">
                           <button
                             onClick={() => {
-                              // Transform measurement data into nested structure
-                              const transformedData = transformMeasurementData(size, qty, measurementValues, selectedRowsBySize[size], fullColumnsBySize[size], measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash || []);
-                              onSizeSubmit(transformedData, measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash || []);
+                              const specsForSubmit = reportType === 'Before Wash'
+                                ? (measurementSpecs.beforeWashGrouped[activeBeforeTab] || measurementSpecs.beforeWash || [])
+                                : (measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash || []);
+
+                              const tableType = reportType === 'Before Wash' ? 'before' : 'after';
+                              const transformedData = transformMeasurementData(size, qty, measurementValues, selectedRowsBySize[size], fullColumnsBySize[size], specsForSubmit, tableType);
+                              onSizeSubmit(transformedData);
                             }}
                             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
                           >
