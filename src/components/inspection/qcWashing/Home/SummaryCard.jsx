@@ -2,41 +2,6 @@ import React from "react";
 
 const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
   // Function to convert fraction to decimal
-  const fractionToDecimal = (frac) => {
-    if (typeof frac !== 'string' || !frac || frac.trim() === '-') return NaN;
-
-    // Standardize fraction characters
-    frac = frac
-      .replace('⁄', '/')
-      .replace('½', '1/2').replace('¼', '1/4').replace('¾', '3/4')
-      .replace('⅛', '1/8').replace('⅜', '3/8').replace('⅝', '5/8').replace('⅞', '7/8')
-      .trim();
-
-    const isNegative = frac.startsWith('-');
-    if (isNegative) {
-      frac = frac.substring(1);
-    }
-
-    let total = 0;
-    if (frac.includes('/')) {
-      const parts = frac.split(' ');
-      if (parts.length > 1 && parts[0]) {
-        total += parseFloat(parts[0]);
-      }
-      const fractionPart = parts.length > 1 ? parts[1] : parts[0];
-      const [num, den] = fractionPart.split('/').map(Number);
-      if (!isNaN(num) && !isNaN(den) && den !== 0) {
-        total += num / den;
-      } else {
-        return NaN;
-      }
-    } else {
-      total = parseFloat(frac);
-    }
-
-    if (isNaN(total)) return NaN;
-    return isNegative ? -total : total;
-  };
 
   // Calculate measurement points only
   let measurementPoints = 0;
@@ -52,22 +17,12 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
         data.pcs.forEach((pc) => {
           if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
             pc.measurementPoints.forEach((point) => {
-              // Only count measurement points that have actual values
-              if (point.value && point.value !== "" && point.value !== "-") {
+              // Use the pre-calculated 'result' field from the measurement point.
+              // This ensures consistency with the details table and handles all cases (including 0).
+              if (point.result === 'pass' || point.result === 'fail') {
                 measurementPoints++;
-
-                // Use the same logic as the measurement table
-                if (point.value && typeof point.value === 'object' && typeof point.value.decimal === 'number') {
-                  const measuredDeviation = point.value.decimal;
-                  const tolMinusValue = fractionToDecimal(point.toleranceMinus);
-                  const tolPlusValue = fractionToDecimal(point.tolerancePlus);
-
-                  if (!isNaN(tolMinusValue) && !isNaN(tolPlusValue)) {
-                    // The deviation should be within the tolerance range
-                    if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
-                      measurementPass++;
-                    }
-                  }
+                if (point.result === 'pass') {
+                  measurementPass++;
                 }
               }
             });
