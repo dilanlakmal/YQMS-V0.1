@@ -22388,6 +22388,390 @@ app.post("/api/qc-accuracy-reports", async (req, res) => {
 });
 
 /* ------------------------------
+   Cutting Dashboard ENDPOINTS (FINAL & COMPLETE)
+------------------------------ */
+
+// Helper function to generate date strings in M/D/YYYY format for filtering
+const generateDateStringsCuttingDashboard = (startDate, endDate) => {
+  if (!startDate || !endDate) return [];
+  const dates = [];
+  let currentDate = new Date(startDate);
+  const lastDate = new Date(endDate);
+
+  currentDate.setHours(0, 0, 0, 0);
+  lastDate.setHours(0, 0, 0, 0);
+
+  while (currentDate <= lastDate) {
+    const M = currentDate.getMonth() + 1;
+    const D = currentDate.getDate();
+    const Y = currentDate.getFullYear();
+    dates.push(`${M}/${D}/${Y}`);
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  return dates;
+};
+
+// This is the logic for the buyer helper, translated into MongoDB aggregation syntax.
+// It will be used inside an $addFields stage.
+const derivedBuyerLogic = {
+  $switch: {
+    branches: [
+      { case: { $regexMatch: { input: "$moNo", regex: "COM" } }, then: "MWW" },
+      {
+        case: { $regexMatch: { input: "$moNo", regex: "CO" } },
+        then: "Costco"
+      },
+      {
+        case: { $regexMatch: { input: "$moNo", regex: "AR" } },
+        then: "Aritzia"
+      },
+      {
+        case: { $regexMatch: { input: "$moNo", regex: "RT" } },
+        then: "Reitmans"
+      },
+      { case: { $regexMatch: { input: "$moNo", regex: "AF" } }, then: "ANF" },
+      { case: { $regexMatch: { input: "$moNo", regex: "NT" } }, then: "STORI" }
+    ],
+    default: "Other"
+  }
+};
+
+// GET DYNAMIC/CROSS-FILTERED filter options for Cutting Dashboard
+app.get("/api/cutting-dashboard/filters", async (req, res) => {
+  try {
+    const { startDate, endDate, buyer, moNo, tableNo, garmentType } = req.query;
+
+    // 1. Build the initial pipeline with date filtering and derived buyer
+    const pipeline = [];
+    if (startDate && endDate) {
+      const dateStrings = generateDateStringsCuttingDashboard(
+        startDate,
+        endDate
+      );
+      if (dateStrings.length > 0) {
+        pipeline.push({ $match: { inspectionDate: { $in: dateStrings } } });
+      } else {
+        return res.json({
+          buyers: [],
+          moNos: [],
+          tableNos: [],
+          garmentTypes: [],
+          qcIds: []
+        });
+      }
+    }
+    pipeline.push({ $addFields: { derivedBuyer: derivedBuyerLogic } });
+
+    // 2. Build the progressive match stage for cross-filtering
+    const progressiveMatch = {};
+    if (buyer) progressiveMatch.derivedBuyer = buyer;
+    if (moNo) progressiveMatch.moNo = moNo;
+    if (tableNo) progressiveMatch.tableNo = tableNo;
+    if (garmentType) progressiveMatch.garmentType = garmentType;
+
+    if (Object.keys(progressiveMatch).length > 0) {
+      pipeline.push({ $match: progressiveMatch });
+    }
+
+    // 3. Use a single facet stage to get all unique lists from the filtered dataset
+    pipeline.push({
+      $facet: {
+        buyers: [
+          { $group: { _id: "$derivedBuyer" } },
+          { $sort: { _id: 1 } },
+          { $project: { value: "$_id", _id: 0 } }
+        ],
+        moNos: [
+          { $group: { _id: "$moNo" } },
+          { $sort: { _id: 1 } },
+          { $project: { value: "$_id", _id: 0 } }
+        ],
+        tableNos: [
+          { $group: { _id: "$tableNo" } },
+          { $sort: { _id: 1 } },
+          { $project: { value: "$_id", _id: 0 } }
+        ],
+        garmentTypes: [
+          { $group: { _id: "$garmentType" } },
+          { $sort: { _id: 1 } },
+          { $project: { value: "$_id", _id: 0 } }
+        ],
+        qcIds: [
+          { $group: { _id: "$cutting_emp_id" } },
+          { $sort: { _id: 1 } },
+          { $project: { value: "$_id", _id: 0 } }
+        ]
+      }
+    });
+
+    const result = await CuttingInspection.aggregate(pipeline);
+
+    const formatResult = (data) =>
+      (data || []).map((item) => item.value).filter(Boolean);
+
+    res.json({
+      buyers: formatResult(result[0].buyers),
+      moNos: formatResult(result[0].moNos),
+      tableNos: formatResult(result[0].tableNos),
+      garmentTypes: formatResult(result[0].garmentTypes),
+      qcIds: formatResult(result[0].qcIds)
+    });
+  } catch (error) {
+    console.error("Error fetching cutting dashboard dynamic filters:", error);
+    res.status(500).json({
+      message: "Failed to fetch dynamic filter options",
+      error: error.message
+    });
+  }
+});
+
+// GET Cutting Dashboard Data
+app.get("/api/cutting-dashboard-data", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      buyer,
+      moNo,
+      tableNo,
+      garmentType,
+      color,
+      qcId,
+      topN = 5,
+      sortOrder = "top"
+    } = req.query;
+
+    // This pipeline will be prepended to all data-fetching aggregations
+    const preMatchPipeline = [];
+
+    // Stage 1: Add the derivedBuyer field first
+    preMatchPipeline.push({ $addFields: { derivedBuyer: derivedBuyerLogic } });
+
+    // Stage 2: Build the match object using the derived buyer
+    const match = {};
+    if (startDate && endDate) {
+      const dateStrings = generateDateStringsCuttingDashboard(
+        startDate,
+        endDate
+      );
+      if (dateStrings.length > 0) {
+        match.inspectionDate = { $in: dateStrings };
+      } else {
+        return res.json({ kpis: {}, charts: {} });
+      }
+    }
+    if (buyer) match.derivedBuyer = buyer; // Filter on the derived buyer
+    if (moNo) match.moNo = moNo;
+    if (tableNo) match.tableNo = tableNo;
+    if (garmentType) match.garmentType = garmentType;
+    if (color) match.color = color;
+    if (qcId) match.cutting_emp_id = qcId;
+
+    preMatchPipeline.push({ $match: match });
+
+    // The rest of the pipelines now start with the correctly filtered data
+    const kpiBasePipeline = [
+      ...preMatchPipeline, // Prepend the filtering logic
+      {
+        $group: {
+          _id: null,
+          totalInspectionQty: { $sum: { $ifNull: ["$totalInspectionQty", 0] } },
+          totalBundleQty: { $sum: { $ifNull: ["$totalBundleQty", 0] } },
+          bundleQtyCheck: { $sum: { $ifNull: ["$bundleQtyCheck", 0] } }
+        }
+      }
+    ];
+
+    const unwindPipeline = [
+      ...preMatchPipeline, // Prepend the filtering logic
+      { $unwind: "$inspectionData" },
+      {
+        $facet: {
+          kpis: [
+            {
+              $group: {
+                _id: null,
+                totalPcs: {
+                  $sum: { $ifNull: ["$inspectionData.totalPcsSize", 0] }
+                },
+                totalPass: {
+                  $sum: { $ifNull: ["$inspectionData.passSize.total", 0] }
+                },
+                totalReject: {
+                  $sum: { $ifNull: ["$inspectionData.rejectSize.total", 0] }
+                },
+                rejectMeasurements: {
+                  $sum: {
+                    $ifNull: ["$inspectionData.rejectMeasurementSize.total", 0]
+                  }
+                },
+                rejectDefects: {
+                  $sum: {
+                    $ifNull: ["$inspectionData.rejectGarmentSize.total", 0]
+                  }
+                },
+                inspectedSizes: { $addToSet: "$inspectionData.inspectedSize" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                totalPcs: 1,
+                totalPass: 1,
+                totalReject: 1,
+                rejectMeasurements: 1,
+                rejectDefects: 1,
+                passRate: {
+                  $cond: [
+                    { $gt: ["$totalPcs", 0] },
+                    {
+                      $multiply: [{ $divide: ["$totalPass", "$totalPcs"] }, 100]
+                    },
+                    0
+                  ]
+                },
+                totalInspectedSizes: { $size: "$inspectedSizes" }
+              }
+            }
+          ],
+          passRateByMo: [
+            {
+              $group: {
+                _id: "$moNo",
+                totalPcs: { $sum: "$inspectionData.totalPcsSize" },
+                totalPass: { $sum: "$inspectionData.passSize.total" },
+                totalReject: { $sum: "$inspectionData.rejectSize.total" }
+              }
+            },
+            {
+              $project: {
+                name: "$_id",
+                _id: 0,
+                totalPcs: 1, // Pass through the counts
+                totalPass: 1,
+                totalReject: 1,
+                passRate: {
+                  $cond: [
+                    { $gt: ["$totalPcs", 0] },
+                    {
+                      $multiply: [{ $divide: ["$totalPass", "$totalPcs"] }, 100]
+                    },
+                    0
+                  ]
+                }
+              }
+            },
+            { $sort: { passRate: sortOrder === "bottom" ? 1 : -1 } },
+            { $limit: parseInt(topN, 10) }
+          ],
+          passRateByDate: [
+            {
+              $group: {
+                _id: "$inspectionDate",
+                totalPcs: { $sum: "$inspectionData.totalPcsSize" },
+                totalPass: { $sum: "$inspectionData.passSize.total" }
+              }
+            },
+            { $addFields: { dateParts: { $split: ["$_id", "/"] } } },
+            {
+              $addFields: {
+                month: { $toInt: { $arrayElemAt: ["$dateParts", 0] } },
+                day: { $toInt: { $arrayElemAt: ["$dateParts", 1] } },
+                year: { $toInt: { $arrayElemAt: ["$dateParts", 2] } }
+              }
+            },
+            { $sort: { year: 1, month: 1, day: 1 } },
+            {
+              $project: {
+                name: "$_id",
+                _id: 0,
+                passRate: {
+                  $cond: [
+                    { $gt: ["$totalPcs", 0] },
+                    {
+                      $multiply: [{ $divide: ["$totalPass", "$totalPcs"] }, 100]
+                    },
+                    0
+                  ]
+                }
+              }
+            },
+            { $limit: 30 }
+          ],
+          passRateByGarmentType: [
+            {
+              $group: {
+                _id: "$garmentType",
+                totalPcs: { $sum: "$inspectionData.totalPcsSize" },
+                totalPass: { $sum: "$inspectionData.passSize.total" }
+              }
+            },
+            {
+              $project: {
+                name: "$_id",
+                _id: 0,
+                passRate: {
+                  $cond: [
+                    { $gt: ["$totalPcs", 0] },
+                    {
+                      $multiply: [{ $divide: ["$totalPass", "$totalPcs"] }, 100]
+                    },
+                    0
+                  ]
+                }
+              }
+            },
+            { $sort: { passRate: -1 } }
+          ]
+        }
+      }
+    ];
+
+    const [kpiBaseResult, unwindResult] = await Promise.all([
+      CuttingInspection.aggregate(kpiBasePipeline),
+      CuttingInspection.aggregate(unwindPipeline)
+    ]);
+
+    const defaultKpis = {
+      totalInspectionQty: 0,
+      totalPcs: 0,
+      totalPass: 0,
+      totalReject: 0,
+      rejectMeasurements: 0,
+      rejectDefects: 0,
+      passRate: 0,
+      totalBundleQty: 0,
+      bundleQtyCheck: 0,
+      totalInspectedSizes: 0
+    };
+
+    const kpis = {
+      ...defaultKpis,
+      ...(kpiBaseResult[0] || {}),
+      ...(unwindResult[0]?.kpis[0] || {})
+    };
+    delete kpis._id;
+
+    const formattedResult = {
+      kpis,
+      charts: {
+        passRateByMo: unwindResult[0]?.passRateByMo || [],
+        passRateByDate: unwindResult[0]?.passRateByDate || [],
+        passRateByGarmentType: unwindResult[0]?.passRateByGarmentType || []
+      }
+    };
+
+    res.json(formattedResult);
+  } catch (error) {
+    console.error("Error fetching cutting dashboard data:", error);
+    res.status(500).json({
+      message: "Failed to fetch cutting dashboard data",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
    AI Chatbot Proxy Route
 ------------------------------ */
 

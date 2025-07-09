@@ -39,6 +39,7 @@ const NavigationPanel = ({
       name: "Cutting",
       icon: <Search size={16} />,
       subMenus: [
+        { name: "Cutting Dashboard", icon: <BarChart size={16} /> },
         { name: "Cutting Reports", icon: <BarChart size={16} /> },
         { name: "Cutting Trend", icon: <TrendingUp size={16} /> }
       ]
