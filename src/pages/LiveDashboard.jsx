@@ -31,6 +31,9 @@ import DigitalMeasurement from "../components/inspection/liveDashboard/DigitalMe
 import DigitalMeasurementCPK from "../components/inspection/liveDashboard/DigitalMeasurement-CPK";
 import DigitalMeasurementBuyerSpec from "../components/inspection/digital_measurement/DigitalMeasurementBuyerSpec";
 import { useAuth } from "../components/authentication/AuthContext";
+
+import CuttingDashboard from "../components/inspection/cutting/CuttingDashboard";
+
 import { User } from "lucide-react";
 
 const LiveDashboard = () => {
@@ -518,6 +521,7 @@ const LiveDashboard = () => {
         )}
 
         {activeSection === "Roving Report" && <RovingReport />}
+        {activeSection === "Cutting Dashboard" && <CuttingDashboard />}
         {activeSection === "Cutting Reports" && <CuttingReport />}
         {activeSection === "Cutting Trend" && (
           <CuttingGarmentTypeTrendAnalysis />

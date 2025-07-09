@@ -89,9 +89,9 @@ export const calculateAccuracy = (defects, totalCheckedQty, reportType) => {
     else grade = "D";
   } else {
     // Standard grading for other types
-    if (finalAccuracy >= 95) grade = "A";
-    else if (finalAccuracy >= 92.5) grade = "B";
-    else if (finalAccuracy >= 90) grade = "C";
+    if (finalAccuracy === 100) grade = "A";
+    else if (finalAccuracy >= 95 && finalAccuracy < 100) grade = "B";
+    else if (finalAccuracy >= 92.5 && finalAccuracy < 95) grade = "C";
     else grade = "D";
   }
 
