@@ -9,6 +9,10 @@ const QCWashingSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  reportType: {
+    type: String,
+    default: 'Before Wash'
+  },
   totalCheckedPoint: {
     type: Number,
     default: 0
