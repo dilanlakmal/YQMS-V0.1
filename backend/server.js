@@ -22267,12 +22267,10 @@ app.get("/api/qa-standard-defects", async (req, res) => {
     const defects = await QAStandardDefectsModel.find({}).sort({ code: 1 });
     res.json(defects);
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "Error fetching standard defects",
-        error: error.message
-      });
+    res.status(500).json({
+      message: "Error fetching standard defects",
+      error: error.message
+    });
   }
 });
 
@@ -22298,12 +22296,10 @@ app.post("/api/qa-standard-defects", async (req, res) => {
     await newDefect.save();
     res.status(201).json(newDefect);
   } catch (error) {
-    res
-      .status(400)
-      .json({
-        message: "Error creating standard defect",
-        error: error.message
-      });
+    res.status(400).json({
+      message: "Error creating standard defect",
+      error: error.message
+    });
   }
 });
 
@@ -22320,12 +22316,10 @@ app.put("/api/qa-standard-defects/:id", async (req, res) => {
     }
     res.json(updatedDefect);
   } catch (error) {
-    res
-      .status(400)
-      .json({
-        message: "Error updating standard defect",
-        error: error.message
-      });
+    res.status(400).json({
+      message: "Error updating standard defect",
+      error: error.message
+    });
   }
 });
 
@@ -22340,12 +22334,10 @@ app.delete("/api/qa-standard-defects/:id", async (req, res) => {
     }
     res.status(200).json({ message: "Defect deleted successfully" });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "Error deleting standard defect",
-        error: error.message
-      });
+    res.status(500).json({
+      message: "Error deleting standard defect",
+      error: error.message
+    });
   }
 });
 
@@ -22444,6 +22436,21 @@ app.get("/api/qa-defects-list", async (req, res) => {
   } catch (error) {
     console.error("Error fetching QA defects list:", error);
     res.status(500).json({ message: "Server error fetching QA defects list" });
+  }
+});
+
+// --- FIX #2: NEW ENDPOINT TO FETCH STANDARD DEFECTS FOR THE FORM ---
+app.get("/api/qa-standard-defects-list", async (req, res) => {
+  try {
+    const defects = await QAStandardDefectsModel.find({})
+      .sort({ code: 1 })
+      .lean(); // Use lean for performance
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching standard defects list:", error);
+    res
+      .status(500)
+      .json({ message: "Server error fetching standard defects list" });
   }
 });
 

@@ -51,36 +51,27 @@ export const defectTypeWeights = {
   Critical: 2
 };
 
+// --- FIX #3: UPDATE ACCURACY CALCULATION LOGIC ---
 export const calculateAccuracy = (defects, totalCheckedQty, reportType) => {
   if (totalCheckedQty <= 0) {
-    return {
-      accuracy: 0,
-      grade: "D",
-      totalDefectPoints: 0,
-      result: "Fail"
-    };
+    return { accuracy: 0, grade: "D", totalDefectPoints: 0, result: "Fail" };
   }
-
   if (!defects || defects.length === 0) {
-    return {
-      accuracy: 100,
-      grade: "A",
-      totalDefectPoints: 0,
-      result: "Pass"
-    };
+    return { accuracy: 100, grade: "A", totalDefectPoints: 0, result: "Pass" };
   }
 
+  // CRUCIAL CHANGE: Base points on 'standardStatus', not 'type'
   const totalDefectPoints = defects.reduce((sum, defect) => {
-    const weight = defectTypeWeights[defect.type] || 0;
+    // Use standardStatus for weighting. Fallback to 'type' if it doesn't exist for some reason.
+    const statusForWeighting = defect.standardStatus || defect.type;
+    const weight = defectTypeWeights[statusForWeighting] || 0;
     return sum + defect.qty * weight;
   }, 0);
 
   const accuracy = (1 - totalDefectPoints / totalCheckedQty) * 100;
   const finalAccuracy = Math.max(0, accuracy);
 
-  // --- START OF MODIFICATION ---
-
-  // Determine Grade (This logic remains for detailed reporting if needed)
+  // Grade and Result logic remains the same, as it's based on the final accuracy score.
   let grade = "D";
   if (reportType === "First Output") {
     if (finalAccuracy === 100) grade = "A";
@@ -88,21 +79,74 @@ export const calculateAccuracy = (defects, totalCheckedQty, reportType) => {
     else if (finalAccuracy >= 70) grade = "C";
     else grade = "D";
   } else {
-    // Standard grading for other types
     if (finalAccuracy === 100) grade = "A";
-    else if (finalAccuracy >= 95 && finalAccuracy < 100) grade = "B";
-    else if (finalAccuracy >= 92.5 && finalAccuracy < 95) grade = "C";
+    else if (finalAccuracy >= 95) grade = "B";
+    else if (finalAccuracy >= 92.5) grade = "C";
     else grade = "D";
   }
 
-  // Determine Pass/Fail Result based ONLY on the accuracy score
   const result = finalAccuracy >= 95 ? "Pass" : "Fail";
 
   return {
     accuracy: parseFloat(finalAccuracy.toFixed(2)),
-    grade, // Kept for potential detailed reports
+    grade,
     totalDefectPoints: parseFloat(totalDefectPoints.toFixed(2)),
-    result // The new, simple Pass/Fail result
+    result
   };
-  // --- END OF MODIFICATION ---
 };
+
+// export const calculateAccuracy = (defects, totalCheckedQty, reportType) => {
+//   if (totalCheckedQty <= 0) {
+//     return {
+//       accuracy: 0,
+//       grade: "D",
+//       totalDefectPoints: 0,
+//       result: "Fail"
+//     };
+//   }
+
+//   if (!defects || defects.length === 0) {
+//     return {
+//       accuracy: 100,
+//       grade: "A",
+//       totalDefectPoints: 0,
+//       result: "Pass"
+//     };
+//   }
+
+//   const totalDefectPoints = defects.reduce((sum, defect) => {
+//     const weight = defectTypeWeights[defect.type] || 0;
+//     return sum + defect.qty * weight;
+//   }, 0);
+
+//   const accuracy = (1 - totalDefectPoints / totalCheckedQty) * 100;
+//   const finalAccuracy = Math.max(0, accuracy);
+
+//   // --- START OF MODIFICATION ---
+
+//   // Determine Grade (This logic remains for detailed reporting if needed)
+//   let grade = "D";
+//   if (reportType === "First Output") {
+//     if (finalAccuracy === 100) grade = "A";
+//     else if (finalAccuracy >= 80) grade = "B";
+//     else if (finalAccuracy >= 70) grade = "C";
+//     else grade = "D";
+//   } else {
+//     // Standard grading for other types
+//     if (finalAccuracy === 100) grade = "A";
+//     else if (finalAccuracy >= 95 && finalAccuracy < 100) grade = "B";
+//     else if (finalAccuracy >= 92.5 && finalAccuracy < 95) grade = "C";
+//     else grade = "D";
+//   }
+
+//   // Determine Pass/Fail Result based ONLY on the accuracy score
+//   const result = finalAccuracy >= 95 ? "Pass" : "Fail";
+
+//   return {
+//     accuracy: parseFloat(finalAccuracy.toFixed(2)),
+//     grade, // Kept for potential detailed reports
+//     totalDefectPoints: parseFloat(totalDefectPoints.toFixed(2)),
+//     result // The new, simple Pass/Fail result
+//   };
+//   // --- END OF MODIFICATION ---
+// };

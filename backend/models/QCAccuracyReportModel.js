@@ -8,6 +8,13 @@ const DefectDetailSchema = new mongoose.Schema(
     defectNameKh: { type: String },
     defectNameCh: { type: String },
     qty: { type: Number, required: true, min: 1 },
+    // New fields for standard defect decision
+    decision: { type: String, required: true },
+    standardStatus: {
+      type: String,
+      enum: ["Critical", "Major", "Minor"],
+      required: true
+    },
     type: {
       type: String,
       enum: ["Critical", "Major", "Minor"],

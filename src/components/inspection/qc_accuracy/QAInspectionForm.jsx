@@ -46,6 +46,8 @@ const QAInspectionForm = () => {
   const [sizeOptions, setSizeOptions] = useState([]);
   const [allDefectsList, setAllDefectsList] = useState([]);
   const [defects, setDefects] = useState([]);
+  // --- FIX #4: NEW STATE FOR STANDARD DEFECTS ---
+  const [standardDefectsList, setStandardDefectsList] = useState([]);
 
   // --- NEW STATE FOR REMARKS AND ADDITIONAL IMAGES ---
   const [remarks, setRemarks] = useState("");
@@ -141,16 +143,33 @@ const QAInspectionForm = () => {
   }, [moNo, selectedColors, API_BASE_URL]);
 
   useEffect(() => {
-    const fetchAllDefects = async () => {
+    // Combined fetch for both defect lists
+    const fetchAllDefectData = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/qa-defects-list`);
-        setAllDefectsList(res.data);
+        const [buyerDefectsRes, standardDefectsRes] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/qa-defects-list`),
+          axios.get(`${API_BASE_URL}/api/qa-standard-defects-list`) // Fetch new list
+        ]);
+        setAllDefectsList(buyerDefectsRes.data);
+        setStandardDefectsList(standardDefectsRes.data); // Store new list in state
       } catch (error) {
-        console.error("Failed to fetch defects list", error);
+        console.error("Failed to fetch defects lists", error);
       }
     };
-    fetchAllDefects();
-  }, [API_BASE_URL]);
+    fetchAllDefectData();
+  }, []);
+
+  // useEffect(() => {
+  //   const fetchAllDefects = async () => {
+  //     try {
+  //       const res = await axios.get(`${API_BASE_URL}/api/qa-defects-list`);
+  //       setAllDefectsList(res.data);
+  //     } catch (error) {
+  //       console.error("Failed to fetch defects list", error);
+  //     }
+  //   };
+  //   fetchAllDefects();
+  // }, [API_BASE_URL]);
 
   const determinedBuyer = useMemo(() => {
     if (!moNo?.value) return "Other";
@@ -229,6 +248,8 @@ const QAInspectionForm = () => {
           defectNameEng: d.defectNameEng,
           defectNameKh: d.defectNameKh,
           defectNameCh: d.defectNameCh,
+          decision: d.decision, // Add to payload
+          standardStatus: d.standardStatus, // Add to payload
           qty: d.qty,
           type: d.type,
           imageUrl: d.imageUrl || "" // Include the imageUrl
@@ -474,6 +495,7 @@ const QAInspectionForm = () => {
           defects={defects}
           setDefects={setDefects}
           availableDefects={allDefectsList}
+          standardDefects={standardDefectsList} // <-- Pass standard defects down
           buyer={determinedBuyer}
           uploadMetadata={{ moNo: moNo?.value, qcId: user?.emp_id }} // Pass metadata
         />

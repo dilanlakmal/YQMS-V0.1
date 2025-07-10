@@ -7,6 +7,7 @@ const DefectInputTable = ({
   defects,
   setDefects,
   availableDefects,
+  standardDefects, // <-- Receive new prop
   buyer,
   uploadMetadata
 }) => {
@@ -42,16 +43,23 @@ const DefectInputTable = ({
     ]);
   };
 
+  // --- FIX #5: UPDATE handleUpdate TO POPULATE NEW FIELDS ---
   const handleUpdate = (index, field, value) => {
     const newDefects = [...defects];
     if (field === "defect") {
+      // Find the corresponding standard defect
+      const stdDefect = standardDefects.find((sd) => sd.code === value.code);
+      const initialDecision = stdDefect?.decisions[0];
+
       newDefects[index] = {
         ...newDefects[index],
         defectCode: value.code,
         defectNameEng: value.english,
         defectNameKh: value.khmer,
         defectNameCh: value.chinese,
-        type: value.selectedType,
+        type: value.selectedType, // Buyer-specific type
+        decision: initialDecision?.decisionEng || "N/A", // Set initial decision
+        standardStatus: initialDecision?.status || "Major", // Set initial standard status
         qty: 1
       };
     } else if (field === "clear") {
@@ -59,13 +67,40 @@ const DefectInputTable = ({
         ...newDefects[index],
         defectCode: null,
         qty: 1,
-        type: null
+        type: null,
+        decision: "", // Clear fields
+        standardStatus: ""
       };
     } else {
       newDefects[index][field] = value;
     }
     setDefects(newDefects);
   };
+
+  // const handleUpdate = (index, field, value) => {
+  //   const newDefects = [...defects];
+  //   if (field === "defect") {
+  //     newDefects[index] = {
+  //       ...newDefects[index],
+  //       defectCode: value.code,
+  //       defectNameEng: value.english,
+  //       defectNameKh: value.khmer,
+  //       defectNameCh: value.chinese,
+  //       type: value.selectedType,
+  //       qty: 1
+  //     };
+  //   } else if (field === "clear") {
+  //     newDefects[index] = {
+  //       ...newDefects[index],
+  //       defectCode: null,
+  //       qty: 1,
+  //       type: null
+  //     };
+  //   } else {
+  //     newDefects[index][field] = value;
+  //   }
+  //   setDefects(newDefects);
+  // };
 
   const handleDelete = (indexToDelete) => {
     setDefects(defects.filter((_, index) => index !== indexToDelete));
@@ -106,11 +141,20 @@ const DefectInputTable = ({
               <th scope="col" className="p-3">
                 {t("qcAccuracy.defectName", "Defect Name")}
               </th>
+
+              {/* --- FIX #5: ADD NEW HEADERS --- */}
+              <th scope="col" className="p-3 w-48 text-center">
+                Decision
+              </th>
+
               <th scope="col" className="p-3 w-32 text-center">
                 {t("qcAccuracy.qty", "Qty")}
               </th>
               <th scope="col" className="p-3 w-40">
                 {t("qcAccuracy.type", "Type")}
+              </th>
+              <th scope="col" className="p-3 w-40">
+                Standard Status
               </th>
               {/* --- NEW IMAGE HEADER --- */}
               <th scope="col" className="p-3 w-24 text-center">
@@ -153,6 +197,7 @@ const DefectInputTable = ({
                         defect={defect}
                         rowIndex={defect.originalIndex}
                         availableDefects={availableDefectsForThisRow}
+                        standardDefects={standardDefects} // <-- Pass full list to row
                         buyer={buyer}
                         onUpdate={handleUpdate}
                         onDelete={handleDelete}
