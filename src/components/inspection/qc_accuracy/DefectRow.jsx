@@ -8,6 +8,7 @@ const DefectRow = ({
   defect,
   rowIndex,
   availableDefects,
+  standardDefects, // <-- Receive standard defects
   buyer,
   onUpdate,
   onDelete,
@@ -66,6 +67,46 @@ const DefectRow = ({
 
   const clearDefect = () => {
     onUpdate(rowIndex, "clear", null);
+  };
+
+  // --- FIX #6: NEW LOGIC FOR STANDARD DECISIONS & STATUS ---
+  const standardDefectInfo = useMemo(() => {
+    if (!defect.defectCode) return null;
+    return standardDefects.find((sd) => sd.code === defect.defectCode);
+  }, [defect.defectCode, standardDefects]);
+
+  const decisionOptions = useMemo(() => {
+    if (!standardDefectInfo) return [];
+    return standardDefectInfo.decisions.map((d) => {
+      const label = i18n.language.startsWith("kh")
+        ? d.decisionKhmer || d.decisionEng
+        : d.decisionEng;
+      return { value: d.decisionEng, label };
+    });
+  }, [standardDefectInfo, i18n.language]);
+
+  const handleDecisionChange = (e) => {
+    const newDecisionEng = e.target.value;
+    const selectedDecision = standardDefectInfo?.decisions.find(
+      (d) => d.decisionEng === newDecisionEng
+    );
+    if (selectedDecision) {
+      onUpdate(rowIndex, "decision", newDecisionEng);
+      onUpdate(rowIndex, "standardStatus", selectedDecision.status);
+    }
+  };
+
+  const statusColorClass = (status) => {
+    switch (status) {
+      case "Critical":
+        return "text-red-600 dark:text-red-400 font-bold";
+      case "Major":
+        return "text-orange-600 dark:text-orange-400 font-semibold";
+      case "Minor":
+        return "text-yellow-600 dark:text-yellow-400";
+      default:
+        return "";
+    }
   };
 
   const handleImageChange = (imageUrl) => {
@@ -133,9 +174,11 @@ const DefectRow = ({
 
   return (
     <tr className="dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700">
+      {/* Pcs No */}
       <td className="p-2 border-x dark:border-gray-600 font-mono text-center">
         {defect.pcsNo}
       </td>
+      {/* Defect Name */}
       <td className="p-2 border-r dark:border-gray-600 min-w-[250px]">
         <div className="flex items-center">
           <Select
@@ -158,6 +201,25 @@ const DefectRow = ({
           )}
         </div>
       </td>
+      {/* --- FIX #6: NEW DECISION CELL --- */}
+      <td className="p-2 border-r dark:border-gray-600 min-w-[200px]">
+        {standardDefectInfo && decisionOptions.length > 1 ? (
+          <select
+            value={defect.decision || ""}
+            onChange={handleDecisionChange}
+            className="w-full p-2 bg-transparent border ... "
+          >
+            {decisionOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="px-2 text-gray-500">{defect.decision || "N/A"}</span>
+        )}
+      </td>
+      {/* Qty */}
       <td className="p-2 border-r dark:border-gray-600 text-center">
         <div className="flex items-center justify-center">
           <button
@@ -177,6 +239,7 @@ const DefectRow = ({
           </button>
         </div>
       </td>
+      {/* Buyer Status (previously Type) */}
       <td className="p-2 border-r dark:border-gray-600 min-w-[150px]">
         <select
           value={defect.type || ""}
@@ -197,6 +260,13 @@ const DefectRow = ({
         </select>
       </td>
 
+      {/* --- FIX #6: NEW STANDARD STATUS CELL --- */}
+      <td className="p-2 border-r dark:border-gray-600 text-center">
+        <span className={statusColorClass(defect.standardStatus)}>
+          {defect.standardStatus}
+        </span>
+      </td>
+
       {/* --- NEW IMAGE COLUMN --- */}
       <td className="p-2 border-r dark:border-gray-600 w-24 text-center">
         <QAImageUpload
@@ -205,6 +275,8 @@ const DefectRow = ({
           uploadMetadata={uploadMetadata}
         />
       </td>
+
+      {/* Action */}
 
       <td className="p-2 text-center">
         <button
