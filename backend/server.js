@@ -2739,6 +2739,9 @@ app.post('/api/qc-washing/submit', async (req, res) => {
     
     const submitData = {
       orderNo: orderNo,
+      reportType: formData.reportType,
+      checkedQty: formData.checkedQty,
+      washQty: formData.washQty,
       totalCheckedPoint: (inspectionData?.length || 0) + (defectData?.length || 0),
       totalPass: defectData?.filter(item => item.ok).length || 0,
       totalFail: defectData?.filter(item => item.no).length || 0,
@@ -2817,7 +2820,7 @@ app.post('/api/qc-washing/submit', async (req, res) => {
 // Auto-save data with color-specific handling
 app.post('/api/qc-washing/auto-save-color', async (req, res) => {
   try {
-    const { orderNo,reportType, colorName, formData, inspectionData, processData, defectData, addedDefects, uploadedImages, comment, signatures, measurementDetails, userId } = req.body;
+    const { orderNo,reportType, washQty, checkedQty, colorName, formData, inspectionData, processData, defectData, addedDefects, uploadedImages, comment, signatures, measurementDetails, userId } = req.body;
     
     // Find existing record or create new one
     let qcRecord = await QCWashing.findOne({ orderNo: orderNo });
@@ -2826,6 +2829,8 @@ app.post('/api/qc-washing/auto-save-color', async (req, res) => {
       qcRecord = new QCWashing({
         orderNo: orderNo,
         reportType: reportType,
+        washQty: washQty,         
+        checkedQty: checkedQty,   
         isAutoSave: true,
         userId: userId,
         status: 'auto-saved',

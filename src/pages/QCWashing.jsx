@@ -130,11 +130,11 @@ const QCWashingPage = () => {
   const imageInputRef = useRef(null);
 
   const [comment, setComment] = useState("");
-  const [signatures, setSignatures] = useState({
-    agreedBy: "",
-    reportedBy: "",
-    reportedTo: "",
-  });
+  // const [signatures, setSignatures] = useState({
+  //   agreedBy: "",
+  //   reportedBy: "",
+  //   reportedTo: "",
+  // });
 
   const [sectionVisibility, setSectionVisibility] = useState({
     orderDetails: true,
@@ -198,7 +198,7 @@ const QCWashingPage = () => {
     defectData,
     addedDefects,
     comment,
-    signatures,
+    // signatures,
     measurementData,
     isDataLoading,
   ]);
@@ -695,10 +695,47 @@ const QCWashingPage = () => {
     setAddedDefects((prev) => prev.filter((d) => d.defectId !== defectId));
   };
 
+  // Calculate totals from Measurement Data to match the Summary Card
+  const getMeasurementStats = () => {
+    let totalCheckedPoints = 0;
+    let totalPass = 0;
+
+    if (measurementData && typeof measurementData === "object") {
+      const allMeasurements = [
+        ...(measurementData.beforeWash || []),
+        ...(measurementData.afterWash || []),
+      ];
+
+      allMeasurements.forEach((data) => {
+        if (data.pcs && Array.isArray(data.pcs)) {
+          data.pcs.forEach((pc) => {
+            if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
+              pc.measurementPoints.forEach((point) => {
+                if (point.result === "pass" || point.result === "fail") {
+                  totalCheckedPoints++;
+                  if (point.result === "pass") {
+                    totalPass++;
+                  }
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+
+    const totalFail = totalCheckedPoints - totalPass;
+    const passRate = totalCheckedPoints > 0 ? Math.round((totalPass / totalCheckedPoints) * 100) : 0;
+    return { totalCheckedPoint: totalCheckedPoints, totalPass, totalFail, passRate };
+  };
+
   // Auto-save functionality - always save data for editing
   const autoSaveData = async () => {
     if (!formData.orderNo && !formData.style) return;
     if (!formData.color) return;
+
+    // Calculate stats
+   const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
 
     try {
       const saveData = {
@@ -706,6 +743,9 @@ const QCWashingPage = () => {
         date: formData.date,
         colorName: formData.color,
         formData,
+        reportType: formData.reportType,
+        washQty: formData.washQty,         
+        checkedQty: formData.checkedQty,   
         inspectionData,
         processData,
         defectData,
@@ -725,6 +765,10 @@ const QCWashingPage = () => {
             washType: "afterWash",
           })),
         ],
+        totalCheckedPoint,
+        totalPass,
+        totalFail,
+        passRate,
         savedAt: new Date().toISOString(),
         userId: user?.emp_id,
       };
@@ -976,12 +1020,15 @@ const QCWashingPage = () => {
             daily: dailyValue || prev.daily,
             buyer: saved.color?.orderDetails?.buyer || prev.buyer,
             factoryName: saved.color?.orderDetails?.factoryName || "YM",
-            checkedQty:
-              saved.color?.defectDetails?.checkedQty || prev.checkedQty,
-            washQty: saved.color?.defectDetails?.washQty || prev.washQty,
-            reportType:
-              saved.color?.orderDetails?.reportType || prev.reportType,
+            // checkedQty:
+            //   saved.color?.defectDetails?.checkedQty || prev.checkedQty,
+            // washQty: saved.color?.defectDetails?.washQty || prev.washQty,
+            // reportType:
+            //   saved.color?.orderDetails?.reportType || prev.reportType,
             result: saved.color?.orderDetails?.result || prev.result,
+            reportType: saved.reportType || saved.color?.orderDetails?.reportType || prev.reportType,
+            washQty: saved.washQty || saved.color?.defectDetails?.washQty || prev.washQty,
+            checkedQty: saved.checkedQty || saved.color?.defectDetails?.checkedQty || prev.checkedQty,
             aqlSampleSize:
               saved.color?.orderDetails?.aqlSampleSize || prev.aqlSampleSize,
             aqlAcceptedDefect:
@@ -1045,7 +1092,7 @@ const QCWashingPage = () => {
 
           setAddedDefects(transformedAddedDefects);
           setComment(saved.color?.defectDetails?.comment || "");
-          const measurementDetails = saved.color?.measurementDetails; // This is now an array
+          const measurementDetails = saved.color?.measurementDetails; 
           if (Array.isArray(measurementDetails)) {
             const beforeWash = measurementDetails.filter(
               (m) => m.washType === "beforeWash"
@@ -1410,11 +1457,11 @@ const QCWashingPage = () => {
                     setAddedDefects([]);
                     setUploadedImages([]);
                     setComment("");
-                    setSignatures({
-                      agreedBy: "",
-                      reportedBy: "",
-                      reportedTo: "",
-                    });
+                    // setSignatures({
+                    //   agreedBy: "",
+                    //   reportedBy: "",
+                    //   reportedTo: "",
+                    // });
                     setMeasurementData({ beforeWash: [], afterWash: [] });
                     setShowMeasurementTable(true);
                   }
@@ -1428,6 +1475,7 @@ const QCWashingPage = () => {
             className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
             onClick={async () => {
               try {
+                 const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
                 const submitData = {
                   orderNo: formData.orderNo || formData.style,
                   date: formData.date,
@@ -1437,6 +1485,9 @@ const QCWashingPage = () => {
                   processData,
                   defectData,
                   addedDefects,
+                  reportType: formData.reportType,
+                  washQty: formData.washQty,
+                  checkedQty: formData.checkedQty,
                   uploadedImages,
                   comment,
                   measurementDetails: [
@@ -1449,6 +1500,10 @@ const QCWashingPage = () => {
                       washType: "afterWash",
                     })),
                   ],
+                  totalCheckedPoint,
+                  totalPass,
+                  totalFail,
+                  passRate,
                   submittedAt: new Date().toISOString(),
                   userId: user?.emp_id,
                 };

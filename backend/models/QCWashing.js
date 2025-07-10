@@ -13,6 +13,8 @@ const QCWashingSchema = new mongoose.Schema({
     type: String,
     default: 'Before Wash'
   },
+   checkedQty: {type: String},
+   washQty: {type: String},
   totalCheckedPoint: {
     type: Number,
     default: 0
