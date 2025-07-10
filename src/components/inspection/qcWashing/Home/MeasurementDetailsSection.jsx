@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import { API_BASE_URL } from '../../../../../config';
+import Swal from 'sweetalert2';
 import MeasurementNumPad from '../../cutting/MeasurementNumPad';
 
 const MeasurementDetailsSection = ({ 
@@ -24,7 +25,7 @@ const MeasurementDetailsSection = ({
   const [error, setError] = useState(null);
   const [fullColumnsBySize, setFullColumnsBySize] = useState({});
   const [selectedRowsBySize, setSelectedRowsBySize] = useState({});
-const [hideUnselectedRowsBySize, setHideUnselectedRowsBySize] = useState({});
+  const [hideUnselectedRowsBySize, setHideUnselectedRowsBySize] = useState({});
   const [selectAllBySize, setSelectAllBySize] = useState({});
   const [showNumPad, setShowNumPad] = useState(false);
   const [currentCell, setCurrentCell] = useState({ size: null, table: null, rowIndex: null, colIndex: null });
@@ -37,10 +38,13 @@ const [hideUnselectedRowsBySize, setHideUnselectedRowsBySize] = useState({});
     const pcs = [];
     for (let pcIndex = 0; pcIndex < qty; pcIndex++) {
       const measurementPoints = [];
+      const isFullColumn = fullColumns?.[pcIndex] || false;
       
       measurementSpecs.forEach((spec, specIndex) => {
-        const isRowSelected = selectedRows?.[specIndex] ?? true;
-        if (!isRowSelected) return;
+        const isRowIndividuallySelected = selectedRows?.[specIndex] ?? true;
+        
+        // If the column is not 'Full', only include individually selected rows.
+        if (!isFullColumn && !isRowIndividuallySelected) return;
         
         const cellKey = `${size}-${tableType}-${specIndex}-${pcIndex}`;
         const measurementValue = measurements?.[cellKey];
@@ -126,9 +130,48 @@ const [hideUnselectedRowsBySize, setHideUnselectedRowsBySize] = useState({});
     if (isNaN(total)) return NaN;
     return isNegative ? -total : total;
   };
+
+  const handleEditClick = (sizeToEdit) => {
+    const washTypeKey = reportType === 'Before Wash' ? 'beforeWash' : 'afterWash';
+    const dataToEdit = (measurementData[washTypeKey] || []).find(item => item.size === sizeToEdit);
+
+    if (!dataToEdit) {
+      console.error("Data to edit not found for size:", sizeToEdit);
+      return;
+    }
+
+    // Add the size to the list of sizes being actively edited/viewed
+    setSelectedSizes(prev => {
+        if (prev.some(s => s.size === sizeToEdit)) {
+            return prev.map(s => s.size === sizeToEdit ? { ...s, qty: dataToEdit.qty } : s);
+        }
+        return [...prev, { size: sizeToEdit, qty: dataToEdit.qty }];
+    });
+
+    // Populate the measurement values state from the saved data
+    if (dataToEdit.measurements) {
+        setMeasurementValues(prev => ({
+            ...prev,
+            ...dataToEdit.measurements
+        }));
+    }
+
+    // Populate the row/column selection states
+    if (dataToEdit.selectedRows) {
+        setSelectedRowsBySize(prev => ({ ...prev, [sizeToEdit]: dataToEdit.selectedRows }));
+    }
+    if (dataToEdit.fullColumns) {
+        setFullColumnsBySize(prev => ({ ...prev, [sizeToEdit]: dataToEdit.fullColumns }));
+    }
+
+    // Trigger the parent to remove it from the "saved" data state.
+    // This will cause a re-render, removing it from the "Saved" list
+    // and showing it in the "Measurement Input" section.
+    if (onMeasurementEdit) {
+        onMeasurementEdit(sizeToEdit);
+    }
+  };
   
-
-
   useEffect(() => {
     if (orderNo && color) {
       fetchSizes();
@@ -832,7 +875,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                       <h4 className="font-medium text-gray-800">Size: {data.size} (Qty: {data.qty})</h4>
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => onMeasurementEdit && onMeasurementEdit(data.size)}
+                          onClick={() => handleEditClick(data.size)}
                           className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
                         >
                           Edit
@@ -869,11 +912,49 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                         <div className="mt-4 flex justify-end">
                           <button
                             onClick={() => {
+                              const validationErrors = [];
+                              const tableType = reportType === 'Before Wash' ? 'before' : 'after';
                               const specsForSubmit = reportType === 'Before Wash'
                                 ? (measurementSpecs.beforeWashGrouped[activeBeforeTab] || measurementSpecs.beforeWash || [])
                                 : (measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash || []);
 
-                              const tableType = reportType === 'Before Wash' ? 'before' : 'after';
+                              const isFullColumnChecked = fullColumnsBySize[size] || [];
+                              const isRowSelected = selectedRowsBySize[size] || Array(specsForSubmit.length).fill(true);
+
+                              for (let pcIndex = 0; pcIndex < qty; pcIndex++) {
+                                const isFull = isFullColumnChecked[pcIndex];
+
+                                if (isFull) {
+                                  // "Full" is checked, all rows are required
+                                  const isAnyEmpty = specsForSubmit.some((spec, specIndex) => {
+                                    const cellKey = `${size}-${tableType}-${specIndex}-${pcIndex}`;
+                                    return !measurementValues[cellKey] || !measurementValues[cellKey].fraction;
+                                  });
+                                  if (isAnyEmpty) {
+                                    validationErrors.push(`You must fill all the measurement points in "pcs ${pcIndex + 1}".`);
+                                  }
+                                } else {
+                                  // "Full" is not checked, only selected rows are required
+                                  specsForSubmit.forEach((spec, specIndex) => {
+                                    if (isRowSelected[specIndex]) {
+                                      const cellKey = `${size}-${tableType}-${specIndex}-${pcIndex}`;
+                                      if (!measurementValues[cellKey] || !measurementValues[cellKey].fraction) {
+                                        validationErrors.push(`Piece ${pcIndex + 1}: Measurement for selected row "${spec.MeasurementPointEngName}" is required.`);
+                                      }
+                                    }
+                                  });
+                                }
+                              }
+
+                              if (validationErrors.length > 0) {
+                                Swal.fire({
+                                  icon: 'error',
+                                  title: 'Incomplete Measurements',
+                                  html: `<div style="text-align: left; max-height: 200px; overflow-y: auto;"><ul>${validationErrors.map(e => `<li>${e}</li>`).join('')}</ul></div>`,
+                                });
+                                return;
+                              }
+
                               const transformedData = transformMeasurementData(size, qty, measurementValues, selectedRowsBySize[size], fullColumnsBySize[size], specsForSubmit, tableType);
                               onSizeSubmit(transformedData);
                             }}
