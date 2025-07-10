@@ -133,8 +133,8 @@ const DefectDetailsSection = ({
               <input 
                 type="text" 
                 value={formData.checkedQty || ''}
-                readOnly
-                className="flex-1 px-3 py-2 border rounded-md bg-gray-100 cursor-not-allowed"
+                readOnly={formData.daily === "Inline"}
+                className="flex-1 px-3 py-2 border rounded-md"
                 placeholder="Auto-calculated when Inline is selected"
               />
             </div>

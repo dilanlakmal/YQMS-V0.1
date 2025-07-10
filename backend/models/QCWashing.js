@@ -37,6 +37,13 @@ const QCWashingSchema = new mongoose.Schema({
       daily: String,
       buyer: String,
       factoryName: String,
+      reportType: {
+        type: String,
+        default: 'Before Wash'
+      },
+      aqlSampleSize: String,
+      aqlAcceptedDefect: String,
+      aqlRejectedDefect: String,
       inspector: {
         engName: String,
         empId: String

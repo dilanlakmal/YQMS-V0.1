@@ -2750,6 +2750,10 @@ app.post('/api/qc-washing/submit', async (req, res) => {
           daily: formData.firstOutput || formData.inline,
           buyer: formData.buyer,
           factoryName: formData.factoryName,
+          reportType: formData.reportType,
+          aqlSampleSize: formData.aqlSampleSize,
+          aqlAcceptedDefect: formData.aqlAcceptedDefect,
+          aqlRejectedDefect: formData.aqlRejectedDefect,
           inspector: {
             engName: signatures?.agreedBy,
             empId: userId
@@ -2851,6 +2855,10 @@ app.post('/api/qc-washing/auto-save-color', async (req, res) => {
       daily: formData.firstOutput || formData.inline,
       buyer: formData.buyer,
       factoryName: formData.factoryName,
+      reportType: formData.reportType,
+      aqlSampleSize: formData.aqlSampleSize,
+      aqlAcceptedDefect: formData.aqlAcceptedDefect,
+      aqlRejectedDefect: formData.aqlRejectedDefect,
       inspector: {
         engName: formData.agreedBy || signatures?.agreedBy,
         empId: userId

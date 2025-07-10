@@ -447,6 +447,11 @@ const QCWashingPage = () => {
         }
       }
 
+      if (field === "daily" && value === "Inline" && formData.washQty) {
+          fetchAQLData(formData.washQty);
+          calculateCheckedQty(formData.washQty);
+        }
+
       // Handle color change - reset color-specific data
       if (field === "color" && value !== prev.color) {
         setInspectionData(initializeInspectionData(masterChecklist));
@@ -573,11 +578,9 @@ const QCWashingPage = () => {
       );
 
       if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({
-            message: `Request failed with status ${response.status}`,
-          }));
+        const errorData = await response.json().catch(() => ({
+          message: `Request failed with status ${response.status}`,
+        }));
         console.error("AQL API Error:", errorData.message || "Unknown error");
         setFormData((prev) => ({
           ...prev,
@@ -765,6 +768,31 @@ const QCWashingPage = () => {
         if (data.success && data.colorData) {
           const colorData = data.colorData;
 
+          // Update formData with color-specific details from the loaded data
+          const orderDetails = colorData.orderDetails;
+          const defectDetails = colorData.defectDetails;
+          if (orderDetails || defectDetails) {
+            setFormData((prev) => {
+              const dailyValue = orderDetails?.daily || "";
+              return {
+                ...prev,
+                washingType: orderDetails?.washingType || "Normal Wash",
+                reportType: orderDetails?.reportType || "Before Wash",
+                factoryName: orderDetails?.factoryName || "YM",
+                washQty: defectDetails?.washQty || "",
+                checkedQty: defectDetails?.checkedQty || "",
+                firstOutput:
+                  dailyValue === "First Output" ? "First Output" : "",
+                inline: dailyValue === "Inline" ? "Inline" : "",
+                daily: dailyValue,
+                result: orderDetails?.result || "",
+                aqlSampleSize: orderDetails?.aqlSampleSize || "",
+                aqlAcceptedDefect: orderDetails?.aqlAcceptedDefect || "",
+                aqlRejectedDefect: orderDetails?.aqlRejectedDefect || "",
+              };
+            });
+          }
+
           // Set inspection data
           if (colorData.inspectionDetails?.checkedPoints) {
             const transformedInspectionData =
@@ -855,22 +883,9 @@ const QCWashingPage = () => {
             date: saved.formData.date
               ? saved.formData.date.split("T")[0]
               : new Date().toISOString().split("T")[0],
-            // Ensure order details fields are populated from saved data
-            orderNo: saved.formData.orderNo || prev.orderNo,
-            style: saved.formData.style || saved.formData.orderNo || prev.style,
-            orderQty: saved.formData.orderQty || prev.orderQty,
-            buyer: saved.formData.buyer || prev.buyer,
-            color: saved.formData.color || prev.color,
-            washingType: saved.formData.washingType || prev.washingType,
-            washQty: saved.formData.washQty || prev.washQty,
-            checkedQty: saved.formData.checkedQty || prev.checkedQty,
-            factoryName: saved.formData.factoryName || prev.factoryName,
-            reportType: saved.formData.reportType || prev.reportType,
-            firstOutput: saved.formData.firstOutput || prev.firstOutput,
-            inline: saved.formData.inline || prev.inline,
-            daily: saved.formData.daily || prev.daily,
-            result: saved.formData.result || prev.result,
-            aqlSampleSize: saved.formData.aqlSampleSize || prev.aqlSampleSize,
+              orderQty: saved.formData.orderQty || prev.orderQty,
+              buyer: saved.formData.buyer || prev.buyer,
+              aqlSampleSize: saved.formData.aqlSampleSize || prev.aqlSampleSize,
             aqlAcceptedDefect:
               saved.formData.aqlAcceptedDefect || prev.aqlAcceptedDefect,
             aqlRejectedDefect:
@@ -1424,7 +1439,6 @@ const QCWashingPage = () => {
                   addedDefects,
                   uploadedImages,
                   comment,
-                  signatures,
                   measurementDetails: [
                     ...measurementData.beforeWash.map((item) => ({
                       ...item,
