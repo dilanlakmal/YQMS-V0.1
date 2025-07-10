@@ -281,7 +281,7 @@ const sqlConfig = {
 const sqlConfigYMCE = {
   user: "visitor",
   password: "visitor",
-  server: "ymws-150",
+  server: "192.167.1.240", //"ymws-150",
   //port: 1433,
   database: "YMCE_SYSTEM",
   options: {
@@ -304,7 +304,7 @@ const sqlConfigYMCE = {
 const sqlConfigYMWHSYS2 = {
   user: "user01",
   password: "Ur@12323",
-  server: "YM-WHSYS",
+  server: "192.167.1.14", //"YM-WHSYS",
   database: "FC_SYSTEM",
   options: {
     encrypt: false,
