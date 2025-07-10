@@ -728,7 +728,9 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                           sizeValue = String(sizeValue);
                           
                           const isSelected = selectedSizes.find(s => s.size === sizeValue);
-                          const isSaved = savedSizes.includes(sizeValue);
+                          const isSaved = currentWashMeasurements.some(
+                            (m) => m.size === sizeValue
+                          );
                           
                           return (
                             <option 
