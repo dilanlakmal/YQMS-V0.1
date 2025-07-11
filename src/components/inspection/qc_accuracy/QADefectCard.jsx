@@ -1,6 +1,6 @@
-import React, { useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Minus, Trash2, RotateCcw } from "lucide-react";
+import { Plus, Minus, Trash2, RotateCcw, Eye, EyeOff } from "lucide-react";
 import Select from "react-select";
 import QAImageUpload from "./QAImageUpload";
 
@@ -27,6 +27,9 @@ const QADefectCard = ({
   uploadMetadata
 }) => {
   const { t, i18n } = useTranslation();
+
+  // --- FIX #1: ADD STATE FOR VISIBILITY ---
+  const [isBodyVisible, setIsBodyVisible] = useState(true);
 
   const getDefectNameForDisplay = (d) => {
     if (!d) return "N/A";
@@ -156,6 +159,14 @@ const QADefectCard = ({
         <h4 className="font-bold text-gray-800 dark:text-gray-200">
           Garment {defect.pcsNo} - Defect {defect.defectInPcs || 1}
         </h4>
+        {/* --- FIX #2: ADD THE TOGGLE BUTTON --- */}
+        <button
+          onClick={() => setIsBodyVisible(!isBodyVisible)}
+          className="p-1 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+          title={isBodyVisible ? "Hide Details" : "Show Details"}
+        >
+          {isBodyVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
         <button
           onClick={() => onDelete(rowIndex)}
           className="text-red-500 hover:text-red-700"
@@ -163,104 +174,108 @@ const QADefectCard = ({
           <Trash2 size={18} />
         </button>
       </div>
-      <dl className="p-4">
-        <CardRow label={t("qcAccuracy.defectName", "Defect Name")}>
-          <div className="flex items-center">
-            <Select
-              value={selectedDefectOption}
-              onChange={handleDefectChange}
-              options={defectOptions}
-              placeholder={t("qcAccuracy.selectDefect", "Select Defect...")}
-              className="react-select-container flex-grow"
-              classNamePrefix="react-select"
-              styles={reactSelectStyles}
-              menuPortalTarget={document.body}
-            />
-            {selectedDefectOption && (
-              <button
-                onClick={clearDefect}
-                className="p-2 text-gray-500 hover:text-red-500 ml-2"
-              >
-                <RotateCcw size={16} />
-              </button>
-            )}
-          </div>
-        </CardRow>
+      {isBodyVisible && (
+        <dl className="p-4">
+          <CardRow label={t("qcAccuracy.defectName", "Defect Name")}>
+            <div className="flex items-center">
+              <Select
+                value={selectedDefectOption}
+                onChange={handleDefectChange}
+                options={defectOptions}
+                placeholder={t("qcAccuracy.selectDefect", "Select Defect...")}
+                className="react-select-container flex-grow"
+                classNamePrefix="react-select"
+                styles={reactSelectStyles}
+                menuPortalTarget={document.body}
+              />
+              {selectedDefectOption && (
+                <button
+                  onClick={clearDefect}
+                  className="p-2 text-gray-500 hover:text-red-500 ml-2"
+                >
+                  <RotateCcw size={16} />
+                </button>
+              )}
+            </div>
+          </CardRow>
 
-        <CardRow label={t("qcAccuracy.decision", "Decision")}>
-          {standardDefectInfo && decisionOptions.length > 1 ? (
+          <CardRow label={t("qcAccuracy.decision", "Decision")}>
+            {standardDefectInfo && decisionOptions.length > 1 ? (
+              <select
+                value={defect.decision || ""}
+                onChange={handleDecisionChange}
+                className="w-full p-2 bg-transparent border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                {decisionOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="px-2 text-gray-500">
+                {defect.decision || "N/A"}
+              </span>
+            )}
+          </CardRow>
+
+          <CardRow label={t("qcAccuracy.qty", "Qty")}>
+            <div className="flex items-center">
+              <button
+                onClick={() =>
+                  onUpdate(rowIndex, "qty", Math.max(1, defect.qty - 1))
+                }
+                className="p-1 text-gray-400 hover:text-white hover:bg-red-500 rounded-full"
+              >
+                <Minus size={16} />
+              </button>
+              <span className="w-10 text-center font-semibold">
+                {defect.qty}
+              </span>
+              <button
+                onClick={() => onUpdate(rowIndex, "qty", defect.qty + 1)}
+                className="p-1 text-gray-400 hover:text-white hover:bg-green-500 rounded-full"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+          </CardRow>
+
+          <CardRow label={t("qcAccuracy.buyerStatus", "Buyer Status")}>
             <select
-              value={defect.decision || ""}
-              onChange={handleDecisionChange}
-              className="w-full p-2 bg-transparent border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+              value={defect.type || ""}
+              onChange={(e) => onUpdate(rowIndex, "type", e.target.value)}
+              disabled={!selectedDefectOption || typeOptions.length <= 1}
+              className="w-full p-2 bg-transparent border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              {decisionOptions.map((opt) => (
+              {typeOptions.length === 0 && (
+                <option value="">
+                  {t("qcAccuracy.selectADefectFirst", "Select a defect")}
+                </option>
+              )}
+              {typeOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
               ))}
             </select>
-          ) : (
-            <span className="px-2 text-gray-500">
-              {defect.decision || "N/A"}
+          </CardRow>
+
+          <CardRow label={t("qcAccuracy.standardStatus", "Standard Status")}>
+            <span className={statusColorClass(defect.standardStatus)}>
+              {defect.standardStatus}
             </span>
-          )}
-        </CardRow>
+          </CardRow>
 
-        <CardRow label={t("qcAccuracy.qty", "Qty")}>
-          <div className="flex items-center">
-            <button
-              onClick={() =>
-                onUpdate(rowIndex, "qty", Math.max(1, defect.qty - 1))
-              }
-              className="p-1 text-gray-400 hover:text-white hover:bg-red-500 rounded-full"
-            >
-              <Minus size={16} />
-            </button>
-            <span className="w-10 text-center font-semibold">{defect.qty}</span>
-            <button
-              onClick={() => onUpdate(rowIndex, "qty", defect.qty + 1)}
-              className="p-1 text-gray-400 hover:text-white hover:bg-green-500 rounded-full"
-            >
-              <Plus size={16} />
-            </button>
-          </div>
-        </CardRow>
-
-        <CardRow label={t("qcAccuracy.buyerStatus", "Buyer Status")}>
-          <select
-            value={defect.type || ""}
-            onChange={(e) => onUpdate(rowIndex, "type", e.target.value)}
-            disabled={!selectedDefectOption || typeOptions.length <= 1}
-            className="w-full p-2 bg-transparent border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-70 disabled:cursor-not-allowed"
-          >
-            {typeOptions.length === 0 && (
-              <option value="">
-                {t("qcAccuracy.selectADefectFirst", "Select a defect")}
-              </option>
-            )}
-            {typeOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </CardRow>
-
-        <CardRow label={t("qcAccuracy.standardStatus", "Standard Status")}>
-          <span className={statusColorClass(defect.standardStatus)}>
-            {defect.standardStatus}
-          </span>
-        </CardRow>
-
-        <CardRow label={t("qcAccuracy.image", "Image")}>
-          <QAImageUpload
-            imageUrl={defect.imageUrl || ""}
-            onImageChange={handleImageChange}
-            uploadMetadata={uploadMetadata}
-          />
-        </CardRow>
-      </dl>
+          <CardRow label={t("qcAccuracy.image", "Image")}>
+            <QAImageUpload
+              imageUrl={defect.imageUrl || ""}
+              onImageChange={handleImageChange}
+              uploadMetadata={uploadMetadata}
+            />
+          </CardRow>
+        </dl>
+      )}
     </div>
   );
 };
