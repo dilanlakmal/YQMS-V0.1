@@ -33,10 +33,6 @@ const QCWashingPage = () => {
     aqlSampleSize: "",
     aqlAcceptedDefect: "",
     aqlRejectedDefect: "",
-    totalCheckedPoint: "",
-    totalPass: "",
-    totalFail: "",
-    passRate: "",
   });
 
   const [subFactories, setSubFactories] = useState([]);
@@ -350,13 +346,31 @@ const QCWashingPage = () => {
     try {
       setIsDataLoading(true);
 
-      // Always fetch available colors from dt_order first
+      // 1. Check if the record has already been submitted
+      const submittedResponse = await fetch(
+        `${API_BASE_URL}/api/qc-washing/load-submitted/${styleNo}`
+      );
+
+      if (submittedResponse.ok) {
+        const submittedData = await submittedResponse.json();
+        if (submittedData.success && submittedData.data) {
+          Swal.fire(
+            "Record Submitted",
+            `The record for Order No '${styleNo}' has already been submitted and cannot be edited.`,
+            "info"
+          );
+          // Clear the input to prevent re-triggering
+          setFormData((prev) => ({ ...prev, orderNo: "", style: "" }));
+          return; // Stop further processing
+        }
+      }
+
+      // 2. If not submitted, fetch order details from dt_orders
       let response = await fetch(
         `${API_BASE_URL}/api/qc-washing/order-details-by-style/${styleNo}`
       );
       let orderData = await response.json();
 
-      // If not found by style, try to fetch by order number
       if (!orderData.success) {
         response = await fetch(
           `${API_BASE_URL}/api/qc-washing/order-details-by-order/${styleNo}`
@@ -365,57 +379,34 @@ const QCWashingPage = () => {
       }
 
       if (orderData.success) {
-        // Always set available colors
         setColorOptions(orderData.colors || []);
         setFormData((prev) => ({
           ...prev,
           orderQty: orderData.orderQty || "",
           buyer: orderData.buyer || "",
-          // Only set color if not already set (to preserve existing selection)
           color:
             prev.color ||
             (orderData.colors && orderData.colors.length > 0
               ? orderData.colors[0]
               : ""),
         }));
+      } else {
+        // If no order details found in dt_orders, it's a critical error.
+        throw new Error(
+          orderData.message || "Style/Order not found in master records."
+        );
       }
 
-      // Then check if saved data exists in qcWashing collection
+      // 3. Check for auto-saved data and load it
       const qcWashingResponse = await fetch(
         `${API_BASE_URL}/api/qc-washing/load-saved/${styleNo}`
       );
 
       if (qcWashingResponse.ok) {
         const qcWashingData = await qcWashingResponse.json();
-
         if (qcWashingData.success && qcWashingData.savedData) {
-          // Load existing qcWashing data but keep the colors from dt_order
           loadSavedData(styleNo);
-          setIsDataLoading(false);
-          return;
         }
-      }
-
-      // If no qcWashing data found, check submitted data
-      const submittedResponse = await fetch(
-        `${API_BASE_URL}/api/qc-washing/load-submitted/${styleNo}`
-      );
-
-      if (submittedResponse.ok) {
-        const submittedData = await submittedResponse.json();
-
-        if (submittedData.success && submittedData.data) {
-          // Load existing submitted data but keep the colors from dt_order
-          loadSavedData(styleNo);
-          setIsDataLoading(false);
-          return;
-        }
-      }
-
-      // Handle case when no existing data found
-      if (!orderData.success) {
-        // Handle API-level errors (e.g., style not found)
-        throw new Error(orderData.message || "Style/Order not found");
       }
     } catch (error) {
       console.error("Error fetching order details:", error);
@@ -818,32 +809,28 @@ const QCWashingPage = () => {
 
           // Update formData with color-specific details from the loaded data
           const orderDetails = colorData.orderDetails;
-          setFormData((prev) => {
-            const dailyValue = orderDetails?.daily || "";
-            return {
-              ...prev,
-              // Values from the top-level of the colorData response
-              reportType: colorData.reportType || "Before Wash",
-              washQty: colorData.washQty || "",
-              checkedQty: colorData.checkedQty || "",
-              totalCheckedPoint: colorData.totalCheckedPoint || "",
-              totalPass: colorData.totalPass || "",
-              totalFail: colorData.totalFail || "",
-              passRate: colorData.passRate || "",
-
-              // Values from the nested orderDetails
-              washingType: orderDetails?.washingType || "Normal Wash",
-              factoryName: orderDetails?.factoryName || "YM",
-              firstOutput:
-                dailyValue === "First Output" ? "First Output" : "",
-              inline: dailyValue === "Inline" ? "Inline" : "",
-              daily: dailyValue,
-              result: orderDetails?.result || "",
-              aqlSampleSize: orderDetails?.aqlSampleSize || "",
-              aqlAcceptedDefect: orderDetails?.aqlAcceptedDefect || "",
-              aqlRejectedDefect: orderDetails?.aqlRejectedDefect || "",
-            };
-          });
+          const defectDetails = colorData.defectDetails;
+          if (orderDetails || defectDetails) {
+            setFormData((prev) => {
+              const dailyValue = orderDetails?.daily || "";
+              return {
+                ...prev,
+                washingType: orderDetails?.washingType || "Normal Wash",
+                reportType: orderDetails?.reportType || "Before Wash",
+                factoryName: orderDetails?.factoryName || "YM",
+                washQty: defectDetails?.washQty || "",
+                checkedQty: defectDetails?.checkedQty || "",
+                firstOutput:
+                  dailyValue === "First Output" ? "First Output" : "",
+                inline: dailyValue === "Inline" ? "Inline" : "",
+                daily: dailyValue,
+                result: orderDetails?.result || "",
+                aqlSampleSize: orderDetails?.aqlSampleSize || "",
+                aqlAcceptedDefect: orderDetails?.aqlAcceptedDefect || "",
+                aqlRejectedDefect: orderDetails?.aqlRejectedDefect || "",
+              };
+            });
+          }
 
           // Set inspection data
           if (colorData.inspectionDetails?.checkedPoints) {
@@ -952,7 +939,6 @@ const QCWashingPage = () => {
               return prev;
             });
           }
-          
 
           if (saved.inspectionData && saved.inspectionData.length > 0) {
             setInspectionData(saved.inspectionData);
@@ -1378,15 +1364,10 @@ const QCWashingPage = () => {
                       daily: "",
                       buyer: "",
                       factoryName: "YM",
-                      reportType: "Before Wash",
                       result: "",
                       aqlSampleSize: "",
                       aqlAcceptedDefect: "",
                       aqlRejectedDefect: "",
-                      totalCheckedPoint: "",
-                      totalPass: "",
-                      totalFail: "",
-                      passRate: "",
                     });
                     setInspectionData(
                       initializeInspectionData(masterChecklist)
