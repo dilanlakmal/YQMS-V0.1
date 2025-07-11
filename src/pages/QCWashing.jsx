@@ -349,6 +349,8 @@ const QCWashingPage = () => {
       setColorOptions([]);
       setFormData((prev) => ({
         ...prev,
+         orderNo: "",
+        style: "",
         color: "",
         orderQty: "",
         buyer: "",
@@ -379,7 +381,21 @@ const QCWashingPage = () => {
         }
       }
 
-      // 2. If not submitted, fetch order details from dt_orders
+
+      // 2. Check for auto-saved data and load it
+      const qcWashingResponse = await fetch(
+        `${API_BASE_URL}/api/qc-washing/load-saved/${styleNo}`
+      );
+
+      if (qcWashingResponse.ok) {
+        const qcWashingData = await qcWashingResponse.json();
+        if (qcWashingData.success && qcWashingData.savedData) {
+          loadSavedData(styleNo);
+        }
+      }
+
+      
+      // 3. If not submitted, fetch order details from dt_orders
       let response = await fetch(
         `${API_BASE_URL}/api/qc-washing/order-details-by-style/${styleNo}`
       );
@@ -409,18 +425,6 @@ const QCWashingPage = () => {
         throw new Error(
           orderData.message || "Style/Order not found in master records."
         );
-      }
-
-      // 3. Check for auto-saved data and load it
-      const qcWashingResponse = await fetch(
-        `${API_BASE_URL}/api/qc-washing/load-saved/${styleNo}`
-      );
-
-      if (qcWashingResponse.ok) {
-        const qcWashingData = await qcWashingResponse.json();
-        if (qcWashingData.success && qcWashingData.savedData) {
-          loadSavedData(styleNo);
-        }
       }
     } catch (error) {
       console.error("Error fetching order details:", error);
