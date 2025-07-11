@@ -823,8 +823,6 @@ const QCWashingPage = () => {
                 washingType: orderDetails?.washingType || "Normal Wash",
                 reportType: orderDetails?.reportType || "Before Wash",
                 factoryName: orderDetails?.factoryName || "YM",
-                washQty: defectDetails?.washQty || prev.washQty,
-                checkedQty: defectDetails?.checkedQty || prev.checkedQty,
                 firstOutput:
                   dailyValue === "First Output" ? "First Output" : "",
                 inline: dailyValue === "Inline" ? "Inline" : "",
@@ -944,6 +942,7 @@ const QCWashingPage = () => {
               return prev;
             });
           }
+          
 
           if (saved.inspectionData && saved.inspectionData.length > 0) {
             setInspectionData(saved.inspectionData);

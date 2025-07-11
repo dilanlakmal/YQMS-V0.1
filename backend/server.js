@@ -2820,7 +2820,7 @@ app.post('/api/qc-washing/submit', async (req, res) => {
 // Auto-save data with color-specific handling
 app.post('/api/qc-washing/auto-save-color', async (req, res) => {
   try {
-    const { orderNo,reportType, washQty, checkedQty, colorName, formData, inspectionData, processData, defectData, addedDefects, uploadedImages, comment, signatures, measurementDetails, userId } = req.body;
+    const { orderNo,reportType, washQty, checkedQty,totalCheckedPoint, totalPass, totalFail, passRate, colorName, formData, inspectionData, processData, defectData, addedDefects, uploadedImages, comment, signatures, measurementDetails, userId } = req.body;
     
     // Find existing record or create new one
     let qcRecord = await QCWashing.findOne({ orderNo: orderNo });
@@ -2830,7 +2830,11 @@ app.post('/api/qc-washing/auto-save-color', async (req, res) => {
         orderNo: orderNo,
         reportType: reportType,
         washQty: washQty,         
-        checkedQty: checkedQty,   
+        checkedQty: checkedQty,
+        totalCheckedPoint: totalCheckedPoint,
+        totalPass: totalPass,
+        totalFail: totalFail,
+        passRate: passRate,   
         isAutoSave: true,
         userId: userId,
         status: 'auto-saved',
@@ -2923,7 +2927,17 @@ app.get('/api/qc-washing/load-color-data/:orderNo/:color', async (req, res) => {
       const colorData = qcRecord.colors.find(c => c.colorName === color);
       
       if (colorData) {
-        res.json({ success: true, colorData: colorData });
+        // res.json({ success: true, colorData: colorData });
+        res.json({ success: true, colorData: {
+          ...colorData,
+          reportType: qcRecord.reportType,
+          washQty: qcRecord.washQty,
+          checkedQty: qcRecord.checkedQty,
+          totalCheckedPoint: qcRecord.totalCheckedPoint,
+          totalPass: qcRecord.totalPass,
+          totalFail: qcRecord.totalFail,
+          passRate: qcRecord.passRate
+        }});
       } else {
         res.json({ success: false, message: 'Color data not found' });
       }
@@ -2957,8 +2971,8 @@ app.get('/api/qc-washing/saved-colors/:orderNo', async (req, res) => {
 // Auto-save data - compare and update only if different
 app.post('/api/qc-washing/auto-save', async (req, res) => {
   try {
-    const { formData, inspectionData, processData, defectData, addedDefects, uploadedImages, comment, signatures, measurementDetails, userId } = req.body;
-    
+    const { reportType, washQty, checkedQty,totalCheckedPoint, totalPass, totalFail, passRate, formData, inspectionData, processData, defectData, addedDefects, uploadedImages, comment, signatures, measurementDetails, userId } = req.body;
+
     const orderNo = formData.orderNo || formData.style;
     
     // Find existing record (auto-save or submitted)
@@ -2966,6 +2980,13 @@ app.post('/api/qc-washing/auto-save', async (req, res) => {
     
     const newData = {
       orderNo: orderNo,
+      reportType: reportType,
+      washQty: washQty,         
+      checkedQty: checkedQty,
+      totalCheckedPoint: totalCheckedPoint,
+      totalPass: totalPass,
+      totalFail: totalFail,
+      passRate: passRate,   
       color: {
         orderDetails: {
           orderQty: formData.orderQty,
@@ -3063,9 +3084,16 @@ app.post('/api/qc-washing/auto-save', async (req, res) => {
 // Load saved data
 app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
   try {
-    const { orderNo } = req.params;
+    const { orderNo, reportType, washQty, checkedQty,totalCheckedPoint, totalPass, totalFail, passRate } = req.params;
     const savedData = await QCWashing.findOne({ 
-      orderNo: orderNo, 
+      orderNo: orderNo,
+      reportType: reportType,
+      washQty: washQty,         
+      checkedQty: checkedQty,
+      totalCheckedPoint: totalCheckedPoint,
+      totalPass: totalPass,
+      totalFail: totalFail,
+      passRate: passRate,    
       isAutoSave: true 
     }).sort({ savedAt: -1 });
 
