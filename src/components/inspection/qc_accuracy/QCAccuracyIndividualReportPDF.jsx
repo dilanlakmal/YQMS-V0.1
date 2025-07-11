@@ -9,8 +9,6 @@ import {
 } from "@react-pdf/renderer";
 
 // --- Register Fonts ---
-// For PDF to support different languages, you must register fonts that contain the necessary characters.
-// Make sure you have these .ttf files in your public/fonts directory.
 Font.register({
   family: "Roboto",
   fonts: [
@@ -20,14 +18,14 @@ Font.register({
 });
 Font.register({
   family: "KhmerOS",
-  src: "/fonts/Khmer-Regular.ttf" // Assuming you have this font for Khmer  - KhmerOS.ttf
+  src: "/fonts/Khmer-Regular.ttf" // Corrected to use the proper filename
 });
 
 // --- Define Styles ---
 const styles = StyleSheet.create({
   page: {
     fontFamily: "Roboto",
-    fontSize: 10,
+    fontSize: 9,
     padding: 30,
     backgroundColor: "#ffffff"
   },
@@ -63,7 +61,8 @@ const styles = StyleSheet.create({
     borderColor: "#bfbfbf",
     borderLeftWidth: 0,
     borderTopWidth: 0,
-    fontWeight: "bold"
+    fontWeight: "bold",
+    textAlign: "center"
   },
   tableCol: {
     padding: 5,
@@ -71,20 +70,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#bfbfbf",
     borderLeftWidth: 0,
-    borderTopWidth: 0
+    borderTopWidth: 0,
+    textAlign: "center"
   },
-  colDate: { width: "10%" },
-  colTime: { width: "8%" },
-  colType: { width: "12%" },
+
+  // --- FIX #1: CORRECTED STYLE NAMES TO MATCH USAGE ---
+  colDate: { width: "8%" },
+  colTime: { width: "7%" },
+  colType: { width: "10%" },
   colMo: { width: "12%" },
-  colLine: { width: "8%" },
-  colChecked: { width: "8%", textAlign: "center" },
-  colDefects: { width: "22%" },
-  colResult: { width: "10%", textAlign: "center" },
-  colGrade: { width: "10%", textAlign: "center" },
+  colLine: { width: "7%" },
+  colChecked: { width: "7%" },
+  colRejectPcs: { width: "7%" },
+  colTotalDefects: { width: "7%" },
+  colDefectDetails: { width: "22%", textAlign: "left" }, // Changed from colDefects to match JSX
+  colResult: { width: "7%" },
+  colGrade: { width: "6%" },
 
   defectText: {
-    fontFamily: "KhmerOS" // Use a font that supports Khmer
+    fontFamily: "KhmerOS"
   },
   statusPill: {
     padding: "2px 4px",
@@ -147,7 +151,14 @@ const QCAccuracyIndividualReportPDF = ({ qcData }) => {
             <Text style={[styles.tableColHeader, styles.colChecked]}>
               Checked
             </Text>
-            <Text style={[styles.tableColHeader, styles.colDefects]}>
+            <Text style={[styles.tableColHeader, styles.colRejectPcs]}>
+              Reject Pcs
+            </Text>
+            <Text style={[styles.tableColHeader, styles.colTotalDefects]}>
+              Total Defects
+            </Text>
+            {/* --- FIX #2: APPLYING THE CORRECT STYLE NAME --- */}
+            <Text style={[styles.tableColHeader, styles.colDefectDetails]}>
               Defect Details
             </Text>
             <Text style={[styles.tableColHeader, styles.colResult]}>
@@ -155,6 +166,7 @@ const QCAccuracyIndividualReportPDF = ({ qcData }) => {
             </Text>
             <Text style={[styles.tableColHeader, styles.colGrade]}>Grade</Text>
           </View>
+
           {/* Table Body */}
           {qcData.reports.map((report) => (
             <View key={report._id} style={styles.tableRow} wrap={false}>
@@ -174,7 +186,15 @@ const QCAccuracyIndividualReportPDF = ({ qcData }) => {
               <Text style={[styles.tableCol, styles.colChecked]}>
                 {report.totalCheckedQty}
               </Text>
-              <View style={[styles.tableCol, styles.colDefects]}>
+              <Text style={[styles.tableCol, styles.colRejectPcs]}>
+                {report.uniquePcsInReport?.length || 0}
+              </Text>
+              <Text style={[styles.tableCol, styles.colTotalDefects]}>
+                {report.totalDefectsInReport || 0}
+              </Text>
+
+              {/* --- FIX #2: APPLYING THE CORRECT STYLE NAME --- */}
+              <View style={[styles.tableCol, styles.colDefectDetails]}>
                 {report.defects?.length > 0 && report.defects[0]?.defectCode ? (
                   report.defects.map((d, i) => (
                     <View key={i} style={{ marginBottom: 4 }}>

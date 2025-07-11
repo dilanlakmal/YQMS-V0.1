@@ -24,6 +24,10 @@ body {
   src: url("./fonts/KhmerOS.ttf") format("truetype");
 }
 
+.react-datepicker-popper-z-50 {
+  z-index: 50 !important;
+}
+
 /* 
   Add these custom properties (CSS Variables) for your theme.
   This is the core of the fix.

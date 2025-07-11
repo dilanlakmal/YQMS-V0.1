@@ -222,11 +222,15 @@ const QAAccuracyResults = () => {
           selected={filters.startDate}
           onChange={(date) => handleFilterChange("startDate", date)}
           className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+          portalId="root-portal"
+          popperClassName="react-datepicker-popper-z-50" // High z-index for the calendar
         />
         <DatePicker
           selected={filters.endDate}
           onChange={(date) => handleFilterChange("endDate", date)}
           className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+          portalId="root-portal"
+          popperClassName="react-datepicker-popper-z-50" // High z-index for the calendar
         />
         <Select
           placeholder="QA ID"
