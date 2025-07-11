@@ -823,8 +823,8 @@ const QCWashingPage = () => {
                 washingType: orderDetails?.washingType || "Normal Wash",
                 reportType: orderDetails?.reportType || "Before Wash",
                 factoryName: orderDetails?.factoryName || "YM",
-                washQty: defectDetails?.washQty || "",
-                checkedQty: defectDetails?.checkedQty || "",
+                washQty: defectDetails?.washQty || prev.washQty,
+                checkedQty: defectDetails?.checkedQty || prev.checkedQty,
                 firstOutput:
                   dailyValue === "First Output" ? "First Output" : "",
                 inline: dailyValue === "Inline" ? "Inline" : "",
@@ -1020,11 +1020,6 @@ const QCWashingPage = () => {
             daily: dailyValue || prev.daily,
             buyer: saved.color?.orderDetails?.buyer || prev.buyer,
             factoryName: saved.color?.orderDetails?.factoryName || "YM",
-            // checkedQty:
-            //   saved.color?.defectDetails?.checkedQty || prev.checkedQty,
-            // washQty: saved.color?.defectDetails?.washQty || prev.washQty,
-            // reportType:
-            //   saved.color?.orderDetails?.reportType || prev.reportType,
             result: saved.color?.orderDetails?.result || prev.result,
             reportType: saved.reportType || saved.color?.orderDetails?.reportType || prev.reportType,
             washQty: saved.washQty || saved.color?.defectDetails?.washQty || prev.washQty,
