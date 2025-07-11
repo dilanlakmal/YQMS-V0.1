@@ -22166,6 +22166,7 @@ app.get("/api/qa-accuracy/full-report", async (req, res) => {
       moNo,
       lineNo,
       tableNo,
+      grade, // This is the new filter parameter from the frontend
       page = 1,
       limit = 50
     } = req.query;
@@ -22187,6 +22188,8 @@ app.get("/api/qa-accuracy/full-report", async (req, res) => {
     } else if (lineNo) {
       matchStage.lineNo = lineNo;
     }
+    // Add the new grade filter to the match stage
+    if (grade) matchStage.grade = grade;
 
     // 2. Define custom sorting orders
     const reportTypeSortOrder = {
