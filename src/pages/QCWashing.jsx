@@ -198,27 +198,21 @@ const QCWashingPage = () => {
     defectData,
     addedDefects,
     comment,
-    // signatures,
     measurementData,
     isDataLoading,
   ]);
 
   // Load saved data when order number changes
   useEffect(() => {
-    if (formData.orderNo) {
-      if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
-      loadSavedData(formData.orderNo);
-    }
-  }, [formData.orderNo]);
+  const identifier = formData.style && formData.style !== formData.orderNo
+    ? formData.style
+    : formData.orderNo;
 
-  // Load saved data when style changes
-  useEffect(() => {
-    if (formData.style && formData.style !== formData.orderNo) {
-      // Clear any pending auto-save before loading new data
-      if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
-      loadSavedData(formData.style);
-    }
-  }, [formData.style]);
+  if (identifier) {
+    if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
+    loadSavedData(identifier);
+  }
+}, [formData.orderNo, formData.style]);
 
   // Load saved measurement sizes when order details change
   useEffect(() => {
