@@ -46,7 +46,7 @@ const QAInspectionForm = () => {
   const [sizeOptions, setSizeOptions] = useState([]);
   const [allDefectsList, setAllDefectsList] = useState([]);
   const [defects, setDefects] = useState([]);
-  // --- FIX #4: NEW STATE FOR STANDARD DEFECTS ---
+  // --- NEW STATE FOR STANDARD DEFECTS ---
   const [standardDefectsList, setStandardDefectsList] = useState([]);
 
   // --- NEW STATE FOR REMARKS AND ADDITIONAL IMAGES ---
@@ -159,18 +159,6 @@ const QAInspectionForm = () => {
     fetchAllDefectData();
   }, []);
 
-  // useEffect(() => {
-  //   const fetchAllDefects = async () => {
-  //     try {
-  //       const res = await axios.get(`${API_BASE_URL}/api/qa-defects-list`);
-  //       setAllDefectsList(res.data);
-  //     } catch (error) {
-  //       console.error("Failed to fetch defects list", error);
-  //     }
-  //   };
-  //   fetchAllDefects();
-  // }, [API_BASE_URL]);
-
   const determinedBuyer = useMemo(() => {
     if (!moNo?.value) return "Other";
     const mo = moNo.value;
@@ -185,9 +173,12 @@ const QAInspectionForm = () => {
 
   // --- FORM VALIDATION LOGIC ---
   const isFormInvalid = useMemo(() => {
-    // Check if any required field is empty or invalid
-    const hasInvalidDefects =
-      defects.length === 0 || defects.every((d) => !d.defectCode);
+    // This is an invalid state (e.g., user clicked "Add Garment" but didn't select a defect).
+    const hasOnlyEmptyDefects =
+      defects.length > 0 && defects.every((d) => !d.defectCode);
+    // // Check if any required field is empty or invalid
+    // const hasInvalidDefects =
+    //   defects.length === 0 || defects.every((d) => !d.defectCode);
     const lineOrTableMissing =
       reportType === "Inline Finishing" ? !tableNo : !lineNo;
 
@@ -196,7 +187,8 @@ const QAInspectionForm = () => {
       !moNo ||
       selectedColors.length === 0 ||
       lineOrTableMissing ||
-      hasInvalidDefects
+      hasOnlyEmptyDefects
+      //hasInvalidDefects
     );
   }, [scannedQc, moNo, selectedColors, reportType, lineNo, tableNo, defects]);
 
@@ -206,6 +198,7 @@ const QAInspectionForm = () => {
   }, [moNo, reportType, checkedQty]);
 
   const handleFinishInspection = async () => {
+    // --- FIX: ADJUST PAYLOAD TO HANDLE EMPTY DEFECTS ARRAY ---
     // Validation is now handled by the disabled button, but we keep this as a backup
     if (isFormInvalid) {
       Swal.fire(

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../components/authentication/AuthContext";
 import { Check, BarChart3, TrendingUp } from "lucide-react";
 import QAInspectionForm from "../components/inspection/qc_accuracy/QAInspectionForm";
+import QAAccuracyResults from "../components/inspection/qc_accuracy/QAAccuracyResults";
 import QAPageTitle from "../components/inspection/qc_accuracy/QAPageTitle";
 
 // Placeholder for other tabs
@@ -37,8 +38,15 @@ const QCAccuracy = () => {
         id: "results",
         labelKey: "qcAccuracy.tabs.results",
         icon: <BarChart3 size={18} />,
-        component: <PlaceholderComponent titleKey="qcAccuracy.tabs.results" />
+        // --- FIX #3: REPLACE PLACEHOLDER WITH THE REAL COMPONENT ---
+        component: <QAAccuracyResults />
       },
+      // {
+      //   id: "results",
+      //   labelKey: "qcAccuracy.tabs.results",
+      //   icon: <BarChart3 size={18} />,
+      //   component: <PlaceholderComponent titleKey="qcAccuracy.tabs.results" />
+      // },
       {
         id: "trend",
         labelKey: "qcAccuracy.tabs.trend",
