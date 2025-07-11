@@ -33,6 +33,10 @@ const QCWashingPage = () => {
     aqlSampleSize: "",
     aqlAcceptedDefect: "",
     aqlRejectedDefect: "",
+    totalCheckedPoint: "",
+    totalPass: "",
+    totalFail: "",
+    passRate: "",
   });
 
   const [subFactories, setSubFactories] = useState([]);
@@ -814,26 +818,32 @@ const QCWashingPage = () => {
 
           // Update formData with color-specific details from the loaded data
           const orderDetails = colorData.orderDetails;
-          const defectDetails = colorData.defectDetails;
-          if (orderDetails || defectDetails) {
-            setFormData((prev) => {
-              const dailyValue = orderDetails?.daily || "";
-              return {
-                ...prev,
-                washingType: orderDetails?.washingType || "Normal Wash",
-                reportType: orderDetails?.reportType || "Before Wash",
-                factoryName: orderDetails?.factoryName || "YM",
-                firstOutput:
-                  dailyValue === "First Output" ? "First Output" : "",
-                inline: dailyValue === "Inline" ? "Inline" : "",
-                daily: dailyValue,
-                result: orderDetails?.result || "",
-                aqlSampleSize: orderDetails?.aqlSampleSize || "",
-                aqlAcceptedDefect: orderDetails?.aqlAcceptedDefect || "",
-                aqlRejectedDefect: orderDetails?.aqlRejectedDefect || "",
-              };
-            });
-          }
+          setFormData((prev) => {
+            const dailyValue = orderDetails?.daily || "";
+            return {
+              ...prev,
+              // Values from the top-level of the colorData response
+              reportType: colorData.reportType || "Before Wash",
+              washQty: colorData.washQty || "",
+              checkedQty: colorData.checkedQty || "",
+              totalCheckedPoint: colorData.totalCheckedPoint || "",
+              totalPass: colorData.totalPass || "",
+              totalFail: colorData.totalFail || "",
+              passRate: colorData.passRate || "",
+
+              // Values from the nested orderDetails
+              washingType: orderDetails?.washingType || "Normal Wash",
+              factoryName: orderDetails?.factoryName || "YM",
+              firstOutput:
+                dailyValue === "First Output" ? "First Output" : "",
+              inline: dailyValue === "Inline" ? "Inline" : "",
+              daily: dailyValue,
+              result: orderDetails?.result || "",
+              aqlSampleSize: orderDetails?.aqlSampleSize || "",
+              aqlAcceptedDefect: orderDetails?.aqlAcceptedDefect || "",
+              aqlRejectedDefect: orderDetails?.aqlRejectedDefect || "",
+            };
+          });
 
           // Set inspection data
           if (colorData.inspectionDetails?.checkedPoints) {
@@ -1368,10 +1378,15 @@ const QCWashingPage = () => {
                       daily: "",
                       buyer: "",
                       factoryName: "YM",
+                      reportType: "Before Wash",
                       result: "",
                       aqlSampleSize: "",
                       aqlAcceptedDefect: "",
                       aqlRejectedDefect: "",
+                      totalCheckedPoint: "",
+                      totalPass: "",
+                      totalFail: "",
+                      passRate: "",
                     });
                     setInspectionData(
                       initializeInspectionData(masterChecklist)

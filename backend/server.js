@@ -2828,13 +2828,6 @@ app.post('/api/qc-washing/auto-save-color', async (req, res) => {
     if (!qcRecord) {
       qcRecord = new QCWashing({
         orderNo: orderNo,
-        reportType: reportType,
-        washQty: washQty,         
-        checkedQty: checkedQty,
-        totalCheckedPoint: totalCheckedPoint,
-        totalPass: totalPass,
-        totalFail: totalFail,
-        passRate: passRate,   
         isAutoSave: true,
         userId: userId,
         status: 'auto-saved',
@@ -2842,6 +2835,14 @@ app.post('/api/qc-washing/auto-save-color', async (req, res) => {
       });
     }
     
+    // Always update top-level fields on every auto-save
+    qcRecord.reportType = reportType;
+    qcRecord.washQty = washQty;
+    qcRecord.checkedQty = checkedQty;
+    qcRecord.totalCheckedPoint = totalCheckedPoint;
+    qcRecord.totalPass = totalPass;
+    qcRecord.totalFail = totalFail;
+    qcRecord.passRate = passRate;
     // Find or create color entry
     let colorEntry = qcRecord.colors?.find(c => c.colorName === colorName);
     
@@ -2928,16 +2929,20 @@ app.get('/api/qc-washing/load-color-data/:orderNo/:color', async (req, res) => {
       
       if (colorData) {
         // res.json({ success: true, colorData: colorData });
-        res.json({ success: true, colorData: {
-          ...colorData,
-          reportType: qcRecord.reportType,
-          washQty: qcRecord.washQty,
-          checkedQty: qcRecord.checkedQty,
-          totalCheckedPoint: qcRecord.totalCheckedPoint,
-          totalPass: qcRecord.totalPass,
-          totalFail: qcRecord.totalFail,
-          passRate: qcRecord.passRate
-        }});
+        // Also include top-level data in the response
+        res.json({ 
+          success: true, 
+          colorData: {
+            ...colorData.toObject(), // Convert Mongoose subdocument to plain object
+            reportType: qcRecord.reportType,
+            washQty: qcRecord.washQty,
+            checkedQty: qcRecord.checkedQty,
+            totalCheckedPoint: qcRecord.totalCheckedPoint,
+            totalPass: qcRecord.totalPass,
+            totalFail: qcRecord.totalFail,
+            passRate: qcRecord.passRate
+          } 
+        });
       } else {
         res.json({ success: false, message: 'Color data not found' });
       }
