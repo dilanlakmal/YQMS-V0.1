@@ -133,6 +133,7 @@ const DefectDetailsSection = ({
               <input 
                 type="text" 
                 value={formData.checkedQty || ''}
+                onChange={(e) => handleInputChange('checkedQty', e.target.value)}
                 readOnly={formData.daily === "Inline"}
                 className="flex-1 px-3 py-2 border rounded-md"
                 placeholder="Auto-calculated when Inline is selected"

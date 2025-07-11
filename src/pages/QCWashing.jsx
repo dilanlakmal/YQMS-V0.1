@@ -659,11 +659,36 @@ const QCWashingPage = () => {
 
   const handleCheckboxChange = (index, checkbox, value) => {
     setDefectData((prev) =>
-      prev.map((item, i) =>
-        i === index
-          ? { ...item, checkboxes: { ...item.checkboxes, [checkbox]: value } }
-          : item
-      )
+      prev.map((item, i) => {
+        if (i === index) {
+          const newCheckboxes = { ...item.checkboxes };
+
+          if (checkbox === "All") {
+            // If 'All' is clicked, set all checkboxes to its value
+            Object.keys(newCheckboxes).forEach((key) => {
+              newCheckboxes[key] = value;
+            });
+          } else {
+            // If an individual checkbox is clicked
+            newCheckboxes[checkbox] = value;
+
+            if (!value) {
+              // If unchecking an individual box, uncheck 'All'
+              newCheckboxes.All = false;
+            } else {
+              // If checking an individual box, check if all others (except 'All') are now checked
+              const allOthersChecked = Object.keys(newCheckboxes)
+                .filter((k) => k !== "All")
+                .every((k) => newCheckboxes[k]);
+              if (allOthersChecked) {
+                newCheckboxes.All = true;
+              }
+            }
+          }
+          return { ...item, checkboxes: newCheckboxes };
+        }
+        return item;
+      })
     );
   };
 
