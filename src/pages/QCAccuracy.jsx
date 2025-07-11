@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../components/authentication/AuthContext";
-import { Check, BarChart3, TrendingUp } from "lucide-react";
+import { Check, BarChart3, TrendingUp, BookOpen } from "lucide-react";
 import QAInspectionForm from "../components/inspection/qc_accuracy/QAInspectionForm";
 import QAAccuracyResults from "../components/inspection/qc_accuracy/QAAccuracyResults";
+import QCAccuracyFullReport from "../components/inspection/qc_accuracy/QCAccuracyFullReport";
 import QAPageTitle from "../components/inspection/qc_accuracy/QAPageTitle";
 
 // Placeholder for other tabs
@@ -40,6 +41,12 @@ const QCAccuracy = () => {
         icon: <BarChart3 size={18} />,
         // --- FIX #3: REPLACE PLACEHOLDER WITH THE REAL COMPONENT ---
         component: <QAAccuracyResults />
+      },
+      {
+        id: "full-report",
+        labelKey: "qcAccuracy.tabs.fullReport",
+        icon: <BookOpen size={18} />,
+        component: <QCAccuracyFullReport />
       },
       // {
       //   id: "results",

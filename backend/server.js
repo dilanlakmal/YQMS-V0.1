@@ -22154,6 +22154,113 @@ app.get("/api/qa-accuracy/results", async (req, res) => {
   }
 });
 
+// --- FIX #1: NEW ENDPOINT FOR PAGINATED FULL REPORT ---
+app.get("/api/qa-accuracy/full-report", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      qaId,
+      qcId,
+      reportType,
+      moNo,
+      lineNo,
+      tableNo,
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    // 1. Build the match stage for filtering
+    const matchStage = {};
+    if (startDate && endDate) {
+      matchStage.reportDate = {
+        $gte: new Date(new Date(startDate).setHours(0, 0, 0, 0)),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      };
+    }
+    if (qaId) matchStage["qcInspector.empId"] = qaId;
+    if (qcId) matchStage["scannedQc.empId"] = qcId;
+    if (reportType) matchStage.reportType = reportType;
+    if (moNo) matchStage.moNo = moNo;
+    if (reportType === "Inline Finishing" && tableNo) {
+      matchStage.tableNo = tableNo;
+    } else if (lineNo) {
+      matchStage.lineNo = lineNo;
+    }
+
+    // 2. Define custom sorting orders
+    const reportTypeSortOrder = {
+      "Inline Sewing": 1,
+      "Inline Finishing": 2,
+      "First Output": 3
+    };
+    const gradeSortOrder = { A: 1, B: 2, C: 3, D: 4 };
+
+    // 3. Create the main aggregation pipeline
+    const aggregationPipeline = [
+      { $match: matchStage },
+      // Add custom sort fields
+      {
+        $addFields: {
+          reportTypeSort: { $ifNull: [reportTypeSortOrder[`$reportType`], 99] },
+          gradeSort: { $ifNull: [gradeSortOrder[`$grade`], 99] },
+          // --- FIX: USE $CONVERT FOR SAFE TYPE CONVERSION ---
+          lineNoNumeric: {
+            $convert: {
+              input: "$lineNo",
+              to: "int",
+              onError: 9999, // If conversion fails (e.g., "NA"), use a high number
+              onNull: 9999 // If the field is null, also use a high number
+            }
+          }
+          //lineNoNumeric: { $toInt: "$lineNo" } // Convert lineNo to number for proper sorting
+        }
+      },
+      // Apply the complex multi-level sort
+      {
+        $sort: {
+          reportDate: 1,
+          reportTypeSort: 1,
+          lineNoNumeric: 1,
+          gradeSort: 1,
+          createdAt: 1
+        }
+      }
+    ];
+
+    // 4. Execute a second pipeline to get the total count for pagination
+    const countPipeline = [...aggregationPipeline, { $count: "total" }];
+    const totalDocuments = await QCAccuracyReportModel.aggregate(countPipeline);
+    const total = totalDocuments.length > 0 ? totalDocuments[0].total : 0;
+
+    // 5. Add pagination to the main pipeline and execute
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    aggregationPipeline.push({ $skip: skip });
+    aggregationPipeline.push({ $limit: limitNum });
+
+    const reports = await QCAccuracyReportModel.aggregate(aggregationPipeline);
+
+    res.json({
+      reports,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching full report:", error);
+    res.status(500).json({
+      message: "Server error fetching full report",
+      error: error.message
+    });
+  }
+});
+
 /* ------------------------------
    Cutting Dashboard ENDPOINTS (FINAL & COMPLETE)
 ------------------------------ */
