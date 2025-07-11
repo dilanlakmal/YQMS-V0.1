@@ -238,6 +238,26 @@ const QCWashingPage = () => {
     }
   }, [formData.aqlSampleSize, formData.inline, formData.daily]);
 
+   // Helper to process measurement data from different API response structures
+  const processMeasurementData = (loadedMeasurements) => {
+    if (Array.isArray(loadedMeasurements)) {
+      const beforeWash = loadedMeasurements.filter(
+        (m) => m.washType === "beforeWash"
+      );
+      const afterWash = loadedMeasurements.filter(
+        (m) => m.washType === "afterWash"
+      );
+      return { beforeWash, afterWash };
+    }
+    if (
+      loadedMeasurements &&
+      (loadedMeasurements.beforeWash || loadedMeasurements.afterWash)
+    ) {
+      return { beforeWash: loadedMeasurements.beforeWash || [], afterWash: loadedMeasurements.afterWash || [] };
+    }
+    return { beforeWash: [], afterWash: [] };
+  };
+
   const initializeInspectionData = (checklist = []) => {
     if (!Array.isArray(checklist)) return [];
     return checklist.map((item) => ({
@@ -796,6 +816,7 @@ const QCWashingPage = () => {
 
   // Load color-specific data
   const loadColorSpecificData = async (orderNo, color) => {
+     setIsDataLoading(true);
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/qc-washing/load-color-data/${orderNo}/${color}`
@@ -807,7 +828,7 @@ const QCWashingPage = () => {
         if (data.success && data.colorData) {
           const colorData = data.colorData;
 
-          // Update formData with color-specific details from the loaded data
+         // Update formData with color-specific details from the loaded data
           const orderDetails = colorData.orderDetails;
           const defectDetails = colorData.defectDetails;
           if (orderDetails || defectDetails) {
@@ -855,15 +876,25 @@ const QCWashingPage = () => {
 
           // Set defect data
           if (colorData.inspectionDetails?.parameters) {
+            const defaultEffectCheckboxes = {
+              All: false, A: false, B: false, C: false, D: false,
+              E: false, F: false, G: false, H: false, I: false, J: false,
+            };
             const transformedDefectData =
-              colorData.inspectionDetails.parameters.map((param) => ({
-                parameter: param.parameterName,
-                ok: param.status === "ok",
-                no: param.status === "no",
-                qty: param.qty || "",
-                remark: param.remark || "",
-                checkboxes: param.checkboxes || {},
-              }));
+             colorData.inspectionDetails.parameters.map((param) => {
+                const isEffect = param.parameterName === "Effect";
+                return {
+                  parameter: param.parameterName,
+                  ok: param.status === "ok",
+                  no: param.status === "no",
+                  qty: param.qty || "",
+                  defectPercent: "", // Ensure this is initialized
+                  remark: param.remark || "",
+                  checkboxes: isEffect
+                    ? { ...defaultEffectCheckboxes, ...(param.checkboxes || {}) }
+                    : param.checkboxes || {},
+                };
+              });
             setDefectData(transformedDefectData);
           }
 
@@ -881,25 +912,19 @@ const QCWashingPage = () => {
 
           // Set comment and measurement data
           setComment(colorData.defectDetails?.comment || "");
-          const loadedMeasurements = colorData.measurementDetails;
-          if (Array.isArray(loadedMeasurements)) {
-            const beforeWash = loadedMeasurements.filter(
-              (m) => m.washType === "beforeWash"
-            );
-            const afterWash = loadedMeasurements.filter(
-              (m) => m.washType === "afterWash"
-            );
-            setMeasurementData({ beforeWash, afterWash });
-          } else if (loadedMeasurements && loadedMeasurements.beforeWash) {
-            setMeasurementData(loadedMeasurements);
-          } else {
-            setMeasurementData({ beforeWash: [], afterWash: [] });
-          }
+          
           console.log("Loaded color-specific data for:", orderNo, color);
         }
       }
     } catch (error) {
       console.error("Error loading color-specific data:", error);
+    Swal.fire({
+        icon: "error",
+        title: "Load Failed",
+        text: `Could not load data for color "${color}". Please try again.`,
+      });
+    } finally {
+      setIsDataLoading(false);
     }
   };
 
@@ -961,20 +986,7 @@ const QCWashingPage = () => {
           setComment(saved.comment || "");
 
           // Set measurement data
-          const measurementDetails = saved.measurementDetails;
-          if (Array.isArray(measurementDetails)) {
-            const beforeWash = measurementDetails.filter(
-              (m) => m.washType === "beforeWash"
-            );
-            const afterWash = measurementDetails.filter(
-              (m) => m.washType === "afterWash"
-            );
-            setMeasurementData({ beforeWash, afterWash });
-          } else if (measurementDetails && measurementDetails.beforeWash) {
-            setMeasurementData(measurementDetails);
-          } else {
-            setMeasurementData({ beforeWash: [], afterWash: [] });
-          }
+          setMeasurementData(processMeasurementData(saved.measurementDetails));
           setShowMeasurementTable(true);
 
           setAutoSaveId(saved._id);
@@ -1082,20 +1094,7 @@ const QCWashingPage = () => {
 
           setAddedDefects(transformedAddedDefects);
           setComment(saved.color?.defectDetails?.comment || "");
-          const measurementDetails = saved.color?.measurementDetails; 
-          if (Array.isArray(measurementDetails)) {
-            const beforeWash = measurementDetails.filter(
-              (m) => m.washType === "beforeWash"
-            );
-            const afterWash = measurementDetails.filter(
-              (m) => m.washType === "afterWash"
-            );
-            setMeasurementData({ beforeWash, afterWash });
-          } else if (measurementDetails && measurementDetails.beforeWash) {
-            setMeasurementData(measurementDetails);
-          } else {
-            setMeasurementData({ beforeWash: [], afterWash: [] });
-          }
+          setMeasurementData(processMeasurementData(saved.color?.measurementDetails));
           setShowMeasurementTable(true);
 
           console.log("Loaded submitted data for order:", orderNo);

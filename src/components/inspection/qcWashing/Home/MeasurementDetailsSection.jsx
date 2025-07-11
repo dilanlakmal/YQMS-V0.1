@@ -517,7 +517,11 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                               type="text"
                               value={value?.fraction || ''}
                               readOnly
-                              onClick={() => setCurrentCell({ size, table: 'before', rowIndex: index, colIndex: i }) || setShowNumPad(true)}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setCurrentCell({ size, table: 'before', rowIndex: index, colIndex: i });
+                                setShowNumPad(true);
+                              }}  
                               className="w-full px-1 py-1 text-center border-0 bg-transparent cursor-pointer" 
                               placeholder="0.0"
                             />

@@ -2929,20 +2929,16 @@ app.get('/api/qc-washing/load-color-data/:orderNo/:color', async (req, res) => {
       
       if (colorData) {
         // res.json({ success: true, colorData: colorData });
-        // Also include top-level data in the response
-        res.json({ 
-          success: true, 
-          colorData: {
-            ...colorData.toObject(), // Convert Mongoose subdocument to plain object
-            reportType: qcRecord.reportType,
-            washQty: qcRecord.washQty,
-            checkedQty: qcRecord.checkedQty,
-            totalCheckedPoint: qcRecord.totalCheckedPoint,
-            totalPass: qcRecord.totalPass,
-            totalFail: qcRecord.totalFail,
-            passRate: qcRecord.passRate
-          } 
-        });
+        res.json({ success: true, colorData: {
+          ...colorData,
+          reportType: qcRecord.reportType,
+          washQty: qcRecord.washQty,
+          checkedQty: qcRecord.checkedQty,
+          totalCheckedPoint: qcRecord.totalCheckedPoint,
+          totalPass: qcRecord.totalPass,
+          totalFail: qcRecord.totalFail,
+          passRate: qcRecord.passRate
+        }});
       } else {
         res.json({ success: false, message: 'Color data not found' });
       }
