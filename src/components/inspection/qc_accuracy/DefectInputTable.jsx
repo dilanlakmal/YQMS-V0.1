@@ -1,13 +1,13 @@
 import React, { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { PlusCircle } from "lucide-react";
-import DefectRow from "./DefectRow";
+import QADefectCard from "./QADefectCard"; // Use the new card component with the correct name
 
 const DefectInputTable = ({
   defects,
   setDefects,
   availableDefects,
-  standardDefects, // <-- Receive new prop
+  standardDefects,
   buyer,
   uploadMetadata
 }) => {
@@ -23,7 +23,9 @@ const DefectInputTable = ({
         defectCode: null,
         qty: 1,
         type: null,
-        imageUrl: "", // Add imageUrl
+        imageUrl: "",
+        decision: "N/A",
+        standardStatus: "",
         tempId: Date.now()
       }
     ]);
@@ -38,28 +40,27 @@ const DefectInputTable = ({
         qty: 1,
         type: null,
         imageUrl: "",
+        decision: "N/A",
+        standardStatus: "",
         tempId: Date.now()
       }
     ]);
   };
 
-  // --- FIX #5: UPDATE handleUpdate TO POPULATE NEW FIELDS ---
   const handleUpdate = (index, field, value) => {
     const newDefects = [...defects];
     if (field === "defect") {
-      // Find the corresponding standard defect
       const stdDefect = standardDefects.find((sd) => sd.code === value.code);
       const initialDecision = stdDefect?.decisions[0];
-
       newDefects[index] = {
         ...newDefects[index],
         defectCode: value.code,
         defectNameEng: value.english,
         defectNameKh: value.khmer,
         defectNameCh: value.chinese,
-        type: value.selectedType, // Buyer-specific type
-        decision: initialDecision?.decisionEng || "N/A", // Set initial decision
-        standardStatus: initialDecision?.status || "Major", // Set initial standard status
+        type: value.selectedType,
+        decision: initialDecision?.decisionEng || "N/A",
+        standardStatus: initialDecision?.status || "Major",
         qty: 1
       };
     } else if (field === "clear") {
@@ -68,7 +69,7 @@ const DefectInputTable = ({
         defectCode: null,
         qty: 1,
         type: null,
-        decision: "", // Clear fields
+        decision: "",
         standardStatus: ""
       };
     } else {
@@ -77,42 +78,17 @@ const DefectInputTable = ({
     setDefects(newDefects);
   };
 
-  // const handleUpdate = (index, field, value) => {
-  //   const newDefects = [...defects];
-  //   if (field === "defect") {
-  //     newDefects[index] = {
-  //       ...newDefects[index],
-  //       defectCode: value.code,
-  //       defectNameEng: value.english,
-  //       defectNameKh: value.khmer,
-  //       defectNameCh: value.chinese,
-  //       type: value.selectedType,
-  //       qty: 1
-  //     };
-  //   } else if (field === "clear") {
-  //     newDefects[index] = {
-  //       ...newDefects[index],
-  //       defectCode: null,
-  //       qty: 1,
-  //       type: null
-  //     };
-  //   } else {
-  //     newDefects[index][field] = value;
-  //   }
-  //   setDefects(newDefects);
-  // };
-
   const handleDelete = (indexToDelete) => {
     setDefects(defects.filter((_, index) => index !== indexToDelete));
   };
 
-  const groupedDefects = useMemo(() => {
+  const defectsByGarment = useMemo(() => {
     const groups = new Map();
-    defects.forEach((defect, index) => {
+    defects.forEach((defect) => {
       if (!groups.has(defect.pcsNo)) {
         groups.set(defect.pcsNo, []);
       }
-      groups.get(defect.pcsNo).push({ ...defect, originalIndex: index });
+      groups.get(defect.pcsNo).push(defect);
     });
     return Array.from(groups.values());
   }, [defects]);
@@ -125,110 +101,77 @@ const DefectInputTable = ({
         </h3>
         <button
           onClick={handleAddPcs}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
         >
           <PlusCircle size={18} />
-          {t("qcAccuracy.addPcs", "Add Pcs")}
+          {t("qcAccuracy.addPcs", "Add New Garment")}
         </button>
       </div>
-      <div className="overflow-x-auto rounded-lg border dark:border-gray-700">
-        <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-          <thead className="text-xs text-gray-700 uppercase bg-gray-100 dark:bg-gray-700 dark:text-gray-400">
-            <tr>
-              <th scope="col" className="p-3 w-20 text-center">
-                {t("qcAccuracy.pcsNo", "Pcs No")}
-              </th>
-              <th scope="col" className="p-3">
-                {t("qcAccuracy.defectName", "Defect Name")}
-              </th>
 
-              {/* --- FIX #5: ADD NEW HEADERS --- */}
-              <th scope="col" className="p-3 w-48 text-center">
-                Decision
-              </th>
+      {defects.length === 0 ? (
+        <div className="p-4 text-center text-gray-500 italic border rounded-lg dark:border-gray-700">
+          {t(
+            "qcAccuracy.noDefectsAdded",
+            'No defects added. Click "Add New Garment" to start.'
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-4">
+          {defects.map((defect, index) => {
+            const defectsForThisPcs = defects.filter(
+              (d) => d.pcsNo === defect.pcsNo
+            );
+            const usedCodesForThisPcs = new Set(
+              defectsForThisPcs.map((d) => d.defectCode).filter(Boolean)
+            );
 
-              <th scope="col" className="p-3 w-32 text-center">
-                {t("qcAccuracy.qty", "Qty")}
-              </th>
-              <th scope="col" className="p-3 w-40">
-                {t("qcAccuracy.type", "Type")}
-              </th>
-              <th scope="col" className="p-3 w-40">
-                Standard Status
-              </th>
-              {/* --- NEW IMAGE HEADER --- */}
-              <th scope="col" className="p-3 w-24 text-center">
-                {t("qcAccuracy.image", "Image")}
-              </th>
-              <th scope="col" className="p-3 w-20 text-center">
-                {t("qcAccuracy.action", "Action")}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {defects.length === 0 ? (
-              <tr>
-                <td
-                  colSpan="5"
-                  className="p-4 text-center text-gray-500 dark:text-gray-400 italic"
-                >
-                  {t(
-                    "qcAccuracy.noDefectsAdded",
-                    'No defects added. Click "Add Pcs" to start.'
-                  )}
-                </td>
-              </tr>
-            ) : (
-              groupedDefects.map((group, groupIndex) => (
-                <React.Fragment key={group[0].pcsNo}>
-                  {group.map((defect, defectInGroupIndex) => {
-                    const usedCodesForThisPcs = new Set(
-                      group.map((d) => d.defectCode).filter(Boolean)
-                    );
-                    const availableDefectsForThisRow = availableDefects.filter(
-                      (d) =>
-                        !usedCodesForThisPcs.has(d.code) ||
-                        d.code === defect.defectCode
-                    );
+            const availableDefectsForThisRow = availableDefects.filter(
+              (d) =>
+                !usedCodesForThisPcs.has(d.code) || d.code === defect.defectCode
+            );
 
-                    return (
-                      <DefectRow
-                        key={defect.tempId || defect.originalIndex}
-                        defect={defect}
-                        rowIndex={defect.originalIndex}
-                        availableDefects={availableDefectsForThisRow}
-                        standardDefects={standardDefects} // <-- Pass full list to row
-                        buyer={buyer}
-                        onUpdate={handleUpdate}
-                        onDelete={handleDelete}
-                        uploadMetadata={uploadMetadata} // Pass metadata down
-                      />
-                    );
-                  })}
-                  <tr className="bg-gray-50 dark:bg-gray-800/50">
-                    <td
-                      colSpan="5"
-                      className="p-1 border-t dark:border-gray-600"
-                    >
-                      <button
-                        onClick={() => handleAddDefectToPcs(group[0].pcsNo)}
-                        className="w-full text-xs flex items-center justify-center gap-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded p-1"
-                      >
-                        <PlusCircle size={14} />
-                        {t(
-                          "qcAccuracy.addAnotherDefect",
-                          "Add Another Defect to Pcs {{pcsNo}}",
-                          { pcsNo: group[0].pcsNo }
-                        )}
-                      </button>
-                    </td>
-                  </tr>
-                </React.Fragment>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+            const defectInPcs = defects.filter(
+              (d) => d.pcsNo === defect.pcsNo && d.tempId <= defect.tempId
+            ).length;
+
+            return (
+              <QADefectCard
+                key={defect.tempId || index}
+                defect={{ ...defect, defectInPcs }}
+                rowIndex={index}
+                availableDefects={availableDefectsForThisRow}
+                standardDefects={standardDefects}
+                buyer={buyer}
+                onUpdate={handleUpdate}
+                onDelete={handleDelete}
+                uploadMetadata={uploadMetadata}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {defectsByGarment.length > 0 && (
+        <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
+          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            Add More Defects to an Existing Garment
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {defectsByGarment.map((group) => (
+              <button
+                key={group[0].pcsNo}
+                onClick={() => handleAddDefectToPcs(group[0].pcsNo)}
+                className="flex items-center gap-2 text-xs bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-full px-3 py-1"
+              >
+                <PlusCircle size={14} />
+                {t("qcAccuracy.addAnotherDefect", "Add to Garment {{pcsNo}}", {
+                  pcsNo: group[0].pcsNo
+                })}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,3 +1,5 @@
+// Vertical table layout -- Now don't use this file, use QADefectCard.jsx instead
+
 import React, { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Minus, Trash2, RotateCcw } from "lucide-react";
@@ -146,31 +148,6 @@ const DefectRow = ({
     }),
     placeholder: (base) => ({ ...base, color: "var(--color-text-secondary)" })
   };
-
-  // const reactSelectStyles = {
-  //   control: (base) => ({
-  //     ...base,
-  //     backgroundColor: "var(--color-bg-secondary)",
-  //     borderColor: "var(--color-border)",
-  //     boxShadow: "none"
-  //   }),
-  //   singleValue: (base) => ({ ...base, color: "var(--color-text-primary)" }),
-  //   input: (base) => ({ ...base, color: "var(--color-text-primary)" }),
-  //   menu: (base) => ({
-  //     ...base,
-  //     backgroundColor: "var(--color-bg-secondary)",
-  //     zIndex: 50
-  //   }),
-  //   menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-  //   option: (base, state) => ({
-  //     ...base,
-  //     backgroundColor: state.isFocused
-  //       ? "var(--color-bg-accent)"
-  //       : "transparent",
-  //     color: "var(--color-text-primary)",
-  //     "&:active": { backgroundColor: "var(--color-bg-accent-active)" }
-  //   })
-  // };
 
   return (
     <tr className="dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700">
