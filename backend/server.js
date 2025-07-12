@@ -2976,45 +2976,46 @@ app.get('/api/qc-washing/saved-colors/:orderNo', async (req, res) => {
 // Load saved data
 app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
   try {
-    const { orderNo, reportType, washQty, checkedQty,totalCheckedPoint, totalPass, totalFail, passRate } = req.params;
-    const savedData = await QCWashing.findOne({ 
+    // Only 'orderNo' is available from req.params for this route
+    const { orderNo } = req.params;
+
+    // Query to find the latest auto-saved document for the given orderNo
+    const savedData = await QCWashing.findOne({
       orderNo: orderNo,
-      reportType: reportType,
-      washQty: washQty,         
-      checkedQty: checkedQty,
-      totalCheckedPoint: totalCheckedPoint,
-      totalPass: totalPass,
-      totalFail: totalFail,
-      passRate: passRate,    
-      isAutoSave: true 
-    }).sort({ savedAt: -1 });
+      isAutoSave: true // Ensure it's an auto-saved record
+    }).sort({ savedAt: -1 }); // Get the most recent one
 
     if (savedData) {
+      // Data transformation for frontend consumption
       const formData = {
         date: savedData.date,
         orderNo: savedData.orderNo,
-        style: savedData.orderNo,
-        orderQty: savedData.color?.orderDetails?.orderQty || '',
-        color: savedData.color?.orderDetails?.color || '',
-        washingType: savedData.color?.orderDetails?.washingType || 'Normal Wash',
-        firstOutput: savedData.color?.orderDetails?.daily || false,
-        inline: savedData.color?.orderDetails?.daily || false,
-        buyer: savedData.color?.orderDetails?.buyer || '',
-        factoryName: savedData.color?.orderDetails?.factoryName || 'YM',
-        checkedQty: savedData.color?.defectDetails?.checkedQty || '',
-        washQty: savedData.color?.defectDetails?.washQty || ''
+        style: savedData.orderNo, // Assuming style is same as orderNo or needs specific field
+        orderQty: savedData.colors?.[0]?.orderDetails?.orderQty || '',
+        color: savedData.colors?.[0]?.orderDetails?.color || '',
+        washingType: savedData.colors?.[0]?.orderDetails?.washingType || 'Normal Wash',
+        firstOutput: savedData.colors?.[0]?.orderDetails?.daily || '', // 'daily' might be string like 'Inline'
+        inline: savedData.colors?.[0]?.orderDetails?.daily === 'Inline' || false, // Adjust based on your 'daily' field
+        daily: savedData.colors?.[0]?.orderDetails?.daily || '',
+        buyer: savedData.colors?.[0]?.orderDetails?.buyer || '',
+        factoryName: savedData.colors?.[0]?.orderDetails?.factoryName || 'YM',
+        checkedQty: savedData.colors?.[0]?.defectDetails?.checkedQty || '',
+        washQty: savedData.colors?.[0]?.defectDetails?.washQty || ''
       };
 
-      // Transform inspection data
-      const inspectionData = savedData.color?.inspectionDetails?.checkedPoints?.map(point => ({
+      // Ensure proper handling for nested arrays/objects like inspectionDetails, defectDetails etc.
+      // The sample record shows 'colors' is an array. You might need to iterate or select a specific color.
+      // For simplicity, using the first color entry [0] from the sample. Adjust as needed.
+      const firstColorData = savedData.colors?.[0];
+
+      const inspectionData = firstColorData?.inspectionDetails?.checkedPoints?.map(point => ({
         checkedList: point.pointName,
         approvedDate: point.approvedDate || '',
         na: point.condition === 'N/A',
         remark: point.remark || ''
       })) || [];
 
-      // Transform defect data
-      const defectData = savedData.color?.inspectionDetails?.parameters?.map(param => ({
+      const defectData = firstColorData?.inspectionDetails?.parameters?.map(param => ({
         parameter: param.parameterName,
         ok: param.status === 'ok',
         no: param.status === 'no',
@@ -3023,29 +3024,37 @@ app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
         checkboxes: param.checkboxes || {}
       })) || [];
 
-      // Transform added defects
-      const addedDefects = savedData.color?.defectDetails?.defects?.map(defect => ({
+      const addedDefects = firstColorData?.defectDetails?.defects?.map(defect => ({
         defectId: defect._id || '',
         defectName: defect.defectName,
         qty: defect.defectQty
       })) || [];
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         savedData: {
           _id: savedData._id,
           formData: formData,
           inspectionData: inspectionData,
           processData: {
-            temperature: savedData.color?.inspectionDetails?.temp || '',
-            time: savedData.color?.inspectionDetails?.time || '',
-            chemical: savedData.color?.inspectionDetails?.chemical || ''
+            temperature: firstColorData?.inspectionDetails?.temp || '',
+            time: firstColorData?.inspectionDetails?.time || '',
+            chemical: firstColorData?.inspectionDetails?.chemical || ''
           },
           defectData: defectData,
           addedDefects: addedDefects,
-          comment: savedData.color?.defectDetails?.comment || '',
-          measurementDetails: savedData.color?.measurementDetails || [],
-          savedAt: savedData.savedAt
+          comment: firstColorData?.defectDetails?.comment || '',
+          measurementDetails: firstColorData?.measurementDetails || [],
+          savedAt: savedData.savedAt,
+          // Include other top-level fields from savedData if needed on frontend
+          reportType: savedData.reportType, // Added from top-level
+          totalCheckedPoint: savedData.totalCheckedPoint, // Added from top-level
+          totalPass: savedData.totalPass, // Added from top-level
+          totalFail: savedData.totalFail, // Added from top-level
+          passRate: savedData.passRate, // Added from top-level
+          // Note: washQty and checkedQty are also at top-level. Your formData pulls from nested. Review your data structure.
+          washQty: savedData.washQty,
+          checkedQty: savedData.checkedQty,
         }
       });
     } else {

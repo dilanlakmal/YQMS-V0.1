@@ -282,12 +282,14 @@ const QCWashingPage = () => {
       if (qcWashingResponse.ok) {
         const qcWashingData = await qcWashingResponse.json();
         if (qcWashingData.success && qcWashingData.savedData) {
+          console.log("Saved reportType from backend:", qcWashingData.savedData.reportType);
           // Instead of calling loadSavedData again, directly set the saved data here to avoid redundant calls
           const saved = qcWashingData.savedData;
 
           setFormData((prev) => ({
             ...prev,
             ...saved.formData,
+            reportType: saved.reportType,
             date: saved.formData.date
               ? saved.formData.date.split("T")[0]
               : new Date().toISOString().split("T")[0],
@@ -915,6 +917,7 @@ const QCWashingPage = () => {
           setFormData((prev) => ({
             ...prev,
             ...saved.formData,
+            reportType: saved.reportType,
             date: saved.formData.date
               ? saved.formData.date.split("T")[0]
               : new Date().toISOString().split("T")[0],
