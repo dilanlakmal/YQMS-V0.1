@@ -2327,48 +2327,7 @@ const getBuyerFromMoNumber = (moNo) => {
    End Points - Measurement Data In qcWashing
 ------------------------------ */
 // Get order details by style number
-app.get('/api/qc-washing/order-details-by-style/:styleNo', async (req, res) => {
-  const { styleNo } = req.params;
-  const collection = ymEcoConnection.db.collection("dt_orders");
-
-  try {
-    const orders = await collection.find({ Order_No: styleNo }).toArray();
-
-    if (!orders || orders.length === 0) {
-      return res.status(404).json({ success: false, message: `Style '${styleNo}' not found.` });
-    }
-
-    // Extract all available colors from OrderColors array
-    const colorSet = new Set();
-    orders.forEach(order => {
-      if (order.OrderColors && Array.isArray(order.OrderColors)) {
-        order.OrderColors.forEach(colorObj => {
-          if (colorObj && colorObj.Color) {
-            colorSet.add(colorObj.Color);
-          }
-        });
-      }
-    });
-    const availableColors = Array.from(colorSet);
-    
-    const orderQty = orders.reduce((sum, order) => sum + (order.TotalQty || 0), 0);
-    const buyerName = getBuyerFromMoNumber(styleNo);
-
-    res.json({
-      success: true,
-      colors: availableColors,
-      orderQty,
-      buyer: buyerName,
-    });
-
-  } catch (error) {
-    console.error(`Error fetching order details for style ${styleNo}:`, error);
-    res.status(500).json({ success: false, message: 'Server error while fetching order details.' });
-  }
-});
-
-// Get order details by order number with saved color data
-app.get('/api/qc-washing/order-details-by-order/:orderNo', async (req, res) => {
+app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
   const { orderNo } = req.params;
   const collection = ymEcoConnection.db.collection("dt_orders");
 
@@ -2376,7 +2335,7 @@ app.get('/api/qc-washing/order-details-by-order/:orderNo', async (req, res) => {
     const orders = await collection.find({ Order_No: orderNo }).toArray();
 
     if (!orders || orders.length === 0) {
-      return res.status(404).json({ success: false, message: `Order '${orderNo}' not found.` });
+      return res.status(404).json({ success: false, message: `Style '${orderNo}' not found.` });
     }
 
     // Extract all available colors from OrderColors array
@@ -2395,34 +2354,75 @@ app.get('/api/qc-washing/order-details-by-order/:orderNo', async (req, res) => {
     const orderQty = orders.reduce((sum, order) => sum + (order.TotalQty || 0), 0);
     const buyerName = getBuyerFromMoNumber(orderNo);
 
-    // Check for saved colors in QCWashing collection
-    let savedColors = [];
-    let defaultColor = availableColors[0] || '';
-    
-    try {
-      const savedData = await QCWashing.findOne({ orderNo: orderNo });
-      if (savedData && savedData.colors && savedData.colors.length > 0) {
-        savedColors = savedData.colors.map(c => c.colorName);
-        defaultColor = savedColors[0]; // Use first saved color as default
-      }
-    } catch (err) {
-      console.log('No saved color data found, using available colors');
-    }
-
     res.json({
       success: true,
-      colors: availableColors, // All available colors from dt_orders
-      savedColors: savedColors, // Colors that have saved data
-      defaultColor: defaultColor, // Default color to select
+      colors: availableColors,
       orderQty,
       buyer: buyerName,
     });
 
   } catch (error) {
-    console.error(`Error fetching order details for order ${orderNo}:`, error);
+    console.error(`Error fetching order details for style ${orderNo}:`, error);
     res.status(500).json({ success: false, message: 'Server error while fetching order details.' });
   }
 });
+
+// Get order details by order number with saved color data
+// app.get('/api/qc-washing/order-details-by-order/:orderNo', async (req, res) => {
+//   const { orderNo } = req.params;
+//   const collection = ymEcoConnection.db.collection("dt_orders");
+
+//   try {
+//     const orders = await collection.find({ Order_No: orderNo }).toArray();
+
+//     if (!orders || orders.length === 0) {
+//       return res.status(404).json({ success: false, message: `Order '${orderNo}' not found.` });
+//     }
+
+//     // Extract all available colors from OrderColors array
+//     const colorSet = new Set();
+//     orders.forEach(order => {
+//       if (order.OrderColors && Array.isArray(order.OrderColors)) {
+//         order.OrderColors.forEach(colorObj => {
+//           if (colorObj && colorObj.Color) {
+//             colorSet.add(colorObj.Color);
+//           }
+//         });
+//       }
+//     });
+//     const availableColors = Array.from(colorSet);
+    
+//     const orderQty = orders.reduce((sum, order) => sum + (order.TotalQty || 0), 0);
+//     const buyerName = getBuyerFromMoNumber(orderNo);
+
+//     // Check for saved colors in QCWashing collection
+//     let savedColors = [];
+//     let defaultColor = availableColors[0] || '';
+    
+//     try {
+//       const savedData = await QCWashing.findOne({ orderNo: orderNo });
+//       if (savedData && savedData.colors && savedData.colors.length > 0) {
+//         savedColors = savedData.colors.map(c => c.colorName);
+//         defaultColor = savedColors[0]; // Use first saved color as default
+//       }
+//     } catch (err) {
+//       console.log('No saved color data found, using available colors');
+//     }
+
+//     res.json({
+//       success: true,
+//       colors: availableColors, // All available colors from dt_orders
+//       savedColors: savedColors, // Colors that have saved data
+//       defaultColor: defaultColor, // Default color to select
+//       orderQty,
+//       buyer: buyerName,
+//     });
+
+//   } catch (error) {
+//     console.error(`Error fetching order details for order ${orderNo}:`, error);
+//     res.status(500).json({ success: false, message: 'Server error while fetching order details.' });
+//   }
+// });
 
 // Get sizes for a specific order and color
 app.get('/api/qc-washing/order-sizes/:orderNo/:color', async (req, res) => {
@@ -2642,7 +2642,7 @@ app.get('/api/qc-washing/order-details-by-order/:orderNo', async (req, res) => {
 // Save size data
 app.post('/api/qc-washing/save-size', async (req, res) => {
   try {
-    const { orderNo, style, color, sizeData, userId } = req.body;
+    const { orderNo, color, sizeData, userId } = req.body;
     
     // Find existing QC record or create new one
     let qcRecord = await QCWashing.findOne({ orderNo: orderNo, isAutoSave: true, userId: userId });
@@ -2711,7 +2711,11 @@ app.post('/api/qc-washing/save-size', async (req, res) => {
 app.get('/api/qc-washing/saved-sizes/:orderNo/:color', async (req, res) => {
   try {
     const { orderNo, color } = req.params;
-    const qcRecord = await QCWashing.findOne({ orderNo: orderNo, isAutoSave: true });
+    const qcRecord = await QCWashing.findOne({ 
+      orderNo: orderNo, 
+      colorName: color,
+      isAutoSave: true 
+    });
     
     if (qcRecord && qcRecord.color && qcRecord.color.measurementDetails) {
       const savedSizes = [];
@@ -2966,119 +2970,6 @@ app.get('/api/qc-washing/saved-colors/:orderNo', async (req, res) => {
   } catch (error) {
     console.error('Get saved colors error:', error);
     res.status(500).json({ success: false, message: 'Failed to get saved colors' });
-  }
-});
-
-// Auto-save data - compare and update only if different
-app.post('/api/qc-washing/auto-save', async (req, res) => {
-  try {
-    const { reportType, washQty, checkedQty,totalCheckedPoint, totalPass, totalFail, passRate, formData, inspectionData, processData, defectData, addedDefects, uploadedImages, comment, signatures, measurementDetails, userId } = req.body;
-
-    const orderNo = formData.orderNo || formData.style;
-    
-    // Find existing record (auto-save or submitted)
-    const existingRecord = await QCWashing.findOne({ orderNo: orderNo });
-    
-    const newData = {
-      orderNo: orderNo,
-      reportType: reportType,
-      washQty: washQty,         
-      checkedQty: checkedQty,
-      totalCheckedPoint: totalCheckedPoint,
-      totalPass: totalPass,
-      totalFail: totalFail,
-      passRate: passRate,   
-      color: {
-        orderDetails: {
-          orderQty: formData.orderQty,
-          color: formData.color,
-          washingType: formData.washingType,
-          daily: formData.firstOutput || formData.inline,
-          buyer: formData.buyer,
-          factoryName: formData.factoryName,
-          inspector: {
-            engName: formData.agreedBy || signatures?.agreedBy,
-            empId: userId
-          }
-        },
-        inspectionDetails: {
-          checkedPoints: inspectionData?.map(item => ({
-            pointName: item.checkedList,
-            approvedDate: item.approvedDate,
-            condition: item.na ? 'N/A' : 'Active',
-            remark: item.remark
-          })) || [],
-          temp: processData?.temperature,
-          time: processData?.time,
-          chemical: processData?.chemical,
-          parameters: defectData?.map(item => ({
-            parameterName: item.parameter,
-            status: item.ok ? 'ok' : 'no',
-            qty: item.qty,
-            remark: item.remark,
-            checkboxes: item.checkboxes || {}
-          })) || []
-        },
-        defectDetails: {
-          checkedQty: formData.checkedQty,
-          washQty: formData.washQty,
-          defects: addedDefects?.map(defect => ({
-            defectName: defect.defectName,
-            defectQty: defect.qty
-          })) || [],
-          defectImages: uploadedImages?.map(img => img.name) || [],
-          comment: comment
-        },
-        measurementDetails: measurementDetails || []
-      },
-      userId: userId,
-      savedAt: new Date()
-    };
-
-    let result;
-    
-    if (existingRecord) {
-      // Compare data to see if update is needed
-      const existingDataStr = JSON.stringify({
-        color: existingRecord.color,
-        orderNo: existingRecord.orderNo
-      });
-      const newDataStr = JSON.stringify({
-        color: newData.color,
-        orderNo: newData.orderNo
-      });
-      
-      if (existingDataStr !== newDataStr) {
-        // Data is different, update the record
-        const updateData = {
-          ...newData,
-          isAutoSave: existingRecord.isAutoSave,
-          status: existingRecord.status,
-          submittedAt: existingRecord.submittedAt
-        };
-        
-        result = await QCWashing.findByIdAndUpdate(
-          existingRecord._id,
-          updateData,
-          { new: true }
-        );
-      } else {
-        // Data is same, no update needed
-        result = existingRecord;
-      }
-    } else {
-      // Create new record
-      result = await QCWashing.create({
-        ...newData,
-        isAutoSave: true,
-        status: 'auto-saved'
-      });
-    }
-
-    res.json({ success: true, id: result._id, message: 'Data auto-saved successfully' });
-  } catch (error) {
-    console.error('Auto-save error:', error);
-    res.status(500).json({ success: false, message: 'Auto-save failed' });
   }
 });
 

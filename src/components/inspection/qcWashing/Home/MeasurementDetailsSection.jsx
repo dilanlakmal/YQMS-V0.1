@@ -512,18 +512,20 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                         }
 
                         return (
-                          <td key={`measurement-input-${index}-${i}`} className={`border border-gray-300 px-2 py-1 text-center ${cellColorClass}`}>
+                          <td key={`measurement-input-${index}-${i}`} className={`border border-gray-300 px-2 py-1 text-center ${cellColorClass} cursor-pointer`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setCurrentCell({ size, table: 'before', rowIndex: index, colIndex: i });
+                              setShowNumPad(true);
+                            }}
+                          >
                             <input
                               type="text"
                               value={value?.fraction || ''}
                               readOnly
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setCurrentCell({ size, table: 'before', rowIndex: index, colIndex: i });
-                                setShowNumPad(true);
-                              }}  
-                              className="w-full px-1 py-1 text-center border-0 bg-transparent cursor-pointer" 
+                              className="w-full px-1 py-1 text-center border-0 bg-transparent"
                               placeholder="0.0"
+                              style={{ pointerEvents: 'none' }}
                             />
                           </td>
                         );
@@ -668,18 +670,19 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                           }
                         }
                         return (
-                           <td key={`measurement-input-${index}-${i}`} className={`border border-gray-300 px-2 py-1 text-center ${cellColorClass}`}>
+                           <td key={`measurement-input-${index}-${i}`} className={`border border-gray-300 px-2 py-1 text-center ${cellColorClass} cursor-pointer`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setCurrentCell({ size, table: 'after', rowIndex: index, colIndex: i });
+                                setShowNumPad(true);
+                              }}>
                             <input 
                               type="text" 
                               value={value?.fraction || ''}
                               readOnly
-                               onClick={(e) => {
-                                e.preventDefault();
-                                setCurrentCell({ size, table: 'after', rowIndex: index, colIndex: i });
-                                setShowNumPad(true);
-                              }}
-                              className="w-full px-1 py-1 text-center border-0 bg-transparent cursor-pointer" 
+                              className="w-full px-1 py-1 text-center border-0 bg-transparent"
                               placeholder="0.0"
+                              style={{ pointerEvents: 'none' }}
                             />
                           </td>
                         );
