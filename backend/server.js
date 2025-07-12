@@ -22264,6 +22264,69 @@ app.get("/api/qa-accuracy/full-report", async (req, res) => {
   }
 });
 
+// --- FIX #1: NEW ENDPOINT TO GET A SINGLE, FULLY-DETAILED INSPECTION REPORT ---
+app.get("/api/qa-accuracy/report/:reportId", async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(reportId)) {
+      return res.status(400).json({ message: "Invalid Report ID format." });
+    }
+
+    // 1. Fetch the main inspection report
+    const report = await QCAccuracyReportModel.findById(reportId).lean();
+    if (!report) {
+      return res.status(404).json({ message: "Inspection report not found." });
+    }
+
+    // 2. Fetch related data using Promise.all for efficiency
+    const [qaUser, qcUser, orderDetails] = await Promise.all([
+      UserProd.findOne({ emp_id: report.qcInspector.empId })
+        .select("face_photo eng_name")
+        .lean(),
+      UserProd.findOne({ emp_id: report.scannedQc.empId })
+        .select("face_photo eng_name")
+        .lean(),
+      ymEcoConnection.db
+        .collection("dt_orders")
+        .findOne({ Order_No: report.moNo })
+    ]);
+
+    // 3. Structure the final response object
+    const responseData = {
+      report, // The main report data
+      qaInspectorDetails: qaUser || {
+        face_photo: null,
+        eng_name: report.qcInspector.engName
+      },
+      scannedQcDetails: qcUser || {
+        face_photo: null,
+        eng_name: report.scannedQc.engName
+      },
+      orderDetails: orderDetails
+        ? {
+            totalQty: orderDetails.TotalQty,
+            custStyle: orderDetails.CustStyle,
+            country: orderDetails.Country,
+            mode: orderDetails.Mode,
+            salesTeamName: orderDetails.SalesTeamName,
+            orderColors: orderDetails.OrderColors
+          }
+        : null // Handle case where order is not found
+    };
+
+    res.json(responseData);
+  } catch (error) {
+    console.error("Error fetching detailed inspection report:", error);
+    res
+      .status(500)
+      .json({
+        message: "Server error fetching report details.",
+        error: error.message
+      });
+  }
+});
+
 /* ------------------------------
    Cutting Dashboard ENDPOINTS (FINAL & COMPLETE)
 ------------------------------ */
