@@ -220,7 +220,6 @@ const QCWashingPage = () => {
       return;
     }
     try {
-      // You may need to create this endpoint on your backend.
       const response = await fetch(
         `${API_BASE_URL}/api/qc-washing/styles/search/${searchTerm}`
       );
@@ -240,7 +239,6 @@ const QCWashingPage = () => {
 
   const fetchOrderDetailsByStyle = async (orderNo) => {
     if (!orderNo) {
-      // Clear related fields if styleNo is cleared
       setColorOptions([]);
       setFormData((prev) => ({
         ...prev,
@@ -255,7 +253,6 @@ const QCWashingPage = () => {
     try {
       setIsDataLoading(true);
 
-      // 1. Check if the record has already been submitted
       const submittedResponse = await fetch(
         `${API_BASE_URL}/api/qc-washing/load-submitted/${orderNo}`
       );
@@ -268,13 +265,11 @@ const QCWashingPage = () => {
             `The record for Order No '${orderNo}' has already been submitted and cannot be edited.`,
             "info"
           );
-          // Clear the input to prevent re-triggering
           setFormData((prev) => ({ ...prev, orderNo: "", style: "" }));
-          return; // Stop further processing
+          return;
         }
       }
 
-      // 2. Check for auto-saved data and load it
       const qcWashingResponse = await fetch(
         `${API_BASE_URL}/api/qc-washing/load-saved/${orderNo}`
       );
@@ -282,14 +277,13 @@ const QCWashingPage = () => {
       if (qcWashingResponse.ok) {
         const qcWashingData = await qcWashingResponse.json();
         if (qcWashingData.success && qcWashingData.savedData) {
-          console.log("Saved reportType from backend:", qcWashingData.savedData.reportType);
-          // Instead of calling loadSavedData again, directly set the saved data here to avoid redundant calls
           const saved = qcWashingData.savedData;
+          console.log("Saved reportType from backend:", saved.formData.reportType);
 
           setFormData((prev) => ({
             ...prev,
             ...saved.formData,
-            reportType: saved.reportType,
+            reportType: saved.formData.reportType || prev.reportType,
             date: saved.formData.date
               ? saved.formData.date.split("T")[0]
               : new Date().toISOString().split("T")[0],
@@ -302,26 +296,23 @@ const QCWashingPage = () => {
               saved?.formData.aqlRejectedDefect || prev.aqlRejectedDefect,
           }));
 
-          // Fetch all colors for the order/style, even when loading saved data
-          let colorResponse = await fetch(
+          // Fetch all colors for the order/style
+          let response = await fetch(
             `${API_BASE_URL}/api/qc-washing/order-details-by-style/${orderNo}`
           );
-          let orderData = await colorResponse.json();
+          let orderData = await response.json();
 
           if (!orderData.success) {
-            colorResponse = await fetch(
+            response = await fetch(
               `${API_BASE_URL}/api/qc-washing/order-details-by-order/${orderNo}`
             );
-            orderData = await colorResponse.json();
+            orderData = await response.json();
           }
-
+          
           if (orderData.success && orderData.colors) {
             setColorOptions(orderData.colors);
-          } else if (saved.formData.color) {
-            // Fallback: if fetching all colors fails, at least ensure the saved color is an option
-            setColorOptions((prev) =>
-              prev.includes(saved.formData.color) ? prev : [...prev, saved.formData.color]
-            );
+          } else {
+            setColorOptions([]); // Clear if no colors found
           }
 
           if (saved.inspectionData && saved.inspectionData.length > 0) {
@@ -344,20 +335,19 @@ const QCWashingPage = () => {
 
           setComment(saved.comment || "");
 
-          // Set measurement data
           setMeasurementData(processMeasurementData(saved.measurementDetails));
           setShowMeasurementTable(true);
 
           setAutoSaveId(saved._id);
           if (saved.savedAt) {
             setLastSaved(new Date(saved.savedAt));
-          }
+           }
           setIsDataLoading(false);
           return;
         }
       }
 
-      // 3. If not submitted, fetch order details from dt_orders
+      // If not submitted and no auto-save, fetch order details from dt_orders
       let response = await fetch(
         `${API_BASE_URL}/api/qc-washing/order-details-by-style/${orderNo}`
       );
@@ -382,8 +372,11 @@ const QCWashingPage = () => {
               ? orderData.colors[0]
               : ""),
         }));
+        // Load color-specific data for the default/first color
+        if (orderData.colors && orderData.colors.length > 0) {
+          loadColorSpecificData(orderNo, orderData.colors[0]);
+        }
       } else {
-        // If no order details found in dt_orders, it's a critical error.
         throw new Error(
           orderData.message || "Style/Order not found in master records."
         );
@@ -406,7 +399,6 @@ const QCWashingPage = () => {
   const handleInputChange = (field, value) => {
     setFormData((prev) => {
       const newState = { ...prev, [field]: value };
-      // When one checkbox is checked, uncheck the other and set daily field as string
       if (field === "firstOutput") {
         newState.inline = "";
         newState.daily = value;
@@ -430,6 +422,7 @@ const QCWashingPage = () => {
 
       // Handle color change - reset color-specific data
       if (field === "color" && value !== prev.color) {
+        // Only reset if the color actually changes
         setInspectionData(initializeInspectionData(masterChecklist));
         setProcessData({ temperature: "", time: "", chemical: "" });
         setDefectData([
@@ -449,6 +442,7 @@ const QCWashingPage = () => {
         setMeasurementData({ beforeWash: [], afterWash: [] });
         setSavedSizes([]);
 
+        // Load data specific to the newly selected color
         if (value && (prev.orderNo || prev.style)) {
           setTimeout(
             () => loadColorSpecificData(prev.orderNo || prev.style, value),
@@ -460,14 +454,13 @@ const QCWashingPage = () => {
       return newState;
     });
 
-    // Handle async operations after state update
     if (
       field === "inline" &&
       value &&
       (formData.orderNo || formData.style) &&
       formData.washQty
     ) {
-      setTimeout(() => fetchAQLData(formData.washQty), 100);
+      setTimeout(() => fetchAQLData(value), 100);
     }
     if (field === "washQty" && value) {
       setTimeout(() => {
@@ -508,19 +501,15 @@ const QCWashingPage = () => {
           const newCheckboxes = { ...item.checkboxes };
 
           if (checkbox === "All") {
-            // If 'All' is clicked, set all checkboxes to its value
             Object.keys(newCheckboxes).forEach((key) => {
               newCheckboxes[key] = value;
             });
           } else {
-            // If an individual checkbox is clicked
             newCheckboxes[checkbox] = value;
 
             if (!value) {
-              // If unchecking an individual box, uncheck 'All'
               newCheckboxes.All = false;
             } else {
-              // If checking an individual box, check if all others (except 'All') are now checked
               const allOthersChecked = Object.keys(newCheckboxes)
                 .filter((k) => k !== "All")
                 .every((k) => newCheckboxes[k]);
@@ -564,7 +553,6 @@ const QCWashingPage = () => {
       },
     ]);
 
-    // Reset inputs
     setSelectedDefect("");
     setDefectQty("");
   };
@@ -574,7 +562,6 @@ const QCWashingPage = () => {
   };
 
    // --- AQL & Checked Qty ---
-  // Fetch AQL data for inline daily field
   const fetchAQLData = async (washQty) => {
     if (!washQty) return;
     try {
@@ -622,7 +609,6 @@ const QCWashingPage = () => {
     }
   };
 
-  // Calculate checked qty based on wash qty and AQL data
   const calculateCheckedQty = (washQty) => {
     setTimeout(() => {
       setFormData((prev) => {
@@ -639,7 +625,6 @@ const QCWashingPage = () => {
   };
 
   // --- Measurement ---
-  // Calculate totals from Measurement Data to match the Summary Card
   const getMeasurementStats = () => {
     let totalCheckedPoints = 0;
     let totalPass = 0;
@@ -673,7 +658,6 @@ const QCWashingPage = () => {
     return { totalCheckedPoint: totalCheckedPoints, totalPass, totalFail, passRate };
   };
 
-  // Handle measurement size save with nested structure
   const handleSizeSubmit = async (transformedSizeData) => {
     try {
       const washType =
@@ -719,7 +703,6 @@ const QCWashingPage = () => {
     }
   };
 
-  // Handle measurement data edit
   const handleMeasurementEdit = (size = null) => {
     setShowMeasurementTable(true);
     if (size) {
@@ -733,7 +716,6 @@ const QCWashingPage = () => {
     }
   };
 
-  // Handle measurement value changes for auto-save
   const handleMeasurementChange = (newMeasurementValues) => {
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
@@ -791,12 +773,10 @@ const QCWashingPage = () => {
   };
 
   // --- Auto-save & Data Load ---
-  // Auto-save functionality - always save data for editing
   const autoSaveData = async () => {
     if (!formData.orderNo && !formData.style) return;
     if (!formData.color) return;
 
-    // Calculate stats
    const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
 
     try {
@@ -860,7 +840,6 @@ const QCWashingPage = () => {
     }
   };
 
-  // Load color-specific data
   const loadColorSpecificData = async (orderNo, color) => {
     setIsDataLoading(true);
     try {
@@ -874,31 +853,63 @@ const QCWashingPage = () => {
         if (data.success && data.colorData) {
           const colorData = data.colorData;
 
-          if (colorData.formData) {
-            setFormData(prev => {
-              // Only update color if different to avoid unnecessary re-renders
-              const newColor = colorData.formData.color || color;
-              const updatedColor = prev.color === newColor ? prev.color : newColor;
+          // Only update formData fields that are specific to the color data.
+          // Keep common fields (orderNo, style, orderQty, buyer) from the main formData.
+          setFormData(prev => ({
+            ...prev,
+            color: colorData.formData.color || color,
+            washingType: colorData.formData.washingType || "Normal Wash",
+            firstOutput: colorData.formData.firstOutput || "",
+            inline: colorData.formData.inline || "",
+            daily: colorData.formData.daily || "",
+            reportType: colorData.reportType || prev.reportType,
+            washQty: colorData.washQty || prev.washQty,
+            checkedQty: colorData.checkedQty || prev.checkedQty,
+            // Keep aql values from main formData or load if specific to color (less common)
+            aqlSampleSize: colorData.formData.aqlSampleSize || prev.aqlSampleSize,
+            aqlAcceptedDefect: colorData.formData.aqlAcceptedDefect || prev.aqlAcceptedDefect,
+            aqlRejectedDefect: colorData.formData.aqlRejectedDefect || prev.aqlRejectedDefect,
+          }));
 
-              return {
-                ...prev,
-                ...colorData.formData,
-                color: updatedColor,
-                reportType: colorData.reportType || prev.reportType,
-                washQty: colorData.washQty || prev.washQty,
-                checkedQty: colorData.checkedQty || prev.checkedQty,
-              };
-            });
-          }
           setInspectionData(colorData.inspectionData || initializeInspectionData(masterChecklist));
           setProcessData(colorData.processData || { temperature: "", time: "", chemical: "" });
-          setDefectData(colorData.defectData || []); 
+          setDefectData(colorData.defectData || [
+            { parameter: "Color Shade 01", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            { parameter: "Color Shade 02", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            { parameter: "Color Shade 03", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            { parameter: "Hand Feel", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            {
+              parameter: "Effect", ok: true, no: false, qty: "", defectPercent: "", remark: "",
+              checkboxes: { All: false, A: false, B: false, C: false, D: false, E: false, F: false, G: false, H: false, I: false, J: false }
+            },
+            { parameter: "Measurement", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            { parameter: "Appearance", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+          ]); // Ensure default defect data is used if no saved data
           setAddedDefects(colorData.addedDefects || []);
           setComment(colorData.comment || "");
           setMeasurementData(processMeasurementData(colorData.measurementDetails || []));
-
+          setSavedSizes(colorData.savedSizes || []); // Load saved sizes for this color
         } else {
           console.log(`No saved data found for color "${color}". Using a clean form.`);
+          // If no color-specific data, reset fields that would be color-specific
+          setInspectionData(initializeInspectionData(masterChecklist));
+          setProcessData({ temperature: "", time: "", chemical: "" });
+          setDefectData([
+            { parameter: "Color Shade 01", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            { parameter: "Color Shade 02", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            { parameter: "Color Shade 03", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            { parameter: "Hand Feel", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            {
+              parameter: "Effect", ok: true, no: false, qty: "", defectPercent: "", remark: "",
+              checkboxes: { All: false, A: false, B: false, C: false, D: false, E: false, F: false, G: false, H: false, I: false, J: false }
+            },
+            { parameter: "Measurement", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            { parameter: "Appearance", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+          ]);
+          setAddedDefects([]);
+          setComment("");
+          setMeasurementData({ beforeWash: [], afterWash: [] });
+          setSavedSizes([]);
         }
       }
     } catch (error) {
@@ -913,7 +924,6 @@ const QCWashingPage = () => {
     }
   };
 
-  // Load saved data - check both auto-save and submitted records
   const loadSavedData = async (orderNo) => {
     try {
       const autoSaveResponse = await fetch(
@@ -925,6 +935,25 @@ const QCWashingPage = () => {
 
         if (autoSaveData.success && autoSaveData.savedData) {
           const saved = autoSaveData.savedData;
+
+          // Fetch all colors associated with the orderNo/style from dt_orders
+          let response = await fetch(
+            `${API_BASE_URL}/api/qc-washing/order-details-by-style/${orderNo}`
+          );
+          let orderData = await response.json();
+
+          if (!orderData.success) {
+            response = await fetch(
+              `${API_BASE_URL}/api/qc-washing/order-details-by-order/${orderNo}`
+            );
+            orderData = await response.json();
+          }
+
+          if (orderData.success && orderData.colors) {
+            setColorOptions(orderData.colors);
+          } else {
+            setColorOptions([]);
+          }
 
           setFormData((prev) => ({
             ...prev,
@@ -942,14 +971,11 @@ const QCWashingPage = () => {
               saved?.formData.aqlRejectedDefect || prev.aqlRejectedDefect,
           }));
 
-          if (saved.formData.color) {
-            setColorOptions((prev) => {
-              if (!prev.includes(saved.formData.color)) {
-                return [...prev, saved.formData.color];
-              }
-              return prev;
-            });
+          // Ensure the currently saved color is selected in the dropdown
+          if (saved.formData.color && !colorOptions.includes(saved.formData.color)) {
+            setColorOptions((prev) => [...prev, saved.formData.color]);
           }
+
 
           if (saved.inspectionData && saved.inspectionData.length > 0) {
             setInspectionData(saved.inspectionData);
@@ -971,7 +997,6 @@ const QCWashingPage = () => {
 
           setComment(saved.comment || "");
 
-          // Set measurement data
           setMeasurementData(processMeasurementData(saved.measurementDetails));
           setShowMeasurementTable(true);
 
@@ -983,7 +1008,6 @@ const QCWashingPage = () => {
         }
       }
 
-      // If no auto-save found, try to load submitted data
       const submittedResponse = await fetch(
         `${API_BASE_URL}/api/qc-washing/load-submitted/${orderNo}`
       );
@@ -994,6 +1018,26 @@ const QCWashingPage = () => {
         if (submittedData.success && submittedData.data) {
           const saved = submittedData.data;
 
+          // Fetch all colors associated with the orderNo/style from dt_orders
+          let response = await fetch(
+            `${API_BASE_URL}/api/qc-washing/order-details-by-style/${orderNo}`
+          );
+          let orderData = await response.json();
+
+          if (!orderData.success) {
+            response = await fetch(
+              `${API_BASE_URL}/api/qc-washing/order-details-by-order/${orderNo}`
+            );
+            orderData = await response.json();
+          }
+
+          if (orderData.success && orderData.colors) {
+            setColorOptions(orderData.colors);
+          } else {
+            setColorOptions([]);
+          }
+
+
           const dailyValue = saved.color?.orderDetails?.daily || "";
           setFormData((prev) => ({
             ...prev,
@@ -1003,7 +1047,7 @@ const QCWashingPage = () => {
             orderNo: saved.orderNo,
             style: saved.orderNo,
             orderQty: saved.color?.orderDetails?.orderQty || prev.orderQty,
-            color: saved.color?.orderDetails?.color || prev.color,
+            color: saved.color?.orderDetails?.color || prev.color, // Set the color from submitted data
             washingType:
               saved.color?.orderDetails?.washingType || "Normal Wash",
             firstOutput: dailyValue === "First Output" ? "First Output" : "",
@@ -1024,16 +1068,6 @@ const QCWashingPage = () => {
               saved.color?.orderDetails?.aqlRejectedDefect ||
               prev.aqlRejectedDefect,
           }));
-
-          // Merge saved color with existing color options
-          if (saved.color?.orderDetails?.color) {
-            setColorOptions((prev) => {
-              if (!prev.includes(saved.color.orderDetails.color)) {
-                return [...prev, saved.color.orderDetails.color];
-              }
-              return prev;
-            });
-          }
 
           const transformedInspectionData =
             saved.color?.inspectionDetails?.checkedPoints?.map((point) => ({
@@ -1087,7 +1121,6 @@ const QCWashingPage = () => {
     }
   };
 
-  // Load saved measurement sizes
   const loadSavedSizes = async (orderNo, color) => {
     try {
       const response = await fetch(
@@ -1113,10 +1146,10 @@ const QCWashingPage = () => {
 
   const PageTitle = () => (
     <div className="text-center">
-      <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
+      <h1 className="text-xl md:text-2xl font-bold text-indigo-700 dark:text-indigo-400 tracking-tight">
         Yorkmars (Cambodia) Garment MFG Co., LTD
       </h1>
-      <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-0.5 md:mt-1">
+      <p className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400 mt-0.5 md:mt-1">
         QC Washing
         {user && ` | ${user.job_title || "Operator"} | ${user.emp_id}`}
       </p>
@@ -1124,17 +1157,16 @@ const QCWashingPage = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 p-2 sm:p-4 md:p-6">
-      <header className="bg-gradient-to-r from-slate-50 to-gray-100 shadow-lg py-5 px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-2 sm:p-4 md:p-6">
+      <header className="bg-gradient-to-r from-slate-50 to-gray-100 dark:from-slate-800 dark:to-gray-900 shadow-lg py-5 px-8">
         <PageTitle />
       </header>
-      {/* Tab Navigation */}
         <div className="flex justify-center mb-6">
           <button
             className={`px-6 py-2 rounded-l-md font-medium ${
               activeTab === 'newInspection'
                 ? 'bg-indigo-600 text-white shadow-lg'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
             }`}
             onClick={() => handleTabChange('newInspection')}
           >
@@ -1144,7 +1176,7 @@ const QCWashingPage = () => {
             className={`px-6 py-2 rounded-r-md font-medium ${
               activeTab === 'submittedData'
                 ? 'bg-indigo-600 text-white shadow-lg'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
             }`}
             onClick={() => handleTabChange('submittedData')}
           >
@@ -1152,8 +1184,6 @@ const QCWashingPage = () => {
           </button>
         </div>
 
-        {/* Conditionally Render Content Based on Active Tab */}
-       
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-6">
          {activeTab === 'newInspection' && (
         <>
@@ -1223,18 +1253,16 @@ const QCWashingPage = () => {
           onMeasurementChange={handleMeasurementChange}
         />
 
-        {/* Auto-save status */}
         {lastSaved && (
-          <div className="text-center text-sm text-gray-600">
+          <div className="text-center text-sm text-gray-600 dark:text-gray-400">
             Last auto-saved: {lastSaved.toLocaleTimeString()}
           </div>
         )}
 
         <div className="flex justify-end space-x-4">
           <button
-            className="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+            className="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700"
             onClick={() => {
-              // Reset form but keep auto-saved data available
               if (autoSaveId) {
                 Swal.fire({
                   title: "Reset Form?",
@@ -1292,7 +1320,7 @@ const QCWashingPage = () => {
             Reset
           </button>
           <button
-            className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+            className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
             onClick={async () => {
               try {
                  const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
@@ -1347,7 +1375,6 @@ const QCWashingPage = () => {
                   setAutoSaveId(null);
                   setLastSaved(null);
 
-                  // Reset form after successful submission
                   setTimeout(() => {
                     window.location.reload();
                   }, 1500);

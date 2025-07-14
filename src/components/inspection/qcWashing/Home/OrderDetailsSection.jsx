@@ -56,6 +56,7 @@ const OrderDetailsSection = ({
               onChange={(e) => handleInputChange('orderQty', e.target.value)}
               readOnly
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 bg-gray-100 cursor-not-allowed"
+              style={{opacity: 1, color: 'inherit'}}
             />
           </div>
           
@@ -85,7 +86,7 @@ const OrderDetailsSection = ({
             </select>
           </div>
           <div className="flex items-center space-x-4">
-            <label className="w-20 text-sm font-medium">Daily:</label>
+            <label className="w-20 text-sm font-medium">Inspection Report:</label>
             <div className="flex space-x-4">
               <label className="flex items-center">
                 <input 
@@ -115,6 +116,7 @@ const OrderDetailsSection = ({
               onChange={(e) => handleInputChange('buyer', e.target.value)}
               readOnly
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 bg-gray-100 cursor-not-allowed"
+              style={{opacity: 1, color: 'inherit'}}
             />
           </div>
           
@@ -133,7 +135,7 @@ const OrderDetailsSection = ({
           </div>
 
           <div className="flex items-center space-x-4">
-            <label className="w-20 text-sm font-medium">Report Type:</label>
+            <label className="w-20 text-sm font-medium">Washing Method:</label>
             <select
               value={formData.reportType || 'Before Wash'}
               onChange={(e) => handleInputChange('reportType', e.target.value)}
