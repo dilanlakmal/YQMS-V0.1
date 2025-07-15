@@ -975,6 +975,10 @@ const QCWashingPage = () => {
           setAddedDefects(colorData.addedDefects || []);
           setComment(colorData.comment || "");
           setMeasurementData(processMeasurementData(colorData.measurementDetails || []));
+          // Ensure inspection data is initialized if it's empty in the response
+          if (!colorData.inspectionData || colorData.inspectionData.length === 0) {
+            setInspectionData(initializeInspectionData(masterChecklist));
+          }
 
         } else {
           console.log(`No saved data found for color "${color}". Using a clean form.`);
@@ -997,6 +1001,7 @@ const QCWashingPage = () => {
           setComment("");
           setMeasurementData({ beforeWash: [], afterWash: [] });
           setSavedSizes([]);
+          setShowMeasurementTable(true);
         }
       }
     } catch (error) {
