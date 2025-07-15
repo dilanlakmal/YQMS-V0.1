@@ -85,6 +85,9 @@ const QCWashingPage = () => {
   const [lastSaved, setLastSaved] = useState(null);
   const autoSaveTimeoutRef = useRef(null);
 
+  // State: Cache for color-specific data to prevent data loss on switching
+  const [colorDataCache, setColorDataCache] = useState({});
+
   // Section Toggle
   const toggleSection = (section) => {
     setSectionVisibility((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -405,17 +408,28 @@ const QCWashingPage = () => {
 
     // --- Form Handlers ---
   const handleInputChange = (field, value) => {
-    // If we are about to change the color, first save the current UI state
-    // to the cache for the color we are switching away from. This prevents data loss
-    // when switching between colors during a session.
+    // --- Cache state before changing color ---
     if (field === 'color' && value !== formData.color && formData.color) {
       const outgoingColor = formData.color;
-      setColorData(outgoingColor, 'inspectionData', inspectionData);
-      setColorData(outgoingColor, 'processData', processData);
-      setColorData(outgoingColor, 'defectData', defectData);
-      setColorData(outgoingColor, 'addedDefects', addedDefects);
-      setColorData(outgoingColor, 'comment', comment);
-      setColorData(outgoingColor, 'measurementData', measurementData);
+      // Capture the current UI state for the color we are leaving
+      const currentStateForColor = {
+        inspectionData,
+        processData,
+        defectData,
+        addedDefects,
+        comment,
+        measurementData,
+        uploadedImages,
+        savedSizes,
+        // also capture relevant form data fields
+        formData: {
+          washQty: formData.washQty,
+          checkedQty: formData.checkedQty,
+          reportType: formData.reportType,
+        }
+      };
+      // Update the cache
+      setColorDataCache(prevCache => ({ ...prevCache, [outgoingColor]: currentStateForColor }));
     }
 
     setFormData((prev) => {
@@ -907,6 +921,26 @@ const QCWashingPage = () => {
 
   // Load color-specific data
   const loadColorSpecificData = async (orderNo, color) => {
+    // 1. Check client-side cache first to avoid data loss and unnecessary API calls
+    if (colorDataCache[color]) {
+      const cachedData = colorDataCache[color];
+      // Apply cached data to state
+      setInspectionData(cachedData.inspectionData);
+      setProcessData(cachedData.processData);
+      setDefectData(cachedData.defectData);
+      setAddedDefects(cachedData.addedDefects);
+      setComment(cachedData.comment);
+      setMeasurementData(cachedData.measurementData);
+      setUploadedImages(cachedData.uploadedImages);
+      setSavedSizes(cachedData.savedSizes);
+      setFormData(prev => ({
+        ...prev,
+        ...(cachedData.formData || {}) // Restore color-specific form data
+      }));
+      return; // Exit early since we loaded from cache
+    }
+
+    // 2. If not in cache, fetch from the server
     setIsDataLoading(true);
     try {
       const response = await fetch(
