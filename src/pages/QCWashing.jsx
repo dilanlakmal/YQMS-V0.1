@@ -671,6 +671,12 @@ const QCWashingPage = () => {
           aqlRejectedDefect: data.aqlData.rejectedDefect.toString(),
         }));
       } else {
+         setFormData((prev) => ({
+          ...prev,
+          aqlSampleSize: "",
+          aqlAcceptedDefect: "",
+          aqlRejectedDefect: "",
+        }));
         console.warn(
           "AQL data not found:",
           data.message || "No AQL chart found for the given criteria."
