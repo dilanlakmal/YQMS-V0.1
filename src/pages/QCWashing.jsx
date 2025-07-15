@@ -1233,8 +1233,8 @@ const QCWashingPage = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 p-2 sm:p-4 md:p-6">
-      <header className="bg-gradient-to-r from-slate-50 to-gray-100 shadow-lg py-5 px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 p-2 sm:p-4 md:p-6">
+      <header className="bg-gradient-to-r from-slate-50 to-gray-100 shadow-lg py-5 px-8 dark:from-slate-900">
         <PageTitle />
       </header>
       {/* Tab Navigation */}
@@ -1263,7 +1263,7 @@ const QCWashingPage = () => {
 
         {/* Conditionally Render Content Based on Active Tab */}
        
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-6">
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-6 dark:bg-slate-900">
          {activeTab === 'newInspection' && (
         <>
         <SummaryCard

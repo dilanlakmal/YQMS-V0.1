@@ -26,9 +26,7 @@ const DefectDetailsSection = ({
 
   let defectStatus = 'N/A';
   let statusColorClass = 'bg-gray-100 text-gray-800';
- // Simplified condition: Check if an inspection type is selected and AQL data is available.
-  // formData.daily is the source of truth for the inspection type ("Inline" or "First Output").
-  if (formData.daily && formData.aqlAcceptedDefect) {
+  if ((formData.inline === 'Inline' || formData.daily === 'Inline' || formData.firstOutput === "First Output" || formData.daily === 'First Output') && formData.aqlAcceptedDefect) {
     const acceptedDefectCount = parseInt(formData.aqlAcceptedDefect, 10);
     if (!isNaN(acceptedDefectCount)) {
       if (totalDefects <= acceptedDefectCount) {
@@ -135,22 +133,19 @@ const DefectDetailsSection = ({
               <input 
                 type="text" 
                 value={formData.checkedQty || ''}
-                readOnly={!!formData.daily} // Read-only if any inspection type is selected
+                readOnly={formData.daily === "Inline" || formData.firstOutput === "First Output"}
                 className="flex-1 px-3 py-2 border rounded-md"
                 placeholder={
-                  formData.daily === "First Output"
+                  formData.firstOutput === "First Output"
                     ? "Auto-fetched for First Output"
-                    : formData.daily === "Inline"
-                    ? "Auto-calculated when Inline is selected"
-                    : ""
+                    : "Auto-calculated when Inline is selected"
                 }
               />
             </div>
            
             {/* AQL Information Display */}
-         {/* Simplified condition: Display if an inspection type is selected and any AQL data is present. */}
-         {formData.daily &&
-           (formData.aqlSampleSize || formData.aqlAcceptedDefect || formData.aqlRejectedDefect) ? (
+         {((formData.inline === 'Inline' || formData.daily === 'Inline') || formData.firstOutput === "First Output") && 
+           (formData.aqlSampleSize || formData.aqlAcceptedDefect || formData.aqlRejectedDefect) && (
             <div className="md:col-span-2 bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-blue-800 mb-2">AQL Information (Level II, AQL 1.0)</h3>
               <div className="grid grid-cols-4 gap-4 text-sm">
@@ -174,7 +169,7 @@ const DefectDetailsSection = ({
                 </div>
               </div>
             </div>
-          ) : null}
+          )}
           </div>
 
 
