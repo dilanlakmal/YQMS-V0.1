@@ -44,7 +44,7 @@ const QCWashingFirstOutputTab = () => {
 
   const handleEdit = (output) => {
     setEditRowId(output._id);
-    setEditedOutput({ ...output });
+     setEditedOutput({ quantity: output.quantity });
   };
 
   const handleCancelEdit = () => {
@@ -154,7 +154,6 @@ const QCWashingFirstOutputTab = () => {
             <thead className="bg-gray-50">
               <tr>
                {[
-                  "Style No",
                   "Checked Qty",
                   "Added By",
                   "Added Date",
@@ -183,7 +182,6 @@ const QCWashingFirstOutputTab = () => {
                   <tr key={output._id} className="hover:bg-gray-50">
                     {editRowId === output._id ? (
                       <>
-                        {renderEditCell("style", editedOutput.style)}
                         {renderEditCell("quantity", editedOutput.quantity, "number")}
                         <td className="px-4 py-2 whitespace-nowrap text-center">
                           <button
@@ -203,8 +201,6 @@ const QCWashingFirstOutputTab = () => {
                       </>
                     ) : (
                       <>
-                       
-                        {renderCell(output.style)}
                         {renderCell(output.quantity)}
                         {renderCell(output.addedBy?.eng_name)}
                         {renderCell(formatDate(output.createdAt))}

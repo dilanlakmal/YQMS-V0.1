@@ -40,6 +40,7 @@
 - GET `/api/qc-washing/saved-sizes/:orderNo/:color` - Get saved sizes
 - POST `/api/qc-washing/submit` - Submit final data
 - GET `/api/qc-washing/order-numbers` - Get order numbers
+- GET `/api/qc-washing/first-output-details` - Get latest first output qty and AQL
 - GET `/api/qc-washing/order-details-by-order/:orderNo` - Get order details
 
 ## Troubleshooting

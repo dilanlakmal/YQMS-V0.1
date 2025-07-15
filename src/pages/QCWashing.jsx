@@ -314,13 +314,14 @@ const QCWashingPage = () => {
             );
             orderData = await colorResponse.json();
           }
-
-          if (orderData.success && orderData.colors) {
+           if (orderData.success && orderData.colors) {
             setColorOptions(orderData.colors);
           } else if (saved.formData.color) {
             // Fallback: if fetching all colors fails, at least ensure the saved color is an option
             setColorOptions((prev) =>
-              prev.includes(saved.formData.color) ? prev : [...prev, saved.formData.color]
+              prev.includes(saved.formData.color)
+                ? prev
+                : [...prev, saved.formData.color]
             );
           }
 
@@ -410,6 +411,9 @@ const QCWashingPage = () => {
       if (field === "firstOutput") {
         newState.inline = "";
         newState.daily = value;
+        if (value === "First Output") {
+          fetchFirstOutputDetails();
+        }
       } else if (field === "inline") {
         newState.firstOutput = "";
         newState.daily = value;
@@ -417,6 +421,8 @@ const QCWashingPage = () => {
         if (value === "First Output") {
           newState.firstOutput = "First Output";
           newState.inline = "";
+          // Call the function to fetch details for First Output
+          fetchFirstOutputDetails();
         } else if (value === "Inline") {
           newState.inline = "Inline";
           newState.firstOutput = "";
@@ -430,25 +436,8 @@ const QCWashingPage = () => {
 
       // Handle color change - reset color-specific data
       if (field === "color" && value !== prev.color) {
-        setInspectionData(initializeInspectionData(masterChecklist));
-        setProcessData({ temperature: "", time: "", chemical: "" });
-        setDefectData([
-          { parameter: "Color Shade 01", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-          { parameter: "Color Shade 02", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-          { parameter: "Color Shade 03", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-          { parameter: "Hand Feel", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-          {
-            parameter: "Effect", ok: true, no: false, qty: "", defectPercent: "", remark: "",
-            checkboxes: { All: false, A: false, B: false, C: false, D: false, E: false, F: false, G: false, H: false, I: false, J: false }
-          },
-          { parameter: "Measurement", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-          { parameter: "Appearance", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-        ]);
-        setAddedDefects([]);
-        setComment("");
-        setMeasurementData({ beforeWash: [], afterWash: [] });
-        setSavedSizes([]);
-
+        // The form reset is now handled by loadColorSpecificData
+        // to prevent erasing data before we know if new data exists.
         if (value && (prev.orderNo || prev.style)) {
           setTimeout(
             () => loadColorSpecificData(prev.orderNo || prev.style, value),
@@ -571,6 +560,57 @@ const QCWashingPage = () => {
 
   const handleDeleteDefect = (defectId) => {
     setAddedDefects((prev) => prev.filter((d) => d.defectId !== defectId));
+  };
+
+  // --- AQL & Checked Qty ---
+  const fetchFirstOutputDetails = async () => {
+    try {
+      setIsDataLoading(true);
+      // Use the working endpoint that lists all first-output records, as seen in the admin panel.
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing-first-outputs`);
+      const data = await response.json();
+
+      if (response.ok && Array.isArray(data) && data.length > 0) {
+        // Find the most recent record by sorting by createdAt date.
+        const latestOutput = data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+
+        if (latestOutput && latestOutput.quantity) {
+          const firstOutputQty = latestOutput.quantity;
+
+          // Set the wash and checked quantity from the fetched record.
+          setFormData(prev => ({
+            ...prev,
+            washQty: firstOutputQty.toString(),
+            checkedQty: firstOutputQty.toString(), // For "First Output", checkedQty is the same as washQty.
+          }));
+
+          // Reuse the existing AQL fetch logic with the new quantity.
+          await fetchAQLData(firstOutputQty);
+        } else {
+          throw new Error("Latest first output record is invalid or has no quantity.");
+        }
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: 'Could not fetch First Output data',
+          text: 'No First Output records found. Please add a record in the admin tab.',
+        });
+        // Clear relevant fields on failure
+        setFormData(prev => ({
+          ...prev,
+          checkedQty: "",
+          washQty: "",
+          aqlSampleSize: "",
+          aqlAcceptedDefect: "",
+          aqlRejectedDefect: "",
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching First Output details:", error);
+      Swal.fire('Error', 'A network error occurred while fetching First Output details.', 'error');
+    } finally {
+      setIsDataLoading(false);
+    }
   };
 
    // --- AQL & Checked Qty ---
@@ -899,6 +939,25 @@ const QCWashingPage = () => {
 
         } else {
           console.log(`No saved data found for color "${color}". Using a clean form.`);
+          // Reset color-specific fields if no data is found for the new color
+          setInspectionData(initializeInspectionData(masterChecklist));
+          setProcessData({ temperature: "", time: "", chemical: "" });
+          setDefectData([
+            { parameter: "Color Shade 01", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            { parameter: "Color Shade 02", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            { parameter: "Color Shade 03", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            { parameter: "Hand Feel", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            {
+              parameter: "Effect", ok: true, no: false, qty: "", defectPercent: "", remark: "",
+              checkboxes: { All: false, A: false, B: false, C: false, D: false, E: false, F: false, G: false, H: false, I: false, J: false }
+            },
+            { parameter: "Measurement", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+            { parameter: "Appearance", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+          ]);
+          setAddedDefects([]);
+          setComment("");
+          setMeasurementData({ beforeWash: [], afterWash: [] });
+          setSavedSizes([]);
         }
       }
     } catch (error) {

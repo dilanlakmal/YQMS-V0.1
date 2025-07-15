@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 
 const qcWashingFirstOutputSchema = new mongoose.Schema(
   {
-    style: { type: String, required: true },
     quantity: { type: Number, required: true },
     addedBy: {
       emp_id: String,

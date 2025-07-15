@@ -26,7 +26,7 @@ const DefectDetailsSection = ({
 
   let defectStatus = 'N/A';
   let statusColorClass = 'bg-gray-100 text-gray-800';
-  if ((formData.inline === 'Inline' || formData.daily === 'Inline') && formData.aqlAcceptedDefect) {
+  if ((formData.inline === 'Inline' || formData.daily === 'Inline' || formData.firstOutput === "First Output" || formData.daily === 'First Output') && formData.aqlAcceptedDefect) {
     const acceptedDefectCount = parseInt(formData.aqlAcceptedDefect, 10);
     if (!isNaN(acceptedDefectCount)) {
       if (totalDefects <= acceptedDefectCount) {
@@ -133,15 +133,19 @@ const DefectDetailsSection = ({
               <input 
                 type="text" 
                 value={formData.checkedQty || ''}
-                onChange={(e) => handleInputChange('checkedQty', e.target.value)}
-                readOnly={formData.daily === "Inline"}
+                readOnly={formData.daily === "Inline" || formData.firstOutput === "First Output"}
                 className="flex-1 px-3 py-2 border rounded-md"
-                placeholder="Auto-calculated when Inline is selected"
+                placeholder={
+                  formData.firstOutput === "First Output"
+                    ? "Auto-fetched for First Output"
+                    : "Auto-calculated when Inline is selected"
+                }
               />
             </div>
            
             {/* AQL Information Display */}
-          {(formData.inline === 'Inline' || formData.daily === 'Inline') && (formData.aqlSampleSize || formData.aqlAcceptedDefect || formData.aqlRejectedDefect) && (
+         {((formData.inline === 'Inline' || formData.daily === 'Inline') || formData.firstOutput === "First Output") && 
+           (formData.aqlSampleSize || formData.aqlAcceptedDefect || formData.aqlRejectedDefect) && (
             <div className="md:col-span-2 bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-blue-800 mb-2">AQL Information (Level II, AQL 1.0)</h3>
               <div className="grid grid-cols-4 gap-4 text-sm">

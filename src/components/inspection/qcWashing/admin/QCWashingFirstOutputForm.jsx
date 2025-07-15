@@ -39,7 +39,6 @@ const LabeledInput = ({
 const QCWashingFirstOutputForm = ({ onOutputAdded }) => {
   const { t } = useTranslation();
   const initialState = {
-    style: "",
     quantity: "",
   };
   const [newOutput, setNewOutput] = useState(initialState);
@@ -89,15 +88,7 @@ const QCWashingFirstOutputForm = ({ onOutputAdded }) => {
         Add New First Output Check Record
       </h2>
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <LabeledInput
-            id="style"
-            labelKey="Style No"
-            name="style"
-            value={newOutput.style}
-            onChange={handleInputChange}
-            required
-          />
+        <div className="max-w-xs">
           <LabeledInput
             id="quantity"
             labelKey="Checked Qty"

@@ -23467,6 +23467,60 @@ app.put('/api/qc-washing/update/:recordId', async (req, res) => {
   }
 });
 
+app.get('/api/qc-washing/first-output-details', async (req, res) => {
+  try {
+    // 1. Get the latest record from the first output collection.
+    const quantity = await QCWashingFirstOutput.findOne().sort({ createdAt: -1 }).lean();
+
+    if (!quantity || !quantity.quantity) {
+      return res.status(404).json({ success: false, message: "No First Output records found. Please add a record in the admin tab." });
+    }
+
+    const lotSizeNum = quantity.quantity;
+
+    // 2. Find the AQL chart based on the quantity (logic adapted from your inline AQL endpoint).
+    const aqlChart = await AQLChart.findOne({
+      Type: "General",
+      Level: "II",
+      "LotSize.min": { $lte: lotSizeNum },
+      $or: [
+        { "LotSize.max": { $gte: lotSizeNum } },
+        { "LotSize.max": null } // Handles ranges with no upper limit
+      ]
+    }).lean();
+
+    if (!aqlChart) {
+      return res
+        .status(404)
+        .json({ success: false, message: `No AQL chart found for the lot size of ${lotSizeNum}.` });
+    }
+
+    // 3. Find the specific AQL entry for level 1.0 within the document.
+    const aqlEntry = aqlChart.AQL.find(aql => aql.level === 1.0);
+
+    if (!aqlEntry) {
+      return res
+        .status(404)
+        .json({ success: false, message: "AQL level 1.0 not found for the matching chart." });
+    }
+
+    // 4. Respond with the data in the format expected by the frontend.
+    res.json({
+      success: true,
+      checkedQty: lotSizeNum, // This is the quantity from the first output record
+      aqlData: {
+        sampleSize: aqlChart.SampleSize,
+        acceptedDefect: aqlEntry.AcceptDefect,
+        rejectedDefect: aqlEntry.RejectDefect
+      }
+    });
+
+  } catch (error) {
+    console.error('First Output AQL calculation error:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching First Output AQL details.' });
+  }
+});
+
 // AQL data endpoint
 app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
   try {
