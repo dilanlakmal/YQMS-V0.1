@@ -23324,93 +23324,6 @@ server.listen(PORT, "0.0.0.0", () => {
    QC Washing Measurement Endpoints
 ------------------------------ */
 
-// Get sizes for a specific order and color
-// app.get('/api/qc-washing/order-sizes/:orderNo/:color', async (req, res) => {
-//   const { orderNo, color } = req.params;
-//   const collection = ymEcoConnection.db.collection("dt_orders");
-
-//   try {
-//     const orders = await collection.find({ Order_No: orderNo }).toArray();
-
-//     if (!orders || orders.length === 0) {
-//       return res.status(404).json({ success: false, message: `Order '${orderNo}' not found.` });
-//     }
-
-//     // Find the color object that matches the requested color
-//     const colorObj = orders.find(order => 
-//       order.OrderColors && order.OrderColors.some(c => 
-//         c.Color.toLowerCase() === color.toLowerCase()
-//       )
-//     );
-
-//     if (!colorObj) {
-//       return res.json({ success: true, sizes: [] });
-//     }
-
-//     // Extract sizes from the matching color
-//     const matchingColor = colorObj.OrderColors.find(c => 
-//       c.Color.toLowerCase() === color.toLowerCase()
-//     );
-
-//     if (!matchingColor || !matchingColor.OrderQty) {
-//       return res.json({ success: true, sizes: [] });
-//     }
-
-//     // Extract sizes that have quantity > 0
-//     const sizes = matchingColor.OrderQty
-//       .filter(entry => entry[Object.keys(entry)[0]] > 0)
-//       .map(entry => {
-//         const sizeName = Object.keys(entry)[0];
-//         return sizeName.split(";")[0].trim(); // Clean size name
-//       })
-//       .filter((size, index, arr) => arr.indexOf(size) === index); // Remove duplicates
-
-//     res.json({ success: true, sizes });
-
-//   } catch (error) {
-//     console.error(`Error fetching sizes for order ${orderNo} and color ${color}:`, error);
-//     res.status(500).json({ success: false, message: 'Server error while fetching sizes.' });
-//   }
-// });
-
-// Get measurement specifications for a specific order and color
-// app.get('/api/qc-washing/measurement-specs/:orderNo/:color', async (req, res) => {
-//   const { orderNo, color } = req.params;
-//   const collection = ymEcoConnection.db.collection("dt_orders");
-
-//   try {
-//     const order = await collection.findOne({ Order_No: orderNo });
-
-//     if (!order) {
-//       return res.status(404).json({ success: false, message: `Order '${orderNo}' not found.` });
-//     }
-
-//     // Find the matching color
-//     const colorObj = order.OrderColors && order.OrderColors.find(c => 
-//       c.Color.toLowerCase() === color.toLowerCase()
-//     );
-
-//     if (!colorObj) {
-//       return res.json({ success: true, specs: [] });
-//     }
-
-//     // Mock measurement specifications - in real implementation, this would come from a measurement specs collection
-//     const mockSpecs = [
-//       { Area: "Chest", Specs: "42", ToleranceMinus: "-1", TolerancePlus: "+1" },
-//       { Area: "Length", Specs: "28", ToleranceMinus: "-0.5", TolerancePlus: "+0.5" },
-//       { Area: "Shoulder", Specs: "18", ToleranceMinus: "-0.5", TolerancePlus: "+0.5" },
-//       { Area: "Sleeve", Specs: "24", ToleranceMinus: "-0.5", TolerancePlus: "+0.5" },
-//       { Area: "Armhole", Specs: "22", ToleranceMinus: "-0.5", TolerancePlus: "+0.5" }
-//     ];
-
-//     res.json({ success: true, specs: mockSpecs });
-
-//   } catch (error) {
-//     console.error(`Error fetching measurement specs for order ${orderNo} and color ${color}:`, error);
-//     res.status(500).json({ success: false, message: 'Server error while fetching measurement specs.' });
-//   }
-// });
-
 // Check if existing record exists for QC Washing
 app.get('/api/qc-washing/check-existing/:orderNo', async (req, res) => {
   try {
@@ -23467,35 +23380,31 @@ app.put('/api/qc-washing/update/:recordId', async (req, res) => {
   }
 });
 
-app.get('/api/qc-washing/first-output-details', async (req, res) => {
+app.post('/api/qc-washing/aql-chart/find-by-sample-size', async (req, res) => {
   try {
-    // 1. Get the latest record from the first output collection.
-    const quantity = await QCWashingFirstOutput.findOne().sort({ createdAt: -1 }).lean();
+    const { sampleSize } = req.body;
+    const sampleSizeNum = parseInt(sampleSize, 10);
 
-    if (!quantity || !quantity.quantity) {
-      return res.status(404).json({ success: false, message: "No First Output records found. Please add a record in the admin tab." });
+    if (isNaN(sampleSizeNum) || sampleSizeNum <= 0) {
+      return res.status(400).json({ success: false, message: "A valid sample size must be provided." });
     }
 
-    const lotSizeNum = quantity.quantity;
-
-    // 2. Find the AQL chart based on the quantity (logic adapted from your inline AQL endpoint).
+    // Find the AQL chart with the smallest SampleSize that is >= the provided sampleSize.
+    // This handles cases where the exact sample size isn't in the table, so we take the next level up,
+    // which is standard AQL practice.
     const aqlChart = await AQLChart.findOne({
       Type: "General",
       Level: "II",
-      "LotSize.min": { $lte: lotSizeNum },
-      $or: [
-        { "LotSize.max": { $gte: lotSizeNum } },
-        { "LotSize.max": null } // Handles ranges with no upper limit
-      ]
-    }).lean();
+      SampleSize: { $gte: sampleSizeNum }
+    }).sort({ SampleSize: 1 }).lean();
 
     if (!aqlChart) {
       return res
         .status(404)
-        .json({ success: false, message: `No AQL chart found for the lot size of ${lotSizeNum}.` });
+        .json({ success: false, message: `No AQL chart found for a sample size of ${sampleSizeNum} or greater.` });
     }
 
-    // 3. Find the specific AQL entry for level 1.0 within the document.
+    // Find the specific AQL entry for level 1.0 within the document.
     const aqlEntry = aqlChart.AQL.find(aql => aql.level === 1.0);
 
     if (!aqlEntry) {
@@ -23504,23 +23413,21 @@ app.get('/api/qc-washing/first-output-details', async (req, res) => {
         .json({ success: false, message: "AQL level 1.0 not found for the matching chart." });
     }
 
-    // 4. Respond with the data in the format expected by the frontend.
+    // Respond with the data in the format expected by the frontend.
     res.json({
       success: true,
-      checkedQty: lotSizeNum, // This is the quantity from the first output record
       aqlData: {
-        sampleSize: aqlChart.SampleSize,
+        sampleSize: aqlChart.SampleSize, // Return the actual sample size from the chart
         acceptedDefect: aqlEntry.AcceptDefect,
         rejectedDefect: aqlEntry.RejectDefect
       }
     });
 
   } catch (error) {
-    console.error('First Output AQL calculation error:', error);
-    res.status(500).json({ success: false, message: 'Server error while fetching First Output AQL details.' });
+    console.error('AQL lookup by sample size error:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching AQL details by sample size.' });
   }
 });
-
 // AQL data endpoint
 app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
   try {
@@ -23535,12 +23442,12 @@ app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
 
     // Find the AQL chart document where the lot size falls within the defined range.
     const aqlChart = await AQLChart.findOne({
-      Type: "General", // Hardcoded as per requirement
-      Level: "II",     // Hardcoded as per requirement
+      Type: "General", 
+      Level: "II",   
       "LotSize.min": { $lte: lotSizeNum },
       $or: [
         { "LotSize.max": { $gte: lotSizeNum } },
-        { "LotSize.max": null } // Handles ranges with no upper limit
+        { "LotSize.max": null }
       ]
     }).lean();
 
@@ -23559,7 +23466,6 @@ app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
         .json({ success: false, message: "AQL level 1.0 not found for the matching chart." });
     }
 
-    // Respond with the data in the format expected by the frontend.
     
     res.json({
       success: true,

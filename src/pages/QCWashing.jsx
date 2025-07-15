@@ -405,6 +405,19 @@ const QCWashingPage = () => {
 
     // --- Form Handlers ---
   const handleInputChange = (field, value) => {
+    // If we are about to change the color, first save the current UI state
+    // to the cache for the color we are switching away from. This prevents data loss
+    // when switching between colors during a session.
+    if (field === 'color' && value !== formData.color && formData.color) {
+      const outgoingColor = formData.color;
+      setColorData(outgoingColor, 'inspectionData', inspectionData);
+      setColorData(outgoingColor, 'processData', processData);
+      setColorData(outgoingColor, 'defectData', defectData);
+      setColorData(outgoingColor, 'addedDefects', addedDefects);
+      setColorData(outgoingColor, 'comment', comment);
+      setColorData(outgoingColor, 'measurementData', measurementData);
+    }
+
     setFormData((prev) => {
       const newState = { ...prev, [field]: value };
       // When one checkbox is checked, uncheck the other and set daily field as string
@@ -566,34 +579,26 @@ const QCWashingPage = () => {
   const fetchFirstOutputDetails = async () => {
     try {
       setIsDataLoading(true);
-      // Use the working endpoint that lists all first-output records, as seen in the admin panel.
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing-first-outputs`);
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/first-output-details`);
       const data = await response.json();
 
-      if (response.ok && Array.isArray(data) && data.length > 0) {
-        // Find the most recent record by sorting by createdAt date.
-        const latestOutput = data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
-
-        if (latestOutput && latestOutput.quantity) {
-          const firstOutputQty = latestOutput.quantity;
-
-          // Set the wash and checked quantity from the fetched record.
-          setFormData(prev => ({
-            ...prev,
-            washQty: firstOutputQty.toString(),
-            checkedQty: firstOutputQty.toString(), // For "First Output", checkedQty is the same as washQty.
-          }));
-
-          // Reuse the existing AQL fetch logic with the new quantity.
-          await fetchAQLData(firstOutputQty);
-        } else {
-          throw new Error("Latest first output record is invalid or has no quantity.");
-        }
+      if (response.ok && data.success) {
+        setFormData(prev => ({
+          ...prev,
+          // Set the checked Qty from the database
+          checkedQty: data.checkedQty.toString(),
+          // Set the AQL values
+          aqlSampleSize: data.aqlData.sampleSize.toString(),
+          aqlAcceptedDefect: data.aqlData.acceptedDefect.toString(),
+          aqlRejectedDefect: data.aqlData.rejectedDefect.toString(),
+          // Wash Qty can be set to checked Qty for consistency if needed
+          washQty: data.checkedQty.toString(),
+        }));
       } else {
         Swal.fire({
           icon: 'error',
           title: 'Could not fetch First Output data',
-          text: 'No First Output records found. Please add a record in the admin tab.',
+          text: data.message || 'An unknown error occurred.',
         });
         // Clear relevant fields on failure
         setFormData(prev => ({
