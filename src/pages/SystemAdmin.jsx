@@ -27,7 +27,7 @@ import CuttingInspectionManage from "../components/inspection/cutting/CuttingIns
 import SCCOperatorsManage from "../components/inspection/scc/SCCOperatorsManage";
 import RovingMasterDataManage from "../components/inspection/qc_roving/RovingMasterDataManage";
 import QC2DefectsAddModify from "../components/inspection/qc2/QC2DefectsAddModify";
-import QCWashing from "../components/inspection/qcWashing/admin/qcWashingModify";
+import QCWashing from "../components/inspection/qc2_washing/admin/qcWashingModify";
 import QADefectsManager from "../components/inspection/qc_accuracy/QADefectsManager";
 import QAStandardDefectsManager from "../components/inspection/qc_accuracy/QAStandardDefectsManager";
 

@@ -2,14 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
 import { useTranslation } from "react-i18next";
 import { API_BASE_URL } from "../../config";
-import OrderDetailsSection from "../components/inspection/qcWashing/Home/OrderDetailsSection";
-import InspectionDataSection from "../components/inspection/qcWashing/Home/InspectionDataSection";
-import DefectDetailsSection from "../components/inspection/qcWashing/Home/DefectDetailsSection";
-import MeasurementDetailsSection from "../components/inspection/qcWashing/Home/MeasurementDetailsSection";
-import SummaryCard from "../components/inspection/qcWashing/Home/SummaryCard";
+import OrderDetailsSection from "../components/inspection/qc2_washing/Home/OrderDetailsSection";
+import InspectionDataSection from "../components/inspection/qc2_washing/Home/InspectionDataSection";
+import DefectDetailsSection from "../components/inspection/qc2_washing/Home/DefectDetailsSection";
+import MeasurementDetailsSection from "../components/inspection/qc2_washing/Home/MeasurementDetailsSection";
+import SummaryCard from "../components/inspection/qc2_washing/Home/SummaryCard";
 import Swal from "sweetalert2";
 import imageCompression from "browser-image-compression";
-import SubmittedWashingDataPage from "../components/inspection/qcWashing/Home/SubmittedWashingData";
+import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/SubmittedWashingData";
 
 const QCWashingPage = () => {
   // Hooks

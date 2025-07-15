@@ -33,6 +33,7 @@
     "b-grade_defect": "B-Grade Defects",
     "b-grade_stock": "B-Grade Stock",
     "ieadmin": "IE Administration",
+    "qcWashing": "QC Washing",
     "upload_beforewash_specs": "Upload Specs"
   },
 
@@ -1491,6 +1492,7 @@
     "qc2Defects": "QC2 Defects",
     "sccOperators": "SCC Operators",
     "auditCheckpointsTab": "Audit Checkpoints",
+    "qcWashingTab": "QC Washing",
     "qadefects": "QA Defects",
     "qastandarddefects": "QA Standard Defects",
     "contentComingSoon": "This section is under development. Content will be available soon."
