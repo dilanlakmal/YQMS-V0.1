@@ -38,6 +38,8 @@ import BGradeDefect from "./pages/BGradeDefect.jsx";
 import BGradeStock from "./pages/BGradeStock.jsx";
 import IEPage from "./pages/IE.jsx";
 import QCWashingPage from "./pages/QCWashing.jsx";
+import UploadWashingSpecs from "./pages/UploadWashingSpecs.jsx";
+import QCAccuracyViewInspectionReport from "./components/inspection/qc_accuracy/QCAccuracyViewInspectionReport";
 
 //Languages
 import "../src/lang/i18n";
@@ -57,17 +59,24 @@ import { ThemeProvider } from "./components/context/ThemeContext";
 
 import CuttingPage from "./pages/Cutting.jsx";
 
+import QCAccuracy from "./pages/QCAccuracy.jsx";
+
 import QAAudit from "./pages/QAAudit.jsx";
 
 export const BluetoothContext = createContext(null);
 
 function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return !!(
-      localStorage.getItem("accessToken") ||
-      sessionStorage.getItem("accessToken")
-    );
+    return !!localStorage.getItem("accessToken");
   });
+
+  // const [isAuthenticated, setIsAuthenticated] = useState(() => {
+  //   return !!(
+  //     localStorage.getItem("accessToken") ||
+  //     sessionStorage.getItem("accessToken")
+  //   );
+  // });
+
   const [detailsSubmitted, setDetailsSubmitted] = useState(false);
   const [sharedState, setSharedState] = useState({
     cumulativeChecked: 0,
@@ -113,16 +122,35 @@ function AppContent() {
     setIsAuthenticated(true);
   };
 
+  // --- MODIFIED handleLogout ---
   const handleLogout = () => {
+    // Clear only localStorage for auth data
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
+
+    // Also remove sessionStorage items in case old data exists
     sessionStorage.removeItem("accessToken");
     sessionStorage.removeItem("refreshToken");
     sessionStorage.removeItem("user");
+
     setIsAuthenticated(false);
     resetAllStates();
+
+    // Fire a specific 'logout' event for other tabs to notice.
+    localStorage.setItem("authEvent", `logout-${Date.now()}`);
   };
+
+  // const handleLogout = () => {
+  //   localStorage.removeItem("accessToken");
+  //   localStorage.removeItem("refreshToken");
+  //   localStorage.removeItem("user");
+  //   sessionStorage.removeItem("accessToken");
+  //   sessionStorage.removeItem("refreshToken");
+  //   sessionStorage.removeItem("user");
+  //   setIsAuthenticated(false);
+  //   resetAllStates();
+  // };
 
   const resetAllStates = () => {
     setInspectionState(null);
@@ -240,6 +268,7 @@ function AppContent() {
       {isAuthenticated && <Navbar onLogout={handleLogout} />}
       <div className={isAuthenticated ? "pt-16" : ""}>
         <Routes>
+          {/* Public Routes */}
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route
@@ -367,6 +396,15 @@ function AppContent() {
               <Route path="/b-grade-stcok" element={<BGradeStock />} />
               <Route path="/ieadmin" element={<IEPage />} />
               <Route path="/qcWashing" element={<QCWashingPage />} />
+              <Route path="/qc-accuracy" element={<QCAccuracy />} />
+              <Route
+                path="/qc-accuracy/view-report/:reportId"
+                element={<QCAccuracyViewInspectionReport />}
+              />
+              <Route
+                path="/upload-beforewash-specs"
+                element={<UploadWashingSpecs />}
+              />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

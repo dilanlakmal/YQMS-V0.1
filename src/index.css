@@ -23,3 +23,43 @@ body {
   font-family: "Khmer OS";
   src: url("./fonts/KhmerOS.ttf") format("truetype");
 }
+
+.react-datepicker-popper-z-50 {
+  z-index: 50 !important;
+}
+
+/* 
+  Add these custom properties (CSS Variables) for your theme.
+  This is the core of the fix.
+*/
+:root {
+  /* Light Theme Variables */
+  --color-bg-primary: #ffffff; /* white */
+  --color-bg-secondary: #f9fafb; /* gray-50 */
+  --color-bg-accent: #e0e7ff; /* indigo-200 */
+  --color-bg-accent-hover: #4f46e5; /* indigo-600 */
+  --color-bg-accent-active: #c7d2fe; /* indigo-300 */
+
+  --color-text-primary: #111827; /* gray-900 */
+  --color-text-secondary: #6b7280; /* gray-500 */
+  --color-text-accent: #3730a3; /* indigo-800 */
+
+  --color-border: #d1d5db; /* gray-300 */
+  --color-border-hover: #9ca3af; /* gray-400 */
+}
+
+html.dark {
+  /* Dark Theme Variable Overrides */
+  --color-bg-primary: #111827; /* gray-900 */
+  --color-bg-secondary: #1f2937; /* gray-800 */
+  --color-bg-accent: #374151; /* gray-700 */
+  --color-bg-accent-hover: #4338ca; /* indigo-700 */
+  --color-bg-accent-active: #4f46e5; /* indigo-600 */
+
+  --color-text-primary: #f9fafb; /* gray-50 */
+  --color-text-secondary: #9ca3af; /* gray-400 */
+  --color-text-accent: #c7d2fe; /* indigo-300 */
+
+  --color-border: #4b5563; /* gray-600 */
+  --color-border-hover: #6b7280; /* gray-500 */
+}

@@ -28,7 +28,7 @@ function Login({ onLogin }) {
   const authenticateUser = async (token) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/user-profile`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       if (response.status === 200) {
@@ -46,10 +46,55 @@ function Login({ onLogin }) {
     }
   };
 
-  //   const authenticateUser = async (token) => {
+  // --- MODIFIED handleSubmit ---
+  // This is the new, simplified logic.
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    if (username && password) {
+      try {
+        const response = await axios.post(`${API_BASE_URL}/api/login`, {
+          username,
+          password
+          // rememberMe is now handled by the browser session / token expiry
+        });
+
+        if (response.status === 200) {
+          const { accessToken, refreshToken, user } = response.data;
+
+          // 1. ALWAYS store tokens in localStorage for cross-tab compatibility.
+          localStorage.setItem("accessToken", accessToken);
+          localStorage.setItem("refreshToken", refreshToken);
+          localStorage.setItem("user", JSON.stringify(user));
+
+          // 2. Fire a specific 'login' event for other tabs to notice.
+          localStorage.setItem("authEvent", `login-${Date.now()}`);
+
+          onLogin(accessToken);
+          updateUser(user);
+          navigate("/home");
+        }
+      } catch (error) {
+        setError("Invalid username or password");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  //Old code for handleSubmit
+
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   setLoading(true);
+  //   setError("");
+  //   if (username && password) {
   //     try {
-  //       const response = await axios.get(`${API_BASE_URL}/api/user-profile`, {
-  //         headers: { Authorization: `Bearer ${token}` },
+  //       const response = await axios.post(`${API_BASE_URL}/api/login`, {
+  //         username,
+  //         password,
+  //         rememberMe
   //       });
 
   //       if (response.status === 200) {
@@ -70,48 +115,12 @@ function Login({ onLogin }) {
   //         navigate("/home");
   //       }
   //     } catch (error) {
-  //       localStorage.removeItem("accessToken");
-  //       sessionStorage.removeItem("accessToken");
-  //       navigate("/login");
+  //       setError("Invalid username or password");
+  //     } finally {
+  //       setLoading(false);
   //     }
-  //   };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    if (username && password) {
-      try {
-        const response = await axios.post(`${API_BASE_URL}/api/login`, {
-          username,
-          password,
-          rememberMe,
-        });
-
-        if (response.status === 200) {
-          const { accessToken, refreshToken, user } = response.data;
-
-          if (rememberMe) {
-            localStorage.setItem("accessToken", accessToken);
-            localStorage.setItem("refreshToken", refreshToken);
-            localStorage.setItem("user", JSON.stringify(user));
-          } else {
-            sessionStorage.setItem("accessToken", accessToken);
-            sessionStorage.setItem("refreshToken", refreshToken);
-            sessionStorage.setItem("user", JSON.stringify(user));
-          }
-
-          onLogin(accessToken);
-          updateUser(user);
-          navigate("/home");
-        }
-      } catch (error) {
-        setError("Invalid username or password");
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
+  //   }
+  // };
 
   const refreshToken = async () => {
     const refreshToken =
@@ -124,7 +133,7 @@ function Login({ onLogin }) {
 
     try {
       const response = await axios.post(`${API_BASE_URL}/api/refresh-token`, {
-        refreshToken,
+        refreshToken
       });
       if (response.status === 200) {
         const { accessToken } = response.data;

@@ -4,6 +4,7 @@ import cors from "cors";
 import express from "express";
 import fs from "fs";
 import https from "https"; 
+import axios from "axios";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import multer from "multer";
@@ -69,6 +70,10 @@ import createSCCElasticOperatorModel from "./models/SCCElasticOperatorModel.js";
 
 import createEMBDefectModel from "./models/EMBdefect.js";
 import createEMBReportModel from "./models/EMBReport.js";
+
+import createQADefectsModel from "./models/QADefectsModel.js";
+import createQCAccuracyReportModel from "./models/QCAccuracyReportModel.js";
+import createQAStandardDefectsModel from "./models/QAStandardDefectsModel.js";
 
 import createAuditCheckPointModel from "./models/AuditCheckPoint.js";
 
@@ -224,6 +229,10 @@ const ElasticReport = createElasticReportModel(ymProdConnection);
 const EMBDefect = createEMBDefectModel(ymProdConnection);
 const EMBReport = createEMBReportModel(ymProdConnection);
 
+const QADefectsModel = createQADefectsModel(ymProdConnection);
+const QCAccuracyReportModel = createQCAccuracyReportModel(ymProdConnection);
+const QAStandardDefectsModel = createQAStandardDefectsModel(ymProdConnection);
+
 // Define new SCC Operator models on ymProdConnection
 const SCCHTOperator = createSCCHTOperatorModel(ymProdConnection);
 const SCCFUOperator = createSCCFUOperatorModel(ymProdConnection);
@@ -237,1576 +246,1098 @@ app.use((req, res, next) => {
   next();
 });
 
-/* ------------------------------
-   YM DataSore SQL
------------------------------- */
-
-// SQL Server Configuration for YMDataStore
-const sqlConfig = {
-  user: "ymdata",
-  password: "Kzw15947",
-  server: "192.167.1.13",
-  port: 1433,
-  database: "YMDataStore",
-  options: {
-    encrypt: false, // Use true if SSL is required
-    trustServerCertificate: true // For self-signed certificates
-  },
-  requestTimeout: 3000000, // Set timeout to 5 minutes (300,000 ms)
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
-  }
-};
-
-/* ------------------------------
-   YMCE_SYSTEM SQL
------------------------------- */
-
-// SQL Server Configuration for YMCE_SYSTEM
-const sqlConfigYMCE = {
-  user: "visitor",
-  password: "visitor",
-  server: "ymws-150",
-  //port: 1433,
-  database: "YMCE_SYSTEM",
-  options: {
-    encrypt: false,
-    trustServerCertificate: true
-  },
-  requestTimeout: 300000,
-  connectionTimeout: 300000, // Increase connection timeout to 300 seconds
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
-  }
-};
-
-/* ------------------------------
-   YMWHSYS2 SQL Configuration
------------------------------- */
-
-const sqlConfigYMWHSYS2 = {
-  user: "user01",
-  password: "Ur@12323",
-  server: "YM-WHSYS",
-  database: "FC_SYSTEM",
-  options: {
-    encrypt: false,
-    trustServerCertificate: true
-  },
-  requestTimeout: 18000000,
-  connectionTimeout: 18000000,
-  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
-};
-
-// Create connection pools
-const poolYMDataStore = new sql.ConnectionPool(sqlConfig);
-const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
-const poolYMWHSYS2 = new sql.ConnectionPool(sqlConfigYMWHSYS2);
-
-// MODIFICATION: Add a status tracker for SQL connections
-const sqlConnectionStatus = {
-  YMDataStore: false,
-  YMCE_SYSTEM: false,
-  YMWHSYS2: false
-};
-
-// Function to connect to a pool, now it updates the status tracker
-async function connectPool(pool, poolName) {
-  try {
-    await pool.connect();
-    console.log(
-      `✅ Successfully connected to ${poolName} pool at ${pool.config.server}`
-    );
-    sqlConnectionStatus[poolName] = true; // Set status to true on success
-
-    // Listen for errors on the pool to detect disconnections
-    pool.on("error", (err) => {
-      console.error(`SQL Pool Error for ${poolName}:`, err);
-      sqlConnectionStatus[poolName] = false; // Set status to false on error
-    });
-  } catch (err) {
-    console.error(`❌ FAILED to connect to ${poolName} pool:`, err.message);
-    sqlConnectionStatus[poolName] = false; // Ensure status is false on failure
-    // We throw the error so Promise.allSettled can catch it
-    throw new Error(`Failed to connect to ${poolName}`);
-  }
-}
-
-// MODIFICATION: This function is now more critical for on-demand reconnections.
-async function ensurePoolConnected(pool, poolName) {
-  // If we know the connection is down, or the pool reports it's not connected
-  if (!sqlConnectionStatus[poolName] || !pool.connected) {
-    console.log(
-      `Pool ${poolName} is not connected. Attempting to reconnect...`
-    );
-    try {
-      // Attempt to close the pool if it's in a broken state before reconnecting
-      if (pool.connected || pool.connecting) {
-        await pool.close();
-      }
-      await connectPool(pool, poolName); // This will re-attempt connection and update the status
-    } catch (reconnectErr) {
-      console.error(
-        `Failed to reconnect to ${poolName}:`,
-        reconnectErr.message
-      );
-      sqlConnectionStatus[poolName] = false; // Ensure status is false
-      throw reconnectErr; // Throw error to be caught by the calling function
-    }
-  }
-  // If we reach here, the pool should be connected.
-  if (!sqlConnectionStatus[poolName]) {
-    throw new Error(`Database ${poolName} is unavailable.`);
-  }
-}
-
-// Drop the conflicting St_No_1 index if it exists
-async function dropConflictingIndex() {
-  try {
-    const indexes = await InlineOrders.collection.getIndexes();
-    if (indexes["St_No_1"]) {
-      await InlineOrders.collection.dropIndex("St_No_1");
-      console.log("Dropped conflicting St_No_1 index.");
-    } else {
-      console.log("St_No_1 index not found, no need to drop.");
-    }
-  } catch (err) {
-    console.error("Error dropping St_No_1 index:", err);
-  }
-}
-
-/* ------------------------------
-   Initialize Pools and Run Initial Syncs
------------------------------- */
-
-// MODIFICATION: Rewritten initializePools and server startup logic
-async function initializeServer() {
-  console.log("--- Initializing Server ---");
-
-  // 1. Handle MongoDB Index
-  await dropConflictingIndex();
-
-  // 2. Attempt to connect to all SQL pools without crashing
-  console.log("Initializing SQL connection pools...");
-  const connectionPromises = [
-    connectPool(poolYMDataStore, "YMDataStore"),
-    connectPool(poolYMCE, "YMCE_SYSTEM"),
-    connectPool(poolYMWHSYS2, "YMWHSYS2")
-  ];
-
-  // Promise.allSettled will not short-circuit. It waits for all promises.
-  const results = await Promise.allSettled(connectionPromises);
-
-  results.forEach((result) => {
-    if (result.status === "rejected") {
-      // The error is already logged in connectPool, but we can add a summary here.
-      console.warn(
-        `Initialization Warning: ${result.reason.message}. Dependent services will be unavailable.`
-      );
-    }
-  });
-
-  console.log("Current SQL Connection Status:", sqlConnectionStatus);
-  console.log(
-    "SQL pool initialization complete. Server will continue regardless of failures."
-  );
-
-  // 3. Run initial data syncs. These functions will now check the connection status internally.
-  console.log("Running initial data synchronizations...");
-  await syncInlineOrders();
-  await syncCutPanelOrders();
-  await syncQC1SunriseData();
-
-  console.log("--- Server Initialization Complete ---");
-}
-
-// Start the server initialization
-initializeServer().catch((err) => {
-  // This catch is for any unexpected errors during the setup process itself.
-  console.error("A critical error occurred during server initialization:", err);
-  // still want to exit here if something truly fundamental fails.
-  // process.exit(1);
-});
-
-/* ------------------------------
-  Fetching RS18 Data from YMDataStore
------------------------------- */
-
-// New Endpoint for RS18 Data (YMDataStore)
-app.get("/api/sunrise/rs18", async (req, res) => {
-  if (!sqlConnectionStatus.YMDataStore) {
-    return res.status(503).json({
-      message:
-        "Service Unavailable: The YMDataStore database is not connected.",
-      error: "Database connection failed"
-    });
-  }
-  try {
-    await ensurePoolConnected(poolYMDataStore, "YMDataStore");
-    const request = poolYMDataStore.request();
-    //pool = await connectToSqlServerYMDataStore();
-    const query = `
-      SELECT
-        FORMAT(CAST(dDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
-        WorkLine,
-        MONo,
-        SizeName,
-        ColorNo,
-        ColorName,
-        ReworkCode,
-        CASE ReworkCode
-          WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
-          WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
-          WHEN '3' THEN N'ដេររមួល / 扭 / Twisted'
-          WHEN '4' THEN N'ជ្រួញនិងទឹករលក និងប៉ោងសាច់ / 起皺/波浪/起包 / Puckering/ Wavy/ Fullness'
-          WHEN '5' THEN N'ដាច់អំបោះ / 斷線 / Broken stitches'
-          WHEN '6' THEN N'លោតអំបោះ / 跳線 / Skipped stitches'
-          WHEN '7' THEN N'ប្រឡាក់ប្រេង / 油漬 / Oil stain'
-          WHEN '8' THEN N'ធ្លុះរន្ធ / 破洞 (包括針洞) / Hole/ Needle hole'
-          WHEN '9' THEN N'ខុសពណ៏ / 色差 / Color shading'
-          WHEN '10' THEN N'ផ្លាកដេរខុសសេរីនិងដេរខុសផ្លាក / 嘜頭錯碼/車錯嘜頭 / Label sewn wrong size/style/po'
-          WHEN '11' THEN N'ប្រឡាក់ / 髒污 / Dirty stain'
-          WHEN '12' THEN N'រហែកថ្នេរ / 爆縫 / Open seam'
-          WHEN '13' THEN N'អត់បានដេរ / 漏車縫/漏空 / Missed sewing'
-          WHEN '14' THEN N'ព្រុយ / 線頭 / Untrimmed thread ends'
-          WHEN '15' THEN N'ខូចសាច់ក្រណាត់(មិនអាចកែ) / 布疵（改不了） / Fabric defect (unrepairable)'
-          WHEN '16' THEN N'គៀបសាច់ / 打折 / Pleated'
-          WHEN '17' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់ / 燙畫/印花/繡花 / Heat transfer/ Printing/ EMB defect'
-          WHEN '18' THEN N'អាវកែផ្សេងៗ / 其它返工 / Others'
-          WHEN '19' THEN N'អ៊ុតអត់ជាប់ / 熨燙不良 / Insecure of Heat transfer'
-          WHEN '20' THEN N'ទំហំទទឺងតូចធំមិនស្មើគ្នា / 左右大小不均匀 / Uneven width'
-          WHEN '21' THEN N'គំលាតម្ជុល តឹង និង ធូរអំបោះពេក / 針距: 線緊/線鬆 / Stitch density tight/loose'
-          WHEN '22' THEN N'សល់ជាយ និង ព្រុយខាងៗ / 毛邊 止口 / Fray edge / Raw edge'
-          WHEN '23' THEN N'ជ្រលក់ពណ៏ខុស រឺក៏ ខូច / 染色不正確 - 次品/廢品 / Incorrect dying'
-          WHEN '24' THEN N'ប្រឡាក់ប្រេង2 / 油漬2 / Oil stain 2'
-          WHEN '25' THEN N'ខុសពណ៏2 / 色差2 / Color variation 2'
-          WHEN '26' THEN N'ប្រឡាក់2 / 髒污2 / Dirty stain 2'
-          WHEN '27' THEN N'ឆ្នូតក្រណាត់2 / 布疵2 / Fabric defect 2'
-          WHEN '28' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់2 / 燙畫 / 印花 /繡花 2 / Heat transfer/ Printing/ EMB defect 2'
-          WHEN '29' THEN N'ដេរអត់ជាប់ / 不牢固 / Insecure'
-          WHEN '30' THEN N'ដេរធ្លាក់ទឹក / 落坑 / Run off stitching'
-          WHEN '31' THEN N'ខូចទ្រង់ទ្រាយ / 形状不良 / Poor shape'
-          WHEN '32' THEN N'បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន) / 布有飞纱，勾纱(可修) / Fabric fly yarn / snagging (repairable)'
-          WHEN '33' THEN N'មិនចំគ្នា / 不对称（骨位，间条） / Mismatched'
-          WHEN '34' THEN N'បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំ វៀច / 车标问题:错位置,反,高低,歪斜 / Label: misplace,invert,uneven,slant'
-          WHEN '35' THEN N'ស្មាមម្ជុល / 针孔 / Needle Mark'
-          WHEN '36' THEN N'បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-) / 衣服錯碼(某部位/裁片) / Wrong size of garment(cut panel/part)'
-          WHEN '37' THEN N'ផ្សេងៗ / 其它-做工不良 / Others - Poor Workmanship (Spare) 2'
-          WHEN '38' THEN N'បញ្ហាបោកទឹក / ជ្រលក់ពណ៌ / 洗水 / 染色不正确 / Improper Washing Dyeing'
-          WHEN '39' THEN N'បញ្ហាអ៊ុត- ឡើងស / ស្នាម / ខ្លោច -ល- / 烫工不良:起镜 / 压痕 / 烫焦 / Improper Ironing: Glazing / Mark / Scorch, etc…'
-          WHEN '40' THEN N'បញ្ហាអ៊ុត: ខូចទ្រង់ទ្រាយ / ខូចរាង / 烫工不良:变形 / 外观不良 / Improper Ironing: Off Shape / Poor Appearance'
-          WHEN '41' THEN N'ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា / 左右高低 / Asymmetry / Hi-Low'
-          WHEN '42' THEN N'ថ្នេរដេរមិនត្រួតគ្នា តូចធំមិនស្មើគ្នា / 车线不重叠 大小不均匀 / Uneven / Misalign stitches'
-          WHEN '43' THEN N'បញ្ហាលើសខ្នាត(+) / 尺寸问题 (+大) / Measurement issue positive'
-          WHEN '44' THEN N'បញ្ហាខ្វះខ្នាត(-) / 尺寸问题 (-小) / Measurement issue negative'
-          ELSE NULL
-        END AS ReworkName,
-        SUM(QtyRework) AS DefectsQty
-      FROM
-        YMDataStore.SUNRISE.RS18 r
-      WHERE
-        TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
-        AND SeqNo <> 700
-        AND TRY_CAST(ReworkCode AS INT) BETWEEN 1 AND 44
-        AND CAST(dDate AS DATE) > '2022-12-31'
-        AND CAST(dDate AS DATE) < DATEADD(DAY, 1, GETDATE())
-      GROUP BY
-        CAST(dDate AS DATE),
-        WorkLine,
-        MONo,
-        SizeName,
-        ColorNo,
-        ColorName,
-        ReworkCode
-      HAVING
-        CASE ReworkCode
-          WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
-          WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
-          WHEN '3' THEN N'ដេររមួល / 扭 / Twisted'
-          WHEN '4' THEN N'ជ្រួញនិងទឹករលក និងប៉ោងសាច់ / 起皺/波浪/起包 / Puckering/ Wavy/ Fullness'
-          WHEN '5' THEN N'ដាច់អំបោះ / 斷線 / Broken stitches'
-          WHEN '6' THEN N'លោតអំបោះ / 跳線 / Skipped stitches'
-          WHEN '7' THEN N'ប្រឡាក់ប្រេង / 油漬 / Oil stain'
-          WHEN '8' THEN N'ធ្លុះរន្ធ / 破洞 (包括針洞) / Hole/ Needle hole'
-          WHEN '9' THEN N'ខុសពណ៏ / 色差 / Color shading'
-          WHEN '10' THEN N'ផ្លាកដេរខុសសេរីនិងដេរខុសផ្លាក / 嘜頭錯碼/車錯嘜頭 / Label sewn wrong size/style/po'
-          WHEN '11' THEN N'ប្រឡាក់ / 髒污 / Dirty stain'
-          WHEN '12' THEN N'រហែកថ្នេរ / 爆縫 / Open seam'
-          WHEN '13' THEN N'អត់បានដេរ / 漏車縫/漏空 / Missed sewing'
-          WHEN '14' THEN N'ព្រុយ / 線頭 / Untrimmed thread ends'
-          WHEN '15' THEN N'ខូចសាច់ក្រណាត់(មិនអាចកែ) / 布疵（改不了） / Fabric defect (unrepairable)'
-          WHEN '16' THEN N'គៀបសាច់ / 打折 / Pleated'
-          WHEN '17' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់ / 燙畫/印花/繡花 / Heat transfer/ Printing/ EMB defect'
-          WHEN '18' THEN N'អាវកែផ្សេងៗ / 其它返工 / Others'
-          WHEN '19' THEN N'អ៊ុតអត់ជាប់ / 熨燙不良 / Insecure of Heat transfer'
-          WHEN '20' THEN N'ទំហំទទឺងតូចធំមិនស្មើគ្នា / 左右大小不均匀 / Uneven width'
-          WHEN '21' THEN N'គំលាតម្ជុល តឹង និង ធូរអំបោះពេក / 針距: 線緊/線鬆 / Stitch density tight/loose'
-          WHEN '22' THEN N'សល់ជាយ និង ព្រុយខាងៗ / 毛邊 止口 / Fray edge / Raw edge'
-          WHEN '23' THEN N'ជ្រលក់ពណ៏ខុស រឺក៏ ខូច / 染色不正確 - 次品/廢品 / Incorrect dying'
-          WHEN '24' THEN N'ប្រឡាក់ប្រេង2 / 油漬2 / Oil stain 2'
-          WHEN '25' THEN N'ខុសពណ៏2 / 色差2 / Color variation 2'
-          WHEN '26' THEN N'ប្រឡាក់2 / 髒污2 / Dirty stain 2'
-          WHEN '27' THEN N'ឆ្នូតក្រណាត់2 / 布疵2 / Fabric defect 2'
-          WHEN '28' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់2 / 燙畫 / 印花 /繡花 2 / Heat transfer/ Printing/ EMB defect 2'
-          WHEN '29' THEN N'ដេរអត់ជាប់ / 不牢固 / Insecure'
-          WHEN '30' THEN N'ដេរធ្លាក់ទឹក / 落坑 / Run off stitching'
-          WHEN '31' THEN N'ខូចទ្រង់ទ្រាយ / 形状不良 / Poor shape'
-          WHEN '32' THEN N'បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន) / 布有飞纱，勾纱(可修) / Fabric fly yarn / snagging (repairable)'
-          WHEN '33' THEN N'មិនចំគ្នា / 不对称（骨位，间条） / Mismatched'
-          WHEN '34' THEN N'បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំ វៀច / 车标问题:错位置,反,高低,歪斜 / Label: misplace,invert,uneven,slant'
-          WHEN '35' THEN N'ស្មាមម្ជុល / 针孔 / Needle Mark'
-          WHEN '36' THEN N'បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-) / 衣服錯碼(某部位/裁片) / Wrong size of garment(cut panel/part)'
-          WHEN '37' THEN N'ផ្សេងៗ / 其它-做工不良 / Others - Poor Workmanship (Spare) 2'
-          WHEN '38' THEN N'បញ្ហាបោកទឹក / ជ្រលក់ពណ៌ / 洗水 / 染色不正确 / Improper Washing Dyeing'
-          WHEN '39' THEN N'បញ្ហាអ៊ុត- ឡើងស / ស្នាម / ខ្លោច -ល- / 烫工不良:起镜 / 压痕 / 烫焦 / Improper Ironing: Glazing / Mark / Scorch, etc…'
-          WHEN '40' THEN N'បញ្ហាអ៊ុត: ខូចទ្រង់ទ្រាយ / ខូចរាង / 烫工不良:变形 / 外观不良 / Improper Ironing: Off Shape / Poor Appearance'
-          WHEN '41' THEN N'ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា / 左右高低 / Asymmetry / Hi-Low'
-          WHEN '42' THEN N'ថ្នេរដេរមិនត្រួតគ្នា តូចធំមិនស្មើគ្នា / 车线不重叠 大小不均匀 / Uneven / Misalign stitches'
-          WHEN '43' THEN N'បញ្ហាលើសខ្នាត(+) / 尺寸问题 (+大) / Measurement issue positive'
-          WHEN '44' THEN N'បញ្ហាខ្វះខ្នាត(-) / 尺寸问题 (-小) / Measurement issue negative'
-          ELSE NULL
-        END IS NOT NULL;
-    `;
-
-    const result = await request.query(query);
-    res.json(result.recordset);
-  } catch (err) {
-    console.error("Error fetching RS18 data:", err);
-    res
-      .status(500)
-      .json({ message: "Failed to fetch RS18 data", error: err.message });
-  }
-});
-
-/* ------------------------------
-   Fetching Sunrise Output Data from YMDataStore
------------------------------- */
-
-// New Endpoint for Sunrise Output Data (YMDataStore)
-app.get("/api/sunrise/output", async (req, res) => {
-  if (!sqlConnectionStatus.YMDataStore) {
-    return res.status(503).json({
-      message:
-        "Service Unavailable: The YMDataStore database is not connected.",
-      error: "Database connection failed"
-    });
-  }
-  try {
-    await ensurePoolConnected(poolYMDataStore, "YMDataStore");
-    const request = poolYMDataStore.request();
-    //pool = await connectToSqlServerYMDataStore();
-    const query = `
-      SELECT
-        FORMAT(CAST(BillDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
-        WorkLine,
-        MONo,
-        SizeName,
-        ColorNo,
-        ColorName,
-        SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END) AS TotalQtyT38,
-        SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END) AS TotalQtyT39
-      FROM
-      (
-        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2023
-        UNION ALL
-        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2024
-        UNION ALL
-        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2025
-      ) AS CombinedData
-      WHERE
-        SeqNo IN (38, 39)
-        AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
-      GROUP BY
-        CAST(BillDate AS DATE),
-        WorkLine,
-        MONo,
-        SizeName,
-        ColorNo,
-        ColorName;
-    `;
-
-    const result = await request.query(query);
-    res.json(result.recordset);
-  } catch (err) {
-    console.error("Error fetching Sunrise Output data:", err);
-    res.status(500).json({
-      message: "Failed to fetch Sunrise Output data",
-      error: err.message
-    });
-  }
-});
-
-/* ------------------------------
-   QC1 Sunrise MongoDB
------------------------------- */
-
-// Function to fetch RS18 data (defects) - Last 7 days only
-const fetchRS18Data = async () => {
-  if (!sqlConnectionStatus.YMDataStore) {
-    return res.status(503).json({
-      message:
-        "Service Unavailable: The YMDataStore database is not connected.",
-      error: "Database connection failed"
-    });
-  }
-  try {
-    await ensurePoolConnected(poolYMDataStore, "YMDataStore");
-    const request = poolYMDataStore.request();
-    const query = `
-      SELECT
-        FORMAT(CAST(dDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
-        WorkLine,
-        MONo,
-        SizeName,
-        ColorNo,
-        ColorName,
-        ReworkCode,
-        CASE ReworkCode
-          WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
-          WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
-          WHEN '3' THEN N'ដេររមួល / 扭 / Twisted'
-          WHEN '4' THEN N'ជ្រួញនិងទឹករលក និងប៉ោងសាច់ / 起皺/波浪/起包 / Puckering/ Wavy/ Fullness'
-          WHEN '5' THEN N'ដាច់អំបោះ / 斷線 / Broken stitches'
-          WHEN '6' THEN N'លោតអំបោះ / 跳線 / Skipped stitches'
-          WHEN '7' THEN N'ប្រឡាក់ប្រេង / 油漬 / Oil stain'
-          WHEN '8' THEN N'ធ្លុះរន្ធ / 破洞 (包括針洞) / Hole/ Needle hole'
-          WHEN '9' THEN N'ខុសពណ៏ / 色差 / Color shading'
-          WHEN '10' THEN N'ផ្លាកដេរខុសសេរីនិងដេរខុសផ្លាក / 嘜頭錯碼/車錯嘜頭 / Label sewn wrong size/style/po'
-          WHEN '11' THEN N'ប្រឡាក់ / 髒污 / Dirty stain'
-          WHEN '12' THEN N'រហែកថ្នេរ / 爆縫 / Open seam'
-          WHEN '13' THEN N'អត់បានដេរ / 漏車縫/漏空 / Missed sewing'
-          WHEN '14' THEN N'ព្រុយ / 線頭 / Untrimmed thread ends'
-          WHEN '15' THEN N'ខូចសាច់ក្រណាត់(មិនអាចកែ) / 布疵（改不了） / Fabric defect (unrepairable)'
-          WHEN '16' THEN N'គៀបសាច់ / 打折 / Pleated'
-          WHEN '17' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់ / 燙畫/印花/繡花 / Heat transfer/ Printing/ EMB defect'
-          WHEN '18' THEN N'អាវកែផ្សេងៗ / 其它返工 / Others'
-          WHEN '19' THEN N'អ៊ុតអត់ជាប់ / 熨燙不良 / Insecure of Heat transfer'
-          WHEN '20' THEN N'ទំហំទទឺងតូចធំមិនស្មើគ្នា / 左右大小不均匀 / Uneven width'
-          WHEN '21' THEN N'គំលាតម្ជុល តឹង និង ធូរអំបោះពេក / 針距: 線緊/線鬆 / Stitch density tight/loose'
-          WHEN '22' THEN N'សល់ជាយ និង ព្រុយខាងៗ / 毛邊 止口 / Fray edge / Raw edge'
-          WHEN '23' THEN N'ជ្រលក់ពណ៏ខុស រឺក៏ ខូច / 染色不正確 - 次品/廢品 / Incorrect dying'
-          WHEN '24' THEN N'ប្រឡាក់ប្រេង2 / 油漬2 / Oil stain 2'
-          WHEN '25' THEN N'ខុសពណ៏2 / 色差2 / Color variation 2'
-          WHEN '26' THEN N'ប្រឡាក់2 / 髒污2 / Dirty stain 2'
-          WHEN '27' THEN N'ឆ្នូតក្រណាត់2 / 布疵2 / Fabric defect 2'
-          WHEN '28' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់2 / 燙畫 / 印花 /繡花 2 / Heat transfer/ Printing/ EMB defect 2'
-          WHEN '29' THEN N'ដេរអត់ជាប់ / 不牢固 / Insecure'
-          WHEN '30' THEN N'ដេរធ្លាក់ទឹក / 落坑 / Run off stitching'
-          WHEN '31' THEN N'ខូចទ្រង់ទ្រាយ / 形状不良 / Poor shape'
-          WHEN '32' THEN N'បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន) / 布有飞纱，勾纱(可修) / Fabric fly yarn / snagging (repairable)'
-          WHEN '33' THEN N'មិនចំគ្នា / 不对称（骨位，间条） / Mismatched'
-          WHEN '34' THEN N'បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំ វៀច / 车标问题:错位置,反,高低,歪斜 / Label: misplace,invert,uneven,slant'
-          WHEN '35' THEN N'ស្មាមម្ជុល / 针孔 / Needle Mark'
-          WHEN '36' THEN N'បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-) / 衣服錯碼(某部位/裁片) / Wrong size of garment(cut panel/part)'
-          WHEN '37' THEN N'ផ្សេងៗ / 其它-做工不良 / Others - Poor Workmanship (Spare) 2'
-          WHEN '38' THEN N'បញ្ហាបោកទឹក / ជ្រលក់ពណ៌ / 洗水 / 染色不正确 / Improper Washing Dyeing'
-          WHEN '39' THEN N'បញ្ហាអ៊ុត- ឡើងស / ស្នាម / ខ្លោច -ល- / 烫工不良:起镜 / 压痕 / 烫焦 / Improper Ironing: Glazing / Mark / Scorch, etc…'
-          WHEN '40' THEN N'បញ្ហាអ៊ុត: ខូចទ្រង់ទ្រាយ / ខូចរាង / 烫工不良:变形 / 外观不良 / Improper Ironing: Off Shape / Poor Appearance'
-          WHEN '41' THEN N'ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា / 左右高低 / Asymmetry / Hi-Low'
-          WHEN '42' THEN N'ថ្នេរដេរមិនត្រួតគ្នា តូចធំមិនស្មើគ្នា / 车线不重叠 大小不均匀 / Uneven / Misalign stitches'
-          WHEN '43' THEN N'បញ្ហាលើសខ្នាត(+) / 尺寸问题 (+大) / Measurement issue positive'
-          WHEN '44' THEN N'បញ្ហាខ្វះខ្នាត(-) / 尺寸问题 (-小) / Measurement issue negative'
-          ELSE NULL
-        END AS ReworkName,
-        SUM(QtyRework) AS DefectsQty
-      FROM
-        YMDataStore.SUNRISE.RS18 r
-      WHERE
-        TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
-        AND SeqNo <> 700
-        AND TRY_CAST(ReworkCode AS INT) BETWEEN 1 AND 44
-        AND CAST(dDate AS DATE) >= DATEADD(DAY, -7, GETDATE())
-        AND CAST(dDate AS DATE) < DATEADD(DAY, 1, GETDATE())
-      GROUP BY
-        CAST(dDate AS DATE),
-        WorkLine,
-        MONo,
-        SizeName,
-        ColorNo,
-        ColorName,
-        ReworkCode
-      HAVING
-        CASE ReworkCode
-          WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
-          WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
-          WHEN '3' THEN N'ដេររមួល / 扭 / Twisted'
-          WHEN '4' THEN N'ជ្រួញនិងទឹករលក និងប៉ោងសាច់ / 起皺/波浪/起包 / Puckering/ Wavy/ Fullness'
-          WHEN '5' THEN N'ដាច់អំបោះ / 斷線 / Broken stitches'
-          WHEN '6' THEN N'លោតអំបោះ / 跳線 / Skipped stitches'
-          WHEN '7' THEN N'ប្រឡាក់ប្រេង / 油漬 / Oil stain'
-          WHEN '8' THEN N'ធ្លុះរន្ធ / 破洞 (包括針洞) / Hole/ Needle hole'
-          WHEN '9' THEN N'ខុសពណ៏ / 色差 / Color shading'
-          WHEN '10' THEN N'ផ្លាកដេរខុសសេរីនិងដេរខុសផ្លាក / 嘜頭錯碼/車錯嘜頭 / Label sewn wrong size/style/po'
-          WHEN '11' THEN N'ប្រឡាក់ / 髒污 / Dirty stain'
-          WHEN '12' THEN N'រហែកថ្នេរ / 爆縫 / Open seam'
-          WHEN '13' THEN N'អត់បានដេរ / 漏車縫/漏空 / Missed sewing'
-          WHEN '14' THEN N'ព្រុយ / 線頭 / Untrimmed thread ends'
-          WHEN '15' THEN N'ខូចសាច់ក្រណាត់(មិនអាចកែ) / 布疵（改不了） / Fabric defect (unrepairable)'
-          WHEN '16' THEN N'គៀបសាច់ / 打折 / Pleated'
-          WHEN '17' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់ / 燙畫/印花/繡花 / Heat transfer/ Printing/ EMB defect'
-          WHEN '18' THEN N'អាវកែផ្សេងៗ / 其它返工 / Others'
-          WHEN '19' THEN N'អ៊ុតអត់ជាប់ / 熨燙不良 / Insecure of Heat transfer'
-          WHEN '20' THEN N'ទំហំទទឺងតូចធំមិនស្មើគ្នា / 左右大小不均匀 / Uneven width'
-          WHEN '21' THEN N'គំលាតម្ជុល តឹង និង ធូរអំបោះពេក / 針距: 線緊/線鬆 / Stitch density tight/loose'
-          WHEN '22' THEN N'សល់ជាយ និង ព្រុយខាងៗ / 毛邊 止口 / Fray edge / Raw edge'
-          WHEN '23' THEN N'ជ្រលក់ពណ៏ខុស រឺក៏ ខូច / 染色不正確 - 次品/廢品 / Incorrect dying'
-          WHEN '24' THEN N'ប្រឡាក់ប្រេង2 / 油漬2 / Oil stain 2'
-          WHEN '25' THEN N'ខុសពណ៏2 / 色差2 / Color variation 2'
-          WHEN '26' THEN N'ប្រឡាក់2 / 髒污2 / Dirty stain 2'
-          WHEN '27' THEN N'ឆ្នូតក្រណាត់2 / 布疵2 / Fabric defect 2'
-          WHEN '28' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់2 / 燙畫 / 印花 /繡花 2 / Heat transfer/ Printing/ EMB defect 2'
-          WHEN '29' THEN N'ដេរអត់ជាប់ / 不牢固 / Insecure'
-          WHEN '30' THEN N'ដេរធ្លាក់ទឹក / 落坑 / Run off stitching'
-          WHEN '31' THEN N'ខូចទ្រង់ទ្រាយ / 形状不良 / Poor shape'
-          WHEN '32' THEN N'បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន) / 布有飞纱，勾纱(可修) / Fabric fly yarn / snagging (repairable)'
-          WHEN '33' THEN N'មិនចំគ្នា / 不对称（骨位，间条） / Mismatched'
-          WHEN '34' THEN N'បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំ វៀច / 车标问题:错位置,反,高低,歪斜 / Label: misplace,invert,uneven,slant'
-          WHEN '35' THEN N'ស្មាមម្ជុល / 针孔 / Needle Mark'
-          WHEN '36' THEN N'បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-) / 衣服錯碼(某部位/裁片) / Wrong size of garment(cut panel/part)'
-          WHEN '37' THEN N'ផ្សេងៗ / 其它-做工不良 / Others - Poor Workmanship (Spare) 2'
-          WHEN '38' THEN N'បញ្ហាបោកទឹក / ជ្រលក់ពណ៌ / 洗水 / 染色不正确 / Improper Washing Dyeing'
-          WHEN '39' THEN N'បញ្ហាអ៊ុត- ឡើងស / ស្នាម / ខ្លោច -ល- / 烫工不良:起镜 / 压痕 / 烫焦 / Improper Ironing: Glazing / Mark / Scorch, etc…'
-          WHEN '40' THEN N'បញ្ហាអ៊ុត: ខូចទ្រង់ទ្រាយ / ខូចរាង / 烫工不良:变形 / 外观不良 / Improper Ironing: Off Shape / Poor Appearance'
-          WHEN '41' THEN N'ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា / 左右高低 / Asymmetry / Hi-Low'
-          WHEN '42' THEN N'ថ្នេរដេរមិនត្រួតគ្នា តូចធំមិនស្មើគ្នា / 车线不重叠 大小不均匀 / Uneven / Misalign stitches'
-          WHEN '43' THEN N'បញ្ហាលើសខ្នាត(+) / 尺寸问题 (+大) / Measurement issue positive'
-          WHEN '44' THEN N'បញ្ហាខ្វះខ្នាត(-) / 尺寸问题 (-小) / Measurement issue negative'
-          ELSE NULL
-        END IS NOT NULL;
-    `;
-    const result = await request.query(query);
-    console.log(
-      `Fetched ${result.recordset.length} RS18 records from the last 7 days`
-    );
-    return result.recordset;
-  } catch (err) {
-    console.error("Error fetching RS18 data:", err);
-    throw err;
-  }
-};
-
-// Function to fetch Output data - Last 7 days only
-const fetchOutputData = async () => {
-  if (!sqlConnectionStatus.YMDataStore) {
-    return res.status(503).json({
-      message:
-        "Service Unavailable: The YMDataStore database is not connected.",
-      error: "Database connection failed"
-    });
-  }
-  try {
-    await ensurePoolConnected(poolYMDataStore, "YMDataStore");
-    const request = poolYMDataStore.request();
-    const query = `
-      SELECT
-        FORMAT(CAST(BillDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
-        WorkLine,
-        MONo,
-        SizeName,
-        ColorNo,
-        ColorName,
-        SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END) AS TotalQtyT38,
-        SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END) AS TotalQtyT39
-      FROM
-      (
-        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2023
-        UNION ALL
-        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2024
-        UNION ALL
-        SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2025
-      ) AS CombinedData
-      WHERE
-        SeqNo IN (38, 39)
-        AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
-        AND CAST(BillDate AS DATE) >= DATEADD(DAY, -7, GETDATE())
-        AND CAST(BillDate AS DATE) < DATEADD(DAY, 1, GETDATE())
-      GROUP BY
-        CAST(BillDate AS DATE),
-        WorkLine,
-        MONo,
-        SizeName,
-        ColorNo,
-        ColorName;
-    `;
-    const result = await request.query(query);
-    console.log(
-      `Fetched ${result.recordset.length} Output records from the last 7 days`
-    );
-    return result.recordset;
-  } catch (err) {
-    console.error("Error fetching Output data:", err);
-    throw err;
-  }
-};
-
-// Helper function to determine Buyer based on MONo
-const determineBuyer = (MONo) => {
-  if (!MONo) return "Other";
-  if (MONo.includes("CO")) return "Costco";
-  if (MONo.includes("AR")) return "Aritzia";
-  if (MONo.includes("RT")) return "Reitmans";
-  if (MONo.includes("AF")) return "ANF";
-  if (MONo.includes("NT")) return "STORI";
-  return "Other";
-};
-
-// Function to sync data to MongoDB - Only process last 7 days and update if modified
-const syncQC1SunriseData = async () => {
-  try {
-    console.log("Starting QC1 Sunrise data sync at", new Date().toISOString());
-
-    // Fetch data from both sources (last 7 days only)
-    const [rs18Data, outputData] = await Promise.all([
-      fetchRS18Data(),
-      fetchOutputData()
-    ]);
-
-    if (outputData.length === 0) {
-      console.log(
-        "No output data fetched from SQL Server for the last 7 days. Sync aborted."
-      );
-      return;
-    }
-
-    // Create a map for defect data for quick lookup
-    const defectMap = new Map();
-    rs18Data.forEach((defect) => {
-      const key = `${defect.InspectionDate}-${defect.WorkLine}-${defect.MONo}-${defect.SizeName}-${defect.ColorNo}-${defect.ColorName}`;
-      if (!defectMap.has(key)) {
-        defectMap.set(key, []);
-      }
-      defectMap.get(key).push({
-        defectCode: defect.ReworkCode,
-        defectName: defect.ReworkName,
-        defectQty: defect.DefectsQty
-      });
-    });
-    console.log(`Defect Map contains ${defectMap.size} entries with defects`);
-
-    // Prepare MongoDB documents starting from output data
-    const documents = [];
-    outputData.forEach((output) => {
-      const key = `${output.InspectionDate}-${output.WorkLine}-${output.MONo}-${output.SizeName}-${output.ColorNo}-${output.ColorName}`;
-      const defectArray = defectMap.get(key) || []; // Empty array if no defects
-
-      const totalDefectsQty = defectArray.reduce(
-        (sum, defect) => sum + defect.defectQty,
-        0
-      );
-      const checkedQty = Math.max(
-        output.TotalQtyT38 || 0,
-        output.TotalQtyT39 || 0
-      );
-
-      const doc = {
-        inspectionDate: output.InspectionDate,
-        lineNo: output.WorkLine,
-        MONo: output.MONo,
-        Size: output.SizeName,
-        Color: output.ColorName,
-        ColorNo: output.ColorNo,
-        Buyer: determineBuyer(output.MONo),
-        CheckedQtyT38: output.TotalQtyT38 || 0,
-        CheckedQtyT39: output.TotalQtyT39 || 0,
-        CheckedQty: checkedQty,
-        DefectArray: defectArray, // Will be empty if no defects
-        totalDefectsQty: totalDefectsQty
-      };
-      documents.push(doc);
-    });
-    console.log(`Prepared ${documents.length} documents for MongoDB`);
-
-    // Log a sample document
-    if (documents.length > 0) {
-      console.log("Sample Document:", documents[0]);
-    }
-
-    // Fetch existing documents from MongoDB for comparison (only for the last 7 days)
-    const existingDocs = await QC1Sunrise.find({
-      inspectionDate: {
-        $gte: new Date(new Date().setDate(new Date().getDate() - 7))
-          .toISOString()
-          .split("T")[0]
-      }
-    }).lean();
-    const existingDocsMap = new Map();
-    existingDocs.forEach((doc) => {
-      const key = `${doc.inspectionDate}-${doc.lineNo}-${doc.MONo}-${doc.Size}-${doc.ColorNo}`;
-      existingDocsMap.set(key, doc);
-    });
-    console.log(
-      `Fetched ${existingDocsMap.size} existing documents from qc1_sunrise for comparison`
-    );
-
-    // Filter documents to only include those that are new or have changed
-    const documentsToUpdate = [];
-    for (const doc of documents) {
-      const key = `${doc.inspectionDate}-${doc.lineNo}-${doc.MONo}-${doc.Size}-${doc.ColorNo}`;
-      const existingDoc = existingDocsMap.get(key);
-
-      if (!existingDoc) {
-        // New document, include it
-        documentsToUpdate.push(doc);
-      } else {
-        // Compare fields to check for changes
-        const hasChanged =
-          existingDoc.CheckedQtyT38 !== doc.CheckedQtyT38 ||
-          existingDoc.CheckedQtyT39 !== doc.CheckedQtyT39 ||
-          existingDoc.CheckedQty !== doc.CheckedQty ||
-          existingDoc.totalDefectsQty !== doc.totalDefectsQty ||
-          JSON.stringify(existingDoc.DefectArray) !==
-            JSON.stringify(doc.DefectArray);
-
-        if (hasChanged) {
-          documentsToUpdate.push(doc);
-        }
-      }
-    }
-    console.log(
-      `Filtered down to ${documentsToUpdate.length} documents that are new or modified`
-    );
-
-    // Bulk upsert into MongoDB
-    const bulkOps = documentsToUpdate.map((doc) => ({
-      updateOne: {
-        filter: {
-          inspectionDate: doc.inspectionDate,
-          lineNo: doc.lineNo,
-          MONo: doc.MONo,
-          Size: doc.Size,
-          ColorNo: doc.ColorNo
-        },
-        update: { $set: doc },
-        upsert: true
-      }
-    }));
-
-    if (bulkOps.length > 0) {
-      const result = await QC1Sunrise.bulkWrite(bulkOps);
-      console.log(
-        `Bulk write result: Matched: ${result.matchedCount}, Modified: ${result.modifiedCount}, Upserted: ${result.upsertedCount}`
-      );
-      console.log(
-        `Successfully synced ${bulkOps.length} documents to qc1_sunrise.`
-      );
-    } else {
-      console.log("No new or modified documents to upsert");
-      console.log("Successfully synced 0 documents to qc1_sunrise.");
-    }
-
-    // Verify collection contents
-    const collectionCount = await QC1Sunrise.countDocuments();
-    console.log(
-      `Total documents in qc1_sunrise collection: ${collectionCount}`
-    );
-
-    console.log(
-      `Successfully completed QC1 Sunrise sync with ${documentsToUpdate.length} new or modified records`
-    );
-  } catch (err) {
-    console.error("Error syncing QC1 Sunrise data:", err);
-    throw err;
-  }
-};
-
-// Endpoint to manually trigger QC1 Sunrise sync
-app.get("/api/sunrise/sync-qc1", async (req, res) => {
-  try {
-    await syncQC1SunriseData();
-    res.json({ message: "QC1 Sunrise data synced successfully" });
-  } catch (err) {
-    console.error("Error in /api/sunrise/sync-qc1 endpoint:", err);
-    res
-      .status(500)
-      .json({ message: "Failed to sync QC1 Sunrise data", error: err.message });
-  }
-});
-
-// Schedule daily sync at midnight
-cron.schedule("0 0 * * *", async () => {
-  console.log("Running daily QC1 Sunrise data sync...");
-  try {
-    await syncQC1SunriseData();
-  } catch (err) {
-    console.error("Error in daily QC1 Sunrise sync:", err);
-  }
-});
-
-/* ------------------------------
-   Fetch inline data from SQL to ym_prod
------------------------------- */
-
-async function syncInlineOrders() {
-  // MODIFICATION: Add connection status check
-  if (!sqlConnectionStatus.YMCE_SYSTEM) {
-    console.warn(
-      "Skipping syncInlineOrders: YMCE_SYSTEM database is not connected."
-    );
-    return;
-  }
-  try {
-    console.log("Starting inline_orders sync at", new Date().toISOString());
-    await ensurePoolConnected(poolYMCE, "YMCE_SYSTEM");
-
-    const request = poolYMCE.request();
-
-    console.log(
-      "Using connection to:",
-      poolYMCE.config.server,
-      "database:",
-      poolYMCE.config.database
-    );
-
-    const query = `
-      SELECT 
-        St_No,
-        By_Style,
-        Tg_No,
-        Tg_Code, 
-        Ma_Code,
-        ch_name,
-        kh_name,
-        Dept_Type
-      FROM 
-        dbo.ViewTg vt
-      WHERE 
-        Dept_Type = 'Sewing';
-    `;
-
-    const result = await request.query(query);
-    const data = result.recordset;
-
-    if (data.length === 0) {
-      console.log("No data to sync to inline_orders.");
-      return;
-    }
-
-    // Group data by St_No, By_Style, and Dept_Type
-    const groupedData = data.reduce((acc, row) => {
-      const key = `${row.St_No}_${row.By_Style}_${row.Dept_Type}`;
-      if (!acc[key]) {
-        acc[key] = {
-          St_No: row.St_No,
-          By_Style: row.By_Style,
-          Dept_Type: row.Dept_Type,
-          orderData: []
-        };
-      }
-      acc[key].orderData.push({
-        Tg_No: row.Tg_No,
-        Tg_Code: row.Tg_Code,
-        Ma_Code: row.Ma_Code,
-        ch_name: row.ch_name,
-        kh_name: row.kh_name,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-      return acc;
-    }, {});
-
-    const documents = Object.values(groupedData);
-
-    // Use bulkWrite with upsert to update or insert documents
-    const bulkOps = documents.map((doc) => ({
-      updateOne: {
-        filter: {
-          St_No: doc.St_No,
-          By_Style: doc.By_Style,
-          Dept_Type: doc.Dept_Type
-        },
-        update: {
-          $set: {
-            St_No: doc.St_No,
-            By_Style: doc.By_Style,
-            Dept_Type: doc.Dept_Type,
-            orderData: doc.orderData,
-            updatedAt: new Date()
-          },
-          $setOnInsert: {
-            createdAt: new Date()
-          }
-        },
-        upsert: true
-      }
-    }));
-
-    await InlineOrders.bulkWrite(bulkOps);
-    console.log(
-      `Successfully synced ${documents.length} documents to inline_orders.`
-    );
-
-    // Optional: Remove documents that no longer exist in the source data
-    const existingKeys = documents.map(
-      (doc) => `${doc.St_No}_${doc.By_Style}_${doc.Dept_Type}`
-    );
-    await InlineOrders.deleteMany({
-      $and: [
-        { St_No: { $exists: true } },
-        { By_Style: { $exists: true } },
-        { Dept_Type: { $exists: true } },
-        {
-          $expr: {
-            $not: {
-              $in: [
-                { $concat: ["$St_No", "_", "$By_Style", "_", "$Dept_Type"] },
-                existingKeys
-              ]
-            }
-          }
-        }
-      ]
-    });
-    console.log("Removed outdated documents from inline_orders.");
-  } catch (err) {
-    console.error("Error during inline_orders sync:", err);
-    throw err;
-  }
-}
-
-// New API Endpoint to manually trigger the sync
-app.post("/api/sync-inline-orders", async (req, res) => {
-  try {
-    await syncInlineOrders();
-    res
-      .status(200)
-      .json({ message: "Inline orders sync completed successfully." });
-  } catch (err) {
-    console.error("Error in /api/sync-inline-orders endpoint:", err);
-    res.status(500).json({
-      message: "Failed to sync inline orders",
-      error: err.message
-    });
-  }
-});
-
-// Schedule the sync to run every day at 11 AM
-cron.schedule("0 11 * * *", async () => {
-  console.log("Running scheduled inline_orders sync at 11 AM...");
-  await syncInlineOrders();
-});
-
-// Run the sync immediately on server start (optional, for testing)
-syncInlineOrders().then(() => {
-  console.log(
-    "Initial inline_orders sync completed. Scheduler is now running..."
-  );
-});
-
-// Updated Endpoint to Search MO Numbers (St_No) from inline_orders in MongoDB with partial matching
-app.get("/api/inline-orders-mo-numbers", async (req, res) => {
-  try {
-    const searchTerm = req.query.search; // Get the search term from query params
-    if (!searchTerm) {
-      return res.status(400).json({ error: "Search term is required" });
-    }
-
-    // Use a case-insensitive regex to match the term anywhere in St_No
-    const regexPattern = new RegExp(searchTerm, "i");
-
-    // Query the inline_orders collection
-    const results = await InlineOrders.find({
-      St_No: { $regex: regexPattern }
-    })
-      .select("St_No") // Only return the St_No field (equivalent to .project({ St_No: 1, _id: 0 }))
-      .limit(100) // Limit results to prevent overwhelming the UI
-      .sort({ St_No: 1 }) // Sort alphabetically
-      .exec();
-
-    // Extract unique St_No values
-    const uniqueMONos = [...new Set(results.map((r) => r.St_No))];
-
-    res.json(uniqueMONos);
-  } catch (err) {
-    console.error("Error fetching MO numbers from inline_orders:", err);
-    res.status(500).json({
-      message: "Failed to fetch MO numbers from inline_orders",
-      error: err.message
-    });
-  }
-});
-
-// New Endpoint to Fetch Inline Order Details for a given MO No (St_No)
-app.get("/api/inline-orders-details", async (req, res) => {
-  try {
-    const stNo = req.query.stNo;
-    if (!stNo) {
-      return res.status(400).json({ error: "St_No is required" });
-    }
-
-    // Find the document where St_No matches
-    const document = await InlineOrders.findOne({ St_No: stNo }).exec();
-
-    if (!document) {
-      return res.status(404).json({ error: "MO No not found" });
-    }
-
-    res.json(document);
-  } catch (err) {
-    console.error("Error fetching Inline Order details:", err);
-    res.status(500).json({
-      message: "Failed to fetch Inline Order details",
-      error: err.message
-    });
-  }
-});
-
-// New Endpoint for YMCE_SYSTEM Data
-app.get("/api/ymce-system-data", async (req, res) => {
-  // MODIFICATION: Add connection status check
-  if (!sqlConnectionStatus.YMCE_SYSTEM) {
-    return res.status(503).json({
-      message:
-        "Service Unavailable: The YMCE_SYSTEM database is not connected.",
-      error: "Database connection failed"
-    });
-  }
-
-  //let pool;
-  try {
-    await ensurePoolConnected(poolYMCE, "YMCE_SYSTEM");
-    const request = poolYMCE.request();
-    const query = `
-      SELECT
-        St_No,
-        By_Style,
-        Tg_No,
-        Tg_Code,
-        Ma_Code,
-        ch_name,
-        kh_name,
-        Dept_Type,
-        SUM(Tg_Pcs) AS PiecesQty,
-        SUM(Tg_Price) AS OperationPrice,
-        SUM(GST_SAM) AS GST
-      FROM
-        dbo.ViewTg vt
-      WHERE
-        Dept_Type = 'Sewing'
-      GROUP BY
-        St_No,
-        By_Style,
-        Tg_No,
-        Tg_Code,
-        Ma_Code,
-        ch_name,
-        kh_name,
-        Dept_Type;
-    `;
-
-    const result = await request.query(query);
-    res.json(result.recordset);
-  } catch (err) {
-    console.error("Error fetching YMCE_SYSTEM data:", err);
-    res.status(500).json({
-      message: "Failed to fetch YMCE_SYSTEM data",
-      error: err.message
-    });
-  }
-});
-
-// /* -----------------------------------------------------------------
-//    STREAMING Cut Panel Orders Sync
-// ----------------------------------------------------------------- */
-// async function syncCutPanelOrders() {
-//   if (!sqlConnectionStatus.YMWHSYS2) {
-//     console.warn(
-//       "[CutPanelOrders] Skipping sync: FC_SYSTEM database is not connected."
-//     );
-//     return;
-//   }
-
-//   // Wrap the entire streaming operation in a Promise for clean async handling
-//   return new Promise(async (resolve, reject) => {
-//     try {
-//       const syncStartTime = new Date();
-//       console.log(
-//         `[CutPanelOrders] Starting STREAMING sync at ${syncStartTime.toISOString()}`
-//       );
-//       await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
-
-//       // The final, fully corrected and optimized SQL query
-//       const query = `
-//         -- *** 1. DATE RANGE UPDATED TO -600 DAYS ***
-//         DECLARE @StartDate DATE = CAST(DATEADD(DAY, -600, GETDATE()) AS DATE);
-
-//         WITH
-//         LotData AS (
-//             SELECT
-//                 v.Style, v.TableNo,
-//                 STUFF((SELECT DISTINCT ', ' + v_inner.Lot FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v_inner WHERE v_inner.Style = v.Style AND v_inner.TableNo = v.TableNo AND v_inner.Lot IS NOT NULL AND v_inner.Lot <> '' FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos
-//             FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v
-//             INNER JOIN [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS inv_filter ON v.TxnNo = inv_filter.TxnNo
-//             WHERE v.Lot IS NOT NULL AND v.Lot <> '' AND inv_filter.Create_Date >= @StartDate
-//             GROUP BY v.Style, v.TableNo
-//         ),
-//         OrderData AS (
-//             SELECT Style, EngColor, Size1, Size2, Size3, Size4, Size5, Size6, Size7, Size8, Size9, Size10,
-//                 OrderQty1, OrderQty2, OrderQty3, OrderQty4, OrderQty5, OrderQty6, OrderQty7, OrderQty8, OrderQty9, OrderQty10,
-//                 TotalOrderQty, SUM(TotalOrderQty) OVER (PARTITION BY Style) AS TotalOrderQtyStyle
-//             FROM (
-//                 SELECT o.Style, o.EngColor, MAX(o.Size1) AS Size1, MAX(o.Size2) AS Size2, MAX(o.Size3) AS Size3, MAX(o.Size4) AS Size4, MAX(o.Size5) AS Size5, MAX(o.Size6) AS Size6, MAX(o.Size7) AS Size7, MAX(o.Size8) AS Size8, MAX(o.Size9) AS Size9, MAX(o.Size10) AS Size10,
-//                     SUM(ISNULL(o.Qty1, 0)) AS OrderQty1, SUM(ISNULL(o.Qty2, 0)) AS OrderQty2, SUM(ISNULL(o.Qty3, 0)) AS OrderQty3, SUM(ISNULL(o.Qty4, 0)) AS OrderQty4, SUM(ISNULL(o.Qty5, 0)) AS OrderQty5, SUM(ISNULL(o.Qty6, 0)) AS OrderQty6, SUM(ISNULL(o.Qty7, 0)) AS OrderQty7, SUM(ISNULL(o.Qty8, 0)) AS OrderQty8, SUM(ISNULL(o.Qty9, 0)) AS OrderQty9, SUM(ISNULL(o.Qty10, 0)) AS OrderQty10,
-//                     SUM(ISNULL(o.Total, 0)) AS TotalOrderQty
-//                 FROM [FC_SYSTEM].[dbo].[ViewOrderQty] AS o
-//                 WHERE EXISTS (SELECT 1 FROM [FC_SYSTEM].[dbo].[ViewSpreading_Inv] vi WHERE vi.Style = o.Style AND vi.EngColor = o.EngColor AND vi.Create_Date >= @StartDate)
-//                 GROUP BY o.Style, o.EngColor
-//             ) AS OrderColorAggregates
-//         )
-//         SELECT
-//             v.Style AS StyleNo, v.Create_Date AS TxnDate, v.TxnNo, CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer, v.BuyerStyle,
-//             v.EngColor AS Color, v.ChnColor, v.ColorNo AS ColorCode, v.Fabric_Type AS FabricType, v.Material,
-
-//             -- *** 2. ROBUST SPREADTABLE LOGIC ADDED ***
-//             CASE
-//                 WHEN PATINDEX('%[_ ]%', v.PreparedBy) > 0
-//                 THEN LTRIM(SUBSTRING(v.PreparedBy, PATINDEX('%[_ ]%', v.PreparedBy) + 1, LEN(v.PreparedBy)))
-//                 ELSE v.PreparedBy
-//             END AS SpreadTable,
-
-//             v.TableNo, v.RollQty, ROUND(v.SpreadYds, 3) AS SpreadYds, v.Unit,
-//             ROUND(v.GrossKgs, 3) AS GrossKgs, ROUND(v.NetKgs, 3) AS NetKgs, v.PlanLayer, v.ActualLayer,
-//             CAST(ISNULL(v.PlanLayer, 0) * (ISNULL(v.Ratio1, 0) + ISNULL(v.Ratio2, 0) + ISNULL(v.Ratio3, 0) + ISNULL(v.Ratio4, 0) + ISNULL(v.Ratio5, 0) + ISNULL(v.Ratio6, 0) + ISNULL(v.Ratio7, 0) + ISNULL(v.Ratio8, 0) + ISNULL(v.Ratio9, 0) + ISNULL(v.Ratio10, 0)) AS INT) AS TotalPcs,
-//             v.Pattern AS MackerNo, ROUND(v.MarkerLength, 3) AS MackerLength, ld.LotNos, od.OrderQty1, od.OrderQty2, od.OrderQty3, od.OrderQty4, od.OrderQty5,
-//             od.OrderQty6, od.OrderQty7, od.OrderQty8, od.OrderQty9, od.OrderQty10, od.TotalOrderQty, od.TotalOrderQtyStyle, v.Ratio1 AS CuttingRatio1,
-//             v.Ratio2 AS CuttingRatio2, v.Ratio3 AS CuttingRatio3, v.Ratio4 AS CuttingRatio4, v.Ratio5 AS CuttingRatio5, v.Ratio6 AS CuttingRatio6,
-//             v.Ratio7 AS CuttingRatio7, v.Ratio8 AS CuttingRatio8, v.Ratio9 AS CuttingRatio9, v.Ratio10 AS CuttingRatio10, v.Size1, v.Size2, v.Size3,
-//             v.Size4, v.Size5, v.Size6, v.Size7, v.Size8, v.Size9, v.Size10,
-//             NULL AS TotalTTLRoll, NULL AS TotalTTLQty, NULL AS TotalBiddingQty, NULL AS TotalBiddingRollQty,
-//             NULL AS SendFactory, NULL AS SendTxnDate, NULL AS SendTxnNo, NULL AS SendTotalQty
-//         FROM [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS v
-//         LEFT JOIN LotData AS ld ON v.Style = ld.Style AND v.TableNo = ld.TableNo
-//         LEFT JOIN OrderData AS od ON v.Style = od.Style AND v.EngColor = od.EngColor
-//         WHERE v.TableNo IS NOT NULL AND v.TableNo <> '' AND v.Create_Date >= @StartDate
-//         ORDER BY v.Create_Date DESC;
-//       `;
-
-//       const request = new sql.Request(poolYMWHSYS2);
-//       request.stream = true; // Enable streaming mode
-
-//       let syncedCount = 0;
-//       let hadError = false;
-
-//       // Event fires for EACH ROW
-//       request.on("row", async (row) => {
-//         try {
-//           request.pause();
-
-//           const markerRatio = [];
-//           for (let j = 1; j <= 10; j++) {
-//             markerRatio.push({
-//               no: j,
-//               size: row[`Size${j}`],
-//               cuttingRatio: row[`CuttingRatio${j}`],
-//               orderQty: row[`OrderQty${j}`]
-//             });
-//           }
-//           const lotNos = row.LotNos
-//             ? row.LotNos.split(",").map((lot) => lot.trim())
-//             : [];
-
-//           // *** 3. COMPOUND FILTER FOR UNIQUENESS ***
-//           await CutPanelOrders.updateOne(
-//             { TxnNo: row.TxnNo, StyleNo: row.StyleNo }, // Corrected compound filter
-//             {
-//               $set: {
-//                 /* Full document mapping */ StyleNo: row.StyleNo,
-//                 TxnDate: row.TxnDate ? new Date(row.TxnDate) : null,
-//                 TxnNo: row.TxnNo,
-//                 Buyer: row.Buyer,
-//                 Color: row.Color,
-//                 SpreadTable: row.SpreadTable,
-//                 TableNo: row.TableNo,
-//                 BuyerStyle: row.BuyerStyle,
-//                 ChColor: row.ChColor,
-//                 ColorCode: row.ColorCode,
-//                 FabricType: row.FabricType,
-//                 Material: row.Material,
-//                 RollQty: row.RollQty,
-//                 SpreadYds: row.SpreadYds,
-//                 Unit: row.Unit,
-//                 GrossKgs: row.GrossKgs,
-//                 NetKgs: row.NetKgs,
-//                 MackerNo: row.MackerNo,
-//                 MackerLength: row.MackerLength,
-//                 SendFactory: row.SendFactory,
-//                 SendTxnDate: row.SendTxnDate ? new Date(row.SendTxnDate) : null,
-//                 SendTxnNo: row.SendTxnNo,
-//                 SendTotalQty: row.SendTotalQty,
-//                 PlanLayer: row.PlanLayer,
-//                 ActualLayer: row.ActualLayer,
-//                 TotalPcs: row.TotalPcs,
-//                 LotNos: lotNos,
-//                 TotalOrderQty: row.TotalOrderQty,
-//                 TotalTTLRoll: row.TotalTTLRoll,
-//                 TotalTTLQty: row.TotalTTLQty,
-//                 TotalBiddingQty: row.TotalBiddingQty,
-//                 TotalBiddingRollQty: row.TotalBiddingRollQty,
-//                 TotalOrderQtyStyle: row.TotalOrderQtyStyle,
-//                 MarkerRatio: markerRatio
-//               }
-//             },
-//             { upsert: true }
-//           );
-
-//           syncedCount++;
-//           if (syncedCount % 100 === 0) {
-//             console.log(
-//               `[CutPanelOrders] ...synced ${syncedCount} records so far...`
-//             );
-//           }
-//         } catch (mongoErr) {
-//           console.error(
-//             `[CutPanelOrders] Error processing row for TxnNo ${row.TxnNo}, Style ${row.StyleNo}:`,
-//             mongoErr
-//           );
-//           hadError = true;
-//         } finally {
-//           request.resume();
-//         }
-//       });
-
-//       // Event fires on a fatal SQL error
-//       request.on("error", (err) => {
-//         console.error("[CutPanelOrders] CRITICAL SQL STREAM ERROR:", err);
-//         hadError = true;
-//         reject(err);
-//       });
-
-//       // Event fires when all rows have been processed
-//       request.on("done", () => {
-//         if (!hadError) {
-//           console.log(
-//             `[CutPanelOrders] STREAMING SYNC COMPLETE. Total documents processed: ${syncedCount}.`
-//           );
-//           resolve();
-//         } else {
-//           console.error(
-//             "[CutPanelOrders] STREAMING SYNC finished with one or more errors."
-//           );
-//           reject(new Error("Sync completed with errors."));
-//         }
-//       });
-
-//       // Start the query
-//       console.log(
-//         "[CutPanelOrders] Executing streaming SQL query for the last 600 days..."
-//       );
-//       request.query(query);
-//     } catch (err) {
-//       console.error("[CutPanelOrders] Error setting up the sync:", err);
-//       reject(err);
-//     }
-//   });
-// }
-
-/* --------------------------------------------------------
-   Cut Panel Orders Sync with GATEKEEPER to prevent deadlocks
--------------------------------------------------------- */
-
-// *** 1. THE GATEKEEPER VARIABLE ***
-let isCutPanelSyncRunning = false;
-
-async function syncCutPanelOrders() {
-  // *** 2. THE GATEKEEPER CHECK ***
-  if (isCutPanelSyncRunning) {
-    console.log(
-      "[CutPanelOrders] Sync is already in progress. Skipping this run."
-    );
-    return;
-  }
-
-  // *** 3. THE TRY...FINALLY BLOCK TO ENSURE THE LOCK IS RELEASED ***
-  try {
-    isCutPanelSyncRunning = true; // Set the lock
-    console.log("[CutPanelOrders] Starting sync at", new Date().toISOString());
-
-    if (!sqlConnectionStatus.YMWHSYS2) {
-      console.warn(
-        "[CutPanelOrders] Skipping sync: YMWHSYS2 database is not connected."
-      );
-      return; // The 'finally' block will still run to release the lock
-    }
-
-    await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
-
-    // This is your query for a rolling 3-day update. This is perfect for the cron job.
-    const query = `
-      DECLARE @StartDate DATE = CAST(DATEADD(DAY, -3, GETDATE()) AS DATE);
-      -- The rest of your optimized SQL query...
-      WITH 
-      LotData AS (
-          SELECT v.Style, v.TableNo, STUFF((SELECT DISTINCT ', ' + v_inner.Lot FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v_inner WHERE v_inner.Style = v.Style AND v_inner.TableNo = v.TableNo AND v_inner.Lot IS NOT NULL AND v_inner.Lot <> '' FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos
-          FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v INNER JOIN [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS inv_filter ON v.TxnNo = inv_filter.TxnNo
-          WHERE v.Lot IS NOT NULL AND v.Lot <> '' AND inv_filter.Create_Date >= @StartDate
-          GROUP BY v.Style, v.TableNo
-      ),
-      OrderData AS (
-          SELECT Style, EngColor, Size1, Size2, Size3, Size4, Size5, Size6, Size7, Size8, Size9, Size10,
-              OrderQty1, OrderQty2, OrderQty3, OrderQty4, OrderQty5, OrderQty6, OrderQty7, OrderQty8, OrderQty9, OrderQty10,
-              TotalOrderQty, SUM(TotalOrderQty) OVER (PARTITION BY Style) AS TotalOrderQtyStyle
-          FROM (
-              SELECT o.Style, o.EngColor, MAX(o.Size1) AS Size1, MAX(o.Size2) AS Size2, MAX(o.Size3) AS Size3, MAX(o.Size4) AS Size4, MAX(o.Size5) AS Size5, MAX(o.Size6) AS Size6, MAX(o.Size7) AS Size7, MAX(o.Size8) AS Size8, MAX(o.Size9) AS Size9, MAX(o.Size10) AS Size10,
-                  SUM(ISNULL(o.Qty1, 0)) AS OrderQty1, SUM(ISNULL(o.Qty2, 0)) AS OrderQty2, SUM(ISNULL(o.Qty3, 0)) AS OrderQty3, SUM(ISNULL(o.Qty4, 0)) AS OrderQty4, SUM(ISNULL(o.Qty5, 0)) AS OrderQty5, SUM(ISNULL(o.Qty6, 0)) AS OrderQty6, SUM(ISNULL(o.Qty7, 0)) AS OrderQty7, SUM(ISNULL(o.Qty8, 0)) AS OrderQty8, SUM(ISNULL(o.Qty9, 0)) AS OrderQty9, SUM(ISNULL(o.Qty10, 0)) AS OrderQty10,
-                  SUM(ISNULL(o.Total, 0)) AS TotalOrderQty
-              FROM [FC_SYSTEM].[dbo].[ViewOrderQty] AS o
-              WHERE EXISTS (SELECT 1 FROM [FC_SYSTEM].[dbo].[ViewSpreading_Inv] vi WHERE vi.Style = o.Style AND vi.EngColor = o.EngColor AND vi.Create_Date >= @StartDate)
-              GROUP BY o.Style, o.EngColor
-          ) AS OrderColorAggregates
-      )
-      SELECT
-          v.Style AS StyleNo, v.Create_Date AS TxnDate, v.TxnNo, CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer, v.BuyerStyle,
-          v.EngColor AS Color, v.ChnColor, v.ColorNo AS ColorCode, v.Fabric_Type AS FabricType, v.Material,
-          CASE WHEN PATINDEX('%[_ ]%', v.PreparedBy) > 0 THEN LTRIM(SUBSTRING(v.PreparedBy, PATINDEX('%[_ ]%', v.PreparedBy) + 1, LEN(v.PreparedBy))) ELSE v.PreparedBy END AS SpreadTable,
-          v.TableNo, v.RollQty, ROUND(v.SpreadYds, 3) AS SpreadYds, v.Unit, ROUND(v.GrossKgs, 3) AS GrossKgs, ROUND(v.NetKgs, 3) AS NetKgs,
-          v.PlanLayer, v.ActualLayer, CAST(ISNULL(v.PlanLayer, 0) * (ISNULL(v.Ratio1, 0) + ISNULL(v.Ratio2, 0) + ISNULL(v.Ratio3, 0) + ISNULL(v.Ratio4, 0) + ISNULL(v.Ratio5, 0) + ISNULL(v.Ratio6, 0) + ISNULL(v.Ratio7, 0) + ISNULL(v.Ratio8, 0) + ISNULL(v.Ratio9, 0) + ISNULL(v.Ratio10, 0)) AS INT) AS TotalPcs,
-          v.Pattern AS MackerNo, ROUND(v.MarkerLength, 3) AS MackerLength, ld.LotNos, od.OrderQty1, od.OrderQty2, od.OrderQty3, od.OrderQty4, od.OrderQty5,
-          od.OrderQty6, od.OrderQty7, od.OrderQty8, od.OrderQty9, od.OrderQty10, od.TotalOrderQty, od.TotalOrderQtyStyle, v.Ratio1 AS CuttingRatio1,
-          v.Ratio2 AS CuttingRatio2, v.Ratio3 AS CuttingRatio3, v.Ratio4 AS CuttingRatio4, v.Ratio5 AS CuttingRatio5, v.Ratio6 AS CuttingRatio6,
-          v.Ratio7 AS CuttingRatio7, v.Ratio8 AS CuttingRatio8, v.Ratio9 AS CuttingRatio9, v.Ratio10 AS CuttingRatio10, v.Size1, v.Size2, v.Size3,
-          v.Size4, v.Size5, v.Size6, v.Size7, v.Size8, v.Size9, v.Size10,
-          NULL AS TotalTTLRoll, NULL AS TotalTTLQty, NULL AS TotalBiddingQty, NULL AS TotalBiddingRollQty,
-          NULL AS SendFactory, NULL AS SendTxnDate, NULL AS SendTxnNo, NULL AS SendTotalQty
-      FROM [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS v
-      LEFT JOIN LotData AS ld ON v.Style = ld.Style AND v.TableNo = ld.TableNo
-      LEFT JOIN OrderData AS od ON v.Style = od.Style AND v.EngColor = od.EngColor
-      WHERE v.TableNo IS NOT NULL AND v.TableNo <> '' AND v.Create_Date >= @StartDate
-      ORDER BY v.Create_Date DESC;
-    `;
-
-    const result = await poolYMWHSYS2.request().query(query);
-    const records = result.recordset;
-
-    if (records.length > 0) {
-      const bulkOps = records.map((row) => ({
-        updateOne: {
-          filter: { TxnNo: row.TxnNo },
-          update: {
-            $set: {
-              StyleNo: row.StyleNo,
-              TxnDate: row.TxnDate ? new Date(row.TxnDate) : null,
-              TxnNo: row.TxnNo,
-              Buyer: row.Buyer,
-              Color: row.Color,
-              SpreadTable: row.SpreadTable,
-              TableNo: row.TableNo,
-              BuyerStyle: row.BuyerStyle,
-              ChColor: row.ChColor,
-              ColorCode: row.ColorCode,
-              FabricType: row.FabricType,
-              Material: row.Material,
-              RollQty: row.RollQty,
-              SpreadYds: row.SpreadYds,
-              Unit: row.Unit,
-              GrossKgs: row.GrossKgs,
-              NetKgs: row.NetKgs,
-              MackerNo: row.MackerNo,
-              MackerLength: row.MackerLength,
-              SendFactory: row.SendFactory,
-              SendTxnDate: row.SendTxnDate ? new Date(row.SendTxnDate) : null,
-              SendTxnNo: row.SendTxnNo,
-              SendTotalQty: row.SendTotalQty,
-              PlanLayer: row.PlanLayer,
-              ActualLayer: row.ActualLayer,
-              TotalPcs: row.TotalPcs,
-              LotNos: row.LotNos
-                ? row.LotNos.split(",").map((lot) => lot.trim())
-                : [],
-              TotalOrderQty: row.TotalOrderQty,
-              TotalTTLRoll: row.TotalTTLRoll,
-              TotalTTLQty: row.TotalTTLQty,
-              TotalBiddingQty: row.TotalBiddingQty,
-              TotalBiddingRollQty: row.TotalBiddingRollQty,
-              TotalOrderQtyStyle: row.TotalOrderQtyStyle,
-              MarkerRatio: Array.from({ length: 10 }, (_, k) => ({
-                no: k + 1,
-                size: row[`Size${k + 1}`],
-                cuttingRatio: row[`CuttingRatio${k + 1}`],
-                orderQty: row[`OrderQty${k + 1}`]
-              }))
-            }
-          },
-          upsert: true
-        }
-      }));
-      await CutPanelOrders.bulkWrite(bulkOps);
-      console.log(
-        `[CutPanelOrders] Successfully synced ${bulkOps.length} documents.`
-      );
-    } else {
-      console.log(
-        "[CutPanelOrders] No new documents to sync in the last 3 days."
-      );
-    }
-  } catch (err) {
-    console.error("Error during cutpanelorders sync:", err);
-  } finally {
-    isCutPanelSyncRunning = false; // Release the lock
-  }
-}
-
-// Schedule the syncCutPanelOrders function to run every 5 minutes
-cron.schedule("*/5 * * * *", syncCutPanelOrders);
-console.log("Scheduled cutpanelorders sync with deadlock protection.");
-
-/* ------------------------------
-   Manual Sync Endpoint & Server Start
------------------------------- */
-
-app.post("/api/sync-cutpanel-orders", async (req, res) => {
-  // This manual trigger will also respect the gatekeeper
-  syncCutPanelOrders();
-  res.status(202).json({
-    message:
-      "Cut panel orders sync initiated successfully. Check logs for progress."
-  });
-});
-
 // /* ------------------------------
-//    New Cut Panel Orders Endpoint
+//    YM DataSore SQL
 // ------------------------------ */
 
-// async function syncCutPanelOrders() {
+// // SQL Server Configuration for YMDataStore
+// const sqlConfig = {
+//   user: "ymdata",
+//   password: "Kzw15947",
+//   server: "192.167.1.13",
+//   port: 1433,
+//   database: "YMDataStore",
+//   options: {
+//     encrypt: false, // Use true if SSL is required
+//     trustServerCertificate: true // For self-signed certificates
+//   },
+//   requestTimeout: 3000000, // Set timeout to 5 minutes (300,000 ms)
+//   pool: {
+//     max: 10,
+//     min: 0,
+//     idleTimeoutMillis: 30000
+//   }
+// };
+
+// /* ------------------------------
+//    YMCE_SYSTEM SQL
+// ------------------------------ */
+
+// // SQL Server Configuration for YMCE_SYSTEM
+// const sqlConfigYMCE = {
+//   user: "visitor",
+//   password: "visitor",
+//   server: "192.167.1.240", //"ymws-150",
+//   //port: 1433,
+//   database: "YMCE_SYSTEM",
+//   options: {
+//     encrypt: false,
+//     trustServerCertificate: true
+//   },
+//   requestTimeout: 300000,
+//   connectionTimeout: 300000, // Increase connection timeout to 300 seconds
+//   pool: {
+//     max: 10,
+//     min: 0,
+//     idleTimeoutMillis: 30000
+//   }
+// };
+
+// /* ------------------------------
+//    YMWHSYS2 SQL Configuration
+// ------------------------------ */
+
+// const sqlConfigYMWHSYS2 = {
+//   user: "user01",
+//   password: "Ur@12323",
+//   server: "192.167.1.14", //"YM-WHSYS",
+//   database: "FC_SYSTEM",
+//   options: {
+//     encrypt: false,
+//     trustServerCertificate: true
+//   },
+//   requestTimeout: 18000000,
+//   connectionTimeout: 18000000,
+//   pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
+// };
+
+// // Create connection pools
+// const poolYMDataStore = new sql.ConnectionPool(sqlConfig);
+// const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
+// const poolYMWHSYS2 = new sql.ConnectionPool(sqlConfigYMWHSYS2);
+
+// // MODIFICATION: Add a status tracker for SQL connections
+// const sqlConnectionStatus = {
+//   YMDataStore: false,
+//   YMCE_SYSTEM: false,
+//   YMWHSYS2: false
+// };
+
+// // Function to connect to a pool, now it updates the status tracker
+// async function connectPool(pool, poolName) {
+//   try {
+//     await pool.connect();
+//     console.log(
+//       `✅ Successfully connected to ${poolName} pool at ${pool.config.server}`
+//     );
+//     sqlConnectionStatus[poolName] = true; // Set status to true on success
+
+//     // Listen for errors on the pool to detect disconnections
+//     pool.on("error", (err) => {
+//       console.error(`SQL Pool Error for ${poolName}:`, err);
+//       sqlConnectionStatus[poolName] = false; // Set status to false on error
+//     });
+//   } catch (err) {
+//     console.error(`❌ FAILED to connect to ${poolName} pool:`, err.message);
+//     sqlConnectionStatus[poolName] = false; // Ensure status is false on failure
+//     // We throw the error so Promise.allSettled can catch it
+//     throw new Error(`Failed to connect to ${poolName}`);
+//   }
+// }
+
+// // MODIFICATION: This function is now more critical for on-demand reconnections.
+// async function ensurePoolConnected(pool, poolName) {
+//   // If we know the connection is down, or the pool reports it's not connected
+//   if (!sqlConnectionStatus[poolName] || !pool.connected) {
+//     console.log(
+//       `Pool ${poolName} is not connected. Attempting to reconnect...`
+//     );
+//     try {
+//       // Attempt to close the pool if it's in a broken state before reconnecting
+//       if (pool.connected || pool.connecting) {
+//         await pool.close();
+//       }
+//       await connectPool(pool, poolName); // This will re-attempt connection and update the status
+//     } catch (reconnectErr) {
+//       console.error(
+//         `Failed to reconnect to ${poolName}:`,
+//         reconnectErr.message
+//       );
+//       sqlConnectionStatus[poolName] = false; // Ensure status is false
+//       throw reconnectErr; // Throw error to be caught by the calling function
+//     }
+//   }
+//   // If we reach here, the pool should be connected.
+//   if (!sqlConnectionStatus[poolName]) {
+//     throw new Error(`Database ${poolName} is unavailable.`);
+//   }
+// }
+
+// // Drop the conflicting St_No_1 index if it exists
+// async function dropConflictingIndex() {
+//   try {
+//     const indexes = await InlineOrders.collection.getIndexes();
+//     if (indexes["St_No_1"]) {
+//       await InlineOrders.collection.dropIndex("St_No_1");
+//       console.log("Dropped conflicting St_No_1 index.");
+//     } else {
+//       console.log("St_No_1 index not found, no need to drop.");
+//     }
+//   } catch (err) {
+//     console.error("Error dropping St_No_1 index:", err);
+//   }
+// }
+
+// /* ------------------------------
+//    Initialize Pools and Run Initial Syncs
+// ------------------------------ */
+
+// // MODIFICATION: Rewritten initializePools and server startup logic
+// async function initializeServer() {
+//   console.log("--- Initializing Server ---");
+
+//   // 1. Handle MongoDB Index
+//   await dropConflictingIndex();
+
+//   // 2. Attempt to connect to all SQL pools without crashing
+//   console.log("Initializing SQL connection pools...");
+//   const connectionPromises = [
+//     connectPool(poolYMDataStore, "YMDataStore"),
+//     connectPool(poolYMCE, "YMCE_SYSTEM"),
+//     connectPool(poolYMWHSYS2, "YMWHSYS2")
+//   ];
+
+//   // Promise.allSettled will not short-circuit. It waits for all promises.
+//   const results = await Promise.allSettled(connectionPromises);
+
+//   results.forEach((result) => {
+//     if (result.status === "rejected") {
+//       // The error is already logged in connectPool, but we can add a summary here.
+//       console.warn(
+//         `Initialization Warning: ${result.reason.message}. Dependent services will be unavailable.`
+//       );
+//     }
+//   });
+
+//   console.log("Current SQL Connection Status:", sqlConnectionStatus);
+//   console.log(
+//     "SQL pool initialization complete. Server will continue regardless of failures."
+//   );
+
+//   // 3. Run initial data syncs. These functions will now check the connection status internally.
+//   console.log("Running initial data synchronizations...");
+//   await syncInlineOrders();
+//   await syncCutPanelOrders();
+//   await syncQC1SunriseData();
+
+//   console.log("--- Server Initialization Complete ---");
+// }
+
+// // Start the server initialization
+// initializeServer().catch((err) => {
+//   // This catch is for any unexpected errors during the setup process itself.
+//   console.error("A critical error occurred during server initialization:", err);
+//   // still want to exit here if something truly fundamental fails.
+//   // process.exit(1);
+// });
+
+// /* ------------------------------
+//   Fetching RS18 Data from YMDataStore
+// ------------------------------ */
+
+// // New Endpoint for RS18 Data (YMDataStore)
+// app.get("/api/sunrise/rs18", async (req, res) => {
+//   if (!sqlConnectionStatus.YMDataStore) {
+//     return res.status(503).json({
+//       message:
+//         "Service Unavailable: The YMDataStore database is not connected.",
+//       error: "Database connection failed"
+//     });
+//   }
+//   try {
+//     await ensurePoolConnected(poolYMDataStore, "YMDataStore");
+//     const request = poolYMDataStore.request();
+//     //pool = await connectToSqlServerYMDataStore();
+//     const query = `
+//       SELECT
+//         FORMAT(CAST(dDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName,
+//         ReworkCode,
+//         CASE ReworkCode
+//           WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
+//           WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
+//           WHEN '3' THEN N'ដេររមួល / 扭 / Twisted'
+//           WHEN '4' THEN N'ជ្រួញនិងទឹករលក និងប៉ោងសាច់ / 起皺/波浪/起包 / Puckering/ Wavy/ Fullness'
+//           WHEN '5' THEN N'ដាច់អំបោះ / 斷線 / Broken stitches'
+//           WHEN '6' THEN N'លោតអំបោះ / 跳線 / Skipped stitches'
+//           WHEN '7' THEN N'ប្រឡាក់ប្រេង / 油漬 / Oil stain'
+//           WHEN '8' THEN N'ធ្លុះរន្ធ / 破洞 (包括針洞) / Hole/ Needle hole'
+//           WHEN '9' THEN N'ខុសពណ៏ / 色差 / Color shading'
+//           WHEN '10' THEN N'ផ្លាកដេរខុសសេរីនិងដេរខុសផ្លាក / 嘜頭錯碼/車錯嘜頭 / Label sewn wrong size/style/po'
+//           WHEN '11' THEN N'ប្រឡាក់ / 髒污 / Dirty stain'
+//           WHEN '12' THEN N'រហែកថ្នេរ / 爆縫 / Open seam'
+//           WHEN '13' THEN N'អត់បានដេរ / 漏車縫/漏空 / Missed sewing'
+//           WHEN '14' THEN N'ព្រុយ / 線頭 / Untrimmed thread ends'
+//           WHEN '15' THEN N'ខូចសាច់ក្រណាត់(មិនអាចកែ) / 布疵（改不了） / Fabric defect (unrepairable)'
+//           WHEN '16' THEN N'គៀបសាច់ / 打折 / Pleated'
+//           WHEN '17' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់ / 燙畫/印花/繡花 / Heat transfer/ Printing/ EMB defect'
+//           WHEN '18' THEN N'អាវកែផ្សេងៗ / 其它返工 / Others'
+//           WHEN '19' THEN N'អ៊ុតអត់ជាប់ / 熨燙不良 / Insecure of Heat transfer'
+//           WHEN '20' THEN N'ទំហំទទឺងតូចធំមិនស្មើគ្នា / 左右大小不均匀 / Uneven width'
+//           WHEN '21' THEN N'គំលាតម្ជុល តឹង និង ធូរអំបោះពេក / 針距: 線緊/線鬆 / Stitch density tight/loose'
+//           WHEN '22' THEN N'សល់ជាយ និង ព្រុយខាងៗ / 毛邊 止口 / Fray edge / Raw edge'
+//           WHEN '23' THEN N'ជ្រលក់ពណ៏ខុស រឺក៏ ខូច / 染色不正確 - 次品/廢品 / Incorrect dying'
+//           WHEN '24' THEN N'ប្រឡាក់ប្រេង2 / 油漬2 / Oil stain 2'
+//           WHEN '25' THEN N'ខុសពណ៏2 / 色差2 / Color variation 2'
+//           WHEN '26' THEN N'ប្រឡាក់2 / 髒污2 / Dirty stain 2'
+//           WHEN '27' THEN N'ឆ្នូតក្រណាត់2 / 布疵2 / Fabric defect 2'
+//           WHEN '28' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់2 / 燙畫 / 印花 /繡花 2 / Heat transfer/ Printing/ EMB defect 2'
+//           WHEN '29' THEN N'ដេរអត់ជាប់ / 不牢固 / Insecure'
+//           WHEN '30' THEN N'ដេរធ្លាក់ទឹក / 落坑 / Run off stitching'
+//           WHEN '31' THEN N'ខូចទ្រង់ទ្រាយ / 形状不良 / Poor shape'
+//           WHEN '32' THEN N'បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន) / 布有飞纱，勾纱(可修) / Fabric fly yarn / snagging (repairable)'
+//           WHEN '33' THEN N'មិនចំគ្នា / 不对称（骨位，间条） / Mismatched'
+//           WHEN '34' THEN N'បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំ វៀច / 车标问题:错位置,反,高低,歪斜 / Label: misplace,invert,uneven,slant'
+//           WHEN '35' THEN N'ស្មាមម្ជុល / 针孔 / Needle Mark'
+//           WHEN '36' THEN N'បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-) / 衣服錯碼(某部位/裁片) / Wrong size of garment(cut panel/part)'
+//           WHEN '37' THEN N'ផ្សេងៗ / 其它-做工不良 / Others - Poor Workmanship (Spare) 2'
+//           WHEN '38' THEN N'បញ្ហាបោកទឹក / ជ្រលក់ពណ៌ / 洗水 / 染色不正确 / Improper Washing Dyeing'
+//           WHEN '39' THEN N'បញ្ហាអ៊ុត- ឡើងស / ស្នាម / ខ្លោច -ល- / 烫工不良:起镜 / 压痕 / 烫焦 / Improper Ironing: Glazing / Mark / Scorch, etc…'
+//           WHEN '40' THEN N'បញ្ហាអ៊ុត: ខូចទ្រង់ទ្រាយ / ខូចរាង / 烫工不良:变形 / 外观不良 / Improper Ironing: Off Shape / Poor Appearance'
+//           WHEN '41' THEN N'ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា / 左右高低 / Asymmetry / Hi-Low'
+//           WHEN '42' THEN N'ថ្នេរដេរមិនត្រួតគ្នា តូចធំមិនស្មើគ្នា / 车线不重叠 大小不均匀 / Uneven / Misalign stitches'
+//           WHEN '43' THEN N'បញ្ហាលើសខ្នាត(+) / 尺寸问题 (+大) / Measurement issue positive'
+//           WHEN '44' THEN N'បញ្ហាខ្វះខ្នាត(-) / 尺寸问题 (-小) / Measurement issue negative'
+//           ELSE NULL
+//         END AS ReworkName,
+//         SUM(QtyRework) AS DefectsQty
+//       FROM
+//         YMDataStore.SUNRISE.RS18 r
+//       WHERE
+//         TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+//         AND SeqNo <> 700
+//         AND TRY_CAST(ReworkCode AS INT) BETWEEN 1 AND 44
+//         AND CAST(dDate AS DATE) > '2022-12-31'
+//         AND CAST(dDate AS DATE) < DATEADD(DAY, 1, GETDATE())
+//       GROUP BY
+//         CAST(dDate AS DATE),
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName,
+//         ReworkCode
+//       HAVING
+//         CASE ReworkCode
+//           WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
+//           WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
+//           WHEN '3' THEN N'ដេររមួល / 扭 / Twisted'
+//           WHEN '4' THEN N'ជ្រួញនិងទឹករលក និងប៉ោងសាច់ / 起皺/波浪/起包 / Puckering/ Wavy/ Fullness'
+//           WHEN '5' THEN N'ដាច់អំបោះ / 斷線 / Broken stitches'
+//           WHEN '6' THEN N'លោតអំបោះ / 跳線 / Skipped stitches'
+//           WHEN '7' THEN N'ប្រឡាក់ប្រេង / 油漬 / Oil stain'
+//           WHEN '8' THEN N'ធ្លុះរន្ធ / 破洞 (包括針洞) / Hole/ Needle hole'
+//           WHEN '9' THEN N'ខុសពណ៏ / 色差 / Color shading'
+//           WHEN '10' THEN N'ផ្លាកដេរខុសសេរីនិងដេរខុសផ្លាក / 嘜頭錯碼/車錯嘜頭 / Label sewn wrong size/style/po'
+//           WHEN '11' THEN N'ប្រឡាក់ / 髒污 / Dirty stain'
+//           WHEN '12' THEN N'រហែកថ្នេរ / 爆縫 / Open seam'
+//           WHEN '13' THEN N'អត់បានដេរ / 漏車縫/漏空 / Missed sewing'
+//           WHEN '14' THEN N'ព្រុយ / 線頭 / Untrimmed thread ends'
+//           WHEN '15' THEN N'ខូចសាច់ក្រណាត់(មិនអាចកែ) / 布疵（改不了） / Fabric defect (unrepairable)'
+//           WHEN '16' THEN N'គៀបសាច់ / 打折 / Pleated'
+//           WHEN '17' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់ / 燙畫/印花/繡花 / Heat transfer/ Printing/ EMB defect'
+//           WHEN '18' THEN N'អាវកែផ្សេងៗ / 其它返工 / Others'
+//           WHEN '19' THEN N'អ៊ុតអត់ជាប់ / 熨燙不良 / Insecure of Heat transfer'
+//           WHEN '20' THEN N'ទំហំទទឺងតូចធំមិនស្មើគ្នា / 左右大小不均匀 / Uneven width'
+//           WHEN '21' THEN N'គំលាតម្ជុល តឹង និង ធូរអំបោះពេក / 針距: 線緊/線鬆 / Stitch density tight/loose'
+//           WHEN '22' THEN N'សល់ជាយ និង ព្រុយខាងៗ / 毛邊 止口 / Fray edge / Raw edge'
+//           WHEN '23' THEN N'ជ្រលក់ពណ៏ខុស រឺក៏ ខូច / 染色不正確 - 次品/廢品 / Incorrect dying'
+//           WHEN '24' THEN N'ប្រឡាក់ប្រេង2 / 油漬2 / Oil stain 2'
+//           WHEN '25' THEN N'ខុសពណ៏2 / 色差2 / Color variation 2'
+//           WHEN '26' THEN N'ប្រឡាក់2 / 髒污2 / Dirty stain 2'
+//           WHEN '27' THEN N'ឆ្នូតក្រណាត់2 / 布疵2 / Fabric defect 2'
+//           WHEN '28' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់2 / 燙畫 / 印花 /繡花 2 / Heat transfer/ Printing/ EMB defect 2'
+//           WHEN '29' THEN N'ដេរអត់ជាប់ / 不牢固 / Insecure'
+//           WHEN '30' THEN N'ដេរធ្លាក់ទឹក / 落坑 / Run off stitching'
+//           WHEN '31' THEN N'ខូចទ្រង់ទ្រាយ / 形状不良 / Poor shape'
+//           WHEN '32' THEN N'បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន) / 布有飞纱，勾纱(可修) / Fabric fly yarn / snagging (repairable)'
+//           WHEN '33' THEN N'មិនចំគ្នា / 不对称（骨位，间条） / Mismatched'
+//           WHEN '34' THEN N'បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំ វៀច / 车标问题:错位置,反,高低,歪斜 / Label: misplace,invert,uneven,slant'
+//           WHEN '35' THEN N'ស្មាមម្ជុល / 针孔 / Needle Mark'
+//           WHEN '36' THEN N'បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-) / 衣服錯碼(某部位/裁片) / Wrong size of garment(cut panel/part)'
+//           WHEN '37' THEN N'ផ្សេងៗ / 其它-做工不良 / Others - Poor Workmanship (Spare) 2'
+//           WHEN '38' THEN N'បញ្ហាបោកទឹក / ជ្រលក់ពណ៌ / 洗水 / 染色不正确 / Improper Washing Dyeing'
+//           WHEN '39' THEN N'បញ្ហាអ៊ុត- ឡើងស / ស្នាម / ខ្លោច -ល- / 烫工不良:起镜 / 压痕 / 烫焦 / Improper Ironing: Glazing / Mark / Scorch, etc…'
+//           WHEN '40' THEN N'បញ្ហាអ៊ុត: ខូចទ្រង់ទ្រាយ / ខូចរាង / 烫工不良:变形 / 外观不良 / Improper Ironing: Off Shape / Poor Appearance'
+//           WHEN '41' THEN N'ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា / 左右高低 / Asymmetry / Hi-Low'
+//           WHEN '42' THEN N'ថ្នេរដេរមិនត្រួតគ្នា តូចធំមិនស្មើគ្នា / 车线不重叠 大小不均匀 / Uneven / Misalign stitches'
+//           WHEN '43' THEN N'បញ្ហាលើសខ្នាត(+) / 尺寸问题 (+大) / Measurement issue positive'
+//           WHEN '44' THEN N'បញ្ហាខ្វះខ្នាត(-) / 尺寸问题 (-小) / Measurement issue negative'
+//           ELSE NULL
+//         END IS NOT NULL;
+//     `;
+
+//     const result = await request.query(query);
+//     res.json(result.recordset);
+//   } catch (err) {
+//     console.error("Error fetching RS18 data:", err);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to fetch RS18 data", error: err.message });
+//   }
+// });
+
+// /* ------------------------------
+//    Fetching Sunrise Output Data from YMDataStore
+// ------------------------------ */
+
+// // New Endpoint for Sunrise Output Data (YMDataStore)
+// app.get("/api/sunrise/output", async (req, res) => {
+//   if (!sqlConnectionStatus.YMDataStore) {
+//     return res.status(503).json({
+//       message:
+//         "Service Unavailable: The YMDataStore database is not connected.",
+//       error: "Database connection failed"
+//     });
+//   }
+//   try {
+//     await ensurePoolConnected(poolYMDataStore, "YMDataStore");
+//     const request = poolYMDataStore.request();
+//     //pool = await connectToSqlServerYMDataStore();
+//     const query = `
+//       SELECT
+//         FORMAT(CAST(BillDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName,
+//         SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END) AS TotalQtyT38,
+//         SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END) AS TotalQtyT39
+//       FROM
+//       (
+//         SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2023
+//         UNION ALL
+//         SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2024
+//         UNION ALL
+//         SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2025
+//       ) AS CombinedData
+//       WHERE
+//         SeqNo IN (38, 39)
+//         AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+//       GROUP BY
+//         CAST(BillDate AS DATE),
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName;
+//     `;
+
+//     const result = await request.query(query);
+//     res.json(result.recordset);
+//   } catch (err) {
+//     console.error("Error fetching Sunrise Output data:", err);
+//     res.status(500).json({
+//       message: "Failed to fetch Sunrise Output data",
+//       error: err.message
+//     });
+//   }
+// });
+
+// /* ------------------------------
+//    QC1 Sunrise MongoDB
+// ------------------------------ */
+
+// // Function to fetch RS18 data (defects) - Last 7 days only
+// const fetchRS18Data = async () => {
+//   if (!sqlConnectionStatus.YMDataStore) {
+//     return res.status(503).json({
+//       message:
+//         "Service Unavailable: The YMDataStore database is not connected.",
+//       error: "Database connection failed"
+//     });
+//   }
+//   try {
+//     await ensurePoolConnected(poolYMDataStore, "YMDataStore");
+//     const request = poolYMDataStore.request();
+//     const query = `
+//       SELECT
+//         FORMAT(CAST(dDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName,
+//         ReworkCode,
+//         CASE ReworkCode
+//           WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
+//           WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
+//           WHEN '3' THEN N'ដេររមួល / 扭 / Twisted'
+//           WHEN '4' THEN N'ជ្រួញនិងទឹករលក និងប៉ោងសាច់ / 起皺/波浪/起包 / Puckering/ Wavy/ Fullness'
+//           WHEN '5' THEN N'ដាច់អំបោះ / 斷線 / Broken stitches'
+//           WHEN '6' THEN N'លោតអំបោះ / 跳線 / Skipped stitches'
+//           WHEN '7' THEN N'ប្រឡាក់ប្រេង / 油漬 / Oil stain'
+//           WHEN '8' THEN N'ធ្លុះរន្ធ / 破洞 (包括針洞) / Hole/ Needle hole'
+//           WHEN '9' THEN N'ខុសពណ៏ / 色差 / Color shading'
+//           WHEN '10' THEN N'ផ្លាកដេរខុសសេរីនិងដេរខុសផ្លាក / 嘜頭錯碼/車錯嘜頭 / Label sewn wrong size/style/po'
+//           WHEN '11' THEN N'ប្រឡាក់ / 髒污 / Dirty stain'
+//           WHEN '12' THEN N'រហែកថ្នេរ / 爆縫 / Open seam'
+//           WHEN '13' THEN N'អត់បានដេរ / 漏車縫/漏空 / Missed sewing'
+//           WHEN '14' THEN N'ព្រុយ / 線頭 / Untrimmed thread ends'
+//           WHEN '15' THEN N'ខូចសាច់ក្រណាត់(មិនអាចកែ) / 布疵（改不了） / Fabric defect (unrepairable)'
+//           WHEN '16' THEN N'គៀបសាច់ / 打折 / Pleated'
+//           WHEN '17' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់ / 燙畫/印花/繡花 / Heat transfer/ Printing/ EMB defect'
+//           WHEN '18' THEN N'អាវកែផ្សេងៗ / 其它返工 / Others'
+//           WHEN '19' THEN N'អ៊ុតអត់ជាប់ / 熨燙不良 / Insecure of Heat transfer'
+//           WHEN '20' THEN N'ទំហំទទឺងតូចធំមិនស្មើគ្នា / 左右大小不均匀 / Uneven width'
+//           WHEN '21' THEN N'គំលាតម្ជុល តឹង និង ធូរអំបោះពេក / 針距: 線緊/線鬆 / Stitch density tight/loose'
+//           WHEN '22' THEN N'សល់ជាយ និង ព្រុយខាងៗ / 毛邊 止口 / Fray edge / Raw edge'
+//           WHEN '23' THEN N'ជ្រលក់ពណ៏ខុស រឺក៏ ខូច / 染色不正確 - 次品/廢品 / Incorrect dying'
+//           WHEN '24' THEN N'ប្រឡាក់ប្រេង2 / 油漬2 / Oil stain 2'
+//           WHEN '25' THEN N'ខុសពណ៏2 / 色差2 / Color variation 2'
+//           WHEN '26' THEN N'ប្រឡាក់2 / 髒污2 / Dirty stain 2'
+//           WHEN '27' THEN N'ឆ្នូតក្រណាត់2 / 布疵2 / Fabric defect 2'
+//           WHEN '28' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់2 / 燙畫 / 印花 /繡花 2 / Heat transfer/ Printing/ EMB defect 2'
+//           WHEN '29' THEN N'ដេរអត់ជាប់ / 不牢固 / Insecure'
+//           WHEN '30' THEN N'ដេរធ្លាក់ទឹក / 落坑 / Run off stitching'
+//           WHEN '31' THEN N'ខូចទ្រង់ទ្រាយ / 形状不良 / Poor shape'
+//           WHEN '32' THEN N'បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន) / 布有飞纱，勾纱(可修) / Fabric fly yarn / snagging (repairable)'
+//           WHEN '33' THEN N'មិនចំគ្នា / 不对称（骨位，间条） / Mismatched'
+//           WHEN '34' THEN N'បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំ វៀច / 车标问题:错位置,反,高低,歪斜 / Label: misplace,invert,uneven,slant'
+//           WHEN '35' THEN N'ស្មាមម្ជុល / 针孔 / Needle Mark'
+//           WHEN '36' THEN N'បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-) / 衣服錯碼(某部位/裁片) / Wrong size of garment(cut panel/part)'
+//           WHEN '37' THEN N'ផ្សេងៗ / 其它-做工不良 / Others - Poor Workmanship (Spare) 2'
+//           WHEN '38' THEN N'បញ្ហាបោកទឹក / ជ្រលក់ពណ៌ / 洗水 / 染色不正确 / Improper Washing Dyeing'
+//           WHEN '39' THEN N'បញ្ហាអ៊ុត- ឡើងស / ស្នាម / ខ្លោច -ល- / 烫工不良:起镜 / 压痕 / 烫焦 / Improper Ironing: Glazing / Mark / Scorch, etc…'
+//           WHEN '40' THEN N'បញ្ហាអ៊ុត: ខូចទ្រង់ទ្រាយ / ខូចរាង / 烫工不良:变形 / 外观不良 / Improper Ironing: Off Shape / Poor Appearance'
+//           WHEN '41' THEN N'ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា / 左右高低 / Asymmetry / Hi-Low'
+//           WHEN '42' THEN N'ថ្នេរដេរមិនត្រួតគ្នា តូចធំមិនស្មើគ្នា / 车线不重叠 大小不均匀 / Uneven / Misalign stitches'
+//           WHEN '43' THEN N'បញ្ហាលើសខ្នាត(+) / 尺寸问题 (+大) / Measurement issue positive'
+//           WHEN '44' THEN N'បញ្ហាខ្វះខ្នាត(-) / 尺寸问题 (-小) / Measurement issue negative'
+//           ELSE NULL
+//         END AS ReworkName,
+//         SUM(QtyRework) AS DefectsQty
+//       FROM
+//         YMDataStore.SUNRISE.RS18 r
+//       WHERE
+//         TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+//         AND SeqNo <> 700
+//         AND TRY_CAST(ReworkCode AS INT) BETWEEN 1 AND 44
+//         AND CAST(dDate AS DATE) >= DATEADD(DAY, -7, GETDATE())
+//         AND CAST(dDate AS DATE) < DATEADD(DAY, 1, GETDATE())
+//       GROUP BY
+//         CAST(dDate AS DATE),
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName,
+//         ReworkCode
+//       HAVING
+//         CASE ReworkCode
+//           WHEN '1' THEN N'សំរុងវែងខ្លីមិនស្មើគ្នា(ខោ ដៃអាវ) / 左右長短(裤和袖长) / Uneven leg/sleeve length'
+//           WHEN '2' THEN N'មិនមែនកែដេរ / 非本位返工 / Non-defective'
+//           WHEN '3' THEN N'ដេររមួល / 扭 / Twisted'
+//           WHEN '4' THEN N'ជ្រួញនិងទឹករលក និងប៉ោងសាច់ / 起皺/波浪/起包 / Puckering/ Wavy/ Fullness'
+//           WHEN '5' THEN N'ដាច់អំបោះ / 斷線 / Broken stitches'
+//           WHEN '6' THEN N'លោតអំបោះ / 跳線 / Skipped stitches'
+//           WHEN '7' THEN N'ប្រឡាក់ប្រេង / 油漬 / Oil stain'
+//           WHEN '8' THEN N'ធ្លុះរន្ធ / 破洞 (包括針洞) / Hole/ Needle hole'
+//           WHEN '9' THEN N'ខុសពណ៏ / 色差 / Color shading'
+//           WHEN '10' THEN N'ផ្លាកដេរខុសសេរីនិងដេរខុសផ្លាក / 嘜頭錯碼/車錯嘜頭 / Label sewn wrong size/style/po'
+//           WHEN '11' THEN N'ប្រឡាក់ / 髒污 / Dirty stain'
+//           WHEN '12' THEN N'រហែកថ្នេរ / 爆縫 / Open seam'
+//           WHEN '13' THEN N'អត់បានដេរ / 漏車縫/漏空 / Missed sewing'
+//           WHEN '14' THEN N'ព្រុយ / 線頭 / Untrimmed thread ends'
+//           WHEN '15' THEN N'ខូចសាច់ក្រណាត់(មិនអាចកែ) / 布疵（改不了） / Fabric defect (unrepairable)'
+//           WHEN '16' THEN N'គៀបសាច់ / 打折 / Pleated'
+//           WHEN '17' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់ / 燙畫/印花/繡花 / Heat transfer/ Printing/ EMB defect'
+//           WHEN '18' THEN N'អាវកែផ្សេងៗ / 其它返工 / Others'
+//           WHEN '19' THEN N'អ៊ុតអត់ជាប់ / 熨燙不良 / Insecure of Heat transfer'
+//           WHEN '20' THEN N'ទំហំទទឺងតូចធំមិនស្មើគ្នា / 左右大小不均匀 / Uneven width'
+//           WHEN '21' THEN N'គំលាតម្ជុល តឹង និង ធូរអំបោះពេក / 針距: 線緊/線鬆 / Stitch density tight/loose'
+//           WHEN '22' THEN N'សល់ជាយ និង ព្រុយខាងៗ / 毛邊 止口 / Fray edge / Raw edge'
+//           WHEN '23' THEN N'ជ្រលក់ពណ៏ខុស រឺក៏ ខូច / 染色不正確 - 次品/廢品 / Incorrect dying'
+//           WHEN '24' THEN N'ប្រឡាក់ប្រេង2 / 油漬2 / Oil stain 2'
+//           WHEN '25' THEN N'ខុសពណ៏2 / 色差2 / Color variation 2'
+//           WHEN '26' THEN N'ប្រឡាក់2 / 髒污2 / Dirty stain 2'
+//           WHEN '27' THEN N'ឆ្នូតក្រណាត់2 / 布疵2 / Fabric defect 2'
+//           WHEN '28' THEN N'បញ្ហាផ្លាកអ៊ុត ព្រីននិងប៉ាក់2 / 燙畫 / 印花 /繡花 2 / Heat transfer/ Printing/ EMB defect 2'
+//           WHEN '29' THEN N'ដេរអត់ជាប់ / 不牢固 / Insecure'
+//           WHEN '30' THEN N'ដេរធ្លាក់ទឹក / 落坑 / Run off stitching'
+//           WHEN '31' THEN N'ខូចទ្រង់ទ្រាយ / 形状不良 / Poor shape'
+//           WHEN '32' THEN N'បញ្ហាក្រណាត់ចូលអំបោះ ទាក់សាច់(កែបាន) / 布有飞纱，勾纱(可修) / Fabric fly yarn / snagging (repairable)'
+//           WHEN '33' THEN N'មិនចំគ្នា / 不对称（骨位，间条） / Mismatched'
+//           WHEN '34' THEN N'បញ្ហាដេរផ្លាក៖ ខុសទីតាំង បញ្ច្រាស់ តូចធំ វៀច / 车标问题:错位置,反,高低,歪斜 / Label: misplace,invert,uneven,slant'
+//           WHEN '35' THEN N'ស្មាមម្ជុល / 针孔 / Needle Mark'
+//           WHEN '36' THEN N'បញ្ហាអាវដេរខុសសេរី(ខុសផ្ទាំង ចង្កេះ -ល-) / 衣服錯碼(某部位/裁片) / Wrong size of garment(cut panel/part)'
+//           WHEN '37' THEN N'ផ្សេងៗ / 其它-做工不良 / Others - Poor Workmanship (Spare) 2'
+//           WHEN '38' THEN N'បញ្ហាបោកទឹក / ជ្រលក់ពណ៌ / 洗水 / 染色不正确 / Improper Washing Dyeing'
+//           WHEN '39' THEN N'បញ្ហាអ៊ុត- ឡើងស / ស្នាម / ខ្លោច -ល- / 烫工不良:起镜 / 压痕 / 烫焦 / Improper Ironing: Glazing / Mark / Scorch, etc…'
+//           WHEN '40' THEN N'បញ្ហាអ៊ុត: ខូចទ្រង់ទ្រាយ / ខូចរាង / 烫工不良:变形 / 外观不良 / Improper Ironing: Off Shape / Poor Appearance'
+//           WHEN '41' THEN N'ឆ្វេងស្តាំខ្ពស់ទាបមិនស្មើគ្នា / 左右高低 / Asymmetry / Hi-Low'
+//           WHEN '42' THEN N'ថ្នេរដេរមិនត្រួតគ្នា តូចធំមិនស្មើគ្នា / 车线不重叠 大小不均匀 / Uneven / Misalign stitches'
+//           WHEN '43' THEN N'បញ្ហាលើសខ្នាត(+) / 尺寸问题 (+大) / Measurement issue positive'
+//           WHEN '44' THEN N'បញ្ហាខ្វះខ្នាត(-) / 尺寸问题 (-小) / Measurement issue negative'
+//           ELSE NULL
+//         END IS NOT NULL;
+//     `;
+//     const result = await request.query(query);
+//     console.log(
+//       `Fetched ${result.recordset.length} RS18 records from the last 7 days`
+//     );
+//     return result.recordset;
+//   } catch (err) {
+//     console.error("Error fetching RS18 data:", err);
+//     throw err;
+//   }
+// };
+
+// // Function to fetch Output data - Last 7 days only
+// const fetchOutputData = async () => {
+//   if (!sqlConnectionStatus.YMDataStore) {
+//     return res.status(503).json({
+//       message:
+//         "Service Unavailable: The YMDataStore database is not connected.",
+//       error: "Database connection failed"
+//     });
+//   }
+//   try {
+//     await ensurePoolConnected(poolYMDataStore, "YMDataStore");
+//     const request = poolYMDataStore.request();
+//     const query = `
+//       SELECT
+//         FORMAT(CAST(BillDate AS DATE), 'MM-dd-yyyy') AS InspectionDate,
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName,
+//         SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END) AS TotalQtyT38,
+//         SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END) AS TotalQtyT39
+//       FROM
+//       (
+//         SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2023
+//         UNION ALL
+//         SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2024
+//         UNION ALL
+//         SELECT BillDate, WorkLine, MONo, SizeName, ColorNo, ColorName, SeqNo, Qty FROM YMDataStore.SunRise_G.tWork2025
+//       ) AS CombinedData
+//       WHERE
+//         SeqNo IN (38, 39)
+//         AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+//         AND CAST(BillDate AS DATE) >= DATEADD(DAY, -7, GETDATE())
+//         AND CAST(BillDate AS DATE) < DATEADD(DAY, 1, GETDATE())
+//       GROUP BY
+//         CAST(BillDate AS DATE),
+//         WorkLine,
+//         MONo,
+//         SizeName,
+//         ColorNo,
+//         ColorName;
+//     `;
+//     const result = await request.query(query);
+//     console.log(
+//       `Fetched ${result.recordset.length} Output records from the last 7 days`
+//     );
+//     return result.recordset;
+//   } catch (err) {
+//     console.error("Error fetching Output data:", err);
+//     throw err;
+//   }
+// };
+
+// // Helper function to determine Buyer based on MONo
+// const determineBuyer = (MONo) => {
+//   if (!MONo) return "Other";
+//   if (MONo.includes("CO")) return "Costco";
+//   if (MONo.includes("AR")) return "Aritzia";
+//   if (MONo.includes("RT")) return "Reitmans";
+//   if (MONo.includes("AF")) return "ANF";
+//   if (MONo.includes("NT")) return "STORI";
+//   return "Other";
+// };
+
+// // Function to sync data to MongoDB - Only process last 7 days and update if modified
+// const syncQC1SunriseData = async () => {
+//   try {
+//     console.log("Starting QC1 Sunrise data sync at", new Date().toISOString());
+
+//     // Fetch data from both sources (last 7 days only)
+//     const [rs18Data, outputData] = await Promise.all([
+//       fetchRS18Data(),
+//       fetchOutputData()
+//     ]);
+
+//     if (outputData.length === 0) {
+//       console.log(
+//         "No output data fetched from SQL Server for the last 7 days. Sync aborted."
+//       );
+//       return;
+//     }
+
+//     // Create a map for defect data for quick lookup
+//     const defectMap = new Map();
+//     rs18Data.forEach((defect) => {
+//       const key = `${defect.InspectionDate}-${defect.WorkLine}-${defect.MONo}-${defect.SizeName}-${defect.ColorNo}-${defect.ColorName}`;
+//       if (!defectMap.has(key)) {
+//         defectMap.set(key, []);
+//       }
+//       defectMap.get(key).push({
+//         defectCode: defect.ReworkCode,
+//         defectName: defect.ReworkName,
+//         defectQty: defect.DefectsQty
+//       });
+//     });
+//     console.log(`Defect Map contains ${defectMap.size} entries with defects`);
+
+//     // Prepare MongoDB documents starting from output data
+//     const documents = [];
+//     outputData.forEach((output) => {
+//       const key = `${output.InspectionDate}-${output.WorkLine}-${output.MONo}-${output.SizeName}-${output.ColorNo}-${output.ColorName}`;
+//       const defectArray = defectMap.get(key) || []; // Empty array if no defects
+
+//       const totalDefectsQty = defectArray.reduce(
+//         (sum, defect) => sum + defect.defectQty,
+//         0
+//       );
+//       const checkedQty = Math.max(
+//         output.TotalQtyT38 || 0,
+//         output.TotalQtyT39 || 0
+//       );
+
+//       const doc = {
+//         inspectionDate: output.InspectionDate,
+//         lineNo: output.WorkLine,
+//         MONo: output.MONo,
+//         Size: output.SizeName,
+//         Color: output.ColorName,
+//         ColorNo: output.ColorNo,
+//         Buyer: determineBuyer(output.MONo),
+//         CheckedQtyT38: output.TotalQtyT38 || 0,
+//         CheckedQtyT39: output.TotalQtyT39 || 0,
+//         CheckedQty: checkedQty,
+//         DefectArray: defectArray, // Will be empty if no defects
+//         totalDefectsQty: totalDefectsQty
+//       };
+//       documents.push(doc);
+//     });
+//     console.log(`Prepared ${documents.length} documents for MongoDB`);
+
+//     // Log a sample document
+//     if (documents.length > 0) {
+//       console.log("Sample Document:", documents[0]);
+//     }
+
+//     // Fetch existing documents from MongoDB for comparison (only for the last 7 days)
+//     const existingDocs = await QC1Sunrise.find({
+//       inspectionDate: {
+//         $gte: new Date(new Date().setDate(new Date().getDate() - 7))
+//           .toISOString()
+//           .split("T")[0]
+//       }
+//     }).lean();
+//     const existingDocsMap = new Map();
+//     existingDocs.forEach((doc) => {
+//       const key = `${doc.inspectionDate}-${doc.lineNo}-${doc.MONo}-${doc.Size}-${doc.ColorNo}`;
+//       existingDocsMap.set(key, doc);
+//     });
+//     console.log(
+//       `Fetched ${existingDocsMap.size} existing documents from qc1_sunrise for comparison`
+//     );
+
+//     // Filter documents to only include those that are new or have changed
+//     const documentsToUpdate = [];
+//     for (const doc of documents) {
+//       const key = `${doc.inspectionDate}-${doc.lineNo}-${doc.MONo}-${doc.Size}-${doc.ColorNo}`;
+//       const existingDoc = existingDocsMap.get(key);
+
+//       if (!existingDoc) {
+//         // New document, include it
+//         documentsToUpdate.push(doc);
+//       } else {
+//         // Compare fields to check for changes
+//         const hasChanged =
+//           existingDoc.CheckedQtyT38 !== doc.CheckedQtyT38 ||
+//           existingDoc.CheckedQtyT39 !== doc.CheckedQtyT39 ||
+//           existingDoc.CheckedQty !== doc.CheckedQty ||
+//           existingDoc.totalDefectsQty !== doc.totalDefectsQty ||
+//           JSON.stringify(existingDoc.DefectArray) !==
+//             JSON.stringify(doc.DefectArray);
+
+//         if (hasChanged) {
+//           documentsToUpdate.push(doc);
+//         }
+//       }
+//     }
+//     console.log(
+//       `Filtered down to ${documentsToUpdate.length} documents that are new or modified`
+//     );
+
+//     // Bulk upsert into MongoDB
+//     const bulkOps = documentsToUpdate.map((doc) => ({
+//       updateOne: {
+//         filter: {
+//           inspectionDate: doc.inspectionDate,
+//           lineNo: doc.lineNo,
+//           MONo: doc.MONo,
+//           Size: doc.Size,
+//           ColorNo: doc.ColorNo
+//         },
+//         update: { $set: doc },
+//         upsert: true
+//       }
+//     }));
+
+//     if (bulkOps.length > 0) {
+//       const result = await QC1Sunrise.bulkWrite(bulkOps);
+//       console.log(
+//         `Bulk write result: Matched: ${result.matchedCount}, Modified: ${result.modifiedCount}, Upserted: ${result.upsertedCount}`
+//       );
+//       console.log(
+//         `Successfully synced ${bulkOps.length} documents to qc1_sunrise.`
+//       );
+//     } else {
+//       console.log("No new or modified documents to upsert");
+//       console.log("Successfully synced 0 documents to qc1_sunrise.");
+//     }
+
+//     // Verify collection contents
+//     const collectionCount = await QC1Sunrise.countDocuments();
+//     console.log(
+//       `Total documents in qc1_sunrise collection: ${collectionCount}`
+//     );
+
+//     console.log(
+//       `Successfully completed QC1 Sunrise sync with ${documentsToUpdate.length} new or modified records`
+//     );
+//   } catch (err) {
+//     console.error("Error syncing QC1 Sunrise data:", err);
+//     throw err;
+//   }
+// };
+
+// // Endpoint to manually trigger QC1 Sunrise sync
+// app.get("/api/sunrise/sync-qc1", async (req, res) => {
+//   try {
+//     await syncQC1SunriseData();
+//     res.json({ message: "QC1 Sunrise data synced successfully" });
+//   } catch (err) {
+//     console.error("Error in /api/sunrise/sync-qc1 endpoint:", err);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to sync QC1 Sunrise data", error: err.message });
+//   }
+// });
+
+// // Schedule daily sync at midnight
+// cron.schedule("0 0 * * *", async () => {
+//   console.log("Running daily QC1 Sunrise data sync...");
+//   try {
+//     await syncQC1SunriseData();
+//   } catch (err) {
+//     console.error("Error in daily QC1 Sunrise sync:", err);
+//   }
+// });
+
+// /* ------------------------------
+//    Fetch inline data from SQL to ym_prod
+// ------------------------------ */
+
+// async function syncInlineOrders() {
 //   // MODIFICATION: Add connection status check
-//   if (!sqlConnectionStatus.YMWHSYS2) {
+//   if (!sqlConnectionStatus.YMCE_SYSTEM) {
 //     console.warn(
-//       "Skipping cuttingOrders sync: YMWHSYS2 database is not connected."
+//       "Skipping syncInlineOrders: YMCE_SYSTEM database is not connected."
 //     );
 //     return;
 //   }
 //   try {
-//     console.log("Starting cutpanelorders sync at", new Date().toISOString());
-//     await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
+//     console.log("Starting inline_orders sync at", new Date().toISOString());
+//     await ensurePoolConnected(poolYMCE, "YMCE_SYSTEM");
+
+//     const request = poolYMCE.request();
+
+//     console.log(
+//       "Using connection to:",
+//       poolYMCE.config.server,
+//       "database:",
+//       poolYMCE.config.database
+//     );
 
 //     const query = `
-//     -- Use the WITH keyword only ONCE at the start of all CTE definitions.
-// WITH
-// -- CTE #1: For aggregating Lot Numbers
-// LotData AS (
-//     SELECT
-//         v.Style,
-//         v.TableNo,
-//         STUFF((SELECT DISTINCT ', ' + v_inner.Lot FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v_inner WHERE v_inner.Style = v.Style AND v_inner.TableNo = v.TableNo AND v_inner.Lot IS NOT NULL AND v_inner.Lot <> '' FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos
-//     FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v
-//     WHERE v.Lot IS NOT NULL AND v.Lot <> ''
-//     GROUP BY v.Style, v.TableNo
-// ),
-// -- CTE #2: For aggregating Order Quantities
-// OrderData AS (
-//     -- Use a final SELECT with a Window Function on top of a subquery.
-//     SELECT
-//         Style, EngColor, Size1, Size2, Size3, Size4, Size5, Size6, Size7, Size8, Size9, Size10,
-//         OrderQty1, OrderQty2, OrderQty3, OrderQty4, OrderQty5, OrderQty6, OrderQty7, OrderQty8, OrderQty9, OrderQty10,
-//         TotalOrderQty,
-//         SUM(TotalOrderQty) OVER (PARTITION BY Style) AS TotalOrderQtyStyle
-//     FROM (
-//         -- This subquery performs the first level of aggregation by Style and Color.
-//         SELECT
-//             Style, EngColor,
-//             MAX(Size1) AS Size1, MAX(Size2) AS Size2, MAX(Size3) AS Size3, MAX(Size4) AS Size4, MAX(Size5) AS Size5,
-//             MAX(Size6) AS Size6, MAX(Size7) AS Size7, MAX(Size8) AS Size8, MAX(Size9) AS Size9, MAX(Size10) AS Size10,
-//             SUM(ISNULL(Qty1, 0)) AS OrderQty1, SUM(ISNULL(Qty2, 0)) AS OrderQty2, SUM(ISNULL(Qty3, 0)) AS OrderQty3,
-//             SUM(ISNULL(Qty4, 0)) AS OrderQty4, SUM(ISNULL(Qty5, 0)) AS OrderQty5, SUM(ISNULL(Qty6, 0)) AS OrderQty6,
-//             SUM(ISNULL(Qty7, 0)) AS OrderQty7, SUM(ISNULL(Qty8, 0)) AS OrderQty8, SUM(ISNULL(Qty9, 0)) AS OrderQty9,
-//             SUM(ISNULL(Qty10, 0)) AS OrderQty10,
-//             SUM(ISNULL(Total, 0)) AS TotalOrderQty
-//         FROM [FC_SYSTEM].[dbo].[ViewOrderQty]
-//         GROUP BY Style, EngColor
-//     ) AS OrderColorAggregates
-// )
-// -- FINAL SELECT STATEMENT
-// SELECT
-//     -- Core Information
-//     v.Style AS StyleNo,
-//     v.Create_Date AS TxnDate,
-//     v.TxnNo,
-//     CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer,
-//     v.BuyerStyle,
+//       SELECT
+//         St_No,
+//         By_Style,
+//         Tg_No,
+//         Tg_Code,
+//         Ma_Code,
+//         ch_name,
+//         kh_name,
+//         Dept_Type
+//       FROM
+//         dbo.ViewTg vt
+//       WHERE
+//         Dept_Type = 'Sewing';
+//     `;
 
-//     -- Color and Fabric Information
-//     v.EngColor AS Color,
-//     v.ChnColor,
-//     v.ColorNo AS ColorCode,
-//     v.Fabric_Type AS FabricType,
-//     v.Material,
+//     const result = await request.query(query);
+//     const data = result.recordset;
 
-//     -- Spreading Details
-//     -- *** THIS IS THE CORRECTED LOGIC FOR SpreadTable ***
-//     -- It handles 'SPREAD G', 'Spread_I', 'SPREAD_J', etc. robustly.
-//     CASE
-//         WHEN PATINDEX('%[_ ]%', v.PreparedBy) > 0
-//         THEN LTRIM(SUBSTRING(v.PreparedBy, PATINDEX('%[_ ]%', v.PreparedBy) + 1, LEN(v.PreparedBy)))
-//         ELSE v.PreparedBy -- Fallback if no space or underscore is found
-//     END AS SpreadTable,
+//     if (data.length === 0) {
+//       console.log("No data to sync to inline_orders.");
+//       return;
+//     }
 
-//     v.TableNo,
-//     v.RollQty,
-//     ROUND(v.SpreadYds, 3) AS SpreadYds,
-//     v.Unit,
-//     ROUND(v.GrossKgs, 3) AS GrossKgs,
-//     ROUND(v.NetKgs, 3) AS NetKgs,
-//     v.PlanLayer,
-//     v.ActualLayer,
-//     CAST(ISNULL(v.PlanLayer, 0) * (ISNULL(v.Ratio1, 0) + ISNULL(v.Ratio2, 0) + ISNULL(v.Ratio3, 0) + ISNULL(v.Ratio4, 0) + ISNULL(v.Ratio5, 0) + ISNULL(v.Ratio6, 0) + ISNULL(v.Ratio7, 0) + ISNULL(v.Ratio8, 0) + ISNULL(v.Ratio9, 0) + ISNULL(v.Ratio10, 0)) AS INT) AS TotalPcs,
+//     // Group data by St_No, By_Style, and Dept_Type
+//     const groupedData = data.reduce((acc, row) => {
+//       const key = `${row.St_No}_${row.By_Style}_${row.Dept_Type}`;
+//       if (!acc[key]) {
+//         acc[key] = {
+//           St_No: row.St_No,
+//           By_Style: row.By_Style,
+//           Dept_Type: row.Dept_Type,
+//           orderData: []
+//         };
+//       }
+//       acc[key].orderData.push({
+//         Tg_No: row.Tg_No,
+//         Tg_Code: row.Tg_Code,
+//         Ma_Code: row.Ma_Code,
+//         ch_name: row.ch_name,
+//         kh_name: row.kh_name,
+//         createdAt: new Date(),
+//         updatedAt: new Date()
+//       });
+//       return acc;
+//     }, {});
 
-//     -- Marker (Pattern) Information
-//     v.Pattern AS MackerNo,
-//     ROUND(v.MarkerLength, 3) AS MackerLength,
+//     const documents = Object.values(groupedData);
 
-//     -- Data from LotData CTE
-//     ld.LotNos,
+//     // Use bulkWrite with upsert to update or insert documents
+//     const bulkOps = documents.map((doc) => ({
+//       updateOne: {
+//         filter: {
+//           St_No: doc.St_No,
+//           By_Style: doc.By_Style,
+//           Dept_Type: doc.Dept_Type
+//         },
+//         update: {
+//           $set: {
+//             St_No: doc.St_No,
+//             By_Style: doc.By_Style,
+//             Dept_Type: doc.Dept_Type,
+//             orderData: doc.orderData,
+//             updatedAt: new Date()
+//           },
+//           $setOnInsert: {
+//             createdAt: new Date()
+//           }
+//         },
+//         upsert: true
+//       }
+//     }));
 
-//     -- Data from OrderData CTE
-//     od.OrderQty1, od.OrderQty2, od.OrderQty3, od.OrderQty4, od.OrderQty5, od.OrderQty6, od.OrderQty7, od.OrderQty8, od.OrderQty9, od.OrderQty10,
-//     od.TotalOrderQty,
-//     od.TotalOrderQtyStyle,
+//     await InlineOrders.bulkWrite(bulkOps);
+//     console.log(
+//       `Successfully synced ${documents.length} documents to inline_orders.`
+//     );
 
-//     -- Cutting Ratios (from spreading view)
-//     v.Ratio1 AS CuttingRatio1, v.Ratio2 AS CuttingRatio2, v.Ratio3 AS CuttingRatio3, v.Ratio4 AS CuttingRatio4, v.Ratio5 AS CuttingRatio5,
-//     v.Ratio6 AS CuttingRatio6, v.Ratio7 AS CuttingRatio7, v.Ratio8 AS CuttingRatio8, v.Ratio9 AS CuttingRatio9, v.Ratio10 AS CuttingRatio10,
+//     // Optional: Remove documents that no longer exist in the source data
+//     const existingKeys = documents.map(
+//       (doc) => `${doc.St_No}_${doc.By_Style}_${doc.Dept_Type}`
+//     );
+//     await InlineOrders.deleteMany({
+//       $and: [
+//         { St_No: { $exists: true } },
+//         { By_Style: { $exists: true } },
+//         { Dept_Type: { $exists: true } },
+//         {
+//           $expr: {
+//             $not: {
+//               $in: [
+//                 { $concat: ["$St_No", "_", "$By_Style", "_", "$Dept_Type"] },
+//                 existingKeys
+//               ]
+//             }
+//           }
+//         }
+//       ]
+//     });
+//     console.log("Removed outdated documents from inline_orders.");
+//   } catch (err) {
+//     console.error("Error during inline_orders sync:", err);
+//     throw err;
+//   }
+// }
 
-//     -- Sizes from the spreading view
-//     v.Size1, v.Size2, v.Size3, v.Size4, v.Size5, v.Size6, v.Size7, v.Size8, v.Size9, v.Size10,
+// // New API Endpoint to manually trigger the sync
+// app.post("/api/sync-inline-orders", async (req, res) => {
+//   try {
+//     await syncInlineOrders();
+//     res
+//       .status(200)
+//       .json({ message: "Inline orders sync completed successfully." });
+//   } catch (err) {
+//     console.error("Error in /api/sync-inline-orders endpoint:", err);
+//     res.status(500).json({
+//       message: "Failed to sync inline orders",
+//       error: err.message
+//     });
+//   }
+// });
 
-//     -- Remaining placeholders
-//     NULL AS TotalTTLRoll, NULL AS TotalTTLQty, NULL AS TotalBiddingQty, NULL AS TotalBiddingRollQty,
-//     NULL AS SendFactory, NULL AS SendTxnDate, NULL AS SendTxnNo, NULL AS SendTotalQty
+// // Schedule the sync to run every day at 11 AM
+// cron.schedule("0 11 * * *", async () => {
+//   console.log("Running scheduled inline_orders sync at 11 AM...");
+//   await syncInlineOrders();
+// });
 
-// FROM
-//     [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS v
-// LEFT JOIN LotData AS ld
-//     ON v.Style = ld.Style AND v.TableNo = ld.TableNo
-// LEFT JOIN OrderData AS od
-//     ON v.Style = od.Style AND v.EngColor = od.EngColor
-// WHERE
-//     v.TableNo IS NOT NULL AND v.TableNo <> ''
-//     AND v.Create_Date >= CAST(DATEADD(DAY, -3, GETDATE()) AS DATE)
-// ORDER BY
-//     v.Create_Date DESC;
+// // Run the sync immediately on server start (optional, for testing)
+// syncInlineOrders().then(() => {
+//   console.log(
+//     "Initial inline_orders sync completed. Scheduler is now running..."
+//   );
+// });
+
+// // New Endpoint for YMCE_SYSTEM Data
+// app.get("/api/ymce-system-data", async (req, res) => {
+//   // MODIFICATION: Add connection status check
+//   if (!sqlConnectionStatus.YMCE_SYSTEM) {
+//     return res.status(503).json({
+//       message:
+//         "Service Unavailable: The YMCE_SYSTEM database is not connected.",
+//       error: "Database connection failed"
+//     });
+//   }
+
+//   //let pool;
+//   try {
+//     await ensurePoolConnected(poolYMCE, "YMCE_SYSTEM");
+//     const request = poolYMCE.request();
+//     const query = `
+//       SELECT
+//         St_No,
+//         By_Style,
+//         Tg_No,
+//         Tg_Code,
+//         Ma_Code,
+//         ch_name,
+//         kh_name,
+//         Dept_Type,
+//         SUM(Tg_Pcs) AS PiecesQty,
+//         SUM(Tg_Price) AS OperationPrice,
+//         SUM(GST_SAM) AS GST
+//       FROM
+//         dbo.ViewTg vt
+//       WHERE
+//         Dept_Type = 'Sewing'
+//       GROUP BY
+//         St_No,
+//         By_Style,
+//         Tg_No,
+//         Tg_Code,
+//         Ma_Code,
+//         ch_name,
+//         kh_name,
+//         Dept_Type;
+//     `;
+
+//     const result = await request.query(query);
+//     res.json(result.recordset);
+//   } catch (err) {
+//     console.error("Error fetching YMCE_SYSTEM data:", err);
+//     res.status(500).json({
+//       message: "Failed to fetch YMCE_SYSTEM data",
+//       error: err.message
+//     });
+//   }
+// });
+
+// /* --------------------------------------------------------
+//    Cut Panel Orders Sync with GATEKEEPER to prevent deadlocks
+// -------------------------------------------------------- */
+
+// // *** 1. THE GATEKEEPER VARIABLE ***
+// let isCutPanelSyncRunning = false;
+
+// async function syncCutPanelOrders() {
+//   // *** 2. THE GATEKEEPER CHECK ***
+//   if (isCutPanelSyncRunning) {
+//     console.log(
+//       "[CutPanelOrders] Sync is already in progress. Skipping this run."
+//     );
+//     return;
+//   }
+
+//   // *** 3. THE TRY...FINALLY BLOCK TO ENSURE THE LOCK IS RELEASED ***
+//   try {
+//     isCutPanelSyncRunning = true; // Set the lock
+//     console.log("[CutPanelOrders] Starting sync at", new Date().toISOString());
+
+//     if (!sqlConnectionStatus.YMWHSYS2) {
+//       console.warn(
+//         "[CutPanelOrders] Skipping sync: YMWHSYS2 database is not connected."
+//       );
+//       return; // The 'finally' block will still run to release the lock
+//     }
+
+//     await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
+
+//     // This is your query for a rolling 3-day update. This is perfect for the cron job.
+//     const query = `
+//       DECLARE @StartDate DATE = CAST(DATEADD(DAY, -3, GETDATE()) AS DATE);
+//       -- The rest of your optimized SQL query...
+//       WITH
+//       LotData AS (
+//           SELECT v.Style, v.TableNo, STUFF((SELECT DISTINCT ', ' + v_inner.Lot FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v_inner WHERE v_inner.Style = v.Style AND v_inner.TableNo = v.TableNo AND v_inner.Lot IS NOT NULL AND v_inner.Lot <> '' FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos
+//           FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v INNER JOIN [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS inv_filter ON v.TxnNo = inv_filter.TxnNo
+//           WHERE v.Lot IS NOT NULL AND v.Lot <> '' AND inv_filter.Create_Date >= @StartDate
+//           GROUP BY v.Style, v.TableNo
+//       ),
+//       OrderData AS (
+//           SELECT Style, EngColor, Size1, Size2, Size3, Size4, Size5, Size6, Size7, Size8, Size9, Size10,
+//               OrderQty1, OrderQty2, OrderQty3, OrderQty4, OrderQty5, OrderQty6, OrderQty7, OrderQty8, OrderQty9, OrderQty10,
+//               TotalOrderQty, SUM(TotalOrderQty) OVER (PARTITION BY Style) AS TotalOrderQtyStyle
+//           FROM (
+//               SELECT o.Style, o.EngColor, MAX(o.Size1) AS Size1, MAX(o.Size2) AS Size2, MAX(o.Size3) AS Size3, MAX(o.Size4) AS Size4, MAX(o.Size5) AS Size5, MAX(o.Size6) AS Size6, MAX(o.Size7) AS Size7, MAX(o.Size8) AS Size8, MAX(o.Size9) AS Size9, MAX(o.Size10) AS Size10,
+//                   SUM(ISNULL(o.Qty1, 0)) AS OrderQty1, SUM(ISNULL(o.Qty2, 0)) AS OrderQty2, SUM(ISNULL(o.Qty3, 0)) AS OrderQty3, SUM(ISNULL(o.Qty4, 0)) AS OrderQty4, SUM(ISNULL(o.Qty5, 0)) AS OrderQty5, SUM(ISNULL(o.Qty6, 0)) AS OrderQty6, SUM(ISNULL(o.Qty7, 0)) AS OrderQty7, SUM(ISNULL(o.Qty8, 0)) AS OrderQty8, SUM(ISNULL(o.Qty9, 0)) AS OrderQty9, SUM(ISNULL(o.Qty10, 0)) AS OrderQty10,
+//                   SUM(ISNULL(o.Total, 0)) AS TotalOrderQty
+//               FROM [FC_SYSTEM].[dbo].[ViewOrderQty] AS o
+//               WHERE EXISTS (SELECT 1 FROM [FC_SYSTEM].[dbo].[ViewSpreading_Inv] vi WHERE vi.Style = o.Style AND vi.EngColor = o.EngColor AND vi.Create_Date >= @StartDate)
+//               GROUP BY o.Style, o.EngColor
+//           ) AS OrderColorAggregates
+//       )
+//       SELECT
+//           v.Style AS StyleNo, v.Create_Date AS TxnDate, v.TxnNo, CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer, v.BuyerStyle,
+//           v.EngColor AS Color, v.ChnColor, v.ColorNo AS ColorCode, v.Fabric_Type AS FabricType, v.Material,
+//           CASE WHEN PATINDEX('%[_ ]%', v.PreparedBy) > 0 THEN LTRIM(SUBSTRING(v.PreparedBy, PATINDEX('%[_ ]%', v.PreparedBy) + 1, LEN(v.PreparedBy))) ELSE v.PreparedBy END AS SpreadTable,
+//           v.TableNo, v.RollQty, ROUND(v.SpreadYds, 3) AS SpreadYds, v.Unit, ROUND(v.GrossKgs, 3) AS GrossKgs, ROUND(v.NetKgs, 3) AS NetKgs,
+//           v.PlanLayer, v.ActualLayer, CAST(ISNULL(v.PlanLayer, 0) * (ISNULL(v.Ratio1, 0) + ISNULL(v.Ratio2, 0) + ISNULL(v.Ratio3, 0) + ISNULL(v.Ratio4, 0) + ISNULL(v.Ratio5, 0) + ISNULL(v.Ratio6, 0) + ISNULL(v.Ratio7, 0) + ISNULL(v.Ratio8, 0) + ISNULL(v.Ratio9, 0) + ISNULL(v.Ratio10, 0)) AS INT) AS TotalPcs,
+//           v.Pattern AS MackerNo, ROUND(v.MarkerLength, 3) AS MackerLength, ld.LotNos, od.OrderQty1, od.OrderQty2, od.OrderQty3, od.OrderQty4, od.OrderQty5,
+//           od.OrderQty6, od.OrderQty7, od.OrderQty8, od.OrderQty9, od.OrderQty10, od.TotalOrderQty, od.TotalOrderQtyStyle, v.Ratio1 AS CuttingRatio1,
+//           v.Ratio2 AS CuttingRatio2, v.Ratio3 AS CuttingRatio3, v.Ratio4 AS CuttingRatio4, v.Ratio5 AS CuttingRatio5, v.Ratio6 AS CuttingRatio6,
+//           v.Ratio7 AS CuttingRatio7, v.Ratio8 AS CuttingRatio8, v.Ratio9 AS CuttingRatio9, v.Ratio10 AS CuttingRatio10, v.Size1, v.Size2, v.Size3,
+//           v.Size4, v.Size5, v.Size6, v.Size7, v.Size8, v.Size9, v.Size10,
+//           NULL AS TotalTTLRoll, NULL AS TotalTTLQty, NULL AS TotalBiddingQty, NULL AS TotalBiddingRollQty,
+//           NULL AS SendFactory, NULL AS SendTxnDate, NULL AS SendTxnNo, NULL AS SendTotalQty
+//       FROM [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS v
+//       LEFT JOIN LotData AS ld ON v.Style = ld.Style AND v.TableNo = ld.TableNo
+//       LEFT JOIN OrderData AS od ON v.Style = od.Style AND v.EngColor = od.EngColor
+//       WHERE v.TableNo IS NOT NULL AND v.TableNo <> '' AND v.Create_Date >= @StartDate
+//       ORDER BY v.Create_Date DESC;
 //     `;
 
 //     const result = await poolYMWHSYS2.request().query(query);
+//     const records = result.recordset;
 
-//     const bulkOps = result.recordset.map((row) => {
-//       const markerRatio = [];
-
-//       for (let i = 1; i <= 10; i++) {
-//         markerRatio.push({
-//           no: i,
-//           size: row[`Size${i}`],
-//           cuttingRatio: row[`CuttingRatio${i}`],
-//           orderQty: row[`OrderQty${i}`]
-//         });
-//       }
-
-//       const lotNos = row.LotNos
-//         ? row.LotNos.split(",").map((lot) => lot.trim())
-//         : [];
-
-//       return {
+//     if (records.length > 0) {
+//       const bulkOps = records.map((row) => ({
 //         updateOne: {
 //           filter: { TxnNo: row.TxnNo },
 //           update: {
@@ -1837,66 +1368,60 @@ app.post("/api/sync-cutpanel-orders", async (req, res) => {
 //               PlanLayer: row.PlanLayer,
 //               ActualLayer: row.ActualLayer,
 //               TotalPcs: row.TotalPcs,
-//               LotNos: lotNos,
+//               LotNos: row.LotNos
+//                 ? row.LotNos.split(",").map((lot) => lot.trim())
+//                 : [],
 //               TotalOrderQty: row.TotalOrderQty,
 //               TotalTTLRoll: row.TotalTTLRoll,
 //               TotalTTLQty: row.TotalTTLQty,
 //               TotalBiddingQty: row.TotalBiddingQty,
 //               TotalBiddingRollQty: row.TotalBiddingRollQty,
 //               TotalOrderQtyStyle: row.TotalOrderQtyStyle,
-//               MarkerRatio: markerRatio
+//               MarkerRatio: Array.from({ length: 10 }, (_, k) => ({
+//                 no: k + 1,
+//                 size: row[`Size${k + 1}`],
+//                 cuttingRatio: row[`CuttingRatio${k + 1}`],
+//                 orderQty: row[`OrderQty${k + 1}`]
+//               }))
 //             }
 //           },
 //           upsert: true
 //         }
-//       };
-//     });
-
-//     if (bulkOps.length > 0) {
+//       }));
 //       await CutPanelOrders.bulkWrite(bulkOps);
 //       console.log(
-//         `Successfully synced ${bulkOps.length} documents to cutpanelorders.`
+//         `[CutPanelOrders] Successfully synced ${bulkOps.length} documents.`
+//       );
+//     } else {
+//       console.log(
+//         "[CutPanelOrders] No new documents to sync in the last 3 days."
 //       );
 //     }
-
-//     // await CutPanelOrders.bulkWrite(bulkOps);
-//     // console.log(
-//     //   `Successfully synced ${bulkOps.length} documents to cutpanelorders.`
-//     // );
 //   } catch (err) {
 //     console.error("Error during cutpanelorders sync:", err);
-//     throw err;
+//   } finally {
+//     isCutPanelSyncRunning = false; // Release the lock
 //   }
 // }
 
 // // Schedule the syncCutPanelOrders function to run every 5 minutes
 // cron.schedule("*/5 * * * *", syncCutPanelOrders);
+// console.log("Scheduled cutpanelorders sync with deadlock protection.");
 
-// //console.log("Scheduled cutpanelorders sync every 5 minutes.");
+// /* ------------------------------
+//    Manual Sync Endpoint & Server Start
+// ------------------------------ */
 
 // app.post("/api/sync-cutpanel-orders", async (req, res) => {
-//   try {
-//     await syncCutPanelOrders();
-//     res
-//       .status(200)
-//       .json({ message: "Cut panel orders sync completed successfully." });
-//   } catch (err) {
-//     console.error("Error in /api/sync-cutpanel-orders endpoint:", err);
-//     res.status(500).json({
-//       message: "Failed to sync cut panel orders",
-//       error: err.message
-//     });
-//   }
+//   // This manual trigger will also respect the gatekeeper
+//   syncCutPanelOrders();
+//   res.status(202).json({
+//     message:
+//       "Cut panel orders sync initiated successfully. Check logs for progress."
+//   });
 // });
 
-// cron.schedule("0 8 * * *", async () => {
-//   console.log("Running scheduled cutpanelorders sync at 8 AM...");
-//   try {
-//     await syncCutPanelOrders();
-//   } catch (err) {
-//     console.error("Scheduled cutpanelorders sync failed:", err);
-//   }
-// });
+/* -------------------------------------------------------------------------------------------------------------------------------------------------
 
 /* ------------------------------
    New Endpoints for CutPanelOrders
@@ -2068,121 +1593,67 @@ app.get("/api/cutpanel-orders/aggregated-total-order-qty", async (req, res) => {
   }
 });
 
-// /* ------------------------------
-//    Updated Endpoints for Cutting.jsx
-// ------------------------------ */
+/* ------------------------------
+   Inline Orders Endpoints
+------------------------------ */
 
-// // Endpoint to Search MO Numbers (StyleNo) from cuttingOrders with partial matching
-// app.get("/api/cutting-orders-mo-numbers", async (req, res) => {
-//   try {
-//     const searchTerm = req.query.search;
-//     if (!searchTerm) {
-//       return res.status(400).json({ error: "Search term is required" });
-//     }
+// Updated Endpoint to Search MO Numbers (St_No) from inline_orders in MongoDB with partial matching
+app.get("/api/inline-orders-mo-numbers", async (req, res) => {
+  try {
+    const searchTerm = req.query.search; // Get the search term from query params
+    if (!searchTerm) {
+      return res.status(400).json({ error: "Search term is required" });
+    }
 
-//     // Use a case-insensitive regex to match the term anywhere in StyleNo
-//     const regexPattern = new RegExp(searchTerm, "i");
+    // Use a case-insensitive regex to match the term anywhere in St_No
+    const regexPattern = new RegExp(searchTerm, "i");
 
-//     // Query the cuttingOrders collection
-//     const results = await CuttingOrders.find({
-//       StyleNo: { $regex: regexPattern }
-//     })
-//       .select("StyleNo") // Only return the StyleNo field
-//       .limit(100) // Limit results to prevent overwhelming the UI
-//       .sort({ StyleNo: 1 }) // Sort alphabetically
-//       .exec();
+    // Query the inline_orders collection
+    const results = await InlineOrders.find({
+      St_No: { $regex: regexPattern }
+    })
+      .select("St_No") // Only return the St_No field (equivalent to .project({ St_No: 1, _id: 0 }))
+      .limit(100) // Limit results to prevent overwhelming the UI
+      .sort({ St_No: 1 }) // Sort alphabetically
+      .exec();
 
-//     // Extract unique StyleNo values
-//     const uniqueMONos = [...new Set(results.map((r) => r.StyleNo))];
+    // Extract unique St_No values
+    const uniqueMONos = [...new Set(results.map((r) => r.St_No))];
 
-//     res.json(uniqueMONos);
-//   } catch (err) {
-//     console.error("Error fetching MO numbers from cuttingOrders:", err);
-//     res.status(500).json({
-//       message: "Failed to fetch MO numbers from cuttingOrders",
-//       error: err.message
-//     });
-//   }
-// });
+    res.json(uniqueMONos);
+  } catch (err) {
+    console.error("Error fetching MO numbers from inline_orders:", err);
+    res.status(500).json({
+      message: "Failed to fetch MO numbers from inline_orders",
+      error: err.message
+    });
+  }
+});
 
-// // Endpoint to Fetch Cutting Order Details for a given MO No (StyleNo)
-// app.get("/api/cutting-orders-details", async (req, res) => {
-//   try {
-//     const styleNo = req.query.styleNo;
-//     if (!styleNo) {
-//       return res.status(400).json({ error: "StyleNo is required" });
-//     }
+// New Endpoint to Fetch Inline Order Details for a given MO No (St_No)
+app.get("/api/inline-orders-details", async (req, res) => {
+  try {
+    const stNo = req.query.stNo;
+    if (!stNo) {
+      return res.status(400).json({ error: "St_No is required" });
+    }
 
-//     // Find all documents where StyleNo matches
-//     const documents = await CuttingOrders.find({ StyleNo: styleNo }).exec();
+    // Find the document where St_No matches
+    const document = await InlineOrders.findOne({ St_No: stNo }).exec();
 
-//     if (documents.length === 0) {
-//       console.log(`No documents found for StyleNo: ${styleNo}`);
-//       return res.status(404).json({ error: "MO No not found" });
-//     }
+    if (!document) {
+      return res.status(404).json({ error: "MO No not found" });
+    }
 
-//     res.json(documents);
-//   } catch (err) {
-//     console.error("Error fetching Cutting Orders details:", err);
-//     res.status(500).json({
-//       message: "Failed to fetch Cutting Orders details",
-//       error: err.message
-//     });
-//   }
-// });
-
-// app.get("/api/cutting-orders-sizes", async (req, res) => {
-//   try {
-//     const { styleNo, color, tableNo } = req.query;
-
-//     if (!styleNo || !color || !tableNo) {
-//       return res
-//         .status(400)
-//         .json({ error: "styleNo, color, and tableNo are required" });
-//     }
-
-//     // Find the document matching the styleNo and color
-//     const document = await CuttingOrders.findOne({
-//       StyleNo: styleNo,
-//       EngColor: color
-//     }).exec();
-
-//     if (!document) {
-//       return res
-//         .status(404)
-//         .json({ error: "Document not found for the given styleNo and color" });
-//     }
-
-//     // Find the cuttingData entry matching the tableNo
-//     const cuttingDataEntry = document.cuttingData.find(
-//       (cd) => cd.tableNo === tableNo
-//     );
-
-//     if (!cuttingDataEntry) {
-//       return res
-//         .status(404)
-//         .json({ error: "Table number not found in cuttingData" });
-//     }
-
-//     // Extract sizes from markerData, filter out null/empty sizes, and sort by no
-//     const sizes = cuttingDataEntry.markerData
-//       .filter((md) => md.size && md.size.trim() !== "" && md.size !== "0") // Exclude null or empty sizes
-//       .map((md) => ({ no: md.no, size: md.size })) // Map to { no, size }
-//       .sort((a, b) => a.no - b.no) // Sort by no
-//       .map((md) => md.size); // Extract only the size values
-
-//     // Remove duplicates
-//     const uniqueSizes = [...new Set(sizes)];
-
-//     res.json(uniqueSizes);
-//   } catch (err) {
-//     console.error("Error fetching sizes from cuttingOrders:", err);
-//     res.status(500).json({
-//       message: "Failed to fetch sizes from cuttingOrders",
-//       error: err.message
-//     });
-//   }
-// });
+    res.json(document);
+  } catch (err) {
+    console.error("Error fetching Inline Order details:", err);
+    res.status(500).json({
+      message: "Failed to fetch Inline Order details",
+      error: err.message
+    });
+  }
+});
 
 /* ------------------------------
    Graceful Shutdown
@@ -4313,6 +3784,137 @@ async function fetchOrderDetails(mono) {
     }, {})
   };
 }
+
+/* ------------------------------
+   End Points - Update dt_orders with Washing Specs
+------------------------------ */
+
+app.post("/api/washing-specs/save", async (req, res) => {
+  const { moNo, washingSpecsData } = req.body;
+
+  if (!moNo || !washingSpecsData || washingSpecsData.length === 0) {
+    return res
+      .status(400)
+      .json({ message: "Missing MO Number or specs data." });
+  }
+
+  try {
+    const collection = ymEcoConnection.db.collection("dt_orders");
+    const orderDocument = await collection.findOne({ Order_No: moNo });
+
+    if (!orderDocument) {
+      return res.status(404).json({
+        message: `Order with MO No '${moNo}' not found in dt_orders.`
+      });
+    }
+
+    // --- DATA TRANSFORMATION LOGIC ---
+
+    const afterWashSpecs = [];
+    const beforeWashSpecs = [];
+
+    // Process AfterWashSpecs from the first sheet
+    const firstSheetData = washingSpecsData[0];
+    if (firstSheetData && firstSheetData.rows) {
+      firstSheetData.rows.forEach((row, rowIndex) => {
+        const specsArray = [];
+        firstSheetData.headers.forEach((header, headerIndex) => {
+          const specData = row.specs[header.size]["After Washing"];
+          if (specData) {
+            specsArray.push({
+              index: headerIndex + 1,
+              size: header.size,
+              // Save BOTH fraction and decimal for the spec value
+              fraction: specData.raw,
+              decimal: specData.decimal
+            });
+          }
+        });
+
+        afterWashSpecs.push({
+          no: rowIndex + 1,
+          kValue: "NA",
+          MeasurementPointEngName: row["Measurement Point - Eng"],
+          MeasurementPointChiName: row["Measurement Point - Chi"],
+          // Save the full object for TolMinus and TolPlus
+          TolMinus: {
+            fraction: row["Tol Minus"].raw,
+            decimal: row["Tol Minus"].decimal
+          },
+          TolPlus: {
+            fraction: row["Tol Plus"].raw,
+            decimal: row["Tol Plus"].decimal
+          },
+          Specs: specsArray
+        });
+      });
+    }
+
+    // Process BeforeWashSpecs from ALL sheets
+    washingSpecsData.forEach((sheetData) => {
+      if (sheetData && sheetData.rows) {
+        sheetData.rows.forEach((row, rowIndex) => {
+          const specsArray = [];
+          sheetData.headers.forEach((header, headerIndex) => {
+            const specData = row.specs[header.size]["Before Washing"];
+            if (specData) {
+              specsArray.push({
+                index: headerIndex + 1,
+                size: header.size,
+                // Save BOTH fraction and decimal for the spec value
+                fraction: specData.raw,
+                decimal: specData.decimal
+              });
+            }
+          });
+
+          beforeWashSpecs.push({
+            no: rowIndex + 1,
+            kValue: sheetData.sheetName,
+            MeasurementPointEngName: row["Measurement Point - Eng"],
+            MeasurementPointChiName: row["Measurement Point - Chi"],
+            // Save the full object for TolMinus and TolPlus
+            TolMinus: {
+              fraction: row["Tol Minus"].raw,
+              decimal: row["Tol Minus"].decimal
+            },
+            TolPlus: {
+              fraction: row["Tol Plus"].raw,
+              decimal: row["Tol Plus"].decimal
+            },
+            Specs: specsArray
+          });
+        });
+      }
+    });
+
+    // --- UPDATE DATABASE ---
+    const updateResult = await collection.updateOne(
+      { _id: orderDocument._id },
+      {
+        $set: {
+          AfterWashSpecs: afterWashSpecs,
+          BeforeWashSpecs: beforeWashSpecs
+        }
+      }
+    );
+
+    if (updateResult.modifiedCount === 0 && updateResult.matchedCount > 0) {
+      return res
+        .status(200)
+        .json({ message: "Washing specs data is already up to date." });
+    }
+
+    res.status(200).json({
+      message: `Successfully updated washing specs for MO No '${moNo}'.`
+    });
+  } catch (error) {
+    console.error("Error saving washing specs:", error);
+    res.status(500).json({
+      message: "An internal server error occurred while saving the data."
+    });
+  }
+});
 
 /* ------------------------------
    End Points - qc2_orderdata
@@ -23312,6 +22914,1252 @@ app.get("/api/ie/user-task-access/:emp_id", async (req, res) => {
   } catch (error) {
     console.error("Error fetching user task access:", error);
     res.status(500).json({ message: "Server error fetching user access." });
+  }
+});
+
+/* =====================================================================
+   ENDPOINTS FOR QA DEFECTS (QC Accuracy)
+===================================================================== */
+
+// GET - Fetch all QA defects with optional filtering
+app.get("/api/qa-defects", async (req, res) => {
+  try {
+    const { isCommon } = req.query;
+    const filter = {};
+    if (isCommon) filter.isCommon = isCommon;
+
+    // Fetch defects from the new model, sort by code, and use lean() for performance
+    const defects = await QADefectsModel.find(filter).sort({ code: 1 }).lean();
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching QA defects:", error);
+    res.status(500).json({ message: "Server error fetching QA defects" });
+  }
+});
+
+// GET - Fetch options for the 'Add QA Defect' form
+app.get("/api/qa-defects/options", async (req, res) => {
+  try {
+    // This endpoint is simpler as we don't need categories, repairs, etc.
+    const lastDefect = await QADefectsModel.findOne().sort({ code: -1 });
+    const nextCode = lastDefect ? lastDefect.code + 1 : 1; // Start from 1 or a higher number like 1001
+
+    res.json({ nextCode });
+  } catch (error) {
+    console.error("Error fetching QA defect options:", error);
+    res.status(500).json({ message: "Server error fetching options" });
+  }
+});
+
+// POST - Add a new QA defect
+app.post("/api/qa-defects", async (req, res) => {
+  try {
+    const { defectLetter, shortEng, english, khmer, chinese, isCommon } =
+      req.body;
+
+    if (!defectLetter || !shortEng || !english || !khmer || !isCommon) {
+      return res.status(400).json({
+        message: "Required fields are missing. Please fill out all fields."
+      });
+    }
+
+    const existingDefect = await QADefectsModel.findOne({
+      $or: [{ shortEng }, { english }, { defectLetter }]
+    });
+    if (existingDefect) {
+      return res.status(409).json({
+        message: `Defect with name or letter already exists.`
+      });
+    }
+
+    const lastDefect = await QADefectsModel.findOne().sort({ code: -1 });
+    const newCode = lastDefect ? lastDefect.code + 1 : 1;
+
+    // Re-use the same logic to create default buyer statuses
+    const allBuyers = ["Costco", "Aritzia", "Reitmans", "ANF", "MWW"];
+    const statusByBuyer = allBuyers.map((buyerName) => ({
+      buyerName: buyerName,
+      defectStatus: ["Major"],
+      isCommon: "Major"
+    }));
+
+    const newQADefect = new QADefectsModel({
+      code: newCode,
+      defectLetter,
+      shortEng,
+      english,
+      khmer,
+      chinese: chinese || "",
+      isCommon,
+      statusByBuyer
+      // createdAt and updatedAt are handled by timestamps: true in the schema
+    });
+
+    await newQADefect.save();
+    res.status(201).json({
+      message: "QA defect added successfully",
+      defect: newQADefect
+    });
+  } catch (error) {
+    console.error("Error adding QA defect:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message:
+          "Duplicate entry. Defect code, name, or letter might already exist."
+      });
+    }
+    res
+      .status(500)
+      .json({ message: "Failed to add QA defect", error: error.message });
+  }
+});
+
+// DELETE - Delete a QA defect by its code
+app.delete("/api/qa-defects/:code", async (req, res) => {
+  try {
+    const { code } = req.params;
+    const defectCode = parseInt(code, 10);
+    if (isNaN(defectCode)) {
+      return res.status(400).json({ message: "Invalid defect code format." });
+    }
+    const deletedDefect = await QADefectsModel.findOneAndDelete({
+      code: defectCode
+    });
+    if (!deletedDefect) {
+      return res.status(404).json({ message: "QA Defect not found." });
+    }
+    res.status(200).json({ message: "QA defect deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting QA defect:", error);
+    res.status(500).json({
+      message: "Failed to delete QA defect",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   QA Defect Buyer Status ENDPOINTS
+------------------------------ */
+
+// GET - Endpoint for all QA defect details for the management page
+app.get("/api/qa-defects/all-details", async (req, res) => {
+  try {
+    const defects = await QADefectsModel.find({}).sort({ code: 1 }).lean();
+    const transformedDefects = defects.map((defect) => ({
+      code: defect.code.toString(),
+      defectLetter: defect.defectLetter, // Include the new field
+      name_en: defect.english,
+      name_kh: defect.khmer,
+      name_ch: defect.chinese,
+      // The other fields like category, repair, type are not in this model
+      statusByBuyer: defect.statusByBuyer || []
+    }));
+    res.json(transformedDefects);
+  } catch (error) {
+    console.error("Error fetching all QA defect details:", error);
+    res.status(500).json({
+      message: "Failed to fetch QA defect details",
+      error: error.message
+    });
+  }
+});
+
+// POST - Endpoint for updating QA defect buyer statuses
+// POST - Endpoint for updating QA defect buyer statuses (Robust Version)
+app.post("/api/qa-defects/buyer-statuses", async (req, res) => {
+  try {
+    const statusesPayload = req.body;
+    if (!Array.isArray(statusesPayload)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid payload: Expected an array of statuses." });
+    }
+
+    // Group the payload by defectCode
+    const updatesByDefect = statusesPayload.reduce((acc, status) => {
+      const defectCode = status.defectCode;
+      if (!acc[defectCode]) {
+        acc[defectCode] = [];
+      }
+      // Push the full buyer status object
+      acc[defectCode].push({
+        buyerName: status.buyerName,
+        defectStatus: status.defectStatus || [],
+        isCommon: status.isCommon || "Major"
+      });
+      return acc;
+    }, {});
+
+    // Create a bulk operation to update each defect's entire statusByBuyer array
+    const bulkOps = Object.keys(updatesByDefect).map((defectCodeStr) => {
+      const defectCodeNum = parseInt(defectCodeStr, 10);
+      return {
+        updateOne: {
+          filter: { code: defectCodeNum },
+          // Overwrite the entire array. This is simpler and more robust.
+          update: {
+            $set: {
+              statusByBuyer: updatesByDefect[defectCodeStr]
+            }
+          }
+        }
+      };
+    });
+
+    if (bulkOps.length > 0) {
+      await QADefectsModel.bulkWrite(bulkOps);
+    }
+
+    res.status(200).json({
+      message: "QA Defect buyer statuses updated successfully."
+    });
+  } catch (error) {
+    console.error("Error updating QA defect buyer statuses:", error);
+    res.status(500).json({
+      message: "Failed to update QA defect buyer statuses",
+      error: error.message
+    });
+  }
+});
+
+/* =====================================================================
+   ENDPOINTS FOR QA STANDARD DEFECTS
+===================================================================== */
+
+// --- FIX #2: NEW CRUD ENDPOINTS ---
+
+// GET all standard defects
+app.get("/api/qa-standard-defects", async (req, res) => {
+  try {
+    const defects = await QAStandardDefectsModel.find({}).sort({ code: 1 });
+    res.json(defects);
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching standard defects",
+      error: error.message
+    });
+  }
+});
+
+// GET next available code
+app.get("/api/qa-standard-defects/next-code", async (req, res) => {
+  try {
+    const lastDefect = await QAStandardDefectsModel.findOne().sort({
+      code: -1
+    });
+    const nextCode = lastDefect ? lastDefect.code + 1 : 1;
+    res.json({ nextCode });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error fetching next code", error: error.message });
+  }
+});
+
+// POST a new standard defect
+app.post("/api/qa-standard-defects", async (req, res) => {
+  try {
+    const newDefect = new QAStandardDefectsModel(req.body);
+    await newDefect.save();
+    res.status(201).json(newDefect);
+  } catch (error) {
+    res.status(400).json({
+      message: "Error creating standard defect",
+      error: error.message
+    });
+  }
+});
+
+// PUT (Update) a standard defect
+app.put("/api/qa-standard-defects/:id", async (req, res) => {
+  try {
+    const updatedDefect = await QAStandardDefectsModel.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+    if (!updatedDefect) {
+      return res.status(404).json({ message: "Defect not found" });
+    }
+    res.json(updatedDefect);
+  } catch (error) {
+    res.status(400).json({
+      message: "Error updating standard defect",
+      error: error.message
+    });
+  }
+});
+
+// DELETE a standard defect
+app.delete("/api/qa-standard-defects/:id", async (req, res) => {
+  try {
+    const deletedDefect = await QAStandardDefectsModel.findByIdAndDelete(
+      req.params.id
+    );
+    if (!deletedDefect) {
+      return res.status(404).json({ message: "Defect not found" });
+    }
+    res.status(200).json({ message: "Defect deleted successfully" });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error deleting standard defect",
+      error: error.message
+    });
+  }
+});
+
+/* =====================================================================
+   ENDPOINTS FOR QC ACCURACY PAGE
+===================================================================== */
+
+// --- Helper function for sanitizing filenames (if not already defined globally) ---
+// const sanitize = (input) => {
+//   if (typeof input !== "string") input = String(input);
+//   let sane = input.replace(/[^a-zA-Z0-9-._]/g, "_");
+//   if (sane === "." || sane === "..") return "_";
+//   return sane;
+// };
+
+// --- FIX #2: NEW IMAGE UPLOAD ENDPOINT FOR QA ACCURACY ---
+const qaAccuracyStorage = multer.memoryStorage();
+const qaAccuracyUpload = multer({
+  storage: qaAccuracyStorage,
+  limits: { fileSize: 25 * 1024 * 1024 }
+});
+
+app.post(
+  "/api/qa-accuracy/upload-image",
+  qaAccuracyUpload.single("imageFile"),
+  async (req, res) => {
+    try {
+      const { imageType, moNo, qcId, date } = req.body;
+      const imageFile = req.file;
+
+      if (!imageFile) {
+        return res
+          .status(400)
+          .json({ success: false, message: "No image file provided." });
+      }
+      if (!imageType || !moNo || !qcId || !date) {
+        return res.status(400).json({
+          success: false,
+          message: "Missing required metadata for image."
+        });
+      }
+
+      // Define the target path for QA Accuracy images
+      const qaAccuracyUploadPath = path.join(
+        __dirname,
+        "public",
+        "storage",
+        "qa_accuracy"
+      );
+      // Ensure the directory exists
+      await fsPromises.mkdir(qaAccuracyUploadPath, { recursive: true });
+
+      // Sanitize metadata for a unique and safe filename
+      const sanitizedImageType = sanitize(imageType); // 'defect' or 'additional'
+      const sanitizedMoNo = sanitize(moNo);
+      const sanitizedQcId = sanitize(qcId);
+      const sanitizedDate = sanitize(date.split("T")[0]); // Use YYYY-MM-DD part of date
+
+      const imagePrefix = `${sanitizedImageType}_${sanitizedMoNo}_${sanitizedDate}_${sanitizedQcId}_`;
+
+      const newFilename = `${imagePrefix}${Date.now()}.webp`;
+      const finalDiskPath = path.join(qaAccuracyUploadPath, newFilename);
+
+      // Process and save the image using sharp
+      await sharp(imageFile.buffer)
+        .resize({
+          width: 1024,
+          height: 1024,
+          fit: "inside",
+          withoutEnlargement: true
+        })
+        .webp({ quality: 80 })
+        .toFile(finalDiskPath);
+
+      const publicUrl = `${API_BASE_URL}/storage/qa_accuracy/${newFilename}`;
+
+      res.json({ success: true, filePath: publicUrl });
+    } catch (error) {
+      console.error("Error in /api/qa-accuracy/upload-image:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error during image processing."
+      });
+    }
+  }
+);
+
+// GET - Fetch all QA defects for the dropdown (lightweight version)
+app.get("/api/qa-defects-list", async (req, res) => {
+  try {
+    const defects = await QADefectsModel.find({})
+      .sort({ code: 1 })
+      .select("code english khmer chinese statusByBuyer") // Select only necessary fields
+      .lean();
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching QA defects list:", error);
+    res.status(500).json({ message: "Server error fetching QA defects list" });
+  }
+});
+
+// --- FIX #2: NEW ENDPOINT TO FETCH STANDARD DEFECTS FOR THE FORM ---
+app.get("/api/qa-standard-defects-list", async (req, res) => {
+  try {
+    const defects = await QAStandardDefectsModel.find({})
+      .sort({ code: 1 })
+      .lean(); // Use lean for performance
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching standard defects list:", error);
+    res
+      .status(500)
+      .json({ message: "Server error fetching standard defects list" });
+  }
+});
+
+// POST - Save a new QC Accuracy Inspection Report
+app.post("/api/qc-accuracy-reports", async (req, res) => {
+  try {
+    // Basic validation
+    const requiredFields = [
+      "reportDate",
+      "qcInspector",
+      "scannedQc",
+      "reportType",
+      "moNo",
+      "totalCheckedQty",
+      "result"
+    ];
+    for (const field of requiredFields) {
+      if (!req.body[field]) {
+        return res
+          .status(400)
+          .json({ message: `Missing required field: ${field}` });
+      }
+    }
+
+    const newReport = new QCAccuracyReportModel(req.body);
+    await newReport.save();
+
+    res.status(201).json({
+      message: "QC Accuracy report saved successfully!",
+      report: newReport
+    });
+  } catch (error) {
+    console.error("Error saving QC Accuracy report:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to save report", error: error.message });
+  }
+});
+
+// --- FIX #1: NEW ENDPOINT TO POPULATE FILTER DROPDOWNS ---
+app.get("/api/qa-accuracy/filter-options", async (req, res) => {
+  try {
+    const [qaIds, qcIds, moNos, lineNos, tableNos] = await Promise.all([
+      QCAccuracyReportModel.distinct("qcInspector.empId"),
+      QCAccuracyReportModel.distinct("scannedQc.empId"),
+      QCAccuracyReportModel.distinct("moNo"),
+      QCAccuracyReportModel.distinct("lineNo", { lineNo: { $ne: "NA" } }),
+      QCAccuracyReportModel.distinct("tableNo", { tableNo: { $ne: "NA" } })
+    ]);
+
+    res.json({
+      qaIds: qaIds.sort(),
+      qcIds: qcIds.sort(),
+      moNos: moNos.sort(),
+      lineNos: lineNos.sort((a, b) => a - b), // Sort numbers correctly
+      tableNos: tableNos.sort()
+    });
+  } catch (error) {
+    console.error("Error fetching filter options:", error);
+    res.status(500).json({ message: "Server error fetching filter options" });
+  }
+});
+
+// --- FIX #2: CORRECTED RESULTS AGGREGATION ENDPOINT ---
+app.get("/api/qa-accuracy/results", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      qaId,
+      qcId,
+      reportType,
+      moNo,
+      lineNo,
+      tableNo
+    } = req.query;
+
+    // --- 1. Build the initial match stage for filtering ---
+    const matchStage = {};
+
+    // Important: Only add filters if they have a value.
+    if (startDate && endDate) {
+      matchStage.reportDate = {
+        $gte: new Date(new Date(startDate).setHours(0, 0, 0, 0)),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      };
+    }
+    if (qaId) matchStage["qcInspector.empId"] = qaId;
+    if (qcId) matchStage["scannedQc.empId"] = qcId;
+    if (reportType) matchStage.reportType = reportType;
+    if (moNo) matchStage.moNo = moNo;
+
+    // Correctly handle conditional filtering for Line No / Table No
+    if (reportType === "Inline Finishing") {
+      if (tableNo) matchStage.tableNo = tableNo;
+    } else {
+      // For 'First Output', 'Inline Sewing', or if no reportType is selected
+      if (lineNo) matchStage.lineNo = lineNo;
+    }
+
+    // --- 2. Main Aggregation Pipeline  ---
+    const results = await QCAccuracyReportModel.aggregate([
+      { $match: matchStage },
+
+      { $unwind: { path: "$defects", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: "$_id",
+          reportDate: { $first: "$reportDate" },
+          createdAt: { $first: "$createdAt" },
+          scannedQc: { $first: "$scannedQc" },
+          qcInspector: { $first: "$qcInspector" },
+          reportType: { $first: "$reportType" },
+          moNo: { $first: "$moNo" },
+          colors: { $first: "$colors" },
+          sizes: { $first: "$sizes" },
+          lineNo: { $first: "$lineNo" },
+          tableNo: { $first: "$tableNo" },
+          totalCheckedQty: { $first: "$totalCheckedQty" },
+          result: { $first: "$result" },
+          grade: { $first: "$grade" },
+          totalDefectPoints: { $first: "$totalDefectPoints" },
+          totalDefectsInReport: { $sum: "$defects.qty" },
+          uniquePcsInReport: { $addToSet: "$defects.pcsNo" },
+          defects: { $push: "$defects" }
+        }
+      },
+      {
+        $group: {
+          _id: "$scannedQc.empId",
+          qcName: { $first: "$scannedQc.engName" },
+          totalChecked: { $sum: "$totalCheckedQty" },
+          totalDefectPoints: { $sum: "$totalDefectPoints" },
+          totalReports: { $sum: 1 },
+          passCount: { $sum: { $cond: [{ $eq: ["$result", "Pass"] }, 1, 0] } },
+          failCount: { $sum: { $cond: [{ $eq: ["$result", "Fail"] }, 1, 0] } },
+          totalRejectedPcs: {
+            $sum: {
+              $size: {
+                $filter: {
+                  input: "$uniquePcsInReport",
+                  as: "item",
+                  cond: { $ne: ["$$item", null] }
+                }
+              }
+            }
+          },
+          //totalRejectedPcs: { $sum: { $size: "$uniquePcsInReport" } },
+          totalDefects: { $sum: "$totalDefectsInReport" },
+          // --- NEW: Calculate counts for each defect status ---
+          minorCount: {
+            $sum: {
+              $size: {
+                $filter: {
+                  input: "$defects",
+                  as: "d",
+                  cond: { $eq: ["$$d.standardStatus", "Minor"] }
+                }
+              }
+            }
+          },
+          majorCount: {
+            $sum: {
+              $size: {
+                $filter: {
+                  input: "$defects",
+                  as: "d",
+                  cond: { $eq: ["$$d.standardStatus", "Major"] }
+                }
+              }
+            }
+          },
+          criticalCount: {
+            $sum: {
+              $size: {
+                $filter: {
+                  input: "$defects",
+                  as: "d",
+                  cond: { $eq: ["$$d.standardStatus", "Critical"] }
+                }
+              }
+            }
+          },
+          reports: { $push: "$$ROOT" }
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "emp_id",
+          as: "qcUserDetails"
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          qcId: "$_id",
+          qcName: "$qcName",
+          facePhoto: { $arrayElemAt: ["$qcUserDetails.face_photo", 0] },
+          stats: {
+            totalChecked: "$totalChecked",
+            totalRejectedPcs: "$totalRejectedPcs",
+            totalDefects: "$totalDefects",
+            passCount: "$passCount",
+            failCount: "$failCount",
+            minorCount: "$minorCount", // Pass new counts
+            majorCount: "$majorCount",
+            criticalCount: "$criticalCount",
+            accuracy: {
+              $cond: [
+                { $eq: ["$totalChecked", 0] },
+                0,
+                {
+                  $multiply: [
+                    {
+                      $subtract: [
+                        1,
+                        { $divide: ["$totalDefectPoints", "$totalChecked"] }
+                      ]
+                    },
+                    100
+                  ]
+                }
+              ]
+            }
+          },
+          reports: "$reports"
+        }
+      }
+    ]);
+
+    res.json(results);
+  } catch (error) {
+    console.error("Error fetching QA Accuracy results:", error);
+    res
+      .status(500)
+      .json({ message: "Server error fetching results", error: error.message });
+  }
+});
+
+// --- FIX #1: NEW ENDPOINT FOR PAGINATED FULL REPORT ---
+app.get("/api/qa-accuracy/full-report", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      qaId,
+      qcId,
+      reportType,
+      moNo,
+      lineNo,
+      tableNo,
+      grade, // This is the new filter parameter from the frontend
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    // 1. Build the match stage for filtering
+    const matchStage = {};
+    if (startDate && endDate) {
+      matchStage.reportDate = {
+        $gte: new Date(new Date(startDate).setHours(0, 0, 0, 0)),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      };
+    }
+    if (qaId) matchStage["qcInspector.empId"] = qaId;
+    if (qcId) matchStage["scannedQc.empId"] = qcId;
+    if (reportType) matchStage.reportType = reportType;
+    if (moNo) matchStage.moNo = moNo;
+    if (reportType === "Inline Finishing" && tableNo) {
+      matchStage.tableNo = tableNo;
+    } else if (lineNo) {
+      matchStage.lineNo = lineNo;
+    }
+    // Add the new grade filter to the match stage
+    if (grade) matchStage.grade = grade;
+
+    // 2. Define custom sorting orders
+    const reportTypeSortOrder = {
+      "Inline Sewing": 1,
+      "Inline Finishing": 2,
+      "First Output": 3
+    };
+    const gradeSortOrder = { A: 1, B: 2, C: 3, D: 4 };
+
+    // 3. Create the main aggregation pipeline
+    const aggregationPipeline = [
+      { $match: matchStage },
+      // Add custom sort fields
+      {
+        $addFields: {
+          reportTypeSort: { $ifNull: [reportTypeSortOrder[`$reportType`], 99] },
+          gradeSort: { $ifNull: [gradeSortOrder[`$grade`], 99] },
+          // --- FIX: USE $CONVERT FOR SAFE TYPE CONVERSION ---
+          lineNoNumeric: {
+            $convert: {
+              input: "$lineNo",
+              to: "int",
+              onError: 9999, // If conversion fails (e.g., "NA"), use a high number
+              onNull: 9999 // If the field is null, also use a high number
+            }
+          }
+          //lineNoNumeric: { $toInt: "$lineNo" } // Convert lineNo to number for proper sorting
+        }
+      },
+      // Apply the complex multi-level sort
+      {
+        $sort: {
+          reportDate: 1,
+          reportTypeSort: 1,
+          lineNoNumeric: 1,
+          gradeSort: 1,
+          createdAt: 1
+        }
+      }
+    ];
+
+    // 4. Execute a second pipeline to get the total count for pagination
+    const countPipeline = [...aggregationPipeline, { $count: "total" }];
+    const totalDocuments = await QCAccuracyReportModel.aggregate(countPipeline);
+    const total = totalDocuments.length > 0 ? totalDocuments[0].total : 0;
+
+    // 5. Add pagination to the main pipeline and execute
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    aggregationPipeline.push({ $skip: skip });
+    aggregationPipeline.push({ $limit: limitNum });
+
+    const reports = await QCAccuracyReportModel.aggregate(aggregationPipeline);
+
+    res.json({
+      reports,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching full report:", error);
+    res.status(500).json({
+      message: "Server error fetching full report",
+      error: error.message
+    });
+  }
+});
+
+// --- FIX #1: NEW ENDPOINT TO GET A SINGLE, FULLY-DETAILED INSPECTION REPORT ---
+app.get("/api/qa-accuracy/report/:reportId", async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(reportId)) {
+      return res.status(400).json({ message: "Invalid Report ID format." });
+    }
+
+    // 1. Fetch the main inspection report
+    const report = await QCAccuracyReportModel.findById(reportId).lean();
+    if (!report) {
+      return res.status(404).json({ message: "Inspection report not found." });
+    }
+
+    // 2. Fetch related data using Promise.all for efficiency
+    const [qaUser, qcUser, orderDetails] = await Promise.all([
+      UserProd.findOne({ emp_id: report.qcInspector.empId })
+        .select("face_photo eng_name")
+        .lean(),
+      UserProd.findOne({ emp_id: report.scannedQc.empId })
+        .select("face_photo eng_name")
+        .lean(),
+      ymEcoConnection.db
+        .collection("dt_orders")
+        .findOne({ Order_No: report.moNo })
+    ]);
+
+    // 3. Structure the final response object
+    const responseData = {
+      report, // The main report data
+      qaInspectorDetails: qaUser || {
+        face_photo: null,
+        eng_name: report.qcInspector.engName
+      },
+      scannedQcDetails: qcUser || {
+        face_photo: null,
+        eng_name: report.scannedQc.engName
+      },
+      orderDetails: orderDetails
+        ? {
+            totalQty: orderDetails.TotalQty,
+            custStyle: orderDetails.CustStyle,
+            country: orderDetails.Country,
+            mode: orderDetails.Mode,
+            salesTeamName: orderDetails.SalesTeamName,
+            orderColors: orderDetails.OrderColors
+          }
+        : null // Handle case where order is not found
+    };
+
+    res.json(responseData);
+  } catch (error) {
+    console.error("Error fetching detailed inspection report:", error);
+    res
+      .status(500)
+      .json({
+        message: "Server error fetching report details.",
+        error: error.message
+      });
+  }
+});
+
+/* ------------------------------
+   Cutting Dashboard ENDPOINTS (FINAL & COMPLETE)
+------------------------------ */
+
+// Helper function to generate date strings in M/D/YYYY format for filtering
+const generateDateStringsCuttingDashboard = (startDate, endDate) => {
+  if (!startDate || !endDate) return [];
+  const dates = [];
+  let currentDate = new Date(startDate);
+  const lastDate = new Date(endDate);
+
+  currentDate.setHours(0, 0, 0, 0);
+  lastDate.setHours(0, 0, 0, 0);
+
+  while (currentDate <= lastDate) {
+    const M = currentDate.getMonth() + 1;
+    const D = currentDate.getDate();
+    const Y = currentDate.getFullYear();
+    dates.push(`${M}/${D}/${Y}`);
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  return dates;
+};
+
+// This is the logic for the buyer helper, translated into MongoDB aggregation syntax.
+// It will be used inside an $addFields stage.
+const derivedBuyerLogic = {
+  $switch: {
+    branches: [
+      { case: { $regexMatch: { input: "$moNo", regex: "COM" } }, then: "MWW" },
+      {
+        case: { $regexMatch: { input: "$moNo", regex: "CO" } },
+        then: "Costco"
+      },
+      {
+        case: { $regexMatch: { input: "$moNo", regex: "AR" } },
+        then: "Aritzia"
+      },
+      {
+        case: { $regexMatch: { input: "$moNo", regex: "RT" } },
+        then: "Reitmans"
+      },
+      { case: { $regexMatch: { input: "$moNo", regex: "AF" } }, then: "ANF" },
+      { case: { $regexMatch: { input: "$moNo", regex: "NT" } }, then: "STORI" }
+    ],
+    default: "Other"
+  }
+};
+
+// GET DYNAMIC/CROSS-FILTERED filter options for Cutting Dashboard
+app.get("/api/cutting-dashboard/filters", async (req, res) => {
+  try {
+    const { startDate, endDate, buyer, moNo, tableNo, garmentType } = req.query;
+
+    // 1. Build the initial pipeline with date filtering and derived buyer
+    const pipeline = [];
+    if (startDate && endDate) {
+      const dateStrings = generateDateStringsCuttingDashboard(
+        startDate,
+        endDate
+      );
+      if (dateStrings.length > 0) {
+        pipeline.push({ $match: { inspectionDate: { $in: dateStrings } } });
+      } else {
+        return res.json({
+          buyers: [],
+          moNos: [],
+          tableNos: [],
+          garmentTypes: [],
+          qcIds: []
+        });
+      }
+    }
+    pipeline.push({ $addFields: { derivedBuyer: derivedBuyerLogic } });
+
+    // 2. Build the progressive match stage for cross-filtering
+    const progressiveMatch = {};
+    if (buyer) progressiveMatch.derivedBuyer = buyer;
+    if (moNo) progressiveMatch.moNo = moNo;
+    if (tableNo) progressiveMatch.tableNo = tableNo;
+    if (garmentType) progressiveMatch.garmentType = garmentType;
+
+    if (Object.keys(progressiveMatch).length > 0) {
+      pipeline.push({ $match: progressiveMatch });
+    }
+
+    // 3. Use a single facet stage to get all unique lists from the filtered dataset
+    pipeline.push({
+      $facet: {
+        buyers: [
+          { $group: { _id: "$derivedBuyer" } },
+          { $sort: { _id: 1 } },
+          { $project: { value: "$_id", _id: 0 } }
+        ],
+        moNos: [
+          { $group: { _id: "$moNo" } },
+          { $sort: { _id: 1 } },
+          { $project: { value: "$_id", _id: 0 } }
+        ],
+        tableNos: [
+          { $group: { _id: "$tableNo" } },
+          { $sort: { _id: 1 } },
+          { $project: { value: "$_id", _id: 0 } }
+        ],
+        garmentTypes: [
+          { $group: { _id: "$garmentType" } },
+          { $sort: { _id: 1 } },
+          { $project: { value: "$_id", _id: 0 } }
+        ],
+        qcIds: [
+          { $group: { _id: "$cutting_emp_id" } },
+          { $sort: { _id: 1 } },
+          { $project: { value: "$_id", _id: 0 } }
+        ]
+      }
+    });
+
+    const result = await CuttingInspection.aggregate(pipeline);
+
+    const formatResult = (data) =>
+      (data || []).map((item) => item.value).filter(Boolean);
+
+    res.json({
+      buyers: formatResult(result[0].buyers),
+      moNos: formatResult(result[0].moNos),
+      tableNos: formatResult(result[0].tableNos),
+      garmentTypes: formatResult(result[0].garmentTypes),
+      qcIds: formatResult(result[0].qcIds)
+    });
+  } catch (error) {
+    console.error("Error fetching cutting dashboard dynamic filters:", error);
+    res.status(500).json({
+      message: "Failed to fetch dynamic filter options",
+      error: error.message
+    });
+  }
+});
+
+// GET Cutting Dashboard Data
+app.get("/api/cutting-dashboard-data", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      buyer,
+      moNo,
+      tableNo,
+      garmentType,
+      color,
+      qcId,
+      topN = 5,
+      sortOrder = "top"
+    } = req.query;
+
+    // This pipeline will be prepended to all data-fetching aggregations
+    const preMatchPipeline = [];
+
+    // Stage 1: Add the derivedBuyer field first
+    preMatchPipeline.push({ $addFields: { derivedBuyer: derivedBuyerLogic } });
+
+    // Stage 2: Build the match object using the derived buyer
+    const match = {};
+    if (startDate && endDate) {
+      const dateStrings = generateDateStringsCuttingDashboard(
+        startDate,
+        endDate
+      );
+      if (dateStrings.length > 0) {
+        match.inspectionDate = { $in: dateStrings };
+      } else {
+        return res.json({ kpis: {}, charts: {} });
+      }
+    }
+    if (buyer) match.derivedBuyer = buyer; // Filter on the derived buyer
+    if (moNo) match.moNo = moNo;
+    if (tableNo) match.tableNo = tableNo;
+    if (garmentType) match.garmentType = garmentType;
+    if (color) match.color = color;
+    if (qcId) match.cutting_emp_id = qcId;
+
+    //preMatchPipeline.push({ $match: match });
+    if (Object.keys(match).length > 0) {
+      preMatchPipeline.push({ $match: match });
+    }
+
+    // Pipeline to count the total number of reports (documents) found
+    const reportCountPipeline = [
+      ...preMatchPipeline,
+      { $count: "totalReports" }
+    ];
+
+    // The rest of the pipelines now start with the correctly filtered data
+    const kpiBasePipeline = [
+      ...preMatchPipeline, // Prepend the filtering logic
+      {
+        $group: {
+          _id: null,
+          totalInspectionQty: { $sum: { $ifNull: ["$totalInspectionQty", 0] } },
+          totalBundleQty: { $sum: { $ifNull: ["$totalBundleQty", 0] } },
+          bundleQtyCheck: { $sum: { $ifNull: ["$bundleQtyCheck", 0] } }
+        }
+      }
+    ];
+
+    const unwindPipeline = [
+      ...preMatchPipeline, // Prepend the filtering logic
+      { $unwind: "$inspectionData" },
+      {
+        $facet: {
+          kpis: [
+            {
+              $group: {
+                _id: null,
+                totalPcs: {
+                  $sum: { $ifNull: ["$inspectionData.totalPcsSize", 0] }
+                },
+                totalPass: {
+                  $sum: { $ifNull: ["$inspectionData.passSize.total", 0] }
+                },
+                totalReject: {
+                  $sum: { $ifNull: ["$inspectionData.rejectSize.total", 0] }
+                },
+                rejectMeasurements: {
+                  $sum: {
+                    $ifNull: ["$inspectionData.rejectMeasurementSize.total", 0]
+                  }
+                },
+                rejectDefects: {
+                  $sum: {
+                    $ifNull: ["$inspectionData.rejectGarmentSize.total", 0]
+                  }
+                },
+                inspectedSizes: { $addToSet: "$inspectionData.inspectedSize" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                totalPcs: 1,
+                totalPass: 1,
+                totalReject: 1,
+                rejectMeasurements: 1,
+                rejectDefects: 1,
+                passRate: {
+                  $cond: [
+                    { $gt: ["$totalPcs", 0] },
+                    {
+                      $multiply: [{ $divide: ["$totalPass", "$totalPcs"] }, 100]
+                    },
+                    0
+                  ]
+                },
+                totalInspectedSizes: { $size: "$inspectedSizes" }
+              }
+            }
+          ],
+          passRateByMo: [
+            {
+              $group: {
+                _id: "$moNo",
+                totalPcs: { $sum: "$inspectionData.totalPcsSize" },
+                totalPass: { $sum: "$inspectionData.passSize.total" },
+                totalReject: { $sum: "$inspectionData.rejectSize.total" }
+              }
+            },
+            {
+              $project: {
+                name: "$_id",
+                _id: 0,
+                totalPcs: 1, // Pass through the counts
+                totalPass: 1,
+                totalReject: 1,
+                passRate: {
+                  $cond: [
+                    { $gt: ["$totalPcs", 0] },
+                    {
+                      $multiply: [{ $divide: ["$totalPass", "$totalPcs"] }, 100]
+                    },
+                    0
+                  ]
+                }
+              }
+            },
+            { $sort: { passRate: sortOrder === "bottom" ? 1 : -1 } },
+            { $limit: parseInt(topN, 10) }
+          ],
+          passRateByDate: [
+            {
+              $group: {
+                _id: "$inspectionDate",
+                totalPcs: { $sum: "$inspectionData.totalPcsSize" },
+                totalPass: { $sum: "$inspectionData.passSize.total" }
+              }
+            },
+            { $addFields: { dateParts: { $split: ["$_id", "/"] } } },
+            {
+              $addFields: {
+                month: { $toInt: { $arrayElemAt: ["$dateParts", 0] } },
+                day: { $toInt: { $arrayElemAt: ["$dateParts", 1] } },
+                year: { $toInt: { $arrayElemAt: ["$dateParts", 2] } }
+              }
+            },
+            { $sort: { year: 1, month: 1, day: 1 } },
+            {
+              $project: {
+                name: "$_id",
+                _id: 0,
+                passRate: {
+                  $cond: [
+                    { $gt: ["$totalPcs", 0] },
+                    {
+                      $multiply: [{ $divide: ["$totalPass", "$totalPcs"] }, 100]
+                    },
+                    0
+                  ]
+                }
+              }
+            },
+            { $limit: 30 }
+          ],
+          passRateByGarmentType: [
+            {
+              $group: {
+                _id: "$garmentType",
+                totalPcs: { $sum: "$inspectionData.totalPcsSize" },
+                totalPass: { $sum: "$inspectionData.passSize.total" }
+              }
+            },
+            {
+              $project: {
+                name: "$_id",
+                _id: 0,
+                passRate: {
+                  $cond: [
+                    { $gt: ["$totalPcs", 0] },
+                    {
+                      $multiply: [{ $divide: ["$totalPass", "$totalPcs"] }, 100]
+                    },
+                    0
+                  ]
+                }
+              }
+            },
+            { $sort: { passRate: -1 } }
+          ]
+        }
+      }
+    ];
+
+    const [kpiBaseResult, unwindResult, reportCountResult] = await Promise.all([
+      CuttingInspection.aggregate(kpiBasePipeline),
+      CuttingInspection.aggregate(unwindPipeline),
+      CuttingInspection.aggregate(reportCountPipeline)
+    ]);
+
+    const defaultKpis = {
+      totalInspectedReports: 0,
+      totalInspectionQty: 0,
+      totalPcs: 0,
+      totalPass: 0,
+      totalReject: 0,
+      rejectMeasurements: 0,
+      rejectDefects: 0,
+      passRate: 0,
+      totalBundleQty: 0,
+      bundleQtyCheck: 0,
+      totalInspectedSizes: 0
+    };
+
+    const kpis = {
+      ...defaultKpis,
+      ...(kpiBaseResult[0] || {}),
+      ...(unwindResult[0]?.kpis[0] || {}),
+      totalInspectedReports: reportCountResult[0]?.totalReports || 0 // <-- Add the count result
+    };
+    delete kpis._id;
+
+    const formattedResult = {
+      kpis,
+      charts: {
+        passRateByMo: unwindResult[0]?.passRateByMo || [],
+        passRateByDate: unwindResult[0]?.passRateByDate || [],
+        passRateByGarmentType: unwindResult[0]?.passRateByGarmentType || []
+      }
+    };
+
+    res.json(formattedResult);
+  } catch (error) {
+    console.error("Error fetching cutting dashboard data:", error);
+    res.status(500).json({
+      message: "Failed to fetch cutting dashboard data",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   AI Chatbot Proxy Route
+------------------------------ */
+
+app.post("/api/ai/ask", async (req, res) => {
+  // Destructure both question and selectedModel from the request body
+  const { question, selectedModel } = req.body;
+
+  if (!question) {
+    return res.status(400).json({ error: "Question is required." });
+  }
+
+  try {
+    // Forward the request to the Python Flask AI service
+    // This URL must match where your Python service is running.
+    const aiServiceResponse = await axios.post("http://localhost:5002/ask", {
+      // Pass both pieces of data to the Python service
+      question: question,
+      selectedModel: selectedModel
+    });
+
+    // Send the response from the AI service back to the React client
+    res.json(aiServiceResponse.data);
+  } catch (error) {
+    console.error("Error proxying request to AI service:", error.message);
+
+    // Provide a user-friendly error message
+    res.status(502).json({
+      answer:
+        "Sorry, I'm having trouble connecting to my brain right now. Please try again later."
+    });
   }
 });
 

@@ -510,6 +510,13 @@ function Home() {
             image: "assets/Home/bundle.avif",
             title: t("home.qcWashing"),
             description: "Washing Report"
+          },
+          {
+            path: "/upload-beforewash-specs",
+            roles: ["Washing Clerk"],
+            image: "assets/Home/uploadspecs.png",
+            title: t("home.upload_beforewash_specs"),
+            description: "Upload Beforewash Specs"
           }
         ]
       },
@@ -556,8 +563,15 @@ function Home() {
             description: "QA Audit Check Point"
           },
           {
+            path: "/qc-accuracy",
+            roles: ["QA"],
+            image: "assets/Home/qc-accuracy.png",
+            title: "QC Accuracy",
+            description: "QA Random Checks"
+          },
+          {
             path: "/final-inspection",
-            roles: ["QA Audit"],
+            roles: ["QA"],
             image: "assets/Home/qafinal.png",
             title: "Final Inspection",
             description: "QA Final Inspection"
