@@ -28,9 +28,21 @@ body {
   z-index: 50 !important;
 }
 
+/* --- ADD KEYFRAME ANIMATION FOR FOCUS INDICATOR --- */
+@keyframes ping-once {
+  75%,
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.animate-ping-once {
+  animation: ping-once 1s cubic-bezier(0, 0, 0.2, 1);
+}
+
 /* 
-  Add these custom properties (CSS Variables) for your theme.
-  This is the core of the fix.
+  custom properties (CSS Variables).
 */
 :root {
   /* Light Theme Variables */

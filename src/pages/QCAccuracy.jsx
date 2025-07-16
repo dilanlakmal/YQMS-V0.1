@@ -6,6 +6,7 @@ import QAInspectionForm from "../components/inspection/qc_accuracy/QAInspectionF
 import QAAccuracyResults from "../components/inspection/qc_accuracy/QAAccuracyResults";
 import QCAccuracyFullReport from "../components/inspection/qc_accuracy/QCAccuracyFullReport";
 import QAPageTitle from "../components/inspection/qc_accuracy/QAPageTitle";
+import QAAccuracyDashboard from "../components/inspection/qc_accuracy/QAAccuracyDashboard";
 
 // Placeholder for other tabs
 const PlaceholderComponent = ({ titleKey, contentKey }) => {
@@ -47,6 +48,12 @@ const QCAccuracy = () => {
         labelKey: "qcAccuracy.tabs.fullReport",
         icon: <BookOpen size={18} />,
         component: <QCAccuracyFullReport />
+      },
+      {
+        id: "dashboard",
+        labelKey: "qcAccuracy.tabs.dashboard",
+        icon: <BookOpen size={18} />,
+        component: <QAAccuracyDashboard />
       },
       // {
       //   id: "results",
