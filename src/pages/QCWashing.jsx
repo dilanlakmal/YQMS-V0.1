@@ -1334,7 +1334,7 @@ const QCWashingPage = () => {
 
         {/* Auto-save status */}
         {lastSaved && (
-          <div className="text-center text-sm text-gray-600">
+          <div className="text-center text-sm text-gray-600 dark:text-gray-300">
             Last auto-saved: {lastSaved.toLocaleTimeString()}
           </div>
         )}

@@ -378,13 +378,13 @@ const toggleSelectAllRows = (size, checked, tableType) => {
 
     return (
       <div key={`measurement-${size}`} className="mb-8">
-        <h4 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
+        <h4 className="text-lg font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-white">
           Size: {size} (Qty: {qty})
         </h4>
         
         {/* K1 Sheet - Before Wash */}
         {reportType === 'Before Wash' && (
-          <div className="bg-blue-50 p-4 rounded-lg mb-4">
+          <div className="bg-blue-50 p-4 rounded-lg mb-4 dark:bg-gray-800 dark:text-white">
           <h5 className="text-sm font-medium mb-3">Before Wash</h5>
           
           {Object.keys(measurementSpecs.beforeWashGrouped).length > 1 && (
@@ -412,17 +412,17 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                   [size]: !prev[size],
                 }))
               }
-              className="text-xs px-3 py-1 border border-gray-400 rounded bg-gray-100 hover:bg-gray-200"
+              className="text-xs px-3 py-1 border border-gray-400 rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-white"
             >
               {hideUnselectedRowsBySize[size] ? 'Show All' : 'Hide Unselected'}
             </button>
           </div>
           
           <div className="overflow-x-auto ">
-            <table className="w-full border-collapse border border-gray-300 text-xs">
+            <table className="w-full border-collapse border border-gray-300 text-xs dark:bg-gray-800 dark:text-white">
              <thead className="bg-gray-50">
                 <tr>
-                  <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium">
+                  <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">
                     <input
                         type="checkbox"
                         checked={
@@ -432,18 +432,18 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                         className="w-4 h-4"
                       />
                   </th>
-                  <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium">Area</th>
-                  <th colSpan={2} className="border border-gray-300 px-2 py-1 font-medium">Tolerance</th>
-                  <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium">Specs</th>
-                  <th colSpan={selectedSizes.find(s => s.size === size)?.qty || 1} className="border border-gray-300 px-2 py-1 font-medium text-center">
+                  <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">Area</th>
+                  <th colSpan={2} className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">Tolerance</th>
+                  <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">Specs</th>
+                  <th colSpan={selectedSizes.find(s => s.size === size)?.qty || 1} className="border border-gray-300 px-2 py-1 font-medium text-center dark:bg-gray-700 dark:text-white">
                     Measurements
                   </th>
                 </tr>
                 <tr>
-                  <th className="border border-gray-300 px-2 py-1 font-medium">-</th>
-                  <th className="border border-gray-300 px-2 py-1 font-medium">+</th>
+                   <th className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">-</th>
+                  <th className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">+</th>
                   {[...Array(qty)].map((_, i) => (
-                      <th key={`measure-header-${i}`} className="border border-gray-300 px-2 py-1 font-medium text-center">
+                      <th key={`measure-header-${i}`} className="border border-gray-300 px-2 py-1 font-medium text-center dark:bg-gray-800 dark:text-white">
                         <div className="flex flex-col items-center">
                           <span>{i + 1}</span>
                           <label className="flex items-center space-x-1 text-[10px]">
@@ -473,22 +473,22 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                   if (shouldHide) return null;
                   
                   return (
-                    <tr key={`k1-${index}`} className="hover:bg-gray-50">
-                      <td className="border border-gray-300 px-2 py-1 text-center">
+                    <tr key={`k1-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-600">
+                      <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleRowSelection(size, index)}
                         />
                       </td>
-                      <td className="border border-gray-300 px-2 py-1">{area}</td>
-                      <td className="border border-gray-300 px-2 py-1 text-center">
+                     <td className="border border-gray-300 px-2 py-1 dark:bg-gray-800 dark:text-white">{area}</td>
+                      <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
                         {tolMinus !== '-' && tolMinus !== '0' ? (tolMinus.startsWith('-') ? tolMinus : `-${tolMinus}`) : '0'}
                       </td>
-                      <td className="border border-gray-300 px-2 py-1 text-center">
+                      <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
                         {tolPlus !== '-' && tolPlus !== '0' ? (tolPlus.startsWith('+') ? tolPlus : `+${tolPlus}`) : '0'}
                       </td>
-                      <td className="border border-gray-300 px-2 py-1 text-center">
+                      <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
                         {specs !== '-' ? specs : '-'}
                       </td>
                       {[...Array(qty)].map((_, i) => {
@@ -523,7 +523,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                               type="text"
                               value={value?.fraction || ''}
                               readOnly
-                              className="w-full px-1 py-1 text-center border-0 bg-transparent"
+                              className="w-full px-1 py-1 text-center border-0 bg-transparent dark:bg-gray-800 dark:text-white"
                               placeholder="0.0"
                               style={{ pointerEvents: 'none' }}
                             />
@@ -550,12 +550,12 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                   [size]: !prev[size],
                 }))
               }
-              className="text-xs px-3 py-1 border border-gray-400 rounded bg-gray-100 hover:bg-gray-200"
+              className="text-xs px-3 py-1 border border-gray-400 rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-white"
             >
               {hideUnselectedRowsBySize[size] ? 'Show All' : 'Hide Unselected'}
             </button>
           </div>
-        <div className="bg-green-50 p-4 rounded-lg mb-4">
+        <div className="bg-green-50 p-4 rounded-lg mb-4 dark:bg-gray-800 dark:text-white">
           <h5 className="text-sm font-medium mb-3">After Wash</h5>
           
           {Object.keys(measurementSpecs.afterWashGrouped).length > 1 && (
@@ -576,10 +576,10 @@ const toggleSelectAllRows = (size, checked, tableType) => {
             </div>
           )}
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-300 text-xs">
+            <table className="w-full border-collapse border border-gray-300 text-xs dark:bg-gray-800 dark:text-white">
               <thead className="bg-gray-50">
                 <tr>
-                   <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium">
+                  <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">
                     <input
                         type="checkbox"
                         checked={
@@ -589,18 +589,18 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                         className="w-4 h-4"
                       />
                   </th>
-                  <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium">Area</th>
-                  <th colSpan={2} className="border border-gray-300 px-2 py-1 font-medium">Tolerance</th>
-                  <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium">Specs</th>
-                  <th colSpan={selectedSizes.find(s => s.size === size)?.qty || 1} className="border border-gray-300 px-2 py-1 font-medium text-center">
+                  <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">Area</th>
+                  <th colSpan={2} className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">Tolerance</th>
+                  <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">Specs</th>
+                  <th colSpan={selectedSizes.find(s => s.size === size)?.qty || 1} className="border border-gray-300 px-2 py-1 font-medium text-center dark:bg-gray-700 dark:text-white">
                     Measurements
                   </th>
                 </tr>
                 <tr>
-                  <th className="border border-gray-300 px-2 py-1 font-medium">-</th>
-                  <th className="border border-gray-300 px-2 py-1 font-medium">+</th>
+                  <th className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">-</th>
+                  <th className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">+</th>
                   {[...Array(qty)].map((_, i) => (
-                      <th key={`measure-header-${i}`} className="border border-gray-300 px-2 py-1 font-medium text-center">
+                      <th key={`measure-header-${i}`} className="border border-gray-300 px-2 py-1 font-medium text-center dark:bg-gray-800 dark:text-white">
                         <div className="flex flex-col items-center">
                           <span>{i + 1}</span>
                           <label className="flex items-center space-x-1 text-[10px]">
@@ -632,22 +632,22 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                   if (shouldHide) return null;
                   
                   return (
-                    <tr key={`k2-${index}`} className="hover:bg-gray-50">
-                      <td className="border border-gray-300 px-2 py-1 text-center">
+                    <tr key={`k2-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-600">
+                      <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleRowSelection(size, index)}
                         />
                       </td>
-                      <td className="border border-gray-300 px-2 py-1">{area}</td>
-                      <td className="border border-gray-300 px-2 py-1 text-center">
+                      <td className="border border-gray-300 px-2 py-1 dark:bg-gray-800 dark:text-white">{area}</td>
+                      <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
                         {tolMinus !== '-' && tolMinus !== '0' ? (tolMinus.startsWith('-') ? tolMinus : `-${tolMinus}`) : '0'}
                       </td>
-                      <td className="border border-gray-300 px-2 py-1 text-center">
+                      <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
                         {tolPlus !== '-' && tolPlus !== '0' ? (tolPlus.startsWith('+') ? tolPlus : `+${tolPlus}`) : '0'}
                       </td>
-                      <td className="border border-gray-300 px-2 py-1 text-center">
+                      <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
                         {specs !== '-' ? specs : '-'}
                       </td>
                       {[...Array(qty)].map((_, i) => {
@@ -670,7 +670,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                           }
                         }
                         return (
-                           <td key={`measurement-input-${index}-${i}`} className={`border border-gray-300 px-2 py-1 text-center ${cellColorClass} cursor-pointer`}
+                           <td key={`measurement-input-${index}-${i}`} className={`border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white ${cellColorClass} cursor-pointer`}
                               onClick={(e) => {
                                 e.preventDefault();
                                 setCurrentCell({ size, table: 'after', rowIndex: index, colIndex: i });
@@ -680,7 +680,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                               type="text" 
                               value={value?.fraction || ''}
                               readOnly
-                              className="w-full px-1 py-1 text-center border-0 bg-transparent"
+                              className="w-full px-1 py-1 text-center border-0 bg-transparent dark:bg-gray-800 dark:text-white"
                               placeholder="0.0"
                               style={{ pointerEvents: 'none' }}
                             />
@@ -701,9 +701,9 @@ const toggleSelectAllRows = (size, checked, tableType) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-4 border-b pb-2">
-        <h2 className="text-lg font-semibold text-gray-800">Measurement Details</h2>
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Measurement Details</h2>
         <button 
           onClick={onToggle}
           className="text-indigo-600 hover:text-indigo-800 font-medium"
@@ -715,15 +715,15 @@ const toggleSelectAllRows = (size, checked, tableType) => {
         <div className="space-y-6">
           {/* Display selected order and color */}
           {orderNo && color && (
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="text-md font-semibold mb-2">Selected Order Details</h3>
+            <div className="bg-blue-50 p-4 rounded-lg dark:bg-gray-700">
+              <h3 className="text-md font-semibold mb-2 dark:text-white">Selected Order Details</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><span className="font-medium">Order No:</span> {orderNo}</div>
-                <div><span className="font-medium">Color:</span> {color}</div>
+                <div><span className="font-medium dark:text-gray-300">Order No:</span> <span className="dark:text-white">{orderNo}</span></div>
+                <div><span className="font-medium dark:text-gray-300">Color:</span> <span className="dark:text-white">{color}</span></div>
               </div>
               {savedSizes.length > 0 && (
-                <div className="mt-3">
-                  <span className="font-medium text-sm">Saved Sizes:</span>
+                <div className="mt-3 dark:text-gray-300 dark:bg-gray-800">
+                  <span className="font-medium text-sm dark:text-gray-300">Saved Sizes:</span>
                   <div className="flex flex-wrap gap-2 mt-1">
                     {savedSizes.map(size => (
                       <span key={size} className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs">
@@ -759,14 +759,14 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                   {sizes.length > 0 ? (
                     <div className="space-y-2">
                       <div className="flex items-center space-x-4">
-                        <label htmlFor="size-select" className="text-sm font-medium">Select Sizes:</label>
+                        <label htmlFor="size-select" className="text-sm font-medium dark:text-gray-300 dark:bg-gray-800">Select Sizes:</label>
                         <select 
                           id="size-select"
                           onChange={(e) => e.target.value && addSize(e.target.value)}
                           value=""
-                          className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500"
+                          className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:text-gray-300 dark:bg-gray-800"
                         >
-                        <option value="">-- Select Size to Add --</option>
+                        <option className="text-sm font-medium dark:text-gray-300 dark:bg-gray-800" value="">-- Select Size to Add --</option>
                         {sizes.map((size, index) => {
                           let sizeValue;
                           if (typeof size === 'object' && size !== null) {
@@ -796,7 +796,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                         </select>
                       </div>
                       {savedSizes.length > 0 && (
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-500 dark:text-gray-300">
                           Note: Saved sizes are grayed out and cannot be selected again.
                         </div>
                       )}
@@ -813,38 +813,38 @@ const toggleSelectAllRows = (size, checked, tableType) => {
 
           {selectedSizes.length > 0 && (
             <div>
-              <h3 className="text-md font-semibold mb-3">Selected Sizes</h3>
+              <h3 className="text-md font-semibold mb-3 dark:text-white dark:bg-gray-800">Selected Sizes</h3>
               <div className="space-y-2">
                 {selectedSizes.map(({ size, qty }) => {
                   const isSaved = savedSizes.includes(size);
                   return (
                     <div key={size} className={`flex items-center justify-between p-3 border rounded-md ${
-                      isSaved ? 'bg-gray-100 border-gray-300' : 'bg-white'
+                      isSaved ? 'bg-gray-100 border-gray-300 dark:bg-gray-600 dark:border-gray-500' : 'bg-white dark:bg-gray-800'
                     }`}>
                       <span className={`font-medium ${
-                        isSaved ? 'text-gray-500' : 'text-gray-900'
+                        isSaved ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'
                       }`}>Size: {size} {isSaved ? '(Saved)' : ''}</span>
                       <div className="flex items-center space-x-3">
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => updateQty(size, -1)}
                             disabled={isSaved}
-                            className={`p-1 rounded-full ${
+                            className={`p-1 rounded-full dark:bg-gray-700 ${
                               isSaved 
-                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                : 'bg-red-100 text-red-600 hover:bg-red-200'
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed dark:text-gray-500'
+                                : 'bg-red-100 text-red-600 hover:bg-red-200 dark:text-red-400'
                             }`}
                           >
                             <Minus size={16} />
                           </button>
-                          <span className="w-8 text-center">{qty}</span>
+                          <span className="w-8 text-center dark:text-gray-300">{qty}</span>
                           <button
                             onClick={() => updateQty(size, 1)}
                             disabled={isSaved}
-                            className={`p-1 rounded-full ${
+                            className={`p-1 rounded-full dark:bg-gray-700 ${
                               isSaved 
-                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                : 'bg-green-100 text-green-600 hover:bg-green-200'
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed dark:text-gray-500'
+                                : 'bg-green-100 text-green-600 hover:bg-green-200 dark:text-green-400'
                             }`}
                           >
                             <Plus size={16} />
@@ -853,7 +853,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                         <button
                           onClick={() => removeSize(size)}
                           disabled={isSaved}
-                          className={`px-3 py-1 rounded-md text-sm ${
+                          className={`px-3 py-1 rounded-md text-sm dark:bg-gray-600 ${
                             isSaved 
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-red-500 text-white hover:bg-red-600'
@@ -873,7 +873,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
           {currentWashMeasurements.length > 0 && (
             <div>
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Saved Measurement Data</h3>
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Saved Measurement Data</h3>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                 {currentWashMeasurements.map((data, index) => (
@@ -893,7 +893,6 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                       </div>
                     </div>
                     <div className="text-sm text-gray-600">
-                      <p>Pieces: {data.pcs?.length || 0}</p>
                       <p>Measurement points per piece: {data.pcs?.[0]?.measurementPoints?.length || 0}</p>
                       <p>Total measurements: {(data.pcs || []).reduce((total, pc) => total + (pc.measurementPoints?.length || 0), 0)}</p>
                     </div>
@@ -906,14 +905,14 @@ const toggleSelectAllRows = (size, checked, tableType) => {
           {/* Show measurement table for new sizes */}
           {showMeasurementTable && selectedSizes.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold mb-4 text-gray-800">Measurement Input</h3>
+              <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Measurement Input</h3>
               <div className="grid grid-cols-1 gap-6">
                 {selectedSizes.map(({ size, qty }) => {
                   const isSaved = savedSizes.includes(size);
                   if (isSaved) return null; // Don't show saved sizes in input section
                   
                   return (
-                    <div key={`measurement-container-${size}`} className="border rounded-lg p-4 bg-white border-gray-200">
+                    <div key={`measurement-container-${size}`} className="border rounded-lg p-4 bg-white border-gray-200 dark:bg-gray-800 dark:text-white">
                       {renderMeasurementTable(size, qty)}
                       {onSizeSubmit && (
                         <div className="mt-4 flex justify-end">
@@ -962,7 +961,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                                 return;
                               }
 
-                              const transformedData = transformMeasurementData(size, qty, measurementValues, selectedRowsBySize[size], fullColumnsBySize[size], specsForSubmit, tableType);
+                               const transformedData = transformMeasurementData(size, qty, measurementValues, selectedRowsBySize[size], fullColumnsBySize[size], specsForSubmit, tableType);
                               onSizeSubmit(transformedData);
                             }}
                             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"

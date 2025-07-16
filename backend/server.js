@@ -31,7 +31,7 @@ import createQC2WorkersDataModel from "./models/QC2WorkersData.js";
 import createQC2BGradeModel from "./models/QC2BGrade.js";
 import createQCWashingDefectsModel from "./models/QCWashingDefectsModel.js";
 import createQCWashingCheckpointsModel from "./models/QCWashingCheckpointsModel.js";
-import createStyleWiseCheckedQtyModel from "./models/StyleWiseCheckedQty.js";
+// import createStyleWiseCheckedQtyModel from "./models/StyleWiseCheckedQty.js";
 import createQCWashingFirstOutputModel from "./models/QCWashingFirstOutputModel.js";
 
 import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
@@ -194,7 +194,7 @@ const QC2BGrade = createQC2BGradeModel(ymProdConnection);
 const QCWashingDefects = createQCWashingDefectsModel(ymProdConnection);
 const QCWashingCheckList = createQCWashingCheckpointsModel(ymProdConnection);
 const QCWashingFirstOutput = createQCWashingFirstOutputModel(ymProdConnection);
-const StyleWiseCheckedQty = createStyleWiseCheckedQtyModel(ymProdConnection);
+// const StyleWiseCheckedQty = createStyleWiseCheckedQtyModel(ymProdConnection);
 const QCWashing = createQCWashingModel(ymProdConnection);
 
 const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
@@ -1838,63 +1838,6 @@ app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
   }
 });
 
-// Get order details by order number with saved color data
-// app.get('/api/qc-washing/order-details-by-order/:orderNo', async (req, res) => {
-//   const { orderNo } = req.params;
-//   const collection = ymEcoConnection.db.collection("dt_orders");
-
-//   try {
-//     const orders = await collection.find({ Order_No: orderNo }).toArray();
-
-//     if (!orders || orders.length === 0) {
-//       return res.status(404).json({ success: false, message: `Order '${orderNo}' not found.` });
-//     }
-
-//     // Extract all available colors from OrderColors array
-//     const colorSet = new Set();
-//     orders.forEach(order => {
-//       if (order.OrderColors && Array.isArray(order.OrderColors)) {
-//         order.OrderColors.forEach(colorObj => {
-//           if (colorObj && colorObj.Color) {
-//             colorSet.add(colorObj.Color);
-//           }
-//         });
-//       }
-//     });
-//     const availableColors = Array.from(colorSet);
-    
-//     const orderQty = orders.reduce((sum, order) => sum + (order.TotalQty || 0), 0);
-//     const buyerName = getBuyerFromMoNumber(orderNo);
-
-//     // Check for saved colors in QCWashing collection
-//     let savedColors = [];
-//     let defaultColor = availableColors[0] || '';
-    
-//     try {
-//       const savedData = await QCWashing.findOne({ orderNo: orderNo });
-//       if (savedData && savedData.colors && savedData.colors.length > 0) {
-//         savedColors = savedData.colors.map(c => c.colorName);
-//         defaultColor = savedColors[0]; // Use first saved color as default
-//       }
-//     } catch (err) {
-//       console.log('No saved color data found, using available colors');
-//     }
-
-//     res.json({
-//       success: true,
-//       colors: availableColors, // All available colors from dt_orders
-//       savedColors: savedColors, // Colors that have saved data
-//       defaultColor: defaultColor, // Default color to select
-//       orderQty,
-//       buyer: buyerName,
-//     });
-
-//   } catch (error) {
-//     console.error(`Error fetching order details for order ${orderNo}:`, error);
-//     res.status(500).json({ success: false, message: 'Server error while fetching order details.' });
-//   }
-// });
-
 // Get sizes for a specific order and color
 app.get('/api/qc-washing/order-sizes/:orderNo/:color', async (req, res) => {
   const { orderNo, color } = req.params;
@@ -2537,20 +2480,190 @@ app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
   }
 });
 
+
+// Get order numbers
+app.get('/api/qc-washing/order-numbers', async (req, res) => {
+  try {
+    const orders = await QCWashing.distinct('orderNo');
+    res.json({ success: true, orderNumbers: orders });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch order numbers' });
+  }
+});
+
+/* ------------------------------
+   QC Washing Measurement Endpoints
+------------------------------ */
+
+// Check if existing record exists for QC Washing
+app.get('/api/qc-washing/check-existing/:orderNo', async (req, res) => {
+  try {
+    const { orderNo } = req.params;
+    const existingRecord = await QCWashing.findOne({ 
+      orderNo: orderNo, 
+      isAutoSave: true 
+    }).sort({ savedAt: -1 });
+
+    if (existingRecord) {
+      res.json({ 
+        exists: true, 
+        recordId: existingRecord._id,
+        existingData: {
+          formData: existingRecord.color?.orderDetails || {},
+          inspectionData: existingRecord.color?.inspectionDetails?.checkedPoints || [],
+          processData: existingRecord.color?.inspectionDetails?.parameters || [],
+          defectData: existingRecord.color?.defectDetails || {},
+          addedDefects: existingRecord.color?.defectDetails?.defects || [],
+          comment: existingRecord.color?.defectDetails?.comment || '',
+          signatures: existingRecord.signatures || {},
+          measurementData: existingRecord.measurementData || []
+        }
+      });
+    } else {
+      res.json({ exists: false });
+    }
+  } catch (error) {
+    console.error('Error checking existing record:', error);
+    res.status(500).json({ success: false, message: 'Failed to check existing record' });
+  }
+});
+
+// Update existing QC Washing record
+app.put('/api/qc-washing/update/:recordId', async (req, res) => {
+  try {
+    const { recordId } = req.params;
+    const updateData = req.body;
+    
+    const updatedRecord = await QCWashing.findByIdAndUpdate(
+      recordId, 
+      updateData, 
+      { new: true }
+    );
+    
+    if (updatedRecord) {
+      res.json({ success: true, id: updatedRecord._id, message: 'Record updated successfully' });
+    } else {
+      res.status(404).json({ success: false, message: 'Record not found' });
+    }
+  } catch (error) {
+    console.error('Error updating record:', error);
+    res.status(500).json({ success: false, message: 'Failed to update record' });
+  }
+});
+
+app.post('/api/qc-washing/aql-chart/find-by-sample-size', async (req, res) => {
+  try {
+    const { sampleSize } = req.body;
+    const sampleSizeNum = parseInt(sampleSize, 10);
+
+    if (isNaN(sampleSizeNum) || sampleSizeNum <= 0) {
+      return res.status(400).json({ success: false, message: "A valid sample size must be provided." });
+    }
+
+    // Find the AQL chart with the smallest SampleSize that is >= the provided sampleSize.
+    // This handles cases where the exact sample size isn't in the table, so we take the next level up,
+    // which is standard AQL practice.
+    const aqlChart = await AQLChart.findOne({
+      Type: "General",
+      Level: "II",
+      SampleSize: { $gte: sampleSizeNum }
+    }).sort({ SampleSize: 1 }).lean();
+
+    if (!aqlChart) {
+      return res
+        .status(404)
+        .json({ success: false, message: `No AQL chart found for a sample size of ${sampleSizeNum} or greater.` });
+    }
+
+    // Find the specific AQL entry for level 1.0 within the document.
+    const aqlEntry = aqlChart.AQL.find(aql => aql.level === 1.0);
+
+    if (!aqlEntry) {
+      return res
+        .status(404)
+        .json({ success: false, message: "AQL level 1.0 not found for the matching chart." });
+    }
+
+    // Respond with the data in the format expected by the frontend.
+    res.json({
+      success: true,
+      aqlData: {
+        sampleSize: aqlChart.SampleSize, // Return the actual sample size from the chart
+        acceptedDefect: aqlEntry.AcceptDefect,
+        rejectedDefect: aqlEntry.RejectDefect
+      }
+    });
+
+  } catch (error) {
+    console.error('AQL lookup by sample size error:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching AQL details by sample size.' });
+  }
+});
+// AQL data endpoint
+app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
+  try {
+    const { lotSize } = req.body;
+
+    if (!lotSize || isNaN(lotSize)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Lot size (wash Qty) is required and must be a number." });
+    }
+    const lotSizeNum = parseInt(lotSize, 10);
+
+    // Find the AQL chart document where the lot size falls within the defined range.
+    const aqlChart = await AQLChart.findOne({
+      Type: "General", 
+      Level: "II",   
+      "LotSize.min": { $lte: lotSizeNum },
+      $or: [
+        { "LotSize.max": { $gte: lotSizeNum } },
+        { "LotSize.max": null }
+      ]
+    }).lean();
+
+    if (!aqlChart) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No AQL chart found for the given lot size." });
+    }
+
+    // Find the specific AQL entry for level 1.0 within the document.
+    const aqlEntry = aqlChart.AQL.find(aql => aql.level === 1.0);
+
+    if (!aqlEntry) {
+      return res
+        .status(404)
+        .json({ success: false, message: "AQL level 1.0 not found for the matching chart." });
+    }
+
+    
+    res.json({
+      success: true,
+      aqlData: {
+        sampleSize: aqlChart.SampleSize,
+        acceptedDefect: aqlEntry.AcceptDefect,
+        rejectedDefect: aqlEntry.RejectDefect
+      }
+    });
+  } catch (error) {
+    console.error('AQL calculation error:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching AQL details.' });
+  }
+});
+
 // Load submitted data
 app.get('/api/qc-washing/load-submitted/:orderNo', async (req, res) => {
   try {
     const { orderNo } = req.params;
     const submittedData = await QCWashing.findOne({ 
       orderNo: orderNo, 
-      status: 'submitted' 
+      isAutoSave: false,
+      status: 'submitted'
     }).sort({ submittedAt: -1 });
 
     if (submittedData) {
-      res.json({ 
-        success: true, 
-        data: submittedData
-      });
+      res.json({ success: true, data: submittedData });
     } else {
       res.json({ success: false, message: 'No submitted data found' });
     }
@@ -2560,13 +2673,24 @@ app.get('/api/qc-washing/load-submitted/:orderNo', async (req, res) => {
   }
 });
 
-// Get order numbers
-app.get('/api/qc-washing/order-numbers', async (req, res) => {
+// Check if submitted data exists
+app.get('/api/qc-washing/check-submitted/:orderNo', async (req, res) => {
   try {
-    const orders = await QCWashing.distinct('orderNo');
-    res.json({ success: true, orderNumbers: orders });
+    const { orderNo } = req.params;
+    const submittedData = await QCWashing.findOne({ 
+      orderNo: orderNo, 
+      isAutoSave: false,
+      status: 'submitted'
+    });
+
+    res.json({ 
+      exists: !!submittedData,
+      isSubmitted: !!submittedData,
+      recordId: submittedData?._id
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch order numbers' });
+    console.error('Check submitted data error:', error);
+    res.status(500).json({ success: false, message: 'Failed to check submitted data' });
   }
 });
 
@@ -3292,8 +3416,7 @@ app.post(
 
 // ENDPOINT 2: REPLACE IMAGE FOR AN EXISTING DEFECT
 // Use this to upload a new image for a defect that already exists.
-app.put(
-  "/api/qc2-defects/:id/image",
+app.put( "/api/qc2-defects/:id/image",
   uploadQc2Image.single("defectImage"),
   async (req, res) => {
     try {
@@ -24166,207 +24289,4 @@ app.post("/api/ai/ask", async (req, res) => {
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ HTTPS Server is running on https://localhost:${PORT}`);
-});
-
-/* ------------------------------
-   QC Washing Measurement Endpoints
------------------------------- */
-
-// Check if existing record exists for QC Washing
-app.get('/api/qc-washing/check-existing/:orderNo', async (req, res) => {
-  try {
-    const { orderNo } = req.params;
-    const existingRecord = await QCWashing.findOne({ 
-      orderNo: orderNo, 
-      isAutoSave: true 
-    }).sort({ savedAt: -1 });
-
-    if (existingRecord) {
-      res.json({ 
-        exists: true, 
-        recordId: existingRecord._id,
-        existingData: {
-          formData: existingRecord.color?.orderDetails || {},
-          inspectionData: existingRecord.color?.inspectionDetails?.checkedPoints || [],
-          processData: existingRecord.color?.inspectionDetails?.parameters || [],
-          defectData: existingRecord.color?.defectDetails || {},
-          addedDefects: existingRecord.color?.defectDetails?.defects || [],
-          comment: existingRecord.color?.defectDetails?.comment || '',
-          signatures: existingRecord.signatures || {},
-          measurementData: existingRecord.measurementData || []
-        }
-      });
-    } else {
-      res.json({ exists: false });
-    }
-  } catch (error) {
-    console.error('Error checking existing record:', error);
-    res.status(500).json({ success: false, message: 'Failed to check existing record' });
-  }
-});
-
-// Update existing QC Washing record
-app.put('/api/qc-washing/update/:recordId', async (req, res) => {
-  try {
-    const { recordId } = req.params;
-    const updateData = req.body;
-    
-    const updatedRecord = await QCWashing.findByIdAndUpdate(
-      recordId, 
-      updateData, 
-      { new: true }
-    );
-    
-    if (updatedRecord) {
-      res.json({ success: true, id: updatedRecord._id, message: 'Record updated successfully' });
-    } else {
-      res.status(404).json({ success: false, message: 'Record not found' });
-    }
-  } catch (error) {
-    console.error('Error updating record:', error);
-    res.status(500).json({ success: false, message: 'Failed to update record' });
-  }
-});
-
-app.post('/api/qc-washing/aql-chart/find-by-sample-size', async (req, res) => {
-  try {
-    const { sampleSize } = req.body;
-    const sampleSizeNum = parseInt(sampleSize, 10);
-
-    if (isNaN(sampleSizeNum) || sampleSizeNum <= 0) {
-      return res.status(400).json({ success: false, message: "A valid sample size must be provided." });
-    }
-
-    // Find the AQL chart with the smallest SampleSize that is >= the provided sampleSize.
-    // This handles cases where the exact sample size isn't in the table, so we take the next level up,
-    // which is standard AQL practice.
-    const aqlChart = await AQLChart.findOne({
-      Type: "General",
-      Level: "II",
-      SampleSize: { $gte: sampleSizeNum }
-    }).sort({ SampleSize: 1 }).lean();
-
-    if (!aqlChart) {
-      return res
-        .status(404)
-        .json({ success: false, message: `No AQL chart found for a sample size of ${sampleSizeNum} or greater.` });
-    }
-
-    // Find the specific AQL entry for level 1.0 within the document.
-    const aqlEntry = aqlChart.AQL.find(aql => aql.level === 1.0);
-
-    if (!aqlEntry) {
-      return res
-        .status(404)
-        .json({ success: false, message: "AQL level 1.0 not found for the matching chart." });
-    }
-
-    // Respond with the data in the format expected by the frontend.
-    res.json({
-      success: true,
-      aqlData: {
-        sampleSize: aqlChart.SampleSize, // Return the actual sample size from the chart
-        acceptedDefect: aqlEntry.AcceptDefect,
-        rejectedDefect: aqlEntry.RejectDefect
-      }
-    });
-
-  } catch (error) {
-    console.error('AQL lookup by sample size error:', error);
-    res.status(500).json({ success: false, message: 'Server error while fetching AQL details by sample size.' });
-  }
-});
-// AQL data endpoint
-app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
-  try {
-    const { lotSize } = req.body;
-
-    if (!lotSize || isNaN(lotSize)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Lot size (wash Qty) is required and must be a number." });
-    }
-    const lotSizeNum = parseInt(lotSize, 10);
-
-    // Find the AQL chart document where the lot size falls within the defined range.
-    const aqlChart = await AQLChart.findOne({
-      Type: "General", 
-      Level: "II",   
-      "LotSize.min": { $lte: lotSizeNum },
-      $or: [
-        { "LotSize.max": { $gte: lotSizeNum } },
-        { "LotSize.max": null }
-      ]
-    }).lean();
-
-    if (!aqlChart) {
-      return res
-        .status(404)
-        .json({ success: false, message: "No AQL chart found for the given lot size." });
-    }
-
-    // Find the specific AQL entry for level 1.0 within the document.
-    const aqlEntry = aqlChart.AQL.find(aql => aql.level === 1.0);
-
-    if (!aqlEntry) {
-      return res
-        .status(404)
-        .json({ success: false, message: "AQL level 1.0 not found for the matching chart." });
-    }
-
-    
-    res.json({
-      success: true,
-      aqlData: {
-        sampleSize: aqlChart.SampleSize,
-        acceptedDefect: aqlEntry.AcceptDefect,
-        rejectedDefect: aqlEntry.RejectDefect
-      }
-    });
-  } catch (error) {
-    console.error('AQL calculation error:', error);
-    res.status(500).json({ success: false, message: 'Server error while fetching AQL details.' });
-  }
-});
-
-// Load submitted data
-app.get('/api/qc-washing/load-submitted/:orderNo', async (req, res) => {
-  try {
-    const { orderNo } = req.params;
-    const submittedData = await QCWashing.findOne({ 
-      orderNo: orderNo, 
-      isAutoSave: false,
-      status: 'submitted'
-    }).sort({ submittedAt: -1 });
-
-    if (submittedData) {
-      res.json({ success: true, data: submittedData });
-    } else {
-      res.json({ success: false, message: 'No submitted data found' });
-    }
-  } catch (error) {
-    console.error('Load submitted data error:', error);
-    res.status(500).json({ success: false, message: 'Failed to load submitted data' });
-  }
-});
-
-// Check if submitted data exists
-app.get('/api/qc-washing/check-submitted/:orderNo', async (req, res) => {
-  try {
-    const { orderNo } = req.params;
-    const submittedData = await QCWashing.findOne({ 
-      orderNo: orderNo, 
-      isAutoSave: false,
-      status: 'submitted'
-    });
-
-    res.json({ 
-      exists: !!submittedData,
-      isSubmitted: !!submittedData,
-      recordId: submittedData?._id
-    });
-  } catch (error) {
-    console.error('Check submitted data error:', error);
-    res.status(500).json({ success: false, message: 'Failed to check submitted data' });
-  }
 });

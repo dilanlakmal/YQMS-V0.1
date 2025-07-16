@@ -23,7 +23,7 @@ const qcWashingCheckpointSchema = new mongoose.Schema(
   }
 );
 
-qcWashingCheckpointSchema.index({ name: 1 }, { unique: true });
+// qcWashingCheckpointSchema.index({ name: 1 }, { unique: true });
 
 export default function createQCWashingCheckpointsModel(connection) {
   return connection.model("QCWashingCheckpoints", qcWashingCheckpointSchema);

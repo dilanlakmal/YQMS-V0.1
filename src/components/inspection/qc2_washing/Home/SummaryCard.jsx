@@ -63,55 +63,55 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
       : "bg-red-50 border-red-200";
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-      <h2 className="text-lg font-semibold text-gray-800 mb-4">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+      <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
         Measurement Summary -{" "}
         <span className="text-indigo-600">{reportType}</span>
       </h2>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {/* Total Measurement Points */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-blue-600">
+        <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
             {totalCheckedPoints}
           </div>
-          <div className="text-sm text-blue-700">Total Measurement Points</div>
+          <div className="text-sm text-blue-700 dark:text-blue-300">Total Measurement Points</div>
         </div>
 
         {/* Total Pass */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-green-600">{totalPass}</div>
-          <div className="text-sm text-green-700">Total Pass</div>
+        <div className="bg-green-50 dark:bg-green-700 border border-green-200 dark:border-green-600 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400">{totalPass}</div>
+          <div className="text-sm text-green-700 dark:text-green-300">Total Pass</div>
         </div>
 
         {/* Total Fail */}
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-red-600">{totalFail}</div>
-          <div className="text-sm text-red-700">Total Fail</div>
+        <div className="bg-red-50 dark:bg-red-700 border border-red-200 dark:border-red-600 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-red-600 dark:text-red-400">{totalFail}</div>
+          <div className="text-sm text-red-700 dark:text-red-300">Total Fail</div>
         </div>
 
         {/* Pass Rate */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-yellow-600">{passRate}%</div>
-          <div className="text-sm text-yellow-700">Pass Rate</div>
+        <div className="bg-yellow-50 dark:bg-yellow-700 border border-yellow-200 dark:border-yellow-600 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{passRate}%</div>
+          <div className="text-sm text-yellow-700 dark:text-yellow-300">Pass Rate</div>
         </div>
 
         {/* Overall Result */}
-        <div className={`${resultBgColor} rounded-lg p-4 text-center`}>
-          <div className={`text-2xl font-bold ${resultColor}`}>
+        <div className={`${resultBgColor} dark:bg-gray-700 dark:border-gray-600 rounded-lg p-4 text-center`}>
+          <div className={`text-2xl font-bold ${resultColor} dark:text-white`}>
             {overallResult}
           </div>
-          <div className={`text-sm ${resultColor}`}>Result</div>
+          <div className={`text-sm ${resultColor} dark:text-gray-300`}>Result</div>
         </div>
       </div>
 
       {/* Measurement Details Breakdown */}
-      <div className="mt-6 text-sm">
-        <div className="bg-gray-100 rounded-lg p-3">
-          <div className="font-medium text-gray-700">
+      <div className="mt-6 text-sm dark:text-gray-300">
+        <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3">
+          <div className="font-medium text-gray-700 dark:text-gray-300">
             Breakdown for {reportType}
           </div>
-          <div className="text-gray-600 mt-1">
+          <div className="text-gray-600 dark:text-gray-400 mt-1">
             - {currentMeasurements.length} sizes measured
             <br />- {totalCheckedPoints} total measurement points checked
           </div>

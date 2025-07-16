@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const QCWashingCheckListSchema = new mongoose.Schema({
+const QCWashingCheckListSchema = new mongoose.Schema(
   {
     name: { 
       type: String, 

@@ -507,7 +507,7 @@ function Home() {
           {
             path: "/qcWashing",
             roles: ["QC Washing"],
-            image: "assets/Home/bundle.avif",
+            image: "assets/Home/qcWashing.png",
             title: t("home.qcWashing"),
             description: "Washing Report"
           },
