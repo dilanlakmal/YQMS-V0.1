@@ -1,4 +1,3 @@
-// --- FIX #3: NEW COMPONENT FOR SINGLE DEFECT IMAGE ---
 import React, { useState } from "react";
 import {
   Camera,

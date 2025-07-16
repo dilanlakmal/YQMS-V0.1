@@ -22318,12 +22318,377 @@ app.get("/api/qa-accuracy/report/:reportId", async (req, res) => {
     res.json(responseData);
   } catch (error) {
     console.error("Error fetching detailed inspection report:", error);
+    res.status(500).json({
+      message: "Server error fetching report details.",
+      error: error.message
+    });
+  }
+});
+
+// --- DASHBOARD SUMMARY ENDPOINT ---
+app.get("/api/qa-accuracy/dashboard-summary", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      qaId,
+      qcId,
+      reportType,
+      moNo,
+      lineNo,
+      tableNo,
+      grade
+    } = req.query;
+
+    const filters = [];
+    if (startDate && endDate) {
+      filters.push({
+        reportDate: {
+          $gte: new Date(new Date(startDate).setHours(0, 0, 0, 0)),
+          $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+        }
+      });
+    }
+    if (qaId) filters.push({ "qcInspector.empId": qaId });
+    if (qcId) filters.push({ "scannedQc.empId": qcId });
+    if (reportType) filters.push({ reportType: reportType });
+    if (moNo) filters.push({ moNo: moNo });
+    if (grade) filters.push({ grade: grade });
+    if (reportType === "Inline Finishing" && tableNo) {
+      filters.push({ tableNo: tableNo });
+    } else if (lineNo) {
+      filters.push({ lineNo: lineNo });
+    }
+
+    const matchStage = filters.length > 0 ? { $and: filters } : {};
+
+    const aggregation = await QCAccuracyReportModel.aggregate([
+      { $match: matchStage },
+      { $unwind: { path: "$defects", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: "$_id",
+          totalCheckedQty: { $first: "$totalCheckedQty" },
+          totalDefectPoints: { $first: "$totalDefectPoints" },
+          defects: { $push: "$defects" },
+          rejectedPcsSet: { $addToSet: "$defects.pcsNo" }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalInspected: { $sum: "$totalCheckedQty" },
+          totalDefectPoints: { $sum: "$totalDefectPoints" },
+          totalRejectedPcs: {
+            $sum: {
+              $size: {
+                $filter: {
+                  input: "$rejectedPcsSet",
+                  as: "item",
+                  cond: { $ne: ["$$item", null] }
+                }
+              }
+            }
+          },
+          totalDefectsQty: {
+            $sum: {
+              $size: {
+                $filter: {
+                  input: "$defects",
+                  as: "d",
+                  cond: { $ifNull: ["$$d.defectCode", false] }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]);
+
+    if (aggregation.length === 0) {
+      return res.json({
+        inspectedQty: 0,
+        rejectPcs: 0,
+        defectsQty: 0,
+        defectRate: 0,
+        defectRatio: 0,
+        accuracy: 100
+      });
+    }
+
+    const stats = aggregation[0];
+    const defectRate =
+      stats.totalInspected > 0
+        ? (stats.totalDefectsQty / stats.totalInspected) * 100
+        : 0;
+    const defectRatio =
+      stats.totalInspected > 0
+        ? (stats.totalRejectedPcs / stats.totalInspected) * 100
+        : 0;
+    const accuracy =
+      stats.totalInspected > 0
+        ? (1 - stats.totalDefectPoints / stats.totalInspected) * 100
+        : 100;
+
+    res.json({
+      inspectedQty: stats.totalInspected,
+      rejectPcs: stats.totalRejectedPcs,
+      defectsQty: stats.totalDefectsQty,
+      defectRate,
+      defectRatio,
+      accuracy
+    });
+  } catch (error) {
+    console.error("Error fetching dashboard summary:", error);
     res
       .status(500)
-      .json({
-        message: "Server error fetching report details.",
-        error: error.message
+      .json({ message: "Server error fetching dashboard summary" });
+  }
+});
+
+// --- NEW ENDPOINT FOR DYNAMIC BAR CHART DATA ---
+app.get("/api/qa-accuracy/chart-data", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      qaId,
+      qcId,
+      reportType,
+      moNo,
+      lineNo,
+      tableNo,
+      grade,
+      groupBy
+    } = req.query;
+    const validGroupByFields = ["lineNo", "moNo", "scannedQc.empId"];
+    if (!groupBy || !validGroupByFields.includes(groupBy)) {
+      return res
+        .status(400)
+        .json({ message: "A valid 'groupBy' parameter is required." });
+    }
+
+    const filters = [];
+    if (startDate && endDate) {
+      filters.push({
+        reportDate: {
+          $gte: new Date(new Date(startDate).setHours(0, 0, 0, 0)),
+          $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+        }
       });
+    }
+    if (qaId) filters.push({ "qcInspector.empId": qaId });
+    if (qcId) filters.push({ "scannedQc.empId": qcId });
+    if (reportType) filters.push({ reportType: reportType });
+    if (moNo) filters.push({ moNo: moNo });
+    if (grade) filters.push({ grade: grade });
+    if (groupBy !== "lineNo" && lineNo) filters.push({ lineNo: lineNo });
+    if (groupBy !== "tableNo" && tableNo) filters.push({ tableNo: tableNo });
+
+    const matchStage = filters.length > 0 ? { $and: filters } : {};
+
+    const results = await QCAccuracyReportModel.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: `$${groupBy}`,
+          totalCheckedQty: { $sum: "$totalCheckedQty" },
+          totalDefectPoints: { $sum: "$totalDefectPoints" }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          name: "$_id",
+          accuracy: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              100,
+              {
+                $multiply: [
+                  {
+                    $subtract: [
+                      1,
+                      { $divide: ["$totalDefectPoints", "$totalCheckedQty"] }
+                    ]
+                  },
+                  100
+                ]
+              }
+            ]
+          }
+        }
+      },
+      { $sort: { accuracy: 1 } }
+    ]);
+
+    const filteredResults = results.filter((r) => r.name && r.name !== "NA");
+    res.json(filteredResults);
+  } catch (error) {
+    console.error("Error fetching chart data:", error);
+    res.status(500).json({ message: "Server error fetching chart data" });
+  }
+});
+
+// --- DAILY TREND ENDPOINT ---
+app.get("/api/qa-accuracy/daily-trend", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      qaId,
+      qcId,
+      reportType,
+      moNo,
+      lineNo,
+      tableNo,
+      grade
+    } = req.query;
+
+    const filters = [];
+    if (startDate && endDate) {
+      filters.push({
+        reportDate: {
+          $gte: new Date(new Date(startDate).setHours(0, 0, 0, 0)),
+          $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+        }
+      });
+    }
+    if (qaId) filters.push({ "qcInspector.empId": qaId });
+    if (qcId) filters.push({ "scannedQc.empId": qcId });
+    if (reportType) filters.push({ reportType: reportType });
+    if (moNo) filters.push({ moNo: moNo });
+    if (grade) filters.push({ grade: grade });
+    if (reportType === "Inline Finishing" && tableNo) {
+      filters.push({ tableNo: tableNo });
+    } else if (lineNo) {
+      filters.push({ lineNo: lineNo });
+    }
+
+    const matchStage = filters.length > 0 ? { $and: filters } : {};
+
+    const results = await QCAccuracyReportModel.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$reportDate" } },
+          totalCheckedQty: { $sum: "$totalCheckedQty" },
+          totalDefectPoints: { $sum: "$totalDefectPoints" }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          date: "$_id",
+          accuracy: {
+            $cond: [
+              { $eq: ["$totalCheckedQty", 0] },
+              100,
+              {
+                $multiply: [
+                  {
+                    $subtract: [
+                      1,
+                      { $divide: ["$totalDefectPoints", "$totalCheckedQty"] }
+                    ]
+                  },
+                  100
+                ]
+              }
+            ]
+          }
+        }
+      },
+      { $sort: { date: 1 } }
+    ]);
+
+    res.json(results);
+  } catch (error) {
+    console.error("Error fetching daily trend data:", error);
+    res.status(500).json({ message: "Server error fetching daily trend data" });
+  }
+});
+
+// --- FIX #1: ENHANCED DEFECT RATE ENDPOINT ---
+app.get("/api/qa-accuracy/defect-rates", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      qaId,
+      qcId,
+      reportType,
+      moNo,
+      lineNo,
+      tableNo,
+      grade
+    } = req.query;
+
+    const filters = [];
+    if (startDate && endDate) {
+      filters.push({
+        reportDate: {
+          $gte: new Date(new Date(startDate).setHours(0, 0, 0, 0)),
+          $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+        }
+      });
+    }
+    if (qaId) filters.push({ "qcInspector.empId": qaId });
+    if (qcId) filters.push({ "scannedQc.empId": qcId });
+    if (reportType) filters.push({ reportType: reportType });
+    if (moNo) filters.push({ moNo: moNo });
+    if (grade) filters.push({ grade: grade });
+    if (reportType === "Inline Finishing" && tableNo) {
+      filters.push({ tableNo: tableNo });
+    } else if (lineNo) {
+      filters.push({ lineNo: lineNo });
+    }
+
+    const matchStage = filters.length > 0 ? { $and: filters } : {};
+
+    // This pipeline will now get the total checked qty for the entire filtered set
+    const totalCheckedAggregation = await QCAccuracyReportModel.aggregate([
+      { $match: matchStage },
+      { $group: { _id: null, totalChecked: { $sum: "$totalCheckedQty" } } }
+    ]);
+    const totalCheckedQty =
+      totalCheckedAggregation.length > 0
+        ? totalCheckedAggregation[0].totalChecked
+        : 0;
+
+    // This pipeline gets the defects
+    const defectAggregation = await QCAccuracyReportModel.aggregate([
+      { $match: matchStage },
+      { $unwind: "$defects" },
+      { $replaceRoot: { newRoot: "$defects" } },
+      {
+        $group: {
+          _id: { name: "$defectNameEng", status: "$standardStatus" },
+          defectQty: { $sum: "$qty" }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          name: "$_id.name",
+          status: "$_id.status",
+          defectQty: "$defectQty",
+          defectRate: {
+            $cond: [
+              { $eq: [totalCheckedQty, 0] },
+              0,
+              { $multiply: [{ $divide: ["$defectQty", totalCheckedQty] }, 100] }
+            ]
+          }
+        }
+      },
+      { $sort: { defectRate: -1 } }
+    ]);
+
+    res.json(defectAggregation);
+  } catch (error) {
+    console.error("Error fetching defect rates:", error);
+    res.status(500).json({ message: "Server error fetching defect rate data" });
   }
 });
 
