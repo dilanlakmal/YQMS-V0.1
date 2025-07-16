@@ -22692,6 +22692,128 @@ app.get("/api/qa-accuracy/defect-rates", async (req, res) => {
   }
 });
 
+// --- FINAL CORRECTED ENDPOINT FOR WEEKLY SUMMARY ---
+// --- FINAL CORRECTED ENDPOINT FOR WEEKLY SUMMARY ---
+app.get("/api/qa-accuracy/weekly-summary", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      qaId,
+      qcId,
+      reportType,
+      moNo,
+      lineNo,
+      tableNo,
+      grade,
+      groupBy // This is the key for the trend table
+    } = req.query;
+
+    // Validate that groupBy is a valid field to prevent injection
+    const allowedGroupByFields = [
+      "reportType",
+      "lineNo",
+      "tableNo",
+      "moNo",
+      "scannedQc.empId"
+    ];
+    if (!groupBy || !allowedGroupByFields.includes(groupBy)) {
+      return res.status(400).json({ message: "Invalid groupBy parameter." });
+    }
+
+    // Build the match stage for filtering
+    const matchStage = {};
+    if (startDate && endDate) {
+      matchStage.reportDate = {
+        $gte: new Date(new Date(startDate).setHours(0, 0, 0, 0)),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      };
+    }
+    if (qaId) matchStage["qcInspector.empId"] = qaId;
+    if (qcId) matchStage["scannedQc.empId"] = qcId;
+    if (reportType) matchStage.reportType = reportType;
+    if (moNo) matchStage.moNo = moNo;
+    if (grade) matchStage.grade = grade;
+    if (reportType === "Inline Finishing" && tableNo) {
+      matchStage.tableNo = tableNo;
+    } else if (lineNo) {
+      matchStage.lineNo = lineNo;
+    }
+
+    // --- Corrected Aggregation Pipeline ---
+    const results = await QCAccuracyReportModel.aggregate([
+      // Stage 1: Filter documents based on query parameters
+      { $match: matchStage },
+
+      // Stage 2: Group by BOTH week and the dynamic field. This is the main fix.
+      {
+        $group: {
+          _id: {
+            year: { $isoWeekYear: "$reportDate" },
+            week: { $isoWeek: "$reportDate" },
+            // Group by the dynamic field's value. Use $ifNull for robustness.
+            groupName: { $ifNull: [`$${groupBy}`, "N/A"] }
+          },
+          totalCheckedQty: { $sum: "$totalCheckedQty" },
+          totalDefectPoints: { $sum: "$totalDefectPoints" },
+          // Collect all defects arrays to be processed in the next stages
+          defects: { $push: "$defects" }
+        }
+      },
+
+      // Stage 3 & 4: Unwind the collected defects arrays to count them
+      // This is an effective way to handle nested arrays
+      { $unwind: { path: "$defects", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$defects", preserveNullAndEmptyArrays: true } },
+
+      // Stage 5: Re-group to calculate defect quantities and unique rejected pieces
+      {
+        $group: {
+          // Group back using the compound _id from the first group stage
+          _id: "$_id",
+          totalCheckedQty: { $first: "$totalCheckedQty" },
+          totalDefectPoints: { $first: "$totalDefectPoints" },
+          totalDefectsQty: { $sum: { $ifNull: ["$defects.qty", 0] } },
+          // Collect unique piece numbers that had defects
+          rejectedPcsSet: { $addToSet: "$defects.pcsNo" }
+        }
+      },
+
+      // Stage 6: Project the final shape for the frontend
+      {
+        $project: {
+          _id: 0,
+          // Deconstruct the _id object into the format the frontend expects
+          weekId: {
+            year: "$_id.year",
+            week: "$_id.week"
+          },
+          groupName: "$_id.groupName",
+          totalChecked: "$totalCheckedQty",
+          totalDefectPoints: "$totalDefectPoints",
+          totalDefects: "$totalDefectsQty",
+          // Count the number of unique rejected pieces
+          rejectedPcs: {
+            $size: {
+              $filter: {
+                // $filter to remove potential nulls from the set
+                input: "$rejectedPcsSet",
+                as: "item",
+                cond: { $ne: ["$$item", null] }
+              }
+            }
+          }
+        }
+      }
+    ]);
+
+    res.json(results);
+  } catch (error) {
+    console.error("Error fetching weekly summary:", error);
+    res.status(500).json({ message: "Server error fetching weekly summary" });
+  }
+});
+
 /* ------------------------------
    Cutting Dashboard ENDPOINTS (FINAL & COMPLETE)
 ------------------------------ */
