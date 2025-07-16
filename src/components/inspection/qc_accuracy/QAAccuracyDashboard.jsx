@@ -2,12 +2,11 @@ import React, { useState } from "react";
 import { Menu, X } from "lucide-react";
 import QCAccuracyDashboardNavPanel from "./QCAccuracyDashboardNavPanel";
 import QAAccuracyDashboardDailySummary from "./QAAccuracyDashboardDailySummary";
-// Import other views as you build them
-// import QAAccuracyDashboardWeeklySummary from './QAAccuracyDashboardWeeklySummary';
+import QCAccuracyWeeklySummary from "./QCAccuracyWeeklySummary";
 
 const viewComponents = {
-  daily: QAAccuracyDashboardDailySummary
-  // weekly: QAAccuracyDashboardWeeklySummary, // Example for future
+  daily: QAAccuracyDashboardDailySummary,
+  weekly: QCAccuracyWeeklySummary
   // monthly: () => <div>Monthly Summary View</div>, // Placeholder
   // qa: () => <div>QA View</div>,
   // qc: () => <div>QC View</div>,
