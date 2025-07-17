@@ -110,7 +110,7 @@ const DefectDetailsSection = ({
     setDefectsByPc(prev => ({
       ...prev,
       [pc]: prev[pc].map(d =>
-        d.id === defectId ? { ...d, isBodyVisible: !d.isBodyVisible } : d
+        d.id === defectId ? { ...d, defectImages: (d.defectImages || []).filter((_, i) => i !== imageIndex) } : d
       ),
     }));
   };

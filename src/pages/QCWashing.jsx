@@ -84,6 +84,7 @@ const QCWashingPage = () => {
   const [autoSaveId, setAutoSaveId] = useState(null);
   const [lastSaved, setLastSaved] = useState(null);
   const autoSaveTimeoutRef = useRef(null);
+  const [defectsByPc, setDefectsByPc] =  useState({});
 
   // State: Cache for color-specific data to prevent data loss on switching
   const [colorDataCache, setColorDataCache] = useState({});
@@ -877,9 +878,20 @@ const QCWashingPage = () => {
         processData,
         defectData,
         addedDefects,
-        uploadedImages: uploadedImages.map((img) => ({
-          name: img.name,
+        additionalImage: uploadedImages.map((img) => ({
+          name: img.file.name,
           preview: img.preview,
+        })),
+        defects: Object.entries(defectsByPc).map(([pc, defects]) => ({
+          pc,
+          defectDetails: defects.map(defect => ({
+              defectPcs: {
+                defectName: defect.selectedDefect,
+                defectQty: defect.defectQty,
+                defectImages: (defect.defectImages || []).map(img => img.preview || img)
+              }
+            })
+          )
         })),
         comment,
         measurementDetails: [
@@ -1316,6 +1328,8 @@ const QCWashingPage = () => {
           setComment={setComment}
           isVisible={sectionVisibility.defectDetails}
           onToggle={() => toggleSection("defectDetails")}
+          defectsByPc={defectsByPc}
+          setDefectsByPc={setDefectsByPc}
         />
 
         <MeasurementDetailsSection
@@ -1418,7 +1432,25 @@ const QCWashingPage = () => {
                   reportType: formData.reportType,
                   washQty: formData.washQty,
                   checkedQty: formData.checkedQty,
-                  uploadedImages,
+                  additionalImage: uploadedImages.map((img) => ({
+                    name: img.file.name,
+                    preview: img.preview,
+                  })),
+
+                  defects: Object.entries(defectsByPc).map(([pc, defects]) => (
+                    {
+                      pc,
+                      defectDetails: defects.map(defect => (
+                        {
+                          defectPcs: {
+                            defectName: defect.selectedDefect,
+                            defectQty: defect.defectQty,
+                            defectImages: (defect.defectImages || []).map(img => img.preview || img)
+                          }
+                        }
+                      ))
+                    }
+                  )),
                   comment,
                   measurementDetails: [
                     ...measurementData.beforeWash.map((item) => ({
