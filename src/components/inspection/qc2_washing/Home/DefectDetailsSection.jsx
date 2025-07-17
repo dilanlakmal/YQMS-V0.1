@@ -400,11 +400,20 @@ const DefectDetailsSection = ({
                       <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
                         {(defect.defectImages || []).map((image, index) => (
                           <div key={index} className="relative">
-                            <img
-                              src={image.preview || image}
-                              alt={image.name}
-                              className="w-full h-24 object-cover rounded-md shadow-md dark:shadow-none"
-                            />
+                             <img
+                                  src={image.preview || image}
+                                  alt={image.name}
+                                  className="w-full h-24 object-cover rounded-md shadow-md dark:shadow-none cursor-pointer"
+                                  onClick={() => {
+                                    Swal.fire({
+                                      imageUrl: image.preview || image,
+                                      imageAlt: image.name,
+                                      imageWidth: 600,
+                                      imageHeight: 400,
+                                    });
+                                  }}
+                                />
+                          
                             <button
                               onClick={() => handleRemoveDefectImage(pc, defect.id, index)}
                               className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1"
