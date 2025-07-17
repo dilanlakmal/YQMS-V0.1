@@ -131,6 +131,17 @@ const DefectDetailsSection = ({
     });
   };
 
+  const handleRemoveDefectImage = (pc, defectId, imageIndex) => {
+    setDefectsByPc(prev => ({
+      ...prev,
+      [pc]: prev[pc].map(d =>
+        d.id === defectId
+          ? { ...d, defectImages: (d.defectImages || []).filter((_, i) => i !== imageIndex) }
+          : d
+      )
+    }));
+  };
+
   // const handleDeleteDefect = (defectId) => {
   //   setAddedDefects(prev => prev.filter(d => d.defectId !== defectId));
   // };
@@ -175,8 +186,44 @@ const DefectDetailsSection = ({
   };
 
   const handleDefectChange = (pc, defectId, field, value) => {
-    setDefectsByPc(prev => ({ ...prev, [pc]: prev[pc].map(d => d.id === defectId ? { ...d, [field]: value } : d) }));
-  };
+      setDefectsByPc(prev => ({
+        ...prev,
+        [pc]: prev[pc].map(d => d.id === defectId ? { ...d, [field]: value } : d)
+      }));
+    };
+  
+    const handleDefectImageChange = async (pc, defectId, e) => {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+  
+      const options = {
+        maxSizeMB: 0.5,
+        maxWidthOrHeight: 1024,
+        useWebWorker: true,
+      };
+  
+      Swal.fire({
+        title: 'Compressing images...',
+        text: 'Please wait.',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+  
+      const compressedFiles = await Promise.all(files.map(async file => {
+        try {
+          const compressedFile = await imageCompression(file, options);
+          return { file: compressedFile, preview: URL.createObjectURL(compressedFile), name: compressedFile.name };
+        } catch (error) {
+          console.error('Image compression failed:', error);
+          Swal.fire('Error', 'Failed to compress image.', 'error');
+          return null;
+        }
+      }));
+  
+      Swal.close();
+      const validImages = compressedFiles.filter(img => img !== null);
+      setDefectsByPc(prev => ({ ...prev, [pc]: prev[pc].map(d => d.id === defectId ? { ...d, defectImages: [...(d.defectImages || []), ...validImages] } : d) }));
+    };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
@@ -312,7 +359,7 @@ const DefectDetailsSection = ({
                             const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
                             handleDefectChange(pc, defect.id, 'defectQty', newValue);
                           }}
-                          className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center"
+                          className="w-full  border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center"
                           placeholder="Qty"
                         />
                           <button onClick={() => handleDefectChange(pc, defect.id, 'defectQty', (parseInt(defect.defectQty, 10) || 0) + 1)} className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white">
@@ -326,7 +373,7 @@ const DefectDetailsSection = ({
                       <h5 className="text-sm font-medium dark:text-gray-300 mb-2">Defect Images (Max 5)</h5>
                       <div className="flex items-center gap-4 mt-3">
                         <button
-                           onClick={() => imageInputRef.current.click()}
+                           onClick={() => document.getElementById(`image-input-${pc}-${defect.id}`).click()}
                           className="flex items-center px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300"
                         >
                           <Upload  size={18} className="mr-2" />Upload
@@ -335,8 +382,8 @@ const DefectDetailsSection = ({
                           type="file"
                           multiple
                           accept="image/*"
-                          ref={imageInputRef}
-                          onChange={handleImageChange}
+                         id={`image-input-${pc}-${defect.id}`}
+                          onChange={(e) => handleDefectImageChange(pc, defect.id, e)}
                           className="hidden"
                         />
                          <button
@@ -347,19 +394,19 @@ const DefectDetailsSection = ({
                         </button>
                        
                         <span className="text-sm text-gray-600 dark:text-gray-300">
-                          {(defect.uploadedImages || []).length} / 5 selected
+                          {(defect.defectImages || []).length} / 5 selected
                         </span>
                       </div>
                       <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                        {(defect.uploadedImages || []).map((image, index) => (
+                        {(defect.defectImages || []).map((image, index) => (
                           <div key={index} className="relative">
                             <img
-                              src={image.preview}
+                              src={image.preview || image}
                               alt={image.name}
                               className="w-full h-24 object-cover rounded-md shadow-md dark:shadow-none"
                             />
                             <button
-                              onClick={() => handleRemoveImage(index)}
+                              onClick={() => handleRemoveDefectImage(pc, defect.id, index)}
                               className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1"
                             >
                               <X size={14} />
@@ -386,12 +433,15 @@ const DefectDetailsSection = ({
           </div>
 
           <div>
-            <h3 className="text-md font-semibold mb-2 dark:text-white">Upload Images (Max 5)</h3>
+            <h3 className="text-md font-semibold mb-2 dark:text-white">Additional Images (Max 5)</h3>
 
             <div className="flex items-center gap-4">
               <button onClick={() => imageInputRef.current.click()} className="flex items-center px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">
-                <Upload size={18} className="mr-2" /> Choose Images
+                <Upload size={18} className="mr-2" /> Upload Images
               </button>
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+              {uploadedImages.map((image, index) => (
+              <div key={index} className="relative">
                <button
                 // onClick={capture}
                 className="flex items-center px-4 py-2 bg-blue-200 rounded-md hover:bg-blue-300"
@@ -400,17 +450,22 @@ const DefectDetailsSection = ({
               </button>
               <input type="file" multiple accept="image/*" ref={imageInputRef} onChange={handleImageChange} className="hidden" />
               <span className="text-sm text-gray-600 dark:text-gray-300">{uploadedImages.length} / 5 selected</span>
+            <img
+              src={image.preview || image}
+              alt={image.name}
+              className="w-full h-24 object-cover rounded-md shadow-md dark:shadow-none"
+            />
+            <button
+            onClick={() => handleRemoveImage(index)}
+            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1"
+          >
+            <X size={14} />
+          </button>
+        </div>
+           ))}
             </div>
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-              {uploadedImages.map((image, index) => (
-                <div key={index} className="relative">
-                  <img src={image.preview} alt={image.name} className="w-full h-24 object-cover rounded-md shadow-md dark:shadow-none" />
-                  <button onClick={() => handleRemoveImage(index)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1">
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
             </div>
+            
         </div>
 
           <div>

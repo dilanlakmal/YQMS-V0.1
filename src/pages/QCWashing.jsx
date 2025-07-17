@@ -1392,6 +1392,7 @@ const QCWashingPage = () => {
                     setUploadedImages([]);
                     setComment("");
                     setMeasurementData({ beforeWash: [], afterWash: [] });
+                    setDefectsByPc({});
                     setShowMeasurementTable(true);
                   }
                 });
@@ -1429,7 +1430,7 @@ const QCWashingPage = () => {
                       washType: "afterWash",
                     })),
                   ],
-                  totalCheckedPoint,
+                 totalCheckedPoint,
                   totalPass,
                   totalFail,
                   passRate,
