@@ -222,7 +222,7 @@ const DefectDetailsSection = ({
   
       Swal.close();
       const validImages = compressedFiles.filter(img => img !== null);
-      setDefectsByPc(prev => ({ ...prev, [pc]: prev[pc].map(d => d.id === defectId ? { ...d, defectImages: [...(d.defectImages || []), ...validImages] } : d) }));
+      setDefectsByPc(prev => ({ ...prev, [pc]: prev[pc].map(d => d.id === defectId ? { ...d, defectImages: [...(d.defectImages || []), ...validImages] } : d) }) ?? {});
     };
 
   return (
@@ -439,35 +439,55 @@ const DefectDetailsSection = ({
               <button onClick={() => imageInputRef.current.click()} className="flex items-center px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">
                 <Upload size={18} className="mr-2" /> Upload Images
               </button>
-              <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-              {uploadedImages.map((image, index) => (
-              <div key={index} className="relative">
-               <button
-                // onClick={capture}
-                className="flex items-center px-4 py-2 bg-blue-200 rounded-md hover:bg-blue-300"
-              >
-                <Camera size={18} className="mr-2" />Capture
-              </button>
-              <input type="file" multiple accept="image/*" ref={imageInputRef} onChange={handleImageChange} className="hidden" />
-              <span className="text-sm text-gray-600 dark:text-gray-300">{uploadedImages.length} / 5 selected</span>
-            <img
-              src={image.preview || image}
-              alt={image.name}
-              className="w-full h-24 object-cover rounded-md shadow-md dark:shadow-none"
+              
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                ref={imageInputRef}
+                onChange={handleImageChange}
+                className="hidden"              
             />
-            <button
-            onClick={() => handleRemoveImage(index)}
-            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1"
-          >
-            <X size={14} />
-          </button>
-        </div>
-           ))}
-            </div>
-            </div>
-            
-        </div>
+             <button
+                  // onClick={capture}
+                  className="flex items-center px-4 py-2 bg-blue-200 rounded-md hover:bg-blue-300"
+                >
+                  <Camera size={18} className="mr-2" />Capture
 
+                </button>
+                <span className="text-sm text-gray-600 dark:text-gray-300">{uploadedImages.length} / 5 selected</span>
+              </div>
+              {uploadedImages.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Uploaded Images:</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mt-2">
+                    {uploadedImages.map((image, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={image.preview || image}
+                          alt={image.name}
+                          className="w-full h-24 object-cover rounded-md shadow-md dark:shadow-none cursor-pointer"
+                          onClick={() => {
+                            Swal.fire({
+                              imageUrl: image.preview || image,
+                              imageAlt: image.name,
+                              imageWidth: 600,
+                              imageHeight: 400,
+                            });
+                          }}
+                        />
+                        <button
+                          onClick={() => handleRemoveImage(index)}
+                          className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+          </div>
           <div>
             <label htmlFor="comment" className="text-md font-semibold mb-2 block dark:text-white">Comments</label>
             <textarea id="comment" value={comment} onChange={(e) => setComment(e.target.value)} rows="4" className="w-full p-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"></textarea>
