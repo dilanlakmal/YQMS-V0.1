@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { Plus, Trash2, UploadCloud, X } from 'lucide-react';
+import { Plus, Trash2, Camera, X, PlusCircle, Upload, Minus, Eye, EyeOff  } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useTranslation } from "react-i18next";
 import imageCompression from 'browser-image-compression';
@@ -23,6 +23,8 @@ const DefectDetailsSection = ({
 }) => {
   const imageInputRef = useRef(null);
   const { i18n } = useTranslation();
+  const videoRef = useRef(null);
+  const [defectsByPc, setDefectsByPc] =  React.useState({});
 
 
   const getDefectNameForDisplay = (d) => {
@@ -34,49 +36,104 @@ const DefectDetailsSection = ({
     return d.english;
   };
 
-  const totalDefects = addedDefects.reduce((sum, defect) => sum + defect.qty, 0);
+  // const totalDefects = addedDefects.reduce((sum, defect) => sum + defect.qty, 0);
 
-  let defectStatus = 'N/A';
-  let statusColorClass = 'bg-gray-100 text-gray-800';
-  if ((formData.inline === 'Inline' || formData.daily === 'Inline' || formData.firstOutput === "First Output" || formData.daily === 'First Output') && formData.aqlAcceptedDefect) {
-    const acceptedDefectCount = parseInt(formData.aqlAcceptedDefect, 10);
-    if (!isNaN(acceptedDefectCount)) {
-      if (totalDefects <= acceptedDefectCount) {
-        defectStatus = 'Pass';
-        statusColorClass = 'bg-green-100 text-green-800';
-      } else {
-        defectStatus = 'Fail';
-        statusColorClass = 'bg-red-100 text-red-800';
-      }
-    }
-  }
+  // let defectStatus = 'N/A';
+  // let statusColorClass = 'bg-gray-100 text-gray-800';
+  // if ((formData.inline === 'Inline' || formData.daily === 'Inline' || formData.firstOutput === "First Output" || formData.daily === 'First Output') && formData.aqlAcceptedDefect) {
+  //   const acceptedDefectCount = parseInt(formData.aqlAcceptedDefect, 10);
+  //   if (!isNaN(acceptedDefectCount)) {
+  //     if (totalDefects <= acceptedDefectCount) {
+  //       defectStatus = 'Pass';
+  //       statusColorClass = 'bg-green-100 text-green-800';
+  //     } else {
+  //       defectStatus = 'Fail';
+  //       statusColorClass = 'bg-red-100 text-red-800';
+  //     }
+  //   }
+  // }
 
-  const handleAddDefect = () => {
-    if (!selectedDefect || !defectQty) {
+  const handleAddDefect = (pc, defect) => {
+    if (!defect.selectedDefect || !defect.defectQty) {
       Swal.fire('Incomplete', 'Please select a defect and enter a quantity.', 'warning');
       return;
     }
 
-    const defectExists = addedDefects.some(d => d.defectId === selectedDefect);
+     const defectExists = defectsByPc[pc].some(d => d.defectId === defect.selectedDefect && d.id !== defect.id);
     if (defectExists) {
       Swal.fire('Duplicate', 'This defect has already been added.', 'error');
       return;
     }
 
-    const defectDetails = defectOptions.find(d => d._id === selectedDefect);
-    setAddedDefects(prev => [...prev, {
-      defectId: defectDetails._id,
-      defectName: defectDetails.english,
-      qty: parseInt(defectQty, 10),
-    }]);
-
-    setSelectedDefect('');
-    setDefectQty('');
+    // const defectDetails = defectOptions.find(d => d._id === selectedDefect);
+    // setAddedDefects(prev => [...prev, {
+    //   defectId: defectDetails._id,
+    //   defectName: defectDetails.english || 'N/A',
+    //   qty: parseInt(defect.defectQty, 10) || 0,
+    // }]);
+  
+    setDefectsByPc(prev => ({
+      ...prev,
+      [pc]: prev[pc].map(d => 
+        d.id === defect.id
+          ? { ...d, defectId: defectDetails._id }
+          : d
+      ),
+    }));
   };
 
-  const handleDeleteDefect = (defectId) => {
-    setAddedDefects(prev => prev.filter(d => d.defectId !== defectId));
+  const handleAddDefectCard = (pc) => {
+    setDefectsByPc(prev => ({
+      ...prev,
+      [pc]: [
+        ...(prev[pc] || []),
+        {
+          id: (prev[pc]?.length || 0) + 1,
+          selectedDefect: '',
+          defectQty: '',
+          defectImages: [],
+          isBodyVisible: true,
+        },
+      ],
+    }));
   };
+
+  const handleAddPc = () => {
+    setDefectsByPc(prev => ({
+      ...prev,
+      [(Object.keys(prev).length || 0) + 1]: [{ id: 1, selectedDefect: '', defectQty: '',  defectImages: [], isBodyVisible: true }],
+    }));
+  };
+  
+  
+  const handleToggleVisibility = (pc, defectId) => {
+    setDefectsByPc(prev => ({
+      ...prev,
+      [pc]: prev[pc].map(d =>
+        d.id === defectId ? { ...d, isBodyVisible: !d.isBodyVisible } : d
+      ),
+    }));
+  };
+  
+  
+    const handleRemoveDefectCard = (pc, defectId) => {
+    setDefectsByPc(prev => {
+      const updatedPcDefects = prev[pc].filter(d => d.id !== defectId);
+      // If no defects are left for this PC, remove the PC entry itself
+      if (updatedPcDefects.length === 0) {
+        const { [pc]: _, ...rest } = prev;
+        return rest;
+      }
+      return {
+        ...prev,
+        [pc]: updatedPcDefects
+      };
+    });
+  };
+
+  // const handleDeleteDefect = (defectId) => {
+  //   setAddedDefects(prev => prev.filter(d => d.defectId !== defectId));
+  // };
 
   const handleRemoveImage = (index) => {
     setUploadedImages(prev => prev.filter((_, i) => i !== index));
@@ -115,6 +172,10 @@ const DefectDetailsSection = ({
       }
     }
     Swal.close();
+  };
+
+  const handleDefectChange = (pc, defectId, field, value) => {
+    setDefectsByPc(prev => ({ ...prev, [pc]: prev[pc].map(d => d.id === defectId ? { ...d, [field]: value } : d) }));
   };
 
   return (
@@ -185,75 +246,157 @@ const DefectDetailsSection = ({
           </div>
 
           <div className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
-            <h3 className="text-md font-semibold mb-3 dark:text-white">Add Defect</h3>
-            <div className="flex flex-col md:flex-row items-end gap-3">
-              <div className="flex-grow w-full">
-                <label className="text-xs font-medium dark:text-gray-300">Defect</label>
-                <select
-                  value={selectedDefect}
-                  onChange={(e) => setSelectedDefect(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                >
-                  <option value="">-- Select a defect --</option>
-                  {defectOptions.map(defect => (
-                    
-                  <option key={defect._id} value={defect._id}>
-                      {getDefectNameForDisplay(defect)}
-                    </option>                  ))}
-                </select> 
-
-           </div>
-              <div className="w-full md:w-40">
-                <label className="text-xs font-medium dark:text-gray-300">Quantity</label>
-                <input
-                  type="number"
-                  value={defectQty}
-                  onChange={(e) => setDefectQty(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                  placeholder="Qty"
-                />
-              </div>
-              <button 
-                onClick={handleAddDefect}
-                className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 w-full md:w-auto"
+            <div className="flex justify-between items-center">
+            <h3 className="text-md font-semibold mb-3 dark:text-white">Defect Details</h3>
+            <div className="mt-4 mb-4">
+              <button
+                onClick={handleAddPc}
+                className="flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700"
               >
-                <Plus size={18} className="mr-1" /> Add
+                <PlusCircle size={18} className="mr-1" /> Add Defect for New PC
               </button>
             </div>
-          </div>
-
-          {addedDefects.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300">
-                <thead className="bg-gray-100">
-                  <tr className="dark:bg-gray-700 dark:text-white">
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left">Defect Name</th>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center">Quantity</th>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {addedDefects.map((defect, index) => (
-                    <tr key={defect.defectId}>
-                      <td className="border border-gray-300 px-4 py-2">{defect.defectName}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-center">{defect.qty}</td>
-                  <td className="border border-gray-300 px-4 py-2 text-center">
-                        <button onClick={() => handleDeleteDefect(defect.defectId)} className="text-red-500 hover:text-red-700">
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
-          )}
+            
+            {Object.keys(defectsByPc).map(pc => (
+              <div key={pc} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {defectsByPc[pc].map((defect, index) => (
+                  <div key={index} className="relative bg-gray-200 dark:bg-gray-800 rounded-lg shadow-md flex-shrink-0 p-3 mb-3 w-full">
+                   <button
+                      onClick={() => handleRemoveDefectCard(pc, defect.id)}
+                      className="absolute top-2 right-2 p-1 text-red-500 rounded-full hover:bg-red-100 dark:hover:bg-red-600 dark:text-red-400 dark:hover:text-white"
+                      aria-label={`Remove Defect ${defect.id} for PC ${pc}`}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                    <h4 className="text-sm font-semibold text-gray-800 dark:text-white">
+                      PC {pc} 
+                    </h4>
+                    <button
+                        onClick={() => handleToggleVisibility(pc, defect.id)}
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                        title={defect.isBodyVisible ? "Hide Details" : "Show Details"}
+                        style={{position:'absolute',right:'30px',top:'10px'}}
+                      >
+                        {defect.isBodyVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                     <h5 className="text-sm font-medium dark:text-gray-300 mb-2">Defect Details</h5>
+                     {defect.isBodyVisible && (
+                    <>
+                    <div className="flex flex-col md:flex-row items-end gap-3 mt-2">
+                      <div className="flex-grow w-full">
+                        <label className="text-xs font-medium dark:text-gray-300">Defect Name</label>
+                        <select
+                          value={defect.selectedDefect}
+                          onChange={(e) => handleDefectChange(pc, defect.id, 'selectedDefect', e.target.value)}
+                          className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                        >
+                          <option value="">-- Select a defect --</option>
+                          {defectOptions.map(d => (
+                            <option key={d._id} value={d._id}>
+                              {getDefectNameForDisplay(d)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="w-full md:w-40">
+                        <label className="text-xs font-medium dark:text-gray-300">Quantity</label>
+                      <div className="flex items-center space-x-2">
+                          <button onClick={() => handleDefectChange(pc, defect.id, 'defectQty', Math.max(0, (parseInt(defect.defectQty, 10) || 1) - 1))} className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white">
+                           <Minus size={16} />
+                         </button>
+                          <input
+                          min="0"
+                          value={defect.defectQty}
+                          onChange={(e) => {
+                            const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
+                            handleDefectChange(pc, defect.id, 'defectQty', newValue);
+                          }}
+                          className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center"
+                          placeholder="Qty"
+                        />
+                          <button onClick={() => handleDefectChange(pc, defect.id, 'defectQty', (parseInt(defect.defectQty, 10) || 0) + 1)} className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white">
+                           <Plus size={16} />
+                          </button>
+                        </div>
+                        </div>
+                    </div>
+                     
+                     <div className="mt-4">
+                      <h5 className="text-sm font-medium dark:text-gray-300 mb-2">Defect Images (Max 5)</h5>
+                      <div className="flex items-center gap-4 mt-3">
+                        <button
+                           onClick={() => imageInputRef.current.click()}
+                          className="flex items-center px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300"
+                        >
+                          <Upload  size={18} className="mr-2" />Upload
+                        </button>
+                         <input
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          ref={imageInputRef}
+                          onChange={handleImageChange}
+                          className="hidden"
+                        />
+                         <button
+                          // onClick={capture}
+                          className="flex items-center px-4 py-2 bg-blue-200 rounded-md hover:bg-blue-300"
+                        >
+                          <Camera size={18} className="mr-2" />Capture
+                        </button>
+                       
+                        <span className="text-sm text-gray-600 dark:text-gray-300">
+                          {(defect.uploadedImages || []).length} / 5 selected
+                        </span>
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                        {(defect.uploadedImages || []).map((image, index) => (
+                          <div key={index} className="relative">
+                            <img
+                              src={image.preview}
+                              alt={image.name}
+                              className="w-full h-24 object-cover rounded-md shadow-md dark:shadow-none"
+                            />
+                            <button
+                              onClick={() => handleRemoveImage(index)}
+                              className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    </>)}
+                  </div>
+                ))}
+
+                <div className="mt-2 mb-2">
+                  <button
+                    onClick={() => handleAddDefectCard(pc)}
+                    className="flex items-center px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-white"
+                  >
+                    <PlusCircle size={18} className="mr-1" /> Add Defect for PC {pc}
+                  </button>
+                </div>
+              </div>
+            ))}
+            
+          </div>
 
           <div>
             <h3 className="text-md font-semibold mb-2 dark:text-white">Upload Images (Max 5)</h3>
+
             <div className="flex items-center gap-4">
               <button onClick={() => imageInputRef.current.click()} className="flex items-center px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">
-                <UploadCloud size={18} className="mr-2" /> Choose Images
+                <Upload size={18} className="mr-2" /> Choose Images
+              </button>
+               <button
+                // onClick={capture}
+                className="flex items-center px-4 py-2 bg-blue-200 rounded-md hover:bg-blue-300"
+              >
+                <Camera size={18} className="mr-2" />Capture
               </button>
               <input type="file" multiple accept="image/*" ref={imageInputRef} onChange={handleImageChange} className="hidden" />
               <span className="text-sm text-gray-600 dark:text-gray-300">{uploadedImages.length} / 5 selected</span>
@@ -274,6 +417,7 @@ const DefectDetailsSection = ({
             <label htmlFor="comment" className="text-md font-semibold mb-2 block dark:text-white">Comments</label>
             <textarea id="comment" value={comment} onChange={(e) => setComment(e.target.value)} rows="4" className="w-full p-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"></textarea>
           </div>
+
 
         </div>
       )}

@@ -504,15 +504,15 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                           if (!isNaN(tolMinusValue) && !isNaN(tolPlusValue)) {
                             // The deviation should be within the tolerance range.
                             if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
-                              cellColorClass = 'bg-green-200'; // Pass
+                              cellColorClass = 'bg-green-200 dark:bg-green-700'; // Pass
                             } else {
-                              cellColorClass = 'bg-red-200'; // Fail
+                              cellColorClass = 'bg-red-200 dark:bg-red-700'; // Fail
                             }
                           }
                         }
 
                         return (
-                          <td key={`measurement-input-${index}-${i}`} className={`border border-gray-300 px-2 py-1 text-center ${cellColorClass} cursor-pointer`}
+                          <td key={`measurement-input-${index}-${i}`} className={`border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white ${cellColorClass} cursor-pointer`}
                             onClick={(e) => {
                               e.preventDefault();
                               setCurrentCell({ size, table: 'before', rowIndex: index, colIndex: i });
@@ -523,7 +523,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                               type="text"
                               value={value?.fraction || ''}
                               readOnly
-                              className="w-full px-1 py-1 text-center border-0 bg-transparent dark:bg-gray-800 dark:text-white"
+                              className="w-full px-1 py-1 text-center border-0 bg-transparent dark:text-white"
                               placeholder="0.0"
                               style={{ pointerEvents: 'none' }}
                             />
@@ -663,9 +663,9 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                           if (!isNaN(tolMinusValue) && !isNaN(tolPlusValue)) {
                             // The deviation should be within the tolerance range.
                             if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
-                              cellColorClass = 'bg-green-200'; // Pass
+                              cellColorClass = 'bg-green-200 dark:bg-green-700'; // Pass
                             } else {
-                              cellColorClass = 'bg-red-200'; // Fail
+                              cellColorClass = 'bg-red-200 dark:bg-red-700'; // Fail
                             }
                           }
                         }
@@ -680,7 +680,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                               type="text" 
                               value={value?.fraction || ''}
                               readOnly
-                              className="w-full px-1 py-1 text-center border-0 bg-transparent dark:bg-gray-800 dark:text-white"
+                              className="w-full px-1 py-1 text-center border-0 bg-transparent dark:text-white"
                               placeholder="0.0"
                               style={{ pointerEvents: 'none' }}
                             />
@@ -893,13 +893,38 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                       </div>
                     </div>
                     <div className="text-sm text-gray-600">
-                      <p>Measurement points per piece: {data.pcs?.[0]?.measurementPoints?.length || 0}</p>
-                      <p>Total measurements: {(data.pcs || []).reduce((total, pc) => total + (pc.measurementPoints?.length || 0), 0)}</p>
+                      <p>Total measurements: {(data.pcs || []).reduce((total, pc) => total + (pc.measurementPoints?.length || 0), 0)}</p>                      
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      {/* Total Checked Points */}
+                      <div className="bg-gray-100 p-2 rounded-md text-center">
+                        <span className="text-blue-500 font-semibold">{data.pcs.flatMap(pc => pc.measurementPoints).length}</span>
+                        <p className="text-xs text-gray-500">Checked</p>
+                      </div>
+
+                      {/* Pass Count */}
+                      <div className="bg-green-100 p-2 rounded-md text-center">
+                        <span className="text-green-500 font-semibold">
+                          {data.pcs.flatMap(pc => pc.measurementPoints).filter(point => point.result === 'pass').length}
+                        </span>
+                        <p className="text-xs text-gray-500">Pass</p>
+                      </div>
+
+                      {/* Fail Count */}
+                      <div className="bg-red-100 p-2 rounded-md text-center">
+                        <span className="text-red-500 font-semibold">
+                          {data.pcs.flatMap(pc => pc.measurementPoints).filter(point => point.result === 'fail').length}
+                        </span>
+                        <p className="text-xs text-gray-500">Fail</p>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+
+
+
           )}
 
           {/* Show measurement table for new sizes */}
