@@ -37,22 +37,22 @@ const DefectDetailsSection = ({
     return d.english;
   };
 
-  // const totalDefects = addedDefects.reduce((sum, defect) => sum + defect.qty, 0);
+  const totalDefects = addedDefects.reduce((sum, defect) => sum + defect.qty, 0);
 
-  // let defectStatus = 'N/A';
-  // let statusColorClass = 'bg-gray-100 text-gray-800';
-  // if ((formData.inline === 'Inline' || formData.daily === 'Inline' || formData.firstOutput === "First Output" || formData.daily === 'First Output') && formData.aqlAcceptedDefect) {
-  //   const acceptedDefectCount = parseInt(formData.aqlAcceptedDefect, 10);
-  //   if (!isNaN(acceptedDefectCount)) {
-  //     if (totalDefects <= acceptedDefectCount) {
-  //       defectStatus = 'Pass';
-  //       statusColorClass = 'bg-green-100 text-green-800';
-  //     } else {
-  //       defectStatus = 'Fail';
-  //       statusColorClass = 'bg-red-100 text-red-800';
-  //     }
-  //   }
-  // }
+  let defectStatus = 'N/A';
+  let statusColorClass = 'bg-gray-100 text-gray-800';
+  if ((formData.inline === 'Inline' || formData.daily === 'Inline' || formData.firstOutput === "First Output" || formData.daily === 'First Output') && formData.aqlAcceptedDefect) {
+    const acceptedDefectCount = parseInt(formData.aqlAcceptedDefect, 10);
+    if (!isNaN(acceptedDefectCount)) {
+      if (totalDefects <= acceptedDefectCount) {
+        defectStatus = 'Pass';
+        statusColorClass = 'bg-green-100 text-green-800';
+      } else {
+        defectStatus = 'Fail';
+        statusColorClass = 'bg-red-100 text-red-800';
+      }
+    }
+  }
 
   const handleAddDefect = (pc, defect) => {
     if (!defect.selectedDefect || !defect.defectQty) {
