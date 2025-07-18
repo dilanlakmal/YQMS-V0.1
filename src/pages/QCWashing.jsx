@@ -924,15 +924,21 @@ const QCWashingPage = () => {
           defectDetails: {
             washQty: formData.washQty,
             checkedQty: formData.checkedQty,
-            defectsByPc: Object.values(defectsByPc).map(pcDefects => ({
-              defectPcs: pcDefects.map(defect => ({
-                defectName: defect.selectedDefect,
-                defectQty: defect.defectQty,
-                defectImages: defect.defectImages.map(img => img.name)
-              }))
+             defectsByPc: Object.entries(defectsByPc).map(
+              ([pcKey, pcDefects]) => ({
+                pcNumber: pcKey,  
+                pcDefects: Array.isArray(pcDefects)
+                  ? pcDefects.map(defect => ({
+                      defectName: defect.selectedDefect,
+                      defectQty: defect.defectQty,
+                      defectImages: Array.isArray(defect.defectImages)
+                        ? defect.defectImages.map(img => img.url || img.name) 
+                        : []
+                    }))
+                  : []
             })),
-            comment: comment,            
-            additionalImages: uploadedImages.map(img => img.name),
+            comment: comment,
+            additionalImages: uploadedImages.map(img => img.url || img.name),
           },
           measurementDetails: [
             ...measurementData.beforeWash.map((item) => ({
@@ -972,6 +978,7 @@ const QCWashingPage = () => {
       }
     } catch (error) {
       // Log the detailed error from the failed fetch request
+      console.error("Auto-save request failed:", error);
       const errorBody = await error.response?.json().catch(() => null);
       console.error("Auto-save request failed:", {
         errorMessage: error.message,

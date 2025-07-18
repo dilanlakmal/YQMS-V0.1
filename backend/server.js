@@ -1797,6 +1797,38 @@ const getBuyerFromMoNumber = (moNo) => {
 /* ------------------------------
    End Points - Measurement Data In qcWashing
 ------------------------------ */
+
+const qcWashingDir = path.join(process.cwd(), "storage", "qc_washing_images");
+
+// Ensure directory exists
+if (!fs.existsSync(qcWashingDir)) {
+  fs.mkdirSync(qcWashingDir, { recursive: true });
+}
+
+// Multer memory storage
+const qcWashingMemoryStorage = multer.memoryStorage();
+
+export const uploadQcWashingImage = multer({
+  storage: qcWashingMemoryStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
+    if (allowedTypes.includes(file.mimetype)) cb(null, true);
+    else cb(new Error("Only JPEG, PNG, GIF allowed"), false);
+  }
+});
+
+// Save file buffer to disk and return URL
+export const saveQcWashingImage = (file) => {
+  const timestamp = Date.now();
+  const ext = path.extname(file.originalname);
+  const newFilename = `${timestamp}-${file.originalname}`;
+  const newPath = path.join(qcWashingDir, newFilename);
+
+  fs.writeFileSync(newPath, file.buffer);
+
+  return `/storage/qc_washing_images/${newFilename}`;
+};
 // Get order details by style number
 app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
   const { orderNo } = req.params;
@@ -2504,6 +2536,14 @@ app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
         qty: defect.defectQty
       })) || [];
 
+      const defectsByPc = firstColorData?.defectDetails?.defectsByPc || {};
+
+      const additionalImage = firstColorData?.defectDetails?.additionalImages?.map(imagePath => ({
+        preview: imagePath,  // Assuming the path can be used directly as a preview URL
+        name: imagePath.split('/').pop(), // Extracts filename from path
+      })) || [];
+
+
       res.json({
         success: true,
         savedData: {
@@ -2517,16 +2557,16 @@ app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
           },
           defectData: defectData,
           addedDefects: addedDefects,
+          defectsByPc: defectsByPc,
+          additionalImage: additionalImage,
           comment: firstColorData?.defectDetails?.comment || '',
           measurementDetails: firstColorData?.measurementDetails || [],
           savedAt: savedData.savedAt,
-          // Include other top-level fields from savedData if needed on frontend
-          reportType: savedData.reportType, // Added from top-level
-          totalCheckedPoint: savedData.totalCheckedPoint, // Added from top-level
-          totalPass: savedData.totalPass, // Added from top-level
-          totalFail: savedData.totalFail, // Added from top-level
-          passRate: savedData.passRate, // Added from top-level
-          // Note: washQty and checkedQty are also at top-level. Your formData pulls from nested. Review your data structure.
+          reportType: savedData.reportType, 
+          totalCheckedPoint: savedData.totalCheckedPoint, 
+          totalPass: savedData.totalPass, 
+          totalFail: savedData.totalFail, 
+          passRate: savedData.passRate, 
           washQty: savedData.washQty,
           checkedQty: savedData.checkedQty,
         }
