@@ -79,13 +79,13 @@ const QCWashingSchema = new mongoose.Schema({
     defectDetails: {
       checkedQty: String,
       washQty: String,
-      defects: [{
-        defectPcs:{
-        defectName: String,
-        defectQty: Number,
-        defectImages: [String],
-      },
-    }],
+      defectsByPc: [{
+         defectPcs:[{ 
+          defectName: String,
+          defectQty: Number,
+          defectImages: [String],
+        }],
+      }],
       additionalImages: [String],
       comment: String
     },

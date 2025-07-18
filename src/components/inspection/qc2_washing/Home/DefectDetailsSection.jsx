@@ -19,14 +19,15 @@ const DefectDetailsSection = ({
   comment,
   setComment,
   isVisible,
-  onToggle 
+  onToggle,
+  defectsByPc,
+  setDefectsByPc
 }) => {
   const imageInputRef = useRef(null);
   const { i18n } = useTranslation();
   const videoRef = useRef(null);
-  const [defectsByPc, setDefectsByPc] =  React.useState({});
-
-
+  // State is now managed by the parent QCWashingPage component
+  
   const getDefectNameForDisplay = (d) => {
     if (!d) return "N/A";
     const lang = i18n.language;
@@ -59,18 +60,14 @@ const DefectDetailsSection = ({
       return;
     }
 
-     const defectExists = defectsByPc[pc].some(d => d.defectId === defect.selectedDefect && d.id !== defect.id);
+    const defectDetails = defectOptions.find(d => d._id === defect.selectedDefect);
+    if (!defectDetails) return;
+
+    const defectExists = defectsByPc[pc].some(d => d.defectId === defect.selectedDefect && d.id !== defect.id);
     if (defectExists) {
       Swal.fire('Duplicate', 'This defect has already been added.', 'error');
       return;
     }
-
-    // const defectDetails = defectOptions.find(d => d._id === selectedDefect);
-    // setAddedDefects(prev => [...prev, {
-    //   defectId: defectDetails._id,
-    //   defectName: defectDetails.english || 'N/A',
-    //   qty: parseInt(defect.defectQty, 10) || 0,
-    // }]);
   
     setDefectsByPc(prev => ({
       ...prev,
@@ -109,9 +106,7 @@ const DefectDetailsSection = ({
   const handleToggleVisibility = (pc, defectId) => {
     setDefectsByPc(prev => ({
       ...prev,
-      [pc]: prev[pc].map(d =>
-        d.id === defectId ? { ...d, defectImages: (d.defectImages || []).filter((_, i) => i !== imageIndex) } : d
-      ),
+      [pc]: prev[pc].map(d => d.id === defectId ? { ...d, isBodyVisible: !d.isBodyVisible } : d),
     }));
   };
   
