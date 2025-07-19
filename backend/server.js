@@ -2730,18 +2730,33 @@ app.put('/api/qc-washing/update/:recordId', async (req, res) => {
   }
 });
 
+const getAqlLevelForBuyer = (buyer) => {
+  // console.log(`Buyer: ${buyer}`);
+  if (!buyer) return 1.0;
+  const buyerUpper = buyer.toUpperCase();
+  // console.log(`Buyer Upper Case: ${buyerUpper}`);
+  
+  if (buyerUpper.includes('MWW')) return 2.5;
+  if (buyerUpper.includes('REITMANS')) return 4.0;
+  if (buyerUpper.includes('ARITZIA')) return 1.5;
+  if (buyerUpper.includes('A & F') || buyerUpper.includes('A&F')) return 1.5;
+  if (buyerUpper.includes('COSCO')) return 1.0;
+  
+  return 1.0;
+};
+
 app.post('/api/qc-washing/aql-chart/find-by-sample-size', async (req, res) => {
   try {
-    const { sampleSize } = req.body;
+    const { sampleSize, orderNo } = req.body;
     const sampleSizeNum = parseInt(sampleSize, 10);
 
     if (isNaN(sampleSizeNum) || sampleSizeNum <= 0) {
       return res.status(400).json({ success: false, message: "A valid sample size must be provided." });
     }
 
-    // Find the AQL chart with the smallest SampleSize that is >= the provided sampleSize.
-    // This handles cases where the exact sample size isn't in the table, so we take the next level up,
-    // which is standard AQL practice.
+    const buyer = await getBuyerFromMoNumber(orderNo);
+    const aqlLevel = getAqlLevelForBuyer(buyer);
+
     const aqlChart = await AQLChart.findOne({
       Type: "General",
       Level: "II",
@@ -2755,12 +2770,12 @@ app.post('/api/qc-washing/aql-chart/find-by-sample-size', async (req, res) => {
     }
 
     // Find the specific AQL entry for level 1.0 within the document.
-    const aqlEntry = aqlChart.AQL.find(aql => aql.level === 1.0);
+    const aqlEntry = aqlChart.AQL.find(aql => aql.level === aqlLevel);
 
     if (!aqlEntry) {
       return res
         .status(404)
-        .json({ success: false, message: "AQL level 1.0 not found for the matching chart." });
+        .json({ success: false, message: "AQL level  ${aqlLevel} not found for the matching chart." });
     }
 
     // Respond with the data in the format expected by the frontend.
@@ -2769,7 +2784,8 @@ app.post('/api/qc-washing/aql-chart/find-by-sample-size', async (req, res) => {
       aqlData: {
         sampleSize: aqlChart.SampleSize, // Return the actual sample size from the chart
         acceptedDefect: aqlEntry.AcceptDefect,
-        rejectedDefect: aqlEntry.RejectDefect
+        rejectedDefect: aqlEntry.RejectDefect,
+        aqlLevelUsed: aqlLevel
       }
     });
 
@@ -2781,7 +2797,7 @@ app.post('/api/qc-washing/aql-chart/find-by-sample-size', async (req, res) => {
 // AQL data endpoint
 app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
   try {
-    const { lotSize } = req.body;
+    const { lotSize, orderNo } = req.body;
 
     if (!lotSize || isNaN(lotSize)) {
       return res
@@ -2789,6 +2805,9 @@ app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
         .json({ success: false, message: "Lot size (wash Qty) is required and must be a number." });
     }
     const lotSizeNum = parseInt(lotSize, 10);
+
+    const buyer = await getBuyerFromMoNumber(orderNo);
+    const aqlLevel = getAqlLevelForBuyer(buyer);
 
     // Find the AQL chart document where the lot size falls within the defined range.
     const aqlChart = await AQLChart.findOne({
@@ -2807,13 +2826,13 @@ app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
         .json({ success: false, message: "No AQL chart found for the given lot size." });
     }
 
-    // Find the specific AQL entry for level 1.0 within the document.
-    const aqlEntry = aqlChart.AQL.find(aql => aql.level === 1.0);
+    // Find the specific AQL entry for level  within the document.
+    const aqlEntry = aqlChart.AQL.find(aql => aql.level === aqlLevel);
 
     if (!aqlEntry) {
       return res
         .status(404)
-        .json({ success: false, message: "AQL level 1.0 not found for the matching chart." });
+        .json({ success: false, message: "AQL level  ${aqlLevel} not found for the matching chart." });
     }
 
     
@@ -2822,7 +2841,8 @@ app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
       aqlData: {
         sampleSize: aqlChart.SampleSize,
         acceptedDefect: aqlEntry.AcceptDefect,
-        rejectedDefect: aqlEntry.RejectDefect
+        rejectedDefect: aqlEntry.RejectDefect,
+        aqlLevelUsed: aqlLevel 
       }
     });
   } catch (error) {

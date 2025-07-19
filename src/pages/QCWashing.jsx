@@ -35,6 +35,7 @@ const QCWashingPage = () => {
     aqlSampleSize: "",
     aqlAcceptedDefect: "",
     aqlRejectedDefect: "",
+    aqlLevelUsed: "", 
   });
 
   // State: Data Lists
@@ -638,9 +639,21 @@ const QCWashingPage = () => {
 
   // --- AQL & Checked Qty ---
   const fetchFirstOutputDetails = async () => {
+    const orderNo = formData.orderNo || formData.style;
+    if (!orderNo) {
+      Swal.fire('Missing Order No', 'Please enter an Order No before selecting First Output.', 'warning');
+      // Uncheck the box to prevent inconsistent state
+      setFormData(prev => ({ ...prev, firstOutput: '', daily: '' }));
+      return;
+    }
     try {
       setIsDataLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/first-output-details`);
+     // This endpoint must be changed to a POST on the backend to accept the orderNo
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/first-output-details`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderNo: orderNo }) // Send orderNo for buyer-specific AQL
+      });
       const data = await response.json();
 
       if (response.ok && data.success) {
@@ -653,6 +666,7 @@ const QCWashingPage = () => {
           aqlAcceptedDefect: data.aqlData.acceptedDefect.toString(),
           aqlRejectedDefect: data.aqlData.rejectedDefect.toString(),
           // Wash Qty can be set to checked Qty for consistency if needed
+          aqlLevelUsed: data.aqlData.aqlLevelUsed,
           washQty: data.checkedQty.toString(),
         }));
       } else {
@@ -669,6 +683,7 @@ const QCWashingPage = () => {
           aqlSampleSize: "",
           aqlAcceptedDefect: "",
           aqlRejectedDefect: "",
+           aqlLevelUsed: "",
         }));
       }
     } catch (error) {
@@ -682,7 +697,12 @@ const QCWashingPage = () => {
    // --- AQL & Checked Qty ---
   // Fetch AQL data for inline daily field
   const fetchAQLData = async (washQty) => {
-    if (!washQty) return;
+   if (!washQty) return;
+    const orderNo = formData.orderNo || formData.style;
+    if (!orderNo) {
+      console.warn("Cannot fetch AQL data without an Order No.");
+      return;
+    }
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/qc-washing/aql-chart/find`,
@@ -691,6 +711,7 @@ const QCWashingPage = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             lotSize: parseInt(washQty) || 0,
+            orderNo: orderNo,
           }),
         }
       );
@@ -705,6 +726,7 @@ const QCWashingPage = () => {
           aqlSampleSize: "",
           aqlAcceptedDefect: "",
           aqlRejectedDefect: "",
+          aqlLevelUsed: "",
         }));
         return;
       }
@@ -716,6 +738,7 @@ const QCWashingPage = () => {
           aqlSampleSize: data.aqlData.sampleSize.toString(),
           aqlAcceptedDefect: data.aqlData.acceptedDefect.toString(),
           aqlRejectedDefect: data.aqlData.rejectedDefect.toString(),
+          aqlLevelUsed: data.aqlData.aqlLevelUsed, 
         }));
       } else {
          setFormData((prev) => ({
@@ -723,6 +746,7 @@ const QCWashingPage = () => {
           aqlSampleSize: "",
           aqlAcceptedDefect: "",
           aqlRejectedDefect: "",
+          aqlLevelUsed: "",
         }));
         console.warn(
           "AQL data not found:",

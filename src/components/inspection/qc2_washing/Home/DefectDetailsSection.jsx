@@ -37,22 +37,25 @@ const DefectDetailsSection = ({
     return d.english;
   };
 
-  // const totalDefects = addedDefects.reduce((sum, defect) => sum + defect.qty, 0);
+  // Correctly calculate total defects from the new defectsByPc structure
+  const totalDefects = Object.values(defectsByPc)
+    .flat()
+    .reduce((sum, defect) => sum + (parseInt(defect.defectQty, 10) || 0), 0);
 
-  // let defectStatus = 'N/A';
-  // let statusColorClass = 'bg-gray-100 text-gray-800';
-  // if ((formData.inline === 'Inline' || formData.daily === 'Inline' || formData.firstOutput === "First Output" || formData.daily === 'First Output') && formData.aqlAcceptedDefect) {
-  //   const acceptedDefectCount = parseInt(formData.aqlAcceptedDefect, 10);
-  //   if (!isNaN(acceptedDefectCount)) {
-  //     if (totalDefects <= acceptedDefectCount) {
-  //       defectStatus = 'Pass';
-  //       statusColorClass = 'bg-green-100 text-green-800';
-  //     } else {
-  //       defectStatus = 'Fail';
-  //       statusColorClass = 'bg-red-100 text-red-800';
-  //     }
-  //   }
-  // }
+  let defectStatus = 'N/A';
+  let statusColorClass = 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200';
+  if ((formData.inline === 'Inline' || formData.daily === 'Inline' || formData.firstOutput === "First Output" || formData.daily === 'First Output') && formData.aqlAcceptedDefect) {
+    const acceptedDefectCount = parseInt(formData.aqlAcceptedDefect, 10);
+    if (!isNaN(acceptedDefectCount)) {
+      if (totalDefects <= acceptedDefectCount) {
+        defectStatus = 'Pass';
+        statusColorClass = 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      } else {
+        defectStatus = 'Fail';
+        statusColorClass = 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      }
+    }
+  }
 
   const handleAddDefect = (pc, defect) => {
     if (!defect.selectedDefect || !defect.defectQty) {
@@ -262,7 +265,9 @@ const DefectDetailsSection = ({
          {((formData.inline === 'Inline' || formData.daily === 'Inline') || formData.firstOutput === "First Output") && 
            (formData.aqlSampleSize || formData.aqlAcceptedDefect || formData.aqlRejectedDefect) && (
             <div className="md:col-span-2 bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">AQL Information (Level II, AQL 1.0)</h3>
+               <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">
+                AQL Information (Level II, AQL {formData.aqlLevelUsed || 'N/A'})
+              </h3>
               <div className="grid grid-cols-4 gap-4 text-sm">
                 <div>
                   <span className="font-medium text-blue-700 dark:text-blue-300">Sample Size:</span>
