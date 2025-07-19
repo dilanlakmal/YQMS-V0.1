@@ -39,6 +39,7 @@ import BGradeStock from "./pages/BGradeStock.jsx";
 import IEPage from "./pages/IE.jsx";
 import UploadWashingSpecs from "./pages/UploadWashingSpecs.jsx";
 import QCAccuracyViewInspectionReport from "./components/inspection/qc_accuracy/QCAccuracyViewInspectionReport";
+import UploadYorksysOrders from "./pages/UploadYorksysOrders.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -403,6 +404,7 @@ function AppContent() {
                 path="/upload-beforewash-specs"
                 element={<UploadWashingSpecs />}
               />
+              <Route path="/qa-yorksys" element={<UploadYorksysOrders />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

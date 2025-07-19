@@ -1,76 +1,95 @@
 import axios from "axios";
-import { ChevronLeft, ChevronRight, Eye, Loader2, Search } from "lucide-react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Loader2,
+  MoreVertical,
+  Search,
+  XCircle,
+  Archive,
+  ClipboardCheck,
+  FileSearch,
+  Scaling,
+  PackageCheck,
+  ThumbsUp,
+  ThumbsDown,
+  AlertTriangle,
+  Bug,
+  ClipboardList,
+  Edit,
+  MessageSquare
+} from "lucide-react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useTranslation } from "react-i18next";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../config";
 import CuttingReportDetailView from "../cutting/report/CuttingReportDetailView";
+import CuttingReportFollowUp from "../cutting/CuttingReportFollowUp";
 
-// Function to determine result status based on totalInspectionQty and sumTotalReject
+// Function to determine result status (remains the same)
 const getResultStatus = (
   totalInspectionQty,
   sumTotalReject,
   sumTotalPcs,
   t
 ) => {
-  // If totalPcs < totalInspectionQty, status is Pending
   if (sumTotalPcs < totalInspectionQty) {
-    return { status: t("common.pending"), color: "" };
+    return {
+      status: t("common.pending"),
+      color: "bg-yellow-100 text-yellow-700"
+    };
   }
-
-  // Logic for Pass/Fail based on totalInspectionQty and sumTotalReject
-  if (totalInspectionQty >= 30 && totalInspectionQty < 45) {
-    if (sumTotalReject > 0) {
+  if (totalInspectionQty >= 315) {
+    if (sumTotalReject > 7)
       return { status: t("common.fail"), color: "bg-red-100 text-red-600" };
-    }
     return { status: t("common.pass"), color: "bg-green-100 text-green-600" };
-  } else if (totalInspectionQty >= 45 && totalInspectionQty < 60) {
-    if (sumTotalReject > 0) {
+  } else if (totalInspectionQty >= 210) {
+    if (sumTotalReject > 5)
       return { status: t("common.fail"), color: "bg-red-100 text-red-600" };
-    }
     return { status: t("common.pass"), color: "bg-green-100 text-green-600" };
-  } else if (totalInspectionQty >= 60 && totalInspectionQty < 90) {
-    if (sumTotalReject > 1) {
+  } else if (totalInspectionQty >= 135) {
+    if (sumTotalReject > 3)
       return { status: t("common.fail"), color: "bg-red-100 text-red-600" };
-    }
     return { status: t("common.pass"), color: "bg-green-100 text-green-600" };
-  } else if (totalInspectionQty >= 90 && totalInspectionQty < 135) {
-    if (sumTotalReject > 2) {
+  } else if (totalInspectionQty >= 90) {
+    if (sumTotalReject > 2)
       return { status: t("common.fail"), color: "bg-red-100 text-red-600" };
-    }
     return { status: t("common.pass"), color: "bg-green-100 text-green-600" };
-  } else if (totalInspectionQty >= 135 && totalInspectionQty < 210) {
-    if (sumTotalReject > 3) {
+  } else if (totalInspectionQty >= 60) {
+    if (sumTotalReject > 1)
       return { status: t("common.fail"), color: "bg-red-100 text-red-600" };
-    }
     return { status: t("common.pass"), color: "bg-green-100 text-green-600" };
-  } else if (totalInspectionQty >= 210 && totalInspectionQty < 315) {
-    if (sumTotalReject > 5) {
+  } else if (totalInspectionQty >= 30) {
+    if (sumTotalReject > 0)
       return { status: t("common.fail"), color: "bg-red-100 text-red-600" };
-    }
-    return { status: t("common.pass"), color: "bg-green-100 text-green-600" };
-  } else if (totalInspectionQty >= 315) {
-    if (sumTotalReject > 7) {
-      return { status: t("common.fail"), color: "bg-red-100 text-red-600" };
-    }
     return { status: t("common.pass"), color: "bg-green-100 text-green-600" };
   }
-
-  // Default case (if totalInspectionQty is 0 or invalid)
-  return { status: t("common.pending"), color: "" };
+  return {
+    status: t("common.pending"),
+    color: "bg-yellow-100 text-yellow-700"
+  };
 };
 
 const CuttingReport = () => {
   const { t, i18n } = useTranslation();
-  const [filters, setFilters] = useState({
+
+  const initialFilters = {
     startDate: new Date(),
-    endDate: null,
+    endDate: new Date(),
+    buyer: "",
     moNo: "",
     tableNo: "",
+    color: "",
+    garmentType: "",
+    spreadTable: "",
+    material: "",
     qcId: ""
-  });
+  };
+
+  const [filters, setFilters] = useState(initialFilters);
   const [reports, setReports] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -78,138 +97,81 @@ const CuttingReport = () => {
   const [loading, setLoading] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState(null);
 
-  const [moNoSearch, setMoNoSearch] = useState("");
-  const [moNoOptions, setMoNoOptions] = useState([]);
-  const [showMoNoDropdown, setShowMoNoDropdown] = useState(false);
-  const moNoDropdownRef = useRef(null);
+  const [filterOptions, setFilterOptions] = useState({
+    buyers: ["MWW", "Costco", "Aritzia", "Reitmans", "ANF", "STORI", "Other"],
+    moNos: [],
+    tableNos: [],
+    colors: [],
+    garmentTypes: [],
+    spreadTables: [],
+    materials: [],
+    qcInspectors: []
+  });
 
-  const [tableNoSearch, setTableNoSearch] = useState("");
-  const [tableNoOptions, setTableNoOptions] = useState([]);
-  const [showTableNoDropdown, setShowTableNoDropdown] = useState(false);
-  const tableNoDropdownRef = useRef(null);
+  // --- START: NEW STATE FOR ACTIONS ---
+  const [activeActionMenu, setActiveActionMenu] = useState(null); // Holds the ID of the report whose menu is open
+  const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
+  const [selectedReportForFollowUp, setSelectedReportForFollowUp] =
+    useState(null);
+  const actionMenuRef = useRef(null);
+  // --- END: NEW STATE FOR ACTIONS ---
 
-  const [qcInspectorOptions, setQcInspectorOptions] = useState([]);
-
-  // Fetch MO Numbers for dropdown
-  useEffect(() => {
-    const fetchMoNumbers = async () => {
-      if (moNoSearch.trim() === "" && !filters.moNo) {
-        // fetch all if search is empty and no filter moNo
-        // setShowMoNoDropdown(false); // Keep it open if focused and search is empty for initial load
-        // return;
-      }
-      try {
-        const response = await axios.get(
-          `${API_BASE_URL}/api/cutting-inspections/mo-numbers`,
-          {
-            params: { search: moNoSearch },
-            withCredentials: true
-          }
-        );
-        setMoNoOptions(response.data);
-        if (response.data.length > 0 && moNoSearch.trim() !== "")
-          setShowMoNoDropdown(true);
-        else if (moNoSearch.trim() === "") setShowMoNoDropdown(false); // Close if search is cleared
-      } catch (error) {
-        console.error("Error fetching MO numbers:", error);
-      }
-    };
-    const debounce = setTimeout(fetchMoNumbers, 300);
-    return () => clearTimeout(debounce);
-  }, [moNoSearch, filters.moNo]);
-
-  // Fetch Table Numbers for dropdown (dependent on selected MO)
-  useEffect(() => {
-    if (!filters.moNo) {
-      setTableNoOptions([]);
-      setShowTableNoDropdown(false);
-      return;
+  const fetchFilterOptions = useCallback(async (currentFilters) => {
+    try {
+      const params = {
+        ...currentFilters,
+        startDate: currentFilters.startDate
+          ? currentFilters.startDate.toLocaleDateString("en-CA")
+          : null,
+        endDate: currentFilters.endDate
+          ? currentFilters.endDate.toLocaleDateString("en-CA")
+          : null
+      };
+      const response = await axios.get(
+        `${API_BASE_URL}/api/cutting-report-filter-options`,
+        { params }
+      );
+      setFilterOptions((prev) => ({ ...prev, ...response.data }));
+    } catch (error) {
+      console.error("Error fetching filter options:", error);
     }
-    const fetchTableNumbers = async () => {
-      if (tableNoSearch.trim() === "" && !filters.tableNo) {
-        //setShowTableNoDropdown(false);
-        // return;
-      }
-      try {
-        const response = await axios.get(
-          `${API_BASE_URL}/api/cutting-inspections/table-numbers`,
-          {
-            params: { moNo: filters.moNo, search: tableNoSearch },
-            withCredentials: true
-          }
-        );
-        setTableNoOptions(response.data);
-        if (response.data.length > 0 && tableNoSearch.trim() !== "")
-          setShowTableNoDropdown(true);
-        else if (tableNoSearch.trim() === "") setShowTableNoDropdown(false);
-      } catch (error) {
-        console.error("Error fetching table numbers:", error);
-      }
-    };
-    const debounce = setTimeout(fetchTableNumbers, 300);
-    return () => clearTimeout(debounce);
-  }, [filters.moNo, tableNoSearch, filters.tableNo]);
-
-  // Fetch QC Inspectors
-  useEffect(() => {
-    const fetchQcInspectors = async () => {
-      try {
-        const response = await axios.get(
-          `${API_BASE_URL}/api/cutting-inspections/qc-inspectors`,
-          {
-            withCredentials: true
-          }
-        );
-        setQcInspectorOptions(response.data);
-      } catch (error) {
-        console.error("Error fetching QC inspectors:", error);
-      }
-    };
-    fetchQcInspectors();
   }, []);
 
-  // Click outside handlers for dropdowns
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        moNoDropdownRef.current &&
-        !moNoDropdownRef.current.contains(event.target)
-      ) {
-        setShowMoNoDropdown(false);
-      }
-      if (
-        tableNoDropdownRef.current &&
-        !tableNoDropdownRef.current.contains(event.target)
-      ) {
-        setShowTableNoDropdown(false);
+    const fetchInitialData = async () => {
+      try {
+        const qcResponse = await axios.get(
+          `${API_BASE_URL}/api/cutting-inspections/qc-inspectors`
+        );
+        setFilterOptions((prev) => ({
+          ...prev,
+          qcInspectors: qcResponse.data
+        }));
+      } catch (error) {
+        console.error("Error fetching initial QC data:", error);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    fetchInitialData();
   }, []);
 
   const fetchReports = useCallback(
-    async (pageToFetch = 1) => {
+    async (pageToFetch = 1, currentFilters = filters) => {
       setLoading(true);
       try {
-        // Format dates to MM/DD/YYYY string before sending
         const params = {
-          ...filters,
-          startDate: filters.startDate
-            ? filters.startDate.toLocaleDateString("en-US")
+          ...currentFilters,
+          startDate: currentFilters.startDate
+            ? currentFilters.startDate.toLocaleDateString("en-US")
             : null,
-          endDate: filters.endDate
-            ? filters.endDate.toLocaleDateString("en-US")
+          endDate: currentFilters.endDate
+            ? currentFilters.endDate.toLocaleDateString("en-US")
             : null,
           page: pageToFetch,
           limit: 15
         };
         const response = await axios.get(
           `${API_BASE_URL}/api/cutting-inspections-report`,
-          {
-            params,
-            withCredentials: true
-          }
+          { params, withCredentials: true }
         );
         setReports(response.data.reports);
         setTotalPages(response.data.totalPages);
@@ -234,18 +196,28 @@ const CuttingReport = () => {
   );
 
   useEffect(() => {
-    fetchReports(1); // Fetch on initial load or when filters change (debounced by user action)
-  }, [fetchReports]);
+    const handler = setTimeout(() => {
+      fetchFilterOptions(filters);
+    }, 500); // Debounce
+    return () => clearTimeout(handler);
+  }, [filters, fetchFilterOptions]);
+
+  useEffect(() => {
+    handleSearch();
+  }, []);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
-    if (name === "moNo") setMoNoSearch(value); // Sync search input
-    if (name === "tableNo") setTableNoSearch(value); // Sync search input
   };
 
   const handleDateChange = (name, date) => {
-    if (name === "endDate" && filters.startDate && date < filters.startDate) {
+    if (
+      name === "endDate" &&
+      date &&
+      filters.startDate &&
+      date < filters.startDate
+    ) {
       Swal.fire({
         icon: "warning",
         title: t("common.invalidDateRange"),
@@ -256,19 +228,68 @@ const CuttingReport = () => {
     setFilters((prev) => ({ ...prev, [name]: date }));
   };
 
+  const handleClearFilters = () => {
+    setFilters(initialFilters);
+    fetchReports(1, initialFilters);
+  };
+
   const handleSearch = () => {
-    fetchReports(1); // Reset to first page on new search
+    fetchReports(1);
   };
 
-  const handleViewReport = (reportId) => {
-    setSelectedReportId(reportId);
+  // --- START: NEW HANDLERS FOR ACTIONS ---
+  const handleActionClick = (reportId) => {
+    setActiveActionMenu(activeActionMenu === reportId ? null : reportId);
   };
 
-  const handleBackFromDetail = () => {
-    setSelectedReportId(null);
-    // Optionally re-fetch reports if data might have changed, though likely not needed here
-    // fetchReports(currentPage);
+  const handleOpenFollowUp = (report) => {
+    setSelectedReportForFollowUp(report);
+    setIsFollowUpModalOpen(true);
+    setActiveActionMenu(null); // Close the action menu
   };
+
+  // Click outside handler to close the action menu
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        actionMenuRef.current &&
+        !actionMenuRef.current.contains(event.target)
+      ) {
+        setActiveActionMenu(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+  // --- END: NEW HANDLERS FOR ACTIONS ---
+
+  const handleViewReport = (reportId) => setSelectedReportId(reportId);
+  const handleBackFromDetail = () => setSelectedReportId(null);
+
+  const renderFilterDropdown = (name, label, options) => (
+    <div>
+      <label className="block text-sm font-medium text-gray-700">{label}</label>
+      <select
+        name={name}
+        value={filters[name]}
+        onChange={handleFilterChange}
+        className="mt-1 w-full p-2 border border-gray-300 rounded-lg shadow-sm text-sm"
+      >
+        <option value="">{t("common.all")}</option>
+        {options.map((opt, index) =>
+          typeof opt === "object" ? (
+            <option key={`${opt.value}-${index}`} value={opt.value}>
+              {opt.label}
+            </option>
+          ) : (
+            <option key={`${opt}-${index}`} value={opt}>
+              {opt}
+            </option>
+          )
+        )}
+      </select>
+    </div>
+  );
 
   if (selectedReportId) {
     return (
@@ -280,14 +301,9 @@ const CuttingReport = () => {
   }
 
   return (
-    <div className="p-4 sm:p-6 bg-gray-50 min-h-screen">
-      <div className="max-w-8xl mx-auto bg-white p-4 sm:p-6 rounded-xl shadow-lg">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 text-center">
-          {t("cutting.cuttingReportTitle")}
-        </h1>
-
-        {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6 p-4 border border-gray-200 rounded-lg">
+    <div className="p-1 sm:p-2 bg-gray-50 min-h-screen">
+      <div className="max-w-8xl mx-auto bg-white p-3 sm:p-4 rounded-xl shadow-lg">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 gap-4 mb-1 p-1 border border-gray-200 rounded-lg">
           <div>
             <label className="block text-sm font-medium text-gray-700">
               {t("common.startDate")}
@@ -312,83 +328,37 @@ const CuttingReport = () => {
               isClearable
             />
           </div>
-          <div ref={moNoDropdownRef}>
-            <label className="block text-sm font-medium text-gray-700">
-              {t("cutting.moNo")}
-            </label>
-            <input
-              type="text"
-              name="moNo"
-              value={moNoSearch}
-              onChange={(e) => {
-                setMoNoSearch(e.target.value);
-                setShowMoNoDropdown(true);
-              }}
-              onFocus={() =>
-                moNoOptions.length > 0 && setShowMoNoDropdown(true)
-              }
-              placeholder={t("cutting.search_mono")}
-              className="mt-1 w-full p-2 border border-gray-300 rounded-lg shadow-sm"
-            />
-            {showMoNoDropdown && moNoOptions.length > 0 && (
-              <ul className="absolute z-10 w-auto bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto shadow-lg">
-                {moNoOptions.map((option) => (
-                  <li
-                    key={option}
-                    onClick={() => {
-                      setFilters((prev) => ({ ...prev, moNo: option }));
-                      setMoNoSearch(option);
-                      setShowMoNoDropdown(false);
-                      setTableNoSearch("");
-                      setFilters((prev) => ({ ...prev, tableNo: "" }));
-                    }}
-                    className="p-2 hover:bg-blue-100 cursor-pointer text-sm"
-                  >
-                    {option}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div ref={tableNoDropdownRef}>
-            <label className="block text-sm font-medium text-gray-700">
-              {t("cutting.tableNo")}
-            </label>
-            <input
-              type="text"
-              name="tableNo"
-              value={tableNoSearch}
-              onChange={(e) => {
-                setTableNoSearch(e.target.value);
-                setShowTableNoDropdown(true);
-              }}
-              onFocus={() =>
-                tableNoOptions.length > 0 && setShowTableNoDropdown(true)
-              }
-              placeholder={t("cutting.search_table_no")}
-              className={`mt-1 w-full p-2 border border-gray-300 rounded-lg shadow-sm ${
-                !filters.moNo ? "bg-gray-100 cursor-not-allowed" : ""
-              }`}
-              disabled={!filters.moNo}
-            />
-            {showTableNoDropdown && tableNoOptions.length > 0 && (
-              <ul className="absolute z-10 w-auto bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto shadow-lg">
-                {tableNoOptions.map((option) => (
-                  <li
-                    key={option}
-                    onClick={() => {
-                      setFilters((prev) => ({ ...prev, tableNo: option }));
-                      setTableNoSearch(option);
-                      setShowTableNoDropdown(false);
-                    }}
-                    className="p-2 hover:bg-blue-100 cursor-pointer text-sm"
-                  >
-                    {option}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {renderFilterDropdown(
+            "buyer",
+            t("cutting.buyer"),
+            filterOptions.buyers
+          )}
+          {renderFilterDropdown("moNo", t("cutting.moNo"), filterOptions.moNos)}
+          {renderFilterDropdown(
+            "tableNo",
+            t("cutting.tableNo"),
+            filterOptions.tableNos
+          )}
+          {renderFilterDropdown(
+            "color",
+            t("cutting.color"),
+            filterOptions.colors
+          )}
+          {renderFilterDropdown(
+            "garmentType",
+            t("cutting.garmentType"),
+            filterOptions.garmentTypes
+          )}
+          {renderFilterDropdown(
+            "spreadTable",
+            t("cutting.spreadTable"),
+            filterOptions.spreadTables
+          )}
+          {renderFilterDropdown(
+            "material",
+            t("cutting.material"),
+            filterOptions.materials
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700">
               {t("cutting.qcId")}
@@ -400,7 +370,7 @@ const CuttingReport = () => {
               className="mt-1 w-full p-2 border border-gray-300 rounded-lg shadow-sm text-sm"
             >
               <option value="">{t("common.all")}</option>
-              {qcInspectorOptions.map((qc) => (
+              {filterOptions.qcInspectors.map((qc) => (
                 <option key={qc.emp_id} value={qc.emp_id}>
                   {qc.emp_id} -{" "}
                   {i18n.language === "km" && qc.kh_name
@@ -410,7 +380,7 @@ const CuttingReport = () => {
               ))}
             </select>
           </div>
-          <div className="flex items-end">
+          <div className="flex items-end col-span-1 xl:col-span-2 space-x-2">
             <button
               onClick={handleSearch}
               className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center shadow-sm"
@@ -423,10 +393,17 @@ const CuttingReport = () => {
               )}
               <span className="ml-2">{t("common.search")}</span>
             </button>
+            <button
+              onClick={handleClearFilters}
+              className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center justify-center shadow-sm"
+              disabled={loading}
+            >
+              <XCircle size={20} />
+              <span className="ml-2">{t("common.clear")}</span>
+            </button>
           </div>
         </div>
 
-        {/* Summary Info */}
         {totalReports > 0 && (
           <div className="mb-4 text-sm text-gray-600">
             {t("common.showing")} {reports.length} {t("common.of")}{" "}
@@ -434,7 +411,51 @@ const CuttingReport = () => {
           </div>
         )}
 
-        {/* Reports Table */}
+        {/* --- NEW LEGEND BLOCK --- */}
+        <div className="mb-4 p-3 border border-gray-200 rounded-lg bg-gray-50 text-sm">
+          <h4 className="font-semibold text-sm mb-2">
+            {t("common.headerIconLegend")}:
+          </h4>
+          <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-9 gap-x-4 gap-y-2">
+            <div className="flex items-center gap-2">
+              <Archive size={16} className="text-blue-600" />
+              <span>{t("cutting.totalQty")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ClipboardCheck size={16} className="text-blue-600" />
+              <span>{t("cutting.qtyChecked")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <FileSearch size={16} className="text-blue-600" />
+              <span>{t("cutting.inspectedQty")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Scaling size={16} className="text-blue-600" />
+              <span>{t("cutting.inspectedSizes")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <PackageCheck size={16} className="text-green-600" />
+              <span>{t("cutting.totalCompleted")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ThumbsUp size={16} className="text-green-600" />
+              <span>{t("cutting.pass")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ThumbsDown size={16} className="text-red-600" />
+              <span>{t("cutting.reject")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={16} className="text-orange-600" />
+              <span>{t("cutting.rejectMeasurements")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Bug size={16} className="text-purple-600" />
+              <span>{t("cutting.rejectDefects")}</span>
+            </div>
+          </div>
+        </div>
+
         {loading && reports.length === 0 ? (
           <div className="flex justify-center items-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -448,57 +469,192 @@ const CuttingReport = () => {
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 border border-gray-300 text-xs sm:text-sm">
               <thead className="bg-gray-100">
-                <tr>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 border-r">
+                <tr className="text-left font-semibold text-gray-600">
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 border-r border-b align-middle"
+                  >
                     {t("cutting.inspectionDate")}
                   </th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 border-r">
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 border-r border-b align-middle"
+                  >
+                    {t("cutting.buyer")}
+                  </th>
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 border-r border-b align-middle"
+                  >
                     {t("cutting.moNo")}
                   </th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 border-r">
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 border-r border-b align-middle"
+                  >
                     {t("cutting.tableNo")}
                   </th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 border-r">
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 border-r border-b align-middle"
+                  >
+                    {t("cutting.custStyle")}
+                  </th>
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 border-r border-b align-middle"
+                  >
+                    {t("cutting.spreadTable")}
+                  </th>
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 border-r border-b align-middle"
+                  >
+                    {t("cutting.material")}
+                  </th>
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 border-r border-b align-middle"
+                  >
+                    {t("cutting.lotNos")}
+                  </th>
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 border-r border-b align-middle"
+                  >
+                    {t("cutting.qcId")}
+                  </th>
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 border-r border-b align-middle"
+                  >
                     {t("cutting.color")}
                   </th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 border-r">
-                    {t("cutting.panel")}
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 border-r border-b align-middle"
+                  >
+                    {t("cutting.garmentType")}
                   </th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-600 border-r">
-                    {t("cutting.totalBundleQty")}
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 border-r border-b align-middle"
+                  >
+                    {t("cutting.mackerNo")}
                   </th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-600 border-r">
-                    {t("cutting.bundleQtyCheck")}
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 border-r border-b align-middle"
+                  >
+                    {t("cutting.mackerRatio")}
                   </th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-600 border-r">
-                    {t("cutting.totalInspectionQty")}
+                  <th
+                    colSpan="3"
+                    className="px-3 py-2 text-center border-r border-b"
+                  >
+                    {t("cutting.layerDetails")}
                   </th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-600 border-r">
-                    {t("cutting.inspectedSizesCount")}
+                  <th
+                    colSpan="4"
+                    className="px-3 py-2 text-center border-r border-b"
+                  >
+                    {t("cutting.bundleDetails")}
                   </th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-600 border-r">
-                    {t("cutting.totalPcs")}
+                  <th
+                    colSpan="5"
+                    className="px-3 py-2 text-center border-r border-b"
+                  >
+                    {t("cutting.inspectionDetails")}
                   </th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-600 border-r">
-                    {t("cutting.pass")}
-                  </th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-600 border-r">
-                    {t("cutting.reject")}
-                  </th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-600 border-r">
-                    {t("cutting.rejectMeasurements")}
-                  </th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-600 border-r">
-                    {t("cutting.rejectDefects")}
-                  </th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-600 border-r">
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 text-right border-r border-b align-middle"
+                  >
                     {t("cutting.passRate")} (%)
                   </th>
-                  <th className="px-3 py-2 text-center font-semibold text-gray-600 border-r">
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 text-center border-r border-b align-middle"
+                  >
                     {t("cutting.results")}
                   </th>
-                  <th className="px-3 py-2 text-center font-semibold text-gray-600">
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 text-center border-r border-b align-middle"
+                  >
                     {t("cutting.report")}
+                  </th>
+                  <th
+                    rowSpan="2"
+                    className="px-3 py-2 text-center border-b align-middle"
+                  >
+                    {t("common.action")}
+                  </th>
+                </tr>
+                <tr className="text-right font-semibold text-gray-600">
+                  <th className="px-3 py-2 border-r border-b">
+                    {t("cutting.plan")}
+                  </th>
+                  <th className="px-3 py-2 border-r border-b">
+                    {t("cutting.actual")}
+                  </th>
+                  <th className="px-3 py-2 border-r border-b">
+                    {t("cutting.totalPcs")}
+                  </th>
+                  {/* Bundle Details (with icons) */}
+                  <th
+                    className="px-3 py-2 border-r border-b"
+                    title={t("cutting.totalQty")}
+                  >
+                    <Archive size={16} className="mx-auto" />
+                  </th>
+                  <th
+                    className="px-3 py-2 border-r border-b"
+                    title={t("cutting.qtyChecked")}
+                  >
+                    <ClipboardCheck size={16} className="mx-auto" />
+                  </th>
+                  <th
+                    className="px-3 py-2 border-r border-b"
+                    title={t("cutting.inspectedQty")}
+                  >
+                    <FileSearch size={16} className="mx-auto" />
+                  </th>
+                  <th
+                    className="px-3 py-2 border-r border-b"
+                    title={t("cutting.inspectedSizes")}
+                  >
+                    <Scaling size={16} className="mx-auto" />
+                  </th>
+                  <th
+                    className="px-3 py-2 border-r border-b"
+                    title={t("cutting.totalCompleted")}
+                  >
+                    <PackageCheck size={16} className="mx-auto" />
+                  </th>
+                  <th
+                    className="px-3 py-2 border-r border-b"
+                    title={t("cutting.pass")}
+                  >
+                    <ThumbsUp size={16} className="mx-auto" />
+                  </th>
+                  <th
+                    className="px-3 py-2 border-r border-b"
+                    title={t("cutting.reject")}
+                  >
+                    <ThumbsDown size={16} className="mx-auto" />
+                  </th>
+                  <th
+                    className="px-3 py-2 border-r border-b"
+                    title={t("cutting.rejectMeasurements")}
+                  >
+                    <AlertTriangle size={16} className="mx-auto" />
+                  </th>
+                  <th
+                    className="px-3 py-2 border-r border-b"
+                    title={t("cutting.rejectDefects")}
+                  >
+                    <Bug size={16} className="mx-auto" />
                   </th>
                 </tr>
               </thead>
@@ -516,45 +672,115 @@ const CuttingReport = () => {
                         {report.inspectionDate}
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap border-r">
+                        {report.buyer}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap border-r">
                         {report.moNo}
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap border-r">
                         {report.tableNo}
                       </td>
+                      <td className="px-3 py-2 border-r break-words min-w-[150px]">
+                        {report.buyerStyle}
+                      </td>
+                      <td className="px-3 py-2 border-r break-words">
+                        {report.cuttingTableDetails?.spreadTable}
+                      </td>
+                      <td className="px-3 py-2 border-r break-words min-w-[150px]">
+                        {report.fabricDetails?.material}
+                      </td>
+                      <td className="px-3 py-2 border-r max-w-xs">
+                        <div className="flex flex-wrap gap-1">
+                          {report.lotNo?.map((lot, idx) => (
+                            <span
+                              key={idx}
+                              className="bg-gray-200 text-gray-800 text-xs font-medium px-2 py-0.5 rounded-full"
+                            >
+                              {lot}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
                       <td className="px-3 py-2 whitespace-nowrap border-r">
+                        {report.cutting_emp_id}
+                      </td>
+                      <td className="px-3 py-2 border-r break-words">
                         {report.color}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap border-r">
+                      <td className="px-3 py-2 border-r break-words">
                         {report.garmentType}
                       </td>
-                      <td className="px-3 py-2 text-right border-r">
+                      <td className="px-3 py-2 text-center border-r">
+                        {report.cuttingTableDetails?.mackerNo}
+                      </td>
+                      <td className="px-3 py-2 border-r min-w-[150px]">
+                        {report.mackerRatio &&
+                          report.mackerRatio.length > 0 && (
+                            <table className="text-xs w-full">
+                              <tbody>
+                                <tr>
+                                  {report.mackerRatio.map((mr) => (
+                                    <td
+                                      key={`${mr.index}-size`}
+                                      className="px-1 text-center font-bold"
+                                    >
+                                      {mr.markerSize}
+                                    </td>
+                                  ))}
+                                </tr>
+                                <tr>
+                                  {report.mackerRatio.map((mr) => (
+                                    <td
+                                      key={`${mr.index}-ratio`}
+                                      className="px-1 pt-1 text-center"
+                                    >
+                                      <span className="bg-amber-600 text-white font-semibold rounded px-1.5 py-0.5">
+                                        {mr.ratio}
+                                      </span>
+                                    </td>
+                                  ))}
+                                </tr>
+                              </tbody>
+                            </table>
+                          )}
+                      </td>
+                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-yellow-100">
+                        {report.cuttingTableDetails?.planLayers}
+                      </td>
+                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
+                        {report.cuttingTableDetails?.actualLayers}
+                      </td>
+                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
+                        {report.cuttingTableDetails?.totalPcs}
+                      </td>
+                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-yellow-100">
                         {report.totalBundleQty}
                       </td>
-                      <td className="px-3 py-2 text-right border-r">
+                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-orange-200 font-bold">
                         {report.bundleQtyCheck}
                       </td>
-                      <td className="px-3 py-2 text-right border-r">
+                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-blue-100">
                         {report.totalInspectionQty}
                       </td>
-                      <td className="px-3 py-2 text-right border-r">
+                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
                         {report.numberOfInspectedSizes}
                       </td>
-                      <td className="px-3 py-2 text-right border-r">
+                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-blue-100 font-bold">
                         {report.sumTotalPcs}
                       </td>
-                      <td className="px-3 py-2 text-right border-r">
+                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-green-100 font-bold">
                         {report.sumTotalPass}
                       </td>
-                      <td className="px-3 py-2 text-right border-r">
+                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-300 font-bold">
                         {report.sumTotalReject}
                       </td>
-                      <td className="px-3 py-2 text-right border-r">
+                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-100 font-bold">
                         {report.sumTotalRejectMeasurement}
                       </td>
-                      <td className="px-3 py-2 text-right border-r">
+                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-100 font-bold">
                         {report.sumTotalRejectDefects}
                       </td>
-                      <td className="px-3 py-2 text-right border-r">
+                      <td className="px-3 py-2 text-right border-r whitespace-nowrap font-bold">
                         {report.overallPassRate?.toFixed(2)}
                       </td>
                       <td
@@ -562,7 +788,7 @@ const CuttingReport = () => {
                       >
                         {status}
                       </td>
-                      <td className="px-3 py-2 text-center">
+                      <td className="px-3 py-2 text-center border-r">
                         <button
                           onClick={() => handleViewReport(report._id)}
                           className="text-blue-600 hover:text-blue-800"
@@ -571,6 +797,65 @@ const CuttingReport = () => {
                           <Eye size={18} />
                         </button>
                       </td>
+
+                      {/* --- MODIFIED ACTION COLUMN --- */}
+                      <td className="px-3 py-2 text-center relative">
+                        <button
+                          onClick={() => handleActionClick(report._id)}
+                          className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-200"
+                        >
+                          <MoreVertical size={18} />
+                        </button>
+
+                        {activeActionMenu === report._id && (
+                          <div
+                            ref={actionMenuRef}
+                            className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20"
+                          >
+                            <ul className="py-1 text-sm text-gray-700">
+                              <li>
+                                <a
+                                  href="#"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleOpenFollowUp(report);
+                                  }}
+                                  className="flex items-center px-4 py-2 hover:bg-gray-100"
+                                >
+                                  <ClipboardList size={16} className="mr-3" />
+                                  {t("common.followUp")}
+                                </a>
+                              </li>
+                              <li>
+                                <a
+                                  href="#"
+                                  onClick={(e) => e.preventDefault()}
+                                  className="flex items-center px-4 py-2 hover:bg-gray-100 text-gray-400 cursor-not-allowed"
+                                >
+                                  <Edit size={16} className="mr-3" />
+                                  {t("common.editFollowUp")}
+                                </a>
+                              </li>
+                              <li>
+                                <a
+                                  href="#"
+                                  onClick={(e) => e.preventDefault()}
+                                  className="flex items-center px-4 py-2 hover:bg-gray-100 text-gray-400 cursor-not-allowed"
+                                >
+                                  <MessageSquare size={16} className="mr-3" />
+                                  {t("common.comments")}
+                                </a>
+                              </li>
+                            </ul>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* <td className="px-3 py-2 text-center">
+                        <button className="text-gray-500 hover:text-gray-700">
+                          <MoreVertical size={18} />
+                        </button>
+                      </td> */}
                     </tr>
                   );
                 })}
@@ -579,7 +864,6 @@ const CuttingReport = () => {
           </div>
         )}
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="mt-6 flex justify-between items-center text-sm">
             <button
@@ -602,6 +886,13 @@ const CuttingReport = () => {
           </div>
         )}
       </div>
+      {/* --- ADD MODAL RENDER AT THE END --- */}
+      {isFollowUpModalOpen && (
+        <CuttingReportFollowUp
+          report={selectedReportForFollowUp}
+          onClose={() => setIsFollowUpModalOpen(false)}
+        />
+      )}
     </div>
   );
 };
