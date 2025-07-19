@@ -2423,6 +2423,7 @@ app.post('/api/qc-washing/auto-save-color', uploadQcWashingFiles.array("images",
           } else if (img.startsWith("http")) {
             // Remote image
             const saved = await saveRemoteImage(img, "defect");
+
             if (saved) results.push(saved);
           } else if (img.startsWith("/storage/qc_washing_images/")) {
             // Already a saved path
@@ -2739,7 +2740,7 @@ const getAqlLevelForBuyer = (buyer) => {
   if (buyerUpper.includes('MWW')) return 2.5;
   if (buyerUpper.includes('REITMANS')) return 4.0;
   if (buyerUpper.includes('ARITZIA')) return 1.5;
-  if (buyerUpper.includes('A & F') || buyerUpper.includes('A&F')) return 1.5;
+  if (buyerUpper.includes('A & F') || buyerUpper.includes('A&F') || buyerUpper.includes('ANF')) return 1.5;
   if (buyerUpper.includes('COSCO')) return 1.0;
   
   return 1.0;

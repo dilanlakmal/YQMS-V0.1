@@ -50,6 +50,7 @@
         aqlSampleSize: String,
         aqlAcceptedDefect: String,
         aqlRejectedDefect: String,
+        aqlLevelUsed: String,
         inspector: {
           engName: String,
           empId: String
@@ -80,9 +81,6 @@
         checkedQty: String,
         washQty: String,
         result: String,
-        aqlSampleSize: String,
-        aqlAcceptedDefect: String,
-        aqlRejectedDefect: String,
         aqlLevelUsed: String,
         defectsByPc: [{
           pcNumber: String, // track PC number

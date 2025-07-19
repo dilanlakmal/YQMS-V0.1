@@ -21,7 +21,8 @@ const DefectDetailsSection = ({
   isVisible,
   onToggle,
   defectsByPc,
-  setDefectsByPc
+  setDefectsByPc,
+  defectStatus
 }) => {
   const imageInputRef = useRef(null);
   const { i18n } = useTranslation();
@@ -37,24 +38,14 @@ const DefectDetailsSection = ({
     return d.english;
   };
 
-  // Correctly calculate total defects from the new defectsByPc structure
-  const totalDefects = Object.values(defectsByPc)
-    .flat()
-    .reduce((sum, defect) => sum + (parseInt(defect.defectQty, 10) || 0), 0);
-
-  let defectStatus = 'N/A';
   let statusColorClass = 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200';
-  if ((formData.inline === 'Inline' || formData.daily === 'Inline' || formData.firstOutput === "First Output" || formData.daily === 'First Output') && formData.aqlAcceptedDefect) {
-    const acceptedDefectCount = parseInt(formData.aqlAcceptedDefect, 10);
-    if (!isNaN(acceptedDefectCount)) {
-      if (totalDefects <= acceptedDefectCount) {
-        defectStatus = 'Pass';
-        statusColorClass = 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      } else {
-        defectStatus = 'Fail';
-        statusColorClass = 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      }
-    }
+  // Correctly calculate total defects from the new defectsByPc structure
+ if (defectStatus === 'Pass') {
+    statusColorClass = 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+  } else if (defectStatus === 'Fail') {
+    statusColorClass = 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+  } else {
+    defectStatus = 'N/A';
   }
 
   const handleAddDefect = (pc, defect) => {
@@ -284,7 +275,7 @@ const DefectDetailsSection = ({
                 <div>
                   <span className="font-medium text-blue-700">Status:</span>
                   <span className={`ml-2 px-2 py-1 rounded-full text-xs font-bold ${statusColorClass}`}>
-                    {defectStatus}
+                    {defectStatus || 'N/A'}
                   </span>
                 </div>
               </div>

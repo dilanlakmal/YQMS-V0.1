@@ -136,6 +136,29 @@ const QCWashingPage = () => {
     }
   }, [formData.aqlSampleSize, formData.inline, formData.daily]);
 
+   // --- useEffect: Calculate AQL Status ---
+  useEffect(() => {
+    if ((formData.inline === 'Inline' || formData.daily === 'Inline' || formData.firstOutput === "First Output" || formData.daily === 'First Output') && formData.aqlAcceptedDefect) {
+        const totalDefects = Object.values(defectsByPc)
+            .flat()
+            .reduce((sum, defect) => sum + (parseInt(defect.defectQty, 10) || 0), 0);
+        
+        const acceptedDefectCount = parseInt(formData.aqlAcceptedDefect, 10);
+
+        if (!isNaN(acceptedDefectCount)) {
+            const newStatus = totalDefects <= acceptedDefectCount ? 'Pass' : 'Fail';
+            if (newStatus !== formData.result) {
+                setFormData(prev => ({ ...prev, result: newStatus }));
+            }
+        }
+    } else {
+        // If not an AQL check, reset the status
+        if (formData.result) { 
+            setFormData(prev => ({ ...prev, result: '' }));
+        }
+    }
+  }, [defectsByPc, formData.aqlAcceptedDefect, formData.inline, formData.daily, formData.firstOutput, formData.result]);
+
   // --- Helper Functions ---
   const processMeasurementData = (loadedMeasurements) => {
     if (Array.isArray(loadedMeasurements)) {
@@ -382,11 +405,11 @@ const QCWashingPage = () => {
           if (saved.additionalImage) {
             // If images were saved as base64 or URLs, ensure they are handled correctly for display
             setUploadedImages(saved.additionalImage.map(img => ({
-              file: null, // No actual file object, just preview for display
-              preview: img.preview || img.url || img, // Handle various possible saved formats
-              name: img.name || 'image.jpg'
+             file: null, 
+              preview: img, 
+              name: 'image.jpg'
             })));
-          }
+            }
 
           setComment(saved.comment || "");
 
@@ -511,8 +534,6 @@ const QCWashingPage = () => {
 
       // Handle color change - reset color-specific data
       if (field === "color" && value !== prev.color) {
-        // The form reset is now handled by loadColorSpecificData
-        // to prevent erasing data before we know if new data exists.
         if (value && (prev.orderNo || prev.style)) {
           setTimeout(
             () => loadColorSpecificData(prev.orderNo || prev.style, value),
@@ -598,44 +619,6 @@ const QCWashingPage = () => {
         return item;
       })
     );
-  };
-
-  const handleAddDefect = () => {
-    if (!selectedDefect || !defectQty) {
-      Swal.fire(
-        "Incomplete",
-        "Please select a defect and enter a quantity.",
-        "warning"
-      );
-      return;
-    }
-
-    const defectExists = addedDefects.some(
-      (d) => d.defectId === selectedDefect
-    );
-    if (defectExists) {
-      Swal.fire("Duplicate", "This defect has already been added.", "error");
-      return;
-    }
-
-    const defectDetails = defectOptions.find((d) => d._id === selectedDefect);
-    setAddedDefects((prev) => [
-      ...prev,
-      {
-        defectId: defectDetails._id,
-        defectName: defectDetails.english,
-        qty: parseInt(defectQty, 10),
-        defectImages: defectDetails.images,
-      },
-    ]);
-
-    // Reset inputs
-    setSelectedDefect("");
-    setDefectQty("");
-  };
-
-  const handleDeleteDefect = (defectId) => {
-    setAddedDefects((prev) => prev.filter((d) => d.defectId !== defectId));
   };
 
   // --- AQL & Checked Qty ---
@@ -881,10 +864,6 @@ const QCWashingPage = () => {
   };
 
  // --- Image Upload ---
-  const handleRemoveImage = (index) => {
-    setUploadedImages((prev) => prev.filter((_, i) => i !== index));
-  };
-
   const handleImageChange = async (e) => {
     const files = Array.from(e.target.files);
     if (uploadedImages.length + files.length > 5) {
@@ -933,6 +912,18 @@ const QCWashingPage = () => {
       if (!formData.orderNo && !formData.style) return;
       if (!formData.color) return;
 
+       // Helper to convert a file to Base64
+      const toBase64 = file => new Promise((resolve, reject) => {
+        if (!file) {
+          resolve(null);
+          return;
+        }
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+      });
+
       // Calculate stats
     const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
 
@@ -980,21 +971,24 @@ const QCWashingPage = () => {
             defectDetails: {
               washQty: formData.washQty,
               checkedQty: formData.checkedQty,
-              defectsByPc: Object.entries(defectsByPc).map(
-                ([pcKey, pcDefects]) => ({
+              result: formData.result, // AQL Status
+              defectsByPc: await Promise.all(Object.entries(defectsByPc).map(
+                async ([pcKey, pcDefects]) => ({
                   pcNumber: pcKey,  
-                  pcDefects: Array.isArray(pcDefects)
-                    ? pcDefects.map(defect => ({
+                  pcDefects: await Promise.all((Array.isArray(pcDefects) ? pcDefects : []).map(async (defect) => ({
                         defectName: defect.selectedDefect,
                         defectQty: defect.defectQty,
-                        defectImages: Array.isArray(defect.defectImages)
-                          ? defect.defectImages.map(img => img.url || img.name) 
-                          : []
-                      }))
-                    : []
-              })),
+                        // Convert defect images to Base64
+                        defectImages: await Promise.all((defect.defectImages || []).map(img => img.file ? toBase64(img.file) : Promise.resolve(img.preview)))
+                      }))),
+                })
+              )),
+
               comment: comment,
-              additionalImages: uploadedImages.map(img => img.url || img.name),
+              // Convert additional images to Base64
+              additionalImages: await Promise.all(
+                uploadedImages.map(img => img.file ? toBase64(img.file) : Promise.resolve(img.preview))
+              ),
             },
             measurementDetails: [
               ...measurementData.beforeWash.map((item) => ({
@@ -1128,8 +1122,16 @@ const QCWashingPage = () => {
             qty: d.defectQty
           })) || []);
 
-          setDefectsByPc(colorData.defectDetails?.defectsByPc || {}); // Load defectsByPc
-          setUploadedImages(colorData.defectDetails?.defectImages?.map(img => ({ // Load uploaded images
+           // Load defectsByPc and convert saved Base64 strings back to preview format
+          const loadedDefectsByPc = colorData.defectDetails?.defectsByPc || {};
+          Object.keys(loadedDefectsByPc).forEach(pc => {
+            loadedDefectsByPc[pc] = loadedDefectsByPc[pc].map(defect => ({
+              ...defect,
+              defectImages: (defect.defectImages || []).map(imgStr => ({ file: null, preview: imgStr, name: 'image.jpg' }))
+            }));
+          });
+          setDefectsByPc(loadedDefectsByPc);
+          setUploadedImages(colorData.defectDetails?.additionalImages?.map(img => ({ // Load uploaded images
             file: null,
             preview: img.preview || img.url || img,
             name: img.name || 'image.jpg'
@@ -1242,14 +1244,32 @@ const QCWashingPage = () => {
           }
 
           if (saved.defectsByPc) { // Load defectsByPc
-            setDefectsByPc(saved.defectsByPc);
+           const transformedDefects = (saved.defectsByPc || []).reduce((acc, item) => {
+              if (item && item.pcNumber) {
+                acc[item.pcNumber] = (item.pcDefects || []).map(defect => ({
+                  ...defect,
+                  defectImages: (defect.defectImages || []).map(imgStr => ({ file: null, preview: imgStr, name: 'image.jpg' }))
+                }));
+              }
+              return acc;
+            }, {});
+            setDefectsByPc(transformedDefects);
           }
-          if (saved.additionalImage) { // Load uploaded images
-            setUploadedImages(saved.additionalImage.map(img => ({
+          if (saved.additionalImages) { // Load uploaded images
+            setUploadedImages(saved.additionalImages.map(img => ({
               file: null,
               preview: img.preview || img.url || img,
               name: img.name || 'image.jpg'
-            })));
+              })));
+          }
+          if (saved.defectDetails?.defectsByPc) {
+            const loadedDefectsByPc = saved.defectDetails.defectsByPc;
+            Object.keys(loadedDefectsByPc).forEach(pc => {
+              loadedDefectsByPc[pc] = loadedDefectsByPc[pc].map(defect => ({
+                ...defect,
+                defectImages: (defect.defectImages || []).map(imgStr => ({ file: null, preview: imgStr, name: 'image.jpg' }))
+              }));
+            });
           }
 
           setComment(saved.comment || "");
@@ -1360,11 +1380,20 @@ const QCWashingPage = () => {
             })) || [];
 
           setAddedDefects(transformedAddedDefects);
-          setDefectsByPc(saved.color?.defectDetails?.defectsByPc || {}); // Load defectsByPc from submitted data
-          setUploadedImages(saved.color?.defectDetails?.defectImages?.map(img => ({ // Load uploaded images from submitted data
+          // Load defectsByPc from submitted data and format for display
+          const loadedDefectsByPc = saved.color?.defectDetails?.defectsByPc || {};
+          Object.keys(loadedDefectsByPc).forEach(pc => {
+            loadedDefectsByPc[pc] = loadedDefectsByPc[pc].map(defect => ({
+              ...defect,
+              defectImages: (defect.defectImages || []).map(imgStr => ({ file: null, preview: imgStr, name: 'image.jpg' }))
+            }));
+          });
+          setDefectsByPc(loadedDefectsByPc);
+          setUploadedImages(saved.color?.defectDetails?.additionalImages?.map(img => ({ // Load uploaded images from submitted data
+
             file: null,
             preview: img.preview || img.url || img,
-            name: img.name || 'image.jpg'
+            name:'image.jpg'
           })) || []);
 
           setComment(saved.color?.defectDetails?.comment || "");
@@ -1501,6 +1530,7 @@ const QCWashingPage = () => {
           setComment={setComment}
           isVisible={sectionVisibility.defectDetails}
           onToggle={() => toggleSection("defectDetails")}
+          defectStatus={formData.result} 
           defectsByPc={defectsByPc}
           setDefectsByPc={setDefectsByPc}
         />
@@ -1592,6 +1622,17 @@ const QCWashingPage = () => {
             className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
             onClick={async () => {
               try {
+                // Helper to convert a file to Base64
+                const toBase64 = file => new Promise((resolve, reject) => {
+                  if (!file) {
+                    resolve(null);
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.readAsDataURL(file);
+                  reader.onload = () => resolve(reader.result);
+                  reader.onerror = error => reject(error);
+                });
                  const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
                 const submitData = {
                   orderNo: formData.orderNo || formData.style,
@@ -1636,15 +1677,20 @@ const QCWashingPage = () => {
                     defectDetails: {
                       washQty: formData.washQty,
                       checkedQty: formData.checkedQty,
-                      defectsByPc: Object.values(defectsByPc).map(pcDefects => ({
-                        defectPcs: pcDefects.map(defect => ({
-                          defectName: defect.selectedDefect,
-                          defectQty: defect.defectQty,
-                          defectImages: defect.defectImages.map(img => img.name)
-                        }))
-                      })),
+                      result: formData.result,
+                      defectsByPc: await Promise.all(Object.entries(defectsByPc).map(
+                        async ([pcKey, pcDefects]) => ({
+                          pcNumber: pcKey,
+                          pcDefects: await Promise.all((Array.isArray(pcDefects) ? pcDefects : []).map(async (defect) => ({
+                            defectName: defect.selectedDefect,
+                            defectQty: defect.defectQty,
+                            defectImages: await Promise.all((defect.defectImages || []).map(img => img.file ? toBase64(img.file) : Promise.resolve(img.preview)))
+                          })))
+                        })
+                      )),
+
                       comment: comment,            
-                      additionalImages: uploadedImages.map(img => img.name),
+                       additionalImages: await Promise.all(uploadedImages.map(img => img.file ? toBase64(img.file) : Promise.resolve(img.preview))),
                     },
                     measurementDetails: [
                       ...measurementData.beforeWash.map((item) => ({
