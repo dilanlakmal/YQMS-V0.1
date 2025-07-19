@@ -331,6 +331,7 @@ const QCWashingPage = () => {
               saved?.formData.aqlAcceptedDefect || prev.aqlAcceptedDefect,
             aqlRejectedDefect:
               saved?.formData.aqlRejectedDefect || prev.aqlRejectedDefect,
+            aqlLevelUsed: saved?.formData.aqlLevelUsed || "",
           }));
 
           // Fetch all colors for the order/style, even when loading saved data
@@ -746,7 +747,7 @@ const QCWashingPage = () => {
           aqlSampleSize: "",
           aqlAcceptedDefect: "",
           aqlRejectedDefect: "",
-          aqlLevelUsed: "",
+           aqlLevelUsed: "",
         }));
         console.warn(
           "AQL data not found:",
@@ -1210,6 +1211,7 @@ const QCWashingPage = () => {
               saved?.formData.aqlAcceptedDefect || prev.aqlAcceptedDefect,
             aqlRejectedDefect:
               saved?.formData.aqlRejectedDefect || prev.aqlRejectedDefect,
+            aqlLevelUsed: saved?.formData.aqlLevelUsed || "",
           }));
 
           if (saved.formData.color) {

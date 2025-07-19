@@ -2747,8 +2747,11 @@ const getAqlLevelForBuyer = (buyer) => {
 
 app.post('/api/qc-washing/aql-chart/find-by-sample-size', async (req, res) => {
   try {
-    const { sampleSize, orderNo } = req.body;
-    const sampleSizeNum = parseInt(sampleSize, 10);
+    const { orderNo } = req.body;
+    // const sampleSizeNum = parseInt(sampleSize, 10);
+    
+    const firstOutputRecord = await QCWashingFirstOutput.findOne().sort({ createdAt: -1 }).lean();
+    const sampleSizeNum = parseInt(firstOutputRecord.quantity, 10);
 
     if (isNaN(sampleSizeNum) || sampleSizeNum <= 0) {
       return res.status(400).json({ success: false, message: "A valid sample size must be provided." });
@@ -2848,6 +2851,64 @@ app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
   } catch (error) {
     console.error('AQL calculation error:', error);
     res.status(500).json({ success: false, message: 'Server error while fetching AQL details.' });
+  }
+});
+
+app.post('/api/qc-washing/first-output-details', async (req, res) => {
+  try {
+    const { orderNo } = req.body;
+
+    if (!orderNo) {
+      return res.status(400).json({ success: false, message: "Order No is required to fetch first output details." });
+    }
+
+    // 1. Find the latest 'First Output' record to get the quantity.
+    // We sort by createdAt descending and take the first one.
+    const firstOutputRecord = await QCWashingFirstOutput.findOne().sort({ createdAt: -1 }).lean();
+
+    if (!firstOutputRecord) {
+      return res.status(404).json({ success: false, message: "No 'First Output' quantity has been set in the admin settings." });
+    }
+
+       const sampleSizeNum = parseInt(firstOutputRecord.quantity, 10);
+
+    // 2. Get the buyer and AQL level based on the provided orderNo.
+    const buyer = await getBuyerFromMoNumber(orderNo);
+    const aqlLevel = getAqlLevelForBuyer(buyer);
+
+    // 3. Find the AQL chart document based on the lot size (quantity).
+   const aqlChart = await AQLChart.findOne({
+      Type: "General",
+      Level: "II",
+      SampleSize: { $gte: sampleSizeNum }
+    }).sort({ SampleSize: 1 }).lean();
+
+    if (!aqlChart) {
+      return res.status(404).json({ success: false, message: "No AQL chart found for the given lot size." });
+    }
+
+    // 4. Find the specific AQL entry for the buyer's AQL level.
+    const aqlEntry = aqlChart.AQL.find(aql => aql.level === aqlLevel);
+
+    if (!aqlEntry) {
+      return res.status(404).json({ success: false, message: `AQL level ${aqlLevel} not found for the matching chart.` });
+    }
+
+    // 5. Respond with the data in the format expected by the frontend.
+    res.json({
+      success: true,
+      checkedQty: firstOutputRecord.quantity,
+      aqlData: {
+        sampleSize: aqlChart.SampleSize,
+        acceptedDefect: aqlEntry.AcceptDefect,
+        rejectedDefect: aqlEntry.RejectDefect,
+        aqlLevelUsed: aqlLevel
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching first output details:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching first output details.' });
   }
 });
 

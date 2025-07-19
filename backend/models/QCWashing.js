@@ -79,6 +79,11 @@
       defectDetails: {
         checkedQty: String,
         washQty: String,
+        result: String,
+        aqlSampleSize: String,
+        aqlAcceptedDefect: String,
+        aqlRejectedDefect: String,
+        aqlLevelUsed: String,
         defectsByPc: [{
           pcNumber: String, // track PC number
           pcDefects: [{
