@@ -13,7 +13,9 @@ const OrderDetailsSection = ({
   fetchMatchingStyles,
   setStyleSuggestions,
   orderNumbers,
-  filterOrderNumbers
+  filterOrderNumbers,
+  filteredOrderNumbers
+  
 }) => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
@@ -38,6 +40,22 @@ const OrderDetailsSection = ({
               placeholder="Enter Order No and click away"
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             />
+             {formData.orderNo && filteredOrderNumbers.length > 0 && (
+              <ul className="absolute z-10 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-40 overflow-y-auto mt-1">
+                {filteredOrderNumbers.map((order, index) => (
+                  <li
+                    key={index}
+                    onMouseDown={() => {
+                      handleInputChange("orderNo", order); 
+                      fetchOrderDetailsByStyle(order);
+                    }}
+                    className="px-3 py-2 hover:bg-indigo-100 dark:hover:bg-indigo-700 cursor-pointer text-sm text-gray-700 dark:text-gray-200"
+                  >
+                    {order}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium">Date:</label>

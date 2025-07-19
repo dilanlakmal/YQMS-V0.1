@@ -241,6 +241,7 @@ const QCWashingPage = () => {
       setStyleSuggestions([]);
     }
   };
+  
 
   const fetchOrderDetailsByStyle = async (orderNo) => {
     if (!orderNo) {
@@ -872,121 +873,121 @@ const QCWashingPage = () => {
   };
 
   // --- Auto-save & Data Load ---
-  // Auto-save functionality - always save data for editing
-  const autoSaveData = async () => {
-    if (!formData.orderNo && !formData.style) return;
-    if (!formData.color) return;
+    // Auto-save functionality - always save data for editing
+    const autoSaveData = async () => {
+      if (!formData.orderNo && !formData.style) return;
+      if (!formData.color) return;
 
-    // Calculate stats
-   const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
+      // Calculate stats
+    const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
 
-    try {
-      const saveData = {
-        orderNo: formData.orderNo || formData.style,
-        date: formData.date,
-        colorName: formData.color,
-        reportType: formData.reportType,
-        washQty: formData.washQty,         
-        checkedQty: formData.checkedQty,   
-        totalCheckedPoint,
-        totalPass,
-        totalFail,
-        passRate,
-        savedAt: new Date().toISOString(),
-        userId: user?.emp_id,
-        // Wrap color-specific data in a 'color' object as per the schema
-        colorData: { // Changed to colorData to match the endpoint structure
-          orderDetails: {
-            ...formData,
-            inspector: {
-              empId: user?.emp_id,
-              name: user?.username, // Assuming username is available
+      try {
+        const saveData = {
+          orderNo: formData.orderNo || formData.style,
+          date: formData.date,
+          colorName: formData.color,
+          reportType: formData.reportType,
+          washQty: formData.washQty,         
+          checkedQty: formData.checkedQty,   
+          totalCheckedPoint,
+          totalPass,
+          totalFail,
+          passRate,
+          savedAt: new Date().toISOString(),
+          userId: user?.emp_id,
+          // Wrap color-specific data in a 'color' object as per the schema
+          colorData: { // Changed to colorData to match the endpoint structure
+            orderDetails: {
+              ...formData,
+              inspector: {
+                empId: user?.emp_id,
+                name: user?.username, // Assuming username is available
+              },
             },
+            inspectionDetails: {
+              temp: processData.temperature,
+              time: processData.time,
+              chemical: processData.chemical,
+              checkedPoints: inspectionData.map(item => ({
+                pointName: item.checkedList,
+                approvedDate: item.approvedDate,
+                condition: item.na ? "N/A" : "Active", // Or based on other logic
+                remark: item.remark,
+              })),
+              parameters: defectData.map(item => ({
+                parameterName: item.parameter,
+                status: item.ok ? "ok" : (item.no ? "no" : ""),
+                qty: item.qty,
+                remark: item.remark,
+                checkboxes: item.checkboxes || {},
+              })),
+            },
+            defectDetails: {
+              washQty: formData.washQty,
+              checkedQty: formData.checkedQty,
+              defectsByPc: Object.entries(defectsByPc).map(
+                ([pcKey, pcDefects]) => ({
+                  pcNumber: pcKey,  
+                  pcDefects: Array.isArray(pcDefects)
+                    ? pcDefects.map(defect => ({
+                        defectName: defect.selectedDefect,
+                        defectQty: defect.defectQty,
+                        defectImages: Array.isArray(defect.defectImages)
+                          ? defect.defectImages.map(img => img.url || img.name) 
+                          : []
+                      }))
+                    : []
+              })),
+              comment: comment,
+              additionalImages: uploadedImages.map(img => img.url || img.name),
+            },
+            measurementDetails: [
+              ...measurementData.beforeWash.map((item) => ({
+                ...item,
+                washType: "beforeWash",
+              })),
+              ...measurementData.afterWash.map((item) => ({
+                ...item,
+                washType: "afterWash",
+              })),
+            ],
           },
-          inspectionDetails: {
-            temp: processData.temperature,
-            time: processData.time,
-            chemical: processData.chemical,
-            checkedPoints: inspectionData.map(item => ({
-              pointName: item.checkedList,
-              approvedDate: item.approvedDate,
-              condition: item.na ? "N/A" : "Active", // Or based on other logic
-              remark: item.remark,
-            })),
-            parameters: defectData.map(item => ({
-              parameterName: item.parameter,
-              status: item.ok ? "ok" : (item.no ? "no" : ""),
-              qty: item.qty,
-              remark: item.remark,
-              checkboxes: item.checkboxes || {},
-            })),
-          },
-          defectDetails: {
-            washQty: formData.washQty,
-            checkedQty: formData.checkedQty,
-             defectsByPc: Object.entries(defectsByPc).map(
-              ([pcKey, pcDefects]) => ({
-                pcNumber: pcKey,  
-                pcDefects: Array.isArray(pcDefects)
-                  ? pcDefects.map(defect => ({
-                      defectName: defect.selectedDefect,
-                      defectQty: defect.defectQty,
-                      defectImages: Array.isArray(defect.defectImages)
-                        ? defect.defectImages.map(img => img.url || img.name) 
-                        : []
-                    }))
-                  : []
-            })),
-            comment: comment,
-            additionalImages: uploadedImages.map(img => img.url || img.name),
-          },
-          measurementDetails: [
-            ...measurementData.beforeWash.map((item) => ({
-              ...item,
-              washType: "beforeWash",
-            })),
-            ...measurementData.afterWash.map((item) => ({
-              ...item,
-              washType: "afterWash",
-            })),
-          ],
-        },
-      };
+        };
 
-      // --- DEBUGGING: Log the payload before sending ---
-      console.log("Auto-saving payload:", JSON.stringify(saveData, null, 2));
+        // --- DEBUGGING: Log the payload before sending ---
+        console.log("Auto-saving payload:", JSON.stringify(saveData, null, 2));
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/auto-save-color`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(saveData),
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc-washing/auto-save-color`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(saveData),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-      );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const result = await response.json();
+        if (result.success) {
+          setAutoSaveId(result.id);
+          setLastSaved(new Date());
+        } else {
+          console.error("Auto-save failed:", result.message);
+        }
+      } catch (error) {
+        // Log the detailed error from the failed fetch request
+        console.error("Auto-save request failed:", error);
+        const errorBody = await error.response?.json().catch(() => null);
+        console.error("Auto-save request failed:", {
+          errorMessage: error.message,
+          errorBody: errorBody,
+        });
+        console.error("Auto-save failed:", error);
       }
-
-      const result = await response.json();
-      if (result.success) {
-        setAutoSaveId(result.id);
-        setLastSaved(new Date());
-      } else {
-        console.error("Auto-save failed:", result.message);
-      }
-    } catch (error) {
-      // Log the detailed error from the failed fetch request
-      console.error("Auto-save request failed:", error);
-      const errorBody = await error.response?.json().catch(() => null);
-      console.error("Auto-save request failed:", {
-        errorMessage: error.message,
-        errorBody: errorBody,
-      });
-      console.error("Auto-save failed:", error);
-    }
-  };
+    };
 
   // Load color-specific data
   const loadColorSpecificData = async (orderNo, color) => {
@@ -1410,6 +1411,7 @@ const QCWashingPage = () => {
           setStyleSuggestions={setStyleSuggestions}
           orderNumbers={filteredOrderNumbers}
           filterOrderNumbers={filterOrderNumbers}
+          filteredOrderNumbers={filteredOrderNumbers}
         />
 
         <InspectionDataSection

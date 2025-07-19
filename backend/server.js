@@ -1797,38 +1797,61 @@ const getBuyerFromMoNumber = (moNo) => {
 /* ------------------------------
    End Points - Measurement Data In qcWashing
 ------------------------------ */
-
-const qcWashingDir = path.join(process.cwd(), "storage", "qc_washing_images");
-
-// Ensure directory exists
+const qcWashingDir = path.join(process.cwd(),"public", "storage", "qc_washing_images");
 if (!fs.existsSync(qcWashingDir)) {
   fs.mkdirSync(qcWashingDir, { recursive: true });
 }
 
-// Multer memory storage
+function saveBase64Image(base64String, prefix = "image") {
+  const matches = base64String.match(/^data:(image\/\w+);base64,(.+)$/);
+  if (!matches) return null;
+
+  const ext = matches[1].split("/")[1];
+  const buffer = Buffer.from(matches[2], "base64");
+  const filename = `${prefix}-${Date.now()}.${ext}`;
+  const filePath = path.join(qcWashingDir, filename);
+  fs.writeFileSync(filePath, buffer);
+  return `/storage/qc_washing_images/${filename}`;
+}
+
+async function saveRemoteImage(url, prefix = "image") {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+
+    const ext = path.extname(url) || ".jpg";
+    const buffer = await res.buffer();
+    const filename = `${prefix}-${Date.now()}${ext}`;
+    const filePath = path.join(qcWashingDir, filename);
+    fs.writeFileSync(filePath, buffer);
+    return `/storage/qc_washing_images/${filename}`;
+  } catch {
+    return null;
+  }
+}
+
+function saveUploadedFile(file) {
+  const filename = `${Date.now()}-${file.originalname.replace(/\s+/g, "_")}`;
+  const filePath = path.join(qcWashingDir, filename);
+  fs.writeFileSync(filePath, file.buffer);
+  return `/storage/qc_washing_images/${filename}`;
+}
 const qcWashingMemoryStorage = multer.memoryStorage();
 
-export const uploadQcWashingImage = multer({
+export const uploadQcWashingFiles = multer({
   storage: qcWashingMemoryStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB per file
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
-    if (allowedTypes.includes(file.mimetype)) cb(null, true);
-    else cb(new Error("Only JPEG, PNG, GIF allowed"), false);
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Only JPEG, PNG, GIF, and WEBP are allowed."), false);
+    }
   }
 });
 
-// Save file buffer to disk and return URL
-export const saveQcWashingImage = (file) => {
-  const timestamp = Date.now();
-  const ext = path.extname(file.originalname);
-  const newFilename = `${timestamp}-${file.originalname}`;
-  const newPath = path.join(qcWashingDir, newFilename);
 
-  fs.writeFileSync(newPath, file.buffer);
-
-  return `/storage/qc_washing_images/${newFilename}`;
-};
 // Get order details by style number
 app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
   const { orderNo } = req.params;
@@ -2374,9 +2397,65 @@ app.post('/api/qc-washing/submit', async (req, res) => {
 // });
 
 
-app.post('/api/qc-washing/auto-save-color', async (req, res) => {
+app.post('/api/qc-washing/auto-save-color', uploadQcWashingFiles.array("images", 20), async (req, res) => {
   try {
     const { orderNo, reportType, washQty, checkedQty, totalCheckedPoint, totalPass, totalFail, passRate, colorName, colorData, userId } = req.body;
+
+      // Handle file uploads
+     const savedImageUrls = [];
+      if (req.files?.length) {
+        for (const file of req.files) {
+          const url = saveUploadedFile(file);
+          savedImageUrls.push(url);
+        }
+      }
+
+         // --- Normalize images for defectDetails ---
+      const normalizeImages = async (images) => {
+        const results = [];
+        for (const img of images || []) {
+          if (!img) continue;
+
+          if (img.startsWith("data:image")) {
+            // Base64
+            const saved = saveBase64Image(img, "defect");
+            if (saved) results.push(saved);
+          } else if (img.startsWith("http")) {
+            // Remote image
+            const saved = await saveRemoteImage(img, "defect");
+            if (saved) results.push(saved);
+          } else if (img.startsWith("/storage/qc_washing_images/")) {
+            // Already a saved path
+            results.push(img);
+          } else {
+            // Treat as a filename and create placeholder
+            const finalPath = path.join(qcWashingDir, img);
+            if (!fs.existsSync(finalPath)) {
+              fs.writeFileSync(finalPath, "");
+            }
+            results.push(`/storage/qc_washing_images/${img}`);
+          }
+        }
+        return results;
+      };
+
+      // Merge uploaded image URLs into additionalImages
+     if (colorData?.defectDetails) {
+        // Save & normalize additionalImages
+        colorData.defectDetails.additionalImages = await normalizeImages([
+          ...(colorData.defectDetails.additionalImages || []),
+          ...savedImageUrls,
+        ]);
+
+        // Save & normalize defectImages for each defect
+        if (colorData.defectDetails.defectsByPc) {
+          for (const pcEntry of colorData.defectDetails.defectsByPc) {
+            for (const defect of pcEntry.pcDefects || []) {
+              defect.defectImages = await normalizeImages(defect.defectImages);
+            }
+          }
+        }
+      }
 
     let qcRecord = await QCWashing.findOne({ orderNo: orderNo });
 
