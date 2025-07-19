@@ -40,8 +40,10 @@ const QCWashingPage = () => {
   // State: Data Lists
   const [subFactories, setSubFactories] = useState([]);
   const [colorOptions, setColorOptions] = useState([]);
-  const [styleSuggestions, setStyleSuggestions] = useState([]);
+  const [orderNoSuggestions, setOrderNoSuggestions] = useState([]); 
+  const [showOrderNoSuggestions, setShowOrderNoSuggestions] = useState(false); 
   const [orderNumbers, setOrderNumbers] = useState([]);
+  const [styleSuggestions, setStyleSuggestions] = useState([]);
   const [filteredOrderNumbers, setFilteredOrderNumbers] = useState([]);
   const [masterChecklist, setMasterChecklist] = useState([]);
   const [defectOptions, setDefectOptions] = useState([]);
@@ -189,6 +191,29 @@ const QCWashingPage = () => {
       setDefectOptions(data);
     } catch (error) {
       console.error("Error fetching washing defects:", error);
+    }
+  };
+
+  // Renamed and updated to use /api/search-mono for order number suggestions
+  const fetchOrderNoSuggestions = async (searchTerm) => {
+    if (!searchTerm || searchTerm.length < 2) { // Only search if at least 2 characters typed
+      setOrderNoSuggestions([]);
+      return;
+    }
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/search-mono?term=${searchTerm}` // Use the new endpoint
+      );
+      if (response.ok) {
+        const data = await response.json();
+        // Assuming the endpoint returns an array of order numbers directly
+        setOrderNoSuggestions(data || []);
+      } else {
+        setOrderNoSuggestions([]);
+      }
+    } catch (error) {
+      console.error("Error fetching order number suggestions:", error);
+      setOrderNoSuggestions([]);
     }
   };
 
@@ -423,6 +448,11 @@ const QCWashingPage = () => {
 
     // --- Form Handlers ---
   const handleInputChange = (field, value) => {
+     // --- Fetch order suggestions ---
+    if (field === "orderNo") {
+      fetchOrderNoSuggestions(value);
+      setShowOrderNoSuggestions(true);
+    }
     // --- Cache state before changing color ---
     if (field === 'color' && value !== formData.color && formData.color) {
       const outgoingColor = formData.color;
@@ -955,7 +985,7 @@ const QCWashingPage = () => {
         };
 
         // --- DEBUGGING: Log the payload before sending ---
-        console.log("Auto-saving payload:", JSON.stringify(saveData, null, 2));
+        // console.log("Auto-saving payload:", JSON.stringify(saveData, null, 2));
 
         const response = await fetch(
           `${API_BASE_URL}/api/qc-washing/auto-save-color`,
@@ -1411,7 +1441,10 @@ const QCWashingPage = () => {
           setStyleSuggestions={setStyleSuggestions}
           orderNumbers={filteredOrderNumbers}
           filterOrderNumbers={filterOrderNumbers}
-          filteredOrderNumbers={filteredOrderNumbers}
+          // filteredOrderNumbers={filteredOrderNumbers}
+          orderNoSuggestions={orderNoSuggestions}
+          showOrderNoSuggestions={showOrderNoSuggestions}
+          setShowOrderNoSuggestions={setShowOrderNoSuggestions}
         />
 
         <InspectionDataSection

@@ -14,9 +14,39 @@ const OrderDetailsSection = ({
   setStyleSuggestions,
   orderNumbers,
   filterOrderNumbers,
-  filteredOrderNumbers
+  // filteredOrderNumbers,
+  orderNoSuggestions,
+  showOrderNoSuggestions,
+  setShowOrderNoSuggestions, 
   
 }) => {
+
+  const handleOrderNoChange = (e) => {
+    handleInputChange("orderNo", e.target.value);
+    // Suggestions are fetched and visibility is set in parent's handleInputChange
+  };
+
+  const handleOrderNoBlur = () => {
+    // A small delay to allow click on suggestion to register before hiding
+    setTimeout(() => {
+      setShowOrderNoSuggestions(false);
+      fetchOrderDetailsByStyle(formData.orderNo); // Fetch details after selection or blur
+    }, 150);
+  };
+
+  const handleOrderNoFocus = () => {
+    // Show suggestions again if input is focused and there are suggestions
+    if (orderNoSuggestions.length > 0) {
+      setShowOrderNoSuggestions(true);
+    }
+  };
+
+  const handleSuggestionClick = (selectedOrder) => {
+    handleInputChange("orderNo", selectedOrder);
+    fetchOrderDetailsByStyle(selectedOrder);
+    setShowOrderNoSuggestions(false); // Hide suggestions immediately on click
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -30,32 +60,32 @@ const OrderDetailsSection = ({
       </div>
          {isVisible && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 dark:text-white">
-          <div className="flex items-center space-x-4 dark:text-gray-300">
-            <label className="w-20 text-sm font-medium ">Oeder No:</label>
-            <input
-              type="text"
-              value={formData.orderNo}
-              onChange={(e) => handleInputChange("orderNo", e.target.value)}
-              onBlur={() => fetchOrderDetailsByStyle(formData.orderNo)}
-              placeholder="Enter Order No and click away"
-              className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            />
-             {formData.orderNo && filteredOrderNumbers.length > 0 && (
-              <ul className="absolute z-10 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-40 overflow-y-auto mt-1">
-                {filteredOrderNumbers.map((order, index) => (
-                  <li
-                    key={index}
-                    onMouseDown={() => {
-                      handleInputChange("orderNo", order); 
-                      fetchOrderDetailsByStyle(order);
-                    }}
-                    className="px-3 py-2 hover:bg-indigo-100 dark:hover:bg-indigo-700 cursor-pointer text-sm text-gray-700 dark:text-gray-200"
-                  >
-                    {order}
-                  </li>
-                ))}
-              </ul>
-            )}
+          <div className="flex items-center space-x-4">
+            <label className="w-20 text-sm font-medium dark:text-gray-300">Order No:</label>
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={formData.orderNo}
+                onChange={handleOrderNoChange}
+                onBlur={handleOrderNoBlur}
+                onFocus={handleOrderNoFocus}
+                placeholder="Enter Order No to search"
+                className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              />
+              {showOrderNoSuggestions && formData.orderNo && orderNoSuggestions.length > 0 && (
+                <ul className="absolute z-10 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-40 overflow-y-auto mt-1">
+                  {orderNoSuggestions.map((order, index) => (
+                    <li
+                      key={index}
+                      onMouseDown={() => handleSuggestionClick(order)}
+                      className="px-3 py-2 hover:bg-indigo-100 dark:hover:bg-indigo-700 cursor-pointer text-sm text-gray-700 dark:text-gray-200"
+                    >
+                      {order}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium">Date:</label>
