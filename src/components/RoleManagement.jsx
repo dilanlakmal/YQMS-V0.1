@@ -250,7 +250,8 @@ export default function RoleManagement() {
     "QC1 Sunrise",
     "System Administration",
     "QA",
-    "Washing Clerk"
+    "Washing Clerk",
+    "QA Clerk"
   ];
 
   // Prepare sorted table data for rendering

@@ -495,7 +495,7 @@ function Home() {
             roles: ["Cutting"],
             image: "assets/Home/cutting.webp",
             title: t("home.cutting"),
-            description: "Cutting Inspection"
+            description: "Cut Panel Inspection"
           },
           {
             path: "/scc",
@@ -561,6 +561,13 @@ function Home() {
             image: "assets/Home/qc-accuracy.png",
             title: "QC Accuracy",
             description: "QA Random Checks"
+          },
+          {
+            path: "/qa-yorksys",
+            roles: ["QA Clerk"],
+            image: "assets/Home/upload-orders.png",
+            title: "Upload Orders",
+            description: "Order data from York-sys"
           },
           {
             path: "/final-inspection",

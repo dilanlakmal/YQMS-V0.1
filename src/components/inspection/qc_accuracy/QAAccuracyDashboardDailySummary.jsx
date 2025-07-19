@@ -84,7 +84,7 @@ const QAAccuracyDashboardDailySummary = () => {
 
   // --- ADD STATE FOR LINE CHART DATA ---
   const [lineTrendData, setLineTrendData] = useState([]);
-  // --- FIX #1: ADD STATE FOR THE NEW DEFECT RATE CHART ---
+  // --- ADD STATE FOR THE NEW DEFECT RATE CHART ---
   const [defectRateData, setDefectRateData] = useState([]);
 
   const [chartType, setChartType] = useState("Line"); // 'Line', 'MO', or 'QC'
@@ -122,6 +122,7 @@ const QAAccuracyDashboardDailySummary = () => {
     setIsChartLoading(true);
     const groupByMap = {
       Line: "lineNo",
+      Table: "tableNo",
       MO: "moNo",
       QC: "scannedQc.empId"
     };
@@ -181,7 +182,7 @@ const QAAccuracyDashboardDailySummary = () => {
     }
   }, [filters]);
 
-  // --- FIX #1: NEW FUNCTION TO FETCH DEFECT RATE CHART DATA ---
+  // --- NEW FUNCTION TO FETCH DEFECT RATE CHART DATA ---
   const fetchDefectRateData = useCallback(async () => {
     setIsChartLoading(true);
     try {
@@ -230,7 +231,7 @@ const QAAccuracyDashboardDailySummary = () => {
     fetchOptions();
   }, []);
 
-  // --- FIX #1: UPDATE USEEFFECT TO FETCH ALL DATA ---
+  // --- UPDATE USEEFFECT TO FETCH ALL DATA ---
   useEffect(() => {
     fetchDashboardData();
     fetchChartData();
@@ -242,13 +243,6 @@ const QAAccuracyDashboardDailySummary = () => {
     fetchLineTrendData,
     fetchDefectRateData
   ]);
-
-  //   // --- UPDATE USEEFFECT TO FETCH ALL DATA ---
-  //   useEffect(() => {
-  //     fetchDashboardData();
-  //     fetchChartData();
-  //     fetchLineTrendData();
-  //   }, [fetchDashboardData, fetchChartData, fetchLineTrendData]);
 
   const handleFilterChange = (name, value) => {
     setFilters((f) => ({ ...f, [name]: value }));
