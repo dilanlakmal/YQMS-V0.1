@@ -31,6 +31,13 @@
       type: Number,
       default: 0
     },
+    totalCheckedPcs: { type: Number, default: 0  },
+    rejectedDefectPcs: { type: Number, default: 0  },
+    totalDefectCount: { type: Number, default: 0  },
+    defectRate: { type: Number },
+    defectRatio: { type: Number },
+    overallFinalResult: { type: String },
+    aqlLevelUsed: { type: String },
     colors: [{
       colorName: String,
       orderDetails: {

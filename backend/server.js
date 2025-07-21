@@ -2218,6 +2218,12 @@ app.post('/api/qc-washing/submit', async (req, res) => {
       totalCheckedPoint: (inspectionData?.length || 0) + (defectData?.length || 0),
       totalPass: defectData?.filter(item => item.ok).length || 0,
       totalFail: defectData?.filter(item => item.no).length || 0,
+      totalCheckedPcs: formData.checkedQty,
+      rejectedDefectPcs: formData.rejectedDefectPcs,
+      totalDefectCount: formData.defectCount,
+      defectRate: formData.defectRate,
+      defectRatio: formData.defectRatio,
+      overallFinalResult: formData.overallFinalResult,
       color: {
         orderDetails: {
           orderQty: formData.orderQty,
@@ -2411,34 +2417,46 @@ app.post('/api/qc-washing/auto-save-color', uploadQcWashingFiles.array("images",
       }
 
          // --- Normalize images for defectDetails ---
-      const normalizeImages = async (images) => {
-        const results = [];
-        for (const img of images || []) {
-          if (!img) continue;
+     const normalizeImages = async (images) => {
+  const results = [];
 
-          if (img.startsWith("data:image")) {
-            // Base64
-            const saved = saveBase64Image(img, "defect");
-            if (saved) results.push(saved);
-          } else if (img.startsWith("http")) {
-            // Remote image
-            const saved = await saveRemoteImage(img, "defect");
+  for (const img of images || []) {
+    let imagePath;
 
-            if (saved) results.push(saved);
-          } else if (img.startsWith("/storage/qc_washing_images/")) {
-            // Already a saved path
-            results.push(img);
-          } else {
-            // Treat as a filename and create placeholder
-            const finalPath = path.join(qcWashingDir, img);
-            if (!fs.existsSync(finalPath)) {
-              fs.writeFileSync(finalPath, "");
-            }
-            results.push(`/storage/qc_washing_images/${img}`);
-          }
-        }
-        return results;
-      };
+    if (typeof img === 'string') {
+      imagePath = img;
+    } else if (typeof img === 'object' && img.preview) {
+      imagePath = img.preview;
+    } else {
+      console.warn('Skipping invalid image:', img);
+      continue; // Skip non-strings and non-object-with-preview
+    }
+
+    if (imagePath.startsWith("data:image")) {
+      // Base64
+      const saved = saveBase64Image(imagePath, "defect");
+      if (saved) results.push(saved);
+    } else if (imagePath.startsWith("http")) {
+      // Remote image
+      const saved = await saveRemoteImage(imagePath, "defect");
+      if (saved) results.push(saved);
+    } else if (imagePath.startsWith("/storage/qc_washing_images/")) {
+      // Already a saved path
+      results.push(imagePath);
+    } else {
+      // Treat as a filename and create placeholder
+      const finalPath = path.join(qcWashingDir, imagePath);
+      if (!fs.existsSync(finalPath)) {
+        fs.writeFileSync(finalPath, "");
+      }
+      results.push(`/storage/qc_washing_images/${imagePath}`);
+    }
+  }
+
+  return results;
+};
+
+
 
       // Merge uploaded image URLs into additionalImages
      if (colorData?.defectDetails) {
@@ -2580,8 +2598,8 @@ app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
         orderQty: savedData.colors?.[0]?.orderDetails?.orderQty || '',
         color: savedData.colors?.[0]?.orderDetails?.color || '',
         washingType: savedData.colors?.[0]?.orderDetails?.washingType || 'Normal Wash',
-        firstOutput: savedData.colors?.[0]?.orderDetails?.daily || '', // 'daily' might be string like 'Inline'
-        inline: savedData.colors?.[0]?.orderDetails?.daily === 'Inline' || false, // Adjust based on your 'daily' field
+        firstOutput: savedData.colors?.[0]?.orderDetails?.daily || '', 
+        inline: savedData.colors?.[0]?.orderDetails?.daily === 'Inline' || false, 
         daily: savedData.colors?.[0]?.orderDetails?.daily || '',
         buyer: savedData.colors?.[0]?.orderDetails?.buyer || '',
         factoryName: savedData.colors?.[0]?.orderDetails?.factoryName || 'YM',
@@ -2589,9 +2607,6 @@ app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
         washQty: savedData.colors?.[0]?.defectDetails?.washQty || ''
       };
 
-      // Ensure proper handling for nested arrays/objects like inspectionDetails, defectDetails etc.
-      // The sample record shows 'colors' is an array. You might need to iterate or select a specific color.
-      // For simplicity, using the first color entry [0] from the sample. Adjust as needed.
       const firstColorData = savedData.colors?.[0];
 
       const inspectionData = firstColorData?.inspectionDetails?.checkedPoints?.map(point => ({

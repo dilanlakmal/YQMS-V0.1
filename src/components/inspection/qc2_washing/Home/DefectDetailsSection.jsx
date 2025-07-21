@@ -131,9 +131,6 @@ const DefectDetailsSection = ({
     }));
   };
 
-  // const handleDeleteDefect = (defectId) => {
-  //   setAddedDefects(prev => prev.filter(d => d.defectId !== defectId));
-  // };
 
   const handleRemoveImage = (index) => {
     setUploadedImages(prev => prev.filter((_, i) => i !== index));
@@ -331,7 +328,7 @@ const DefectDetailsSection = ({
                         >
                           <option value="">-- Select a defect --</option>
                           {defectOptions.map(d => (
-                            <option key={d._id} value={d._id}>
+                            <option key={d._id} value={d.defectName}>
                               {getDefectNameForDisplay(d)}
                             </option>
                           ))}

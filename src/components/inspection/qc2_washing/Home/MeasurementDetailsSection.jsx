@@ -3,6 +3,7 @@ import { Plus, Minus } from 'lucide-react';
 import { API_BASE_URL } from '../../../../../config';
 import Swal from 'sweetalert2';
 import MeasurementNumPad from '../../cutting/MeasurementNumPad';
+import SummaryCard from '../Home/SummaryCard'
 
 const MeasurementDetailsSection = ({ 
   orderNo,
@@ -702,6 +703,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+      <div>
       <div className="flex justify-between items-center mb-4 border-b pb-2">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Measurement Details</h2>
         <button 
@@ -710,6 +712,14 @@ const toggleSelectAllRows = (size, checked, tableType) => {
         >
           {isVisible ? 'Hide' : 'Show'}
         </button>
+
+         
+      </div>
+      <SummaryCard
+            measurementData={measurementData}
+            showMeasurementTable={showMeasurementTable}
+            reportType={reportType}
+          />
       </div>
       {isVisible && (
         <div className="space-y-6">
