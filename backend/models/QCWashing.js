@@ -75,13 +75,11 @@
         }],
         parameters: [{
           parameterName: String,
-          status: String,
-          qty: String,
+          checkedQty: { type: Number, default: 0 },
+          failedQty: { type: Number, default: 0 },
+          passRate: { type: String, default: '0.00' },
+          result: { type: String, default: '' },
           remark: String,
-          checkboxes: {
-            type: Map,
-            of: Boolean
-          }
         }]
       },
       defectDetails: {

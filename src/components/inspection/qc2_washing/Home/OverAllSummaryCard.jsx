@@ -43,15 +43,11 @@ const OverAllSummaryCard = ({
     measurementPoints > 0
       ? ((measurementPass / measurementPoints) * 100).toFixed(2)
       : 0;
-
-  // New Calculations based on defectDetails prop
   const totalCheckedPcs = defectDetails?.checkedQty || 0;
   const washQty = defectDetails?.washQty || 0;
-  const rejectedDefectPcs = defectDetails?.result === "Fail" ? totalCheckedPcs : 0; // Assuming if defect result is 'Fail', all checked pcs are rejected
+  const rejectedDefectPcs = defectDetails?.result === "Fail" ? totalCheckedPcs : 0; 
   
   const totalDefectCount = defectDetails?.defectsByPc.reduce((sum, pc) => {
-    // Each defect entry in defectsByPc for a PC represents one defect instance.
-    // So, we sum the length of defects array for each PC.
     return sum + (pc.defects ? pc.defects.length : 0);
   }, 0);
 
@@ -60,20 +56,16 @@ const OverAllSummaryCard = ({
       ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(2)
       : 0;
   
-  // Assuming defect ratio is total defects per total checked pieces (same as defect rate, but perhaps not percentage)
   const defectRatio = totalCheckedPcs > 0 ? (totalDefectCount / totalCheckedPcs).toFixed(2) : 0;
 
 
-  // Overall Result Logic
   let overallResult = "Pass";
   let resultColor = "text-green-600";
   let resultBgColor = "bg-green-50";
 
-  // Check if any measurement point failed
   const measurementOverallResult =
     totalFail > 0 ? "Fail" : "Pass";
 
-  // Check defect overall result
   const defectOverallResult = defectDetails?.result || "N/A";
 
   if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
@@ -85,7 +77,6 @@ const OverAllSummaryCard = ({
     resultColor = "text-green-600";
     resultBgColor = "bg-green-50";
   } else {
-    // If one is N/A and other is Pass, or both are N/A, consider it N/A or default to Pass if no fails
     overallResult = "N/A";
     resultColor = "text-gray-600";
     resultBgColor = "bg-gray-50";

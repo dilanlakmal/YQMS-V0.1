@@ -75,7 +75,7 @@ const QCWashingPage = () => {
 
   // State: Inspection, Defect, Measurement
   const [inspectionData, setInspectionData] = useState([]);
-  const [processData, setProcessData] = useState({ temperature: "", time: "", chemical: "" });
+  const [processData, setProcessData] = useState({ machineType: "", temperature: "", time: "", chemical: "" });
   const [defectData, setDefectData] = useState([
     { parameter: "Color Shade 01", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
     { parameter: "Color Shade 02", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
@@ -96,6 +96,7 @@ const QCWashingPage = () => {
   const [savedSizes, setSavedSizes] = useState([]);
   const [measurementData, setMeasurementData] = useState({ beforeWash: [], afterWash: [] });
   const [showMeasurementTable, setShowMeasurementTable] = useState(true);
+  const [machineType, setMachineType] = useState('Washing Machine');
 
   // State: UI/UX
   const [sectionVisibility, setSectionVisibility] = useState({
@@ -129,6 +130,11 @@ const QCWashingPage = () => {
     if (imageObject.file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
+        // Add a check to ensure the file is actually a blob/file
+          if (!(imageObject.file instanceof Blob)) {
+            reject(new Error("Invalid file object provided."));
+            return;
+          }
         reader.readAsDataURL(imageObject.file);
         reader.onload = () => resolve(reader.result);
         reader.onerror = (error) => reject(error);
@@ -436,7 +442,14 @@ const QCWashingPage = () => {
           }
 
           if (saved.defectData && saved.defectData.length > 0) {
-            setDefectData(saved.defectData);
+            setDefectData(saved.defectData.map(param => ({
+              parameter: param.parameterName,
+              checkedQty: param.checkedQty || 0,
+              failedQty: param.failedQty || 0,
+              passRate: param.passRate || '0.00',
+              result: param.result || '',
+              remark: param.remark || '',
+            })));
           }
 
           if (saved.addedDefects) {
@@ -992,13 +1005,21 @@ const QCWashingPage = () => {
                 condition: item.na ? "N/A" : "Active", 
                 remark: item.remark,
               })),
-              parameters: defectData.map(item => ({
-                parameterName: item.parameter,
-                status: item.ok ? "ok" : (item.no ? "no" : ""),
-                qty: item.qty,
-                remark: item.remark,
-                checkboxes: item.checkboxes || {},
-              })),
+              parameters: defectData.map(item => {
+                // Calculate passRate and result for each parameter
+                const checkedQty = Number(item.checkedQty) || 0;
+                const failedQty = Number(item.failedQty) || 0;
+                const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
+                const result = checkedQty > 0 ? (passRate >= 90 ? 'Pass' : 'Fail') : '';
+                return {
+                  parameterName: item.parameter,
+                  checkedQty: item.checkedQty || 0,
+                  failedQty: item.failedQty || 0,
+                  passRate,
+                  result,
+                  remark: item.remark,
+                };
+              }),
             },
             defectDetails: {
               washQty: formData.washQty,
@@ -1630,10 +1651,10 @@ const QCWashingPage = () => {
          {activeTab === 'newInspection' && (
         <>
         <OverAllSummaryCard
-              measurementData={formData.colors[0]?.measurementDetails} 
-              defectDetails={formData.colors[0]?.defectDetails} 
-              reportType={formData.reportType}
-              showMeasurementTable={showMeasurementTable}
+          measurementData={formData.colors[0]?.measurementDetails} 
+          defectDetails={formData.colors[0]?.defectDetails} 
+          reportType={formData.reportType}
+          showMeasurementTable={showMeasurementTable}
         />
         <OrderDetailsSection
           formData={formData}
@@ -1664,6 +1685,8 @@ const QCWashingPage = () => {
           handleCheckboxChange={handleCheckboxChange}
           isVisible={sectionVisibility.inspectionData}
           onToggle={() => toggleSection("inspectionData")}
+          machineType={machineType}
+          setMachineType={setMachineType}
         />
 
         <DefectDetailsSection
@@ -1812,14 +1835,21 @@ const QCWashingPage = () => {
                         condition: item.na ? "N/A" : "Active",
                         remark: item.remark,
                       })),
-                      parameters: defectData.map(item => ({
+                     parameters: defectData.map(item => {
+                      const checkedQty = Number(item.checkedQty) || 0;
+                      const failedQty = Number(item.failedQty) || 0;
+                      const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
+                      const result = checkedQty > 0 ? (passRate >= 90 ? 'Pass' : 'Fail') : '';
+                      return {
                         parameterName: item.parameter,
-                        status: item.ok ? "ok" : (item.no ? "no" : ""),
-                        qty: item.qty,
+                        checkedQty: item.checkedQty || 0,
+                        failedQty: item.failedQty || 0,
+                        passRate,
+                        result,
                         remark: item.remark,
-                        checkboxes: item.checkboxes || {},
-                      })),
-                    },
+                      };
+                    }),
+                  },
                     defectDetails: {
                       washQty: formData.washQty,
                       checkedQty: formData.checkedQty,

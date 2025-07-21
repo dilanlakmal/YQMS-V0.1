@@ -9,7 +9,9 @@ const InspectionDataSection = ({
   handleDefectChange,
   handleCheckboxChange,
   isVisible,
-  onToggle 
+  onToggle,
+  machineType,         // <-- Add this prop
+  setMachineType  
 }) => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
@@ -68,13 +70,32 @@ const InspectionDataSection = ({
               </tbody>
             </table>
           </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Machine Type
+            </label>
+            <select
+              value={machineType}
+              onChange={e => setMachineType(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
+            >
+              <option value="Washing Machine">Washing Machine</option>
+              <option value="Tumble Dry">Tumble Dry</option>
+            </select>
+          </div>
+
+          <div className="overflow-x-auto dark:overflow-x-auto">
+            {/* ...inspection table code unchanged... */}
+          </div>
+
+          {/* Process Data Fields */}
           <div className="grid grid-cols-3 gap-4 mt-4 dark:text-white">
             <div className="flex items-center space-x-2 dark:text-white">
               <label className="text-sm font-medium dark:text-gray-300">Temperature:</label>
               <input
-                type="number" 
+                type="number"
                 value={processData.temperature}
-                onChange={(e) => setProcessData(prev => ({ ...prev, temperature: e.target.value }))}
+                onChange={e => setProcessData(prev => ({ ...prev, temperature: e.target.value }))}
                 className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
               />
               <span className="text-sm">°C</span>
@@ -84,21 +105,24 @@ const InspectionDataSection = ({
               <input
                 type="number"
                 value={processData.time}
-                onChange={(e) => setProcessData(prev => ({ ...prev, time: e.target.value }))}
+                onChange={e => setProcessData(prev => ({ ...prev, time: e.target.value }))}
                 className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
               />
               <span className="text-sm">min</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium dark:text-gray-300">Chemical:</label>
-              <input
-                type="number"
-                 value={processData.chemical}
-                onChange={(e) => setProcessData(prev => ({ ...prev, chemical: e.target.value }))}
-                className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
-              />
-              <span className="text-sm">gram</span>
-            </div>
+            {/* Only show Chemical if Washing Machine is selected */}
+            {machineType === 'Washing Machine' && (
+              <div className="flex items-center space-x-2">
+                <label className="text-sm font-medium dark:text-gray-300">Chemical:</label>
+                <input
+                  type="number"
+                  value={processData.chemical}
+                  onChange={e => setProcessData(prev => ({ ...prev, chemical: e.target.value }))}
+                  className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                />
+                <span className="text-sm">gram</span>
+              </div>
+            )}
           </div>
           <div className="mt-8 pt-6 border-t border-gray-200">
             <div className="overflow-x-auto">
@@ -106,77 +130,75 @@ const InspectionDataSection = ({
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-700">
                     <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-white">Parameters</th>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Ok</th>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">No</th>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Qty(pcs)</th>
+                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Checked QTY</th>
+                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Failed QTY</th>
+                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Pass Rate (%)</th>
+                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Result</th>
                     <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-white">Remark</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {defectData.map((item, index) => (
-                    <tr key={index}>
-                      <td className="border border-gray-300 px-4 py-2 font-medium dark:bg-gray-700 dark:text-white dark:border-gray-600">{item.parameter}</td>
-                      {item.parameter !== 'Defect' && (
-                        <>
-                          <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center">
-                            <input 
-                              type="radio" 
-                              name={`status-${index}`}
-                              checked={item.ok}
-                              onChange={(e) => handleDefectChange(index, 'ok', e.target.checked)}
-                            />  
+                  {defectData
+                    .filter(item => item.parameter !== 'Effect') // Remove Effect row
+                    .map((item, index) => {
+                      // Calculate pass rate
+                      const checkedQty = Number(item.checkedQty) || 0;
+                      const failedQty = Number(item.failedQty) || 0;
+                      const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
+                      const result = checkedQty > 0 ? (passRate >= 90 ? 'Pass' : 'Fail') : '';
+
+                      return (
+                        <tr key={index}>
+                          <td className="border border-gray-300 px-4 py-2 font-medium dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                            {item.parameter}
                           </td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center">
-                            <input 
-                              type="radio"  
-                              name={`status-${index}`}
-                              checked={item.no}
-                              onChange={(e) => handleDefectChange(index, 'no', e.target.checked)}
+                          <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
+                              <div className="flex items-center justify-center space-x-2">
+                                <button
+                                  type="button"
+                                  className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                                  onClick={() => handleDefectChange(index, 'checkedQty', Math.max((Number(item.checkedQty) || 0) - 1, 0))}
+                                >-</button>
+                                <span>{item.checkedQty || 0}</span>
+                                <button
+                                  type="button"
+                                  className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                                  onClick={() => handleDefectChange(index, 'checkedQty', (Number(item.checkedQty) || 0) + 1)}
+                                >+</button>
+                              </div>
+                            </td>
+                            <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
+                              <div className="flex items-center justify-center space-x-2">
+                                <button
+                                  type="button"
+                                  className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                                  onClick={() => handleDefectChange(index, 'failedQty', Math.max((Number(item.failedQty) || 0) - 1, 0))}
+                                >-</button>
+                                <span>{item.failedQty || 0}</span>
+                                <button
+                                  type="button"
+                                  className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                                  onClick={() => handleDefectChange(index, 'failedQty', (Number(item.failedQty) || 0) + 1)}
+                                >+</button>
+                              </div>
+                            </td>
+                          <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
+                            {passRate}
+                          </td>
+                          <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
+                            {result}
+                          </td>
+                          <td className="border border-gray-300 px-4 py-2 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                            <input
+                              type="text"
+                              value={item.remark}
+                              onChange={e => handleDefectChange(index, 'remark', e.target.value)}
+                              className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
                             />
                           </td>
-                        </>
-                      )}
-                      {item.parameter === 'Defect' && (
-                        <>
-                          <td className="border border-gray-300 px-4 py-2 dark:bg-gray-700 dark:text-white dark:border-gray-600"></td>
-                          <td className="border border-gray-300 px-4 py-2 dark:bg-gray-700 dark:text-white dark:border-gray-600"></td>
-                        </>
-                      )}
-                      <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-white">
-                        <input
-                          type="number"
-                           value={item.qty}
-                          onChange={(e) => handleDefectChange(index, 'qty', e.target.value)}
-                          disabled={item.ok && item.parameter !== 'Effect'}
-                          className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                        />
-                      </td>
-                      <td className="border border-gray-300 px-4 py-2 dark:bg-gray-700 dark:text-white dark:border-gray-600">
-                        {item.parameter === 'Effect' ? (
-                          <div className="grid grid-cols-5 gap-1">
-                            {Object.keys(item.checkboxes).map(checkbox => (                           
-                              <label key={checkbox} className="flex items-center text-xs dark:text-gray-300">
-                                   <input
-                                      type="checkbox"
-                                      checked={item.checkboxes[checkbox]}
-                                      onChange={(e) => handleCheckboxChange(index, checkbox, e.target.checked)}
-                                      className="mr-1 dark:bg-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                                   />
-                                {checkbox}
-                              </label>
-                            ))}
-                          </div>
-                        ) : (
-                          <input 
-                            type="text" 
-                            value={item.remark}
-                            onChange={(e) => handleDefectChange(index, 'remark', e.target.value)}
-                            className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                          />
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>

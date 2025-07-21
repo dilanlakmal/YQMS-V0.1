@@ -2618,11 +2618,11 @@ app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
 
       const defectData = firstColorData?.inspectionDetails?.parameters?.map(param => ({
         parameter: param.parameterName,
-        ok: param.status === 'ok',
-        no: param.status === 'no',
-        qty: param.qty || '',
+        checkedQty: param.checkedQty || 0,
+        failedQty: param.failedQty || 0,
+        passRate: param.passRate || '0.00',
+        result: param.result || '',
         remark: param.remark || '',
-        checkboxes: param.checkboxes || {}
       })) || [];
 
       const addedDefects = firstColorData?.defectDetails?.defects?.map(defect => ({
