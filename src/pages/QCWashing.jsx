@@ -76,7 +76,7 @@ const QCWashingPage = () => {
   // State: Inspection, Defect, Measurement
   const [inspectionData, setInspectionData] = useState([]);
   const [processData, setProcessData] = useState({ machineType: "", temperature: "", time: "", chemical: "" });
-  const [defectData, setDefectData] = useState([
+  const defaultDefectData = [
     { parameter: "Color Shade 01", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
     { parameter: "Color Shade 02", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
     { parameter: "Color Shade 03", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
@@ -87,7 +87,20 @@ const QCWashingPage = () => {
     },
     { parameter: "Measurement", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
     { parameter: "Appearance", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-  ]);
+  ];
+  const [defectData, setDefectData] = useState(normalizeDefectData(defaultDefectData));
+  function normalizeDefectData(data) {
+  return (data || []).map(param => ({
+    ...param,
+    parameter: param.parameter || param.parameterName || "",
+    ok: param.ok !== undefined ? param.ok : true,
+    no: param.no !== undefined ? param.no : false,
+    checkedQty: param.checkedQty || 0,
+    failedQty: param.failedQty || 0,
+    remark: param.remark || "",
+    checkboxes: param.checkboxes || {},
+  }));
+}
   const [addedDefects, setAddedDefects] = useState([]);
   const [selectedDefect, setSelectedDefect] = useState("");
   const [defectQty, setDefectQty] = useState("");
@@ -443,12 +456,14 @@ const QCWashingPage = () => {
 
           if (saved.defectData && saved.defectData.length > 0) {
             setDefectData(saved.defectData.map(param => ({
-              parameter: param.parameterName,
+              ...param,
+              parameter: param.parameter || param.parameterName || "",
+              ok: param.ok !== undefined ? param.ok : true,
+              no: param.no !== undefined ? param.no : false,
               checkedQty: param.checkedQty || 0,
               failedQty: param.failedQty || 0,
-              passRate: param.passRate || '0.00',
-              result: param.result || '',
-              remark: param.remark || '',
+              remark: param.remark || "",
+              checkboxes: param.checkboxes || {},
             })));
           }
 
@@ -629,20 +644,21 @@ const QCWashingPage = () => {
   };
 
   const handleDefectChange = (index, field, value) => {
-    setDefectData((prev) =>
-      prev.map((item, i) => {
-        if (i === index) {
-          if (field === "ok" && value) {
-            return { ...item, ok: true, no: false, qty: "", defectPercent: "" };
-          } else if (field === "no" && value) {
-            return { ...item, ok: false, no: true };
-          }
-          return { ...item, [field]: value };
-        }
-        return item;
-      })
-    );
-  };
+  setDefectData(prev =>
+    prev.map((item, i) => {
+      if (i !== index) return item;
+      if (field === "ok" && value) {
+        // If Ok is selected, reset other fields and set no to false
+        return { ...item, ok: true, no: false, checkedQty: 0, failedQty: 0, remark: "" };
+      }
+      if (field === "no" && value) {
+        // If No is selected, set ok to false
+        return { ...item, ok: false, no: true };
+      }
+      return { ...item, [field]: value };
+    })
+  );
+};
 
   const handleCheckboxChange = (index, checkbox, value) => {
     setDefectData((prev) =>
@@ -1224,25 +1240,12 @@ const QCWashingPage = () => {
 
           setProcessData(colorData.inspectionDetails ? { temperature: colorData.inspectionDetails.temp || "", time: colorData.inspectionDetails.time || "", chemical: colorData.inspectionDetails.chemical || "" } : { temperature: "", time: "", chemical: "" });
 
-          setDefectData(colorData.inspectionDetails?.parameters?.map((param) => ({ 
-              parameter: param.parameterName,
-              ok: param.status === "ok",
-              no: param.status === "no",
-              qty: param.qty || "",
-              remark: param.remark || "",
-              checkboxes: param.checkboxes || {},
-            })) || [ 
-            { parameter: "Color Shade 01", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-            { parameter: "Color Shade 02", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-            { parameter: "Color Shade 03", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-            { parameter: "Hand Feel", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-            {
-              parameter: "Effect", ok: true, no: false, qty: "", defectPercent: "", remark: "",
-              checkboxes: { All: false, A: false, B: false, C: false, D: false, E: false, F: false, G: false, H: false, I: false, J: false }
-            },
-            { parameter: "Measurement", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-            { parameter: "Appearance", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-          ]);
+         if (colorData.inspectionDetails?.parameters && colorData.inspectionDetails.parameters.length > 0)  {
+            setDefectData(normalizeDefectData(colorData.inspectionDetails.parameters));
+          } else {
+            setDefectData(normalizeDefectData(defaultDefectData));
+          }
+
           setAddedDefects(colorData.defectDetails?.defects?.map(d => ({ 
             defectId: d.defectId,
             defectName: d.defectName,
@@ -1296,19 +1299,9 @@ const QCWashingPage = () => {
         } else {
           console.log(`No saved data found for color "${color}". Using a clean form.`);
           setInspectionData(initializeInspectionData(masterChecklist));
-          setProcessData({ temperature: "", time: "", chemical: "" });
-          setDefectData([
-            { parameter: "Color Shade 01", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-            { parameter: "Color Shade 02", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-            { parameter: "Color Shade 03", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-            { parameter: "Hand Feel", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-            {
-              parameter: "Effect", ok: true, no: false, qty: "", defectPercent: "", remark: "",
-              checkboxes: { All: false, A: false, B: false, C: false, D: false, E: false, F: false, G: false, H: false, I: false, J: false }
-            },
-            { parameter: "Measurement", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-            { parameter: "Appearance", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-          ]);
+          setProcessData({ machineType: "", temperature: "", time: "", chemical: "" });
+          setDefectData(normalizeDefectData(defaultDefectData));
+
           setAddedDefects([]);
           setDefectsByPc({}); 
           setUploadedImages([]); 
@@ -1381,7 +1374,7 @@ const QCWashingPage = () => {
           }
 
           if (saved.defectData && saved.defectData.length > 0) {
-            setDefectData(saved.defectData);
+            setDefectData(normalizeDefectData(saved.defectData));
           }
 
           // if (saved.addedDefects) {
@@ -1533,15 +1526,7 @@ const QCWashingPage = () => {
           });
 
           const transformedDefectData =
-            saved.color?.inspectionDetails?.parameters?.map((param) => ({
-              parameter: param.parameterName,
-              ok: param.status === "ok",
-              no: param.status === "no",
-              qty: param.qty || "",
-              remark: param.remark || "",
-              checkboxes: param.checkboxes || {},
-            })) || [];
-
+            normalizeDefectData(saved.color?.inspectionDetails?.parameters) || [];
           if (transformedDefectData.length > 0) {
             setDefectData(transformedDefectData);
           }
@@ -1767,19 +1752,9 @@ const QCWashingPage = () => {
                     setInspectionData(
                       initializeInspectionData(masterChecklist)
                     );
-                    setProcessData({ temperature: "", time: "", chemical: "" });
-                    setDefectData([
-                      { parameter: "Color Shade 01", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-                      { parameter: "Color Shade 02", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-                      { parameter: "Color Shade 03", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-                      { parameter: "Hand Feel", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-                      {
-                        parameter: "Effect", ok: true, no: false, qty: "", defectPercent: "", remark: "",
-                        checkboxes: { All: false, A: false, B: false, C: false, D: false, E: false, F: false, G: false, H: false, I: false, J: false }
-                      },
-                      { parameter: "Measurement", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-                      { parameter: "Appearance", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-                                ]);
+                    setProcessData({machineType: "", temperature: "", time: "", chemical: "" });
+                    setDefectData(normalizeDefectData(defaultDefectData));
+
                     setAddedDefects([]);
                     setUploadedImages([]);
                     setComment("");

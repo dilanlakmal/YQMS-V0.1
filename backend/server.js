@@ -2296,113 +2296,6 @@ app.post('/api/qc-washing/submit', async (req, res) => {
   }
 });
 
-// Auto-save data with color-specific handling
-// app.post('/api/qc-washing/auto-save-color', async (req, res) => {
-//   try {
-//     const { orderNo,reportType, washQty, checkedQty,totalCheckedPoint, totalPass, totalFail, passRate, colorName, formData, inspectionData, processData, defectData, defectsByPc, uploadedImages, comment, signatures, measurementDetails, userId } = req.body;
-    
-//     // Find existing record or create new one
-//     let qcRecord = await QCWashing.findOne({ orderNo: orderNo });
-    
-//     if (!qcRecord) {
-//       qcRecord = new QCWashing({
-//         orderNo: orderNo,
-//         isAutoSave: true,
-//         userId: userId,
-//         status: 'auto-saved',
-//         colors: []
-//       });
-//     }
-    
-//     // Always update top-level fields on every auto-save
-//     qcRecord.reportType = reportType;
-//     qcRecord.washQty = washQty;
-//     qcRecord.checkedQty = checkedQty;
-//     qcRecord.totalCheckedPoint = totalCheckedPoint;
-//     qcRecord.totalPass = totalPass;
-//     qcRecord.totalFail = totalFail;
-//     qcRecord.passRate = passRate;
-//     // Find or create color entry
-//     let colorEntry = qcRecord.colors?.find(c => c.colorName === colorName);
-    
-//     if (!colorEntry) {
-//       if (!qcRecord.colors) qcRecord.colors = [];
-//       colorEntry = {
-//         colorName: colorName,
-//         orderDetails: {},
-//         inspectionDetails: {},
-//         defectDetails: {},
-//         measurementDetails: []
-//       };
-//       qcRecord.colors.push(colorEntry);
-//     }
-    
-//     // Update color-specific data
-//     colorEntry.orderDetails = {
-//       orderQty: formData.orderQty,
-//       color: formData.color,
-//       washingType: formData.washingType,
-//       daily: formData.firstOutput || formData.inline,
-//       buyer: formData.buyer,
-//       factoryName: formData.factoryName,
-//       reportType: formData.reportType,
-//       aqlSampleSize: formData.aqlSampleSize,
-//       aqlAcceptedDefect: formData.aqlAcceptedDefect,
-//       aqlRejectedDefect: formData.aqlRejectedDefect,
-//       inspector: {
-//         engName: formData.agreedBy || signatures?.agreedBy,
-//         empId: userId
-//       }
-//     };
-    
-//     colorEntry.inspectionDetails = {
-//       checkedPoints: inspectionData?.map(item => ({
-//         pointName: item.checkedList,
-//         approvedDate: item.approvedDate,
-//         condition: item.na ? 'N/A' : 'Active',
-//         remark: item.remark
-//       })) || [],
-//       temp: processData?.temperature,
-//       time: processData?.time,
-//       chemical: processData?.chemical,
-//       parameters: defectData?.map(item => ({
-//         parameterName: item.parameter,
-//         status: item.ok ? 'ok' : 'no',
-//         qty: item.qty,
-//         remark: item.remark,
-//         checkboxes: item.checkboxes || {}
-//       })) || []
-//     };
-    
-//     colorEntry.defectDetails = {
-//       checkedQty: formData.checkedQty,
-//       washQty: formData.washQty,
-//       defectsByPc: Object.values(defectsByPc).map(pcDefects => ({
-//         defectPcs: pcDefects.map(defect => ({
-//           defectName: defect.selectedDefect,
-//           defectQty: defect.defectQty,
-//           defectImages: defect.defectImages.map(img => img.name)
-//         }))
-//       })),
-//       comment: comment,
-//       additionalImages: uploadedImages.map((img) => ({
-//       name: img.name,
-//       })),
-//     };
-    
-//     colorEntry.measurementDetails = measurementDetails || [];
-    
-//     qcRecord.savedAt = new Date();
-//     await qcRecord.save();
-
-//     res.json({ success: true, id: qcRecord._id, message: 'Color data auto-saved successfully' });
-//   } catch (error) {
-//     console.error('Auto-save color error:', error);
-//     res.status(500).json({ success: false, message: 'Auto-save failed' });
-//   }
-// });
-
-
 app.post('/api/qc-washing/auto-save-color', uploadQcWashingFiles.array("images", 20), async (req, res) => {
   try {
     const { orderNo, reportType, washQty, checkedQty, totalCheckedPoint, totalPass, totalFail, passRate, colorName, colorData, userId } = req.body;
@@ -2617,14 +2510,16 @@ app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
       })) || [];
 
       const defectData = firstColorData?.inspectionDetails?.parameters?.map(param => ({
-        parameter: param.parameterName,
+        parameter: param.parameter || param.parameterName || param.name || "",
         checkedQty: param.checkedQty || 0,
         failedQty: param.failedQty || 0,
         passRate: param.passRate || '0.00',
         result: param.result || '',
         remark: param.remark || '',
+        ok: param.ok !== undefined ? param.ok : true,
+        no: param.no !== undefined ? param.no : false,
+        checkboxes: param.checkboxes || {},
       })) || [];
-
       const addedDefects = firstColorData?.defectDetails?.defects?.map(defect => ({
         defectId: defect._id || '',
         defectName: defect.defectName,

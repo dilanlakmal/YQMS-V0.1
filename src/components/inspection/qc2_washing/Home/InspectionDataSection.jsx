@@ -10,7 +10,7 @@ const InspectionDataSection = ({
   handleCheckboxChange,
   isVisible,
   onToggle,
-  machineType,         // <-- Add this prop
+  machineType,        
   setMachineType  
 }) => {
   return (
@@ -126,80 +126,114 @@ const InspectionDataSection = ({
           </div>
           <div className="mt-8 pt-6 border-t border-gray-200">
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300 dark:border-gray-600">
-                <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-700">
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-white">Parameters</th>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Checked QTY</th>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Failed QTY</th>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Pass Rate (%)</th>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Result</th>
-                    <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-white">Remark</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {defectData
-                    .filter(item => item.parameter !== 'Effect') // Remove Effect row
-                    .map((item, index) => {
-                      // Calculate pass rate
-                      const checkedQty = Number(item.checkedQty) || 0;
-                      const failedQty = Number(item.failedQty) || 0;
-                      const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
-                      const result = checkedQty > 0 ? (passRate >= 90 ? 'Pass' : 'Fail') : '';
+              <table>
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-700">
+                  <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-white">Parameters</th>
+                  <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Ok</th>
+                  <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">No</th>
+                  <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Checked QTY</th>
+                  <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Failed QTY</th>
+                  <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Pass Rate (%)</th>
+                  <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Result</th>
+                  <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-white">Remark</th>
+                </tr>
+              </thead>
+              <tbody>
+                {defectData
+                  .filter(item => (item.parameter || item.parameterName) !== 'Effect')
+                  .map((item, index) => {
+                    const paramName = item.parameter || item.parameterName || "";
+                    // Calculate pass rate and result
+                    const checkedQty = Number(item.checkedQty) || 0;
+                    const failedQty = Number(item.failedQty) || 0;
+                    const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
+                    const result = checkedQty > 0 ? (passRate >= 90 ? 'Pass' : 'Fail') : '';
+                    const isOk = item.ok !== false; // Default to true if undefined
+                    const isNo = item.no === true;
 
-                      return (
-                        <tr key={index}>
-                          <td className="border border-gray-300 px-4 py-2 font-medium dark:bg-gray-700 dark:text-white dark:border-gray-600">
-                            {item.parameter}
-                          </td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
-                              <div className="flex items-center justify-center space-x-2">
-                                <button
-                                  type="button"
-                                  className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
-                                  onClick={() => handleDefectChange(index, 'checkedQty', Math.max((Number(item.checkedQty) || 0) - 1, 0))}
-                                >-</button>
-                                <span>{item.checkedQty || 0}</span>
-                                <button
-                                  type="button"
-                                  className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
-                                  onClick={() => handleDefectChange(index, 'checkedQty', (Number(item.checkedQty) || 0) + 1)}
-                                >+</button>
-                              </div>
-                            </td>
-                            <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
-                              <div className="flex items-center justify-center space-x-2">
-                                <button
-                                  type="button"
-                                  className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
-                                  onClick={() => handleDefectChange(index, 'failedQty', Math.max((Number(item.failedQty) || 0) - 1, 0))}
-                                >-</button>
-                                <span>{item.failedQty || 0}</span>
-                                <button
-                                  type="button"
-                                  className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
-                                  onClick={() => handleDefectChange(index, 'failedQty', (Number(item.failedQty) || 0) + 1)}
-                                >+</button>
-                              </div>
-                            </td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
-                            {passRate}
-                          </td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
-                            {result}
-                          </td>
-                          <td className="border border-gray-300 px-4 py-2 dark:bg-gray-700 dark:text-white dark:border-gray-600">
-                            <input
-                              type="text"
-                              value={item.remark}
-                              onChange={e => handleDefectChange(index, 'remark', e.target.value)}
-                              className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
+                    return (
+                      <tr key={index}>
+                        {/* Parameter Name */}
+                        <td className="border border-gray-300 px-4 py-2 font-medium dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                          {paramName || <span className="text-red-500">No Name</span>}
+                        </td>
+                        {/* Ok Radio */}
+                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center">
+                          <input
+                            type="radio"
+                            name={`okno-${index}`}
+                            checked={isOk}
+                            onChange={() => handleDefectChange(index, 'ok', true)}
+                          />
+                        </td>
+                        {/* No Radio */}
+                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center">
+                          <input
+                            type="radio"
+                            name={`okno-${index}`}
+                            checked={isNo}
+                            onChange={() => handleDefectChange(index, 'no', true)}
+                          />
+                        </td>
+                        {/* Checked QTY with + and - */}
+                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
+                          <div className="flex items-center justify-center space-x-2">
+                            <button
+                              type="button"
+                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                              onClick={() => handleDefectChange(index, 'checkedQty', Math.max((Number(item.checkedQty) || 0) - 1, 0))}
+                              disabled={isOk}
+                            >-</button>
+                            <span className={isOk ? "text-gray-400" : ""}>{item.checkedQty || 0}</span>
+                            <button
+                              type="button"
+                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                              onClick={() => handleDefectChange(index, 'checkedQty', (Number(item.checkedQty) || 0) + 1)}
+                              disabled={isOk}
+                            >+</button>
+                          </div>
+                        </td>
+                        {/* Failed QTY with + and - */}
+                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
+                          <div className="flex items-center justify-center space-x-2">
+                            <button
+                              type="button"
+                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                              onClick={() => handleDefectChange(index, 'failedQty', Math.max((Number(item.failedQty) || 0) - 1, 0))}
+                              disabled={isOk}
+                            >-</button>
+                            <span className={isOk ? "text-gray-400" : ""}>{item.failedQty || 0}</span>
+                            <button
+                              type="button"
+                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                              onClick={() => handleDefectChange(index, 'failedQty', (Number(item.failedQty) || 0) + 1)}
+                              disabled={isOk}
+                            >+</button>
+                          </div>
+                        </td>
+                        {/* Pass Rate */}
+                        <td className={`border border-gray-300 dark:border-gray-600 px-4 py-2 text-center ${isOk ? "text-gray-400" : "dark:text-white"}`}>
+                          {passRate}
+                        </td>
+                        {/* Result */}
+                        <td className={`border border-gray-300 dark:border-gray-600 px-4 py-2 text-center ${isOk ? "text-gray-400" : "dark:text-white"}`}>
+                          {result}
+                        </td>
+                        {/* Remark */}
+                        <td className="border border-gray-300 px-4 py-2 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                          <input
+                            type="text"
+                            value={item.remark}
+                            onChange={e => handleDefectChange(index, 'remark', e.target.value)}
+                            className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                            disabled={isOk}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
               </table>
             </div>
           </div>
