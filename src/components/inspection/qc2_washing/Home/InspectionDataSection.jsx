@@ -256,7 +256,13 @@ const InspectionDataSection = ({
                               onClick={() => handleDefectChange(index, 'failedQty', Math.max((Number(item.failedQty) || 0) - 1, 0))}
                               disabled={isOk}
                             >-</button>
-                            <span className={isOk ? "text-gray-400" : ""}>{item.failedQty || 0}</span>
+                            <input
+                                value={item.failedQty || 0}
+                                onChange={e => handleDefectChange(index, 'failedQty', e.target.value)}
+                                className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                                disabled={isOk}
+                                min={0}
+                              />
                             <button
                               type="button"
                               className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
