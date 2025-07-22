@@ -273,7 +273,11 @@ const InspectionDataSection = ({
                           {aqlAccept}
                         </td>
                         {/* Result */}
-                        <td className={`border border-gray-300 dark:border-gray-600 px-4 py-2 text-center ${isOk ? "text-gray-400" : "dark:text-white"}`}>
+                        <td className={`border border-gray-300 dark:border-gray-600 px-4 py-2 text-center
+                            ${item.result === "Pass" ? "bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200"
+                              : item.result === "Fail" ? "bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200"
+                              : "dark:text-white"}
+                          `}>
                           {result}
                         </td>
                         {/* Remark */}

@@ -83,6 +83,8 @@
           ok: { type: Boolean, default: true },   
           no: { type: Boolean, default: false }, 
           checkboxes: mongoose.Schema.Types.Mixed,
+          aqlAcceptedDefect: Number, 
+          aqlLevelUsed: String,
         }]
       },
       defectDetails: {

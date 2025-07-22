@@ -2514,6 +2514,7 @@ app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
         failedQty: param.failedQty || 0,
         passRate: param.passRate || '0.00',
         result: param.result || '',
+        aqlAcceptedDefect: param.aqlAcceptedDefect,
         remark: param.remark || '',
         ok: param.ok !== undefined ? param.ok : true,
         no: param.no !== undefined ? param.no : false,
@@ -2826,18 +2827,13 @@ app.post('/api/qc-washing/first-output-details', async (req, res) => {
 app.post('/api/qc-washing/aql-chart/parameter', async (req, res) => {
   try {
     const { orderNo, checkedQty } = req.body;
-
     if (!orderNo || !checkedQty || isNaN(checkedQty)) {
       return res.status(400).json({ success: false, message: "Order No and checkedQty are required." });
     }
-
     const lotSizeNum = parseInt(checkedQty, 10);
-
-    // FIX: Await the async function
     const buyer = await getBuyerFromMoNumber(orderNo);
     const aqlLevel = getAqlLevelForBuyer(buyer);
 
-    // Find the AQL chart document where the lot size falls within the defined range.
     const aqlChart = await AQLChart.findOne({
       Type: "General",
       Level: "II",
@@ -2848,12 +2844,21 @@ app.post('/api/qc-washing/aql-chart/parameter', async (req, res) => {
       ]
     }).lean();
 
-    
+    if (!aqlChart) {
+      return res.status(404).json({ success: false, message: "No AQL chart found for the given lot size." });
+    }
+    if (!Array.isArray(aqlChart.AQL)) {
+      return res.status(404).json({ success: false, message: "AQL data is missing in the chart." });
+    }
 
-    // Find the specific AQL entry for the buyer's AQL level.
-    const aqlEntry = aqlChart.AQL.find(aql => aql.level === aqlLevel);
+    // Use string comparison to avoid type mismatch
+    const aqlEntry = aqlChart.AQL.find(aql => String(aql.level) === String(aqlLevel));
 
-    
+    if (!aqlEntry) {
+      // Log for debugging
+      console.error('AQL for parameter error: No entry found for level', aqlLevel, 'in', aqlChart.AQL);
+      return res.status(404).json({ success: false, message: `AQL level ${aqlLevel} not found for the matching chart.` });
+    }
 
     res.json({
       success: true,
@@ -2864,7 +2869,6 @@ app.post('/api/qc-washing/aql-chart/parameter', async (req, res) => {
         aqlLevelUsed: aqlLevel
       }
     });
-
   } catch (error) {
     console.error('AQL for parameter error:', error);
     res.status(500).json({ success: false, message: 'Server error while fetching AQL details for parameter.' });

@@ -138,16 +138,16 @@ const QCWashingPage = () => {
   const [inspectionData, setInspectionData] = useState([]);
   const [processData, setProcessData] = useState({ machineType: "", temperature: "", time: "", chemical: "" });
   const defaultDefectData = [
-    { parameter: "Color Shade 01", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-    { parameter: "Color Shade 02", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-    { parameter: "Color Shade 03", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-    { parameter: "Hand Feel", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+    { parameter: "Color Shade 01", ok: true, no: false,  checkedQty: 0, failedQty: 0, aqlAcceptedDefect: "",result: "Pass", remark: "" },
+    { parameter: "Color Shade 02", ok: true, no: false, qcheckedQty: 0, failedQty: 0, aqlAcceptedDefect: "",result: "Pass", remark: "" },
+    { parameter: "Color Shade 03", ok: true, no: false, checkedQty: 0, failedQty: 0, aqlAcceptedDefect: "",result: "Pass", remark: ""},
+    { parameter: "Hand Feel", ok: true, no: false,checkedQty: 0, failedQty: 0, aqlAcceptedDefect: "",result: "Pass", remark: ""},
     {
-      parameter: "Effect", ok: true, no: false, qty: "", defectPercent: "", remark: "",
+      parameter: "Effect", ok: true, no: false, checkedQty: 0, failedQty: 0, aqlAcceptedDefect: "",result: "Pass", remark: "",
       checkboxes: { All: false, A: false, B: false, C: false, D: false, E: false, F: false, G: false, H: false, I: false, J: false }
     },
-    { parameter: "Measurement", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
-    { parameter: "Appearance", ok: true, no: false, qty: "", defectPercent: "", remark: "" },
+    { parameter: "Measurement", ok: true, no: false, checkedQty: 0, failedQty: 0, aqlAcceptedDefect: "",result: "Pass", remark: "" },
+    { parameter: "Appearance", ok: true, no: false, checkedQty: 0, failedQty: 0, aqlAcceptedDefect: "",result: "Pass", remark: ""},
   ];
   const [defectData, setDefectData] = useState(normalizeDefectData(defaultDefectData));
   function normalizeDefectData(data) {
@@ -159,6 +159,7 @@ const QCWashingPage = () => {
     checkedQty: param.checkedQty || 0,
     failedQty: param.failedQty || 0,
     remark: param.remark || "",
+    aqlAcceptedDefect: param.aqlAcceptedDefect || "",
     checkboxes: param.checkboxes || {},
   }));
 }
@@ -1200,17 +1201,20 @@ useEffect(() => {
                 remark: item.remark,
               })),
               parameters: defectData.map(item => {
-                // Calculate passRate and result for each parameter
-                const checkedQty = Number(item.checkedQty) || 0;
-                const failedQty = Number(item.failedQty) || 0;
-                const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
-                const result = checkedQty > 0 ? (passRate >= 90 ? 'Pass' : 'Fail') : '';
+                    const checkedQty = Number(item.checkedQty) || 0;
+                    const failedQty = Number(item.failedQty) || 0;
+                    const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
+                    // Use the correct result logic below!
+                    const result = (item.aqlAcceptedDefect !== undefined && checkedQty > 0)
+                      ? (failedQty <= item.aqlAcceptedDefect ? "Pass" : "Fail")
+                      : "";
                 return {
                   parameterName: item.parameter,
                   checkedQty: item.checkedQty || 0,
                   failedQty: item.failedQty || 0,
                   passRate,
                   result,
+                  aqlAcceptedDefect: item.aqlAcceptedDefect,
                   remark: item.remark,
                   ok: item.ok,
                   no: item.no,
@@ -1956,7 +1960,10 @@ useEffect(() => {
                       const checkedQty = Number(item.checkedQty) || 0;
                       const failedQty = Number(item.failedQty) || 0;
                       const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
-                      const result = checkedQty > 0 ? (passRate >= 90 ? 'Pass' : 'Fail') : '';
+                      // Use the correct result logic below!
+                      const result = (item.aqlAcceptedDefect !== undefined && checkedQty > 0)
+                        ? (failedQty <= item.aqlAcceptedDefect ? "Pass" : "Fail")
+                        : "";
                       return {
                         parameterName: item.parameter,
                         checkedQty: item.checkedQty || 0,
