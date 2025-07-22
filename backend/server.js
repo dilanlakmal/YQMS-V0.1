@@ -82,6 +82,7 @@ import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
 import { promises as fsPromises } from "fs";
 import { Server as SocketIO } from "socket.io";
+import crypto from "crypto";
 
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "./config.js";
@@ -95,6 +96,8 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 5000;
+
+
 
 /* ------------------------------
    for HTTPS
@@ -1805,30 +1808,35 @@ if (!fs.existsSync(qcWashingDir)) {
 function saveBase64Image(base64String, prefix = "image") {
   const matches = base64String.match(/^data:(image\/\w+);base64,(.+)$/);
   if (!matches) return null;
-
   const ext = matches[1].split("/")[1];
   const buffer = Buffer.from(matches[2], "base64");
-  const filename = `${prefix}-${Date.now()}.${ext}`;
+  // Generate a hash of the image content
+  const hash = crypto.createHash('md5').update(buffer).digest('hex');
+  const filename = `${prefix}-${hash}.${ext}`;
   const filePath = path.join(qcWashingDir, filename);
-  fs.writeFileSync(filePath, buffer);
+
+  // Only save if file does not already exist
+  if (!fs.existsSync(filePath)) {
+    fs.writeFileSync(filePath, buffer);
+  }
   return `/storage/qc_washing_images/${filename}`;
 }
 
-async function saveRemoteImage(url, prefix = "image") {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
+// async function saveRemoteImage(url, prefix = "image") {
+//   try {
+//     const res = await fetch(url);
+//     if (!res.ok) return null;
 
-    const ext = path.extname(url) || ".jpg";
-    const buffer = await res.buffer();
-    const filename = `${prefix}-${Date.now()}${ext}`;
-    const filePath = path.join(qcWashingDir, filename);
-    fs.writeFileSync(filePath, buffer);
-    return `/storage/qc_washing_images/${filename}`;
-  } catch {
-    return null;
-  }
-}
+//     const ext = path.extname(url) || ".jpg";
+//     const buffer = await res.buffer();
+//     const filename = `${prefix}-${Date.now()}${ext}`;
+//     const filePath = path.join(qcWashingDir, filename);
+//     fs.writeFileSync(filePath, buffer);
+//     return `/storage/qc_washing_images/${filename}`;
+//   } catch {
+//     return null;
+//   }
+// }
 
 function saveUploadedFile(file) {
   const filename = `${Date.now()}-${file.originalname.replace(/\s+/g, "_")}`;
@@ -2311,46 +2319,36 @@ app.post('/api/qc-washing/auto-save-color', uploadQcWashingFiles.array("images",
 
          // --- Normalize images for defectDetails ---
      const normalizeImages = async (images) => {
-  const results = [];
+        const results = [];
+        for (const img of images || []) {
+          let imagePath;
+          if (typeof img === 'string') {
+            imagePath = img;
+          } else if (typeof img === 'object' && img.preview) {
+            imagePath = img.preview;
+          } else {
+            console.warn('Skipping invalid image:', img);
+            continue;
+          }
 
-  for (const img of images || []) {
-    let imagePath;
-
-    if (typeof img === 'string') {
-      imagePath = img;
-    } else if (typeof img === 'object' && img.preview) {
-      imagePath = img.preview;
-    } else {
-      console.warn('Skipping invalid image:', img);
-      continue; // Skip non-strings and non-object-with-preview
-    }
-
-    if (imagePath.startsWith("data:image")) {
-      // Base64
-      const saved = saveBase64Image(imagePath, "defect");
-      if (saved) results.push(saved);
-    } else if (imagePath.startsWith("http")) {
-      // Remote image
-      const saved = await saveRemoteImage(imagePath, "defect");
-      if (saved) results.push(saved);
-    } else if (imagePath.startsWith("/storage/qc_washing_images/")) {
-      // Already a saved path
-      results.push(imagePath);
-    } else {
-      // Treat as a filename and create placeholder
-      const finalPath = path.join(qcWashingDir, imagePath);
-      if (!fs.existsSync(finalPath)) {
-        fs.writeFileSync(finalPath, "");
-      }
-      results.push(`/storage/qc_washing_images/${imagePath}`);
-    }
-  }
-
-  return results;
-};
-
-
-
+          if (imagePath.startsWith("data:image")) {
+            // Base64: Save as new file
+            const saved = saveBase64Image(imagePath, "defect");
+            if (saved) results.push(saved);
+          } else if (imagePath.startsWith("/storage/qc_washing_images/")) {
+            // Already a saved path: just keep it, do NOT save again
+            results.push(imagePath);
+          // } else if (imagePath.startsWith("http")) {
+          //   // Remote image: download and save ONCE
+          //   const saved = await saveRemoteImage(imagePath, "defect");
+          //   if (saved) results.push(saved);
+          } else {
+            // Unknown format: skip
+            console.warn('Unknown image format, skipping:', imagePath);
+          }
+        }
+        return results;
+      };
       // Merge uploaded image URLs into additionalImages
      if (colorData?.defectDetails) {
         // Save & normalize additionalImages
