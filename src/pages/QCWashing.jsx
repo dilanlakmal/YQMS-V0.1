@@ -12,6 +12,56 @@ import Swal from "sweetalert2";
 import imageCompression from "browser-image-compression";
 import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/SubmittedWashingData";
 
+function transformDefectsByPc(savedDefectsByPc) {
+  const normalizeImageSrc = (src) => {
+    if (!src) return "";
+    return src.startsWith("data:") || src.startsWith("/storage/")
+      ? src
+      : `data:image/jpeg;base64,${src}`;
+  };
+
+  if (Array.isArray(savedDefectsByPc)) {
+    // Array from backend
+    return savedDefectsByPc.reduce((acc, pcData) => {
+      const pcNumber = pcData.pcNumber;
+      if (pcNumber) {
+        acc[pcNumber] = (pcData.pcDefects || []).map((defect, index) => ({
+          id: index + 1,
+          selectedDefect: defect.defectName || defect.selectedDefect || "",
+          defectQty: defect.defectQty || "",
+          isBodyVisible: true,
+          defectImages: (defect.defectImages || []).map(imgStr => ({
+            file: null,
+            preview: normalizeImageSrc(imgStr),
+            name: "image.jpg"
+          }))
+        }));
+      }
+      return acc;
+    }, {});
+  }
+  // Already an object
+  if (typeof savedDefectsByPc === "object" && savedDefectsByPc !== null) {
+    const result = {};
+    Object.keys(savedDefectsByPc).forEach(pc => {
+      result[pc] = (savedDefectsByPc[pc] || []).map((defect, index) => ({
+        id: defect.id || index + 1,
+        selectedDefect: defect.defectName || defect.selectedDefect || "",
+        defectQty: defect.defectQty || "",
+        isBodyVisible: defect.isBodyVisible !== undefined ? defect.isBodyVisible : true,
+        defectImages: (defect.defectImages || []).map(imgStr => ({
+          file: null,
+          preview: normalizeImageSrc(imgStr),
+          name: "image.jpg"
+        }))
+      }));
+    });
+    return result;
+  }
+  return {};
+}
+
+
 const QCWashingPage = () => {
   // Hooks
   const { user } = useAuth();
@@ -177,7 +227,16 @@ const QCWashingPage = () => {
       autoSaveTimeoutRef.current = setTimeout(() => { autoSaveData(); }, 3000);
     }
     return () => { if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current); };
-  }, [formData, inspectionData, processData, defectData, addedDefects, comment, measurementData, uploadedImages, defectsByPc, isDataLoading]); // Added uploadedImages and defectsByPc here for auto-save
+  }, [formData, inspectionData, processData, defectData, addedDefects, comment, measurementData, uploadedImages, defectsByPc, isDataLoading]); 
+
+  useEffect(() => {
+  console.log("defectsByPc after load:", defectsByPc);
+}, [defectsByPc]);
+
+useEffect(() => {
+  console.log("uploadedImages after load:", uploadedImages);
+}, [uploadedImages]);
+
 
   // --- useEffect: Load Saved Data on Order Change ---
   useEffect(() => {
@@ -473,7 +532,7 @@ const QCWashingPage = () => {
 
           // Load defectsByPc and uploadedImages from saved data
           if (saved.defectsByPc) {
-            setDefectsByPc(saved.defectsByPc);
+            setDefectsByPc(transformDefectsByPc(saved.defectsByPc));
           }
           if (saved.additionalImage) {
             // If images were saved as base64 or URLs, ensure they are handled correctly for display
@@ -1251,40 +1310,23 @@ const QCWashingPage = () => {
             defectName: d.defectName,
             qty: d.defectQty
           })) || []);
-          const normalizeImageSrc = (src) => {
-            if (!src) return "";
-            return src.startsWith("data:") || src.startsWith("/storage/")
-              ? src
-              : `data:image/jpeg;base64,${src}`;
-          };
 
-           // Correctly transform the saved defectsByPc array into the object structure the UI expects
-          const savedDefectsArray = colorData.defectDetails?.defectsByPc || [];
-          const transformedDefectsByPc = savedDefectsArray.reduce((acc, pcData) => {
-            const pcNumber = pcData.pcNumber;
-            if (pcNumber) {
-              acc[pcNumber] = (pcData.pcDefects || []).map((defect, index) => ({
-                id: index + 1,
-                selectedDefect: defect.defectName,
-                defectQty: defect.defectQty,
-                isBodyVisible: true,
-                defectImages: (defect.defectImages || []).map(imgStr => ({
-                  file: null,
-                  preview: normalizeImageSrc(imgStr),
-                  name: 'image.jpg'
-                }))
-              }));
-            }
-            return acc;
-          }, {});
-          setDefectsByPc(transformedDefectsByPc);
-         setUploadedImages(
-            (colorData.defectDetails?.additionalImages || []).map(img => ({
-              file: null,
-            preview: normalizeImageSrc(img.preview || img.url || img),
-            name: img.name || 'image.jpg'
-          }))
-          );
+          
+        if (colorData.defectDetails?.defectsByPc) {
+          setDefectsByPc(transformDefectsByPc(colorData.defectDetails.defectsByPc));
+        } else {
+          setDefectsByPc({});
+        }
+         if (colorData.defectDetails?.additionalImages) {
+            setUploadedImages(
+              (colorData.defectDetails.additionalImages || []).map(img => ({
+                file: null,
+                preview: img,
+                name: "image.jpg"
+              }))
+            );
+          }
+
 
           setComment(colorData.defectDetails?.comment || "");
           setMeasurementData(processMeasurementData(colorData.measurementDetails || []));
@@ -1381,44 +1423,32 @@ const QCWashingPage = () => {
           //   setAddedDefects(saved.addedDefects);
           // }
 
-          const normalizeImageSrcForSaved = (src) => {
-            if (!src) return "";
-            // Handles both raw strings and image objects with a preview property
-            const preview = typeof src === 'string' ? src : (src.preview || src.url);
-            if (!preview) return "";
-            return preview.startsWith("data:") || preview.startsWith("/storage/")
-              ? preview
-              : `data:image/jpeg;base64,${preview}`;
-          };
-
-          if (saved.defectsByPc) {
-            const transformedDefects = (saved.defectsByPc || []).reduce((acc, item) => {
-              if (item && item.pcNumber) {
-                acc[item.pcNumber] = (item.pcDefects || []).map((defect, index) => ({
-                  id: index + 1,
-                  isBodyVisible: true,
-                  selectedDefect: defect.defectName || defect.selectedDefect || "", 
-                  defectQty: defect.defectQty || "",
-                  defectImages: (defect.defectImages || []).map(img => ({
-                    file: null,
-                    preview: normalizeImageSrcForSaved(img),
-                    name: img.name || "image.jpg",
-                    })),
-                }));
-              }
-              return acc;
-            }, {});
-            setDefectsByPc(transformedDefects);
+         if (saved.defectDetails?.defectsByPc) {
+            setDefectsByPc(transformDefectsByPc(saved.defectDetails.defectsByPc));
+          } else if (saved.defectsByPc) {
+            setDefectsByPc(transformDefectsByPc(saved.defectsByPc));
+          } else {
+            setDefectsByPc({});
           }
 
-          if (saved.additionalImages) {
+          if (saved.defectDetails?.additionalImages) {
             setUploadedImages(
-              setUploadedImages(saved.additionalImages.map(img => ({
-              file: null,
-              preview: normalizeImageSrcForSaved(img),
-              name: img.name || "image.jpg",
-            })))
-          );
+              (saved.defectDetails.additionalImages || []).map(img => ({
+                file: null,
+                preview: img,
+                name: "image.jpg"
+              }))
+            );
+          } else if (saved.additionalImages) {
+            setUploadedImages(
+              (saved.additionalImages || []).map(img => ({
+                file: null,
+                preview: img,
+                name: "image.jpg"
+              }))
+            );
+          } else {
+            setUploadedImages([]);
           }
 
           // If defectsByPc also exists under defectDetails, normalize and set it too
