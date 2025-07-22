@@ -241,11 +241,11 @@ const QCWashingPage = () => {
   }, [formData, inspectionData, processData, defectData, addedDefects, comment, measurementData, uploadedImages, defectsByPc, isDataLoading]); 
 
   useEffect(() => {
-  console.log("defectsByPc after load:", defectsByPc);
+  // console.log("defectsByPc after load:", defectsByPc);
 }, [defectsByPc]);
 
 useEffect(() => {
-  console.log("uploadedImages after load:", uploadedImages);
+  // console.log("uploadedImages after load:", uploadedImages);
 }, [uploadedImages]);
 
 
@@ -470,8 +470,7 @@ useEffect(() => {
       if (qcWashingResponse.ok) {
         const qcWashingData = await qcWashingResponse.json();
         if (qcWashingData.success && qcWashingData.savedData) {
-          console.log("Saved reportType from backend:", qcWashingData.savedData.reportType);
-          // Instead of calling loadSavedData again, directly set the saved data here to avoid redundant calls
+         
           const saved = qcWashingData.savedData;
 
           setFormData((prev) => ({
@@ -827,10 +826,7 @@ useEffect(() => {
   const fetchAQLData = async (washQty) => {
    if (!washQty) return;
     const orderNo = formData.orderNo || formData.style;
-    if (!orderNo) {
-      console.warn("Cannot fetch AQL data without an Order No.");
-      return;
-    }
+    
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/qc-washing/aql-chart/find`,
@@ -1104,6 +1100,9 @@ useEffect(() => {
                   passRate,
                   result,
                   remark: item.remark,
+                  ok: item.ok,
+                  no: item.no,
+                  checkboxes: item.checkboxes || {},
                 };
               }),
             },
@@ -1163,13 +1162,13 @@ useEffect(() => {
           console.error("Auto-save failed:", result.message);
         }
       } catch (error) {
-        console.error("Auto-save request failed:", error);
+        // console.error("Auto-save request failed:", error);
         const errorBody = await error.response?.json().catch(() => null);
         console.error("Auto-save request failed:", {
           errorMessage: error.message,
           errorBody: errorBody,
         });
-        console.error("Auto-save failed:", error);
+        // console.error("Auto-save failed:", error);
       }
     };
 
@@ -1349,7 +1348,7 @@ useEffect(() => {
           }
 
         } else {
-          console.log(`No saved data found for color "${color}". Using a clean form.`);
+          // console.log(`No saved data found for color "${color}". Using a clean form.`);
           setInspectionData(initializeInspectionData(masterChecklist));
           setProcessData({ machineType: "", temperature: "", time: "", chemical: "" });
           setDefectData(normalizeDefectData(defaultDefectData));
@@ -1611,7 +1610,7 @@ useEffect(() => {
 
       if (data.success) {
         setSavedSizes(data.savedSizes || []);
-        console.log("Loaded saved sizes:", data.savedSizes);
+        // console.log("Loaded saved sizes:", data.savedSizes);
       }
     } catch (error) {
       console.error("Error loading saved sizes:", error);
@@ -1852,6 +1851,9 @@ useEffect(() => {
                         passRate,
                         result,
                         remark: item.remark,
+                        ok: item.ok,
+                        no: item.no,
+                        checkboxes: item.checkboxes || {},
                       };
                     }),
                   },

@@ -2261,7 +2261,8 @@ app.post('/api/qc-washing/submit', async (req, res) => {
           chemical: processData?.chemical,
           parameters: defectData?.map(item => ({
             parameterName: item.parameter,
-            status: item.ok ? 'ok' : 'no',
+            ok: item.ok,          
+            no: item.no, 
             qty: item.qty,
             remark: item.remark,
             checkboxes: item.checkboxes || {}

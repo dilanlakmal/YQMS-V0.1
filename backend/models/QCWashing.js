@@ -80,6 +80,9 @@
           passRate: { type: String, default: '0.00' },
           result: { type: String, default: '' },
           remark: String,
+          ok: { type: Boolean, default: true },   
+          no: { type: Boolean, default: false }, 
+          checkboxes: mongoose.Schema.Types.Mixed,
         }]
       },
       defectDetails: {
