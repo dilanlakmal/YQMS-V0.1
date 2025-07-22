@@ -196,7 +196,16 @@ const OrderDetailsSection = ({
               <option value="After Wash">After Wash</option>
             </select>
           </div>         
-
+          <div className="flex items-center space-x-4">
+            <label className="w-20 text-sm font-medium dark:text-gray-300">Wash Qty:</label>
+            <input
+              type="number"
+              value={formData.washQty}
+              onChange={e => handleInputChange('washQty', e.target.value)}
+              className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              min={0}
+            />
+          </div>
         </div>
       )}
     </div>

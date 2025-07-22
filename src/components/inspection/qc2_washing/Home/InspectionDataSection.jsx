@@ -11,7 +11,8 @@ const InspectionDataSection = ({
   isVisible,
   onToggle,
   machineType,        
-  setMachineType  
+  setMachineType,
+  washQty 
 }) => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
@@ -135,6 +136,7 @@ const InspectionDataSection = ({
                   <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Checked QTY</th>
                   <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Failed QTY</th>
                   <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Pass Rate (%)</th>
+                  <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">AQL Accept</th>
                   <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">Result</th>
                   <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-white">Remark</th>
                 </tr>
@@ -148,7 +150,11 @@ const InspectionDataSection = ({
                     const checkedQty = Number(item.checkedQty) || 0;
                     const failedQty = Number(item.failedQty) || 0;
                     const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
-                    const result = checkedQty > 0 ? (passRate >= 90 ? 'Pass' : 'Fail') : '';
+                    // const result = checkedQty > 0 ? (passRate >= 90 ? 'Pass' : 'Fail') : '';
+                    const aqlAccept = item.aqlAcceptedDefect !== undefined ? item.aqlAcceptedDefect : "-";
+                    const result = (item.aqlAcceptedDefect !== undefined && checkedQty > 0)
+                      ? (failedQty <= item.aqlAcceptedDefect ? "Pass" : "Fail")
+                      : "";
                     const isOk = item.ok !== false; // Default to true if undefined
                     const isNo = item.no === true;
 
@@ -178,22 +184,69 @@ const InspectionDataSection = ({
                         </td>
                         {/* Checked QTY with + and - */}
                         <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
-                          <div className="flex items-center justify-center space-x-2">
-                            <button
-                              type="button"
-                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
-                              onClick={() => handleDefectChange(index, 'checkedQty', Math.max((Number(item.checkedQty) || 0) - 1, 0))}
-                              disabled={isOk}
-                            >-</button>
-                            <span className={isOk ? "text-gray-400" : ""}>{item.checkedQty || 0}</span>
-                            <button
-                              type="button"
-                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
-                              onClick={() => handleDefectChange(index, 'checkedQty', (Number(item.checkedQty) || 0) + 1)}
-                              disabled={isOk}
-                            >+</button>
-                          </div>
-                        </td>
+                            {paramName === "Hand Feel" ? (
+                               <div className="flex items-center justify-center space-x-2">
+                              <button
+                                type="button"
+                                className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                                onClick={() => {
+                                  const currentCheckedQty =
+                                    item.checkedQty !== undefined && item.checkedQty !== null
+                                      ? Number(item.checkedQty)
+                                      : Number(washQty) || 0;
+                                  handleDefectChange(index, 'checkedQty', Math.max(currentCheckedQty - 1, 0));
+                                }}
+                                disabled={isOk}
+                              >-</button>
+                              <input
+                                value={
+                                  item.checkedQty !== undefined && item.checkedQty !== null
+                                    ? item.checkedQty
+                                    : washQty || 0
+                                }
+                                onChange={e => handleDefectChange(index, 'checkedQty', e.target.value)}
+                                className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                                disabled={isOk}
+                                min={0}
+                              />
+                              <button
+                                type="button"
+                                className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                                onClick={() => {
+                                  const currentCheckedQty =
+                                    item.checkedQty !== undefined && item.checkedQty !== null
+                                      ? Number(item.checkedQty)
+                                      : Number(washQty) || 0;
+                                  handleDefectChange(index, 'checkedQty', currentCheckedQty + 1);
+                                }}
+                                disabled={isOk}
+                              >+</button>
+                            </div>
+                            ) : (
+                              // For others, allow editing
+                              <div className="flex items-center justify-center space-x-2">
+                                <button
+                                  type="button"
+                                  className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                                  onClick={() => handleDefectChange(index, 'checkedQty', Math.max((Number(item.checkedQty) || 0) - 1, 0))}
+                                  disabled={isOk}
+                                >-</button>
+                                <input
+                                  value={item.checkedQty || 0}
+                                  onChange={e => handleDefectChange(index, 'checkedQty', e.target.value)}
+                                  className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                                  disabled={isOk}
+                                  min={0}
+                                />
+                                <button
+                                  type="button"
+                                  className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                                  onClick={() => handleDefectChange(index, 'checkedQty', (Number(item.checkedQty) || 0) + 1)}
+                                  disabled={isOk}
+                                >+</button>
+                              </div>
+                            )}
+                          </td>
                         {/* Failed QTY with + and - */}
                         <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
                           <div className="flex items-center justify-center space-x-2">
@@ -215,6 +268,9 @@ const InspectionDataSection = ({
                         {/* Pass Rate */}
                         <td className={`border border-gray-300 dark:border-gray-600 px-4 py-2 text-center ${isOk ? "text-gray-400" : "dark:text-white"}`}>
                           {passRate}
+                        </td>
+                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
+                          {aqlAccept}
                         </td>
                         {/* Result */}
                         <td className={`border border-gray-300 dark:border-gray-600 px-4 py-2 text-center ${isOk ? "text-gray-400" : "dark:text-white"}`}>

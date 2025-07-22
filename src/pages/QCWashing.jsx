@@ -270,6 +270,16 @@ useEffect(() => {
     }
   }, [formData.aqlSampleSize, formData.inline, formData.daily]);
 
+  useEffect(() => {
+  setDefectData(prev =>
+    prev.map(item =>
+      item.parameter === "Hand Feel"
+        ? { ...item, checkedQty: formData.washQty }
+        : item
+    )
+  );
+}, [formData.washQty]);
+
    // --- useEffect: Calculate AQL Status ---
   useEffect(() => {
     if ((formData.inline === 'Inline' || formData.daily === 'Inline' || formData.firstOutput === "First Output" || formData.daily === 'First Output') && formData.aqlAcceptedDefect) {
@@ -620,6 +630,7 @@ useEffect(() => {
       fetchOrderNoSuggestions(value);
       setShowOrderNoSuggestions(true);
     }
+    
     // --- Cache state before changing color ---
     if (field === 'color' && value !== formData.color && formData.color) {
       const outgoingColor = formData.color;
@@ -713,21 +724,33 @@ useEffect(() => {
   };
 
   const handleDefectChange = (index, field, value) => {
-  setDefectData(prev =>
-    prev.map((item, i) => {
-      if (i !== index) return item;
-      if (field === "ok" && value) {
-        // If Ok is selected, reset other fields and set no to false
-        return { ...item, ok: true, no: false, checkedQty: 0, failedQty: 0, remark: "" };
-      }
-      if (field === "no" && value) {
-        // If No is selected, set ok to false
-        return { ...item, ok: false, no: true };
-      }
-      return { ...item, [field]: value };
-    })
-  );
-};
+    setDefectData(prev =>
+      prev.map((item, i) => {
+        if (i !== index) return item;
+
+        if (field === "ok" && value) {
+          return { ...item, ok: true, no: false, checkedQty: 0, failedQty: 0, remark: "", aqlAcceptedDefect: undefined, result: "" };
+        }
+        if (field === "no" && value) {
+          return { ...item, ok: false, no: true };
+        }
+        if (field === "checkedQty") {
+          const orderNo = formData.orderNo || formData.style;
+          fetchAqlForParameter(orderNo, value, setDefectData, index);
+          return { ...item, checkedQty: value };
+        }
+        if (field === "failedQty") {
+          const failedQty = Number(value) || 0;
+          let result = item.result;
+          if (item.aqlAcceptedDefect !== undefined) {
+            result = failedQty <= item.aqlAcceptedDefect ? "Pass" : "Fail";
+          }
+          return { ...item, failedQty: value, result };
+        }
+        return { ...item, [field]: value };
+      })
+    );
+  };
 
   const handleCheckboxChange = (index, checkbox, value) => {
     setDefectData((prev) =>
@@ -897,6 +920,95 @@ useEffect(() => {
       });
     }, 100);
   };
+
+  const fetchAqlForParameter = async (orderNo, checkedQty, setDefectData, defectIndex) => {
+  if (!orderNo || !checkedQty) return;
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/qc-washing/aql-chart/parameter`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderNo: orderNo,
+          checkedQty: parseInt(checkedQty, 10) || 0,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        message: `Request failed with status ${response.status}`,
+      }));
+      console.error("AQL API Error:", errorData.message || "Unknown error");
+      // Optionally update defectData state to clear AQL values for this parameter
+      if (setDefectData && typeof defectIndex === "number") {
+        setDefectData(prev =>
+          prev.map((item, idx) =>
+            idx === defectIndex
+              ? { ...item, aqlAcceptedDefect: "", aqlLevelUsed: "", result: "" }
+              : item
+          )
+        );
+      }
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (data.success && data.aqlData) {
+      // Optionally update defectData state for this parameter
+      if (setDefectData && typeof defectIndex === "number") {
+        setDefectData(prev =>
+          prev.map((item, idx) =>
+            idx === defectIndex
+              ? {
+                  ...item,
+                  aqlAcceptedDefect: data.aqlData.acceptedDefect,
+                  aqlLevelUsed: data.aqlData.aqlLevelUsed,
+                  result:
+                    (Number(item.failedQty) || 0) <= data.aqlData.acceptedDefect
+                      ? "Pass"
+                      : "Fail",
+                }
+              : item
+          )
+        );
+      }
+      return data.aqlData;
+    } else {
+      if (setDefectData && typeof defectIndex === "number") {
+        setDefectData(prev =>
+          prev.map((item, idx) =>
+            idx === defectIndex
+              ? { ...item, aqlAcceptedDefect: "", aqlLevelUsed: "", result: "" }
+              : item
+          )
+        );
+      }
+      console.warn(
+        "AQL data not found:",
+        data.message || "No AQL chart found for the given criteria."
+      );
+      return null;
+    }
+  } catch (error) {
+    console.error("Error fetching AQL data:", error);
+    if (setDefectData && typeof defectIndex === "number") {
+      setDefectData(prev =>
+        prev.map((item, idx) =>
+          idx === defectIndex
+            ? { ...item, aqlAcceptedDefect: "", aqlLevelUsed: "", result: "" }
+            : item
+        )
+      );
+    }
+    return null;
+  }
+};
+
+
 
   // --- Measurement ---
   // Calculate totals from Measurement Data to match the Summary Card
@@ -1701,6 +1813,7 @@ useEffect(() => {
           onToggle={() => toggleSection("inspectionData")}
           machineType={machineType}
           setMachineType={setMachineType}
+          washQty={formData.washQty}
         />
 
         <DefectDetailsSection

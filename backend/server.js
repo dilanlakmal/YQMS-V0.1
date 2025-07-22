@@ -2822,6 +2822,55 @@ app.post('/api/qc-washing/first-output-details', async (req, res) => {
   }
 });
 
+// POST /api/qc-washing/aql-chart/for-parameter
+app.post('/api/qc-washing/aql-chart/parameter', async (req, res) => {
+  try {
+    const { orderNo, checkedQty } = req.body;
+
+    if (!orderNo || !checkedQty || isNaN(checkedQty)) {
+      return res.status(400).json({ success: false, message: "Order No and checkedQty are required." });
+    }
+
+    const lotSizeNum = parseInt(checkedQty, 10);
+
+    // FIX: Await the async function
+    const buyer = await getBuyerFromMoNumber(orderNo);
+    const aqlLevel = getAqlLevelForBuyer(buyer);
+
+    // Find the AQL chart document where the lot size falls within the defined range.
+    const aqlChart = await AQLChart.findOne({
+      Type: "General",
+      Level: "II",
+      "LotSize.min": { $lte: lotSizeNum },
+      $or: [
+        { "LotSize.max": { $gte: lotSizeNum } },
+        { "LotSize.max": null }
+      ]
+    }).lean();
+
+    
+
+    // Find the specific AQL entry for the buyer's AQL level.
+    const aqlEntry = aqlChart.AQL.find(aql => aql.level === aqlLevel);
+
+    
+
+    res.json({
+      success: true,
+      aqlData: {
+        sampleSize: aqlChart.SampleSize,
+        acceptedDefect: aqlEntry.AcceptDefect,
+        rejectedDefect: aqlEntry.RejectDefect,
+        aqlLevelUsed: aqlLevel
+      }
+    });
+
+  } catch (error) {
+    console.error('AQL for parameter error:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching AQL details for parameter.' });
+  }
+});
+
 // Load submitted data
 app.get('/api/qc-washing/load-submitted/:orderNo', async (req, res) => {
   try {
