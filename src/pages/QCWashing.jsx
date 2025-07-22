@@ -61,6 +61,17 @@ function transformDefectsByPc(savedDefectsByPc) {
   return {};
 }
 
+function normalizeImagePreview(img) {
+  if (!img) return "";
+  if (typeof img === "string") return img;
+  if (typeof img === "object" && img.preview) {
+    // If img.preview is a string, return it. If it's an object, return its .preview property.
+    return typeof img.preview === "string" ? img.preview : (img.preview.preview || "");
+  }
+  return "";
+}
+
+
 
 const QCWashingPage = () => {
   // Hooks
@@ -538,7 +549,7 @@ useEffect(() => {
             // If images were saved as base64 or URLs, ensure they are handled correctly for display
             setUploadedImages(saved.additionalImage.map(img => ({
              file: null, 
-              preview: img, 
+              preview: normalizeImagePreview(img),
               name: 'image.jpg'
             })));
             }
@@ -1321,12 +1332,11 @@ useEffect(() => {
             setUploadedImages(
               (colorData.defectDetails.additionalImages || []).map(img => ({
                 file: null,
-                preview: img,
+                preview: normalizeImagePreview(img),
                 name: "image.jpg"
               }))
             );
           }
-
 
           setComment(colorData.defectDetails?.comment || "");
           setMeasurementData(processMeasurementData(colorData.measurementDetails || []));
@@ -1435,20 +1445,10 @@ useEffect(() => {
             setUploadedImages(
               (saved.defectDetails.additionalImages || []).map(img => ({
                 file: null,
-                preview: img,
+                preview: normalizeImagePreview(img),
                 name: "image.jpg"
               }))
             );
-          } else if (saved.additionalImages) {
-            setUploadedImages(
-              (saved.additionalImages || []).map(img => ({
-                file: null,
-                preview: img,
-                name: "image.jpg"
-              }))
-            );
-          } else {
-            setUploadedImages([]);
           }
 
           // If defectsByPc also exists under defectDetails, normalize and set it too
