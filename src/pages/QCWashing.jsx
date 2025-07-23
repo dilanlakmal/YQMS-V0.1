@@ -133,6 +133,23 @@ const QCWashingPage = () => {
   const [masterChecklist, setMasterChecklist] = useState([]);
   const [defectOptions, setDefectOptions] = useState([]);
   const [activeTab, setActiveTab] = useState('newInspection');
+  const [overallSummary, setOverallSummary] = useState(null);
+
+  const fetchOverallSummary = async (orderNo, color) => {
+    if (!orderNo || !color) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/overall-summary/${orderNo}/${color}`);
+      const data = await response.json();
+      if (data.success) {
+        setOverallSummary(data.summary);
+      } else {
+        setOverallSummary(null);
+      }
+    } catch (error) {
+      setOverallSummary(null);
+      console.error('Error fetching overall summary:', error);
+    }
+  };
 
   // State: Inspection, Defect, Measurement
   const [inspectionData, setInspectionData] = useState([]);
@@ -280,6 +297,11 @@ useEffect(() => {
     )
   );
 }, [formData.washQty]);
+useEffect(() => {
+  if (formData.orderNo && formData.color) {
+    fetchOverallSummary(formData.orderNo, formData.color);
+  }
+}, [formData.orderNo, formData.color, lastSaved]);
 
    // --- useEffect: Calculate AQL Status ---
   useEffect(() => {
@@ -1789,6 +1811,7 @@ useEffect(() => {
          {activeTab === 'newInspection' && (
         <>
         <OverAllSummaryCard
+          summary={overallSummary}
           measurementData={formData.colors[0]?.measurementDetails} 
           defectDetails={formData.colors[0]?.defectDetails} 
           reportType={formData.reportType}

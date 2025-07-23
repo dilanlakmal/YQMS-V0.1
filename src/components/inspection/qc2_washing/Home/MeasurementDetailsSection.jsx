@@ -889,43 +889,43 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                 {currentWashMeasurements.map((data, index) => (
                   <div key={`saved-${index}`} className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-medium text-gray-800">Size: {data.size} (Qty: {data.qty})</h4>
+                      <h4 className="font-medium text-gray-800 text-lg">Size: {data.size} (Qty: {data.qty})</h4>
                       <div className="flex space-x-2">
                         <button
                           onClick={() => handleEditClick(data.size)}
-                          className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                          className="px-2 py-1 bg-blue-600 text-white rounded text-s hover:bg-blue-700"
                         >
                           Edit
                         </button>
-                        <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                        <span className="text-s text-green-600 bg-green-100 px-2 py-1 rounded-full">
                           Saved
                         </span>
                       </div>
                     </div>
                     <div className="text-sm text-gray-600">
-                      <p>Total measurements: {(data.pcs || []).reduce((total, pc) => total + (pc.measurementPoints?.length || 0), 0)}</p>                      
+                      {/* <p>Total measurements: {(data.pcs || []).reduce((total, pc) => total + (pc.measurementPoints?.length || 0), 0)}</p>                       */}
                     </div>
                     <div className="mt-2 grid grid-cols-3 gap-2">
                       {/* Total Checked Points */}
                       <div className="bg-gray-100 p-2 rounded-md text-center">
-                        <span className="text-blue-500 font-semibold">{data.pcs.flatMap(pc => pc.measurementPoints).length}</span>
-                        <p className="text-xs text-gray-500">Checked</p>
+                        <span className="text-blue-500 font-semibold text-2xl">{data.pcs.flatMap(pc => pc.measurementPoints).length}</span>
+                        <p className="text-s text-gray-900">Checked</p>
                       </div>
 
                       {/* Pass Count */}
                       <div className="bg-green-100 p-2 rounded-md text-center">
-                        <span className="text-green-500 font-semibold">
+                        <span className="text-green-500 font-semibold text-2xl">
                           {data.pcs.flatMap(pc => pc.measurementPoints).filter(point => point.result === 'pass').length}
                         </span>
-                        <p className="text-xs text-gray-500">Pass</p>
+                        <p className="text-s text-gray-900">Pass</p>
                       </div>
 
                       {/* Fail Count */}
                       <div className="bg-red-100 p-2 rounded-md text-center">
-                        <span className="text-red-500 font-semibold">
+                        <span className="text-red-500 font-semibold text-2xl">
                           {data.pcs.flatMap(pc => pc.measurementPoints).filter(point => point.result === 'fail').length}
                         </span>
-                        <p className="text-xs text-gray-500">Fail</p>
+                        <p className="text-s text-gray-900">Fail</p>
                       </div>
                     </div>
                   </div>

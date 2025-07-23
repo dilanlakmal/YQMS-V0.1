@@ -71,7 +71,7 @@ const InspectionDataSection = ({
               </tbody>
             </table>
           </div>
-          <div className="mb-4">
+          <div className="mb-4 mt-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Machine Type
             </label>

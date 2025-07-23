@@ -2645,6 +2645,89 @@ app.put('/api/qc-washing/update/:recordId', async (req, res) => {
   }
 });
 
+// GET - Get overall summary for a given orderNo and color
+app.get('/api/qc-washing/overall-summary/:orderNo/:color', async (req, res) => {
+  try {
+    const { orderNo, color } = req.params;
+    const qcRecord = await QCWashing.findOne({ orderNo: orderNo });
+    if (!qcRecord || !qcRecord.colors) {
+      return res.status(404).json({ success: false, message: 'No data found for this order.' });
+    }
+    const colorData = qcRecord.colors.find(c => c.colorName === color);
+    if (!colorData) {
+      return res.status(404).json({ success: false, message: 'No data found for this color.' });
+    }
+
+    // Measurement points and checked pcs
+    let measurementPoints = 0, measurementPass = 0, totalCheckedPcs = 0;
+    (colorData.measurementDetails || []).forEach(md => {
+      if (Array.isArray(md.pcs)) {
+        totalCheckedPcs += md.pcs.length; // <-- FIXED: sum of pcs
+        md.pcs.forEach(pc => {
+          (pc.measurementPoints || []).forEach(point => {
+            if (point.result === 'pass' || point.result === 'fail') {
+              measurementPoints++;
+              if (point.result === 'pass') measurementPass++;
+            }
+          });
+        });
+      }
+    });
+    const totalFail = measurementPoints - measurementPass;
+    const passRate = measurementPoints > 0 ? ((measurementPass / measurementPoints) * 100).toFixed(2) : 0;
+
+    // Defect details
+    const defectDetails = colorData.defectDetails || {};
+    let rejectedDefectPcs = 0;
+    let totalDefectCount = 0;
+    if (Array.isArray(defectDetails.defectsByPc)) {
+      rejectedDefectPcs = defectDetails.defectsByPc.length; // <-- FIXED: count of PCs with defects
+      totalDefectCount = defectDetails.defectsByPc.reduce((sum, pc) => sum + (Array.isArray(pc.pcDefects) ? pc.pcDefects.length : 0), 0);
+    }
+    const washQty = parseInt(defectDetails.washQty) || 0;
+    const defectRate = totalCheckedPcs > 0 ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(2) : 0;
+    const defectRatio = totalCheckedPcs > 0 ? (totalDefectCount / totalCheckedPcs).toFixed(2) : 0;
+    const checkedQty = defectDetails.checkedQty || ""; 
+
+    // Overall result
+    const measurementOverallResult = totalFail > 0 ? "Fail" : "Pass";
+    const defectOverallResult = defectDetails.result || "N/A";
+    let overallResult = "N/A";
+    if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
+      overallResult = "Fail";
+    } else if (measurementOverallResult === "Pass" && defectOverallResult === "Pass") {
+      overallResult = "Pass";
+    }
+
+    res.json({
+      success: true,
+      summary: {
+        orderNo,
+        color,
+        totalCheckedPcs,
+        checkedQty,
+        washQty,
+        rejectedDefectPcs,
+        totalDefectCount,
+        defectRate,
+        defectRatio,
+        overallResult,
+        passRate,
+        measurementPoints,
+        measurementPass,
+        totalFail,
+        measurementOverallResult,
+        defectOverallResult,
+        defectDetails,
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching overall summary:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching overall summary.' });
+  }
+});
+
+
 const getAqlLevelForBuyer = (buyer) => {
   // console.log(`Buyer: ${buyer}`);
   if (!buyer) return 1.0;
