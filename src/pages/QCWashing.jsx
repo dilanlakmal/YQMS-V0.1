@@ -491,15 +491,14 @@ useEffect(() => {
             date: saved.formData.date
               ? saved.formData.date.split("T")[0]
               : new Date().toISOString().split("T")[0],
-            orderQty: saved?.formData.orderQty || prev.orderQty,
-            buyer: saved?.formData.buyer || prev.buyer,
-            aqlSampleSize: saved?.formData.aqlSampleSize || prev.aqlSampleSize,
-            aqlAcceptedDefect:
-              saved?.formData.aqlAcceptedDefect || prev.aqlAcceptedDefect,
-            aqlRejectedDefect:
-              saved?.formData.aqlRejectedDefect || prev.aqlRejectedDefect,
-            aqlLevelUsed: saved?.formData.aqlLevelUsed || "",
+            orderQty: saved?.formData.orderQty || saved?.colors?.[0]?.orderDetails?.orderQty || prev.orderQty,
+            buyer: saved?.formData.buyer || saved?.colors?.[0]?.orderDetails?.buyer || prev.buyer,
+            aqlSampleSize: saved?.formData.aqlSampleSize || saved?.colors?.[0]?.orderDetails?.aqlSampleSize || prev.aqlSampleSize,
+            aqlAcceptedDefect: saved?.formData.aqlAcceptedDefect || saved?.colors?.[0]?.orderDetails?.aqlAcceptedDefect || prev.aqlAcceptedDefect,
+            aqlRejectedDefect: saved?.formData.aqlRejectedDefect || saved?.colors?.[0]?.orderDetails?.aqlRejectedDefect || prev.aqlRejectedDefect,
+            aqlLevelUsed: saved?.formData.aqlLevelUsed || saved?.colors?.[0]?.orderDetails?.aqlLevelUsed || "",
           }));
+       
 
           // Fetch all colors for the order/style, even when loading saved data
           let colorResponse = await fetch(
@@ -1412,7 +1411,19 @@ useEffect(() => {
                 color: updatedColor,
                 reportType: colorData.orderDetails.reportType || prev.reportType,
                 washQty: colorData.defectDetails?.washQty || prev.washQty,
-                checkedQty: colorData.defectDetails?.checkedQty || prev.checkedQty, 
+                checkedQty: colorData.defectDetails?.checkedQty || prev.checkedQty,
+                aqlSampleSize: colorData.orderDetails.aqlSampleSize
+                  || colorData.inspectionDetails?.aqlSampleSize
+                  || prev.aqlSampleSize,
+                aqlAcceptedDefect: colorData.orderDetails.aqlAcceptedDefect
+                  || colorData.inspectionDetails?.aqlAcceptedDefect
+                  || prev.aqlAcceptedDefect,
+                aqlRejectedDefect: colorData.orderDetails.aqlRejectedDefect
+                  || colorData.inspectionDetails?.aqlRejectedDefect
+                  || prev.aqlRejectedDefect,
+                aqlLevelUsed: colorData.orderDetails.aqlLevelUsed
+                  || colorData.inspectionDetails?.aqlLevelUsed
+                  || prev.aqlLevelUsed, 
               };
             });
           }
@@ -1510,15 +1521,12 @@ useEffect(() => {
             date: saved.formData.date
               ? saved.formData.date.split("T")[0]
               : new Date().toISOString().split("T")[0],
-              orderQty: saved?.formData.orderQty || prev.orderQty,
-              buyer: saved?.formData.buyer || prev.buyer,
-              aqlSampleSize: saved?.formData.aqlSampleSize || prev.aqlSampleSize,
-            aqlAcceptedDefect:
-              saved?.formData.aqlAcceptedDefect || prev.aqlAcceptedDefect,
-            aqlRejectedDefect:
-              saved?.formData.aqlRejectedDefect || prev.aqlRejectedDefect,
-            aqlLevelUsed: saved?.formData.aqlLevelUsed || "",
-            
+              orderQty: saved?.formData.orderQty || saved?.colors?.[0]?.orderDetails?.orderQty || prev.orderQty,
+              buyer: saved?.formData.buyer || saved?.colors?.[0]?.orderDetails?.buyer || prev.buyer,
+              aqlSampleSize: saved?.formData.aqlSampleSize || saved?.colors?.[0]?.orderDetails?.aqlSampleSize || prev.aqlSampleSize,
+              aqlAcceptedDefect: saved?.formData.aqlAcceptedDefect || saved?.colors?.[0]?.orderDetails?.aqlAcceptedDefect || prev.aqlAcceptedDefect,
+              aqlRejectedDefect: saved?.formData.aqlRejectedDefect || saved?.colors?.[0]?.orderDetails?.aqlRejectedDefect || prev.aqlRejectedDefect,
+              aqlLevelUsed: saved?.formData.aqlLevelUsed || saved?.colors?.[0]?.orderDetails?.aqlLevelUsed || "",
           }));
 
           if (saved.formData.color) {

@@ -2496,7 +2496,11 @@ app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
         buyer: savedData.colors?.[0]?.orderDetails?.buyer || '',
         factoryName: savedData.colors?.[0]?.orderDetails?.factoryName || 'YM',
         checkedQty: savedData.colors?.[0]?.defectDetails?.checkedQty || '',
-        washQty: savedData.colors?.[0]?.defectDetails?.washQty || ''
+        washQty: savedData.colors?.[0]?.defectDetails?.washQty || '',
+        aqlSampleSize: savedData.colors?.[0]?.orderDetails?.aqlSampleSize || '',
+        aqlAcceptedDefect: savedData.colors?.[0]?.orderDetails?.aqlAcceptedDefect || '',
+        aqlRejectedDefect: savedData.colors?.[0]?.orderDetails?.aqlRejectedDefect || '',
+        aqlLevelUsed: savedData.colors?.[0]?.orderDetails?.aqlLevelUsed || '',
       };
 
       const firstColorData = savedData.colors?.[0];

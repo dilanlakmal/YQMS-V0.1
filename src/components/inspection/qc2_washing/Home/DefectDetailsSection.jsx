@@ -252,8 +252,8 @@ const DefectDetailsSection = ({
             {/* AQL Information Display */}
          {((formData.inline === 'Inline' || formData.daily === 'Inline') || formData.firstOutput === "First Output") && 
            (formData.aqlSampleSize || formData.aqlAcceptedDefect || formData.aqlRejectedDefect) && (
-            <div className="md:col-span-2 bg-blue-50 border border-blue-200 rounded-lg p-4">
-               <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">
+            <div className="md:col-span-2 bg-blue-50 dark:bg-slate-800 border border-blue-200 dark:border-slate-600 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">
                 AQL Information (Level II, AQL {formData.aqlLevelUsed || 'N/A'})
               </h3>
               <div className="grid grid-cols-4 gap-4 text-sm">
@@ -270,13 +270,14 @@ const DefectDetailsSection = ({
                   <span className="ml-2 text-blue-900 dark:text-blue-200">{formData.aqlRejectedDefect || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="font-medium text-blue-700">Status:</span>
+                  <span className="font-medium text-blue-700 dark:text-blue-300">Status:</span>
                   <span className={`ml-2 px-2 py-1 rounded-full text-xs font-bold ${statusColorClass}`}>
                     {defectStatus || 'N/A'}
                   </span>
                 </div>
               </div>
             </div>
+
           )}
           </div>
 
