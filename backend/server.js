@@ -2116,6 +2116,60 @@ app.get('/api/qc-washing/order-details-by-order/:orderNo', async (req, res) => {
   }
 });
 
+function calculateSummaryFields(qcRecord, colorName) {
+  if (!qcRecord || !qcRecord.colors) return {};
+
+  const colorData = qcRecord.colors.find(c => c.colorName === colorName);
+  if (!colorData) return {};
+
+  let measurementPoints = 0, measurementPass = 0, totalCheckedPcs = 0;
+  (colorData.measurementDetails || []).forEach(md => {
+    if (Array.isArray(md.pcs)) {
+      totalCheckedPcs += md.pcs.length;
+      md.pcs.forEach(pc => {
+        (pc.measurementPoints || []).forEach(point => {
+          if (point.result === 'pass' || point.result === 'fail') {
+            measurementPoints++;
+            if (point.result === 'pass') measurementPass++;
+          }
+        });
+      });
+    }
+  });
+
+  const defectDetails = colorData.defectDetails || {};
+  let rejectedDefectPcs = 0;
+  let totalDefectCount = 0;
+  if (Array.isArray(defectDetails.defectsByPc)) {
+    rejectedDefectPcs = defectDetails.defectsByPc.length;
+    totalDefectCount = defectDetails.defectsByPc.reduce(
+      (sum, pc) => sum + (Array.isArray(pc.pcDefects) ? pc.pcDefects.length : 0), 0
+    );
+  }
+  const defectRate = totalCheckedPcs > 0 ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(2) : 0;
+  const defectRatio = totalCheckedPcs > 0 ? (totalDefectCount / totalCheckedPcs).toFixed(2) : 0;
+
+  const totalFail = measurementPoints - measurementPass;
+  const measurementOverallResult = totalFail > 0 ? "Fail" : "Pass";
+  const defectOverallResult = defectDetails.result || "N/A";
+  let overallFinalResult = "N/A";
+  if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
+    overallFinalResult = "Fail";
+  } else if (measurementOverallResult === "Pass" && defectOverallResult === "Pass") {
+    overallFinalResult = "Pass";
+  }
+
+  return {
+    totalCheckedPcs,
+    rejectedDefectPcs,
+    totalDefectCount,
+    defectRate: parseFloat(defectRate),
+    defectRatio: parseFloat(defectRatio),
+    overallFinalResult,
+  };
+}
+
+
 // Save size data
 app.post('/api/qc-washing/save-size', async (req, res) => {
   try {
@@ -2280,11 +2334,14 @@ app.post('/api/qc-washing/submit', async (req, res) => {
         },
         measurementDetails: measurementDetails || []
       },
+      
       isAutoSave: false,
       userId: userId,
       submittedAt: new Date(),
       status: 'submitted'
     };
+    const summaryFields = calculateSummaryFields(fakeRecord, formData.color);
+    Object.assign(submitData, summaryFields);
 
     // Check if any record already exists (auto-save or submitted)
     const existingRecord = await QCWashing.findOne({ orderNo: orderNo });
@@ -2407,6 +2464,8 @@ app.post('/api/qc-washing/auto-save-color', uploadQcWashingFiles.array("images",
       colorEntry.defectDetails = colorData.defectDetails; // This now includes defectsByPc and additionalImages
       colorEntry.measurementDetails = colorData.measurementDetails;
     }
+    const summaryFields = calculateSummaryFields(qcRecord, colorName);
+    Object.assign(qcRecord, summaryFields);
 
     qcRecord.savedAt = new Date();
     await qcRecord.save();
