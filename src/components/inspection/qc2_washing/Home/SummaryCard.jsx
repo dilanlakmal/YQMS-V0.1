@@ -46,7 +46,7 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
   const overallResult =
     measurementPoints === 0
       ? "PENDING"
-      : parseFloat(passRate) >= 80
+      : parseFloat(passRate) >= 90
       ? "PASS"
       : "FAIL";
   const resultColor =
