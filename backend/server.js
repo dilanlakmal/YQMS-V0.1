@@ -2151,7 +2151,7 @@ function calculateSummaryFields(qcRecord, colorName) {
       (sum, pc) => sum + (Array.isArray(pc.pcDefects) ? pc.pcDefects.length : 0), 0
     );
   }
-  const defectRate = totalCheckedPcs > 0 ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(2) : 0;
+  const defectRate = totalCheckedPcs > 0 ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(1) : 0;
   const defectRatio = totalCheckedPcs > 0 ? (totalDefectCount / totalCheckedPcs).toFixed(2) : 0;
 
   const totalFail = measurementPoints - measurementPass;
@@ -2682,7 +2682,7 @@ app.get('/api/qc-washing/overall-summary/:orderNo/:color', async (req, res) => {
       totalDefectCount = defectDetails.defectsByPc.reduce((sum, pc) => sum + (Array.isArray(pc.pcDefects) ? pc.pcDefects.length : 0), 0);
     }
     const washQty = parseInt(defectDetails.washQty) || 0;
-    const defectRate = totalCheckedPcs > 0 ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(2) : 0;
+    const defectRate = totalCheckedPcs > 0 ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(1) : 0;
     const defectRatio = totalCheckedPcs > 0 ? (totalDefectCount / totalCheckedPcs).toFixed(2) : 0;
     const checkedQty = defectDetails.checkedQty || ""; 
 
@@ -2726,10 +2726,8 @@ app.get('/api/qc-washing/overall-summary/:orderNo/:color', async (req, res) => {
 
 
 const getAqlLevelForBuyer = (buyer) => {
-  // console.log(`Buyer: ${buyer}`);
   if (!buyer) return 1.0;
   const buyerUpper = buyer.toUpperCase();
-  // console.log(`Buyer Upper Case: ${buyerUpper}`);
   
   if (buyerUpper.includes('MWW')) return 2.5;
   if (buyerUpper.includes('REITMANS')) return 4.0;
@@ -2940,7 +2938,7 @@ app.post('/api/qc-washing/aql-chart/parameter', async (req, res) => {
 
     if (!aqlEntry) {
       // Log for debugging
-      console.error('AQL for parameter error: No entry found for level', aqlLevel, 'in', aqlChart.AQL);
+      // console.error('AQL for parameter error: No entry found for level', aqlLevel, 'in', aqlChart.AQL);
       return res.status(404).json({ success: false, message: `AQL level ${aqlLevel} not found for the matching chart.` });
     }
 

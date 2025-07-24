@@ -109,7 +109,7 @@ function calculateSummaryData(currentFormData) {
 
   const calculatedDefectRate =
     calculatedTotalCheckedPcs > 0
-      ? ((calculatedTotalDefectCount / calculatedTotalCheckedPcs) * 100).toFixed(2)
+      ? ((calculatedTotalDefectCount / calculatedTotalCheckedPcs) * 100).toFixed(1)
       : 0;
 
   const calculatedDefectRatio =
@@ -326,11 +326,9 @@ const QCWashingPage = () => {
   }, [formData, inspectionData, processData, defectData, addedDefects, comment, measurementData, uploadedImages, defectsByPc, isDataLoading]); 
 
   useEffect(() => {
-  // console.log("defectsByPc after load:", defectsByPc);
 }, [defectsByPc]);
 
 useEffect(() => {
-  // console.log("uploadedImages after load:", uploadedImages);
 }, [uploadedImages]);
 
 
@@ -984,10 +982,10 @@ useEffect(() => {
           aqlRejectedDefect: "",
            aqlLevelUsed: "",
         }));
-        console.warn(
-          "AQL data not found:",
-          data.message || "No AQL chart found for the given criteria."
-        );
+        // console.warn(
+        //   "AQL data not found:",
+        //   data.message || "No AQL chart found for the given criteria."
+        // );
       }
     } catch (error) {
       console.error("Error fetching AQL data:", error);
@@ -1030,7 +1028,7 @@ useEffect(() => {
       const errorData = await response.json().catch(() => ({
         message: `Request failed with status ${response.status}`,
       }));
-      console.error("AQL API Error:", errorData.message || "Unknown error");
+      // console.error("AQL API Error:", errorData.message || "Unknown error");
       // Optionally update defectData state to clear AQL values for this parameter
       if (setDefectData && typeof defectIndex === "number") {
         setDefectData(prev =>
@@ -1076,10 +1074,10 @@ useEffect(() => {
           )
         );
       }
-      console.warn(
-        "AQL data not found:",
-        data.message || "No AQL chart found for the given criteria."
-      );
+      // console.warn(
+      //   "AQL data not found:",
+      //   data.message || "No AQL chart found for the given criteria."
+      // );
       return null;
     }
   } catch (error) {
@@ -2060,7 +2058,7 @@ useEffect(() => {
                 };
 
                 // --- 3. Debug: Log the payload before sending ---
-                console.log('Submit payload:', submitData);
+                
 
                 // --- 4. Submit to the server ---
                 const response = await fetch(
