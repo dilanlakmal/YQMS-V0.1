@@ -81,7 +81,7 @@ const DefectDetailsSection = ({
         {
           id: (prev[pc]?.length || 0) + 1,
           selectedDefect: '',
-          defectQty: '',
+          defectQty: 1,
           defectImages: [],
           isBodyVisible: true,
         },
@@ -92,7 +92,7 @@ const DefectDetailsSection = ({
   const handleAddPc = () => {
     setDefectsByPc(prev => ({
       ...prev,
-      [(Object.keys(prev).length || 0) + 1]: [{ id: 1, selectedDefect: '', defectQty: '',  defectImages: [], isBodyVisible: true }],
+      [(Object.keys(prev).length || 0) + 1]: [{ id: 1, selectedDefect: '', defectQty: 1,  defectImages: [], isBodyVisible: true }],
     }));
   };
   
