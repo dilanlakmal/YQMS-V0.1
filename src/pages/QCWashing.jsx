@@ -71,7 +71,74 @@ function normalizeImagePreview(img) {
   return "";
 }
 
+function calculateSummaryData(currentFormData) {
+  const currentDefectDetails = currentFormData.colors[0]?.defectDetails;
+  const currentMeasurementData = currentFormData.colors[0]?.measurementDetails;
 
+  let calculatedMeasurementPoints = 0;
+  let calculatedMeasurementPass = 0;
+
+  if (currentMeasurementData && Array.isArray(currentMeasurementData)) {
+    currentMeasurementData.forEach((data) => {
+      if (data.pcs && Array.isArray(data.pcs)) {
+        data.pcs.forEach((pc) => {
+          if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
+            pc.measurementPoints.forEach((point) => {
+              if (point.result === 'pass' || point.result === 'fail') {
+                calculatedMeasurementPoints++;
+                if (point.result === 'pass') {
+                  calculatedMeasurementPass++;
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // Always use Number() to ensure numeric values
+  const calculatedTotalCheckedPcs = Number(currentDefectDetails?.checkedQty) || 0;
+  const calculatedWashQty = Number(currentDefectDetails?.washQty) || 0;
+  const calculatedRejectedDefectPcs = currentDefectDetails?.result === "Fail" ? calculatedTotalCheckedPcs : 0;
+
+  // Use pc.pcDefects for defect counting
+  const calculatedTotalDefectCount = currentDefectDetails?.defectsByPc
+    ? currentDefectDetails.defectsByPc.reduce((sum, pc) => sum + (pc.pcDefects ? pc.pcDefects.length : 0), 0)
+    : 0;
+
+  const calculatedDefectRate =
+    calculatedTotalCheckedPcs > 0
+      ? ((calculatedTotalDefectCount / calculatedTotalCheckedPcs) * 100).toFixed(2)
+      : 0;
+
+  const calculatedDefectRatio =
+    calculatedTotalCheckedPcs > 0
+      ? (calculatedTotalDefectCount / calculatedTotalCheckedPcs).toFixed(2)
+      : 0;
+
+  let calculatedOverallResult = "Pass";
+  const measurementOverallResult =
+    calculatedMeasurementPoints - calculatedMeasurementPass > 0 ? "Fail" : "Pass";
+  const defectOverallResult = currentDefectDetails?.result || "N/A";
+
+  if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
+    calculatedOverallResult = "Fail";
+  } else if (measurementOverallResult === "Pass" && defectOverallResult === "Pass") {
+    calculatedOverallResult = "Pass";
+  } else {
+    calculatedOverallResult = "N/A";
+  }
+
+  return {
+    totalCheckedPcs: calculatedTotalCheckedPcs,
+    rejectedDefectPcs: calculatedRejectedDefectPcs,
+    totalDefectCount: calculatedTotalDefectCount,
+    defectRate: parseFloat(calculatedDefectRate) || 0,
+    defectRatio: parseFloat(calculatedDefectRatio) || 0,
+    overallFinalResult: calculatedOverallResult,
+  };
+}
 
 const QCWashingPage = () => {
   // Hooks
@@ -1312,70 +1379,12 @@ useEffect(() => {
      // Function to calculate and update summary data (NEW/MODIFIED)
   // This function should be called whenever relevant data (defectDetails, measurementData) changes
   const updateSummaryData = (currentFormData) => {
-    const currentDefectDetails = currentFormData.colors[0]?.defectDetails; // Assuming single color for simplicity
-    const currentMeasurementData = currentFormData.colors[0]?.measurementDetails; // Assuming single color
-
-    // Recalculate based on the logic in OverAllSummaryCard
-    let calculatedMeasurementPoints = 0;
-    let calculatedMeasurementPass = 0;
-
-    if (currentMeasurementData && Array.isArray(currentMeasurementData)) {
-        currentMeasurementData.forEach((data) => {
-            if (data.pcs && Array.isArray(data.pcs)) {
-                data.pcs.forEach((pc) => {
-                    if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
-                        pc.measurementPoints.forEach((point) => {
-                            if (point.result === 'pass' || point.result === 'fail') {
-                                calculatedMeasurementPoints++;
-                                if (point.result === 'pass') {
-                                    calculatedMeasurementPass++;
-                                }
-                            }
-                        });
-                    }
-                });
-            }
-        });
-    }
-
-    const calculatedTotalCheckedPcs = currentDefectDetails?.checkedQty || 0;
-    const calculatedWashQty = currentDefectDetails?.washQty || 0;
-    const calculatedRejectedDefectPcs = currentDefectDetails?.result === "Fail" ? calculatedTotalCheckedPcs : 0;
-    
-    const calculatedTotalDefectCount = currentDefectDetails?.defectsByPc.reduce((sum, pc) => {
-        return sum + (pc.defects ? pc.defects.length : 0);
-    }, 0);
-
-    const calculatedDefectRate =
-        calculatedTotalCheckedPcs > 0
-            ? ((calculatedTotalDefectCount / calculatedTotalCheckedPcs) * 100).toFixed(2)
-            : 0;
-    
-    const calculatedDefectRatio = calculatedTotalCheckedPcs > 0 ? (calculatedTotalDefectCount / calculatedTotalCheckedPcs).toFixed(2) : 0;
-
-    let calculatedOverallResult = "Pass";
-    const measurementOverallResult = calculatedMeasurementPoints - calculatedMeasurementPass > 0 ? "Fail" : "Pass";
-    const defectOverallResult = currentDefectDetails?.result || "N/A";
-
-    if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
-      calculatedOverallResult = "Fail";
-    } else if (measurementOverallResult === "Pass" && defectOverallResult === "Pass") {
-      calculatedOverallResult = "Pass";
-    } else {
-      calculatedOverallResult = "N/A";
-    }
-
-
-    setFormData((prevData) => ({
-      ...prevData,
-      totalCheckedPcs: calculatedTotalCheckedPcs,
-      rejectedDefectPcs: calculatedRejectedDefectPcs,
-      totalDefectCount: calculatedTotalDefectCount,
-      defectRate: parseFloat(calculatedDefectRate), // Ensure it's a number
-      defectRatio: parseFloat(calculatedDefectRatio), // Ensure it's a number
-      overallFinalResult: calculatedOverallResult,
-    }));
-  };
+  const summary = calculateSummaryData(currentFormData);
+  setFormData((prevData) => ({
+    ...prevData,
+    ...summary,
+  }));
+};
 
   // useEffect to trigger summary data update when relevant form data changes
   useEffect(() => {
@@ -1949,7 +1958,31 @@ useEffect(() => {
             className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
             onClick={async () => {
               try {
-                 const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
+                // --- 1. Recalculate summary with the latest state ---
+                const summary = calculateSummaryData({
+                  ...formData,
+                  colors: [{
+                    ...formData.colors[0],
+                    defectDetails: {
+                      ...formData.colors[0]?.defectDetails,
+                      checkedQty: formData.checkedQty,
+                      washQty: formData.washQty,
+                      result: formData.result,
+                      defectsByPc: Object.entries(defectsByPc).map(([pcNumber, pcDefects]) => ({
+                        pcNumber,
+                        pcDefects,
+                      })),
+                    },
+                    measurementDetails: [
+                      ...measurementData.beforeWash.map((item) => ({ ...item, washType: "beforeWash" })),
+                      ...measurementData.afterWash.map((item) => ({ ...item, washType: "afterWash" })),
+                    ],
+                  }]
+                });
+
+                // --- 2. Build the submitData payload ---
+                const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
+
                 const submitData = {
                   orderNo: formData.orderNo || formData.style,
                   date: formData.date,
@@ -1961,12 +1994,7 @@ useEffect(() => {
                   totalPass,
                   totalFail,
                   passRate,
-                  totalCheckedPcs: formData.totalCheckedPcs,
-                  rejectedDefectPcs: formData.rejectedDefectPcs,
-                  totalDefectCount: formData.totalDefectCount,
-                  defectRate: formData.defectRate,
-                  defectRatio: formData.defectRatio,
-                  overallFinalResult: formData.overallFinalResult,
+                  ...summary, // <-- This ensures all summary fields are at the top level
                   submittedAt: new Date().toISOString(),
                   userId: user?.emp_id,
                   color: {
@@ -1987,27 +2015,26 @@ useEffect(() => {
                         condition: item.na ? "N/A" : "Active",
                         remark: item.remark,
                       })),
-                     parameters: defectData.map(item => {
-                      const checkedQty = Number(item.checkedQty) || 0;
-                      const failedQty = Number(item.failedQty) || 0;
-                      const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
-                      // Use the correct result logic below!
-                      const result = (item.aqlAcceptedDefect !== undefined && checkedQty > 0)
-                        ? (failedQty <= item.aqlAcceptedDefect ? "Pass" : "Fail")
-                        : "";
-                      return {
-                        parameterName: item.parameter,
-                        checkedQty: item.checkedQty || 0,
-                        failedQty: item.failedQty || 0,
-                        passRate,
-                        result,
-                        remark: item.remark,
-                        ok: item.ok,
-                        no: item.no,
-                        checkboxes: item.checkboxes || {},
-                      };
-                    }),
-                  },
+                      parameters: defectData.map(item => {
+                        const checkedQty = Number(item.checkedQty) || 0;
+                        const failedQty = Number(item.failedQty) || 0;
+                        const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
+                        const result = (item.aqlAcceptedDefect !== undefined && checkedQty > 0)
+                          ? (failedQty <= item.aqlAcceptedDefect ? "Pass" : "Fail")
+                          : "";
+                        return {
+                          parameterName: item.parameter,
+                          checkedQty: item.checkedQty || 0,
+                          failedQty: item.failedQty || 0,
+                          passRate,
+                          result,
+                          remark: item.remark,
+                          ok: item.ok,
+                          no: item.no,
+                          checkboxes: item.checkboxes || {},
+                        };
+                      }),
+                    },
                     defectDetails: {
                       washQty: formData.washQty,
                       checkedQty: formData.checkedQty,
@@ -2018,27 +2045,24 @@ useEffect(() => {
                           pcDefects: await Promise.all((Array.isArray(pcDefects) ? pcDefects : []).map(async (defect) => ({
                             defectName: defect.selectedDefect,
                             defectQty: defect.defectQty,
-                            defectImages: await Promise.all((defect.defectImages || []).map(img => imageToBase64(img))) // Use the new helper here
+                            defectImages: await Promise.all((defect.defectImages || []).map(img => imageToBase64(img)))
                           })))
                         })
                       )),
-
-                      comment: comment,            
-                       additionalImages: await Promise.all(uploadedImages.map(img => imageToBase64(img))), // Use the new helper here
+                      comment: comment,
+                      additionalImages: await Promise.all(uploadedImages.map(img => imageToBase64(img))),
                     },
                     measurementDetails: [
-                      ...measurementData.beforeWash.map((item) => ({
-                        ...item,
-                        washType: "beforeWash",
-                      })),
-                      ...measurementData.afterWash.map((item) => ({
-                        ...item,
-                        washType: "afterWash",
-                      })),
+                      ...measurementData.beforeWash.map((item) => ({ ...item, washType: "beforeWash" })),
+                      ...measurementData.afterWash.map((item) => ({ ...item, washType: "afterWash" })),
                     ],
                   },
                 };
 
+                // --- 3. Debug: Log the payload before sending ---
+                console.log('Submit payload:', submitData);
+
+                // --- 4. Submit to the server ---
                 const response = await fetch(
                   `${API_BASE_URL}/api/qc-washing/submit`,
                   {
@@ -2049,6 +2073,7 @@ useEffect(() => {
                 );
 
                 const result = await response.json();
+
                 if (result.success) {
                   Swal.fire(
                     "Success",
@@ -2057,11 +2082,9 @@ useEffect(() => {
                   );
                   setAutoSaveId(null);
                   setLastSaved(null);
-
-                  // Reset form after successful submission
                   setTimeout(() => {
                     window.location.reload();
-                  }, 1500);
+                  }, 500);
                 } else {
                   Swal.fire(
                     "Error",
@@ -2077,6 +2100,7 @@ useEffect(() => {
           >
             Submit
           </button>
+
         </div>
         </>
         )}

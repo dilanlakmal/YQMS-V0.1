@@ -1887,6 +1887,7 @@ app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
     
     const orderQty = orders.reduce((sum, order) => sum + (order.TotalQty || 0), 0);
     const buyerName = getBuyerFromMoNumber(orderNo);
+    
 
     res.json({
       success: true,
@@ -2266,53 +2267,96 @@ app.get('/api/qc-washing/saved-sizes/:orderNo/:color', async (req, res) => {
 });
 
 // Submit final data - update existing or create new
+// app.post('/api/qc-washing/submit', async (req, res) => {
+//   try {
+//     const body = req.body;
+//      console.log("Received body:", JSON.stringify(body, null, 2));
+//     const orderNo = body.orderNo || body.style;
+
+//     const submitData = {
+//       orderNo,
+//       reportType: body.reportType,
+//       checkedQty: body.checkedQty,
+//       washQty: body.washQty,
+
+//       // Keep these values from the client instead of overriding
+//       totalCheckedPoint: body.totalCheckedPoint || (
+//         (body.color?.inspectionDetails?.checkedPoints?.length || 0) +
+//         (body.color?.inspectionDetails?.parameters?.length || 0)
+//       ),
+//       totalPass: body.totalPass || (body.color?.inspectionDetails?.parameters?.filter(item => item.ok)?.length || 0),
+//       totalFail: body.totalFail || (body.color?.inspectionDetails?.parameters?.filter(item => item.no)?.length || 0),
+
+//       // Preserve the actual values sent by client
+//       totalCheckedPcs: Number(body.totalCheckedPcs) || 0,
+//       rejectedDefectPcs: Number(body.rejectedDefectPcs) || 0,
+//       totalDefectCount: Number(body.totalDefectCount) || 0,
+//       defectRate: Number(body.defectRate) || 0,
+//       defectRatio: Number(body.defectRatio) || 0,
+//       overallFinalResult: body.overallFinalResult || "N/A",
+
+//       color: body.color,
+//       measurementDetails: body.color?.measurementDetails || [],
+//       isAutoSave: false,
+//       userId: body.userId,
+//       submittedAt: new Date(),
+//       status: 'submitted'
+//     };
+
+//     // Keep additional summary fields (if needed)
+//     // const summaryFields = calculateSummaryFields(body.color?.orderDetails?.color);
+//     // Object.assign(submitData, summaryFields);
+
+//     const existingRecord = await QCWashing.findOne({ orderNo });
+//     let result;
+//     console.log('Received body:', req.body); 
+//     if (existingRecord) {
+//         // Use $set to update only the fields in submitData
+//         result = await QCWashing.findByIdAndUpdate(
+//           existingRecord._id,
+//           { $set: submitData },
+//           { new: true }
+//         );
+//       } else {
+//         result = await QCWashing.create(submitData);
+//       }
+
+//     res.json({ success: true, submissionId: result._id, message: 'QC Washing data submitted successfully' });
+//   } catch (error) {
+//     console.error('Submit error:', error);
+//     res.status(500).json({ success: false, message: 'Failed to submit data', error: error.message });
+//   }
+// });
+
 app.post('/api/qc-washing/submit', async (req, res) => {
   try {
-    const body = req.body;
+    const { orderNo } = req.body;
 
-    // Directly access fields from body
-    const orderNo = body.orderNo || body.style;
-
-    const submitData = {
+    // 1. Find the latest auto-save record for this order
+    const latestAutoSave = await QCWashing.findOne({
       orderNo,
-      reportType: body.reportType,
-      checkedQty: body.checkedQty,
-      washQty: body.washQty,
-      totalCheckedPoint: (body.color?.inspectionDetails?.checkedPoints?.length || 0) + (body.color?.inspectionDetails?.parameters?.length || 0),
-      totalPass: body.color?.inspectionDetails?.parameters?.filter(item => item.ok)?.length || 0,
-      totalFail: body.color?.inspectionDetails?.parameters?.filter(item => item.no)?.length || 0,
-      totalCheckedPcs: body.checkedQty,
-      rejectedDefectPcs: body.rejectedDefectPcs,
-      totalDefectCount: body.totalDefectCount,
-      defectRate: body.defectRate,
-      defectRatio: body.defectRatio,
-      overallFinalResult: body.overallFinalResult,
-      color: body.color,
-      measurementDetails: body.color?.measurementDetails || [],
-      isAutoSave: false,
-      userId: body.userId,
-      submittedAt: new Date(),
-      status: 'submitted'
-    };
+      isAutoSave: true
+    }).sort({ updatedAt: -1 });
 
-    const summaryFields = calculateSummaryFields(body.color?.orderDetails?.color);
-    Object.assign(submitData, summaryFields);
-
-    const existingRecord = await QCWashing.findOne({ orderNo });
-
-    let result;
-    if (existingRecord) {
-      result = await QCWashing.findByIdAndUpdate(existingRecord._id, submitData, { new: true });
-    } else {
-      result = await QCWashing.create(submitData);
+    if (!latestAutoSave) {
+      return res.status(404).json({ success: false, message: 'No auto-save record found to submit.' });
     }
 
-    res.json({ success: true, submissionId: result._id, message: 'QC Washing data submitted successfully' });
+    // 2. Update the auto-save record to mark as submitted
+    latestAutoSave.isAutoSave = false;
+    latestAutoSave.status = 'submitted';
+    latestAutoSave.submittedAt = new Date();
+    latestAutoSave.savedAt = new Date(); // Optionally update savedAt
+
+    await latestAutoSave.save();
+
+    res.json({ success: true, submissionId: latestAutoSave._id, message: 'QC Washing data submitted successfully' });
   } catch (error) {
     console.error('Submit error:', error);
     res.status(500).json({ success: false, message: 'Failed to submit data', error: error.message });
   }
 });
+
 
 app.post('/api/qc-washing/auto-save-color', uploadQcWashingFiles.array("images", 20), async (req, res) => {
   try {
