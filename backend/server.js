@@ -1771,6 +1771,10 @@ app.get("/api/users/search-by-empid", async (req, res) => {
   }
 });
 
+                                                                /* ------------------------------
+                                                                  QC-Washing enpoint Start
+                                                                ------------------------------ */
+
 /* ------------------------------
    Helper function for buyer mapping
 ------------------------------ */
@@ -3398,6 +3402,12 @@ app.delete("/api/qc-washing-first-outputs/:id", async (req, res) => {
     res.status(500).json({ message: "Error deleting record", error });
   }
 });
+
+                                                                /* ------------------------------
+                                                                  QC-Washing enpoint End
+                                                                ------------------------------ */
+
+
 /* =============================================================================
    End Points - Sub-Con Factories
    ============================================================================= */
