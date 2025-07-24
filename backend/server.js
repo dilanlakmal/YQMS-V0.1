@@ -2268,97 +2268,49 @@ app.get('/api/qc-washing/saved-sizes/:orderNo/:color', async (req, res) => {
 // Submit final data - update existing or create new
 app.post('/api/qc-washing/submit', async (req, res) => {
   try {
-    const { formData, inspectionData, processData, defectData, addedDefects, uploadedImages, comment, signatures, measurementDetails, userId } = req.body;
-    
-    const orderNo = formData.orderNo || formData.style;
-    
+    const body = req.body;
+
+    // Directly access fields from body
+    const orderNo = body.orderNo || body.style;
+
     const submitData = {
-      orderNo: orderNo,
-      reportType: formData.reportType,
-      checkedQty: formData.checkedQty,
-      washQty: formData.washQty,
-      totalCheckedPoint: (inspectionData?.length || 0) + (defectData?.length || 0),
-      totalPass: defectData?.filter(item => item.ok).length || 0,
-      totalFail: defectData?.filter(item => item.no).length || 0,
-      totalCheckedPcs: formData.checkedQty,
-      rejectedDefectPcs: formData.rejectedDefectPcs,
-      totalDefectCount: formData.defectCount,
-      defectRate: formData.defectRate,
-      defectRatio: formData.defectRatio,
-      overallFinalResult: formData.overallFinalResult,
-      color: {
-        orderDetails: {
-          orderQty: formData.orderQty,
-          color: formData.color,
-          washingType: formData.washingType,
-          daily: formData.firstOutput || formData.inline,
-          buyer: formData.buyer,
-          factoryName: formData.factoryName,
-          reportType: formData.reportType,
-          aqlSampleSize: formData.aqlSampleSize,
-          aqlAcceptedDefect: formData.aqlAcceptedDefect,
-          aqlRejectedDefect: formData.aqlRejectedDefect,
-          inspector: {
-            engName: signatures?.agreedBy,
-            empId: userId
-          }
-        },
-        inspectionDetails: {
-          checkedPoints: inspectionData?.map(item => ({
-            pointName: item.checkedList,
-            approvedDate: item.approvedDate,
-            condition: item.na ? 'N/A' : 'Active',
-            remark: item.remark
-          })) || [],
-          temp: processData?.temperature,
-          time: processData?.time,
-          chemical: processData?.chemical,
-          parameters: defectData?.map(item => ({
-            parameterName: item.parameter,
-            ok: item.ok,          
-            no: item.no, 
-            qty: item.qty,
-            remark: item.remark,
-            checkboxes: item.checkboxes || {}
-          })) || []
-        },
-        defectDetails: {
-          checkedQty: formData.checkedQty,
-          washQty: formData.washQty,
-          defects: addedDefects?.map(defect => ({
-            defectName: defect.defectName,
-            defectQty: defect.qty
-          })) || [],
-          defectImages: uploadedImages?.map(img => img.name) || [],
-          comment: comment
-        },
-        measurementDetails: measurementDetails || []
-      },
-      
+      orderNo,
+      reportType: body.reportType,
+      checkedQty: body.checkedQty,
+      washQty: body.washQty,
+      totalCheckedPoint: (body.color?.inspectionDetails?.checkedPoints?.length || 0) + (body.color?.inspectionDetails?.parameters?.length || 0),
+      totalPass: body.color?.inspectionDetails?.parameters?.filter(item => item.ok)?.length || 0,
+      totalFail: body.color?.inspectionDetails?.parameters?.filter(item => item.no)?.length || 0,
+      totalCheckedPcs: body.checkedQty,
+      rejectedDefectPcs: body.rejectedDefectPcs,
+      totalDefectCount: body.totalDefectCount,
+      defectRate: body.defectRate,
+      defectRatio: body.defectRatio,
+      overallFinalResult: body.overallFinalResult,
+      color: body.color,
+      measurementDetails: body.color?.measurementDetails || [],
       isAutoSave: false,
-      userId: userId,
+      userId: body.userId,
       submittedAt: new Date(),
       status: 'submitted'
     };
-    const summaryFields = calculateSummaryFields(fakeRecord, formData.color);
+
+    const summaryFields = calculateSummaryFields(body.color?.orderDetails?.color);
     Object.assign(submitData, summaryFields);
 
-    // Check if any record already exists (auto-save or submitted)
-    const existingRecord = await QCWashing.findOne({ orderNo: orderNo });
+    const existingRecord = await QCWashing.findOne({ orderNo });
 
     let result;
     if (existingRecord) {
-      // Update existing record
       result = await QCWashing.findByIdAndUpdate(existingRecord._id, submitData, { new: true });
     } else {
-      // Create new submitted record
       result = await QCWashing.create(submitData);
     }
 
     res.json({ success: true, submissionId: result._id, message: 'QC Washing data submitted successfully' });
   } catch (error) {
     console.error('Submit error:', error);
-    res.status(500).json({ success: false, message: 'Failed to submit data' });
+    res.status(500).json({ success: false, message: 'Failed to submit data', error: error.message });
   }
 });
 
