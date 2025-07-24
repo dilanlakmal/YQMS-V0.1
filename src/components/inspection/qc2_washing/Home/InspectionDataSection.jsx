@@ -90,41 +90,40 @@ const InspectionDataSection = ({
           </div>
 
           {/* Process Data Fields */}
-          <div className="grid grid-cols-3 gap-4 mt-4 dark:text-white">
-            <div className="flex items-center space-x-2 dark:text-white">
-              <label className="text-sm font-medium dark:text-gray-300">Temperature:</label>
-              <input
-                type="number"
-                value={processData.temperature}
-                onChange={e => setProcessData(prev => ({ ...prev, temperature: e.target.value }))}
-                className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
-              />
-              <span className="text-sm">°C</span>
-            </div>
-            <div className="flex items-center space-x-2 dark:text-white">
-              <label className="text-sm font-medium dark:text-gray-300">Time:</label>
-              <input
-                type="number"
-                value={processData.time}
-                onChange={e => setProcessData(prev => ({ ...prev, time: e.target.value }))}
-                className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
-              />
-              <span className="text-sm">min</span>
-            </div>
-            {/* Only show Chemical if Washing Machine is selected */}
-            {machineType === 'Washing Machine' && (
-              <div className="flex items-center space-x-2">
-                <label className="text-sm font-medium dark:text-gray-300">Chemical:</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4 dark:text-white">
+              <div className="flex items-center space-x-2 dark:text-white">
+                <label className="text-sm font-medium dark:text-gray-300">Temp:</label>
                 <input
                   type="number"
-                  value={processData.chemical}
-                  onChange={e => setProcessData(prev => ({ ...prev, chemical: e.target.value }))}
-                  className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                  value={processData.temperature}
+                  onChange={e => setProcessData(prev => ({ ...prev, temperature: e.target.value }))}
+                  className="w-20 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
                 />
-                <span className="text-sm">gram</span>
+                <span className="text-sm">°C</span>
               </div>
-            )}
-          </div>
+              <div className="flex items-center space-x-2 dark:text-white">
+                <label className="text-sm font-medium dark:text-gray-300">Time:</label>
+                <input
+                  type="number"
+                  value={processData.time}
+                  onChange={e => setProcessData(prev => ({ ...prev, time: e.target.value }))}
+                  className="w-20 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                />
+                <span className="text-sm">min</span>
+              </div>
+              {machineType === 'Washing Machine' && (
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm font-medium dark:text-gray-300">Chem:</label>
+                  <input
+                    type="number"
+                    value={processData.chemical}
+                    onChange={e => setProcessData(prev => ({ ...prev, chemical: e.target.value }))}
+                    className="w-20 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                  />
+                  <span className="text-sm">gram</span>
+                </div>
+              )}
+            </div>
           <div className="mt-8 pt-6 border-t border-gray-200">
             <div className="overflow-x-auto">
               <table>
