@@ -208,7 +208,14 @@ const DefectDetailsSection = ({
   
       Swal.close();
       const validImages = compressedFiles.filter(img => img !== null);
-      setDefectsByPc(prev => ({ ...prev, [pc]: prev[pc].map(d => d.id === defectId ? { ...d, defectImages: [...(d.defectImages || []), ...validImages] } : d) }) ?? {});
+      setDefectsByPc(prev => ({
+        ...prev,
+        [pc]: prev[pc].map(d =>
+          d.id === defectId
+            ? { ...d, defectImages: [...(d.defectImages || []), ...validImages] }
+            : d
+        )
+      }));
     };
 
   return (
