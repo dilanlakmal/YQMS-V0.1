@@ -40,6 +40,13 @@ import IEPage from "./pages/IE.jsx";
 import UploadWashingSpecs from "./pages/UploadWashingSpecs.jsx";
 import QCAccuracyViewInspectionReport from "./components/inspection/qc_accuracy/QCAccuracyViewInspectionReport";
 import UploadYorksysOrders from "./pages/UploadYorksysOrders.jsx";
+import YQMSTrainingSchedule from "./pages/YQMSTrainingSchedule.jsx";
+import YQMSExam from "./pages/YQMSExam.jsx";
+import CuttingInline from "./pages/CuttingInline.jsx";
+import SelectDTBuyerSpec from "./pages/SelectDTBuyerSpec.jsx";
+import ANFMeasurement from "./pages/ANFMeasurement.jsx";
+import CEMasterList from "./pages/CEMasterList.jsx";
+import QCWashingPage from "./pages/QCWashing.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -404,7 +411,14 @@ function AppContent() {
                 path="/upload-beforewash-specs"
                 element={<UploadWashingSpecs />}
               />
+              <Route path="/qcWashing" element={<QCWashingPage />} />
+              <Route path="/select-dt-specs" element={<SelectDTBuyerSpec />} />
+              <Route path="/anf-washing" element={<ANFMeasurement />} />
+              <Route path="/master-list" element={<CEMasterList />} />
               <Route path="/qa-yorksys" element={<UploadYorksysOrders />} />
+              <Route path="/training" element={<YQMSTrainingSchedule />} />
+              <Route path="/exam" element={<YQMSExam />} />
+              <Route path="/cutting-inline" element={<CuttingInline />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

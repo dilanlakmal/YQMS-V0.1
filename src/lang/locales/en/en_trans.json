@@ -33,7 +33,11 @@
     "b-grade_defect": "B-Grade Defects",
     "b-grade_stock": "B-Grade Stock",
     "ieadmin": "IE Administration",
-    "upload_beforewash_specs": "Upload Specs"
+    "upload_beforewash_specs": "Upload Specs",
+    "cutting-inline": "Cutting Inline",
+    "select_dt_specs": "Select DT Specs",
+    "anf_washing": "ANF Measurements",
+    "qcWashing": "QC Washing"
   },
 
   "nav": {
