@@ -368,7 +368,8 @@ import {
   CheckSquare,
   Shield,
   Sun,
-  Moon
+  Moon,
+  ClipboardList
 } from "lucide-react";
 
 // --- Theme Hook for Dark Mode ---
@@ -498,6 +499,13 @@ function Home() {
             description: "Cut Panel Inspection"
           },
           {
+            path: "/cutting-inline",
+            roles: ["Cutting"],
+            image: "assets/Home/cutting-inline.png",
+            title: t("home.cutting-inline"),
+            description: "Cutting Inline Inspection"
+          },
+          {
             path: "/scc",
             roles: ["SCC"],
             image: "assets/Home/bundle.avif",
@@ -505,11 +513,32 @@ function Home() {
             description: "Spreading & Cutting"
           },
           {
+            path: "/qcWashing",
+            roles: ["QC Washing"],
+            image: "assets/Home/qcwashing.png",
+            title: t("home.qcWashing"),
+            description: "Washing Report"
+          },
+          {
             path: "/upload-beforewash-specs",
             roles: ["Washing Clerk"],
             image: "assets/Home/uploadspecs.png",
             title: t("home.upload_beforewash_specs"),
             description: "Upload Beforewash Specs"
+          },
+          {
+            path: "/select-dt-specs",
+            roles: ["Washing Clerk", "QA Clerk"],
+            image: "assets/Home/select-specs.png",
+            title: t("home.select_dt_specs"),
+            description: "Select After Wash DT Specs"
+          },
+          {
+            path: "/anf-washing",
+            roles: ["QA"],
+            image: "assets/Home/anf-washing.png",
+            title: t("home.anf_washing"),
+            description: "ANF Measurements"
           }
         ]
       },
@@ -552,8 +581,8 @@ function Home() {
             path: "/audit",
             roles: ["QA Audit"],
             image: "assets/Home/qaa.png",
-            title: "Audit",
-            description: "QA Audit Check Point"
+            title: "QMS Audit",
+            description: "QMS Audit Check Point"
           },
           {
             path: "/qc-accuracy",
@@ -561,6 +590,20 @@ function Home() {
             image: "assets/Home/qc-accuracy.png",
             title: "QC Accuracy",
             description: "QA Random Checks"
+          },
+          {
+            path: "/training",
+            roles: ["System Administration"],
+            image: "assets/Home/training.jpg",
+            title: "YQMS Training",
+            description: "Training Schedule & Progress"
+          },
+          {
+            path: "/exam",
+            roles: ["System Administration"],
+            image: "assets/Home/exam.jpg",
+            title: "YQMS Exam",
+            description: "Create Exam & Preview"
           },
           {
             path: "/qa-yorksys",
@@ -575,6 +618,21 @@ function Home() {
             image: "assets/Home/qafinal.png",
             title: "Final Inspection",
             description: "QA Final Inspection"
+          }
+        ]
+      },
+      {
+        id: "ce-section",
+        title: "CE",
+        icon: <ClipboardList className="w-5 h-5 mr-2" />,
+        bgColor: "bg-orange-50 dark:bg-orange-900/20",
+        items: [
+          {
+            path: "/master-list",
+            roles: ["CE"],
+            image: "assets/Home/masterlist.png",
+            title: "Master List",
+            description: "View and manage the Master List"
           }
         ]
       },
