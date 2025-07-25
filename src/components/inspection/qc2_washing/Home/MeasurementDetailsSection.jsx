@@ -313,12 +313,32 @@ const MeasurementDetailsSection = ({
     const prevForSize = prev[size] || [];
     const updated = [...prevForSize];
     updated[columnIndex] = !updated[columnIndex];
+
+    // If now checked, set all related cells to 0
+    if (updated[columnIndex]) {
+      const specs = reportType === 'Before Wash'
+        ? (measurementSpecs.beforeWashGrouped[activeBeforeTab] || measurementSpecs.beforeWash)
+        : (measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash);
+      const tableType = reportType === 'Before Wash' ? 'before' : 'after';
+      setMeasurementValues(prevValues => {
+        const newValues = { ...prevValues };
+        specs.forEach((spec, specIndex) => {
+          const cellKey = `${size}-${tableType}-${specIndex}-${columnIndex}`;
+          if (!newValues[cellKey]) {
+            newValues[cellKey] = { decimal: 0, fraction: '0' };
+          }
+        });
+        return newValues;
+      });
+    }
+
     return {
       ...prev,
       [size]: updated
     };
   });
 };
+
 
  const toggleSelectAll = (size) => {
   setSelectAllBySize(prev => ({
@@ -337,6 +357,22 @@ const toggleRowSelection = (size, rowIndex) => {
     const updatedSelections = [...prevSelections];
     updatedSelections[rowIndex] = !updatedSelections[rowIndex];
 
+    // If now checked, set all related cells to 0
+    if (updatedSelections[rowIndex]) {
+      const qty = selectedSizes.find(s => s.size === size)?.qty || 1;
+      const tableType = reportType === 'Before Wash' ? 'before' : 'after';
+      setMeasurementValues(prevValues => {
+        const newValues = { ...prevValues };
+        for (let i = 0; i < qty; i++) {
+          const cellKey = `${size}-${tableType}-${rowIndex}-${i}`;
+          if (!newValues[cellKey]) {
+            newValues[cellKey] = { decimal: 0, fraction: '0' };
+          }
+        }
+        return newValues;
+      });
+    }
+
     // Update selectAll state based on row selections
     const allSelected = updatedSelections.every(Boolean);
     setSelectAllBySize(prevSelectAll => ({
@@ -347,6 +383,7 @@ const toggleRowSelection = (size, rowIndex) => {
     return { ...prev, [size]: updatedSelections };
   });
 };
+
 
 const toggleSelectAllRows = (size, checked, tableType) => {
   const specs =
@@ -400,7 +437,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                       : 'bg-white text-blue-600 border border-blue-600'
                   }`}
                 >
-                  {kValue === 'NA' ? 'General' : `K-${kValue}`}
+                  {kValue === 'NA' ? 'General' : `${kValue}`}
                 </button>
               ))}
             </div>
@@ -493,44 +530,46 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                         {specs !== '-' ? specs : '-'}
                       </td>
                       {[...Array(qty)].map((_, i) => {
-                        const cellKey = `${size}-before-${index}-${i}`;
-                        const value = measurementValues[cellKey];
-                        let cellColorClass = 'bg-transparent';
+                          const cellKey = `${size}-before-${index}-${i}`;
+                          const value = measurementValues[cellKey];
 
-                        if (value && typeof value.decimal === 'number') {
-                          const measuredDeviation = value.decimal;
-                          const tolMinusValue = fractionToDecimal(tolMinus);
-                          const tolPlusValue = fractionToDecimal(tolPlus);
+                          // Determine if cell should be enabled
+                          const isFull = fullColumnsBySize[size]?.[i] || false;
+                          const isRowSelected = selectedRowsBySize[size]?.[index] ?? true;
+                          const isEnabled = isFull || isRowSelected;
 
-                          if (!isNaN(tolMinusValue) && !isNaN(tolPlusValue)) {
-                            // The deviation should be within the tolerance range.
-                            if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
-                              cellColorClass = 'bg-green-200 dark:bg-green-700'; // Pass
-                            } else {
-                              cellColorClass = 'bg-red-200 dark:bg-red-700'; // Fail
-                            }
-                          }
-                        }
+                          // Add gray-out style if not enabled
+                          const cellColorClass = !isEnabled
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            : (value && typeof value.decimal === 'number'
+                                ? (value.decimal >= fractionToDecimal(tolMinus) && value.decimal <= fractionToDecimal(tolPlus)
+                                    ? 'bg-green-200 dark:bg-green-700'
+                                    : 'bg-red-200 dark:bg-red-700')
+                                : 'bg-transparent');
 
-                        return (
-                          <td key={`measurement-input-${index}-${i}`} className={`border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white ${cellColorClass} cursor-pointer`}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setCurrentCell({ size, table: 'before', rowIndex: index, colIndex: i });
-                              setShowNumPad(true);
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={value?.fraction || ''}
-                              readOnly
-                              className="w-full px-1 py-1 text-center border-0 bg-transparent dark:text-white"
-                              placeholder="0.0"
-                              style={{ pointerEvents: 'none' }}
-                            />
-                          </td>
-                        );
-                      })}
+                          return (
+                            <td
+                              key={`measurement-input-${index}-${i}`}
+                              className={`border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white ${cellColorClass} ${isEnabled ? 'cursor-pointer' : ''}`}
+                              onClick={isEnabled ? (e) => {
+                                e.preventDefault();
+                                setCurrentCell({ size, table: 'before', rowIndex: index, colIndex: i });
+                                setShowNumPad(true);
+                              } : undefined}
+                            >
+                              <input
+                                type="text"
+                                value={value?.fraction || ''}
+                                readOnly
+                                disabled={!isEnabled}
+                                className={`w-full px-1 py-1 text-center border-0 bg-transparent dark:text-white ${!isEnabled ? 'text-gray-400' : ''}`}
+                                placeholder="0.0"
+                                style={{ pointerEvents: 'none' }}
+                              />
+                            </td>
+                          );
+                        })}
+
                     </tr>
                   );
                 })}
@@ -724,7 +763,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
       {isVisible && (
         <div className="space-y-6">
           {/* Display selected order and color */}
-          {orderNo && color && (
+          {/* {orderNo && color && (
             <div className="bg-blue-50 p-4 rounded-lg dark:bg-gray-700">
               <h3 className="text-md font-semibold mb-2 dark:text-white">Selected Order Details</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
@@ -744,7 +783,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                 </div>
               )}
             </div>
-          )}
+          )} */}
           
           {!orderNo || !color ? (
             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
@@ -767,7 +806,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
               {!loading && !error && (
                 <div>
                   {sizes.length > 0 ? (
-                    <div className="space-y-2">
+                    <div className="space-y-2 mt-4">
                       <div className="flex items-center space-x-4">
                         <label htmlFor="size-select" className="text-sm font-medium dark:text-gray-300 dark:bg-gray-800">Select Sizes:</label>
                         <select 
@@ -885,26 +924,26 @@ const toggleSelectAllRows = (size, checked, tableType) => {
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Saved Measurement Data</h3>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-3 lg:grid-cols-4 gap-2 mb-6">
                 {currentWashMeasurements.map((data, index) => (
                   <div key={`saved-${index}`} className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-medium text-gray-800 text-lg">Size: {data.size} (Qty: {data.qty})</h4>
+                      <h4 className="font-medium text-gray-800 text-sm">Size: {data.size} (Qty: {data.qty})</h4>
                       <div className="flex space-x-2">
                         <button
                           onClick={() => handleEditClick(data.size)}
-                          className="px-2 py-1 bg-blue-600 text-white rounded text-s hover:bg-blue-700"
+                          className="px-2 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
                         >
                           Edit
                         </button>
-                        <span className="text-s text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                        <span className="text-sm text-green-600 bg-green-100 px-2 py-1 rounded-full">
                           Saved
                         </span>
                       </div>
                     </div>
-                    <div className="text-sm text-gray-600">
+                    {/* <div className="text-sm text-gray-600"> */}
                       {/* <p>Total measurements: {(data.pcs || []).reduce((total, pc) => total + (pc.measurementPoints?.length || 0), 0)}</p>                       */}
-                    </div>
+                    {/* </div> */}
                     <div className="mt-2 grid grid-cols-3 gap-2">
                       {/* Total Checked Points */}
                       <div className="bg-gray-100 p-2 rounded-md text-center">

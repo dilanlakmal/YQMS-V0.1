@@ -75,6 +75,7 @@ function calculateSummaryData(currentFormData) {
   const currentDefectDetails = currentFormData.colors[0]?.defectDetails;
   const currentMeasurementData = currentFormData.colors[0]?.measurementDetails;
 
+
   let calculatedMeasurementPoints = 0;
   let calculatedMeasurementPass = 0;
 
@@ -99,6 +100,7 @@ function calculateSummaryData(currentFormData) {
 
   // Always use Number() to ensure numeric values
   const calculatedTotalCheckedPcs = Number(currentDefectDetails?.checkedQty) || 0;
+  const totalRejectPcs = Number(currentDefectDetails?.rejectedDefectPcs) || 0;
   const calculatedWashQty = Number(currentDefectDetails?.washQty) || 0;
   const calculatedRejectedDefectPcs = currentDefectDetails?.result === "Fail" ? calculatedTotalCheckedPcs : 0;
 
@@ -114,7 +116,7 @@ function calculateSummaryData(currentFormData) {
 
   const calculatedDefectRatio =
     calculatedTotalCheckedPcs > 0
-      ? (calculatedTotalDefectCount / calculatedTotalCheckedPcs).toFixed(2)
+      ? (calculatedTotalDefectCount / calculatedTotalCheckedPcs).toFixed(1)
       : 0;
 
   let calculatedOverallResult = "Pass";
@@ -1785,11 +1787,11 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 p-2 sm:p-4 md:p-6">
-      <header className="bg-gradient-to-r from-slate-50 to-gray-100 shadow-lg py-5 px-8 dark:from-slate-900">
+      
         <PageTitle />
-      </header>
+      
       {/* Tab Navigation */}
-        <div className="flex justify-center mb-6">
+        <div className="flex justify-center mb-6 mt-4">
           <button
             className={`px-6 py-2 rounded-l-md font-medium ${
               activeTab === 'newInspection'
@@ -1808,7 +1810,7 @@ useEffect(() => {
             }`}
             onClick={() => handleTabChange('submittedData')}
           >
-            Submitted Data
+           Report
           </button>
         </div>
 

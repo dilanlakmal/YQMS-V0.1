@@ -75,19 +75,19 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
           <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">
             {totalCheckedPoints}
           </div>
-          <div className="text-sm text-blue-700 dark:text-blue-300">Total Measurement Points</div>
+          <div className="text-sm text-blue-700 dark:text-blue-300">Measurement Points</div>
         </div>
 
         {/* Total Pass */}
         <div className="bg-green-50 dark:bg-green-700 border border-green-200 dark:border-green-600 rounded-lg p-4 text-center">
           <div className="text-4xl font-bold text-green-600 dark:text-green-400">{totalPass}</div>
-          <div className="text-sm text-green-700 dark:text-green-300">Total Pass</div>
+          <div className="text-sm text-green-700 dark:text-green-300">Pass</div>
         </div>
 
         {/* Total Fail */}
         <div className="bg-red-50 dark:bg-red-700 border border-red-200 dark:border-red-600 rounded-lg p-4 text-center">
           <div className="text-4xl font-bold text-red-600 dark:text-red-400">{totalFail}</div>
-          <div className="text-sm text-red-700 dark:text-red-300">Total Fail</div>
+          <div className="text-sm text-red-700 dark:text-red-300">Fail</div>
         </div>
 
         {/* Pass Rate */}
@@ -106,7 +106,7 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
       </div>
 
       {/* Measurement Details Breakdown */}
-      <div className="mt-6 text-sm dark:text-gray-300">
+      {/* <div className="mt-6 text-sm dark:text-gray-300">
         <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3">
           <div className="font-medium text-gray-700 dark:text-gray-300">
             Breakdown for {reportType}
@@ -116,7 +116,7 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
             <br />- {totalCheckedPoints} total measurement points checked
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };
