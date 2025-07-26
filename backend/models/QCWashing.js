@@ -64,9 +64,14 @@
         }
       },
       inspectionDetails: {
-        temp: String,
-        time: String,
-        chemical: String,
+         machineProcesses: [
+            {
+              machineType: String,
+              temperature: String,
+              time: String,
+              chemical: String // optional for Tumble Dry
+            }
+          ],
         checkedPoints: [{
           pointName: String,
           approvedDate: String,

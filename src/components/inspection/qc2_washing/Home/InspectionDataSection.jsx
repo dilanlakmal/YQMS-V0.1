@@ -1,4 +1,4 @@
-import React from 'react';
+import {useState} from 'react';
 
 const machineTypes = [
   {
@@ -34,9 +34,9 @@ const InspectionDataSection = ({
   setMachineType,
   washQty 
 }) => {
-  //  const [processData, setProcessData] = useState({
-  // "Washing Machine": { temperature: "", time: "", chemical: "" },
-  // "Tumble Dry": { temperature: "", time: "" }
+//   const [processData, setProcessData] = useState({
+//   "Washing Machine": { temperature: "", time: "", chemical: "" },
+//   "Tumble Dry": { temperature: "", time: "" }
 // });
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">

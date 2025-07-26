@@ -230,7 +230,10 @@ const QCWashingPage = () => {
 
   // State: Inspection, Defect, Measurement
   const [inspectionData, setInspectionData] = useState([]);
-  const [processData, setProcessData] = useState({ machineType: "", temperature: "", time: "", chemical: "" });
+  const [processData, setProcessData] = useState({
+  "Washing Machine": { temperature: "", time: "", chemical: "" },
+  "Tumble Dry": { temperature: "", time: "" }
+});
   const defaultDefectData = [
     { parameter: "Color Shade 01", ok: true, no: false,  checkedQty: 0, failedQty: 0, aqlAcceptedDefect: "",result: "Pass", remark: "" },
     { parameter: "Color Shade 02", ok: true, no: false, qcheckedQty: 0, failedQty: 0, aqlAcceptedDefect: "",result: "Pass", remark: "" },
@@ -1301,9 +1304,10 @@ useEffect(() => {
               },
             },
             inspectionDetails: {
-              temp: processData.temperature,
-              time: processData.time,
-              chemical: processData.chemical,
+              machineProcesses: Object.entries(processData).map(([machineType, params]) => ({
+                machineType,
+                ...params
+              })),
               checkedPoints: inspectionData.map(item => ({
                 pointName: item.checkedList,
                 approvedDate: item.approvedDate,
@@ -1488,7 +1492,15 @@ useEffect(() => {
               remark: point.remark || "",
             })) || initializeInspectionData(masterChecklist));
 
-          setProcessData(colorData.inspectionDetails ? { temperature: colorData.inspectionDetails.temp || "", time: colorData.inspectionDetails.time || "", chemical: colorData.inspectionDetails.chemical || "" } : { temperature: "", time: "", chemical: "" });
+          const processDataObj = {};
+            (colorData.inspectionDetails?.machineProcesses || []).forEach(proc => {
+              processDataObj[proc.machineType] = {
+                temperature: proc.temperature || "",
+                time: proc.time || "",
+                chemical: proc.chemical || ""
+              };
+            });
+            setProcessData(processDataObj);
 
          if (colorData.inspectionDetails?.parameters && colorData.inspectionDetails.parameters.length > 0)  {
             setDefectData(normalizeDefectData(colorData.inspectionDetails.parameters));
@@ -1726,11 +1738,15 @@ useEffect(() => {
             setInspectionData(initializeInspectionData(masterChecklist));
           }
 
-          setProcessData({
-            temperature: saved.color?.inspectionDetails?.temp || "",
-            time: saved.color?.inspectionDetails?.time || "",
-            chemical: saved.color?.inspectionDetails?.chemical || "",
-          });
+          const processData = {};
+            (transformedInspectionData.inspectionDetails?.machineProcesses || []).forEach(proc => {
+              processData[proc.machineType] = {
+                temperature: proc.temperature || "",
+                time: proc.time || "",
+                chemical: proc.chemical || ""
+              };
+            });
+            setProcessData(processData);
 
           const transformedDefectData =
             normalizeDefectData(saved.color?.inspectionDetails?.parameters) || [];
