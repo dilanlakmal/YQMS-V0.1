@@ -361,13 +361,13 @@ useEffect(() => {
 
 
   // --- useEffect: Load Saved Data on Order Change ---
-  useEffect(() => {
-    const identifier = formData.style && formData.style !== formData.orderNo ? formData.style : formData.orderNo;
-    if (identifier) {
-      if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
-      loadSavedData(identifier);
-    }
-  }, [formData.orderNo, formData.style]);
+  // useEffect(() => {
+  //   const identifier = formData.style && formData.style !== formData.orderNo ? formData.style : formData.orderNo;
+  //   if (identifier) {
+  //     if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
+  //     loadSavedData(identifier);
+  //   }
+  // }, [formData.orderNo, formData.style]);
 
   // --- useEffect: Load Saved Sizes on Order/Color Change ---
   useEffect(() => {
@@ -402,7 +402,7 @@ useEffect(() => {
       String(item.checkedQty) === String(formData.washQty) &&
       (item.aqlAcceptedDefect === "" || item.aqlAcceptedDefect === undefined)
     ) {
-      // console.log("Triggering fetchAqlForParameter for", item.parameter, idx, item.checkedQty, formData.washQty);
+     
       fetchAqlForParameter(
         formData.orderNo || formData.style,
         formData.washQty,
