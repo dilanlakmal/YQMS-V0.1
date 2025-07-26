@@ -10,7 +10,7 @@ const ANFMeasurementPageTitle = ({ user }) => {
         Yorkmars (Cambodia) Garment MFG Co., LTD
       </h1>
       <p className="text-xs sm:text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1">
-        {t("anfMeasurement.title", "ANF Digital Measurement")}
+        {t("anfMeasurement.title", "Buyer Specific After Wash Measurement")}
         {user && ` | ${user.job_title || "Operator"} | ${user.emp_id}`}
       </p>
     </div>

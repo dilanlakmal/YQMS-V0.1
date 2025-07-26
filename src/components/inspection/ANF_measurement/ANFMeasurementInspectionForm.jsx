@@ -3,8 +3,10 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import axios from "axios";
 import Select from "react-select";
+import { useAuth } from "../../authentication/AuthContext";
 import { API_BASE_URL } from "../../../../config";
 import MeasurementNumPad from "../cutting/MeasurementNumPad";
+import ANFMeasurementPreview from "./ANFMeasurementPreview";
 import {
   ChevronLeft,
   ChevronRight,
@@ -20,7 +22,9 @@ import {
   AlertTriangle,
   TrendingDown,
   Eye,
-  EyeOff
+  EyeOff,
+  Save,
+  Loader2
 } from "lucide-react";
 
 // --- MeasurementCell Component ---
@@ -118,6 +122,8 @@ const ANFMeasurementInspectionForm = ({
   } = inspectionState;
   // --- State Hooks ---
 
+  const { user } = useAuth();
+
   const [moOptions, setMoOptions] = useState([]);
   const [buyer, setBuyer] = useState("");
   const [sizeOptions, setSizeOptions] = useState([]);
@@ -127,6 +133,8 @@ const ANFMeasurementInspectionForm = ({
   const [isNumpadOpen, setIsNumpadOpen] = useState(false);
   const [activeCell, setActiveCell] = useState(null);
   const [isOrderDetailsVisible, setIsOrderDetailsVisible] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Helper function to update a specific field in the parent's state
   const updateState = useCallback(
@@ -327,6 +335,114 @@ const ANFMeasurementInspectionForm = ({
     };
   }, [garments, specTableData]);
 
+  // --- NEW: Save Logic ---
+  const handleSave = async () => {
+    if (
+      !user?.emp_id ||
+      !selectedMo ||
+      !selectedSize ||
+      selectedColors.length === 0
+    ) {
+      Swal.fire(
+        "Incomplete Data",
+        "Please ensure MO, Color, and Size are selected before saving.",
+        "warning"
+      );
+      return;
+    }
+    setIsSaving(true);
+
+    // 1. Construct the payload
+    const payload = {
+      inspectionDate,
+      qcID: user.emp_id,
+      moNo: selectedMo.value,
+      buyer: buyer,
+      color: selectedColors.map((c) => c.value),
+      orderDetails: {
+        custStyle: orderDetails.custStyle,
+        mode: orderDetails.mode,
+        country: orderDetails.country,
+        origin: orderDetails.origin,
+        orderQty_style: orderDetails.totalOrderQty,
+        orderQty_bySize: orderDetails.colorQtyBySize
+      },
+      measurementDetails: [
+        {
+          size: selectedSize.value,
+          sizeSummary: {
+            garmentDetailsCheckedQty: summaryStats.totalGarmentsChecked,
+            garmentDetailsOKGarment: summaryStats.totalOkGarments,
+            garmentDetailsRejected: summaryStats.totalIssuesGarments,
+            measurementDetailsPoints: summaryStats.totalMeasurementPoints,
+            measurementDetailsPass: summaryStats.totalOkPoints,
+            measurementDetailsTotalIssues: summaryStats.totalIssuesPoints,
+            measurementDetailsTolPositive: summaryStats.totalPosTol,
+            measurementDetailsTolNegative: summaryStats.totalNegTol
+          },
+          buyerSpecData: specTableData.map((spec) => ({
+            no: spec.orderNo,
+            measurementPoint: spec.specName,
+            tolNeg_fraction: decimalToFractionString(spec.tolMinus),
+            tolPos_fraction: decimalToFractionString(spec.tolPlus),
+            spec_fraction: spec.specValueFraction,
+            tolNeg_decimal: spec.tolMinus,
+            tolPos_decimal: spec.tolPlus,
+            spec_decimal: spec.specValueDecimal
+          })),
+          sizeMeasurementData: garments.map((garment, index) => ({
+            garmentNo: index + 1,
+            measurements: specTableData.map((spec) => {
+              const measurement = garment[spec.orderNo];
+
+              // Recalculate the deviation by subtracting the base spec from the final measured value.
+              const deviationDecimal =
+                measurement?.decimal !== null &&
+                measurement?.decimal !== undefined
+                  ? parseFloat(
+                      (measurement.decimal - spec.specValueDecimal).toFixed(4)
+                    )
+                  : 0;
+
+              return {
+                orderNo: spec.orderNo,
+                decimalValue: deviationDecimal, // Now saves the correct deviation decimal
+                fractionValue: measurement?.fraction || "0" // The fraction is already the deviation
+              };
+            })
+          }))
+        }
+      ]
+    };
+
+    // 2. Send to the API
+    try {
+      await axios.post(`${API_BASE_URL}/api/anf-measurement/reports`, payload, {
+        withCredentials: true
+      });
+      Swal.fire(
+        "Success!",
+        "Measurement data for this size has been saved.",
+        "success"
+      );
+
+      // 3. Reset for next size
+      updateState("selectedSize", null);
+      setSpecTableData([]);
+      updateState("garments", [{}]);
+      updateState("currentGarmentIndex", 0);
+    } catch (error) {
+      console.error("Error saving inspection data:", error);
+      Swal.fire(
+        "Error",
+        error.response?.data?.error || "Failed to save data. Please try again.",
+        "error"
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const selectStyles = {
     control: (styles) => ({
       ...styles,
@@ -473,8 +589,9 @@ const ANFMeasurementInspectionForm = ({
 
       {/* Size selection */}
       {orderDetails && (
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-          <div className="w-full sm:w-1/5 md:w-1/5">
+        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md flex justify-between items-end flex-wrap gap-4">
+          {/* Size Dropdown */}
+          <div className="w-full sm:w-auto sm:min-w-[200px]">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Size
             </label>
@@ -488,6 +605,31 @@ const ANFMeasurementInspectionForm = ({
               styles={selectStyles}
             />
           </div>
+
+          {/* Action Buttons */}
+          {specTableData.length > 0 && (
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setIsPreviewOpen(true)}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
+              >
+                <Eye size={16} className="mr-2" />
+                Preview
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-500 disabled:cursor-not-allowed"
+              >
+                {isSaving ? (
+                  <Loader2 size={16} className="mr-2 animate-spin" />
+                ) : (
+                  <Save size={16} className="mr-2" />
+                )}
+                {isSaving ? "Saving..." : "Save Inspection"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -751,6 +893,18 @@ const ANFMeasurementInspectionForm = ({
             </div>
           </div>
         </>
+      )}
+
+      {/* --- NEW: Render the Preview Modal --- */}
+      {isPreviewOpen && (
+        <ANFMeasurementPreview
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          inspectionState={inspectionState}
+          orderDetails={orderDetails}
+          specTableData={specTableData}
+          buyer={buyer}
+        />
       )}
 
       {isNumpadOpen && (
