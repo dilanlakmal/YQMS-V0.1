@@ -81,6 +81,7 @@ const DefectDetailsSection = ({
         {
           id: (prev[pc]?.length || 0) + 1,
           selectedDefect: '',
+          defectName: '',
           defectQty: 1,
           defectImages: [],
           isBodyVisible: true,
@@ -92,7 +93,7 @@ const DefectDetailsSection = ({
   const handleAddPc = () => {
     setDefectsByPc(prev => ({
       ...prev,
-      [(Object.keys(prev).length || 0) + 1]: [{ id: 1, selectedDefect: '', defectQty: 1,  defectImages: [], isBodyVisible: true }],
+      [(Object.keys(prev).length || 0) + 1]: [{ id: 1, selectedDefect: '',defectNmae:'', defectQty: 1,  defectImages: [], isBodyVisible: true }],
     }));
   };
   
@@ -172,11 +173,26 @@ const DefectDetailsSection = ({
   };
 
   const handleDefectChange = (pc, defectId, field, value) => {
-      setDefectsByPc(prev => ({
-        ...prev,
-        [pc]: prev[pc].map(d => d.id === defectId ? { ...d, [field]: value } : d)
-      }));
-    };
+  setDefectsByPc(prev => ({
+    ...prev,
+    [pc]: prev[pc].map(d => {
+      if (d.id === defectId) {
+        if (field === 'selectedDefect') {
+          // Find the defect object by _id
+          const defectObj = defectOptions.find(opt => opt._id === value);
+          return {
+            ...d,
+            selectedDefect: value,
+            defectName: defectObj ? getDefectNameForDisplay(defectObj) : '', // Save the name in the current language
+          };
+        }
+        return { ...d, [field]: value };
+      }
+      return d;
+    })
+  }));
+};
+
   
     const handleDefectImageChange = async (pc, defectId, e) => {
       const files = Array.from(e.target.files);
@@ -336,7 +352,7 @@ const DefectDetailsSection = ({
                         >
                           <option value="">-- Select a defect --</option>
                           {defectOptions.map(d => (
-                            <option key={d._id} value={d.defectName}>
+                            <option key={d._id} value={d._id}>
                               {getDefectNameForDisplay(d)}
                             </option>
                           ))}

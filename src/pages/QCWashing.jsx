@@ -75,9 +75,8 @@ function calculateSummaryData(currentFormData) {
   const currentDefectDetails = currentFormData.colors[0]?.defectDetails;
   const currentMeasurementData = currentFormData.colors[0]?.measurementDetails;
 
-
-  let calculatedMeasurementPoints = 0;
-  let calculatedMeasurementPass = 0;
+  let measurementPoints = 0;
+  let measurementPass = 0;
 
   if (currentMeasurementData && Array.isArray(currentMeasurementData)) {
     currentMeasurementData.forEach((data) => {
@@ -86,9 +85,9 @@ function calculateSummaryData(currentFormData) {
           if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
             pc.measurementPoints.forEach((point) => {
               if (point.result === 'pass' || point.result === 'fail') {
-                calculatedMeasurementPoints++;
+                measurementPoints++;
                 if (point.result === 'pass') {
-                  calculatedMeasurementPass++;
+                  measurementPass++;
                 }
               }
             });
@@ -99,48 +98,57 @@ function calculateSummaryData(currentFormData) {
   }
 
   // Always use Number() to ensure numeric values
-  const calculatedTotalCheckedPcs = Number(currentDefectDetails?.checkedQty) || 0;
-  const totalRejectPcs = Number(currentDefectDetails?.rejectedDefectPcs) || 0;
+  const checkedPcs = Number(currentDefectDetails?.checkedQty) || 0;
+  const totalRejectPcs = currentDefectDetails?.defectsByPc
+  ? currentDefectDetails.defectsByPc.filter(pc =>
+      Array.isArray(pc.pcDefects) && pc.pcDefects.length > 0
+    ).length
+  : 0;
   const calculatedWashQty = Number(currentDefectDetails?.washQty) || 0;
-  const calculatedRejectedDefectPcs = currentDefectDetails?.result === "Fail" ? calculatedTotalCheckedPcs : 0;
+  const rejectedDefectPcs = currentDefectDetails?.result === "Fail" ? checkedPcs : 0;
 
   // Use pc.pcDefects for defect counting
-  const calculatedTotalDefectCount = currentDefectDetails?.defectsByPc
-    ? currentDefectDetails.defectsByPc.reduce((sum, pc) => sum + (pc.pcDefects ? pc.pcDefects.length : 0), 0)
+  const defectCount = currentDefectDetails?.defectsByPc
+    ? currentDefectDetails.defectsByPc.reduce((sum, pc) => {
+        return sum + (Array.isArray(pc.pcDefects)
+          ? pc.pcDefects.reduce((defSum, defect) => defSum + (parseInt(defect.defectQty, 10) || 0), 0)
+          : 0);
+      }, 0)
     : 0;
-
-  const calculatedDefectRate =
-    calculatedTotalCheckedPcs > 0
-      ? ((calculatedTotalDefectCount / calculatedTotalCheckedPcs) * 100).toFixed(1)
+  const defectRate =
+    checkedPcs > 0
+      ? ((defectCount / checkedPcs) * 100).toFixed(1)
       : 0;
 
-  const calculatedDefectRatio =
-    calculatedTotalCheckedPcs > 0
-      ? (calculatedTotalDefectCount / calculatedTotalCheckedPcs).toFixed(1)
+  // FIXED: Defect Ratio is now (rejectedDefectPcs / checkedPcs) * 100
+  const defectRatio =
+    checkedPcs > 0
+      ? ((totalRejectPcs / checkedPcs) * 100).toFixed(1)
       : 0;
 
-  let calculatedOverallResult = "Pass";
+  let overallResult = "Pass";
   const measurementOverallResult =
-    calculatedMeasurementPoints - calculatedMeasurementPass > 0 ? "Fail" : "Pass";
+    measurementPoints - measurementPass > 0 ? "Fail" : "Pass";
   const defectOverallResult = currentDefectDetails?.result || "N/A";
 
   if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
-    calculatedOverallResult = "Fail";
+    overallResult = "Fail";
   } else if (measurementOverallResult === "Pass" && defectOverallResult === "Pass") {
-    calculatedOverallResult = "Pass";
+    overallResult = "Pass";
   } else {
-    calculatedOverallResult = "N/A";
+   overallResult = "N/A";
   }
 
   return {
-    totalCheckedPcs: calculatedTotalCheckedPcs,
-    rejectedDefectPcs: calculatedRejectedDefectPcs,
-    totalDefectCount: calculatedTotalDefectCount,
-    defectRate: parseFloat(calculatedDefectRate) || 0,
-    defectRatio: parseFloat(calculatedDefectRatio) || 0,
-    overallFinalResult: calculatedOverallResult,
+    totalCheckedPcs: checkedPcs,
+    rejectedDefectPcs: rejectedDefectPcs,
+    totalDefectCount: defectCount,
+    defectRate: parseFloat(defectRate) || 0,
+    defectRatio: parseFloat(defectRatio) || 0,
+    overallFinalResult: overallResult,
   };
 }
+
 
 const QCWashingPage = () => {
   // Hooks
@@ -1318,7 +1326,8 @@ useEffect(() => {
                 async ([pcKey, pcDefects]) => ({
                   pcNumber: pcKey,  
                   pcDefects: await Promise.all((Array.isArray(pcDefects) ? pcDefects : []).map(async (defect) => ({
-                        defectName: defect.selectedDefect,
+                      defectId: defect.selectedDefect,      // Save the _id
+                      defectName: defect.defectName,   
                       defectQty: defect.defectQty,
                       defectImages: await Promise.all((defect.defectImages || []).map(img => imageToBase64(img))), // Use the new helper here
                     }))), 
