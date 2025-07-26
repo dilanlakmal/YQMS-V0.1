@@ -2714,7 +2714,13 @@ app.get('/api/qc-washing/overall-summary/:orderNo/:color', async (req, res) => {
     let totalDefectCount = 0;
     if (Array.isArray(defectDetails.defectsByPc)) {
       rejectedDefectPcs = defectDetails.defectsByPc.length; // <-- FIXED: count of PCs with defects
-      totalDefectCount = defectDetails.defectsByPc.reduce((sum, pc) => sum + (Array.isArray(pc.pcDefects) ? pc.pcDefects.length : 0), 0);
+     totalDefectCount = defectDetails.defectsByPc.reduce(
+        (sum, pc) => sum + (
+          Array.isArray(pc.pcDefects)
+            ? pc.pcDefects.reduce((defSum, defect) => defSum + (parseInt(defect.defectQty, 10) || 0), 0)
+            : 0
+        ), 0
+     )
     }
     const washQty = parseInt(defectDetails.washQty) || 0;
     const defectRate = totalCheckedPcs > 0 ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(1) : 0;
