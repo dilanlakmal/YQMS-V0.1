@@ -342,6 +342,7 @@ const QCWashingPage = () => {
     fetchChecklist();
   }, []);
 
+  
   // --- useEffect: Auto-save ---
   useEffect(() => {
     if (isDataLoading) return;
@@ -380,16 +381,38 @@ useEffect(() => {
     }
   }, [formData.aqlSampleSize, formData.inline, formData.daily]);
 
-  useEffect(() => {
+ useEffect(() => {
+  if (!formData.washQty || isNaN(Number(formData.washQty))) return;
+  const autoAqlParams = ["Color Shade 01", "Color Shade 02", "Color Shade 03", "Hand Feel"];
   setDefectData(prev =>
     prev.map(item =>
-      ["Color Shade 01", "Color Shade 02", "Color Shade 03", "Hand Feel"].includes(item.parameter)
+      autoAqlParams.includes(item.parameter)
         ? { ...item, checkedQty: formData.washQty }
         : item
     )
   );
 }, [formData.washQty]);
 
+useEffect(() => {
+  if (!formData.washQty || isNaN(Number(formData.washQty))) return;
+  const autoAqlParams = ["Color Shade 01", "Color Shade 02", "Color Shade 03", "Hand Feel"];
+  defectData.forEach((item, idx) => {
+    if (
+      autoAqlParams.includes(item.parameter) &&
+      String(item.checkedQty) === String(formData.washQty) &&
+      (item.aqlAcceptedDefect === "" || item.aqlAcceptedDefect === undefined)
+    ) {
+      // console.log("Triggering fetchAqlForParameter for", item.parameter, idx, item.checkedQty, formData.washQty);
+      fetchAqlForParameter(
+        formData.orderNo || formData.style,
+        formData.washQty,
+        setDefectData,
+        idx
+      );
+    }
+  });
+  // eslint-disable-next-line
+}, [defectData, formData.washQty, formData.orderNo, formData.style]);
 
 useEffect(() => {
   if (formData.orderNo && formData.color) {
@@ -1460,6 +1483,7 @@ useEffect(() => {
     formData.colors[0]?.defectDetails?.defectsByPc,
     formData.colors[0]?.measurementDetails,
   ]);
+  
 
   // Load color-specific data
   const loadColorSpecificData = async (orderNo, color) => {

@@ -70,7 +70,7 @@ const InspectionDataSection = ({
                         type="date"
                         value={item.approvedDate}
                         onChange={(e) => handleInspectionChange(index, 'approvedDate', e.target.value)}
-                        // disabled={item.na}
+                        disabled={item.na}
                         className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
                       />
                     </td>
@@ -86,7 +86,7 @@ const InspectionDataSection = ({
                         type="text"
                         value={item.remark}
                         onChange={(e) => handleInspectionChange(index, 'remark', e.target.value)}
-                        // disabled={item.na}                       
+                        disabled={item.na}                       
                         className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
                       />
                     </td>
@@ -148,7 +148,7 @@ const InspectionDataSection = ({
                     const failedQty = Number(item.failedQty) || 0;
                     const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
                     // const result = checkedQty > 0 ? (passRate >= 90 ? 'Pass' : 'Fail') : '';
-                    const aqlAccept = item.aqlAcceptedDefect !== undefined ? item.aqlAcceptedDefect : "-";
+                    const aqlAccept = item.aqlAcceptedDefect !== undefined && item.aqlAcceptedDefect !== "" ? item.aqlAcceptedDefect : "-";
                     const result = (item.aqlAcceptedDefect !== undefined && checkedQty > 0)
                       ? (failedQty <= item.aqlAcceptedDefect ? "Pass" : "Fail")
                       : "";
