@@ -366,12 +366,14 @@ useEffect(() => {
   useEffect(() => {
   setDefectData(prev =>
     prev.map(item =>
-      item.parameter === "Hand Feel"
+      ["Color Shade 01", "Color Shade 02", "Color Shade 03", "Hand Feel"].includes(item.parameter)
         ? { ...item, checkedQty: formData.washQty }
         : item
     )
   );
 }, [formData.washQty]);
+
+
 useEffect(() => {
   if (formData.orderNo && formData.color) {
     fetchOverallSummary(formData.orderNo, formData.color);

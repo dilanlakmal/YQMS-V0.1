@@ -183,7 +183,7 @@ const InspectionDataSection = ({
                         </td>
                         {/* Checked QTY with + and - */}
                            <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
-                            {paramName === "Hand Feel" ? (
+                            {["Color Shade 01", "Color Shade 02", "Color Shade 03", "Hand Feel"].includes(paramName) ? (
                                <div className="flex items-center justify-center space-x-2">
                               <button
                                 type="button"
