@@ -101,9 +101,9 @@ const InspectionDataSection = ({
                 <span className="font-semibold dark:text-white min-w-[130px]">{type.label}:</span>
                 {type.parameters.map((param) => (
                   <div key={param.key} className="flex items-center space-x-2 border bg-gray-100 dark:bg-gray-700">
-                    <label className="text-sm font-medium dark:text-gray-300">{param.label}:</label>
+                    <label className="text-sm font-medium dark:text-white">{param.label}:</label>
                     <input
-                      type="number"
+                      // type="number"
                       value={processData[type.value]?.[param.key] || ""}
                       onChange={e =>
                         setProcessData(prev => ({
@@ -114,9 +114,9 @@ const InspectionDataSection = ({
                           }
                         }))
                       }
-                      className="w-20 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                      className="w-14 px-3 py-2 border rounded-md dark:bg-gray-500 dark:text-white dark:border-gray-600"
                     />
-                    <span className="text-sm dark:text-gray-300">{param.unit}</span>
+                    <span className="text-sm dark:text-white">{param.unit}</span>
                   </div>
                 ))}
               </div>
