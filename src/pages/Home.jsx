@@ -538,7 +538,7 @@ function Home() {
             roles: ["QA"],
             image: "assets/Home/anf-washing.png",
             title: t("home.anf_washing"),
-            description: "ANF Measurements"
+            description: "QC After Wash Measurements"
           }
         ]
       },
