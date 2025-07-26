@@ -211,6 +211,7 @@ const QCWashingPage = () => {
   const [defectOptions, setDefectOptions] = useState([]);
   const [activeTab, setActiveTab] = useState('newInspection');
   const [overallSummary, setOverallSummary] = useState(null);
+  const [colorOrderQty, setColorOrderQty] = useState(null);
 
   const fetchOverallSummary = async (orderNo, color) => {
     if (!orderNo || !color) return;
@@ -405,6 +406,28 @@ useEffect(() => {
         }
     }
   }, [defectsByPc, formData.aqlAcceptedDefect, formData.inline, formData.daily, formData.firstOutput, formData.result]);
+
+  useEffect(() => {
+  const fetchColorOrderQty = async () => {
+    if (!formData.orderNo || !formData.color) {
+      setColorOrderQty(null);
+      return;
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/order-color-qty/${formData.orderNo}/${encodeURIComponent(formData.color)}`);
+      const data = await response.json();
+      if (data.success) {
+        setColorOrderQty(data.colorOrderQty);
+      } else {
+        setColorOrderQty(null);
+      }
+    } catch (error) {
+      setColorOrderQty(null);
+    }
+  };
+  fetchColorOrderQty();
+}, [formData.orderNo, formData.color]);
+
 
   // --- Helper Functions ---
   const processMeasurementData = (loadedMeasurements) => {
@@ -1298,6 +1321,7 @@ useEffect(() => {
           colorData: {
             orderDetails: {
               ...formData,
+              colorOrderQty,
               inspector: {
                 empId: user?.emp_id,
                 name: user?.username, 
@@ -1492,6 +1516,11 @@ useEffect(() => {
               remark: point.remark || "",
             })) || initializeInspectionData(masterChecklist));
 
+             const colorOrderQty =
+              colorData.orderDetails?.colorOrderQty ||
+              null;
+            setColorOrderQty(colorOrderQty);
+
           const processDataObj = {};
             (colorData.inspectionDetails?.machineProcesses || []).forEach(proc => {
               processDataObj[proc.machineType] = {
@@ -1617,6 +1646,12 @@ useEffect(() => {
           if (saved.defectData && saved.defectData.length > 0) {
             setDefectData(normalizeDefectData(saved.defectData));
           }
+
+          const colorOrderQty =
+            saved.colors?.[0]?.orderDetails?.colorOrderQty ||
+            saved.formData?.colorOrderQty ||
+            null;
+          setColorOrderQty(colorOrderQty);
 
           // if (saved.addedDefects) {
           //   setAddedDefects(saved.addedDefects);
@@ -1882,6 +1917,7 @@ useEffect(() => {
           orderNoSuggestions={orderNoSuggestions}
           showOrderNoSuggestions={showOrderNoSuggestions}
           setShowOrderNoSuggestions={setShowOrderNoSuggestions}
+          colorOrderQty={colorOrderQty}
         />
 
         <InspectionDataSection

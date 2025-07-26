@@ -1906,6 +1906,39 @@ app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
   }
 });
 
+// GET - Get total order qty for a specific orderNo and color
+app.get('/api/qc-washing/order-color-qty/:orderNo/:color', async (req, res) => {
+  const { orderNo, color } = req.params;
+  const collection = ymEcoConnection.db.collection("dt_orders");
+  try {
+    const orders = await collection.find({ Order_No: orderNo }).toArray();
+    if (!orders || orders.length === 0) {
+      return res.status(404).json({ success: false, message: `Order '${orderNo}' not found.` });
+    }
+    let totalQty = 0;
+    orders.forEach(order => {
+      if (order.OrderColors && Array.isArray(order.OrderColors)) {
+        const colorObj = order.OrderColors.find(c => 
+          c.Color.toLowerCase() === color.toLowerCase()
+        );
+        if (colorObj && Array.isArray(colorObj.OrderQty)) {
+          colorObj.OrderQty.forEach(sizeObj => {
+            // Each sizeObj is like { "XS": 32 }
+            Object.values(sizeObj).forEach(qty => {
+              if (typeof qty === "number" && qty > 0) totalQty += qty;
+            });
+          });
+        }
+      }
+    });
+    res.json({ success: true, orderNo, color, colorOrderQty: totalQty });
+  } catch (error) {
+    console.error(`Error fetching color order qty for ${orderNo} / ${color}:`, error);
+    res.status(500).json({ success: false, message: 'Server error while fetching color order qty.' });
+  }
+});
+
+
 // Get sizes for a specific order and color
 app.get('/api/qc-washing/order-sizes/:orderNo/:color', async (req, res) => {
   const { orderNo, color } = req.params;

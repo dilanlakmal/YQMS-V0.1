@@ -42,6 +42,7 @@
       colorName: String,
       orderDetails: {
         orderQty: String,
+        colorOrderQty: Number,
         color: String,
         washingType: {
           type: String,
