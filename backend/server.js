@@ -2566,6 +2566,7 @@ app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
         preview: imagePath,  // Assuming the path can be used directly as a preview URL
         name: imagePath.split('/').pop(), // Extracts filename from path
       })) || [];
+      const machineProcesses = firstColorData?.inspectionDetails?.machineProcesses || [];
 
 
       res.json({
@@ -2575,9 +2576,10 @@ app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
           formData: formData,
           inspectionData: inspectionData,
           processData: {
-            temperature: firstColorData?.inspectionDetails?.temp || '',
-            time: firstColorData?.inspectionDetails?.time || '',
-            chemical: firstColorData?.inspectionDetails?.chemical || ''
+            // temperature: firstColorData?.inspectionDetails?.temp || '',
+            // time: firstColorData?.inspectionDetails?.time || '',
+            // chemical: firstColorData?.inspectionDetails?.chemical || ''
+             machineProcesses: machineProcesses
           },
           defectData: defectData,
           addedDefects: addedDefects,

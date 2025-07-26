@@ -149,6 +149,19 @@ function calculateSummaryData(currentFormData) {
   };
 }
 
+function machineProcessesToObject(machineProcesses) {
+  const obj = {};
+  (machineProcesses || []).forEach(proc => {
+    obj[proc.machineType] = {
+      temperature: proc.temperature || "",
+      time: proc.time || "",
+      chemical: proc.chemical || ""
+    };
+  });
+  return obj;
+}
+
+
 
 const QCWashingPage = () => {
   // Hooks
@@ -654,8 +667,8 @@ useEffect(() => {
             setInspectionData(initializeInspectionData(masterChecklist));
           }
 
-          if (saved.processData) {
-            setProcessData(saved.processData);
+          if (saved.processData && Array.isArray(saved.processData.machineProcesses)) {
+            setProcessData(machineProcessesToObject(saved.processData.machineProcesses));
           }
 
           if (saved.defectData && saved.defectData.length > 0) {
@@ -1521,15 +1534,7 @@ useEffect(() => {
               null;
             setColorOrderQty(colorOrderQty);
 
-          const processDataObj = {};
-            (colorData.inspectionDetails?.machineProcesses || []).forEach(proc => {
-              processDataObj[proc.machineType] = {
-                temperature: proc.temperature || "",
-                time: proc.time || "",
-                chemical: proc.chemical || ""
-              };
-            });
-            setProcessData(processDataObj);
+         setProcessData(machineProcessesToObject(colorData.inspectionDetails?.machineProcesses));
 
          if (colorData.inspectionDetails?.parameters && colorData.inspectionDetails.parameters.length > 0)  {
             setDefectData(normalizeDefectData(colorData.inspectionDetails.parameters));
@@ -1639,9 +1644,14 @@ useEffect(() => {
             setInspectionData(initializeInspectionData(masterChecklist));
           }
 
-          if (saved.processData) {
-            setProcessData(saved.processData);
+          if (saved.colors?.[0]?.inspectionDetails?.machineProcesses) {
+            setProcessData(machineProcessesToObject(saved.colors[0].inspectionDetails.machineProcesses));
+          } else if (saved.processData && Array.isArray(saved.processData.machineProcesses)) {
+            setProcessData(machineProcessesToObject(saved.processData.machineProcesses));
+          } else if (saved.processData) {
+            setProcessData(saved.processData); // fallback for old format
           }
+
 
           if (saved.defectData && saved.defectData.length > 0) {
             setDefectData(normalizeDefectData(saved.defectData));
