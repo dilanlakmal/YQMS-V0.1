@@ -385,9 +385,9 @@ useEffect(() => {
   if (!formData.washQty || isNaN(Number(formData.washQty))) return;
   const autoAqlParams = ["Color Shade 01", "Color Shade 02", "Color Shade 03", "Hand Feel"];
   setDefectData(prev =>
-    prev.map(item =>
+     prev.map(item =>
       autoAqlParams.includes(item.parameter)
-        ? { ...item, checkedQty: formData.washQty }
+        ? { ...item, checkedQty: formData.washQty, aqlAcceptedDefect: "", aqlLevelUsed: "" }
         : item
     )
   );
