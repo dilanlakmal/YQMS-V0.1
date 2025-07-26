@@ -46,7 +46,7 @@ const InspectionDataSection = ({
                         type="date"
                         value={item.approvedDate}
                         onChange={(e) => handleInspectionChange(index, 'approvedDate', e.target.value)}
-                        disabled={item.na}
+                        // disabled={item.na}
                         className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
                       />
                     </td>
@@ -62,7 +62,7 @@ const InspectionDataSection = ({
                         type="text"
                         value={item.remark}
                         onChange={(e) => handleInspectionChange(index, 'remark', e.target.value)}
-                        disabled={item.na}                       
+                        // disabled={item.na}                       
                         className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
                       />
                     </td>
@@ -182,7 +182,7 @@ const InspectionDataSection = ({
                           />
                         </td>
                         {/* Checked QTY with + and - */}
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
+                           <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
                             {paramName === "Hand Feel" ? (
                                <div className="flex items-center justify-center space-x-2">
                               <button
@@ -195,7 +195,7 @@ const InspectionDataSection = ({
                                       : Number(washQty) || 0;
                                   handleDefectChange(index, 'checkedQty', Math.max(currentCheckedQty - 1, 0));
                                 }}
-                                disabled={isOk}
+                                // disabled={isOk}
                               >-</button>
                               <input
                                 value={
@@ -205,7 +205,7 @@ const InspectionDataSection = ({
                                 }
                                 onChange={e => handleDefectChange(index, 'checkedQty', e.target.value)}
                                 className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                                disabled={isOk}
+                                // disabled={isOk}
                                 min={0}
                               />
                               <button
@@ -218,7 +218,7 @@ const InspectionDataSection = ({
                                       : Number(washQty) || 0;
                                   handleDefectChange(index, 'checkedQty', currentCheckedQty + 1);
                                 }}
-                                disabled={isOk}
+                                // disabled={isOk}
                               >+</button>
                             </div>
                             ) : (
@@ -228,20 +228,20 @@ const InspectionDataSection = ({
                                   type="button"
                                   className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
                                   onClick={() => handleDefectChange(index, 'checkedQty', Math.max((Number(item.checkedQty) || 0) - 1, 0))}
-                                  disabled={isOk}
+                                  // disabled={isOk}
                                 >-</button>
                                 <input
                                   value={item.checkedQty || 0}
                                   onChange={e => handleDefectChange(index, 'checkedQty', e.target.value)}
                                   className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                                  disabled={isOk}
+                                  // disabled={isOk}
                                   min={0}
                                 />
                                 <button
                                   type="button"
                                   className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
                                   onClick={() => handleDefectChange(index, 'checkedQty', (Number(item.checkedQty) || 0) + 1)}
-                                  disabled={isOk}
+                                  // disabled={isOk}
                                 >+</button>
                               </div>
                             )}
@@ -253,20 +253,20 @@ const InspectionDataSection = ({
                               type="button"
                               className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
                               onClick={() => handleDefectChange(index, 'failedQty', Math.max((Number(item.failedQty) || 0) - 1, 0))}
-                              disabled={isOk}
+                              // disabled={isOk}
                             >-</button>
                             <input
                                 value={item.failedQty || 0}
                                 onChange={e => handleDefectChange(index, 'failedQty', e.target.value)}
                                 className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                                disabled={isOk}
+                                // disabled={isOk}
                                 min={0}
                               />
                             <button
                               type="button"
                               className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
                               onClick={() => handleDefectChange(index, 'failedQty', (Number(item.failedQty) || 0) + 1)}
-                              disabled={isOk}
+                              // disabled={isOk}
                             >+</button>
                           </div>
                         </td>
@@ -292,7 +292,7 @@ const InspectionDataSection = ({
                             value={item.remark}
                             onChange={e => handleDefectChange(index, 'remark', e.target.value)}
                             className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                            disabled={isOk}
+                            // disabled={isOk}
                           />
                         </td>
                       </tr>

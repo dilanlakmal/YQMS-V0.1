@@ -824,6 +824,25 @@ useEffect(() => {
     setDefectData(prev =>
       prev.map((item, i) => {
         if (i !== index) return item;
+        if (field === "failedQty") {
+          const failedQty = Number(value) || 0;
+          let ok = item.ok;
+          let no = item.no;
+
+          if (failedQty > 0) {
+          ok = false;
+          no = true;
+        } else {
+          // If failedQty is 0, auto-select Ok, enable Ok
+          ok = true;
+          no = false;
+        } 
+          let result = item.result;
+          if (item.aqlAcceptedDefect !== undefined) {
+            result = failedQty <= item.aqlAcceptedDefect ? "Pass" : "Fail";
+          }
+          return { ...item, failedQty: value, ok, no, result };
+        }
 
         if (field === "ok" && value) {
           return { ...item, ok: true, no: false, checkedQty: 0, failedQty: 0, remark: "", aqlAcceptedDefect: undefined, result: "" };
@@ -836,14 +855,7 @@ useEffect(() => {
           fetchAqlForParameter(orderNo, value, setDefectData, index);
           return { ...item, checkedQty: value };
         }
-        if (field === "failedQty") {
-          const failedQty = Number(value) || 0;
-          let result = item.result;
-          if (item.aqlAcceptedDefect !== undefined) {
-            result = failedQty <= item.aqlAcceptedDefect ? "Pass" : "Fail";
-          }
-          return { ...item, failedQty: value, result };
-        }
+        
         return { ...item, [field]: value };
       })
     );
