@@ -31,13 +31,17 @@ const SubmittedWashingDataPage = () => {
     fetchSubmittedData();
   }, []);
 
-  if (isLoading) {
-    return <div className="text-center py-4">Loading submitted data...</div>;
-  }
+  // if (isLoading) {
+  //   return <div className="text-center py-4">Loading submitted data...</div>;
+  // }
 
-  if (error) {
-    return <div className="text-center py-4 text-red-600">Error: {error}</div>;
-  }
+  // if (error) {
+  //   return <div className="text-center py-4 text-red-600">Error: {error}</div>;
+  // }
+
+  if (isLoading || error) {
+  return <div className="text-center py-4 text-lg font-semibold text-gray-600 bg-blue-100 dark:text-white dark:bg-gray-600">Coming Soon</div>;
+}
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
