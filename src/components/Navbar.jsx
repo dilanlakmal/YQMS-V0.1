@@ -54,7 +54,6 @@ export default function Navbar({ onLogout }) {
 
   const navStructure = useMemo(
     () => [
-      /* ... your navStructure is correct and unchanged ... */
       {
         id: "qc2-system",
         title: "QC2",
@@ -127,14 +126,19 @@ export default function Navbar({ onLogout }) {
         items: [
           { path: "/audit", roles: ["QA Audit"], title: "Audit" },
           {
-            path: "/final-inspection",
-            roles: ["QA"],
-            title: "Final Inspection"
-          },
-          {
             path: "/qc-accuracy",
             roles: ["QA"],
             title: "QC Accuracy"
+          },
+          {
+            path: "/qa-yorksys",
+            roles: ["QA Clerk"],
+            title: "Upload Orders"
+          },
+          {
+            path: "/final-inspection",
+            roles: ["QA"],
+            title: "Final Inspection"
           }
         ]
       },

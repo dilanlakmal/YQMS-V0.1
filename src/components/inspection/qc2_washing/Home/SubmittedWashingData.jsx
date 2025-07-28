@@ -1,4 +1,3 @@
-// SubmittedWashingDataPage.jsx
 import React, { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../../../../../config'; 
 
@@ -11,14 +10,13 @@ const SubmittedWashingDataPage = () => {
     const fetchSubmittedData = async () => {
       try {
         setIsLoading(true);
-        // This endpoint would fetch all submitted QC washing data
         const response = await fetch(`${API_BASE_URL}/api/qc-washing/all-submitted`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
         if (data.success) {
-          setSubmittedData(data.data); // Assuming 'data' contains the array of submitted records
+          setSubmittedData(data.data); 
         } else {
           setError(data.message || "Failed to fetch submitted data.");
         }
@@ -57,7 +55,7 @@ const SubmittedWashingDataPage = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Report Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Result</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted By</th>
-                {/* Add more headers as needed */}
+               
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -69,7 +67,7 @@ const SubmittedWashingDataPage = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.reportType}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.formData?.result || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.userId || 'N/A'}</td>
-                  {/* Render more data fields */}
+                
                 </tr>
               ))}
             </tbody>

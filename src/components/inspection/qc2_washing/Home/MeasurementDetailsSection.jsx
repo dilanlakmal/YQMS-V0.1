@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Minus } from 'lucide-react';
-import { API_BASE_URL } from '../../../../../config';
-import Swal from 'sweetalert2';
-import MeasurementNumPad from '../../cutting/MeasurementNumPad';
-import SummaryCard from '../Home/SummaryCard'
+import React, { useState, useEffect } from "react";
+import { Plus, Minus } from "lucide-react";
+import { API_BASE_URL } from "../../../../../config";
+import Swal from "sweetalert2";
+import MeasurementNumPad from "../../cutting/MeasurementNumPad";
+import SummaryCard from "../Home/SummaryCard";
 
-const MeasurementDetailsSection = ({ 
+const MeasurementDetailsSection = ({
   orderNo,
   color,
   isVisible,
@@ -34,7 +34,6 @@ const MeasurementDetailsSection = ({
 
   const currentWashMeasurements = (reportType === 'Before Wash' ? measurementData.beforeWash : measurementData.afterWash) || [];
 
-  // Transform measurement data into nested structure
   const transformMeasurementData = (size, qty, measurements, selectedRows, fullColumns, measurementSpecs, tableType) => {
     const pcs = [];
     for (let pcIndex = 0; pcIndex < qty; pcIndex++) {
@@ -44,13 +43,11 @@ const MeasurementDetailsSection = ({
       measurementSpecs.forEach((spec, specIndex) => {
         const isRowIndividuallySelected = selectedRows?.[specIndex] ?? true;
         
-        // If the column is not 'Full', only include individually selected rows.
         if (!isFullColumn && !isRowIndividuallySelected) return;
         
         const cellKey = `${size}-${tableType}-${specIndex}-${pcIndex}`;
         const measurementValue = measurements?.[cellKey];
         
-        // Determine the pass/fail result based on the same logic as the UI
         let result = '';
         if (measurementValue && typeof measurementValue.decimal === 'number') {
           const measuredDeviation = measurementValue.decimal;
@@ -99,7 +96,6 @@ const MeasurementDetailsSection = ({
     const fractionToDecimal = (frac) => {
     if (typeof frac !== 'string' || !frac || frac.trim() === '-') return NaN;
 
-    // Standardize fraction characters
     frac = frac
       .replace('⁄', '/')
       .replace('½', '1/2').replace('¼', '1/4').replace('¾', '3/4')
@@ -141,7 +137,6 @@ const MeasurementDetailsSection = ({
       return;
     }
 
-    // Add the size to the list of sizes being actively edited/viewed
     setSelectedSizes(prev => {
         if (prev.some(s => s.size === sizeToEdit)) {
             return prev.map(s => s.size === sizeToEdit ? { ...s, qty: dataToEdit.qty } : s);
@@ -149,7 +144,6 @@ const MeasurementDetailsSection = ({
         return [...prev, { size: sizeToEdit, qty: dataToEdit.qty }];
     });
 
-    // Populate the measurement values state from the saved data
     if (dataToEdit.measurements) {
         setMeasurementValues(prev => ({
             ...prev,
@@ -157,7 +151,6 @@ const MeasurementDetailsSection = ({
         }));
     }
 
-    // Populate the row/column selection states
     if (dataToEdit.selectedRows) {
         setSelectedRowsBySize(prev => ({ ...prev, [sizeToEdit]: dataToEdit.selectedRows }));
     }
@@ -165,9 +158,6 @@ const MeasurementDetailsSection = ({
         setFullColumnsBySize(prev => ({ ...prev, [sizeToEdit]: dataToEdit.fullColumns }));
     }
 
-    // Trigger the parent to remove it from the "saved" data state.
-    // This will cause a re-render, removing it from the "Saved" list
-    // and showing it in the "Measurement Input" section.
     if (onMeasurementEdit) {
         onMeasurementEdit(sizeToEdit);
     }
@@ -188,28 +178,13 @@ const MeasurementDetailsSection = ({
     try {
       setLoading(true);
       setError(null);
-      // console.log('Fetching sizes for:', orderNo, color);
       const response = await fetch(`${API_BASE_URL}/api/qc-washing/order-sizes/${orderNo}/${color}`);
       const data = await response.json();
-      // console.log('Sizes response:', data);
       
       if (data.success) {
-        // Handle case where API returns 'Sizes' instead of 'sizes'
         const availableSizes = data.sizes || data.Sizes || [];
         setSizes(availableSizes);
-        // console.log('Set sizes:', availableSizes);
-
-        // Automatically populate selected sizes with a default quantity when they are fetched
-        // const initialSelectedSizes = availableSizes.map(size => {
-        //   let sizeValue;
-        //   if (typeof size === 'object' && size !== null) {
-        //     sizeValue = size.size || size.Size || size.name || size.value || Object.values(size)[0] || 'Unknown';
-        //   } else {
-        //     sizeValue = size;
-        //   }
-        //   return { size: String(sizeValue), qty: 5 };
-        // });
-        // setSelectedSizes(initialSelectedSizes);
+        
         setSelectedSizes([]);
       } else {
         setError(data.message || 'Failed to fetch sizes');
@@ -228,11 +203,8 @@ const MeasurementDetailsSection = ({
 
   const fetchMeasurementSpecs = async () => {
     try {
-      // console.log('Fetching measurement specs for:', orderNo, color);
       const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}/${color}`);
       const data = await response.json();
-      
-      // console.log('Measurement specs response:', data);
       
       if (response.ok && data.success) {
         const beforeWashGrouped = data.beforeWashGrouped || {};
@@ -251,14 +223,7 @@ const MeasurementDetailsSection = ({
         if (beforeKeys.length > 0) setActiveBeforeTab(beforeKeys[0]);
         if (afterKeys.length > 0) setActiveAfterTab(afterKeys[0]);
         
-        // console.log('Set measurement specs:', {
-        //   beforeWash: data.beforeWashSpecs || [],
-        //   afterWash: data.afterWashSpecs || [],
-        //   beforeWashGrouped,
-        //   afterWashGrouped
-        // });
       } else {
-        // console.error('Failed to fetch measurement specs:', data.message);
         setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
       }
     } catch (error) {
@@ -314,7 +279,6 @@ const MeasurementDetailsSection = ({
     const updated = [...prevForSize];
     updated[columnIndex] = !updated[columnIndex];
 
-    // If now checked, set all related cells to 0
     if (updated[columnIndex]) {
       const specs = reportType === 'Before Wash'
         ? (measurementSpecs.beforeWashGrouped[activeBeforeTab] || measurementSpecs.beforeWash)
@@ -338,7 +302,6 @@ const MeasurementDetailsSection = ({
     };
   });
 };
-
 
  const toggleSelectAll = (size) => {
   setSelectAllBySize(prev => ({
@@ -464,9 +427,9 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                     <input
                         type="checkbox"
                         checked={
-                          (selectedRowsBySize[size] || []).every(Boolean) // all true = checked
+                          (selectedRowsBySize[size] || []).every(Boolean) 
                         }
-                        onChange={(e) => toggleSelectAllRows(size, e.target.checked, 'before')} // or 'after' depending on table
+                        onChange={(e) => toggleSelectAllRows(size, e.target.checked, 'before')} 
                         className="w-4 h-4"
                       />
                   </th>
@@ -533,12 +496,10 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                           const cellKey = `${size}-before-${index}-${i}`;
                           const value = measurementValues[cellKey];
 
-                          // Determine if cell should be enabled
                           const isFull = fullColumnsBySize[size]?.[i] || false;
                           const isRowSelected = selectedRowsBySize[size]?.[index] ?? true;
                           const isEnabled = isFull || isRowSelected;
 
-                          // Add gray-out style if not enabled
                           const cellColorClass = !isEnabled
                             ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                             : (value && typeof value.decimal === 'number'
@@ -550,21 +511,25 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                           return (
                             <td
                               key={`measurement-input-${index}-${i}`}
-                              className={`border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white ${cellColorClass} ${isEnabled ? 'cursor-pointer' : ''}`}
-                              onClick={isEnabled ? (e) => {
+                              className={`border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white ${cellColorClass} cursor-pointer`}
+                              onClick={(e) => {
                                 e.preventDefault();
-                                setCurrentCell({ size, table: 'before', rowIndex: index, colIndex: i });
+                                setCurrentCell({
+                                  size,
+                                  table: "before",
+                                  rowIndex: index,
+                                  colIndex: i
+                                });
                                 setShowNumPad(true);
-                              } : undefined}
+                              }}
                             >
                               <input
                                 type="text"
-                                value={value?.fraction || ''}
+                                value={value?.fraction || ""}
                                 readOnly
-                                disabled={!isEnabled}
-                                className={`w-full px-1 py-1 text-center border-0 bg-transparent dark:text-white ${!isEnabled ? 'text-gray-400' : ''}`}
+                                className="w-full px-1 py-1 text-center border-0 bg-transparent dark:text-white"
                                 placeholder="0.0"
-                                style={{ pointerEvents: 'none' }}
+                                style={{ pointerEvents: "none" }}
                               />
                             </td>
                           );
@@ -623,9 +588,9 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                     <input
                         type="checkbox"
                         checked={
-                          (selectedRowsBySize[size] || []).every(Boolean) // all true = checked
+                          (selectedRowsBySize[size] || []).every(Boolean) 
                         }
-                        onChange={(e) => toggleSelectAllRows(size, e.target.checked, 'before')} // or 'after' depending on table
+                        onChange={(e) => toggleSelectAllRows(size, e.target.checked, 'before')} 
                         className="w-4 h-4"
                       />
                   </th>
@@ -660,7 +625,6 @@ const toggleSelectAllRows = (size, checked, tableType) => {
 
               <tbody>
                 {(measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash)?.map((spec, index) => {
-                  // console.log('After wash spec:', spec);
                   const isSelected = selectedRowsBySize[size]?.[index] ?? true;
                   const shouldHide = hideUnselectedRowsBySize[size] && !isSelected;
                   const area = spec.MeasurementPointEngName || `Point ${index + 1}`;
@@ -701,7 +665,6 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                           const tolPlusValue = fractionToDecimal(tolPlus);
 
                           if (!isNaN(tolMinusValue) && !isNaN(tolPlusValue)) {
-                            // The deviation should be within the tolerance range.
                             if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
                               cellColorClass = 'bg-green-200 dark:bg-green-700'; // Pass
                             } else {
@@ -819,7 +782,6 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                         {sizes.map((size, index) => {
                           let sizeValue;
                           if (typeof size === 'object' && size !== null) {
-                            // Handle different casings for the size property and keep original fallbacks
                             sizeValue = size.size || size.Size || size.name || size.value || Object.values(size)[0] || 'Unknown';
                           } else {
                             sizeValue = size;
@@ -971,9 +933,6 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                 ))}
               </div>
             </div>
-
-
-
           )}
 
           {/* Show measurement table for new sizes */}

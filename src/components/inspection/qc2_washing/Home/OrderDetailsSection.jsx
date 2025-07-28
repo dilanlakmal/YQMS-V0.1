@@ -1,11 +1,11 @@
-import React from 'react';
+import React from "react";
 
-const OrderDetailsSection = ({ 
-  formData, 
+const OrderDetailsSection = ({
+  formData,
   handleInputChange,
   fetchOrderDetailsByStyle,
   colorOptions,
-  subFactories, 
+  subFactories,
   user,
   isVisible,
   onToggle,
@@ -26,7 +26,6 @@ const OrderDetailsSection = ({
     handleInputChange("orderNo", e.target.value);
     // Suggestions are fetched and visibility is set in parent's handleInputChange
   };
-
 
   const handleOrderNoBlur = () => {
     // A small delay to allow click on suggestion to register before hiding

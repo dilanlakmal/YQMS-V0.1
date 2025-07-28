@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import { useTranslation } from "react-i18next";
 import { API_BASE_URL } from "../../../../config";
@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import QCAccuracyFullReportPDF from "./QCAccuracyFullReportPDF";
+import useClickOutside from "./useClickOutside";
 
 // react-select styles (can be moved to a separate file if used elsewhere)
 const reactSelectStyles = {
@@ -88,6 +89,14 @@ const QCAccuracyFullReport = () => {
 
   // State to manage which dropdown is open
   const [openDropdownId, setOpenDropdownId] = useState(null);
+
+  // --- CREATE A REF FOR THE DROPDOWN CONTAINER ---
+  const dropdownRef = useRef(null);
+
+  // --- USE THE HOOK TO CLOSE THE DROPDOWN ---
+  // When a click happens outside the element referenced by dropdownRef,
+  // it will call the handler, which sets the openDropdownId to null.
+  useClickOutside(dropdownRef, () => setOpenDropdownId(null));
 
   const fetchFullReport = useCallback(async () => {
     setIsLoading(true);
@@ -193,7 +202,7 @@ const QCAccuracyFullReport = () => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)] bg-white dark:bg-gray-800 rounded-lg shadow-md">
-      {/* Filter Pane - Fixed */}
+      {/* Filter Pane */}
       <div className="p-4 border-b dark:border-gray-700">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {/* --- ADD `popperClassName` --- */}
@@ -353,7 +362,7 @@ const QCAccuracyFullReport = () => {
                 <th className="p-2 text-left">Defect Details</th>
                 <th className="p-2 text-center">Result</th>
                 <th className="p-2 text-center">Grade</th>
-                {/* --- FIX #2: ADD ACTION HEADER --- */}
+                {/* --- ADD ACTION HEADER --- */}
                 <th className="p-2 text-center">Action</th>
               </tr>
             </thead>
@@ -434,9 +443,12 @@ const QCAccuracyFullReport = () => {
                     {report.result}
                   </td>
                   <td className="p-2 text-center font-bold">{report.grade}</td>
-                  {/* --- FIX #2: ADD ACTION DROPDOWN --- */}
+                  {/* --- ADD ACTION DROPDOWN --- */}
                   <td className="p-2 text-center">
-                    <div className="relative">
+                    <div
+                      className="relative"
+                      ref={openDropdownId === report._id ? dropdownRef : null}
+                    >
                       <button
                         onClick={() =>
                           setOpenDropdownId(

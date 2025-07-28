@@ -33,8 +33,11 @@
     "b-grade_defect": "B-Grade Defects",
     "b-grade_stock": "B-Grade Stock",
     "ieadmin": "IE Administration",
-    "qcWashing": "QC Washing",
-    "upload_beforewash_specs": "Upload Specs"
+    "upload_beforewash_specs": "Upload Specs",
+    "cutting-inline": "Cutting Inline",
+    "select_dt_specs": "Select DT Specs",
+    "anf_washing": "QC AW Washing",
+    "qcWashing": "QC Washing"
   },
 
   "nav": {
@@ -655,7 +658,7 @@
     "panelNameKhmer": "Part Name (Khmer)",
     "spreadTable": "Spread Table",
     "spreadTableNo": "Spread Table No",
-    "mackerNo": "Marker No",
+    "mackerNo": "Macker No",
     "mackerLength": "Marker Length",
     "fabricType": "Fabric Type",
     "material": "Material",
@@ -823,7 +826,33 @@
     "modifyMeasurementPointsTitle": "Modify / Delete Cutting Measurement Points",
     "noPointsFoundTitle": "No Measurement Points Found",
     "noPointsFoundMsg": "No measurement points found for this Garment Type. Please add points to proceed.",
-    "remarks": "Remarks"
+    "remarks": "Remarks",
+    "mackerRatio": "Macker Ratio",
+    "garmentType": "Garment Type",
+    "lotNos": "Lot Nos",
+    "layerDetails": "Layer Details",
+    "plan": "Plan",
+    "actual": "Actual",
+    "totalQty": "Total Bundle Qty",
+    "qtyChecked": "No of Bundle Qty Checked",
+    "inspectedQty": "Total Inspected Qty",
+    "inspectedSizes": "Total Inspected Size",
+    "totalCompleted": "Total Completed Qty",
+    "inspectionDetails": "Inspection Details",
+    "custStyle": "Buyer Style",
+    "followUpReport": "Cutting Follow Up Report",
+    "measurementIssues": "Measurement Issues",
+    "supervisorActions": "Supervisor Actions",
+    "enterFollowUpActions": "Write down corrective Actions..",
+    "overallResult": "Result",
+    "aqlresults": "AQL",
+    "inspectedSize": "Size",
+    "measurementPointName": "Measurement Point Name",
+    "measuredValues": "Measurements",
+    "totalCount": "Total Rejects",
+    "totalNegTol": "Total Neg. TOL",
+    "totalPosTol": "Total Pos. TOL",
+    "noMeasurementIssuesFound": "No issues recorded"
   },
 
   "cuttingReport": {
@@ -957,7 +986,16 @@
     "filters": "Filters",
     "delete": "Delete",
     "clear": "Clear",
-    "saved": "Saved!"
+    "saved": "Saved!",
+    "action": "Action",
+    "headerIconLegend": "Icon Details",
+    "followUp": "Follow Up",
+    "editFollowUp": "Edit Follow Up",
+    "comments": "Comments",
+    "actionsComments": "Actions",
+    "featureComingSoon": "This Feature Coming Soon..",
+    "actionRequired": "Action Require",
+    "noActionRequired": "No Action Require"
   },
 
   "editGar": {

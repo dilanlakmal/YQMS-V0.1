@@ -34,10 +34,6 @@ const InspectionDataSection = ({
   setMachineType,
   washQty 
 }) => {
-//   const [processData, setProcessData] = useState({
-//   "Washing Machine": { temperature: "", time: "", chemical: "" },
-//   "Tumble Dry": { temperature: "", time: "" }
-// });
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -147,12 +143,11 @@ const InspectionDataSection = ({
                     const checkedQty = Number(item.checkedQty) || 0;
                     const failedQty = Number(item.failedQty) || 0;
                     const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
-                    // const result = checkedQty > 0 ? (passRate >= 90 ? 'Pass' : 'Fail') : '';
                     const aqlAccept = item.aqlAcceptedDefect !== undefined && item.aqlAcceptedDefect !== "" ? item.aqlAcceptedDefect : "-";
                     const result = (item.aqlAcceptedDefect !== undefined && checkedQty > 0)
                       ? (failedQty <= item.aqlAcceptedDefect ? "Pass" : "Fail")
                       : "";
-                    const isOk = item.ok !== false; // Default to true if undefined
+                    const isOk = item.ok !== false; 
                     const isNo = item.no === true;
 
                     return (
