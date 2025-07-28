@@ -21,10 +21,9 @@ const OverAllSummaryCard = ({ summary }) => {
     totalDefectCount,
     defectRate,
     defectRatio,
-    overallFinalResult
+    overallFinalResult,
+    overallResult,
   } = summary;
-
-  const overallResult = overallFinalResult || "N/A";
 
   let resultColor = "text-green-600 dark:text-green-400";
   let resultBgColor = "bg-green-50 dark:bg-green-900/50";

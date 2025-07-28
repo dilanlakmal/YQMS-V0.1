@@ -27,6 +27,7 @@ const DefectDetailsSection = ({
   const imageInputRef = useRef(null);
   const { i18n } = useTranslation();
   const videoRef = useRef(null);
+  // State is now managed by the parent QCWashingPage component
   
   const getDefectNameForDisplay = (d) => {
     if (!d) return "N/A";
@@ -38,6 +39,7 @@ const DefectDetailsSection = ({
   };
 
   let statusColorClass = 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200';
+  // Correctly calculate total defects from the new defectsByPc structure
  if (defectStatus === 'Pass') {
     statusColorClass = 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
   } else if (defectStatus === 'Fail') {
@@ -46,30 +48,30 @@ const DefectDetailsSection = ({
     defectStatus = 'N/A';
   }
 
-  const handleAddDefect = (pc, defect) => {
-    if (!defect.selectedDefect || !defect.defectQty) {
-      Swal.fire('Incomplete', 'Please select a defect and enter a quantity.', 'warning');
-      return;
-    }
+  // const handleAddDefect = (pc, defect) => {
+  //   if (!defect.selectedDefect || !defect.defectQty) {
+  //     Swal.fire('Incomplete', 'Please select a defect and enter a quantity.', 'warning');
+  //     return;
+  //   }
 
-    const defectDetails = defectOptions.find(d => d._id === defect.selectedDefect);
-    if (!defectDetails) return;
+  //   const defectDetails = defectOptions.find(d => d._id === defect.selectedDefect);
+  //   if (!defectDetails) return;
 
-    const defectExists = defectsByPc[pc].some(d => d.defectId === defect.selectedDefect && d.id !== defect.id);
-    if (defectExists) {
-      Swal.fire('Duplicate', 'This defect has already been added.', 'error');
-      return;
-    }
+  //   const defectExists = defectsByPc[pc].some(d => d.defectId === defect.selectedDefect && d.id !== defect.id);
+  //   if (defectExists) {
+  //     Swal.fire('Duplicate', 'This defect has already been added.', 'error');
+  //     return;
+  //   }
   
-    setDefectsByPc(prev => ({
-      ...prev,
-      [pc]: prev[pc].map(d => 
-        d.id === defect.id
-          ? { ...d, defectId: defectDetails._id }
-          : d
-      ),
-    }));
-  };
+  //   setDefectsByPc(prev => ({
+  //     ...prev,
+  //     [pc]: prev[pc].map(d => 
+  //       d.id === defect.id
+  //         ? { ...d, defectId: defectDetails._id }
+  //         : d
+  //     ),
+  //   }));
+  // };
 
   const handleAddDefectCard = (pc) => {
     setDefectsByPc(prev => ({
@@ -107,6 +109,7 @@ const DefectDetailsSection = ({
     const handleRemoveDefectCard = (pc, defectId) => {
     setDefectsByPc(prev => {
       const updatedPcDefects = prev[pc].filter(d => d.id !== defectId);
+      // If no defects are left for this PC, remove the PC entry itself
       if (updatedPcDefects.length === 0) {
         const { [pc]: _, ...rest } = prev;
         return rest;
@@ -128,6 +131,7 @@ const DefectDetailsSection = ({
       )
     }));
   };
+
 
   const handleRemoveImage = (index) => {
     setUploadedImages(prev => prev.filter((_, i) => i !== index));
@@ -174,6 +178,7 @@ const DefectDetailsSection = ({
     [pc]: prev[pc].map(d => {
       if (d.id === defectId) {
         if (field === 'selectedDefect') {
+          // Find the defect object by _id
           const defectObj = defectOptions.find(opt => opt._id === value);
           return {
             ...d,
@@ -188,6 +193,7 @@ const DefectDetailsSection = ({
   }));
 };
 
+  
     const handleDefectImageChange = async (pc, defectId, e) => {
       const files = Array.from(e.target.files);
       if (files.length === 0) return;
