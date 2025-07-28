@@ -23719,6 +23719,55 @@ app.post("/api/anf-measurement/reports", async (req, res) => {
   }
 });
 
+// Endpoint to get existing measurement data for a specific size in a report
+app.get("/api/anf-measurement/existing-data", async (req, res) => {
+  try {
+    const { date, qcId, moNo, color, size } = req.query;
+
+    if (!date || !qcId || !moNo || !color || !size) {
+      return res
+        .status(400)
+        .json({ error: "Missing required query parameters." });
+    }
+
+    // Colors can come as a comma-separated string from query params
+    const colorArray = Array.isArray(color) ? color : color.split(",");
+
+    // The unique key for finding the document, same as in the POST endpoint
+    const filter = {
+      inspectionDate: new Date(new Date(date).setHours(0, 0, 0, 0)),
+      qcID: qcId,
+      moNo: moNo,
+      color: { $all: colorArray.sort(), $size: colorArray.length }
+    };
+
+    const report = await ANFMeasurementReport.findOne(filter);
+
+    if (!report) {
+      // No report found, so no existing data. Return empty.
+      return res.json([]);
+    }
+
+    // Report found, now find the specific size's data within it
+    const sizeData = report.measurementDetails.find(
+      (detail) => detail.size === size
+    );
+
+    if (!sizeData || !sizeData.sizeMeasurementData) {
+      // Report exists, but not for this size. Return empty.
+      return res.json([]);
+    }
+
+    // Success! Return the array of measured garments for that size
+    res.json(sizeData.sizeMeasurementData);
+  } catch (error) {
+    console.error("Error fetching existing measurement data:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to fetch existing measurement data." });
+  }
+});
+
 /* ------------------------------
    QC-Washing enpoint Start
   ------------------------------ */
