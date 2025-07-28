@@ -99,13 +99,15 @@ function calculateSummaryData(currentFormData) {
 
   // Always use Number() to ensure numeric values
   const checkedPcs = Number(currentDefectDetails?.checkedQty) || 0;
-  const totalRejectPcs = currentDefectDetails?.defectsByPc
-  ? currentDefectDetails.defectsByPc.filter(pc =>
-      Array.isArray(pc.pcDefects) && pc.pcDefects.length > 0
-    ).length
+  // const totalRejectPcs = currentDefectDetails?.defectsByPc
+  // ? currentDefectDetails.defectsByPc.filter(pc =>
+  //     Array.isArray(pc.pcDefects) && pc.pcDefects.length > 0
+  //   ).length
+  // : 0;
+  // const calculatedWashQty = Number(currentDefectDetails?.washQty) || 0;
+  const rejectedDefectPcs = Array.isArray(currentDefectDetails?.defectsByPc)
+  ? currentDefectDetails.defectsByPc.length
   : 0;
-  const calculatedWashQty = Number(currentDefectDetails?.washQty) || 0;
-  const rejectedDefectPcs = currentDefectDetails?.result === "Fail" ? checkedPcs : 0;
 
   // Use pc.pcDefects for defect counting
   const defectCount = currentDefectDetails?.defectsByPc
@@ -123,7 +125,7 @@ function calculateSummaryData(currentFormData) {
   // FIXED: Defect Ratio is now (rejectedDefectPcs / checkedPcs) * 100
   const defectRatio =
     checkedPcs > 0
-      ? ((totalRejectPcs / checkedPcs) * 100).toFixed(1)
+      ? ((rejectedDefectPcs / checkedPcs) * 100).toFixed(1)
       : 0;
 
   let overallResult = "Pass";

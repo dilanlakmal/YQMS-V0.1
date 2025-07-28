@@ -2185,7 +2185,7 @@ function calculateSummaryFields(qcRecord, colorName) {
     );
   }
   const defectRate = totalCheckedPcs > 0 ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(1) : 0;
-  const defectRatio = totalCheckedPcs > 0 ? (totalDefectCount / totalCheckedPcs).toFixed(2) : 0;
+  const defectRatio = totalCheckedPcs > 0 ? ((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1) : 0;
 
   const totalFail = measurementPoints - measurementPass;
   const measurementOverallResult = totalFail > 0 ? "Fail" : "Pass";
@@ -2724,7 +2724,7 @@ app.get('/api/qc-washing/overall-summary/:orderNo/:color', async (req, res) => {
     }
     const washQty = parseInt(defectDetails.washQty) || 0;
     const defectRate = totalCheckedPcs > 0 ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(1) : 0;
-    const defectRatio = totalCheckedPcs > 0 ? (totalDefectCount / totalCheckedPcs).toFixed(2) : 0;
+    const defectRatio = totalCheckedPcs > 0 ? ((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1) : 0;
     const checkedQty = defectDetails.checkedQty || ""; 
 
     // Overall result
