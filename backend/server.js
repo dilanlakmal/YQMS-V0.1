@@ -24340,7 +24340,11 @@ function calculateSummaryFields(qcRecord, colorName) {
   if (Array.isArray(defectDetails.defectsByPc)) {
     rejectedDefectPcs = defectDetails.defectsByPc.length;
     totalDefectCount = defectDetails.defectsByPc.reduce(
-      (sum, pc) => sum + (Array.isArray(pc.pcDefects) ? pc.pcDefects.length : 0), 0
+      (sum, pc) => sum + (
+        Array.isArray(pc.pcDefects)
+          ? pc.pcDefects.reduce((defSum, defect) => defSum + (parseInt(defect.defectQty, 10) || 0), 0)
+          : 0
+      ), 0
     );
   }
   const defectRate = totalCheckedPcs > 0 ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(1) : 0;
