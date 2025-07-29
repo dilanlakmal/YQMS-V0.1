@@ -378,6 +378,7 @@ const ANFMeasurementInspectionForm = ({
 
   const summaryStats = useMemo(() => {
     if (specTableData.length === 0 || garments.length === 0) {
+      // ... (no change to this part)
       return {
         totalGarmentsChecked: garments.length,
         totalMeasurementPoints: 0,
@@ -393,28 +394,54 @@ const ANFMeasurementInspectionForm = ({
       };
     }
 
-    // --- START: NEW "INNOCENT UNTIL PROVEN GUILTY" LOGIC ---
-
+    // --- GARMENT LOGIC (This part is correct and remains unchanged) ---
     let totalOkGarments = 0;
-    let totalPointsMeasuredAndInTol = 0;
-    let totalPointsMeasuredAndOutOfTol = 0;
-    let totalPosTol = 0;
-    let totalNegTol = 0;
-
     garments.forEach((garment) => {
-      // Each garment starts as OK. We look for a reason to fail it.
       let isGarmentRejected = false;
-
-      // Skip any malformed garment entries
-      if (typeof garment !== "object" || garment === null) {
-        return;
-      }
+      if (typeof garment !== "object" || garment === null) return;
 
       specTableData.forEach((spec) => {
         const measurement = garment[spec.orderNo];
+        if (
+          measurement &&
+          measurement.decimal !== null &&
+          measurement.decimal !== undefined
+        ) {
+          const diff = measurement.decimal - spec.specValueDecimal;
+          if (diff > spec.tolPlus || diff < spec.tolMinus) {
+            isGarmentRejected = true;
+          }
+        }
+      });
+      if (!isGarmentRejected) {
+        totalOkGarments++;
+      }
+    });
+    const totalGarmentsChecked = garments.length;
+    const totalIssuesGarments = totalGarmentsChecked - totalOkGarments;
+    const passRateByGarment =
+      totalGarmentsChecked > 0
+        ? ((totalOkGarments / totalGarmentsChecked) * 100).toFixed(2)
+        : "0.00";
+    const defectRate =
+      totalGarmentsChecked > 0
+        ? ((totalIssuesGarments / totalGarmentsChecked) * 100).toFixed(2)
+        : "0.00";
+    // --- END OF GARMENT LOGIC ---
 
-        // We only care about points that the user has explicitly measured.
-        // The default "0" state for a non-zero spec does not count as a measurement.
+    // --- START: CORRECTED POINT CALCULATION LOGIC ---
+    let totalPosTol = 0;
+    let totalNegTol = 0;
+    let totalIssuesPoints = 0;
+
+    // Loop through every possible measurement point
+    garments.forEach((garment) => {
+      if (typeof garment !== "object" || garment === null) return;
+      specTableData.forEach((spec) => {
+        const measurement = garment[spec.orderNo];
+
+        // We only care about points that have an explicit, non-null value.
+        // Unmeasured points are considered "Pass" by default for this calculation.
         if (
           measurement &&
           measurement.decimal !== null &&
@@ -422,69 +449,156 @@ const ANFMeasurementInspectionForm = ({
         ) {
           const diff = measurement.decimal - spec.specValueDecimal;
 
-          // Check if it's out of tolerance
-          if (diff > spec.tolPlus || diff < spec.tolMinus) {
-            isGarmentRejected = true; // Mark the whole garment as rejected
-            totalPointsMeasuredAndOutOfTol++;
-            if (diff > spec.tolPlus) totalPosTol++;
-            if (diff < spec.tolMinus) totalNegTol++;
-          } else {
-            // The point is measured and within tolerance
-            totalPointsMeasuredAndInTol++;
+          if (diff > spec.tolPlus) {
+            totalPosTol++;
+          } else if (diff < spec.tolMinus) {
+            totalNegTol++;
           }
         }
       });
-
-      // After checking all points for the garment, increment the final counts.
-      if (isGarmentRejected) {
-        // If we found any reason to fail it, it's a rejected garment.
-        // This count is handled below.
-      } else {
-        // If we checked all points and found no failures, it's an OK garment.
-        totalOkGarments++;
-      }
     });
 
-    const totalGarmentsChecked = garments.length;
-    // A garment is rejected if it's not OK.
-    const totalIssuesGarments = totalGarmentsChecked - totalOkGarments;
+    // The total number of points is simply garments * spec points.
+    const totalMeasurementPoints = garments.length * specTableData.length;
 
-    // Calculate point-based stats
-    const totalIssuesPoints = totalPointsMeasuredAndOutOfTol;
-    const totalOkPoints = totalPointsMeasuredAndInTol;
-    const totalMeasurementPoints = totalOkPoints + totalIssuesPoints;
+    // Total issues is the sum of tolerance failures.
+    totalIssuesPoints = totalPosTol + totalNegTol;
 
-    // Calculate percentages
-    const passRateByGarment =
-      totalGarmentsChecked > 0
-        ? ((totalOkGarments / totalGarmentsChecked) * 100).toFixed(2)
-        : "0.00";
+    // Pass points are all the points that are not issues.
+    const totalOkPoints = totalMeasurementPoints - totalIssuesPoints;
 
     const passRateByPoints =
       totalMeasurementPoints > 0
         ? ((totalOkPoints / totalMeasurementPoints) * 100).toFixed(2)
         : "0.00";
+    // --- END OF CORRECTED POINT LOGIC ---
 
-    const defectRate =
-      totalGarmentsChecked > 0
-        ? ((totalIssuesGarments / totalGarmentsChecked) * 100).toFixed(2)
-        : "0.00";
-
+    // Return the combined results
     return {
       totalGarmentsChecked,
-      totalMeasurementPoints,
-      totalPosTol,
-      totalNegTol,
-      totalIssuesPoints,
       totalOkGarments,
       totalIssuesGarments,
       passRateByGarment,
-      passRateByPoints,
+      defectRate,
+      // Point stats:
+      totalMeasurementPoints,
       totalOkPoints,
-      defectRate
+      totalIssuesPoints,
+      totalPosTol,
+      totalNegTol,
+      passRateByPoints
     };
-    // --- END: NEW LOGIC ---
   }, [garments, specTableData]);
+
+  // const summaryStats = useMemo(() => {
+  //   if (specTableData.length === 0 || garments.length === 0) {
+  //     return {
+  //       totalGarmentsChecked: garments.length,
+  //       totalMeasurementPoints: 0,
+  //       totalPosTol: 0,
+  //       totalNegTol: 0,
+  //       totalIssuesPoints: 0,
+  //       totalOkGarments: 0,
+  //       totalIssuesGarments: 0,
+  //       passRateByGarment: "0.00",
+  //       passRateByPoints: "0.00",
+  //       totalOkPoints: 0,
+  //       defectRate: "0.00"
+  //     };
+  //   }
+
+  //   // --- START: NEW "INNOCENT UNTIL PROVEN GUILTY" LOGIC ---
+
+  //   let totalOkGarments = 0;
+  //   let totalPointsMeasuredAndInTol = 0;
+  //   let totalPointsMeasuredAndOutOfTol = 0;
+  //   let totalPosTol = 0;
+  //   let totalNegTol = 0;
+
+  //   garments.forEach((garment) => {
+  //     // Each garment starts as OK. We look for a reason to fail it.
+  //     let isGarmentRejected = false;
+
+  //     // Skip any malformed garment entries
+  //     if (typeof garment !== "object" || garment === null) {
+  //       return;
+  //     }
+
+  //     specTableData.forEach((spec) => {
+  //       const measurement = garment[spec.orderNo];
+
+  //       // We only care about points that the user has explicitly measured.
+  //       // The default "0" state for a non-zero spec does not count as a measurement.
+  //       if (
+  //         measurement &&
+  //         measurement.decimal !== null &&
+  //         measurement.decimal !== undefined
+  //       ) {
+  //         const diff = measurement.decimal - spec.specValueDecimal;
+
+  //         // Check if it's out of tolerance
+  //         if (diff > spec.tolPlus || diff < spec.tolMinus) {
+  //           isGarmentRejected = true; // Mark the whole garment as rejected
+  //           totalPointsMeasuredAndOutOfTol++;
+  //           if (diff > spec.tolPlus) totalPosTol++;
+  //           if (diff < spec.tolMinus) totalNegTol++;
+  //         } else {
+  //           // The point is measured and within tolerance
+  //           totalPointsMeasuredAndInTol++;
+  //         }
+  //       }
+  //     });
+
+  //     // After checking all points for the garment, increment the final counts.
+  //     if (isGarmentRejected) {
+  //       // If we found any reason to fail it, it's a rejected garment.
+  //       // This count is handled below.
+  //     } else {
+  //       // If we checked all points and found no failures, it's an OK garment.
+  //       totalOkGarments++;
+  //     }
+  //   });
+
+  //   const totalGarmentsChecked = garments.length;
+  //   // A garment is rejected if it's not OK.
+  //   const totalIssuesGarments = totalGarmentsChecked - totalOkGarments;
+
+  //   // Calculate point-based stats
+  //   const totalIssuesPoints = totalPointsMeasuredAndOutOfTol;
+  //   const totalOkPoints = totalPointsMeasuredAndInTol;
+  //   const totalMeasurementPoints = totalOkPoints + totalIssuesPoints;
+
+  //   // Calculate percentages
+  //   const passRateByGarment =
+  //     totalGarmentsChecked > 0
+  //       ? ((totalOkGarments / totalGarmentsChecked) * 100).toFixed(2)
+  //       : "0.00";
+
+  //   const passRateByPoints =
+  //     totalMeasurementPoints > 0
+  //       ? ((totalOkPoints / totalMeasurementPoints) * 100).toFixed(2)
+  //       : "0.00";
+
+  //   const defectRate =
+  //     totalGarmentsChecked > 0
+  //       ? ((totalIssuesGarments / totalGarmentsChecked) * 100).toFixed(2)
+  //       : "0.00";
+
+  //   return {
+  //     totalGarmentsChecked,
+  //     totalMeasurementPoints,
+  //     totalPosTol,
+  //     totalNegTol,
+  //     totalIssuesPoints,
+  //     totalOkGarments,
+  //     totalIssuesGarments,
+  //     passRateByGarment,
+  //     passRateByPoints,
+  //     totalOkPoints,
+  //     defectRate
+  //   };
+  //   // --- END: NEW LOGIC ---
+  // }, [garments, specTableData]);
 
   // --- NEW: Save Logic ---
   const handleSave = async () => {

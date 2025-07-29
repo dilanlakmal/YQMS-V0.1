@@ -1,15 +1,11 @@
 import React from "react";
 
 const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
-  // Function to convert fraction to decimal
-
-  // Calculate measurement points only
   let measurementPoints = 0;
   let measurementPass = 0;
   let currentMeasurements = [];
 
   if (measurementData && typeof measurementData === "object") {
-    // Determine which wash type to show based on reportType
     const washType = reportType === "Before Wash" ? "beforeWash" : "afterWash";
     currentMeasurements = measurementData[washType] || [];
 
@@ -18,8 +14,6 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
         data.pcs.forEach((pc) => {
           if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
             pc.measurementPoints.forEach((point) => {
-              // Use the pre-calculated 'result' field from the measurement point.
-              // This ensures consistency with the details table and handles all cases (including 0).
               if (point.result === "pass" || point.result === "fail") {
                 measurementPoints++;
                 if (point.result === "pass") {
@@ -42,7 +36,6 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
       ? ((measurementPass / measurementPoints) * 100).toFixed(1)
       : 0;
 
-  // Determine overall result (pass if pass rate >= 80% OR if no measurements have been entered yet)
   const overallResult =
     measurementPoints === 0
       ? "PENDING"
@@ -70,37 +63,29 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
       </h2>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        {/* Total Measurement Points */}
         <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 text-center">
           <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">
             {totalCheckedPoints}
           </div>
           <div className="text-sm text-blue-700 dark:text-blue-300">
-            Total Measurement Points
+            Measurement Points
           </div>
         </div>
 
-        {/* Total Pass */}
         <div className="bg-green-50 dark:bg-green-700 border border-green-200 dark:border-green-600 rounded-lg p-4 text-center">
           <div className="text-4xl font-bold text-green-600 dark:text-green-400">
             {totalPass}
           </div>
-          <div className="text-sm text-green-700 dark:text-green-300">
-            Total Pass
-          </div>
+          <div className="text-sm text-green-700 dark:text-green-300">Pass</div>
         </div>
 
-        {/* Total Fail */}
         <div className="bg-red-50 dark:bg-red-700 border border-red-200 dark:border-red-600 rounded-lg p-4 text-center">
           <div className="text-4xl font-bold text-red-600 dark:text-red-400">
             {totalFail}
           </div>
-          <div className="text-sm text-red-700 dark:text-red-300">
-            Total Fail
-          </div>
+          <div className="text-sm text-red-700 dark:text-red-300">Fail</div>
         </div>
 
-        {/* Pass Rate */}
         <div className="bg-yellow-50 dark:bg-yellow-700 border border-yellow-200 dark:border-yellow-600 rounded-lg p-4 text-center">
           <div className="text-4xl font-bold text-yellow-600 dark:text-yellow-400">
             {passRate}%
@@ -110,7 +95,6 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
           </div>
         </div>
 
-        {/* Overall Result */}
         <div
           className={`${resultBgColor} dark:bg-gray-700 dark:border-gray-600 rounded-lg p-4 text-center`}
         >
@@ -124,7 +108,7 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
       </div>
 
       {/* Measurement Details Breakdown */}
-      <div className="mt-6 text-sm dark:text-gray-300">
+      {/* <div className="mt-6 text-sm dark:text-gray-300">
         <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3">
           <div className="font-medium text-gray-700 dark:text-gray-300">
             Breakdown for {reportType}
@@ -134,7 +118,7 @@ const SummaryCard = ({ measurementData, showMeasurementTable, reportType }) => {
             <br />- {totalCheckedPoints} total measurement points checked
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };
