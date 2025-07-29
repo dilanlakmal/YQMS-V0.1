@@ -90,6 +90,7 @@ import createQCWashingModel from "./models/QCWashing.js";
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
+
 import { promises as fsPromises } from "fs";
 import crypto from "crypto";
 
@@ -23634,9 +23635,14 @@ app.post("/api/anf-measurement/reports", async (req, res) => {
         .json({ error: "Missing required fields for the report." });
     }
 
+    // --- FIX: Create a timezone-agnostic UTC date ---
+    // This creates a date object for midnight UTC on the given day, regardless of server timezone.
+    const reportDate = new Date(`${inspectionDate}T00:00:00.000Z`);
+
     // The unique key for finding the document
     const filter = {
-      inspectionDate: new Date(new Date(inspectionDate).setHours(0, 0, 0, 0)),
+      //inspectionDate: new Date(new Date(inspectionDate).setHours(0, 0, 0, 0)),
+      inspectionDate: reportDate, // Use the standardized UTC date
       qcID,
       moNo,
       color: { $all: color.sort(), $size: color.length } // Sort colors for consistent matching
@@ -23664,7 +23670,8 @@ app.post("/api/anf-measurement/reports", async (req, res) => {
       // --- If Report Does Not Exist, Create It ---
       // We're creating it in memory first, then we'll calculate the summary before saving
       report = new ANFMeasurementReport({
-        inspectionDate: filter.inspectionDate,
+        //inspectionDate: filter.inspectionDate,
+        inspectionDate: reportDate, // Use the standardized UTC date
         qcID,
         moNo,
         buyer,
@@ -23730,12 +23737,16 @@ app.get("/api/anf-measurement/existing-data", async (req, res) => {
         .json({ error: "Missing required query parameters." });
     }
 
+    // --- FIX: Create a timezone-agnostic UTC date for the filter ---
+    const reportDate = new Date(`${date}T00:00:00.000Z`);
+
     // Colors can come as a comma-separated string from query params
     const colorArray = Array.isArray(color) ? color : color.split(",");
 
     // The unique key for finding the document, same as in the POST endpoint
     const filter = {
-      inspectionDate: new Date(new Date(date).setHours(0, 0, 0, 0)),
+      //inspectionDate: new Date(new Date(date).setHours(0, 0, 0, 0)),
+      inspectionDate: reportDate, // Use the standardized UTC date
       qcID: qcId,
       moNo: moNo,
       color: { $all: colorArray.sort(), $size: colorArray.length }

@@ -82,7 +82,10 @@ const ANFMeasurementReportSchema = new mongoose.Schema(
       measurementDetailsTolNegative: { type: Number, default: 0 }
     }
   },
-  { timestamps: true }
+  {
+    // Enable timestamps (createdAt, updatedAt)
+    timestamps: true
+  }
 );
 
 // Create a compound index to ensure uniqueness for a given inspection session

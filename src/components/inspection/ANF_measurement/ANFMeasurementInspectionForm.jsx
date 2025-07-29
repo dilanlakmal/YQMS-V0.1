@@ -7,6 +7,7 @@ import { useAuth } from "../../authentication/AuthContext";
 import { API_BASE_URL } from "../../../../config";
 import MeasurementNumPad from "../cutting/MeasurementNumPad";
 import ANFMeasurementPreview from "./ANFMeasurementPreview";
+import SuccessToast from "./SuccessToast";
 import {
   ChevronLeft,
   ChevronRight,
@@ -136,6 +137,7 @@ const ANFMeasurementInspectionForm = ({
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isLoadingSizeData, setIsLoadingSizeData] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
 
   // Helper function to update a specific field in the parent's state
   const updateState = useCallback(
@@ -313,28 +315,6 @@ const ANFMeasurementInspectionForm = ({
     updateState
   ]); // Add dependencies
 
-  // useEffect(() => {
-  //   if (selectedMo && selectedSize) {
-  //     axios
-  //       .get(`${API_BASE_URL}/api/anf-measurement/spec-table`, {
-  //         params: { moNo: selectedMo.value, size: selectedSize.value },
-  //         withCredentials: true
-  //       })
-  //       .then((res) => {
-  //         setSpecTableData(res.data);
-  //         const initialGarmentData = {};
-  //         res.data.forEach((row) => {
-  //           initialGarmentData[row.orderNo] = { decimal: null, fraction: "0" };
-  //         });
-  //         updateState("garments", [initialGarmentData]);
-  //         updateState("currentGarmentIndex", 0);
-  //       })
-  //       .catch((err) => console.error("Error fetching spec table data:", err));
-  //   } else {
-  //     setSpecTableData([]);
-  //   }
-  // }, [selectedMo, selectedSize]);
-
   // --- calculates and stores the final measurement ---
   const handleNumpadInput = (deviationDecimal, deviationFraction) => {
     if (activeCell) {
@@ -397,82 +377,94 @@ const ANFMeasurementInspectionForm = ({
   }, [orderQtyBySelectedColor]);
 
   const summaryStats = useMemo(() => {
-    if (specTableData.length === 0) return {};
-    const totalGarmentsChecked = garments.length;
-    const totalMeasurementPoints = specTableData.length * totalGarmentsChecked;
-    let totalPosTol = 0,
-      totalNegTol = 0,
-      totalOkGarments = 0;
+    if (specTableData.length === 0 || garments.length === 0) {
+      return {
+        totalGarmentsChecked: garments.length,
+        totalMeasurementPoints: 0,
+        totalPosTol: 0,
+        totalNegTol: 0,
+        totalIssuesPoints: 0,
+        totalOkGarments: 0,
+        totalIssuesGarments: 0,
+        passRateByGarment: "0.00",
+        passRateByPoints: "0.00",
+        totalOkPoints: 0,
+        defectRate: "0.00"
+      };
+    }
+
+    // --- START: NEW "INNOCENT UNTIL PROVEN GUILTY" LOGIC ---
+
+    let totalOkGarments = 0;
+    let totalPointsMeasuredAndInTol = 0;
+    let totalPointsMeasuredAndOutOfTol = 0;
+    let totalPosTol = 0;
+    let totalNegTol = 0;
 
     garments.forEach((garment) => {
-      let isGarmentOk = true;
-      // Ensure garment is a valid object before proceeding
+      // Each garment starts as OK. We look for a reason to fail it.
+      let isGarmentRejected = false;
+
+      // Skip any malformed garment entries
       if (typeof garment !== "object" || garment === null) {
-        return; // Skip this iteration if garment is not an object
+        return;
       }
 
       specTableData.forEach((spec) => {
         const measurement = garment[spec.orderNo];
 
-        // --- THIS IS THE FIX ---
-        // We now check if `measurement` exists AND has a valid number for its decimal property.
+        // We only care about points that the user has explicitly measured.
+        // The default "0" state for a non-zero spec does not count as a measurement.
         if (
           measurement &&
           measurement.decimal !== null &&
           measurement.decimal !== undefined
         ) {
           const diff = measurement.decimal - spec.specValueDecimal;
-          if (diff > spec.tolPlus) {
-            totalPosTol++;
-            isGarmentOk = false;
-          } else if (diff < spec.tolMinus) {
-            totalNegTol++;
-            isGarmentOk = false;
-          }
-        } else {
-          // If a measurement point is missing for a garment that has been started,
-          // it cannot be considered "OK". This handles cases where a garment object
-          // exists but is incomplete.
-          const hasAnyMeasurement = Object.keys(garment).some(
-            (key) => garment[key].decimal !== null
-          );
-          if (hasAnyMeasurement) {
-            isGarmentOk = false;
+
+          // Check if it's out of tolerance
+          if (diff > spec.tolPlus || diff < spec.tolMinus) {
+            isGarmentRejected = true; // Mark the whole garment as rejected
+            totalPointsMeasuredAndOutOfTol++;
+            if (diff > spec.tolPlus) totalPosTol++;
+            if (diff < spec.tolMinus) totalNegTol++;
+          } else {
+            // The point is measured and within tolerance
+            totalPointsMeasuredAndInTol++;
           }
         }
       });
-      if (isGarmentOk) totalOkGarments++;
+
+      // After checking all points for the garment, increment the final counts.
+      if (isGarmentRejected) {
+        // If we found any reason to fail it, it's a rejected garment.
+        // This count is handled below.
+      } else {
+        // If we checked all points and found no failures, it's an OK garment.
+        totalOkGarments++;
+      }
     });
 
-    // garments.forEach((garment) => {
-    //   let isGarmentOk = true;
-    //   specTableData.forEach((spec) => {
-    //     const measurement = garment[spec.orderNo];
-    //     if (measurement?.decimal !== null) {
-    //       const diff = measurement.decimal - spec.specValueDecimal;
-    //       if (diff > spec.tolPlus) {
-    //         totalPosTol++;
-    //         isGarmentOk = false;
-    //       } else if (diff < spec.tolMinus) {
-    //         totalNegTol++;
-    //         isGarmentOk = false;
-    //       }
-    //     }
-    //   });
-    //   if (isGarmentOk) totalOkGarments++;
-    // });
-
-    const totalIssuesPoints = totalPosTol + totalNegTol;
-    const totalOkPoints = totalMeasurementPoints - totalIssuesPoints;
+    const totalGarmentsChecked = garments.length;
+    // A garment is rejected if it's not OK.
     const totalIssuesGarments = totalGarmentsChecked - totalOkGarments;
+
+    // Calculate point-based stats
+    const totalIssuesPoints = totalPointsMeasuredAndOutOfTol;
+    const totalOkPoints = totalPointsMeasuredAndInTol;
+    const totalMeasurementPoints = totalOkPoints + totalIssuesPoints;
+
+    // Calculate percentages
     const passRateByGarment =
       totalGarmentsChecked > 0
         ? ((totalOkGarments / totalGarmentsChecked) * 100).toFixed(2)
         : "0.00";
+
     const passRateByPoints =
       totalMeasurementPoints > 0
         ? ((totalOkPoints / totalMeasurementPoints) * 100).toFixed(2)
         : "0.00";
+
     const defectRate =
       totalGarmentsChecked > 0
         ? ((totalIssuesGarments / totalGarmentsChecked) * 100).toFixed(2)
@@ -491,6 +483,7 @@ const ANFMeasurementInspectionForm = ({
       totalOkPoints,
       defectRate
     };
+    // --- END: NEW LOGIC ---
   }, [garments, specTableData]);
 
   // --- NEW: Save Logic ---
@@ -510,9 +503,17 @@ const ANFMeasurementInspectionForm = ({
     }
     setIsSaving(true);
 
+    // This helper function correctly handles timezone offsets to get the right day.
+    const toLocalISOString = (date) => {
+      const offset = date.getTimezoneOffset();
+      const adjustedDate = new Date(date.getTime() - offset * 60 * 1000);
+      return adjustedDate.toISOString().split("T")[0];
+    };
+
     // 1. Construct the payload
     const payload = {
-      inspectionDate,
+      //inspectionDate,
+      inspectionDate: toLocalISOString(inspectionDate),
       qcID: user.emp_id,
       moNo: selectedMo.value,
       buyer: buyer,
@@ -578,17 +579,19 @@ const ANFMeasurementInspectionForm = ({
       await axios.post(`${API_BASE_URL}/api/anf-measurement/reports`, payload, {
         withCredentials: true
       });
-      Swal.fire(
-        "Success!",
-        "Measurement data for this size has been saved.",
-        "success"
-      );
+      // Instead of Swal, set toast state to true
+      setShowSuccessToast(true);
+      // Swal.fire(
+      //   "Success!",
+      //   "Measurement data for this size has been saved.",
+      //   "success"
+      // );
 
-      // 3. Reset for next size
-      updateState("selectedSize", null);
-      setSpecTableData([]);
-      updateState("garments", [{}]);
-      updateState("currentGarmentIndex", 0);
+      // // 3. Reset for next size
+      // updateState("selectedSize", null);
+      // setSpecTableData([]);
+      // updateState("garments", [{}]);
+      // updateState("currentGarmentIndex", 0);
     } catch (error) {
       console.error("Error saving inspection data:", error);
       Swal.fire(
@@ -1079,6 +1082,13 @@ const ANFMeasurementInspectionForm = ({
           onInput={handleNumpadInput}
         />
       )}
+
+      {/* --- RENDER THE TOAST COMPONENT AT THE END --- */}
+      <SuccessToast
+        isOpen={showSuccessToast}
+        message="Data for this size has been saved!"
+        onClose={() => setShowSuccessToast(false)}
+      />
     </div>
   );
 };
