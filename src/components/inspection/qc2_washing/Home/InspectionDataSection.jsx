@@ -1,4 +1,24 @@
-import React from "react";
+import { useState } from "react";
+
+const machineTypes = [
+  {
+    value: "Washing Machine",
+    label: "Washing Machine",
+    parameters: [
+      { key: "temperature", label: "Temp", unit: "°C" },
+      { key: "time", label: "Time", unit: "min" },
+      { key: "chemical", label: "Chem", unit: "gram" }
+    ]
+  },
+  {
+    value: "Tumble Dry",
+    label: "Tumble Dry",
+    parameters: [
+      { key: "temperature", label: "Temp", unit: "°C" },
+      { key: "time", label: "Time", unit: "min" }
+    ]
+  }
+];
 
 const InspectionDataSection = ({
   inspectionData,
@@ -104,77 +124,41 @@ const InspectionDataSection = ({
               </tbody>
             </table>
           </div>
-          <div className="mb-4 mt-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Machine Type
-            </label>
-            <select
-              value={machineType}
-              onChange={(e) => setMachineType(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
-            >
-              <option value="Washing Machine">Washing Machine</option>
-              <option value="Tumble Dry">Tumble Dry</option>
-            </select>
-          </div>
-
-          <div className="overflow-x-auto dark:overflow-x-auto">
-            {/* ...inspection table code unchanged... */}
-          </div>
-
-          {/* Process Data Fields */}
-          <div className="grid grid-cols-3 gap-4 mt-4 dark:text-white">
-            <div className="flex items-center space-x-2 dark:text-white">
-              <label className="text-sm font-medium dark:text-gray-300">
-                Temperature:
-              </label>
-              <input
-                type="number"
-                value={processData.temperature}
-                onChange={(e) =>
-                  setProcessData((prev) => ({
-                    ...prev,
-                    temperature: e.target.value
-                  }))
-                }
-                className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
-              />
-              <span className="text-sm">°C</span>
-            </div>
-            <div className="flex items-center space-x-2 dark:text-white">
-              <label className="text-sm font-medium dark:text-gray-300">
-                Time:
-              </label>
-              <input
-                type="number"
-                value={processData.time}
-                onChange={(e) =>
-                  setProcessData((prev) => ({ ...prev, time: e.target.value }))
-                }
-                className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
-              />
-              <span className="text-sm">min</span>
-            </div>
-            {/* Only show Chemical if Washing Machine is selected */}
-            {machineType === "Washing Machine" && (
-              <div className="flex items-center space-x-2">
-                <label className="text-sm font-medium dark:text-gray-300">
-                  Chemical:
-                </label>
-                <input
-                  type="number"
-                  value={processData.chemical}
-                  onChange={(e) =>
-                    setProcessData((prev) => ({
-                      ...prev,
-                      chemical: e.target.value
-                    }))
-                  }
-                  className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                />
-                <span className="text-sm">gram</span>
+          <div className="mb-4 mt-4 space-y-4">
+            {machineTypes.map((type) => (
+              <div key={type.value} className="flex items-center space-x-4">
+                <span className="font-semibold dark:text-white min-w-[130px]">
+                  {type.label}:
+                </span>
+                {type.parameters.map((param) => (
+                  <div
+                    key={param.key}
+                    className="flex items-center space-x-2 border bg-gray-100 dark:bg-gray-700"
+                  >
+                    <label className="text-sm font-medium dark:text-white">
+                      {param.label}:
+                    </label>
+                    <input
+                      // type="number"
+                      value={processData[type.value]?.[param.key] || ""}
+                      onChange={(e) =>
+                        setProcessData((prev) => ({
+                          ...prev,
+                          [type.value]: {
+                            ...prev[type.value],
+                            [param.key]: e.target.value
+                          }
+                        }))
+                      }
+                      className="w-14 px-3 py-2 border rounded-md dark:bg-gray-500 dark:text-white dark:border-gray-600"
+                    />
+                    <span className="text-sm dark:text-white">
+                      {param.unit}
+                    </span>
+                  </div>
+                ))}
               </div>
-            )}
+            ))}
           </div>
           <div className="mt-8 pt-6 border-t border-gray-200">
             <div className="overflow-x-auto">
@@ -229,9 +213,9 @@ const InspectionDataSection = ({
                               100
                             ).toFixed(2)
                           : "0.00";
-                      // const result = checkedQty > 0 ? (passRate >= 90 ? 'Pass' : 'Fail') : '';
                       const aqlAccept =
-                        item.aqlAcceptedDefect !== undefined
+                        item.aqlAcceptedDefect !== undefined &&
+                        item.aqlAcceptedDefect !== ""
                           ? item.aqlAcceptedDefect
                           : "-";
                       const result =
@@ -240,7 +224,7 @@ const InspectionDataSection = ({
                             ? "Pass"
                             : "Fail"
                           : "";
-                      const isOk = item.ok !== false; // Default to true if undefined
+                      const isOk = item.ok !== false;
                       const isNo = item.no === true;
 
                       return (
@@ -275,7 +259,12 @@ const InspectionDataSection = ({
                           </td>
                           {/* Checked QTY with + and - */}
                           <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-center dark:text-white">
-                            {paramName === "Hand Feel" ? (
+                            {[
+                              "Color Shade 01",
+                              "Color Shade 02",
+                              "Color Shade 03",
+                              "Hand Feel"
+                            ].includes(paramName) ? (
                               <div className="flex items-center justify-center space-x-2">
                                 <button
                                   type="button"
@@ -292,7 +281,7 @@ const InspectionDataSection = ({
                                       Math.max(currentCheckedQty - 1, 0)
                                     );
                                   }}
-                                  disabled={isOk}
+                                  // disabled={isOk}
                                 >
                                   -
                                 </button>
@@ -311,7 +300,7 @@ const InspectionDataSection = ({
                                     )
                                   }
                                   className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                                  disabled={isOk}
+                                  // disabled={isOk}
                                   min={0}
                                 />
                                 <button
@@ -329,7 +318,7 @@ const InspectionDataSection = ({
                                       currentCheckedQty + 1
                                     );
                                   }}
-                                  disabled={isOk}
+                                  // disabled={isOk}
                                 >
                                   +
                                 </button>
@@ -350,7 +339,7 @@ const InspectionDataSection = ({
                                       )
                                     )
                                   }
-                                  disabled={isOk}
+                                  // disabled={isOk}
                                 >
                                   -
                                 </button>
@@ -364,7 +353,7 @@ const InspectionDataSection = ({
                                     )
                                   }
                                   className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                                  disabled={isOk}
+                                  // disabled={isOk}
                                   min={0}
                                 />
                                 <button
@@ -377,7 +366,7 @@ const InspectionDataSection = ({
                                       (Number(item.checkedQty) || 0) + 1
                                     )
                                   }
-                                  disabled={isOk}
+                                  // disabled={isOk}
                                 >
                                   +
                                 </button>
@@ -400,7 +389,7 @@ const InspectionDataSection = ({
                                     )
                                   )
                                 }
-                                disabled={isOk}
+                                // disabled={isOk}
                               >
                                 -
                               </button>
@@ -414,7 +403,7 @@ const InspectionDataSection = ({
                                   )
                                 }
                                 className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                                disabled={isOk}
+                                // disabled={isOk}
                                 min={0}
                               />
                               <button
@@ -427,7 +416,7 @@ const InspectionDataSection = ({
                                     (Number(item.failedQty) || 0) + 1
                                   )
                                 }
-                                disabled={isOk}
+                                // disabled={isOk}
                               >
                                 +
                               </button>
@@ -471,7 +460,7 @@ const InspectionDataSection = ({
                                 )
                               }
                               className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                              disabled={isOk}
+                              // disabled={isOk}
                             />
                           </td>
                         </tr>

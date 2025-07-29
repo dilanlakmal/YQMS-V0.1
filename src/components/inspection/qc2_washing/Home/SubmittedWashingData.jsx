@@ -1,4 +1,3 @@
-// SubmittedWashingDataPage.jsx
 import React, { useEffect, useState } from "react";
 import { API_BASE_URL } from "../../../../../config";
 
@@ -11,7 +10,6 @@ const SubmittedWashingDataPage = () => {
     const fetchSubmittedData = async () => {
       try {
         setIsLoading(true);
-        // This endpoint would fetch all submitted QC washing data
         const response = await fetch(
           `${API_BASE_URL}/api/qc-washing/all-submitted`
         );
@@ -20,7 +18,7 @@ const SubmittedWashingDataPage = () => {
         }
         const data = await response.json();
         if (data.success) {
-          setSubmittedData(data.data); // Assuming 'data' contains the array of submitted records
+          setSubmittedData(data.data);
         } else {
           setError(data.message || "Failed to fetch submitted data.");
         }
@@ -35,12 +33,20 @@ const SubmittedWashingDataPage = () => {
     fetchSubmittedData();
   }, []);
 
-  if (isLoading) {
-    return <div className="text-center py-4">Loading submitted data...</div>;
-  }
+  // if (isLoading) {
+  //   return <div className="text-center py-4">Loading submitted data...</div>;
+  // }
 
-  if (error) {
-    return <div className="text-center py-4 text-red-600">Error: {error}</div>;
+  // if (error) {
+  //   return <div className="text-center py-4 text-red-600">Error: {error}</div>;
+  // }
+
+  if (isLoading || error) {
+    return (
+      <div className="text-center py-4 text-lg font-semibold text-gray-600 bg-blue-100 dark:text-white dark:bg-gray-600">
+        Coming Soon
+      </div>
+    );
   }
 
   return (
@@ -73,7 +79,6 @@ const SubmittedWashingDataPage = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Submitted By
                 </th>
-                {/* Add more headers as needed */}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -97,7 +102,6 @@ const SubmittedWashingDataPage = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {record.userId || "N/A"}
                   </td>
-                  {/* Render more data fields */}
                 </tr>
               ))}
             </tbody>

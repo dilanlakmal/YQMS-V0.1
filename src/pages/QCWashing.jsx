@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
-//import { useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import { API_BASE_URL } from "../../config";
 import OrderDetailsSection from "../components/inspection/qc2_washing/Home/OrderDetailsSection";
 import InspectionDataSection from "../components/inspection/qc2_washing/Home/InspectionDataSection";
 import DefectDetailsSection from "../components/inspection/qc2_washing/Home/DefectDetailsSection";
 import MeasurementDetailsSection from "../components/inspection/qc2_washing/Home/MeasurementDetailsSection";
-//import SummaryCard from "../components/inspection/qc2_washing/Home/SummaryCard";
 import OverAllSummaryCard from "../components/inspection/qc2_washing/Home/OverAllSummaryCard";
 import Swal from "sweetalert2";
 import imageCompression from "browser-image-compression";
@@ -27,7 +26,7 @@ function transformDefectsByPc(savedDefectsByPc) {
       if (pcNumber) {
         acc[pcNumber] = (pcData.pcDefects || []).map((defect, index) => ({
           id: index + 1,
-          selectedDefect: defect.defectName || defect.selectedDefect || "",
+          selectedDefect: defect.defectId || defect.selectedDefect || "",
           defectQty: defect.defectQty || "",
           isBodyVisible: true,
           defectImages: (defect.defectImages || []).map((imgStr) => ({
@@ -46,7 +45,7 @@ function transformDefectsByPc(savedDefectsByPc) {
     Object.keys(savedDefectsByPc).forEach((pc) => {
       result[pc] = (savedDefectsByPc[pc] || []).map((defect, index) => ({
         id: defect.id || index + 1,
-        selectedDefect: defect.defectName || defect.selectedDefect || "",
+        selectedDefect: defect.defectId || defect.selectedDefect || "",
         defectQty: defect.defectQty || "",
         isBodyVisible:
           defect.isBodyVisible !== undefined ? defect.isBodyVisible : true,
@@ -78,8 +77,8 @@ function calculateSummaryData(currentFormData) {
   const currentDefectDetails = currentFormData.colors[0]?.defectDetails;
   const currentMeasurementData = currentFormData.colors[0]?.measurementDetails;
 
-  let calculatedMeasurementPoints = 0;
-  let calculatedMeasurementPass = 0;
+  let measurementPoints = 0;
+  let measurementPass = 0;
 
   if (currentMeasurementData && Array.isArray(currentMeasurementData)) {
     currentMeasurementData.forEach((data) => {
@@ -88,9 +87,9 @@ function calculateSummaryData(currentFormData) {
           if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
             pc.measurementPoints.forEach((point) => {
               if (point.result === "pass" || point.result === "fail") {
-                calculatedMeasurementPoints++;
+                measurementPoints++;
                 if (point.result === "pass") {
-                  calculatedMeasurementPass++;
+                  measurementPass++;
                 }
               }
             });
@@ -101,59 +100,75 @@ function calculateSummaryData(currentFormData) {
   }
 
   // Always use Number() to ensure numeric values
-  const calculatedTotalCheckedPcs =
-    Number(currentDefectDetails?.checkedQty) || 0;
-  const calculatedWashQty = Number(currentDefectDetails?.washQty) || 0;
-  const calculatedRejectedDefectPcs =
-    currentDefectDetails?.result === "Fail" ? calculatedTotalCheckedPcs : 0;
-
-  // Use pc.pcDefects for defect counting
-  const calculatedTotalDefectCount = currentDefectDetails?.defectsByPc
-    ? currentDefectDetails.defectsByPc.reduce(
-        (sum, pc) => sum + (pc.pcDefects ? pc.pcDefects.length : 0),
-        0
-      )
+  const checkedPcs = Number(currentDefectDetails?.checkedQty) || 0;
+  // const totalRejectPcs = currentDefectDetails?.defectsByPc
+  // ? currentDefectDetails.defectsByPc.filter(pc =>
+  //     Array.isArray(pc.pcDefects) && pc.pcDefects.length > 0
+  //   ).length
+  // : 0;
+  // const calculatedWashQty = Number(currentDefectDetails?.washQty) || 0;
+  const rejectedDefectPcs = Array.isArray(currentDefectDetails?.defectsByPc)
+    ? currentDefectDetails.defectsByPc.length
     : 0;
 
-  const calculatedDefectRate =
-    calculatedTotalCheckedPcs > 0
-      ? (
-          (calculatedTotalDefectCount / calculatedTotalCheckedPcs) *
-          100
-        ).toFixed(2)
-      : 0;
+  // Use pc.pcDefects for defect counting
+  const defectCount = currentDefectDetails?.defectsByPc
+    ? currentDefectDetails.defectsByPc.reduce((sum, pc) => {
+        return (
+          sum +
+          (Array.isArray(pc.pcDefects)
+            ? pc.pcDefects.reduce(
+                (defSum, defect) =>
+                  defSum + (parseInt(defect.defectQty, 10) || 0),
+                0
+              )
+            : 0)
+        );
+      }, 0)
+    : 0;
+  const defectRate =
+    checkedPcs > 0 ? ((defectCount / checkedPcs) * 100).toFixed(1) : 0;
 
-  const calculatedDefectRatio =
-    calculatedTotalCheckedPcs > 0
-      ? (calculatedTotalDefectCount / calculatedTotalCheckedPcs).toFixed(2)
-      : 0;
+  // FIXED: Defect Ratio is now (rejectedDefectPcs / checkedPcs) * 100
+  const defectRatio =
+    checkedPcs > 0 ? ((rejectedDefectPcs / checkedPcs) * 100).toFixed(1) : 0;
 
-  let calculatedOverallResult = "Pass";
+  let overallResult = "Pass";
   const measurementOverallResult =
-    calculatedMeasurementPoints - calculatedMeasurementPass > 0
-      ? "Fail"
-      : "Pass";
+    measurementPoints - measurementPass > 0 ? "Fail" : "Pass";
   const defectOverallResult = currentDefectDetails?.result || "N/A";
 
   if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
-    calculatedOverallResult = "Fail";
+    overallResult = "Fail";
   } else if (
     measurementOverallResult === "Pass" &&
     defectOverallResult === "Pass"
   ) {
-    calculatedOverallResult = "Pass";
+    overallResult = "Pass";
   } else {
-    calculatedOverallResult = "N/A";
+    overallResult = "N/A";
   }
 
   return {
-    totalCheckedPcs: calculatedTotalCheckedPcs,
-    rejectedDefectPcs: calculatedRejectedDefectPcs,
-    totalDefectCount: calculatedTotalDefectCount,
-    defectRate: parseFloat(calculatedDefectRate) || 0,
-    defectRatio: parseFloat(calculatedDefectRatio) || 0,
-    overallFinalResult: calculatedOverallResult
+    totalCheckedPcs: checkedPcs,
+    rejectedDefectPcs: rejectedDefectPcs,
+    totalDefectCount: defectCount,
+    defectRate: parseFloat(defectRate) || 0,
+    defectRatio: parseFloat(defectRatio) || 0,
+    overallFinalResult: overallResult
   };
+}
+
+function machineProcessesToObject(machineProcesses) {
+  const obj = {};
+  (machineProcesses || []).forEach((proc) => {
+    obj[proc.machineType] = {
+      temperature: proc.temperature || "",
+      time: proc.time || "",
+      chemical: proc.chemical || ""
+    };
+  });
+  return obj;
 }
 
 const QCWashingPage = () => {
@@ -217,6 +232,7 @@ const QCWashingPage = () => {
   const [defectOptions, setDefectOptions] = useState([]);
   const [activeTab, setActiveTab] = useState("newInspection");
   const [overallSummary, setOverallSummary] = useState(null);
+  const [colorOrderQty, setColorOrderQty] = useState(null);
 
   const fetchOverallSummary = async (orderNo, color) => {
     if (!orderNo || !color) return;
@@ -239,10 +255,8 @@ const QCWashingPage = () => {
   // State: Inspection, Defect, Measurement
   const [inspectionData, setInspectionData] = useState([]);
   const [processData, setProcessData] = useState({
-    machineType: "",
-    temperature: "",
-    time: "",
-    chemical: ""
+    "Washing Machine": { temperature: "", time: "", chemical: "" },
+    "Tumble Dry": { temperature: "", time: "" }
   });
   const defaultDefectData = [
     {
@@ -445,16 +459,13 @@ const QCWashingPage = () => {
   useEffect(() => {}, [uploadedImages]);
 
   // --- useEffect: Load Saved Data on Order Change ---
-  useEffect(() => {
-    const identifier =
-      formData.style && formData.style !== formData.orderNo
-        ? formData.style
-        : formData.orderNo;
-    if (identifier) {
-      if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
-      loadSavedData(identifier);
-    }
-  }, [formData.orderNo, formData.style]);
+  // useEffect(() => {
+  //   const identifier = formData.style && formData.style !== formData.orderNo ? formData.style : formData.orderNo;
+  //   if (identifier) {
+  //     if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
+  //     loadSavedData(identifier);
+  //   }
+  // }, [formData.orderNo, formData.style]);
 
   // --- useEffect: Load Saved Sizes on Order/Color Change ---
   useEffect(() => {
@@ -474,14 +485,52 @@ const QCWashingPage = () => {
   }, [formData.aqlSampleSize, formData.inline, formData.daily]);
 
   useEffect(() => {
+    if (!formData.washQty || isNaN(Number(formData.washQty))) return;
+    const autoAqlParams = [
+      "Color Shade 01",
+      "Color Shade 02",
+      "Color Shade 03",
+      "Hand Feel"
+    ];
     setDefectData((prev) =>
       prev.map((item) =>
-        item.parameter === "Hand Feel"
-          ? { ...item, checkedQty: formData.washQty }
+        autoAqlParams.includes(item.parameter)
+          ? {
+              ...item,
+              checkedQty: formData.washQty,
+              aqlAcceptedDefect: "",
+              aqlLevelUsed: ""
+            }
           : item
       )
     );
   }, [formData.washQty]);
+
+  useEffect(() => {
+    if (!formData.washQty || isNaN(Number(formData.washQty))) return;
+    const autoAqlParams = [
+      "Color Shade 01",
+      "Color Shade 02",
+      "Color Shade 03",
+      "Hand Feel"
+    ];
+    defectData.forEach((item, idx) => {
+      if (
+        autoAqlParams.includes(item.parameter) &&
+        String(item.checkedQty) === String(formData.washQty) &&
+        (item.aqlAcceptedDefect === "" || item.aqlAcceptedDefect === undefined)
+      ) {
+        fetchAqlForParameter(
+          formData.orderNo || formData.style,
+          formData.washQty,
+          setDefectData,
+          idx
+        );
+      }
+    });
+    // eslint-disable-next-line
+  }, [defectData, formData.washQty, formData.orderNo, formData.style]);
+
   useEffect(() => {
     if (formData.orderNo && formData.color) {
       fetchOverallSummary(formData.orderNo, formData.color);
@@ -526,6 +575,31 @@ const QCWashingPage = () => {
     formData.firstOutput,
     formData.result
   ]);
+
+  useEffect(() => {
+    const fetchColorOrderQty = async () => {
+      if (!formData.orderNo || !formData.color) {
+        setColorOrderQty(null);
+        return;
+      }
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc-washing/order-color-qty/${
+            formData.orderNo
+          }/${encodeURIComponent(formData.color)}`
+        );
+        const data = await response.json();
+        if (data.success) {
+          setColorOrderQty(data.colorOrderQty);
+        } else {
+          setColorOrderQty(null);
+        }
+      } catch (error) {
+        setColorOrderQty(null);
+      }
+    };
+    fetchColorOrderQty();
+  }, [formData.orderNo, formData.color]);
 
   // --- Helper Functions ---
   const processMeasurementData = (loadedMeasurements) => {
@@ -778,8 +852,13 @@ const QCWashingPage = () => {
             setInspectionData(initializeInspectionData(masterChecklist));
           }
 
-          if (saved.processData) {
-            setProcessData(saved.processData);
+          if (
+            saved.processData &&
+            Array.isArray(saved.processData.machineProcesses)
+          ) {
+            setProcessData(
+              machineProcessesToObject(saved.processData.machineProcesses)
+            );
           }
 
           if (saved.defectData && saved.defectData.length > 0) {
@@ -983,6 +1062,25 @@ const QCWashingPage = () => {
     setDefectData((prev) =>
       prev.map((item, i) => {
         if (i !== index) return item;
+        if (field === "failedQty") {
+          const failedQty = Number(value) || 0;
+          let ok = item.ok;
+          let no = item.no;
+
+          if (failedQty > 0) {
+            ok = false;
+            no = true;
+          } else {
+            // If failedQty is 0, auto-select Ok, enable Ok
+            ok = true;
+            no = false;
+          }
+          let result = item.result;
+          if (item.aqlAcceptedDefect !== undefined) {
+            result = failedQty <= item.aqlAcceptedDefect ? "Pass" : "Fail";
+          }
+          return { ...item, failedQty: value, ok, no, result };
+        }
 
         if (field === "ok" && value) {
           return {
@@ -1004,14 +1102,7 @@ const QCWashingPage = () => {
           fetchAqlForParameter(orderNo, value, setDefectData, index);
           return { ...item, checkedQty: value };
         }
-        if (field === "failedQty") {
-          const failedQty = Number(value) || 0;
-          let result = item.result;
-          if (item.aqlAcceptedDefect !== undefined) {
-            result = failedQty <= item.aqlAcceptedDefect ? "Pass" : "Fail";
-          }
-          return { ...item, failedQty: value, result };
-        }
+
         return { ...item, [field]: value };
       })
     );
@@ -1483,15 +1574,19 @@ const QCWashingPage = () => {
         colorData: {
           orderDetails: {
             ...formData,
+            colorOrderQty,
             inspector: {
               empId: user?.emp_id,
               name: user?.username
             }
           },
           inspectionDetails: {
-            temp: processData.temperature,
-            time: processData.time,
-            chemical: processData.chemical,
+            machineProcesses: Object.entries(processData).map(
+              ([machineType, params]) => ({
+                machineType,
+                ...params
+              })
+            ),
             checkedPoints: inspectionData.map((item) => ({
               pointName: item.checkedList,
               approvedDate: item.approvedDate,
@@ -1536,7 +1631,8 @@ const QCWashingPage = () => {
                 pcDefects: await Promise.all(
                   (Array.isArray(pcDefects) ? pcDefects : []).map(
                     async (defect) => ({
-                      defectName: defect.selectedDefect,
+                      defectId: defect.selectedDefect, // Save the _id
+                      defectName: defect.defectName,
                       defectQty: defect.defectQty,
                       defectImages: await Promise.all(
                         (defect.defectImages || []).map((img) =>
@@ -1698,14 +1794,13 @@ const QCWashingPage = () => {
             })) || initializeInspectionData(masterChecklist)
           );
 
+          const colorOrderQty = colorData.orderDetails?.colorOrderQty || null;
+          setColorOrderQty(colorOrderQty);
+
           setProcessData(
-            colorData.inspectionDetails
-              ? {
-                  temperature: colorData.inspectionDetails.temp || "",
-                  time: colorData.inspectionDetails.time || "",
-                  chemical: colorData.inspectionDetails.chemical || ""
-                }
-              : { temperature: "", time: "", chemical: "" }
+            machineProcessesToObject(
+              colorData.inspectionDetails?.machineProcesses
+            )
           );
 
           if (
@@ -1863,13 +1958,32 @@ const QCWashingPage = () => {
             setInspectionData(initializeInspectionData(masterChecklist));
           }
 
-          if (saved.processData) {
-            setProcessData(saved.processData);
+          if (saved.colors?.[0]?.inspectionDetails?.machineProcesses) {
+            setProcessData(
+              machineProcessesToObject(
+                saved.colors[0].inspectionDetails.machineProcesses
+              )
+            );
+          } else if (
+            saved.processData &&
+            Array.isArray(saved.processData.machineProcesses)
+          ) {
+            setProcessData(
+              machineProcessesToObject(saved.processData.machineProcesses)
+            );
+          } else if (saved.processData) {
+            setProcessData(saved.processData); // fallback for old format
           }
 
           if (saved.defectData && saved.defectData.length > 0) {
             setDefectData(normalizeDefectData(saved.defectData));
           }
+
+          const colorOrderQty =
+            saved.colors?.[0]?.orderDetails?.colorOrderQty ||
+            saved.formData?.colorOrderQty ||
+            null;
+          setColorOrderQty(colorOrderQty);
 
           // if (saved.addedDefects) {
           //   setAddedDefects(saved.addedDefects);
@@ -2007,11 +2121,17 @@ const QCWashingPage = () => {
             setInspectionData(initializeInspectionData(masterChecklist));
           }
 
-          setProcessData({
-            temperature: saved.color?.inspectionDetails?.temp || "",
-            time: saved.color?.inspectionDetails?.time || "",
-            chemical: saved.color?.inspectionDetails?.chemical || ""
+          const processData = {};
+          (
+            transformedInspectionData.inspectionDetails?.machineProcesses || []
+          ).forEach((proc) => {
+            processData[proc.machineType] = {
+              temperature: proc.temperature || "",
+              time: proc.time || "",
+              chemical: proc.chemical || ""
+            };
           });
+          setProcessData(processData);
 
           const transformedDefectData =
             normalizeDefectData(saved.color?.inspectionDetails?.parameters) ||
@@ -2102,9 +2222,8 @@ const QCWashingPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 p-2 sm:p-4 md:p-6">
       <PageTitle />
 
-      {/* </header> */}
       {/* Tab Navigation */}
-      <div className="flex justify-center mb-1 mt-4">
+      <div className="flex justify-center mb-6 mt-4">
         <button
           className={`px-6 py-2 rounded-l-md font-medium ${
             activeTab === "newInspection"
@@ -2117,11 +2236,11 @@ const QCWashingPage = () => {
         </button>
         <button
           className={`px-6 py-2 rounded-r-md font-medium ${
-            activeTab === "Report"
+            activeTab === "submittedData"
               ? "bg-indigo-600 text-white shadow-lg"
               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
           }`}
-          onClick={() => handleTabChange("Report")}
+          onClick={() => handleTabChange("submittedData")}
         >
           Report
         </button>
@@ -2156,6 +2275,7 @@ const QCWashingPage = () => {
               orderNoSuggestions={orderNoSuggestions}
               showOrderNoSuggestions={showOrderNoSuggestions}
               setShowOrderNoSuggestions={setShowOrderNoSuggestions}
+              colorOrderQty={colorOrderQty}
             />
 
             <InspectionDataSection
@@ -2464,7 +2584,7 @@ const QCWashingPage = () => {
           </>
         )}
 
-        {activeTab === "Report" && <SubmittedWashingDataPage />}
+        {activeTab === "submittedData" && <SubmittedWashingDataPage />}
       </main>
     </div>
   );

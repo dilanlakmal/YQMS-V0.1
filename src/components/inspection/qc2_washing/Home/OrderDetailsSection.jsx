@@ -17,7 +17,8 @@ const OrderDetailsSection = ({
   // filteredOrderNumbers,
   orderNoSuggestions,
   showOrderNoSuggestions,
-  setShowOrderNoSuggestions
+  setShowOrderNoSuggestions,
+  colorOrderQty
 }) => {
   const handleOrderNoChange = (e) => {
     handleInputChange("orderNo", e.target.value);
@@ -62,7 +63,7 @@ const OrderDetailsSection = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 dark:text-white">
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium dark:text-gray-300">
-              Order No:
+              MoNo:
             </label>
             <div className="relative flex-1">
               <input
@@ -129,6 +130,18 @@ const OrderDetailsSection = ({
                   </option>
                 ))}
             </select>
+            {colorOrderQty !== null && (
+              <span
+                className="ml-2 flex items-center px-3 py-1 rounded-full font-semibold text-gray-800 bg-yellow-100 border border-yellow-300 dark:bg-yellow-700 dark:text-yellow-100 dark:border-yellow-600"
+                style={{ minWidth: 60 }}
+                title="Total order quantity for selected color"
+              >
+                <span className="mr-1 text-xs font-medium text-gray-600 dark:text-yellow-50">
+                  Color Qty:
+                </span>
+                {colorOrderQty}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center space-x-4">

@@ -539,6 +539,13 @@ function Home() {
             image: "assets/Home/anf-washing.png",
             title: t("home.anf_washing"),
             description: "QC After Wash Measurements"
+          },
+          {
+            path: "/anf-washing",
+            roles: ["ANF QA"],
+            image: "assets/Home/anf-washing.png",
+            title: t("home.anf_washing_version2"),
+            description: "QC AW Measurements - Version 2"
           }
         ]
       },
@@ -588,7 +595,7 @@ function Home() {
             path: "/qc-accuracy",
             roles: ["QA"],
             image: "assets/Home/qc-accuracy.png",
-            title: "QC Accuracy",
+            title: "QA Random Inspection",
             description: "QA Random Checks"
           },
           {

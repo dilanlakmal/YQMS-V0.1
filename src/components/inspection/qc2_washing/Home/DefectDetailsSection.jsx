@@ -61,36 +61,30 @@ const DefectDetailsSection = ({
     defectStatus = "N/A";
   }
 
-  const handleAddDefect = (pc, defect) => {
-    if (!defect.selectedDefect || !defect.defectQty) {
-      Swal.fire(
-        "Incomplete",
-        "Please select a defect and enter a quantity.",
-        "warning"
-      );
-      return;
-    }
+  // const handleAddDefect = (pc, defect) => {
+  //   if (!defect.selectedDefect || !defect.defectQty) {
+  //     Swal.fire('Incomplete', 'Please select a defect and enter a quantity.', 'warning');
+  //     return;
+  //   }
 
-    const defectDetails = defectOptions.find(
-      (d) => d._id === defect.selectedDefect
-    );
-    if (!defectDetails) return;
+  //   const defectDetails = defectOptions.find(d => d._id === defect.selectedDefect);
+  //   if (!defectDetails) return;
 
-    const defectExists = defectsByPc[pc].some(
-      (d) => d.defectId === defect.selectedDefect && d.id !== defect.id
-    );
-    if (defectExists) {
-      Swal.fire("Duplicate", "This defect has already been added.", "error");
-      return;
-    }
+  //   const defectExists = defectsByPc[pc].some(d => d.defectId === defect.selectedDefect && d.id !== defect.id);
+  //   if (defectExists) {
+  //     Swal.fire('Duplicate', 'This defect has already been added.', 'error');
+  //     return;
+  //   }
 
-    setDefectsByPc((prev) => ({
-      ...prev,
-      [pc]: prev[pc].map((d) =>
-        d.id === defect.id ? { ...d, defectId: defectDetails._id } : d
-      )
-    }));
-  };
+  //   setDefectsByPc(prev => ({
+  //     ...prev,
+  //     [pc]: prev[pc].map(d =>
+  //       d.id === defect.id
+  //         ? { ...d, defectId: defectDetails._id }
+  //         : d
+  //     ),
+  //   }));
+  // };
 
   const handleAddDefectCard = (pc) => {
     setDefectsByPc((prev) => ({
@@ -100,6 +94,7 @@ const DefectDetailsSection = ({
         {
           id: (prev[pc]?.length || 0) + 1,
           selectedDefect: "",
+          defectName: "",
           defectQty: 1,
           defectImages: [],
           isBodyVisible: true
@@ -115,6 +110,7 @@ const DefectDetailsSection = ({
         {
           id: 1,
           selectedDefect: "",
+          defectNmae: "",
           defectQty: 1,
           defectImages: [],
           isBodyVisible: true
@@ -212,9 +208,21 @@ const DefectDetailsSection = ({
   const handleDefectChange = (pc, defectId, field, value) => {
     setDefectsByPc((prev) => ({
       ...prev,
-      [pc]: prev[pc].map((d) =>
-        d.id === defectId ? { ...d, [field]: value } : d
-      )
+      [pc]: prev[pc].map((d) => {
+        if (d.id === defectId) {
+          if (field === "selectedDefect") {
+            // Find the defect object by _id
+            const defectObj = defectOptions.find((opt) => opt._id === value);
+            return {
+              ...d,
+              selectedDefect: value,
+              defectName: defectObj ? getDefectNameForDisplay(defectObj) : ""
+            };
+          }
+          return { ...d, [field]: value };
+        }
+        return d;
+      })
     }));
   };
 
@@ -256,74 +264,15 @@ const DefectDetailsSection = ({
 
     Swal.close();
     const validImages = compressedFiles.filter((img) => img !== null);
-
-    // The fix is applied in this 'setDefectsByPc' call
     setDefectsByPc((prev) => ({
       ...prev,
       [pc]: prev[pc].map((d) =>
         d.id === defectId
-          ? {
-              ...d,
-              defectImages: [...(d.defectImages || []), ...validImages]
-            }
+          ? { ...d, defectImages: [...(d.defectImages || []), ...validImages] }
           : d
       )
     }));
   };
-
-  //   const handleDefectImageChange = async (pc, defectId, e) => {
-  //     const files = Array.from(e.target.files);
-  //     if (files.length === 0) return;
-
-  //     const options = {
-  //       maxSizeMB: 0.5,
-  //       maxWidthOrHeight: 1024,
-  //       useWebWorker: true
-  //     };
-
-  //     Swal.fire({
-  //       title: "Compressing images...",
-  //       text: "Please wait.",
-  //       allowOutsideClick: false,
-  //       didOpen: () => {
-  //         Swal.showLoading();
-  //       }
-  //     });
-
-  //     const compressedFiles = await Promise.all(
-  //       files.map(async (file) => {
-  //         try {
-  //           const compressedFile = await imageCompression(file, options);
-  //           return {
-  //             file: compressedFile,
-  //             preview: URL.createObjectURL(compressedFile),
-  //             name: compressedFile.name
-  //           };
-  //         } catch (error) {
-  //           console.error("Image compression failed:", error);
-  //           Swal.fire("Error", "Failed to compress image.", "error");
-  //           return null;
-  //         }
-  //       })
-  //     );
-
-  //     Swal.close();
-  //     const validImages = compressedFiles.filter((img) => img !== null);
-  //     setDefectsByPc(
-  //       (prev) =>
-  //         ({
-  //           ...prev,
-  //           [pc]: prev[pc].map((d) =>
-  //             d.id === defectId
-  //               ? {
-  //                   ...d,
-  //                   defectImages: [...(d.defectImages || []), ...validImages]
-  //                 }
-  //               : d
-  //           )
-  //         } ?? {})
-  //     );
-  //   };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
@@ -503,7 +452,7 @@ const DefectDetailsSection = ({
                               >
                                 <option value="">-- Select a defect --</option>
                                 {defectOptions.map((d) => (
-                                  <option key={d._id} value={d.defectName}>
+                                  <option key={d._id} value={d._id}>
                                     {getDefectNameForDisplay(d)}
                                   </option>
                                 ))}

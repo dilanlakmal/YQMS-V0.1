@@ -47,7 +47,6 @@ const MeasurementDetailsSection = ({
       ? measurementData.beforeWash
       : measurementData.afterWash) || [];
 
-  // Transform measurement data into nested structure
   const transformMeasurementData = (
     size,
     qty,
@@ -65,13 +64,11 @@ const MeasurementDetailsSection = ({
       measurementSpecs.forEach((spec, specIndex) => {
         const isRowIndividuallySelected = selectedRows?.[specIndex] ?? true;
 
-        // If the column is not 'Full', only include individually selected rows.
         if (!isFullColumn && !isRowIndividuallySelected) return;
 
         const cellKey = `${size}-${tableType}-${specIndex}-${pcIndex}`;
         const measurementValue = measurements?.[cellKey];
 
-        // Determine the pass/fail result based on the same logic as the UI
         let result = "";
         if (measurementValue && typeof measurementValue.decimal === "number") {
           const measuredDeviation = measurementValue.decimal;
@@ -124,7 +121,6 @@ const MeasurementDetailsSection = ({
   const fractionToDecimal = (frac) => {
     if (typeof frac !== "string" || !frac || frac.trim() === "-") return NaN;
 
-    // Standardize fraction characters
     frac = frac
       .replace("⁄", "/")
       .replace("½", "1/2")
@@ -174,7 +170,6 @@ const MeasurementDetailsSection = ({
       return;
     }
 
-    // Add the size to the list of sizes being actively edited/viewed
     setSelectedSizes((prev) => {
       if (prev.some((s) => s.size === sizeToEdit)) {
         return prev.map((s) =>
@@ -184,7 +179,6 @@ const MeasurementDetailsSection = ({
       return [...prev, { size: sizeToEdit, qty: dataToEdit.qty }];
     });
 
-    // Populate the measurement values state from the saved data
     if (dataToEdit.measurements) {
       setMeasurementValues((prev) => ({
         ...prev,
@@ -192,7 +186,6 @@ const MeasurementDetailsSection = ({
       }));
     }
 
-    // Populate the row/column selection states
     if (dataToEdit.selectedRows) {
       setSelectedRowsBySize((prev) => ({
         ...prev,
@@ -206,9 +199,6 @@ const MeasurementDetailsSection = ({
       }));
     }
 
-    // Trigger the parent to remove it from the "saved" data state.
-    // This will cause a re-render, removing it from the "Saved" list
-    // and showing it in the "Measurement Input" section.
     if (onMeasurementEdit) {
       onMeasurementEdit(sizeToEdit);
     }
@@ -234,30 +224,15 @@ const MeasurementDetailsSection = ({
     try {
       setLoading(true);
       setError(null);
-      // console.log('Fetching sizes for:', orderNo, color);
       const response = await fetch(
         `${API_BASE_URL}/api/qc-washing/order-sizes/${orderNo}/${color}`
       );
       const data = await response.json();
-      // console.log('Sizes response:', data);
 
       if (data.success) {
-        // Handle case where API returns 'Sizes' instead of 'sizes'
         const availableSizes = data.sizes || data.Sizes || [];
         setSizes(availableSizes);
-        // console.log('Set sizes:', availableSizes);
 
-        // Automatically populate selected sizes with a default quantity when they are fetched
-        // const initialSelectedSizes = availableSizes.map(size => {
-        //   let sizeValue;
-        //   if (typeof size === 'object' && size !== null) {
-        //     sizeValue = size.size || size.Size || size.name || size.value || Object.values(size)[0] || 'Unknown';
-        //   } else {
-        //     sizeValue = size;
-        //   }
-        //   return { size: String(sizeValue), qty: 5 };
-        // });
-        // setSelectedSizes(initialSelectedSizes);
         setSelectedSizes([]);
       } else {
         setError(data.message || "Failed to fetch sizes");
@@ -276,13 +251,10 @@ const MeasurementDetailsSection = ({
 
   const fetchMeasurementSpecs = async () => {
     try {
-      // console.log('Fetching measurement specs for:', orderNo, color);
       const response = await fetch(
         `${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}/${color}`
       );
       const data = await response.json();
-
-      // console.log('Measurement specs response:', data);
 
       if (response.ok && data.success) {
         const beforeWashGrouped = data.beforeWashGrouped || {};
@@ -300,15 +272,7 @@ const MeasurementDetailsSection = ({
         const afterKeys = Object.keys(afterWashGrouped);
         if (beforeKeys.length > 0) setActiveBeforeTab(beforeKeys[0]);
         if (afterKeys.length > 0) setActiveAfterTab(afterKeys[0]);
-
-        // console.log('Set measurement specs:', {
-        //   beforeWash: data.beforeWashSpecs || [],
-        //   afterWash: data.afterWashSpecs || [],
-        //   beforeWashGrouped,
-        //   afterWashGrouped
-        // });
       } else {
-        // console.error('Failed to fetch measurement specs:', data.message);
         setMeasurementSpecs({
           beforeWash: [],
           afterWash: [],
@@ -378,6 +342,27 @@ const MeasurementDetailsSection = ({
       const prevForSize = prev[size] || [];
       const updated = [...prevForSize];
       updated[columnIndex] = !updated[columnIndex];
+
+      if (updated[columnIndex]) {
+        const specs =
+          reportType === "Before Wash"
+            ? measurementSpecs.beforeWashGrouped[activeBeforeTab] ||
+              measurementSpecs.beforeWash
+            : measurementSpecs.afterWashGrouped[activeAfterTab] ||
+              measurementSpecs.afterWash;
+        const tableType = reportType === "Before Wash" ? "before" : "after";
+        setMeasurementValues((prevValues) => {
+          const newValues = { ...prevValues };
+          specs.forEach((spec, specIndex) => {
+            const cellKey = `${size}-${tableType}-${specIndex}-${columnIndex}`;
+            if (!newValues[cellKey]) {
+              newValues[cellKey] = { decimal: 0, fraction: "0" };
+            }
+          });
+          return newValues;
+        });
+      }
+
       return {
         ...prev,
         [size]: updated
@@ -411,6 +396,22 @@ const MeasurementDetailsSection = ({
         ).fill(true);
       const updatedSelections = [...prevSelections];
       updatedSelections[rowIndex] = !updatedSelections[rowIndex];
+
+      // If now checked, set all related cells to 0
+      if (updatedSelections[rowIndex]) {
+        const qty = selectedSizes.find((s) => s.size === size)?.qty || 1;
+        const tableType = reportType === "Before Wash" ? "before" : "after";
+        setMeasurementValues((prevValues) => {
+          const newValues = { ...prevValues };
+          for (let i = 0; i < qty; i++) {
+            const cellKey = `${size}-${tableType}-${rowIndex}-${i}`;
+            if (!newValues[cellKey]) {
+              newValues[cellKey] = { decimal: 0, fraction: "0" };
+            }
+          }
+          return newValues;
+        });
+      }
 
       // Update selectAll state based on row selections
       const allSelected = updatedSelections.every(Boolean);
@@ -481,7 +482,7 @@ const MeasurementDetailsSection = ({
                           : "bg-white text-blue-600 border border-blue-600"
                       }`}
                     >
-                      {kValue === "NA" ? "General" : `K-${kValue}`}
+                      {kValue === "NA" ? "General" : `${kValue}`}
                     </button>
                   )
                 )}
@@ -513,12 +514,12 @@ const MeasurementDetailsSection = ({
                     >
                       <input
                         type="checkbox"
-                        checked={
-                          (selectedRowsBySize[size] || []).every(Boolean) // all true = checked
-                        }
+                        checked={(selectedRowsBySize[size] || []).every(
+                          Boolean
+                        )}
                         onChange={(e) =>
                           toggleSelectAllRows(size, e.target.checked, "before")
-                        } // or 'after' depending on table
+                        }
                         className="w-4 h-4"
                       />
                     </th>
@@ -636,26 +637,20 @@ const MeasurementDetailsSection = ({
                         {[...Array(qty)].map((_, i) => {
                           const cellKey = `${size}-before-${index}-${i}`;
                           const value = measurementValues[cellKey];
-                          let cellColorClass = "bg-transparent";
 
-                          if (value && typeof value.decimal === "number") {
-                            const measuredDeviation = value.decimal;
-                            const tolMinusValue = fractionToDecimal(tolMinus);
-                            const tolPlusValue = fractionToDecimal(tolPlus);
+                          const isFull = fullColumnsBySize[size]?.[i] || false;
+                          const isRowSelected =
+                            selectedRowsBySize[size]?.[index] ?? true;
+                          const isEnabled = isFull || isRowSelected;
 
-                            if (!isNaN(tolMinusValue) && !isNaN(tolPlusValue)) {
-                              // The deviation should be within the tolerance range.
-                              if (
-                                measuredDeviation >= tolMinusValue &&
-                                measuredDeviation <= tolPlusValue
-                              ) {
-                                cellColorClass =
-                                  "bg-green-200 dark:bg-green-700"; // Pass
-                              } else {
-                                cellColorClass = "bg-red-200 dark:bg-red-700"; // Fail
-                              }
-                            }
-                          }
+                          const cellColorClass = !isEnabled
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : value && typeof value.decimal === "number"
+                            ? value.decimal >= fractionToDecimal(tolMinus) &&
+                              value.decimal <= fractionToDecimal(tolPlus)
+                              ? "bg-green-200 dark:bg-green-700"
+                              : "bg-red-200 dark:bg-red-700"
+                            : "bg-transparent";
 
                           return (
                             <td
@@ -742,16 +737,16 @@ const MeasurementDetailsSection = ({
                       >
                         <input
                           type="checkbox"
-                          checked={
-                            (selectedRowsBySize[size] || []).every(Boolean) // all true = checked
-                          }
+                          checked={(selectedRowsBySize[size] || []).every(
+                            Boolean
+                          )}
                           onChange={(e) =>
                             toggleSelectAllRows(
                               size,
                               e.target.checked,
                               "before"
                             )
-                          } // or 'after' depending on table
+                          }
                           className="w-4 h-4"
                         />
                       </th>
@@ -816,7 +811,6 @@ const MeasurementDetailsSection = ({
                       measurementSpecs.afterWashGrouped[activeAfterTab] ||
                       measurementSpecs.afterWash
                     )?.map((spec, index) => {
-                      // console.log('After wash spec:', spec);
                       const isSelected =
                         selectedRowsBySize[size]?.[index] ?? true;
                       const shouldHide =
@@ -881,7 +875,6 @@ const MeasurementDetailsSection = ({
                                 !isNaN(tolMinusValue) &&
                                 !isNaN(tolPlusValue)
                               ) {
-                                // The deviation should be within the tolerance range.
                                 if (
                                   measuredDeviation >= tolMinusValue &&
                                   measuredDeviation <= tolPlusValue
@@ -955,34 +948,19 @@ const MeasurementDetailsSection = ({
       {isVisible && (
         <div className="space-y-6">
           {/* Display selected order and color */}
-          {orderNo && color && (
+          {/* {orderNo && color && (
             <div className="bg-blue-50 p-4 rounded-lg dark:bg-gray-700">
-              <h3 className="text-md font-semibold mb-2 dark:text-white">
-                Selected Order Details
-              </h3>
+              <h3 className="text-md font-semibold mb-2 dark:text-white">Selected Order Details</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium dark:text-gray-300">
-                    Order No:
-                  </span>{" "}
-                  <span className="dark:text-white">{orderNo}</span>
-                </div>
-                <div>
-                  <span className="font-medium dark:text-gray-300">Color:</span>{" "}
-                  <span className="dark:text-white">{color}</span>
-                </div>
+                <div><span className="font-medium dark:text-gray-300">Order No:</span> <span className="dark:text-white">{orderNo}</span></div>
+                <div><span className="font-medium dark:text-gray-300">Color:</span> <span className="dark:text-white">{color}</span></div>
               </div>
               {savedSizes.length > 0 && (
                 <div className="mt-3 dark:text-gray-300 dark:bg-gray-800">
-                  <span className="font-medium text-sm dark:text-gray-300">
-                    Saved Sizes:
-                  </span>
+                  <span className="font-medium text-sm dark:text-gray-300">Saved Sizes:</span>
                   <div className="flex flex-wrap gap-2 mt-1">
-                    {savedSizes.map((size) => (
-                      <span
-                        key={size}
-                        className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs"
-                      >
+                    {savedSizes.map(size => (
+                      <span key={size} className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs">
                         {size}
                       </span>
                     ))}
@@ -990,7 +968,7 @@ const MeasurementDetailsSection = ({
                 </div>
               )}
             </div>
-          )}
+          )} */}
 
           {!orderNo || !color ? (
             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
@@ -1016,7 +994,7 @@ const MeasurementDetailsSection = ({
               {!loading && !error && (
                 <div>
                   {sizes.length > 0 ? (
-                    <div className="space-y-2">
+                    <div className="space-y-2 mt-4">
                       <div className="flex items-center space-x-4">
                         <label
                           htmlFor="size-select"
@@ -1041,7 +1019,6 @@ const MeasurementDetailsSection = ({
                           {sizes.map((size, index) => {
                             let sizeValue;
                             if (typeof size === "object" && size !== null) {
-                              // Handle different casings for the size property and keep original fallbacks
                               sizeValue =
                                 size.size ||
                                 size.Size ||
@@ -1184,31 +1161,31 @@ const MeasurementDetailsSection = ({
                   Saved Measurement Data
                 </h3>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-3 lg:grid-cols-4 gap-2 mb-6">
                 {currentWashMeasurements.map((data, index) => (
                   <div
                     key={`saved-${index}`}
                     className="bg-green-50 border border-green-200 rounded-lg p-4"
                   >
                     <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-medium text-gray-800 text-lg">
+                      <h4 className="font-medium text-gray-800 text-sm">
                         Size: {data.size} (Qty: {data.qty})
                       </h4>
                       <div className="flex space-x-2">
                         <button
                           onClick={() => handleEditClick(data.size)}
-                          className="px-2 py-1 bg-blue-600 text-white rounded text-s hover:bg-blue-700"
+                          className="px-2 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
                         >
                           Edit
                         </button>
-                        <span className="text-s text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                        <span className="text-sm text-green-600 bg-green-100 px-2 py-1 rounded-full">
                           Saved
                         </span>
                       </div>
                     </div>
-                    <div className="text-sm text-gray-600">
-                      {/* <p>Total measurements: {(data.pcs || []).reduce((total, pc) => total + (pc.measurementPoints?.length || 0), 0)}</p>                       */}
-                    </div>
+                    {/* <div className="text-sm text-gray-600"> */}
+                    {/* <p>Total measurements: {(data.pcs || []).reduce((total, pc) => total + (pc.measurementPoints?.length || 0), 0)}</p>                       */}
+                    {/* </div> */}
                     <div className="mt-2 grid grid-cols-3 gap-2">
                       {/* Total Checked Points */}
                       <div className="bg-gray-100 p-2 rounded-md text-center">
