@@ -45,6 +45,7 @@ import YQMSExam from "./pages/YQMSExam.jsx";
 import CuttingInline from "./pages/CuttingInline.jsx";
 import SelectDTBuyerSpec from "./pages/SelectDTBuyerSpec.jsx";
 import ANFMeasurement from "./pages/ANFMeasurement.jsx";
+import ANFMeasurementVer2 from "./pages/ANFMeasurementVer2.jsx";
 import CEMasterList from "./pages/CEMasterList.jsx";
 import QCWashingPage from "./pages/QCWashing.jsx";
 
@@ -414,6 +415,10 @@ function AppContent() {
               <Route path="/qcWashing" element={<QCWashingPage />} />
               <Route path="/select-dt-specs" element={<SelectDTBuyerSpec />} />
               <Route path="/anf-washing" element={<ANFMeasurement />} />
+              <Route
+                path="/anf-washing-ver2"
+                element={<ANFMeasurementVer2 />}
+              />
               <Route path="/master-list" element={<CEMasterList />} />
               <Route path="/qa-yorksys" element={<UploadYorksysOrders />} />
               <Route path="/training" element={<YQMSTrainingSchedule />} />

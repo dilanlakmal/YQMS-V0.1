@@ -541,9 +541,9 @@ function Home() {
             description: "QC After Wash Measurements"
           },
           {
-            path: "/anf-washing",
+            path: "/anf-washing-ver2",
             roles: ["ANF QA"],
-            image: "assets/Home/anf-washing.png",
+            image: "assets/Home/anf-washing-ver2.png",
             title: t("home.anf_washing_version2"),
             description: "QC AW Measurements - Version 2"
           }
