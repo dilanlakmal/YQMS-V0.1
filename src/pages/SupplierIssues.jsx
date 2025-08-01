@@ -3,6 +3,7 @@ import { useAuth } from "../components/authentication/AuthContext";
 import { Check, BarChart3 } from "lucide-react";
 import SupplierPageTitle from "../components/inspection/supplier_issue/SupplierPageTitle";
 import SupplierInspectionForm from "../components/inspection/supplier_issue/SupplierInspectionForm";
+import SupplierIssueResults from "../components/inspection/supplier_issue/SupplierIssueResults";
 
 const PlaceholderComponent = ({ title }) => (
   <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md min-h-[300px] flex justify-center items-center">
@@ -28,7 +29,15 @@ const SupplierIssues = () => {
         id: "results",
         label: "Results",
         icon: <BarChart3 size={18} />,
-        component: <PlaceholderComponent title="Results Under Development" />
+        // --- NEW ---
+        // 2. Replace the placeholder with your new component
+        component: <SupplierIssueResults />
+      },
+      {
+        id: "upcoming",
+        label: "Upcoming",
+        icon: <BarChart3 size={18} />,
+        component: <PlaceholderComponent title="Under Development" />
       }
     ],
     []
