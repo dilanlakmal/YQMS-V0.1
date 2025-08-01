@@ -38,7 +38,8 @@
     "select_dt_specs": "Select DT Specs",
     "anf_washing": "QC AW Washing",
     "qcWashing": "QC Washing",
-    "anf_washing_version2": "AW Washing - V2"
+    "anf_washing_version2": "AW Washing - V2",
+    "supplier-issues": "Supplier Issues"
   },
 
   "nav": {
@@ -1518,23 +1519,6 @@
     "failedToFetch": "Failed to fetch EMB defects."
   },
 
-  "systemAdmin": {
-    "title": "System Administration",
-    "subtitle": "Manage system configurations and master data.",
-    "rovingDefects": "Roving Defects",
-    "rovingPairing": "Roving Pairing",
-    "cuttingPoints": "Cutting Modify Points",
-    "cuttingAdding": "Cutting - Add Points",
-    "cuttingFabricDefects": "Cutting Fabric Defects",
-    "sccHeatTransferDefects": "HT Defects",
-    "manageCuttingReports": "Manage Cutting Reports",
-    "qc2Defects": "QC2 Defects",
-    "sccOperators": "SCC Operators",
-    "auditCheckpointsTab": "Audit Checkpoints",
-    "qadefects": "QA Defects",
-    "qastandarddefects": "QA Standard Defects",
-    "contentComingSoon": "This section is under development. Content will be available soon."
-  },
   "sccOperators": {
     "settingsTitle": "Machine & Operator Settings",
     "htMachines": "HT Machines Count",
@@ -1976,5 +1960,24 @@
     "minor": "Minor",
     "major": "Major",
     "critical": "Critical"
+  },
+  "systemAdmin": {
+    "title": "System Administration",
+    "subtitle": "Manage system configurations and master data.",
+    "rovingDefects": "Roving Defects",
+    "rovingPairing": "Roving Pairing",
+    "cuttingPoints": "Cutting Modify Points",
+    "cuttingAdding": "Cutting - Add Points",
+    "cuttingFabricDefects": "Cutting Fabric Defects",
+    "sccHeatTransferDefects": "HT Defects",
+    "manageCuttingReports": "Manage Cutting Reports",
+    "qc2Defects": "QC2 Defects",
+    "sccOperators": "SCC Operators",
+    "auditCheckpointsTab": "Audit Checkpoints",
+    "qadefects": "QA Defects",
+    "qastandarddefects": "QA Standard Defects",
+    "qcWashingTab": "Washing QC",
+    "supplierIssuesTab": "Supplier Issues",
+    "contentComingSoon": "This section is under development. Content will be available soon."
   }
 }
