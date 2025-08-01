@@ -546,6 +546,13 @@ function Home() {
             image: "assets/Home/anf-washing-ver2.png",
             title: t("home.anf_washing_version2"),
             description: "QC AW Measurements - Version 2"
+          },
+          {
+            path: "/supplier-issues",
+            roles: ["Supplier QC"],
+            image: "assets/Home/supplier-issues.png",
+            title: t("home.supplier-issues"),
+            description: "Supplier Issues Sub-Con Fty"
           }
         ]
       },

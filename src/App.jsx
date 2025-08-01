@@ -71,6 +71,8 @@ import QCAccuracy from "./pages/QCAccuracy.jsx";
 
 import QAAudit from "./pages/QAAudit.jsx";
 
+import SupplierIssues from "./pages/SupplierIssues.jsx";
+
 export const BluetoothContext = createContext(null);
 
 function AppContent() {
@@ -419,6 +421,7 @@ function AppContent() {
                 path="/anf-washing-ver2"
                 element={<ANFMeasurementVer2 />}
               />
+              <Route path="/supplier-issues" element={<SupplierIssues />} />
               <Route path="/master-list" element={<CEMasterList />} />
               <Route path="/qa-yorksys" element={<UploadYorksysOrders />} />
               <Route path="/training" element={<YQMSTrainingSchedule />} />
