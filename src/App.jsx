@@ -47,7 +47,7 @@ import SelectDTBuyerSpec from "./pages/SelectDTBuyerSpec.jsx";
 import ANFMeasurement from "./pages/ANFMeasurement.jsx";
 import ANFMeasurementVer2 from "./pages/ANFMeasurementVer2.jsx";
 import CEMasterList from "./pages/CEMasterList.jsx";
-import QCWashingPage from "./pages/QCWashing.jsx";
+//import QCWashingPage from "./pages/QCWashing.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -414,7 +414,7 @@ function AppContent() {
                 path="/upload-beforewash-specs"
                 element={<UploadWashingSpecs />}
               />
-              <Route path="/qcWashing" element={<QCWashingPage />} />
+              {/* <Route path="/qcWashing" element={<QCWashingPage />} /> */}
               <Route path="/select-dt-specs" element={<SelectDTBuyerSpec />} />
               <Route path="/anf-washing" element={<ANFMeasurement />} />
               <Route

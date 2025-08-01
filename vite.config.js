@@ -8,6 +8,9 @@ export default defineConfig({
     host: "0.0.0.0", // This will allow you to access the server from another device
     port: 3001,
     open: true,
+    build: {
+      chunkSizeWarningLimit: 20000
+    },
     https: {
       key: fs.readFileSync(
         //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175-key.pem"
