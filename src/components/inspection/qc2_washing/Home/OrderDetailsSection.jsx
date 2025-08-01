@@ -1,4 +1,6 @@
-import React from "react";
+import {useState} from "react";
+import Swal from "sweetalert2";
+import { API_BASE_URL } from "../../../../../config";
 
 const OrderDetailsSection = ({
   formData,
@@ -19,8 +21,60 @@ const OrderDetailsSection = ({
   showOrderNoSuggestions,
   setShowOrderNoSuggestions, 
   colorOrderQty,
-  
+  activateNextSection,
+  setRecordId,
 }) => {
+  const [isSaved, setIsSaved] = useState(false);
+    const handleSave = async () => {
+    try {
+      const saveData = {
+        formData,
+        userId: user?.emp_id,
+        savedAt: new Date().toISOString(),
+      };
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/orderData-save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(saveData)
+      });
+      const result = await response.json();
+      if (result.success) {
+        Swal.fire({
+        icon: 'success',
+        title: 'Data saved successfully!',
+        showConfirmButton: false,
+        timer: 1800,
+        timerProgressBar: true,
+        position: 'top-end',
+        toast: true
+      });
+        setIsSaved(true);
+        if (activateNextSection) activateNextSection();
+        if (result.id && setRecordId) setRecordId(result.id);
+      } else {
+        Swal.fire({
+        icon: 'error',
+        title: result.message || "Failed to save data",
+        showConfirmButton: false,
+        timer: 2000,
+        timerProgressBar: true,
+        position: 'top-end',
+        toast: true
+      });
+      }
+    } catch (error) {
+      Swal.fire({
+      icon: 'error',
+      title: "Failed to save data",
+      showConfirmButton: false,
+      timer: 2000,
+      timerProgressBar: true,
+      position: 'top-end',
+      toast: true
+    });
+      console.error("Save error:", error);
+    }
+  };
 
   const handleOrderNoChange = (e) => {
     handleInputChange("orderNo", e.target.value);
@@ -72,6 +126,7 @@ const OrderDetailsSection = ({
                 onFocus={handleOrderNoFocus}
                 placeholder="Enter Order No to search"
                 className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                disabled={isSaved}
               />
               {showOrderNoSuggestions && formData.orderNo && orderNoSuggestions.length > 0 && (
                 <ul className="absolute z-10 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-40 overflow-y-auto mt-1">
@@ -80,6 +135,7 @@ const OrderDetailsSection = ({
                       key={index}
                       onMouseDown={() => handleSuggestionClick(order)}
                       className="px-3 py-2 hover:bg-indigo-100 dark:hover:bg-indigo-700 cursor-pointer text-sm text-gray-700 dark:text-gray-200"
+                       disabled={isSaved}
                     >
                       {order}
                     </li>
@@ -95,6 +151,7 @@ const OrderDetailsSection = ({
               value={formData.date}
               onChange={(e) => handleInputChange('date', e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+               disabled={isSaved}
             />
           </div>
           <div className="flex items-center space-x-4">
@@ -106,6 +163,7 @@ const OrderDetailsSection = ({
               readOnly
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 bg-gray-100 cursor-not-allowed dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               style={{opacity: 1, color: 'inherit'}}
+               disabled={isSaved}
             />
           </div>
           
@@ -115,6 +173,7 @@ const OrderDetailsSection = ({
               value={formData.color}
               onChange={(e) => handleInputChange('color', e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+               disabled={isSaved}
             >
               <option value="">-- Select Color --</option>
               {colorOptions && colorOptions.map((color) => (
@@ -139,6 +198,7 @@ const OrderDetailsSection = ({
               value={formData.washingType}
               onChange={(e) => handleInputChange("washingType", e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+               disabled={isSaved}
             >
               <option value="Normal Wash">Normal Wash</option>
               <option value="Acid Wash">Acid Wash</option>
@@ -155,6 +215,7 @@ const OrderDetailsSection = ({
                   checked={formData.firstOutput === true || formData.firstOutput === 'First Output'}
                   onChange={(e) => handleInputChange('firstOutput', e.target.checked ? 'First Output' : '')}
                   className="mr-2 dark:bg-gray-700 dark:checked:bg-indigo-500 dark:border-gray-600 dark:text-white"
+                   disabled={isSaved}
                 />
                 First Output
               </label>
@@ -164,6 +225,7 @@ const OrderDetailsSection = ({
                   checked={formData.inline === true || formData.inline === 'Inline'}
                   onChange={(e) => handleInputChange('inline', e.target.checked ? 'Inline' : '')}
                   className="mr-2 dark:bg-gray-700 dark:checked:bg-indigo-500 dark:border-gray-600 dark:text-white"
+                   disabled={isSaved}
                 />
                 Inline
               </label>
@@ -178,6 +240,7 @@ const OrderDetailsSection = ({
               readOnly
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white cursor-not-allowed"
               style={{ opacity: 1, color: "inherit" }}
+               disabled={isSaved}
             />
           </div>
 
@@ -187,6 +250,7 @@ const OrderDetailsSection = ({
               value={formData.factoryName}
               onChange={(e) => handleInputChange("factoryName", e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+               disabled={isSaved}
             >
               <option value="YM">YM</option>
               {subFactories.map((factory, index) => (
@@ -202,6 +266,7 @@ const OrderDetailsSection = ({
               value={formData.reportType || 'Before Wash'}
               onChange={(e) => handleInputChange('reportType', e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+               disabled={isSaved}
             >
               <option value="Before Wash">Before Wash</option>
               <option value="After Wash">After Wash</option>
@@ -215,10 +280,20 @@ const OrderDetailsSection = ({
               onChange={e => handleInputChange('washQty', e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               min={0}
+               disabled={isSaved}
             />
           </div>
         </div>
       )}
+      <div className="flex justify-end mt-4">
+            <button
+              className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
+              onClick={handleSave}
+              disabled={isSaved}
+            >
+              Save
+            </button>
+          </div>
     </div>
   );
 };

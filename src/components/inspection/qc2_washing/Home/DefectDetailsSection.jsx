@@ -361,14 +361,14 @@ const DefectDetailsSection = ({
                       <div className="w-full md:w-40">
                         <label className="text-xs font-medium dark:text-gray-300">Quantity</label>
                       <div className="flex items-center space-x-2">
-                          <button onClick={() => handleDefectChange(pc, defect.id, 'defectQty', Math.max(0, (parseInt(defect.defectQty, 10) || 1) - 1))} className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white">
+                          <button onClick={() => handleDefectChange(pc, defect.id, 'defectQty', Math.max(1, (parseInt(defect.defectQty, 10) || 1) - 1))} className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white">
                            <Minus size={16} />
                          </button>
                           <input
-                          min="0"
+                          min="1"
                           value={defect.defectQty}
                           onChange={(e) => {
-                            const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
+                            const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
                             handleDefectChange(pc, defect.id, 'defectQty', newValue);
                           }}
                           className="w-full  border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center"

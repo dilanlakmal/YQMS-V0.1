@@ -253,13 +253,29 @@ const MeasurementDetailsSection = ({
     return num.toString();
   };
 
+  // const addSize = (size) => {
+  //   const sizeStr = String(size);
+  //   if (!selectedSizes.find(s => s.size === sizeStr)) {
+  //     const newSize = { size: sizeStr, qty: 5 };
+  //     setSelectedSizes(prev => [...prev, newSize]);
+  //   }
+  // };
+
   const addSize = (size) => {
-    const sizeStr = String(size);
-    if (!selectedSizes.find(s => s.size === sizeStr)) {
-      const newSize = { size: sizeStr, qty: 5 };
-      setSelectedSizes(prev => [...prev, newSize]);
-    }
-  };
+  const sizeStr = String(size);
+  if (!selectedSizes.find(s => s.size === sizeStr)) {
+    const newSize = { size: sizeStr, qty: 5 };
+    setSelectedSizes(prev => [...prev, newSize]);
+    // Set all measurement points to unselected for this size
+    const specs = reportType === 'Before Wash'
+      ? (measurementSpecs.beforeWashGrouped[activeBeforeTab] || measurementSpecs.beforeWash)
+      : (measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash);
+    setSelectedRowsBySize(prev => ({
+      ...prev,
+      [sizeStr]: Array(specs.length).fill(false)
+    }));
+  }
+};
 
   const removeSize = (size) => {
     setSelectedSizes(prev => prev.filter(s => s.size !== size));
@@ -364,7 +380,10 @@ const toggleSelectAllRows = (size, checked, tableType) => {
 
 
   const renderMeasurementTable = (size, qty) => {
-    if (!measurementSpecs || (!measurementSpecs.beforeWash?.length && !measurementSpecs.afterWash?.length)) {
+    if  (!measurementSpecs || 
+    ((!measurementSpecs.beforeWash || measurementSpecs.beforeWash.length === 0) && 
+     (!measurementSpecs.afterWash || measurementSpecs.afterWash.length === 0))
+  ) {
       return (
         <div className="mb-8" key={`table-${size}`}>
           <h4 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
@@ -387,24 +406,26 @@ const toggleSelectAllRows = (size, checked, tableType) => {
         {reportType === 'Before Wash' && (
           <div className="bg-blue-50 p-4 rounded-lg mb-4 dark:bg-gray-800 dark:text-white">
           <h5 className="text-sm font-medium mb-3">Before Wash</h5>
-          
+
           {Object.keys(measurementSpecs.beforeWashGrouped).length > 1 && (
-            <div className="flex space-x-2 mb-3">
-              {Object.keys(measurementSpecs.beforeWashGrouped).map(kValue => (
-                <button
-                  key={kValue}
-                  onClick={() => setActiveBeforeTab(kValue)}
-                  className={`px-3 py-1 text-xs rounded ${
-                    activeBeforeTab === kValue
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white text-blue-600 border border-blue-600'
-                  }`}
-                >
-                  {kValue === 'NA' ? 'General' : `${kValue}`}
-                </button>
-              ))}
+            <div className="mb-3">
+              <label className="mr-2 text-sm font-medium">K Value:</label>
+              <select
+                value={activeBeforeTab}
+                onChange={e => setActiveBeforeTab(e.target.value)}
+                className="px-2 py-1 border rounded text-sm"
+              >
+                {Object.keys(measurementSpecs.beforeWashGrouped).map(kValue => (
+                  <option key={kValue} value={kValue}>
+                    {kValue === 'NA' ? 'General' : `K-${kValue}`}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
+
+          
+          
           <div className="flex justify-end mb-2">
             <button
               onClick={() =>
@@ -424,14 +445,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
              <thead className="bg-gray-50">
                 <tr>
                   <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">
-                    <input
-                        type="checkbox"
-                        checked={
-                          (selectedRowsBySize[size] || []).every(Boolean) 
-                        }
-                        onChange={(e) => toggleSelectAllRows(size, e.target.checked, 'before')} 
-                        className="w-4 h-4"
-                      />
+                    
                   </th>
                   <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">Area</th>
                   <th colSpan={2} className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">Tolerance</th>
@@ -564,35 +578,28 @@ const toggleSelectAllRows = (size, checked, tableType) => {
           <h5 className="text-sm font-medium mb-3">After Wash</h5>
           
           {Object.keys(measurementSpecs.afterWashGrouped).length > 1 && (
-            <div className="flex space-x-2 mb-3">
-              {Object.keys(measurementSpecs.afterWashGrouped).map(kValue => (
-                <button
-                  key={kValue}
-                  onClick={() => setActiveAfterTab(kValue)}
-                  className={`px-3 py-1 text-xs rounded ${
-                    activeAfterTab === kValue
-                      ? 'bg-green-600 text-white'
-                      : 'bg-white text-green-600 border border-green-600'
-                  }`}
+              <div className="mb-3">
+                <label className="mr-2 text-sm font-medium">K Value:</label>
+                <select
+                  value={activeAfterTab}
+                  onChange={e => setActiveAfterTab(e.target.value)}
+                  className="px-2 py-1 border rounded text-sm"
                 >
-                  {kValue === 'NA' ? 'General' : `K-${kValue}`}
-                </button>
-              ))}
-            </div>
-          )}
+                  {Object.keys(measurementSpecs.afterWashGrouped).map(kValue => (
+                    <option key={kValue} value={kValue}>
+                      {kValue === 'NA' ? 'General' : `K-${kValue}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
           <div className="overflow-x-auto">
             <table className="w-full border-collapse border border-gray-300 text-xs dark:bg-gray-800 dark:text-white">
               <thead className="bg-gray-50">
                 <tr>
                   <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">
-                    <input
-                        type="checkbox"
-                        checked={
-                          (selectedRowsBySize[size] || []).every(Boolean) 
-                        }
-                        onChange={(e) => toggleSelectAllRows(size, e.target.checked, 'before')} 
-                        className="w-4 h-4"
-                      />
+                    
                   </th>
                   <th rowSpan={2} className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">Area</th>
                   <th colSpan={2} className="border border-gray-300 px-2 py-1 font-medium dark:bg-gray-700 dark:text-white">Tolerance</th>
@@ -636,7 +643,10 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                   if (shouldHide) return null;
                   
                   return (
-                    <tr key={`k2-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-600">
+                    <tr
+                      key={`k2-${index}`}
+                      className={`hover:bg-gray-50 dark:hover:bg-gray-600 ${!isSelected ? 'bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500' : ''}`}
+                    >
                       <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
                         <input
                           type="checkbox"
@@ -657,30 +667,29 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                       {[...Array(qty)].map((_, i) => {
                         const cellKey = `${size}-after-${index}-${i}`;
                         const value = measurementValues[cellKey];
-                        let cellColorClass = 'bg-transparent';
-
-                        if (value && typeof value.decimal === 'number') {
-                          const measuredDeviation = value.decimal;
-                          const tolMinusValue = fractionToDecimal(tolMinus);
-                          const tolPlusValue = fractionToDecimal(tolPlus);
-
-                          if (!isNaN(tolMinusValue) && !isNaN(tolPlusValue)) {
-                            if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
-                              cellColorClass = 'bg-green-200 dark:bg-green-700'; // Pass
-                            } else {
-                              cellColorClass = 'bg-red-200 dark:bg-red-700'; // Fail
-                            }
-                          }
-                        }
+                        const isFull = fullColumnsBySize[size]?.[i] || false;
+                        const isRowSelected = selectedRowsBySize[size]?.[index] ?? true;
+                        const isEnabled = isFull || isRowSelected;
+                        const cellColorClass = !isEnabled
+                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                          : (value && typeof value.decimal === 'number'
+                              ? (value.decimal >= fractionToDecimal(tolMinus) && value.decimal <= fractionToDecimal(tolPlus)
+                                  ? 'bg-green-200 dark:bg-green-700'
+                                  : 'bg-red-200 dark:bg-red-700')
+                              : 'bg-transparent');
                         return (
-                           <td key={`measurement-input-${index}-${i}`} className={`border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white ${cellColorClass} cursor-pointer`}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setCurrentCell({ size, table: 'after', rowIndex: index, colIndex: i });
-                                setShowNumPad(true);
-                              }}>
-                            <input 
-                              type="text" 
+                          <td
+                            key={`measurement-input-${index}-${i}`}
+                            className={`border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white ${cellColorClass} cursor-pointer`}
+                            onClick={e => {
+                              e.preventDefault();
+                              if (!isEnabled) return;
+                              setCurrentCell({ size, table: 'after', rowIndex: index, colIndex: i });
+                              setShowNumPad(true);
+                            }}
+                          >
+                            <input
+                              type="text"
                               value={value?.fraction || ''}
                               readOnly
                               className="w-full px-1 py-1 text-center border-0 bg-transparent dark:text-white"
@@ -690,6 +699,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                           </td>
                         );
                       })}
+
                     </tr>
                   );
                 })}

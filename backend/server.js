@@ -25868,6 +25868,212 @@ app.delete("/api/qc-washing-first-outputs/:id", async (req, res) => {
   }
 });
 
+//New QC_Washing Endpoints
+
+app.post("/api/qc-washing/orderData-save", async (req, res) => {
+  try {
+    const { formData, userId, savedAt } = req.body;
+
+    if (!formData || !formData.orderNo) {
+      return res.status(400).json({ success: false, message: "Order No is required." });
+    }
+
+    // Try to find an existing record by orderNo (or use another unique field)
+    let record = await QCWashing.findOne({ orderNo: formData.orderNo });
+
+    if (!record) {
+      // Create new record
+      record = new QCWashing({
+        ...formData,
+        userId,
+        savedAt,
+        status: "draft"
+      });
+    } else {
+      // Update existing record
+      Object.assign(record, formData);
+      record.userId = userId;
+      record.savedAt = savedAt;
+      record.status = "draft";
+    }
+
+    await record.save();
+
+    res.json({ success: true, id: record._id });
+  } catch (err) {
+    console.error("OrderData-save error:", err);
+    res.status(500).json({ success: false, message: "Server error while saving order data." });
+  }
+});
+
+const inspectionMemoryStorage = multer.memoryStorage();
+
+const uploadInspectionImage = multer({
+  storage: inspectionMemoryStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG, and GIF images are allowed"), false);
+    }
+  }
+});
+
+app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (req, res) => {
+  try {
+    const { recordId } = req.body;
+    const inspectionData = JSON.parse(req.body.inspectionData || '[]');
+    const processData = JSON.parse(req.body.processData || '{}');
+    const defectData = JSON.parse(req.body.defectData || '[]');
+
+    if (!recordId) {
+      return res.status(400).json({ success: false, message: "recordId is required" });
+    }
+
+    // Ensure upload directory exists
+    const uploadDir = path.join(__dirname, '../public/storage/qc_washing_images/inspection');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    // Map uploaded files by fieldname and write them to disk
+    const fileMap = {};
+    for (const file of (req.files || [])) {
+      const fileExtension = path.extname(file.originalname);
+      const newFilename = `inspection-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
+      const fullFilePath = path.join(uploadDir, newFilename);
+      await fs.promises.writeFile(fullFilePath, file.buffer);
+      // Save relative path for DB
+      fileMap[file.fieldname] = `/public/storage/qc_washing_images/inspection/${newFilename}`;
+    }
+
+    // Find or create the record
+    let record = await QCWashing.findById(recordId);
+    if (!record) {
+      record = new QCWashing({ _id: recordId });
+    }
+
+    // Build checkedPoints with correct image URLs
+    record.inspectionDetails = {
+      ...record.inspectionDetails,
+      checkedPoints: (inspectionData || []).map((item, idx) => ({
+        pointName: item.checkedList,
+        decision: item.decision === "ok",
+        comparison: (item.comparisonImages || []).map((img, imgIdx) => {
+          // Use uploaded relative path if available, else fallback to img.name
+          return fileMap[`comparisonImages_${idx}_${imgIdx}`] || img.name;
+        }),
+        remark: item.remark,
+      })),
+      machineProcesses: Object.entries(processData || {}).map(([machineType, params]) => ({
+        machineType,
+        ...params,
+      })),
+      parameters: (defectData || []).map(item => ({
+        parameterName: item.parameter,
+        checkedQty: item.checkedQty,
+        defectQty: item.failedQty,
+        passRate: item.passRate,
+        result: item.result,
+        remark: item.remark,
+      })),
+    };
+
+    record.savedAt = new Date();
+    record.status = 'draft';
+
+    await record.save();
+
+    res.json({ success: true, message: "Inspection data saved" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async (req, res) => {
+  try {
+    const { recordId } = req.body;
+    const inspectionData = JSON.parse(req.body.inspectionData || '[]');
+    const processData = JSON.parse(req.body.processData || '{}');
+    const defectData = JSON.parse(req.body.defectData || '[]');
+    const existingImagesMap = JSON.parse(req.body.existingImagesMap || '{}');
+
+    if (!recordId) {
+      return res.status(400).json({ success: false, message: "recordId is required" });
+    }
+
+    // Ensure upload directory exists
+    const uploadDir = path.join(__dirname, '../public/storage/qc_washing_images/inspection');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    // Map uploaded files by fieldname and write them to disk
+    const fileMap = {};
+    for (const file of (req.files || [])) {
+      const fileExtension = path.extname(file.originalname);
+      const newFilename = `inspection-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
+      const fullFilePath = path.join(uploadDir, newFilename);
+      await fs.promises.writeFile(fullFilePath, file.buffer);
+      // Save relative path for DB
+      fileMap[file.fieldname] = `/public/storage/qc_washing_images/inspection/${newFilename}`;
+    }
+
+    // Find the record (do not create if not found)
+    let record = await QCWashing.findById(recordId);
+    if (!record) {
+      return res.status(404).json({ success: false, message: "Record not found for update" });
+    }
+
+    // Build checkedPoints with correct image URLs
+    record.inspectionDetails = {
+      ...record.inspectionDetails,
+      checkedPoints: (inspectionData || []).map((item, idx) => {
+        const images = [];
+        (item.comparisonImages || []).forEach((img, imgIdx) => {
+          if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
+            images.push(fileMap[`comparisonImages_${idx}_${imgIdx}`]);
+          } else if (img.preview && typeof img.preview === "string") {
+            images.push(img.preview);
+          }
+        });
+        return {
+          pointName: item.checkedList,
+          decision: item.decision === "ok",
+          comparison: images,
+          remark: item.remark,
+        };
+      }),
+      machineProcesses: Object.entries(processData || {}).map(([machineType, params]) => ({
+        machineType,
+        ...params,
+      })),
+      parameters: (defectData || []).map(item => ({
+        parameterName: item.parameter,
+        checkedQty: item.checkedQty,
+        defectQty: item.failedQty,
+        passRate: item.passRate,
+        result: item.result,
+        remark: item.remark,
+      })),
+    };
+
+    record.savedAt = new Date();
+    // Optionally update status if needed
+    // record.status = 'draft';
+
+    await record.save();
+
+    res.json({ success: true, message: "Inspection data updated" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 /* ------------------------------
    AI Chatbot Proxy Route
 ------------------------------ */

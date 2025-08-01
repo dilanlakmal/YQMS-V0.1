@@ -235,6 +235,13 @@ function Home() {
             description: "QMS Audit Check Point"
           },
           {
+            path: "/qc2-upload-data",
+            roles: ["Washing Clerk"],
+            image: "assets/Home/uploadspecs.png",
+            title: t("home.qc2_upload_data"),
+            description: "QC2 Upload Data"
+          },
+          {
             path: "/qc-accuracy",
             roles: ["QA"],
             image: "assets/Home/qc-accuracy.png",
