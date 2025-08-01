@@ -507,7 +507,8 @@ function stripFileFromImages(inspectionData) {
                         name={`decision-${idx}`}
                         checked={item.decision === "ok"}
                         onChange={() => handleDecisionChange(idx, "ok")}
-                        className="mr-2 dark:bg-gray-700 dark:checked:bg-indigo-500 dark:border-gray-600 dark:text-white"
+                        className="mr-2 dark:bg-gray-700 dark:checked:bg-indigo-500 dark:border-gray-600 dark:text-white disabled:bg-gray-400"
+                        disabled={!isEditing}
                       /> Ok
                     </label>
                     <label className="ml-2 dark:border-gray-600 dark:text-white">
@@ -516,7 +517,8 @@ function stripFileFromImages(inspectionData) {
                         name={`decision-${idx}`}
                         checked={item.decision === "no"}
                         onChange={() => handleDecisionChange(idx, "no")}
-                        className="mr-2 dark:bg-gray-700 dark:checked:bg-indigo-500 dark:border-gray-600 dark:text-white"
+                        className="mr-2 dark:bg-gray-700 dark:checked:bg-indigo-500 dark:border-gray-600 dark:text-white disabled:bg-gray-400"
+                        disabled={!isEditing}
                       /> No
                     </label>
                   </td>
@@ -524,9 +526,9 @@ function stripFileFromImages(inspectionData) {
                     {/* Upload Button */}
                     <button
                       type="button"
-                      className="flex items-center justify-center px-2 py-1 bg-blue-500 text-white rounded mr-2"
+                      className="flex items-center justify-center px-2 py-1 bg-blue-500 text-white rounded mr-2 disabled:bg-gray-400"
                       onClick={() => uploadRefs.current[idx].click()}
-                      disabled={(item.comparisonImages || []).length >= 2}
+                      disabled={!isEditing || (item.comparisonImages || []).length >= 2}
                       title="Upload"
                     >
                       <FaUpload className="mr-1" />
@@ -535,20 +537,22 @@ function stripFileFromImages(inspectionData) {
                     <input
                       type="file"
                       accept="image/*"
+                      className=" disabled:bg-gray-400"
                       style={{ display: 'none' }}
                       ref={el => uploadRefs.current[idx] = el}
                       onChange={e => {
                         handleImageChange(idx, e.target.files);
                         e.target.value = null; // allow re-upload of same file
                       }}
+                      disabled={!isEditing}
                     />
 
                     {/* Capture Button */}
                     <button
                       type="button"
-                      className="flex items-center justify-center px-2 py-1 bg-green-500 text-white rounded"
+                      className="flex items-center justify-center px-2 py-1 bg-green-500 text-white rounded disabled:bg-gray-400"
                       onClick={() => captureRefs.current[idx].click()}
-                      disabled={(item.comparisonImages || []).length >= 2}
+                      disabled={!isEditing || (item.comparisonImages || []).length >= 2}
                       title="Capture"
                     >
                       <FaCamera className="mr-1" />
@@ -557,6 +561,7 @@ function stripFileFromImages(inspectionData) {
                     <input
                       type="file"
                       accept="image/*"
+                      className=" disabled:bg-gray-400"
                       capture="environment"
                       style={{ display: 'none' }}
                       ref={el => captureRefs.current[idx] = el}
@@ -564,6 +569,7 @@ function stripFileFromImages(inspectionData) {
                         handleImageChange(idx, e.target.files);
                         e.target.value = null;
                       }}
+                      disabled={!isEditing}
                     />
                     {/* Thumbnails */}
                     <div className="flex mt-1">
@@ -578,8 +584,9 @@ function stripFileFromImages(inspectionData) {
                               />
                               <button
                                 type="button"
+                                disabled={!isEditing}
                                 onClick={() => handleRemoveImage(idx, imgIdx)}
-                                className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center"
+                                className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center disabled:bg-gray-400"
                               >×</button>
                             </div>
                           ))}
@@ -596,7 +603,8 @@ function stripFileFromImages(inspectionData) {
                           )
                         )
                       }
-                      className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                      className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:bg-gray-400"
+                      disabled={!isEditing}
                     />
                   </td>
                 </tr>
@@ -644,7 +652,8 @@ function stripFileFromImages(inspectionData) {
                             }
                           }))
                         }
-                        className="w-12 md:w-24 px-3 py-2 border rounded-md dark:bg-gray-500 dark:text-white dark:border-gray-600"
+                        className="w-12 md:w-24 px-3 py-2 border rounded-md dark:bg-gray-500 dark:text-white dark:border-gray-600 disabled:bg-gray-400"
+                        disabled={!isEditing}
                       />
                       {/* Unit */}
                       <span className="text-sm dark:text-white">{param.unit}</span>
@@ -682,7 +691,8 @@ function stripFileFromImages(inspectionData) {
                               {idx === 0 && (
                                 <button
                                   type="button"
-                                  className="ml-2 px-2 py-1 bg-green-500 text-white rounded"
+                                  disabled={!isEditing}
+                                  className="ml-2 px-2 py-1 bg-green-500 text-white rounded disabled:bg-gray-400"
                                   onClick={handleAddColorShade}
                                   title="Add Color Shade"
                                 >
@@ -692,7 +702,8 @@ function stripFileFromImages(inspectionData) {
                               {colorShadeRows.length > 1 && (
                                 <button
                                   type="button"
-                                  className="ml-2 px-2 py-1 bg-red-500 text-white rounded"
+                                  disabled={!isEditing}
+                                  className="ml-2 px-2 py-1 bg-red-500 text-white rounded disabled:bg-gray-400"
                                   onClick={() => handleRemoveColorShade(idx)}
                                   title="Remove"
                                 >
@@ -707,7 +718,8 @@ function stripFileFromImages(inspectionData) {
                           <div className="flex items-center justify-center space-x-2">
                             <button
                               type="button"
-                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                              disabled={!isEditing}
+                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded disabled:bg-gray-400"
                               onClick={() =>
                                 handleParamInputChange(
                                   rowIdx,
@@ -730,11 +742,13 @@ function stripFileFromImages(inspectionData) {
                                 if (e.target.value === "") handleParamInputChange(rowIdx, "checkedQty", 0);
                               }}
                               onChange={e => handleParamInputChange(rowIdx, "checkedQty", e.target.value)}
-                              className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center"
+                              className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center disabled:bg-gray-400"
+                              disabled={!isEditing}
                             />
                             <button
                               type="button"
-                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                              disabled={!isEditing}
+                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded disabled:bg-gray-400"
                               onClick={() =>
                                 handleParamInputChange(
                                   rowIdx,
@@ -752,7 +766,8 @@ function stripFileFromImages(inspectionData) {
                           <div className="flex items-center justify-center space-x-2">
                             <button
                               type="button"
-                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                              disabled={!isEditing}
+                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded disabled:bg-gray-400"
                               onClick={() =>
                                 handleParamInputChange(
                                   rowIdx,
@@ -775,11 +790,13 @@ function stripFileFromImages(inspectionData) {
                                 if (e.target.value === "") handleParamInputChange(rowIdx, "failedQty", 0);
                               }}
                               onChange={e => handleParamInputChange(rowIdx, "failedQty", e.target.value)}
-                              className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center"
+                              className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center disabled:bg-gray-400"
+                              disabled={!isEditing}
                             />
                             <button
                               type="button"
-                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded"
+                              disabled={!isEditing}
+                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded disabled:bg-gray-400"
                               onClick={() =>
                                 handleParamInputChange(
                                   rowIdx,
@@ -814,7 +831,8 @@ function stripFileFromImages(inspectionData) {
                             type="text"
                             value={item.remark}
                             onChange={e => handleParamInputChange(rowIdx, "remark", e.target.value)}
-                            className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                            className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:bg-gray-400"
+                            disabled={!isEditing}
                           />
                         </td>
                         
