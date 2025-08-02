@@ -4,6 +4,7 @@ import { API_BASE_URL } from "../../../../../config";
 
 const OrderDetailsSection = ({
   formData,
+  setFormData, 
   handleInputChange,
   fetchOrderDetailsByStyle,
   colorOptions,
@@ -24,23 +25,87 @@ const OrderDetailsSection = ({
   activateNextSection,
   setRecordId,
   setSavedSizes,
+  onLoadSavedDataById,
 }) => {
   const [isSaved, setIsSaved] = useState(false);
     const handleSave = async () => {
-    try {
-      const saveData = {
-        formData,
-        userId: user?.emp_id,
-        savedAt: new Date().toISOString(),
-      };
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/orderData-save`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(saveData)
+  try {
+    // 1. Build the unique key for checking existing record
+    const uniqueKey = {
+      orderNo: formData.orderNo,
+      date: formData.date,
+      color: formData.color,
+      washingType: formData.washingType,
+      reportType: formData.reportType, // Washing Method
+      factoryName: formData.factoryName,
+      daily: formData.daily,
+      inspector: {
+        empId: user?.emp_id
+      }
+    };
+
+    // 2. Check if a record already exists
+    const checkRes = await fetch(`${API_BASE_URL}/api/qc-washing/find-existing`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(uniqueKey)
+    });
+    const checkData = await checkRes.json();
+
+    if (checkData.success && checkData.exists) {
+      // 3. Prompt user: edit or cancel
+      const result = await Swal.fire({
+        icon: 'info',
+        title: 'Order details already saved',
+        text: 'Do you want to edit the existing record?',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, edit',
+        cancelButtonText: 'No, cancel'
       });
-      const result = await response.json();
-      if (result.success) {
+
+      if (result.isConfirmed) {
+        // 4. Load the existing record into the form (map as needed)
+        const record = checkData.record;
+        setFormData({
+          ...formData,
+          ...record, // You may need to map fields if structure differs
+        });
+        setRecordId(record._id);
+        setIsSaved(true);
+         if (onLoadSavedDataById) onLoadSavedDataById(record._id);
+        // Activate the next section
+        if (activateNextSection) activateNextSection();
+
         Swal.fire({
+          icon: 'success',
+          title: 'Existing record loaded for editing.',
+          showConfirmButton: false,
+          timer: 1500,
+          position: 'top-end',
+          toast: true
+        });
+        return;
+      }
+
+    }
+
+    // 5. If not exists, proceed to save as new
+    const saveData = {
+      formData,
+      userId: user?.emp_id,
+      savedAt: new Date().toISOString(),
+    };
+
+    const response = await fetch(`${API_BASE_URL}/api/qc-washing/orderData-save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(saveData)
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      Swal.fire({
         icon: 'success',
         title: 'Data saved successfully!',
         showConfirmButton: false,
@@ -49,11 +114,11 @@ const OrderDetailsSection = ({
         position: 'top-end',
         toast: true
       });
-        setIsSaved(true);
-        if (activateNextSection) activateNextSection();
-        if (result.id && setRecordId) setRecordId(result.id);
-      } else {
-        Swal.fire({
+      setIsSaved(true);
+      if (activateNextSection) activateNextSection();
+      if (result.id && setRecordId) setRecordId(result.id);
+    } else {
+      Swal.fire({
         icon: 'error',
         title: result.message || "Failed to save data",
         showConfirmButton: false,
@@ -62,9 +127,9 @@ const OrderDetailsSection = ({
         position: 'top-end',
         toast: true
       });
-      }
-    } catch (error) {
-      Swal.fire({
+    }
+  } catch (error) {
+    Swal.fire({
       icon: 'error',
       title: "Failed to save data",
       showConfirmButton: false,
@@ -73,9 +138,10 @@ const OrderDetailsSection = ({
       position: 'top-end',
       toast: true
     });
-      console.error("Save error:", error);
-    }
-  };
+    console.error("Save error:", error);
+  }
+};
+
 
   const handleOrderNoChange = (e) => {
     handleInputChange("orderNo", e.target.value);

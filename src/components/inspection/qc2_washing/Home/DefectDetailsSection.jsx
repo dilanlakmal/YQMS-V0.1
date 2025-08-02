@@ -1,4 +1,4 @@
-import  { useRef,useState } from "react";
+import  { useRef,useState,useEffect } from "react";
 import { Plus, Trash2, Camera, X, PlusCircle, Upload, Minus, Eye, EyeOff  } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useTranslation } from "react-i18next";
@@ -10,29 +10,23 @@ const DefectDetailsSection = ({
   formData,
   handleInputChange,
   defectOptions,
-  addedDefects,
-  setAddedDefects,
-  selectedDefect,
-  setSelectedDefect,
-  defectQty,
-  setDefectQty,
-  uploadedImages,
-  setUploadedImages,
-  comment,
-  setComment,
   isVisible,
   onToggle,
-  defectsByPc,
-  setDefectsByPc,
   defectStatus,
   recordId,
-  activateNextSection
+  activateNextSection,
+  onLoadSavedDataById,
 }) => {
   const imageInputRef = useRef(null);
   const { i18n } = useTranslation();
-  const videoRef = useRef(null);
   const [isSaved, setIsSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(true);
+  const [defectsByPc, setDefectsByPc] =  useState({});
+  const [uploadedImages, setUploadedImages] = useState([]);
+  const [comment, setComment] = useState("");
+  const [selectedDefect, setSelectedDefect] = useState("");
+  const [defectQty, setDefectQty] = useState("");
+  const [addedDefects, setAddedDefects] = useState([]);
 
   // State is now managed by the parent QCWashingPage component
   
@@ -329,6 +323,7 @@ const DefectDetailsSection = ({
           setUploadedImages(additionalImages || []);
           setIsSaved(true);
           setIsEditing(false);
+          if (onLoadSavedDataById) onLoadSavedDataById(recordId);
           if (activateNextSection) activateNextSection();
         } else {
           Swal.fire({ icon: 'error', title: result.message || "Failed to save defect details", timer: 2000, toast: true, position: 'top-end', showConfirmButton: false });
@@ -415,6 +410,11 @@ const DefectDetailsSection = ({
         console.error(err);
       }
     };
+
+    useEffect(() => {
+}, [defectsByPc]);
+useEffect(() => {
+}, [uploadedImages]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">

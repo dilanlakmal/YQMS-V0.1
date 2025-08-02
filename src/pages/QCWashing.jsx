@@ -288,8 +288,6 @@ const activateNextSection = (currentSection) => {
   }));
 }
   const [addedDefects, setAddedDefects] = useState([]);
-  const [selectedDefect, setSelectedDefect] = useState("");
-  const [defectQty, setDefectQty] = useState("");
   const [uploadedImages, setUploadedImages] = useState([]);
   const [comment, setComment] = useState("");
   const [savedSizes, setSavedSizes] = useState([]);
@@ -312,16 +310,16 @@ const activateNextSection = (currentSection) => {
     setSectionVisibility((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
-  // Helper function to convert image file to Base64 or return existing preview string
+
   const imageToBase64 = (imageObject) => {
     if (!imageObject) {
       return Promise.resolve(null);
     }
-    // If it's a File object (newly uploaded or re-selected), convert it to Base64
+
     if (imageObject.file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        // Add a check to ensure the file is actually a blob/file
+     
           if (!(imageObject.file instanceof Blob)) {
             reject(new Error("Invalid file object provided."));
             return;
@@ -331,8 +329,7 @@ const activateNextSection = (currentSection) => {
         reader.onerror = (error) => reject(error);
       });
     } else if (imageObject.preview) {
-      // If it's already a preview string (from loaded data), send it as is
-      // This assumes the backend can identify if this preview string refers to an already-saved image
+  
       return Promise.resolve(imageObject.preview);
     }
     return Promise.resolve(null);
@@ -346,27 +343,9 @@ const activateNextSection = (currentSection) => {
     fetchOrderNumbers();
     fetchChecklist();
   }, []);
-
-
-
   useEffect(() => {
-}, [defectsByPc]);
-
-useEffect(() => {
 }, [uploadedImages]);
 
-
-  // --- useEffect: Load Saved Data on Order Change ---
-  // useEffect(() => {
-  //   const identifier = formData.style && formData.style !== formData.orderNo ? formData.style : formData.orderNo;
-  //   if (identifier) {
-  //     if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
-  //     loadSavedData(identifier);
-  //   }
-  // }, [formData.orderNo, formData.style]);
-
-  // --- useEffect: Load Saved Sizes on Order/Color Change ---
- 
 
   // --- useEffect: Calculate Checked Qty ---
   useEffect(() => {
@@ -374,39 +353,6 @@ useEffect(() => {
       calculateCheckedQty(formData.washQty);
     }
   }, [formData.aqlSampleSize, formData.inline, formData.daily]);
-
-//  useEffect(() => {
-//   if (!formData.washQty || isNaN(Number(formData.washQty))) return;
-//   const autoAqlParams = ["Color Shade 01", "Appearence"];
-//   setDefectData(prev =>
-//      prev.map(item =>
-//       autoAqlParams.includes(item.parameter)
-//         ? { ...item, checkedQty: formData.washQty, aqlAcceptedDefect: "", aqlLevelUsed: "" }
-//         : item
-//     )
-//   );
-// }, [formData.washQty]);
-
-// useEffect(() => {
-//   if (!formData.washQty || isNaN(Number(formData.washQty))) return;
-//   const autoAqlParams = ["Color Shade 01", "Appearence"];
-//   defectData.forEach((item, idx) => {
-//     if (
-//       autoAqlParams.includes(item.parameter) &&
-//       String(item.checkedQty) === String(formData.washQty) &&
-//       (item.aqlAcceptedDefect === "" || item.aqlAcceptedDefect === undefined)
-//     ) {
-     
-//       fetchAqlForParameter(
-//         formData.orderNo || formData.style,
-//         formData.washQty,
-//         setDefectData,
-//         idx
-//       );
-//     }
-//   });
-  // eslint-disable-next-line
-// }, [defectData, formData.washQty, formData.orderNo, formData.style]);
 
 useEffect(() => {
   if (formData.orderNo && formData.color) {
@@ -627,111 +573,112 @@ useEffect(() => {
           return; // Stop further processing
         }
       }
+      
 
       // 2. Check for auto-saved data and load it
-      const qcWashingResponse = await fetch(
-        `${API_BASE_URL}/api/qc-washing/load-saved/${orderNo}`
-      );
+      // const qcWashingResponse = await fetch(
+      //   `${API_BASE_URL}/api/qc-washing/load-saved/${orderNo}`
+      // );
 
-      if (qcWashingResponse.ok) {
-        const qcWashingData = await qcWashingResponse.json();
-        if (qcWashingData.success && qcWashingData.savedData) {
+      // if (qcWashingResponse.ok) {
+      //   const qcWashingData = await qcWashingResponse.json();
+      //   if (qcWashingData.success && qcWashingData.savedData) {
          
-          const saved = qcWashingData.savedData;
+      //     const saved = qcWashingData.savedData;
 
-          setFormData((prev) => ({
-            ...prev,
-            ...saved.formData,
-            reportType: saved.reportType,
-            date: saved.formData.date
-              ? saved.formData.date.split("T")[0]
-              : new Date().toISOString().split("T")[0],
-            orderQty: saved?.formData.orderQty || saved?.colors?.[0]?.orderDetails?.orderQty || prev.orderQty,
-            buyer: saved?.formData.buyer || saved?.colors?.[0]?.orderDetails?.buyer || prev.buyer,
-            aqlSampleSize: saved?.formData.aqlSampleSize || saved?.colors?.[0]?.orderDetails?.aqlSampleSize || prev.aqlSampleSize,
-            aqlAcceptedDefect: saved?.formData.aqlAcceptedDefect || saved?.colors?.[0]?.orderDetails?.aqlAcceptedDefect || prev.aqlAcceptedDefect,
-            aqlRejectedDefect: saved?.formData.aqlRejectedDefect || saved?.colors?.[0]?.orderDetails?.aqlRejectedDefect || prev.aqlRejectedDefect,
-            aqlLevelUsed: saved?.formData.aqlLevelUsed || saved?.colors?.[0]?.orderDetails?.aqlLevelUsed || "",
-          }));
+      //     setFormData((prev) => ({
+      //       ...prev,
+      //       ...saved.formData,
+      //       reportType: saved.reportType,
+      //       date: saved.formData.date
+      //         ? saved.formData.date.split("T")[0]
+      //         : new Date().toISOString().split("T")[0],
+      //       orderQty: saved?.formData.orderQty || saved?.colors?.[0]?.orderDetails?.orderQty || prev.orderQty,
+      //       buyer: saved?.formData.buyer || saved?.colors?.[0]?.orderDetails?.buyer || prev.buyer,
+      //       aqlSampleSize: saved?.formData.aqlSampleSize || saved?.colors?.[0]?.orderDetails?.aqlSampleSize || prev.aqlSampleSize,
+      //       aqlAcceptedDefect: saved?.formData.aqlAcceptedDefect || saved?.colors?.[0]?.orderDetails?.aqlAcceptedDefect || prev.aqlAcceptedDefect,
+      //       aqlRejectedDefect: saved?.formData.aqlRejectedDefect || saved?.colors?.[0]?.orderDetails?.aqlRejectedDefect || prev.aqlRejectedDefect,
+      //       aqlLevelUsed: saved?.formData.aqlLevelUsed || saved?.colors?.[0]?.orderDetails?.aqlLevelUsed || "",
+      //     }));
        
 
-          // Fetch all colors for the order/style, even when loading saved data
-          let colorResponse = await fetch(
-            `${API_BASE_URL}/api/qc-washing/order-details-by-style/${orderNo}`
-          );
-          let orderData = await colorResponse.json();
+      //     // Fetch all colors for the order/style, even when loading saved data
+      //     let colorResponse = await fetch(
+      //       `${API_BASE_URL}/api/qc-washing/order-details-by-style/${orderNo}`
+      //     );
+      //     let orderData = await colorResponse.json();
 
-          if (!orderData.success) {
-            colorResponse = await fetch(
-              `${API_BASE_URL}/api/qc-washing/order-details-by-order/${orderNo}`
-            );
-            orderData = await colorResponse.json();
-          }
-           if (orderData.success && orderData.colors) {
-            setColorOptions(orderData.colors);
-          } else if (saved.formData.color) {
-            // Fallback: if fetching all colors fails, at least ensure the saved color is an option
-            setColorOptions((prev) =>
-              prev.includes(saved.formData.color)
-                ? prev
-                : [...prev, saved.formData.color]
-            );
-          }
+      //     if (!orderData.success) {
+      //       colorResponse = await fetch(
+      //         `${API_BASE_URL}/api/qc-washing/order-details-by-order/${orderNo}`
+      //       );
+      //       orderData = await colorResponse.json();
+      //     }
+      //      if (orderData.success && orderData.colors) {
+      //       setColorOptions(orderData.colors);
+      //     } else if (saved.formData.color) {
+      //       // Fallback: if fetching all colors fails, at least ensure the saved color is an option
+      //       setColorOptions((prev) =>
+      //         prev.includes(saved.formData.color)
+      //           ? prev
+      //           : [...prev, saved.formData.color]
+      //       );
+      //     }
 
-          if (saved.inspectionData && saved.inspectionData.length > 0) {
-            setInspectionData(saved.inspectionData);
-          } else if (masterChecklist.length > 0) {
-            setInspectionData(initializeInspectionData(masterChecklist));
-          }
+      //     if (saved.inspectionData && saved.inspectionData.length > 0) {
+      //       setInspectionData(saved.inspectionData);
+      //     } else if (masterChecklist.length > 0) {
+      //       setInspectionData(initializeInspectionData(masterChecklist));
+      //     }
 
-          if (saved.processData && Array.isArray(saved.processData.machineProcesses)) {
-            setProcessData(machineProcessesToObject(saved.processData.machineProcesses));
-          }
+      //     if (saved.processData && Array.isArray(saved.processData.machineProcesses)) {
+      //       setProcessData(machineProcessesToObject(saved.processData.machineProcesses));
+      //     }
 
-          if (saved.defectData && saved.defectData.length > 0) {
-            setDefectData(saved.defectData.map(param => ({
-              ...param,
-              parameter: param.parameter || param.parameterName || "",
-              ok: param.ok !== undefined ? param.ok : true,
-              no: param.no !== undefined ? param.no : false,
-              checkedQty: param.checkedQty || 0,
-              failedQty: param.failedQty || 0,
-              remark: param.remark || "",
-              checkboxes: param.checkboxes || {},
-            })));
-          }
+      //     if (saved.defectData && saved.defectData.length > 0) {
+      //       setDefectData(saved.defectData.map(param => ({
+      //         ...param,
+      //         parameter: param.parameter || param.parameterName || "",
+      //         ok: param.ok !== undefined ? param.ok : true,
+      //         no: param.no !== undefined ? param.no : false,
+      //         checkedQty: param.checkedQty || 0,
+      //         failedQty: param.failedQty || 0,
+      //         remark: param.remark || "",
+      //         checkboxes: param.checkboxes || {},
+      //       })));
+      //     }
 
-          if (saved.addedDefects) {
-            setAddedDefects(saved.addedDefects);
-          }
+      //     if (saved.addedDefects) {
+      //       setAddedDefects(saved.addedDefects);
+      //     }
 
-          // Load defectsByPc and uploadedImages from saved data
-          if (saved.defectsByPc) {
-            setDefectsByPc(transformDefectsByPc(saved.defectsByPc));
-          }
-          if (saved.additionalImage) {
-            // If images were saved as base64 or URLs, ensure they are handled correctly for display
-            setUploadedImages(saved.additionalImage.map(img => ({
-             file: null, 
-              preview: normalizeImagePreview(img),
-              name: 'image.jpg'
-            })));
-            }
+      //     // Load defectsByPc and uploadedImages from saved data
+      //     if (saved.defectsByPc) {
+      //       setDefectsByPc(transformDefectsByPc(saved.defectsByPc));
+      //     }
+      //     if (saved.additionalImage) {
+      //       // If images were saved as base64 or URLs, ensure they are handled correctly for display
+      //       setUploadedImages(saved.additionalImage.map(img => ({
+      //        file: null, 
+      //         preview: normalizeImagePreview(img),
+      //         name: 'image.jpg'
+      //       })));
+      //       }
 
-          setComment(saved.comment || "");
+      //     setComment(saved.comment || "");
 
-          // Set measurement data
-          setMeasurementData(processMeasurementData(saved.measurementDetails));
-          setShowMeasurementTable(true);
+      //     // Set measurement data
+      //     setMeasurementData(processMeasurementData(saved.measurementDetails));
+      //     setShowMeasurementTable(true);
 
-          setAutoSaveId(saved._id);
-          if (saved.savedAt) {
-            setLastSaved(new Date(saved.savedAt));
-          }
-          setIsDataLoading(false);
-          return;
-        }
-      }
+      //     setAutoSaveId(saved._id);
+      //     if (saved.savedAt) {
+      //       setLastSaved(new Date(saved.savedAt));
+      //     }
+      //     setIsDataLoading(false);
+      //     return;
+      //   }
+      // }
 
       // 3. If not submitted, fetch order details from dt_orders
       let response = await fetch(
@@ -777,6 +724,98 @@ useEffect(() => {
       setIsDataLoading(false);
     }
   };
+
+  const loadSavedDataById = async (id) => {
+  if (!id) return;
+  setIsDataLoading(true);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/qc-washing/load-saved-by-id/${id}`);
+    const data = await response.json();
+    if (!data.success || !data.savedData) {
+      Swal.fire("No saved data found", "", "info");
+      setIsDataLoading(false);
+      return;
+    }
+    const saved = data.savedData;
+
+    // --- Transform and set all relevant states as before ---
+    setFormData(prev => ({
+      ...prev,
+      ...saved.formData, // or map fields as needed
+      date: saved.formData?.date ? saved.formData.date.split("T")[0] : prev.date,
+      reportType: saved.reportType || prev.reportType,
+      orderQty: saved.formData?.orderQty || prev.orderQty,
+      buyer: saved.formData?.buyer || prev.buyer,
+      aqlSampleSize: saved.formData?.aqlSampleSize || prev.aqlSampleSize,
+      aqlAcceptedDefect: saved.formData?.aqlAcceptedDefect || prev.aqlAcceptedDefect,
+      aqlRejectedDefect: saved.formData?.aqlRejectedDefect || prev.aqlRejectedDefect,
+      aqlLevelUsed: saved.formData?.aqlLevelUsed || prev.aqlLevelUsed,
+    }));
+
+    setInspectionData(
+  (saved.inspectionDetails?.checkedPoints || []).map(item => ({
+    checkedList: item.pointName || "",
+    decision: item.decision === true ? "ok" : item.decision === false ? "no" : "",
+    comparisonImages: (item.comparison || []).map(img => ({
+      file: null,
+      preview: img,
+      name: typeof img === "string" ? img.split('/').pop() : "image.jpg"
+    })),
+    remark: item.remark || "",
+    approvedDate: item.approvedDate || "",
+    na: item.condition === "N/A" || false,
+  }))
+);
+
+// 2. Process Data (Machine Processes)
+if (saved.inspectionDetails?.machineProcesses) {
+  setProcessData(machineProcessesToObject(saved.inspectionDetails.machineProcesses));
+}
+    if (saved.processData && Array.isArray(saved.processData.machineProcesses)) {
+      setProcessData(machineProcessesToObject(saved.processData.machineProcesses));
+    }
+    setDefectData(
+  (saved.inspectionDetails?.parameters || []).map(param => ({
+    parameter: param.parameterName || param.parameter || "",
+    checkedQty: param.checkedQty || 0,
+    failedQty: param.defectQty || param.failedQty || 0,
+    passRate: param.passRate || "",
+    result: param.result || "",
+    remark: param.remark || "",
+    ok: param.ok !== undefined ? param.ok : true,
+    no: param.no !== undefined ? param.no : false,
+    aqlAcceptedDefect: param.aqlAcceptedDefect || "",
+    checkboxes: param.checkboxes || {},
+  }))
+);
+    setAddedDefects(saved.addedDefects || []);
+    setDefectsByPc(transformDefectsByPc(saved.defectsByPc || {}));
+    setUploadedImages((saved.additionalImage || []).map(img => ({
+      file: null,
+      preview: img.preview || img,
+      name: img.name || (typeof img === "string" ? img.split('/').pop() : "image.jpg")
+    })));
+    setComment(saved.comment || "");
+    setMeasurementData(processMeasurementData(saved.measurementDetails || []));
+    setSavedSizes((saved.measurementDetails || []).map(m => m.size));
+    setRecordId(saved._id);
+    if (saved.savedAt) setLastSaved(new Date(saved.savedAt));
+    Swal.fire({
+      icon: "success",
+      title: "Saved data loaded!",
+      timer: 1200,
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false
+    });
+  } catch (error) {
+    Swal.fire("Error loading saved data", error.message, "error");
+    console.error("Error loading saved data:", error);
+  } finally {
+    setIsDataLoading(false);
+  }
+};
+
 
     // --- Form Handlers ---
   const handleInputChange = (field, value) => {
@@ -1130,48 +1169,57 @@ useEffect(() => {
   };
 
   // Handle measurement size save with nested structure
-  const handleSizeSubmit = async (transformedSizeData) => {
-    try {
-      const washType =
-        formData.reportType === "Before Wash" ? "beforeWash" : "afterWash";
+ const handleSizeSubmit = async (transformedSizeData) => {
+  try {
+    // 1. Update local state as before
+    const washType = formData.reportType === "Before Wash" ? "beforeWash" : "afterWash";
+    setMeasurementData((prev) => {
+      const currentArray = prev[washType];
+      const existingIndex = currentArray.findIndex((item) => item.size === transformedSizeData.size);
+      if (existingIndex >= 0) {
+        const updated = [...currentArray];
+        updated[existingIndex] = transformedSizeData;
+        return { ...prev, [washType]: updated };
+      } else {
+        return { ...prev, [washType]: [...currentArray, transformedSizeData] };
+      }
+    });
+    setSavedSizes((prev) => {
+      if (!prev.includes(transformedSizeData.size)) {
+        return [...prev, transformedSizeData.size];
+      }
+      return prev;
+    });
+    setShowMeasurementTable(true);
 
-      setMeasurementData((prev) => {
-        const currentArray = prev[washType];
-        const existingIndex = currentArray.findIndex(
-          (item) => item.size === transformedSizeData.size
-        );
-
-        if (existingIndex >= 0) {
-          const updated = [...currentArray];
-          updated[existingIndex] = transformedSizeData;
-          return { ...prev, [washType]: updated };
-        } else {
-          return {
-            ...prev,
-            [washType]: [...currentArray, transformedSizeData],
-          };
-        }
-      });
-
-      setSavedSizes((prev) => {
-        if (!prev.includes(transformedSizeData.size)) {
-          return [...prev, transformedSizeData.size];
-        }
-        return prev;
-      });
-
-      setShowMeasurementTable(true);
-
-      Swal.fire(
-        "Success",
-        `Size data saved successfully to ${formData.reportType}!`,
-        "success"
-      );
-    } catch (error) {
-      console.error("Error saving size:", error);
-      Swal.fire("Error", "Failed to save size data", "error");
+    // 2. Save to backend
+    if (!recordId) {
+      Swal.fire("Order details must be saved first!", "", "warning");
+      return;
     }
-  };
+    // Add washType to the data
+    const measurementDetail = { ...transformedSizeData, washType };
+    const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recordId,
+        measurementDetail
+      })
+    });
+    const result = await response.json();
+    if (result.success) {
+      Swal.fire("Success", `Size data saved to database!`, "success");
+      if (typeof loadSavedDataById === "function") loadSavedDataById(recordId);
+    } else {
+      Swal.fire("Error", result.message || "Failed to save measurement data", "error");
+    }
+  } catch (error) {
+    console.error("Error saving size:", error);
+    Swal.fire("Error", "Failed to save size data", "error");
+  }
+};
+
 
   // Handle measurement data edit
   const handleMeasurementEdit = (size = null) => {
@@ -1398,34 +1446,35 @@ useEffect(() => {
       setIsDataLoading(false);
     }
   };
-// Load saved measurement sizes
-  // const loadSavedSizes = async (orderNo, color) => {
-  //   try {
-  //     const response = await fetch(
-  //       `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${color}`
-  //     );
 
-  //     if (!response.ok) {
-  //       // setSavedSizes([]);
-  //       return;
-  //     }
+  // Load saved measurement sizes
+  const loadSavedSizes = async (orderNo, color) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${color}`
+      );
 
-  //     const data = await response.json();
+      if (!response.ok) {
+        // setSavedSizes([]);
+        return;
+      }
 
-  //     if (data.success) {
-  //       setSavedSizes(data.savedSizes || []);
-  //       // console.log("Loaded saved sizes:", data.savedSizes);
-  //     }
-  //   } catch (error) {
-  //     console.error("Error loading saved sizes:", error);
-  //     setSavedSizes([]);
-  //   }
-  // };
+      const data = await response.json();
 
-  //  useEffect(() => {
-  //   if (formData.orderNo && formData.color) loadSavedSizes(formData.orderNo, formData.color);
-  // }, [formData.orderNo, formData.color]);
-  
+      if (data.success) {
+        setSavedSizes(data.savedSizes || []);
+        // console.log("Loaded saved sizes:", data.savedSizes);
+      }
+    } catch (error) {
+      console.error("Error loading saved sizes:", error);
+      setSavedSizes([]);
+    }
+  };
+
+   useEffect(() => {
+    if (formData.orderNo && formData.color) loadSavedSizes(formData.orderNo, formData.color);
+  }, [formData.orderNo, formData.color]);
+
   const PageTitle = () => (
     <div className="text-center">
       <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
@@ -1480,8 +1529,10 @@ useEffect(() => {
           showMeasurementTable={showMeasurementTable}
         />
         <OrderDetailsSection
+        onLoadSavedDataById={loadSavedDataById}
         setSavedSizes={setSavedSizes}
           formData={formData}
+          setFormData={setFormData}
           handleInputChange={handleInputChange}
           fetchOrderDetailsByStyle={fetchOrderDetailsByStyle}
           colorOptions={colorOptions}
@@ -1505,12 +1556,12 @@ useEffect(() => {
           comment={comment}
           measurementData={measurementData}
           uploadedImages={uploadedImages}
-          defectsByPc={defectsByPc}
           activateNextSection={() => activateNextSection('orderDetails')}
            setRecordId={setRecordId}
         />
         {sectionVisibility.inspectionData && (
         <InspectionDataSection
+          onLoadSavedDataById={loadSavedDataById}
           inspectionData={inspectionData}
           setInspectionData={setInspectionData} 
           processData={processData}
@@ -1528,30 +1579,24 @@ useEffect(() => {
         )}
         {sectionVisibility.defectDetails && (
         <DefectDetailsSection
+          onLoadSavedDataById={loadSavedDataById}
           formData={formData}
           handleInputChange={handleInputChange}
           defectOptions={defectOptions}
           addedDefects={addedDefects}
           setAddedDefects={setAddedDefects}
-          selectedDefect={selectedDefect}
-          setSelectedDefect={setSelectedDefect}
-          defectQty={defectQty}
-          setDefectQty={setDefectQty}
           uploadedImages={uploadedImages}
           setUploadedImages={setUploadedImages}
-          comment={comment}
-          setComment={setComment}
           isVisible={sectionVisibility.defectDetails}
           onToggle={() => toggleSection("defectDetails")}
           defectStatus={formData.result} 
-          defectsByPc={defectsByPc}
-          setDefectsByPc={setDefectsByPc}
           activateNextSection={() => activateNextSection('defectDetails')}
           recordId={recordId}
         />
         )}
         {sectionVisibility.measurementDetails && (
         <MeasurementDetailsSection
+          onLoadSavedDataById={loadSavedDataById}
           orderNo={formData.orderNo || formData.style}
           color={formData.color}
           reportType={formData.reportType}
@@ -1569,11 +1614,11 @@ useEffect(() => {
         )}
 
         {/* Auto-save status */}
-        {lastSaved && (
+        {/* {lastSaved && (
           <div className="text-center text-sm text-gray-600 dark:text-gray-300">
             Last auto-saved: {lastSaved.toLocaleTimeString()}
           </div>
-        )}
+        )} */}
 
         <div className="flex justify-end space-x-4">
           <button
@@ -1731,11 +1776,7 @@ useEffect(() => {
                     ],
                   },
                 };
-
-                // --- 3. Debug: Log the payload before sending ---
-                
-
-                // --- 4. Submit to the server ---
+                // --- 3. Submit to the server ---
                 const response = await fetch(
                   `${API_BASE_URL}/api/qc-washing/submit`,
                   {

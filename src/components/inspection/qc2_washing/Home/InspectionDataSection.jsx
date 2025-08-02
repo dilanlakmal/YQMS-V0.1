@@ -44,6 +44,7 @@ const InspectionDataSection = ({
   setDefectData, 
   recordId,
   activateNextSection,
+   onLoadSavedDataById,
 }) => {
 
   const uploadRefs = useRef([]);
@@ -207,6 +208,7 @@ const InspectionDataSection = ({
          setInspectionData(prev => stripFileFromImages(prev));
         setIsSaved(true);
         setIsEditing(false);
+        if (onLoadSavedDataById) onLoadSavedDataById(recordId);
         if (activateNextSection) activateNextSection();
       } else {
         Swal.fire({

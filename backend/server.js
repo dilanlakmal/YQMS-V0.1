@@ -24928,111 +24928,111 @@ app.get('/api/qc-washing/saved-colors/:orderNo', async (req, res) => {
 });
 
 // Load saved data
-app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
-  try {
-    // Only 'orderNo' is available from req.params for this route
-    const { orderNo } = req.params;
+// app.get('/api/qc-washing/load-saved/:orderNo', async (req, res) => {
+//   try {
+//     // Only 'orderNo' is available from req.params for this route
+//     const { orderNo } = req.params;
 
-    // Query to find the latest auto-saved document for the given orderNo
-    const savedData = await QCWashing.findOne({
-      orderNo: orderNo,
-      isAutoSave: true // Ensure it's an auto-saved record
-    }).sort({ savedAt: -1 }); // Get the most recent one
+//     // Query to find the latest auto-saved document for the given orderNo
+//     const savedData = await QCWashing.findOne({
+//       orderNo: orderNo,
+//       isAutoSave: true // Ensure it's an auto-saved record
+//     }).sort({ savedAt: -1 }); // Get the most recent one
 
-    if (savedData) {
-      // Data transformation for frontend consumption
-      const formData = {
-        date: savedData.date,
-        orderNo: savedData.orderNo,
-        style: savedData.orderNo, // Assuming style is same as orderNo or needs specific field
-        orderQty: savedData.colors?.[0]?.orderDetails?.orderQty || '',
-        color: savedData.colors?.[0]?.orderDetails?.color || '',
-        washingType: savedData.colors?.[0]?.orderDetails?.washingType || 'Normal Wash',
-        firstOutput: savedData.colors?.[0]?.orderDetails?.daily || '', 
-        inline: savedData.colors?.[0]?.orderDetails?.daily === 'Inline' || false, 
-        daily: savedData.colors?.[0]?.orderDetails?.daily || '',
-        buyer: savedData.colors?.[0]?.orderDetails?.buyer || '',
-        factoryName: savedData.colors?.[0]?.orderDetails?.factoryName || 'YM',
-        checkedQty: savedData.colors?.[0]?.defectDetails?.checkedQty || '',
-        washQty: savedData.colors?.[0]?.defectDetails?.washQty || '',
-        aqlSampleSize: savedData.colors?.[0]?.orderDetails?.aqlSampleSize || '',
-        aqlAcceptedDefect: savedData.colors?.[0]?.orderDetails?.aqlAcceptedDefect || '',
-        aqlRejectedDefect: savedData.colors?.[0]?.orderDetails?.aqlRejectedDefect || '',
-        aqlLevelUsed: savedData.colors?.[0]?.orderDetails?.aqlLevelUsed || '',
-      };
+//     if (savedData) {
+//       // Data transformation for frontend consumption
+//       const formData = {
+//         date: savedData.date,
+//         orderNo: savedData.orderNo,
+//         style: savedData.orderNo, // Assuming style is same as orderNo or needs specific field
+//         orderQty: savedData.colors?.[0]?.orderDetails?.orderQty || '',
+//         color: savedData.colors?.[0]?.orderDetails?.color || '',
+//         washingType: savedData.colors?.[0]?.orderDetails?.washingType || 'Normal Wash',
+//         firstOutput: savedData.colors?.[0]?.orderDetails?.daily || '', 
+//         inline: savedData.colors?.[0]?.orderDetails?.daily === 'Inline' || false, 
+//         daily: savedData.colors?.[0]?.orderDetails?.daily || '',
+//         buyer: savedData.colors?.[0]?.orderDetails?.buyer || '',
+//         factoryName: savedData.colors?.[0]?.orderDetails?.factoryName || 'YM',
+//         checkedQty: savedData.colors?.[0]?.defectDetails?.checkedQty || '',
+//         washQty: savedData.colors?.[0]?.defectDetails?.washQty || '',
+//         aqlSampleSize: savedData.colors?.[0]?.orderDetails?.aqlSampleSize || '',
+//         aqlAcceptedDefect: savedData.colors?.[0]?.orderDetails?.aqlAcceptedDefect || '',
+//         aqlRejectedDefect: savedData.colors?.[0]?.orderDetails?.aqlRejectedDefect || '',
+//         aqlLevelUsed: savedData.colors?.[0]?.orderDetails?.aqlLevelUsed || '',
+//       };
 
-      const firstColorData = savedData.colors?.[0];
+//       const firstColorData = savedData.colors?.[0];
 
-      const inspectionData = firstColorData?.inspectionDetails?.checkedPoints?.map(point => ({
-        checkedList: point.pointName,
-        approvedDate: point.approvedDate || '',
-        na: point.condition === 'N/A',
-        remark: point.remark || ''
-      })) || [];
+//       const inspectionData = firstColorData?.inspectionDetails?.checkedPoints?.map(point => ({
+//         checkedList: point.pointName,
+//         approvedDate: point.approvedDate || '',
+//         na: point.condition === 'N/A',
+//         remark: point.remark || ''
+//       })) || [];
 
-      const defectData = firstColorData?.inspectionDetails?.parameters?.map(param => ({
-        parameter: param.parameter || param.parameterName || param.name || "",
-        checkedQty: param.checkedQty || 0,
-        failedQty: param.failedQty || 0,
-        passRate: param.passRate || '0.00',
-        result: param.result || '',
-        aqlAcceptedDefect: param.aqlAcceptedDefect,
-        remark: param.remark || '',
-        ok: param.ok !== undefined ? param.ok : true,
-        no: param.no !== undefined ? param.no : false,
-        checkboxes: param.checkboxes || {}
-      })) || [];
-      const addedDefects = firstColorData?.defectDetails?.defects?.map(defect => ({
-        defectId: defect._id || '',
-        defectName: defect.defectName,
-        qty: defect.defectQty
-      })) || [];
+//       const defectData = firstColorData?.inspectionDetails?.parameters?.map(param => ({
+//         parameter: param.parameter || param.parameterName || param.name || "",
+//         checkedQty: param.checkedQty || 0,
+//         failedQty: param.failedQty || 0,
+//         passRate: param.passRate || '0.00',
+//         result: param.result || '',
+//         aqlAcceptedDefect: param.aqlAcceptedDefect,
+//         remark: param.remark || '',
+//         ok: param.ok !== undefined ? param.ok : true,
+//         no: param.no !== undefined ? param.no : false,
+//         checkboxes: param.checkboxes || {}
+//       })) || [];
+//       const addedDefects = firstColorData?.defectDetails?.defects?.map(defect => ({
+//         defectId: defect._id || '',
+//         defectName: defect.defectName,
+//         qty: defect.defectQty
+//       })) || [];
 
-      const defectsByPc = firstColorData?.defectDetails?.defectsByPc || {};
+//       const defectsByPc = firstColorData?.defectDetails?.defectsByPc || {};
 
-      const additionalImage = firstColorData?.defectDetails?.additionalImages?.map(imagePath => ({
-        preview: imagePath,  // Assuming the path can be used directly as a preview URL
-        name: imagePath.split('/').pop() // Extracts filename from path
-      })) || [];
-      const machineProcesses = firstColorData?.inspectionDetails?.machineProcesses || [];
+//       const additionalImage = firstColorData?.defectDetails?.additionalImages?.map(imagePath => ({
+//         preview: imagePath,  // Assuming the path can be used directly as a preview URL
+//         name: imagePath.split('/').pop() // Extracts filename from path
+//       })) || [];
+//       const machineProcesses = firstColorData?.inspectionDetails?.machineProcesses || [];
 
 
-      res.json({
-        success: true,
-        savedData: {
-          _id: savedData._id,
-          formData: formData,
-          inspectionData: inspectionData,
-          processData: {
-            // temperature: firstColorData?.inspectionDetails?.temp || '',
-            // time: firstColorData?.inspectionDetails?.time || '',
-            // chemical: firstColorData?.inspectionDetails?.chemical || ''
-             machineProcesses: machineProcesses
-          },
-          defectData: defectData,
-          addedDefects: addedDefects,
-          defectsByPc: defectsByPc,
-          additionalImage: additionalImage,
-          comment: firstColorData?.defectDetails?.comment || '',
-          measurementDetails: firstColorData?.measurementDetails || [],
-          savedAt: savedData.savedAt,
-          reportType: savedData.reportType, 
-          totalCheckedPoint: savedData.totalCheckedPoint, 
-          totalPass: savedData.totalPass, 
-          totalFail: savedData.totalFail, 
-          passRate: savedData.passRate, 
-          washQty: savedData.washQty,
-          checkedQty: savedData.checkedQty,
-        }
-      });
-    } else {
-      res.json({ success: false, message: 'No saved data found' });
-    }
-  } catch (error) {
-    console.error('Load saved data error:', error);
-    res.status(500).json({ success: false, message: 'Failed to load saved data' });
-  }
-});
+//       res.json({
+//         success: true,
+//         savedData: {
+//           _id: savedData._id,
+//           formData: formData,
+//           inspectionData: inspectionData,
+//           processData: {
+//             // temperature: firstColorData?.inspectionDetails?.temp || '',
+//             // time: firstColorData?.inspectionDetails?.time || '',
+//             // chemical: firstColorData?.inspectionDetails?.chemical || ''
+//              machineProcesses: machineProcesses
+//           },
+//           defectData: defectData,
+//           addedDefects: addedDefects,
+//           defectsByPc: defectsByPc,
+//           additionalImage: additionalImage,
+//           comment: firstColorData?.defectDetails?.comment || '',
+//           measurementDetails: firstColorData?.measurementDetails || [],
+//           savedAt: savedData.savedAt,
+//           reportType: savedData.reportType, 
+//           totalCheckedPoint: savedData.totalCheckedPoint, 
+//           totalPass: savedData.totalPass, 
+//           totalFail: savedData.totalFail, 
+//           passRate: savedData.passRate, 
+//           washQty: savedData.washQty,
+//           checkedQty: savedData.checkedQty,
+//         }
+//       });
+//     } else {
+//       res.json({ success: false, message: 'No saved data found' });
+//     }
+//   } catch (error) {
+//     console.error('Load saved data error:', error);
+//     res.status(500).json({ success: false, message: 'Failed to load saved data' });
+//   }
+// });
 
 
 // Get order numbers
@@ -25375,56 +25375,56 @@ app.post('/api/qc-washing/first-output-details', async (req, res) => {
 });
 
 // POST /api/qc-washing/aql-chart/for-parameter
-app.post('/api/qc-washing/aql-chart/parameter', async (req, res) => {
-  try {
-    const { orderNo, checkedQty } = req.body;
-    if (!orderNo || !checkedQty || isNaN(checkedQty)) {
-      return res.status(400).json({ success: false, message: "Order No and checkedQty are required." });
-    }
-    const lotSizeNum = parseInt(checkedQty, 10);
-    const buyer = await getBuyerFromMoNumber(orderNo);
-    const aqlLevel = getAqlLevelForBuyer(buyer);
+// app.post('/api/qc-washing/aql-chart/parameter', async (req, res) => {
+//   try {
+//     const { orderNo, checkedQty } = req.body;
+//     if (!orderNo || !checkedQty || isNaN(checkedQty)) {
+//       return res.status(400).json({ success: false, message: "Order No and checkedQty are required." });
+//     }
+//     const lotSizeNum = parseInt(checkedQty, 10);
+//     const buyer = await getBuyerFromMoNumber(orderNo);
+//     const aqlLevel = getAqlLevelForBuyer(buyer);
 
-    const aqlChart = await AQLChart.findOne({
-      Type: "General",
-      Level: "II",
-      "LotSize.min": { $lte: lotSizeNum },
-      $or: [
-        { "LotSize.max": { $gte: lotSizeNum } },
-        { "LotSize.max": null }
-      ]
-    }).lean();
+//     const aqlChart = await AQLChart.findOne({
+//       Type: "General",
+//       Level: "II",
+//       "LotSize.min": { $lte: lotSizeNum },
+//       $or: [
+//         { "LotSize.max": { $gte: lotSizeNum } },
+//         { "LotSize.max": null }
+//       ]
+//     }).lean();
 
-    if (!aqlChart) {
-      return res.status(404).json({ success: false, message: "No AQL chart found for the given lot size." });
-    }
-    if (!Array.isArray(aqlChart.AQL)) {
-      return res.status(404).json({ success: false, message: "AQL data is missing in the chart." });
-    }
+//     if (!aqlChart) {
+//       return res.status(404).json({ success: false, message: "No AQL chart found for the given lot size." });
+//     }
+//     if (!Array.isArray(aqlChart.AQL)) {
+//       return res.status(404).json({ success: false, message: "AQL data is missing in the chart." });
+//     }
 
-    // Use string comparison to avoid type mismatch
-    const aqlEntry = aqlChart.AQL.find(aql => String(aql.level) === String(aqlLevel));
+//     // Use string comparison to avoid type mismatch
+//     const aqlEntry = aqlChart.AQL.find(aql => String(aql.level) === String(aqlLevel));
 
-    if (!aqlEntry) {
-      // Log for debugging
-      // console.error('AQL for parameter error: No entry found for level', aqlLevel, 'in', aqlChart.AQL);
-      return res.status(404).json({ success: false, message: `AQL level ${aqlLevel} not found for the matching chart.` });
-    }
+//     if (!aqlEntry) {
+//       // Log for debugging
+//       // console.error('AQL for parameter error: No entry found for level', aqlLevel, 'in', aqlChart.AQL);
+//       return res.status(404).json({ success: false, message: `AQL level ${aqlLevel} not found for the matching chart.` });
+//     }
 
-    res.json({
-      success: true,
-      aqlData: {
-        sampleSize: aqlChart.SampleSize,
-        acceptedDefect: aqlEntry.AcceptDefect,
-        rejectedDefect: aqlEntry.RejectDefect,
-        aqlLevelUsed: aqlLevel
-      }
-    });
-  } catch (error) {
-    console.error('AQL for parameter error:', error);
-    res.status(500).json({ success: false, message: 'Server error while fetching AQL details for parameter.' });
-  }
-});
+//     res.json({
+//       success: true,
+//       aqlData: {
+//         sampleSize: aqlChart.SampleSize,
+//         acceptedDefect: aqlEntry.AcceptDefect,
+//         rejectedDefect: aqlEntry.RejectDefect,
+//         aqlLevelUsed: aqlLevel
+//       }
+//     });
+//   } catch (error) {
+//     console.error('AQL for parameter error:', error);
+//     res.status(500).json({ success: false, message: 'Server error while fetching AQL details for parameter.' });
+//   }
+// });
 
 // Load submitted data
 app.get('/api/qc-washing/load-submitted/:orderNo', async (req, res) => {
@@ -25873,13 +25873,32 @@ app.delete("/api/qc-washing-first-outputs/:id", async (req, res) => {
 app.post("/api/qc-washing/orderData-save", async (req, res) => {
   try {
     const { formData, userId, savedAt } = req.body;
-
     if (!formData || !formData.orderNo) {
       return res.status(400).json({ success: false, message: "Order No is required." });
     }
+    const dateValue = formData.date
+    ? new Date(formData.date.length === 10 ? formData.date + "T00:00:00.000Z" : formData.date)
+    : undefined;
 
-    // Try to find an existing record by orderNo (or use another unique field)
-    let record = await QCWashing.findOne({ orderNo: formData.orderNo });
+
+    // Build the query for uniqueness
+    const query = {
+      orderNo: formData.orderNo,
+      date: dateValue,
+      color: formData.color,
+      washingType: formData.washingType,
+      reportType: formData.reportType,
+      factoryName: formData.factoryName, 
+      daily: formData.daily,
+      inline: formData.inline,
+      "inspector.empId": userId || formData.inspector?.empId
+    };
+    Object.keys(query).forEach(
+      (key) => (query[key] === undefined || query[key] === "") && delete query[key]
+    );
+
+    // Find existing record
+    let record = await QCWashing.findOne(query);
 
     if (!record) {
       // Create new record
@@ -25898,13 +25917,78 @@ app.post("/api/qc-washing/orderData-save", async (req, res) => {
     }
 
     await record.save();
-
     res.json({ success: true, id: record._id });
   } catch (err) {
     console.error("OrderData-save error:", err);
     res.status(500).json({ success: false, message: "Server error while saving order data." });
   }
 });
+
+app.post("/api/qc-washing/find-existing", async (req, res) => {
+ 
+  try {
+    const {
+      orderNo,
+      date,
+      color,
+      washingType,
+      reportType,
+      factoryName,
+      daily,
+      inspectorId
+    } = req.body;
+
+    const dateValue = date
+      ? new Date(date.length === 10 ? date + "T00:00:00.000Z" : date)
+      : undefined;
+
+    // Build the query to match ALL fields
+    const query = {
+      orderNo,
+      date: dateValue,
+      color,
+      washingType,
+      reportType,
+      factoryName,
+      "inspector.empId": inspectorId,
+      // For inspection report, you may want to match either firstOutput or inline
+      // If you want to match both, use both fields
+      daily,
+    };
+
+    // Remove undefined or empty string fields from query
+    Object.keys(query).forEach(
+      (key) => (query[key] === undefined || query[key] === "") && delete query[key]
+    );
+
+    const record = await QCWashing.findOne(query);
+
+    if (record) {
+      res.json({ success: true, exists: true, record });
+    } else {
+      res.json({ success: true, exists: false });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+// In your Express backend
+app.get('/api/qc-washing/load-saved-by-id/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const savedData = await QCWashing.findById(id);
+    if (savedData) {
+      // ...transform as needed, similar to your existing logic...
+      res.json({ success: true, savedData });
+    } else {
+      res.json({ success: false, message: 'No saved data found' });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to load saved data' });
+  }
+});
+
 
 const inspectionMemoryStorage = multer.memoryStorage();
 
@@ -26204,6 +26288,38 @@ app.post('/api/qc-washing/defect-details-update', uploadDefectImage.any(), async
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
+// Save or update measurement details for a record
+app.post('/api/qc-washing/measurement-save', async (req, res) => {
+  try {
+    const { recordId, measurementDetail } = req.body;
+    if (!recordId || !measurementDetail) {
+      return res.status(400).json({ success: false, message: "Missing recordId or measurementDetail" });
+    }
+
+    // Find the record
+    const record = await QCWashing.findById(recordId);
+    if (!record) {
+      return res.status(404).json({ success: false, message: "Record not found" });
+    }
+
+    // Remove any existing measurement for this size & washType
+    record.measurementDetails = (record.measurementDetails || []).filter(md =>
+      !(md.size === measurementDetail.size && md.washType === measurementDetail.washType)
+    );
+    // Add the new/updated measurement
+    record.measurementDetails.push(measurementDetail);
+
+    record.savedAt = new Date();
+    await record.save();
+
+    res.json({ success: true, message: "Measurement detail saved", measurementDetails: record.measurementDetails });
+  } catch (err) {
+    console.error('Measurement save error:', err);
+    res.status(500).json({ success: false, message: "Failed to save measurement detail" });
+  }
+});
+
 
 /* ------------------------------
    AI Chatbot Proxy Route
