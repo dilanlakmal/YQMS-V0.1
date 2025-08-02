@@ -38,6 +38,13 @@ const BuyerSpecDataSchema = new mongoose.Schema(
 const SizeMeasurementDetailsSchema = new mongoose.Schema(
   {
     size: { type: String, required: true },
+    // --- NEW: Add a status field with a default value ---
+    status: {
+      type: String,
+      enum: ["In Progress", "Completed"],
+      default: "In Progress",
+      required: true
+    },
     sizeSummary: {
       garmentDetailsCheckedQty: { type: Number, default: 0 },
       garmentDetailsOKGarment: { type: Number, default: 0 },

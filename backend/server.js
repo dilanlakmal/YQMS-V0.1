@@ -140,7 +140,7 @@ const server = https.createServer(credentials, app);
 const io = new Server(server, {
   cors: {
     origin: "https://192.167.12.162:3001", //"https://192.165.2.175:3001", //"https://localhost:3001"
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
   }
@@ -158,7 +158,7 @@ app.use(bodyParser.json());
 app.use(
   cors({
     origin: "https://192.167.12.162:3001", //["http://localhost:3001", "https://localhost:3001"],
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
   })
@@ -23732,6 +23732,56 @@ app.post("/api/anf-measurement/reports", async (req, res) => {
   }
 });
 
+// --- NEW: Endpoint to update the status of a specific size in a report ---
+app.patch("/api/anf-measurement/reports/status", async (req, res) => {
+  try {
+    const { inspectionDate, qcID, moNo, color, size, status } = req.body;
+
+    // Validation
+    if (!inspectionDate || !qcID || !moNo || !color || !size || !status) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
+    if (!["In Progress", "Completed"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status value." });
+    }
+
+    const reportDate = new Date(`${inspectionDate}T00:00:00.000Z`);
+    const filter = {
+      inspectionDate: reportDate,
+      qcID,
+      moNo,
+      color: { $all: color.sort(), $size: color.length }
+    };
+
+    // Find the report and update the status of the specific size within the array
+    const result = await ANFMeasurementReport.updateOne(
+      { ...filter, "measurementDetails.size": size },
+      { $set: { "measurementDetails.$.status": status } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res
+        .status(404)
+        .json({ error: "No matching report or size found to update." });
+    }
+    if (result.modifiedCount === 0) {
+      // This can happen if the status is already what you're trying to set it to
+      return res
+        .status(200)
+        .json({ message: "Status was already set to the desired value." });
+    }
+
+    res
+      .status(200)
+      .json({ message: `Size status successfully updated to '${status}'.` });
+  } catch (error) {
+    console.error("Error updating size status:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to update size status.", details: error.message });
+  }
+});
+
 // Endpoint to get existing measurement data for a specific size in a report
 app.get("/api/anf-measurement/existing-data", async (req, res) => {
   try {
@@ -23762,7 +23812,9 @@ app.get("/api/anf-measurement/existing-data", async (req, res) => {
 
     if (!report) {
       // No report found, so no existing data. Return empty.
-      return res.json([]);
+      // return res.json([]);
+      // --- MODIFIED: Return a default structure if no report is found ---
+      return res.json({ measurements: [], status: "In Progress" });
     }
 
     // Report found, now find the specific size's data within it
@@ -23772,11 +23824,18 @@ app.get("/api/anf-measurement/existing-data", async (req, res) => {
 
     if (!sizeData || !sizeData.sizeMeasurementData) {
       // Report exists, but not for this size. Return empty.
-      return res.json([]);
+      //return res.json([]);
+      // --- MODIFIED: Return a default structure if the size is not in the report ---
+      return res.json({ measurements: [], status: "In Progress" });
     }
 
     // Success! Return the array of measured garments for that size
-    res.json(sizeData.sizeMeasurementData);
+    //res.json(sizeData.sizeMeasurementData);
+    // --- MODIFIED: Return an object containing both measurements and status ---
+    res.json({
+      measurements: sizeData.sizeMeasurementData,
+      status: sizeData.status // This will be 'In Progress' or 'Completed'
+    });
   } catch (error) {
     console.error("Error fetching existing measurement data:", error);
     res
@@ -25732,225 +25791,225 @@ app.get("/api/anf-measurement/existing-data", async (req, res) => {
 //   }
 // });
 
-// /* -------------------------------------------
-//    End Points - Supplier Issues Configuration
-// ------------------------------------------- */
+/* -------------------------------------------
+   End Points - Supplier Issues Configuration
+------------------------------------------- */
 
-// // GET all supplier issue configurations
-// app.get("/api/supplier-issues/defects", async (req, res) => {
-//   try {
-//     const configs = await SupplierIssuesDefect.find().sort({ factoryType: 1 });
-//     res.json(configs);
-//   } catch (error) {
-//     res.status(500).json({ error: "Failed to fetch configurations." });
-//   }
-// });
+// GET all supplier issue configurations
+app.get("/api/supplier-issues/defects", async (req, res) => {
+  try {
+    const configs = await SupplierIssuesDefect.find().sort({ factoryType: 1 });
+    res.json(configs);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch configurations." });
+  }
+});
 
-// // GET a specific configuration by factory type
-// app.get("/api/supplier-issues/defects/:factoryType", async (req, res) => {
-//   try {
-//     const config = await SupplierIssuesDefect.findOne({
-//       factoryType: req.params.factoryType
-//     });
-//     if (!config) {
-//       return res.status(404).json({ error: "Configuration not found." });
-//     }
-//     // Sort defect list by the 'no' field
-//     config.defectList.sort((a, b) => a.no - b.no);
-//     res.json(config);
-//   } catch (error) {
-//     res.status(500).json({ error: "Failed to fetch configuration." });
-//   }
-// });
+// GET a specific configuration by factory type
+app.get("/api/supplier-issues/defects/:factoryType", async (req, res) => {
+  try {
+    const config = await SupplierIssuesDefect.findOne({
+      factoryType: req.params.factoryType
+    });
+    if (!config) {
+      return res.status(404).json({ error: "Configuration not found." });
+    }
+    // Sort defect list by the 'no' field
+    config.defectList.sort((a, b) => a.no - b.no);
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch configuration." });
+  }
+});
 
-// // POST a new Factory Type (creates a new document)
-// app.post("/api/supplier-issues/defects", async (req, res) => {
-//   try {
-//     const { factoryType } = req.body;
-//     if (!factoryType) {
-//       return res.status(400).json({ error: "Factory type is required." });
-//     }
-//     const newConfig = new SupplierIssuesDefect({ factoryType });
-//     await newConfig.save();
-//     res.status(201).json(newConfig);
-//   } catch (error) {
-//     if (error.code === 11000) {
-//       return res
-//         .status(409)
-//         .json({ error: "This Factory Type already exists." });
-//     }
-//     res.status(400).json({ error: "Failed to create configuration." });
-//   }
-// });
+// POST a new Factory Type (creates a new document)
+app.post("/api/supplier-issues/defects", async (req, res) => {
+  try {
+    const { factoryType } = req.body;
+    if (!factoryType) {
+      return res.status(400).json({ error: "Factory type is required." });
+    }
+    const newConfig = new SupplierIssuesDefect({ factoryType });
+    await newConfig.save();
+    res.status(201).json(newConfig);
+  } catch (error) {
+    if (error.code === 11000) {
+      return res
+        .status(409)
+        .json({ error: "This Factory Type already exists." });
+    }
+    res.status(400).json({ error: "Failed to create configuration." });
+  }
+});
 
-// // POST (add) a new Factory Name to a specific Factory Type's list
-// app.post(
-//   "/api/supplier-issues/defects/:factoryType/factories",
-//   async (req, res) => {
-//     try {
-//       const { factoryType } = req.params;
-//       const { factoryName } = req.body;
-//       if (!factoryName) {
-//         return res.status(400).json({ error: "Factory name is required." });
-//       }
-//       const result = await SupplierIssuesDefect.updateOne(
-//         { factoryType },
-//         { $addToSet: { factoryList: factoryName } } // $addToSet prevents duplicates
-//       );
-//       if (result.nModified === 0 && result.n === 0)
-//         return res.status(404).json({ error: "Factory type not found." });
-//       res.status(200).json({ message: "Factory name added successfully." });
-//     } catch (error) {
-//       res
-//         .status(500)
-//         .json({ error: "Server error while adding factory name." });
-//     }
-//   }
-// );
+// POST (add) a new Factory Name to a specific Factory Type's list
+app.post(
+  "/api/supplier-issues/defects/:factoryType/factories",
+  async (req, res) => {
+    try {
+      const { factoryType } = req.params;
+      const { factoryName } = req.body;
+      if (!factoryName) {
+        return res.status(400).json({ error: "Factory name is required." });
+      }
+      const result = await SupplierIssuesDefect.updateOne(
+        { factoryType },
+        { $addToSet: { factoryList: factoryName } } // $addToSet prevents duplicates
+      );
+      if (result.nModified === 0 && result.n === 0)
+        return res.status(404).json({ error: "Factory type not found." });
+      res.status(200).json({ message: "Factory name added successfully." });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ error: "Server error while adding factory name." });
+    }
+  }
+);
 
-// // PUT (update) a Factory Name
-// app.put(
-//   "/api/supplier-issues/defects/:factoryType/factories",
-//   async (req, res) => {
-//     try {
-//       const { factoryType } = req.params;
-//       const { oldName, newName } = req.body;
-//       if (!oldName || !newName) {
-//         return res
-//           .status(400)
-//           .json({ error: "Old and new factory names are required." });
-//       }
-//       const result = await SupplierIssuesDefect.updateOne(
-//         { factoryType, factoryList: oldName },
-//         { $set: { "factoryList.$": newName } }
-//       );
-//       if (result.nModified === 0)
-//         return res
-//           .status(404)
-//           .json({ error: "Factory name not found or no change made." });
-//       res.status(200).json({ message: "Factory name updated successfully." });
-//     } catch (error) {
-//       res
-//         .status(500)
-//         .json({ error: "Server error while updating factory name." });
-//     }
-//   }
-// );
+// PUT (update) a Factory Name
+app.put(
+  "/api/supplier-issues/defects/:factoryType/factories",
+  async (req, res) => {
+    try {
+      const { factoryType } = req.params;
+      const { oldName, newName } = req.body;
+      if (!oldName || !newName) {
+        return res
+          .status(400)
+          .json({ error: "Old and new factory names are required." });
+      }
+      const result = await SupplierIssuesDefect.updateOne(
+        { factoryType, factoryList: oldName },
+        { $set: { "factoryList.$": newName } }
+      );
+      if (result.nModified === 0)
+        return res
+          .status(404)
+          .json({ error: "Factory name not found or no change made." });
+      res.status(200).json({ message: "Factory name updated successfully." });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ error: "Server error while updating factory name." });
+    }
+  }
+);
 
-// // DELETE a Factory Name
-// app.delete(
-//   "/api/supplier-issues/defects/:factoryType/factories",
-//   async (req, res) => {
-//     try {
-//       const { factoryType } = req.params;
-//       const { factoryName } = req.body;
-//       const result = await SupplierIssuesDefect.updateOne(
-//         { factoryType },
-//         { $pull: { factoryList: factoryName } }
-//       );
-//       if (result.nModified === 0)
-//         return res.status(404).json({ error: "Factory name not found." });
-//       res.status(200).json({ message: "Factory name deleted successfully." });
-//     } catch (error) {
-//       res
-//         .status(500)
-//         .json({ error: "Server error while deleting factory name." });
-//     }
-//   }
-// );
+// DELETE a Factory Name
+app.delete(
+  "/api/supplier-issues/defects/:factoryType/factories",
+  async (req, res) => {
+    try {
+      const { factoryType } = req.params;
+      const { factoryName } = req.body;
+      const result = await SupplierIssuesDefect.updateOne(
+        { factoryType },
+        { $pull: { factoryList: factoryName } }
+      );
+      if (result.nModified === 0)
+        return res.status(404).json({ error: "Factory name not found." });
+      res.status(200).json({ message: "Factory name deleted successfully." });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ error: "Server error while deleting factory name." });
+    }
+  }
+);
 
-// // POST (add) a new Defect to a specific Factory Type's list
-// app.post(
-//   "/api/supplier-issues/defects/:factoryType/defects",
-//   async (req, res) => {
-//     try {
-//       const { factoryType } = req.params;
-//       const { defectNameEng, defectNameKhmer, defectNameChi } = req.body;
-//       if (!defectNameEng) {
-//         return res
-//           .status(400)
-//           .json({ error: "Defect Name (English) is required." });
-//       }
+// POST (add) a new Defect to a specific Factory Type's list
+app.post(
+  "/api/supplier-issues/defects/:factoryType/defects",
+  async (req, res) => {
+    try {
+      const { factoryType } = req.params;
+      const { defectNameEng, defectNameKhmer, defectNameChi } = req.body;
+      if (!defectNameEng) {
+        return res
+          .status(400)
+          .json({ error: "Defect Name (English) is required." });
+      }
 
-//       const config = await SupplierIssuesDefect.findOne({ factoryType });
-//       if (!config) {
-//         return res.status(404).json({ error: "Factory type not found." });
-//       }
+      const config = await SupplierIssuesDefect.findOne({ factoryType });
+      if (!config) {
+        return res.status(404).json({ error: "Factory type not found." });
+      }
 
-//       const nextNo =
-//         config.defectList.length > 0
-//           ? Math.max(...config.defectList.map((d) => d.no)) + 1
-//           : 1;
+      const nextNo =
+        config.defectList.length > 0
+          ? Math.max(...config.defectList.map((d) => d.no)) + 1
+          : 1;
 
-//       const newDefect = {
-//         no: nextNo,
-//         defectNameEng,
-//         defectNameKhmer,
-//         defectNameChi
-//       };
+      const newDefect = {
+        no: nextNo,
+        defectNameEng,
+        defectNameKhmer,
+        defectNameChi
+      };
 
-//       await SupplierIssuesDefect.updateOne(
-//         { factoryType },
-//         { $push: { defectList: newDefect } }
-//       );
-//       res
-//         .status(201)
-//         .json({ message: "Defect added successfully.", defect: newDefect });
-//     } catch (error) {
-//       res.status(500).json({ error: "Server error while adding defect." });
-//     }
-//   }
-// );
+      await SupplierIssuesDefect.updateOne(
+        { factoryType },
+        { $push: { defectList: newDefect } }
+      );
+      res
+        .status(201)
+        .json({ message: "Defect added successfully.", defect: newDefect });
+    } catch (error) {
+      res.status(500).json({ error: "Server error while adding defect." });
+    }
+  }
+);
 
-// // PUT (update) a Defect
-// app.put(
-//   "/api/supplier-issues/defects/:factoryType/defects/:defectId",
-//   async (req, res) => {
-//     try {
-//       const { factoryType, defectId } = req.params;
-//       const updateData = req.body;
+// PUT (update) a Defect
+app.put(
+  "/api/supplier-issues/defects/:factoryType/defects/:defectId",
+  async (req, res) => {
+    try {
+      const { factoryType, defectId } = req.params;
+      const updateData = req.body;
 
-//       const updateFields = {};
-//       for (const key in updateData) {
-//         updateFields[`defectList.$.${key}`] = updateData[key];
-//       }
+      const updateFields = {};
+      for (const key in updateData) {
+        updateFields[`defectList.$.${key}`] = updateData[key];
+      }
 
-//       const result = await SupplierIssuesDefect.updateOne(
-//         { factoryType, "defectList._id": defectId },
-//         { $set: updateFields }
-//       );
+      const result = await SupplierIssuesDefect.updateOne(
+        { factoryType, "defectList._id": defectId },
+        { $set: updateFields }
+      );
 
-//       if (result.nModified === 0)
-//         return res
-//           .status(404)
-//           .json({ error: "Defect not found or no change made." });
-//       res.status(200).json({ message: "Defect updated successfully." });
-//     } catch (error) {
-//       res.status(500).json({ error: "Server error while updating defect." });
-//     }
-//   }
-// );
+      if (result.nModified === 0)
+        return res
+          .status(404)
+          .json({ error: "Defect not found or no change made." });
+      res.status(200).json({ message: "Defect updated successfully." });
+    } catch (error) {
+      res.status(500).json({ error: "Server error while updating defect." });
+    }
+  }
+);
 
-// // DELETE a Defect
-// app.delete(
-//   "/api/supplier-issues/defects/:factoryType/defects/:defectId",
-//   async (req, res) => {
-//     try {
-//       const { factoryType, defectId } = req.params;
+// DELETE a Defect
+app.delete(
+  "/api/supplier-issues/defects/:factoryType/defects/:defectId",
+  async (req, res) => {
+    try {
+      const { factoryType, defectId } = req.params;
 
-//       const result = await SupplierIssuesDefect.updateOne(
-//         { factoryType },
-//         { $pull: { defectList: { _id: defectId } } }
-//       );
+      const result = await SupplierIssuesDefect.updateOne(
+        { factoryType },
+        { $pull: { defectList: { _id: defectId } } }
+      );
 
-//       if (result.nModified === 0)
-//         return res.status(404).json({ error: "Defect not found." });
-//       res.status(200).json({ message: "Defect deleted successfully." });
-//     } catch (error) {
-//       res.status(500).json({ error: "Server error while deleting defect." });
-//     }
-//   }
-// );
+      if (result.nModified === 0)
+        return res.status(404).json({ error: "Defect not found." });
+      res.status(200).json({ message: "Defect deleted successfully." });
+    } catch (error) {
+      res.status(500).json({ error: "Server error while deleting defect." });
+    }
+  }
+);
 
 /* -------------------------------------------
    End Points - Supplier Issues Reports
@@ -26136,33 +26195,6 @@ app.get("/api/supplier-issues/report-options", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch filter options." });
   }
 });
-
-// // POST a new supplier issue report
-// app.post("/api/supplier-issues/reports", async (req, res) => {
-//   try {
-//     const newReport = new SupplierIssueReport(req.body);
-//     await newReport.save();
-//     res
-//       .status(201)
-//       .json({ message: "Report saved successfully", data: newReport });
-//   } catch (error) {
-//     console.error("Error saving supplier issue report:", error);
-//     res
-//       .status(400)
-//       .json({ error: "Failed to save report.", details: error.message });
-//   }
-// });
-
-// // GET all supplier issue reports (for results tab)
-// app.get("/api/supplier-issues/reports", async (req, res) => {
-//   try {
-//     // Add filtering based on query params later as needed
-//     const reports = await SupplierIssueReport.find().sort({ reportDate: -1 });
-//     res.json(reports);
-//   } catch (error) {
-//     res.status(500).json({ error: "Failed to fetch reports." });
-//   }
-// });
 
 /* ------------------------------
    AI Chatbot Proxy Route

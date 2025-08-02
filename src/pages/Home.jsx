@@ -577,6 +577,13 @@ function Home() {
             description: "QC1 Inspection Point"
           },
           {
+            path: "/qc1-subcon-inspection",
+            roles: ["QC1 Sub Con"],
+            image: "assets/Home/qcc.png",
+            title: t("home.qc1_inspection"),
+            description: "QC1 Sub Con Inspection"
+          },
+          {
             path: "/inline-emp",
             roles: ["Printing"],
             image: "assets/Home/qc2.png",

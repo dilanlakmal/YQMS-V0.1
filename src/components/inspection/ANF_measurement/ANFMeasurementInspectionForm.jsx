@@ -25,8 +25,11 @@ import {
   Eye,
   EyeOff,
   Save,
-  Loader2
+  Loader2,
+  Lock,
+  Unlock
 } from "lucide-react";
+import Swal from "sweetalert2";
 
 // --- MeasurementCell Component ---
 const MeasurementCell = ({
@@ -139,6 +142,10 @@ const ANFMeasurementInspectionForm = ({
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
 
+  // --- NEW: State to track the status of the currently selected size ---
+  const [currentSizeStatus, setCurrentSizeStatus] = useState("In Progress");
+  const [isStatusUpdating, setIsStatusUpdating] = useState(false);
+
   // Helper function to update a specific field in the parent's state
   const updateState = useCallback(
     (field, value) => {
@@ -204,6 +211,10 @@ const ANFMeasurementInspectionForm = ({
     const fetchSizeData = async () => {
       if (selectedMo && selectedSize) {
         setIsLoadingSizeData(true);
+
+        // --- NEW: Reset status when fetching new size data ---
+        setCurrentSizeStatus("In Progress");
+
         try {
           // --- Step 1: Fetch the spec table (this is required for both new and existing data) ---
           const specRes = await axios.get(
@@ -231,7 +242,13 @@ const ANFMeasurementInspectionForm = ({
             }
           );
 
-          const existingGarmentsData = existingDataRes.data;
+          //const existingGarmentsData = existingDataRes.data;
+          // --- MODIFIED: Destructure both measurements and status from the response ---
+          const { measurements: existingGarmentsData, status: loadedStatus } =
+            existingDataRes.data;
+
+          // --- NEW: Set the status from the loaded data ---
+          setCurrentSizeStatus(loadedStatus || "In Progress");
 
           // --- Step 3: Process the data ---
           if (
@@ -300,6 +317,7 @@ const ANFMeasurementInspectionForm = ({
       } else {
         // Clear table if size is deselected
         setSpecTableData([]);
+        setCurrentSizeStatus("In Progress"); // Reset status if size is cleared
         updateState("garments", [{}]);
         updateState("currentGarmentIndex", 0);
       }
@@ -314,6 +332,9 @@ const ANFMeasurementInspectionForm = ({
     user,
     updateState
   ]); // Add dependencies
+
+  // --- NEW: Helper variable for readability ---
+  const isSizeCompleted = currentSizeStatus === "Completed";
 
   // --- calculates and stores the final measurement ---
   const handleNumpadInput = (deviationDecimal, deviationFraction) => {
@@ -608,6 +629,81 @@ const ANFMeasurementInspectionForm = ({
     }
   };
 
+  // --- new button handlers ---
+  const updateSizeStatus = async (newStatus) => {
+    // --- Central function to call the new PATCH endpoint ---
+    if (!selectedMo || !selectedSize || selectedColors.length === 0) return;
+
+    setIsStatusUpdating(true);
+    try {
+      const payload = {
+        inspectionDate: inspectionState.inspectionDate
+          .toISOString()
+          .split("T")[0],
+        qcID: user.emp_id,
+        moNo: selectedMo.value,
+        color: selectedColors.map((c) => c.value),
+        size: selectedSize.value,
+        status: newStatus
+      };
+      await axios.patch(
+        `${API_BASE_URL}/api/anf-measurement/reports/status`,
+        payload,
+        {
+          withCredentials: true
+        }
+      );
+      // On success, update the local state
+      setCurrentSizeStatus(newStatus);
+      Swal.fire(
+        "Success",
+        `This size has been marked as '${newStatus}'.`,
+        "success"
+      );
+    } catch (error) {
+      console.error("Error updating size status:", error);
+      Swal.fire(
+        "Error",
+        "Failed to update the status. Please try again.",
+        "error"
+      );
+    } finally {
+      setIsStatusUpdating(false);
+    }
+  };
+
+  const handleFinishSize = () => {
+    Swal.fire({
+      title: "Are you sure?",
+      text: "Finishing this size will lock it from further editing. You will need to unlock it to make changes.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, finish it!"
+    }).then((result) => {
+      if (result.isConfirmed) {
+        updateSizeStatus("Completed");
+      }
+    });
+  };
+
+  const handleContinueSize = () => {
+    Swal.fire({
+      title: "Unlock this size?",
+      text: "This size is marked as 'Completed'. Do you want to unlock it to continue or modify the inspection?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, unlock it!"
+    }).then((result) => {
+      if (result.isConfirmed) {
+        updateSizeStatus("In Progress");
+      }
+    });
+  };
+
   const selectStyles = {
     control: (styles) => ({
       ...styles,
@@ -789,9 +885,40 @@ const ANFMeasurementInspectionForm = ({
                 <Eye size={16} className="mr-2" />
                 Preview
               </button>
+
+              {/* --- NEW: Conditional Buttons for Finish/Continue --- */}
+              {!isSizeCompleted ? (
+                <button
+                  onClick={handleFinishSize}
+                  disabled={isSaving || isStatusUpdating}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 disabled:bg-green-400"
+                >
+                  {isStatusUpdating ? (
+                    <Loader2 size={16} className="mr-2 animate-spin" />
+                  ) : (
+                    <Lock size={16} className="mr-2" />
+                  )}
+                  Finish Size
+                </button>
+              ) : (
+                <button
+                  onClick={handleContinueSize}
+                  disabled={isSaving || isStatusUpdating}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-300"
+                >
+                  {isStatusUpdating ? (
+                    <Loader2 size={16} className="mr-2 animate-spin" />
+                  ) : (
+                    <Unlock size={16} className="mr-2" />
+                  )}
+                  Continue Size
+                </button>
+              )}
+
               <button
                 onClick={handleSave}
-                disabled={isSaving}
+                //disabled={isSaving}
+                disabled={isSaving || isStatusUpdating || isSizeCompleted}
                 className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-500 disabled:cursor-not-allowed"
               >
                 {isSaving ? (
@@ -830,6 +957,7 @@ const ANFMeasurementInspectionForm = ({
               {currentGarmentIndex > 0 && (
                 <button
                   onClick={() => removeGarment(currentGarmentIndex)}
+                  disabled={isSizeCompleted} // --- MODIFIED
                   className="p-2 text-red-500 hover:bg-red-100 rounded-md"
                 >
                   <Trash2 size={16} />
@@ -849,6 +977,7 @@ const ANFMeasurementInspectionForm = ({
               </button>
               <button
                 onClick={addGarment}
+                disabled={isSizeCompleted} // --- MODIFIED
                 className="ml-4 px-3 py-2 text-sm bg-indigo-600 text-white rounded-md"
               >
                 Next Garment
@@ -910,11 +1039,19 @@ const ANFMeasurementInspectionForm = ({
                       specDecimal={row.specValueDecimal}
                       tol={{ minus: row.tolMinus, plus: row.tolPlus }}
                       onClick={() => {
-                        setActiveCell({
-                          garmentIndex: currentGarmentIndex,
-                          orderNo: row.orderNo
-                        });
-                        setIsNumpadOpen(true);
+                        // --- MODIFIED: Only open numpad if size is not completed ---
+                        if (!isSizeCompleted) {
+                          setActiveCell({
+                            garmentIndex: currentGarmentIndex,
+                            orderNo: row.orderNo
+                          });
+                          setIsNumpadOpen(true);
+                        }
+                        // setActiveCell({
+                        //   garmentIndex: currentGarmentIndex,
+                        //   orderNo: row.orderNo
+                        // });
+                        // setIsNumpadOpen(true);
                       }}
                     />
                   </tr>
