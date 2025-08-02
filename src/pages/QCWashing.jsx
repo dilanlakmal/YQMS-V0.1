@@ -366,9 +366,7 @@ useEffect(() => {
   // }, [formData.orderNo, formData.style]);
 
   // --- useEffect: Load Saved Sizes on Order/Color Change ---
-  useEffect(() => {
-    if (formData.orderNo && formData.color) loadSavedSizes(formData.orderNo, formData.color);
-  }, [formData.orderNo, formData.color]);
+ 
 
   // --- useEffect: Calculate Checked Qty ---
   useEffect(() => {
@@ -1400,151 +1398,34 @@ useEffect(() => {
       setIsDataLoading(false);
     }
   };
+// Load saved measurement sizes
+  // const loadSavedSizes = async (orderNo, color) => {
+  //   try {
+  //     const response = await fetch(
+  //       `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${color}`
+  //     );
 
-  // Load saved data - check both auto-save and submitted records
-  const loadSavedData = async (orderNo) => {
-    try {
-      
-      // If no auto-save found, try to load submitted data
-      const submittedResponse = await fetch(
-        `${API_BASE_URL}/api/qc-washing/load-submitted/${orderNo}`
-      );
+  //     if (!response.ok) {
+  //       // setSavedSizes([]);
+  //       return;
+  //     }
 
-      if (submittedResponse.ok) {
-        const submittedData = await submittedResponse.json();
+  //     const data = await response.json();
 
-        if (submittedData.success && submittedData.data) {
-          const saved = submittedData.data;
+  //     if (data.success) {
+  //       setSavedSizes(data.savedSizes || []);
+  //       // console.log("Loaded saved sizes:", data.savedSizes);
+  //     }
+  //   } catch (error) {
+  //     console.error("Error loading saved sizes:", error);
+  //     setSavedSizes([]);
+  //   }
+  // };
 
-          const dailyValue = saved.color?.orderDetails?.daily || "";
-          setFormData((prev) => ({
-            ...prev,
-            date: saved.date
-              ? saved.date.split("T")[0]
-              : new Date().toISOString().split("T")[0],
-            orderNo: saved.orderNo,
-            style: saved.orderNo,
-            orderQty: saved.color?.orderDetails?.orderQty || prev.orderQty,
-            color: saved.color?.orderDetails?.color || prev.color,
-            washingType:
-              saved.color?.orderDetails?.washingType || "Normal Wash",
-            firstOutput: dailyValue === "First Output" ? "First Output" : "",
-            inline: dailyValue === "Inline" ? "Inline" : "",
-            daily: dailyValue || prev.daily,
-            buyer: saved.color?.orderDetails?.buyer || prev.buyer,
-            factoryName: saved.color?.orderDetails?.factoryName || "YM",
-            result: saved.color?.orderDetails?.result || prev.result,
-            reportType: saved.reportType || saved.color?.orderDetails?.reportType || prev.reportType,
-            washQty: saved.washQty || saved.color?.defectDetails?.washQty || prev.washQty,
-            checkedQty: saved.checkedQty || saved.color?.defectDetails?.checkedQty || prev.checkedQty,
-            aqlSampleSize:
-              saved.color?.orderDetails?.aqlSampleSize || prev.aqlSampleSize,
-            aqlAcceptedDefect:
-              saved.color?.orderDetails?.aqlAcceptedDefect ||
-              prev.aqlAcceptedDefect,
-            aqlRejectedDefect:
-              saved.color?.orderDetails?.aqlRejectedDefect ||
-              prev.aqlRejectedDefect,
-          }));
-
-          // Merge saved color with existing color options
-          if (saved.color?.orderDetails?.color) {
-            setColorOptions((prev) => {
-              if (!prev.includes(saved.color.orderDetails.color)) {
-                return [...prev, saved.color.orderDetails.color];
-              }
-              return prev;
-            });
-          }
-
-          const transformedInspectionData =
-            saved.color?.inspectionDetails?.checkedPoints?.map((point) => ({
-              checkedList: point.pointName,
-              approvedDate: point.approvedDate || "",
-              na: point.condition === "N/A",
-              remark: point.remark || "",
-            })) || [];
-
-          if (transformedInspectionData.length > 0) {
-            setInspectionData(transformedInspectionData);
-          } else if (masterChecklist.length > 0) {
-            setInspectionData(initializeInspectionData(masterChecklist));
-          }
-
-          const processData = {};
-            (transformedInspectionData.inspectionDetails?.machineProcesses || []).forEach(proc => {
-              processData[proc.machineType] = {
-                temperature: proc.temperature || "",
-                time: proc.time || "",
-                chemical: proc.chemical || ""
-              };
-            });
-            setProcessData(processData);
-
-          const transformedDefectData =
-            normalizeDefectData(saved.color?.inspectionDetails?.parameters) || [];
-          if (transformedDefectData.length > 0) {
-            setDefectData(transformedDefectData);
-          }
-
-          const transformedAddedDefects =
-            saved.color?.defectDetails?.defects?.map((defect) => ({
-              defectId: defect._id || "",
-              defectName: defect.defectName,
-              qty: defect.defectQty,
-            })) || [];
-
-          setAddedDefects(transformedAddedDefects);
-          // Load defectsByPc from submitted data and format for display
-          const loadedDefectsByPc = saved.color?.defectDetails?.defectsByPc || {};
-          Object.keys(loadedDefectsByPc).forEach(pc => {
-            loadedDefectsByPc[pc] = loadedDefectsByPc[pc].map(defect => ({
-              ...defect,
-              defectImages: (defect.defectImages || []).map(imgStr => ({ file: null, preview: imgStr, name: 'image.jpg' }))
-            }));
-          });
-          setDefectsByPc(loadedDefectsByPc);
-          setUploadedImages(saved.color?.defectDetails?.additionalImages?.map(img => ({
-
-            file: null,
-            preview: img.preview || img.url || img,
-            name:'image.jpg'
-          })) || []);
-
-          setComment(saved.color?.defectDetails?.comment || "");
-          setMeasurementData(processMeasurementData(saved.color?.measurementDetails));
-          setShowMeasurementTable(true);
-        }
-      }
-    } catch (error) {
-      console.error("Error loading saved data:", error);
-    }
-  };
-
-  // Load saved measurement sizes
-  const loadSavedSizes = async (orderNo, color) => {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${color}`
-      );
-
-      if (!response.ok) {
-        setSavedSizes([]);
-        return;
-      }
-
-      const data = await response.json();
-
-      if (data.success) {
-        setSavedSizes(data.savedSizes || []);
-        // console.log("Loaded saved sizes:", data.savedSizes);
-      }
-    } catch (error) {
-      console.error("Error loading saved sizes:", error);
-      setSavedSizes([]);
-    }
-  };
-
+  //  useEffect(() => {
+  //   if (formData.orderNo && formData.color) loadSavedSizes(formData.orderNo, formData.color);
+  // }, [formData.orderNo, formData.color]);
+  
   const PageTitle = () => (
     <div className="text-center">
       <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
@@ -1599,6 +1480,7 @@ useEffect(() => {
           showMeasurementTable={showMeasurementTable}
         />
         <OrderDetailsSection
+        setSavedSizes={setSavedSizes}
           formData={formData}
           handleInputChange={handleInputChange}
           fetchOrderDetailsByStyle={fetchOrderDetailsByStyle}
@@ -1668,7 +1550,7 @@ useEffect(() => {
           recordId={recordId}
         />
         )}
-         
+        {sectionVisibility.measurementDetails && (
         <MeasurementDetailsSection
           orderNo={formData.orderNo || formData.style}
           color={formData.color}
@@ -1681,7 +1563,10 @@ useEffect(() => {
           showMeasurementTable={showMeasurementTable}
           onMeasurementEdit={handleMeasurementEdit}
           onMeasurementChange={handleMeasurementChange}
+          activateNextSection={() => activateNextSection('defectDetails')}
+          recordId={recordId}
         />
+        )}
 
         {/* Auto-save status */}
         {lastSaved && (

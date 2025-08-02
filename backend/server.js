@@ -25910,7 +25910,7 @@ const inspectionMemoryStorage = multer.memoryStorage();
 
 const uploadInspectionImage = multer({
   storage: inspectionMemoryStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (req, file, cb) => {
     const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
     if (allowedTypes.includes(file.mimetype)) {
@@ -26071,6 +26071,137 @@ app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+const defectMemoryStorage = multer.memoryStorage();
+const uploadDefectImage = multer({
+  storage: defectMemoryStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG, and GIF images are allowed"), false);
+    }
+  }
+});
+// Save defect details with images
+app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (req, res) => {
+  try {
+    const { recordId } = req.body;
+    const defectDetails = JSON.parse(req.body.defectDetails || '{}');
+    if (!recordId) return res.status(400).json({ success: false, message: "Missing recordId" });
+
+    // Ensure upload directory exists
+    const uploadDir = path.join(__dirname, '../public/storage/qc_washing_images/defect');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    // Map uploaded files by fieldname and write them to disk
+    const fileMap = {};
+    for (const file of (req.files || [])) {
+     let fileExtension = path.extname(file.originalname);
+  if (!fileExtension) {
+    // fallback to .jpg if no extension is found
+    fileExtension = '.jpg';
+  }
+      const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
+      const fullFilePath = path.join(uploadDir, newFilename);
+      await fs.promises.writeFile(fullFilePath, file.buffer);
+      fileMap[file.fieldname] = `/public/storage/qc_washing_images/defect/${newFilename}`;
+    }
+
+    // Attach image URLs to defectDetails.defectsByPc and additionalImages
+    if (defectDetails.defectsByPc) {
+      defectDetails.defectsByPc.forEach((pc, pcIdx) => {
+        (pc.pcDefects || []).forEach((defect, defectIdx) => {
+          if (defect.defectImages) {
+            defect.defectImages = defect.defectImages.map((img, imgIdx) => {
+              // If file uploaded, use its path, else keep as is (for already saved images)
+              return fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`] || img.name;
+            });
+          }
+        });
+      });
+    }
+    if (defectDetails.additionalImages) {
+      defectDetails.additionalImages = defectDetails.additionalImages.map((img, imgIdx) => {
+        return fileMap[`additionalImages_${imgIdx}`] || img.name;
+      });
+    }
+
+    // Save to DB
+    const doc = await QCWashing.findByIdAndUpdate(
+      recordId,
+      { 'defectDetails': defectDetails, updatedAt: new Date() },
+      { new: true }
+    );
+    if (!doc) return res.status(404).json({ success: false, message: "Record not found" });
+    res.json({ success: true, data: doc.defectDetails });
+  } catch (err) {
+    console.error('Defect details save error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Update defect details with images
+app.post('/api/qc-washing/defect-details-update', uploadDefectImage.any(), async (req, res) => {
+  try {
+    const { recordId } = req.body;
+    const defectDetails = JSON.parse(req.body.defectDetails || '{}');
+    if (!recordId) return res.status(400).json({ success: false, message: "Missing recordId" });
+
+    // Ensure upload directory exists
+    const uploadDir = path.join(__dirname, '../public/storage/qc_washing_images/defect');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    // Map uploaded files by fieldname and write them to disk
+    const fileMap = {};
+    for (const file of (req.files || [])) {
+     let fileExtension = path.extname(file.originalname);
+  if (!fileExtension) {
+    // fallback to .jpg if no extension is found
+    fileExtension = '.jpg';
+  }
+      const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
+      const fullFilePath = path.join(uploadDir, newFilename);
+      await fs.promises.writeFile(fullFilePath, file.buffer);
+      fileMap[file.fieldname] = `/public/storage/qc_washing_images/defect/${newFilename}`;
+    }
+
+    // Attach image URLs to defectDetails.defectsByPc and additionalImages
+    if (defectDetails.defectsByPc) {
+      defectDetails.defectsByPc.forEach((pc, pcIdx) => {
+        (pc.pcDefects || []).forEach((defect, defectIdx) => {
+          if (defect.defectImages) {
+            defect.defectImages = defect.defectImages.map((img, imgIdx) => {
+              return fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`] || img;
+            });
+          }
+        });
+      });
+    }
+    if (defectDetails.additionalImages) {
+      defectDetails.additionalImages = defectDetails.additionalImages.map((img, imgIdx) => {
+        return fileMap[`additionalImages_${imgIdx}`] || img;
+      });
+    }
+
+    // Save to DB
+    const doc = await QCWashing.findByIdAndUpdate(
+      recordId,
+      { 'defectDetails': defectDetails, updatedAt: new Date() },
+      { new: true }
+    );
+    if (!doc) return res.status(404).json({ success: false, message: "Record not found" });
+    res.json({ success: true, data: doc.defectDetails });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

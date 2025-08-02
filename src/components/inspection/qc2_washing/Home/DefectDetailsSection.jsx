@@ -1,8 +1,10 @@
-import React, { useRef } from "react";
+import  { useRef,useState } from "react";
 import { Plus, Trash2, Camera, X, PlusCircle, Upload, Minus, Eye, EyeOff  } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useTranslation } from "react-i18next";
 import imageCompression from 'browser-image-compression';
+import { API_BASE_URL } from "../../../../../config";
+
 
 const DefectDetailsSection = ({ 
   formData,
@@ -22,11 +24,16 @@ const DefectDetailsSection = ({
   onToggle,
   defectsByPc,
   setDefectsByPc,
-  defectStatus
+  defectStatus,
+  recordId,
+  activateNextSection
 }) => {
   const imageInputRef = useRef(null);
   const { i18n } = useTranslation();
   const videoRef = useRef(null);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isEditing, setIsEditing] = useState(true);
+
   // State is now managed by the parent QCWashingPage component
   
   const getDefectNameForDisplay = (d) => {
@@ -47,31 +54,6 @@ const DefectDetailsSection = ({
   } else {
     defectStatus = 'N/A';
   }
-
-  // const handleAddDefect = (pc, defect) => {
-  //   if (!defect.selectedDefect || !defect.defectQty) {
-  //     Swal.fire('Incomplete', 'Please select a defect and enter a quantity.', 'warning');
-  //     return;
-  //   }
-
-  //   const defectDetails = defectOptions.find(d => d._id === defect.selectedDefect);
-  //   if (!defectDetails) return;
-
-  //   const defectExists = defectsByPc[pc].some(d => d.defectId === defect.selectedDefect && d.id !== defect.id);
-  //   if (defectExists) {
-  //     Swal.fire('Duplicate', 'This defect has already been added.', 'error');
-  //     return;
-  //   }
-  
-  //   setDefectsByPc(prev => ({
-  //     ...prev,
-  //     [pc]: prev[pc].map(d => 
-  //       d.id === defect.id
-  //         ? { ...d, defectId: defectDetails._id }
-  //         : d
-  //     ),
-  //   }));
-  // };
 
   const handleAddDefectCard = (pc) => {
     setDefectsByPc(prev => ({
@@ -131,7 +113,6 @@ const DefectDetailsSection = ({
       )
     }));
   };
-
 
   const handleRemoveImage = (index) => {
     setUploadedImages(prev => prev.filter((_, i) => i !== index));
@@ -234,16 +215,217 @@ const DefectDetailsSection = ({
       }));
     };
 
+  
+    function stripFileFromDefectImages(defectsByPc, uploadedImages) {
+      // Remove .file from defect images
+      const newDefectsByPc = {};
+      Object.entries(defectsByPc).forEach(([pc, pcDefects]) => {
+        newDefectsByPc[pc] = pcDefects.map(defect => ({
+          ...defect,
+          defectImages: (defect.defectImages || []).map(img => {
+            if (img.file && img.preview) {
+              // After upload, keep only preview and name
+              return { preview: img.preview, name: img.name };
+            }
+            return img;
+          })
+        }));
+      });
+
+      // Remove .file from additional images
+      const newUploadedImages = (uploadedImages || []).map(img => {
+        if (img.file && img.preview) {
+          return { preview: img.preview, name: img.name };
+        }
+        return img;
+      });
+
+      return { newDefectsByPc, newUploadedImages };
+    }
+
+    const handleSaveDefectDetails = async () => {
+      if (!recordId) {
+        Swal.fire("Order details must be saved first!", "", "warning");
+        return;
+      }
+      try {
+        // 1. Build defectDetails object
+        const defectDetails = {
+          checkedQty: formData.checkedQty,
+          washQty: formData.washQty,
+          result: defectStatus,
+          aqlLevelUsed: formData.aqlLevelUsed,
+          defectsByPc: [],
+          additionalImages: [],
+          comment,
+        };
+
+        // 2. Build FormData and collect files
+        const formDataObj = new FormData();
+        formDataObj.append("recordId", recordId);
+
+        // For each PC and defect, handle images
+        Object.entries(defectsByPc).forEach(([pcNumber, pcDefects], pcIdx) => {
+          const pcDefectsArr = [];
+          pcDefects.forEach((defect, defectIdx) => {
+            const defectImages = (defect.defectImages || []).map((img, imgIdx) => {
+              if (img.file) {
+                formDataObj.append(`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`, img.file);
+                return null; 
+              }
+              return img.preview || img; 
+            });
+            pcDefectsArr.push({
+              defectId: defect.selectedDefect,
+              defectName: defect.defectName,
+              defectQty: defect.defectQty,
+              defectImages,
+            });
+          });
+          defectDetails.defectsByPc.push({
+            pcNumber,
+            pcDefects: pcDefectsArr,
+          });
+        });
+
+        // Additional images
+        (uploadedImages || []).forEach((img, imgIdx) => {
+          if (img.file) {
+            formDataObj.append(`additionalImages_${imgIdx}`, img.file);
+            defectDetails.additionalImages.push(null);
+          } else {
+            defectDetails.additionalImages.push(img.preview || img);
+          }
+        });
+
+        formDataObj.append("defectDetails", JSON.stringify(defectDetails));
+
+        // 3. Send to backend
+        const response = await fetch(`${API_BASE_URL}/api/qc-washing/defect-details-save`, {
+          method: "POST",
+          body: formDataObj,
+        });
+        const result = await response.json();
+
+        if (result.success) {
+          Swal.fire({ icon: 'success', title: 'Defect details saved!', timer: 1000, toast: true, position: 'top-end', showConfirmButton: false });
+          const { defectsByPc: backendDefectsByPc, additionalImages } = result.data || {};
+          setDefectsByPc(
+            (backendDefectsByPc || []).reduce((acc, pc) => {
+              acc[pc.pcNumber] = (pc.pcDefects || []).map(defect => {
+                // Find the defect option by _id
+                const defectObj = defectOptions.find(opt => opt._id === defect.selectedDefect || opt._id === defect.defectId);
+                return {
+                  ...defect,
+                  selectedDefect: defect.selectedDefect || defect.defectId || "",
+                  defectName: defect.defectName || (defectObj ? getDefectNameForDisplay(defectObj) : ""),
+                  // keep other fields as is
+                };
+              });
+              return acc;
+            }, {})
+          );
+
+          setUploadedImages(additionalImages || []);
+          setIsSaved(true);
+          setIsEditing(false);
+          if (activateNextSection) activateNextSection();
+        } else {
+          Swal.fire({ icon: 'error', title: result.message || "Failed to save defect details", timer: 2000, toast: true, position: 'top-end', showConfirmButton: false });
+        }
+      } catch (err) {
+        Swal.fire({ icon: 'error', title: "Error saving defect details", timer: 2000, toast: true, position: 'top-end', showConfirmButton: false });
+        console.error(err);
+      }
+    };
+
+
+    const handleUpdateDefectDetails = async () => {
+      if (!recordId) {
+        Swal.fire("Order details must be saved first!", "", "warning");
+        return;
+      }
+      try {
+        // 1. Build defectDetails object
+        const defectDetails = {
+          checkedQty: formData.checkedQty,
+          washQty: formData.washQty,
+          result: defectStatus,
+          aqlLevelUsed: formData.aqlLevelUsed,
+          defectsByPc: [],
+          additionalImages: [],
+          comment,
+        };
+
+        // 2. Build FormData and collect files
+        const formDataObj = new FormData();
+        formDataObj.append("recordId", recordId);
+
+        // For each PC and defect, handle images
+        Object.entries(defectsByPc).forEach(([pcNumber, pcDefects], pcIdx) => {
+          const pcDefectsArr = [];
+          pcDefects.forEach((defect, defectIdx) => {
+            const defectImages = (defect.defectImages || []).map((img, imgIdx) => {
+              if (img.file) {
+                formDataObj.append(`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`, img.file);
+                return null; 
+              }
+              return img.preview || img;
+            });
+            pcDefectsArr.push({
+              defectId: defect.selectedDefect,
+              defectName: defect.defectName,
+              defectQty: defect.defectQty,
+              defectImages,
+            });
+          });
+          defectDetails.defectsByPc.push({
+            pcNumber,
+            pcDefects: pcDefectsArr,
+          });
+        });
+
+        // Additional images
+        (uploadedImages || []).forEach((img, imgIdx) => {
+          if (img.file) {
+            formDataObj.append(`additionalImages_${imgIdx}`, img.file);
+            defectDetails.additionalImages.push(null);
+          } else {
+            defectDetails.additionalImages.push(img.preview || img);
+          }
+        });
+
+        formDataObj.append("defectDetails", JSON.stringify(defectDetails));
+
+        const response = await fetch(`${API_BASE_URL}/api/qc-washing/defect-details-update`, {
+          method: "POST",
+          body: formDataObj,
+        });
+        const result = await response.json();
+        if (result.success) {
+          Swal.fire({ icon: 'success', title: 'Defect details updated!', timer: 1000, toast: true, position: 'top-end', showConfirmButton: false });
+          stripFileFromDefectImages(defectsByPc, uploadedImages);
+          setIsSaved(true);
+          setIsEditing(false);
+        } else {
+          Swal.fire({ icon: 'error', title: result.message || "Failed to update defect details", timer: 2000, toast: true, position: 'top-end', showConfirmButton: false });
+        }
+      } catch (err) {
+        Swal.fire({ icon: 'error', title: "Error updating defect details", timer: 2000, toast: true, position: 'top-end', showConfirmButton: false });
+        console.error(err);
+      }
+    };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-4 border-b pb-2">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Defect Details</h2>
-        <button
+        {/* <button
           onClick={onToggle}
           className="text-indigo-600 hover:text-indigo-800 font-medium"
         >
           {isVisible ? 'Hide' : 'Show'}
-        </button>
+        </button> */}
       </div>
       {isVisible && (
         <div className="space-y-6">
@@ -254,7 +436,8 @@ const DefectDetailsSection = ({
                 type="number"
                 value={formData.washQty}
                 onChange={(e) => handleInputChange('washQty', e.target.value)}
-                className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:bg-gray-200 disabled:dark:bg-gray-500"
+                disabled={!isEditing}
                />
             </div>
             <div className="flex items-center space-x-4">
@@ -263,12 +446,13 @@ const DefectDetailsSection = ({
                 type="text" 
                 value={formData.checkedQty || ''}
                 readOnly={formData.daily === "Inline" || formData.firstOutput === "First Output"}
-                className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:bg-gray-200 disabled:dark:bg-gray-500"
                 placeholder={
                   formData.firstOutput === "First Output"
                     ? "Auto-fetched for First Output"
                     : "Auto-calculated when Inline is selected"
                 }
+                 disabled={!isEditing}
               />
             </div>
            
@@ -310,7 +494,8 @@ const DefectDetailsSection = ({
             <div className="mt-4 mb-4">
               <button
                 onClick={handleAddPc}
-                className="flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700"
+                className="flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-200 disabled:dark:bg-gray-500"
+                 disabled={!isEditing}
               >
                 <PlusCircle size={18} className="mr-1" /> Add Defect for New PC
               </button>
@@ -323,8 +508,9 @@ const DefectDetailsSection = ({
                   <div key={index} className="relative bg-gray-200 dark:bg-gray-800 rounded-lg shadow-md flex-shrink-0 p-3 mb-3 w-full">
                    <button
                       onClick={() => handleRemoveDefectCard(pc, defect.id)}
-                      className="absolute top-2 right-2 p-1 text-red-500 rounded-full hover:bg-red-100 dark:hover:bg-red-600 dark:text-red-400 dark:hover:text-white"
+                      className="absolute top-2 right-2 p-1 text-red-500 rounded-full hover:bg-red-100 dark:hover:bg-red-600 dark:text-red-400 dark:hover:text-white disabled:bg-gray-200 disabled:dark:bg-gray-500"
                       aria-label={`Remove Defect ${defect.id} for PC ${pc}`}
+                       disabled={!isEditing}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -333,9 +519,10 @@ const DefectDetailsSection = ({
                     </h4>
                     <button
                         onClick={() => handleToggleVisibility(pc, defect.id)}
-                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:bg-gray-200 disabled:dark:bg-gray-500"
                         title={defect.isBodyVisible ? "Hide Details" : "Show Details"}
                         style={{position:'absolute',right:'30px',top:'10px'}}
+                         disabled={!isEditing}
                       >
                         {defect.isBodyVisible ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
@@ -348,7 +535,8 @@ const DefectDetailsSection = ({
                         <select
                           value={defect.selectedDefect}
                           onChange={(e) => handleDefectChange(pc, defect.id, 'selectedDefect', e.target.value)}
-                          className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                          className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:bg-gray-200 disabled:dark:bg-gray-500"
+                           disabled={!isEditing}
                         >
                           <option value="">-- Select a defect --</option>
                           {defectOptions.map(d => (
@@ -361,7 +549,10 @@ const DefectDetailsSection = ({
                       <div className="w-full md:w-40">
                         <label className="text-xs font-medium dark:text-gray-300">Quantity</label>
                       <div className="flex items-center space-x-2">
-                          <button onClick={() => handleDefectChange(pc, defect.id, 'defectQty', Math.max(1, (parseInt(defect.defectQty, 10) || 1) - 1))} className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white">
+                          <button onClick={() => handleDefectChange(pc, defect.id, 'defectQty', Math.max(1, (parseInt(defect.defectQty, 10) || 1) - 1))} 
+                          disabled={!isEditing}
+                          className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white disabled:bg-gray-200 disabled:dark:bg-gray-500">
+                            
                            <Minus size={16} />
                          </button>
                           <input
@@ -371,10 +562,13 @@ const DefectDetailsSection = ({
                             const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
                             handleDefectChange(pc, defect.id, 'defectQty', newValue);
                           }}
-                          className="w-full  border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center"
+                          className="w-full  border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center disabled:bg-gray-200 disabled:dark:bg-gray-500"
                           placeholder="Qty"
+                           disabled={!isEditing}
                         />
-                          <button onClick={() => handleDefectChange(pc, defect.id, 'defectQty', (parseInt(defect.defectQty, 10) || 0) + 1)} className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white">
+                          <button onClick={() => handleDefectChange(pc, defect.id, 'defectQty', (parseInt(defect.defectQty, 10) || 0) + 1)} 
+                           disabled={!isEditing}
+                          className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white disabled:bg-gray-200 disabled:dark:bg-gray-500">
                            <Plus size={16} />
                           </button>
                         </div>
@@ -386,7 +580,8 @@ const DefectDetailsSection = ({
                       <div className="flex items-center gap-4 mt-3">
                         <button
                            onClick={() => document.getElementById(`image-input-${pc}-${defect.id}`).click()}
-                          className="flex items-center px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300"
+                            disabled={!isEditing}
+                          className="flex items-center px-4 py-2 bg-green-200 rounded-md hover:bg-gray-300 disabled:bg-gray-200 disabled:dark:bg-gray-500"
                         >
                           <Upload  size={18} className="mr-2" />Upload
                         </button>
@@ -396,11 +591,13 @@ const DefectDetailsSection = ({
                           accept="image/*"
                          id={`image-input-${pc}-${defect.id}`}
                           onChange={(e) => handleDefectImageChange(pc, defect.id, e)}
-                          className="hidden"
+                          className="hidden disabled:bg-gray-200 disabled:dark:bg-gray-500"
+                           disabled={!isEditing}
                         />
                          <button
                           // onClick={capture}
-                          className="flex items-center px-4 py-2 bg-blue-200 rounded-md hover:bg-blue-300"
+                          disabled={!isEditing}
+                          className="flex items-center px-4 py-2 bg-blue-200 rounded-md hover:bg-blue-300 disabled:bg-gray-200 disabled:dark:bg-gray-500"
                         >
                           <Camera size={18} className="mr-2" />Capture
                         </button>
@@ -414,12 +611,12 @@ const DefectDetailsSection = ({
                           <div key={index} className="relative">
                              <img
                                   src={image.preview || image}
-                                  alt={image.name}
+                                  alt={image.name || "defect image"}
                                   className="w-full h-24 object-cover rounded-md shadow-md dark:shadow-none cursor-pointer"
                                   onClick={() => {
                                     Swal.fire({
                                       imageUrl: image.preview || image,
-                                      imageAlt: image.name,
+                                      imageAlt: image.name || "",
                                       imageWidth: 600,
                                       imageHeight: 400,
                                     });
@@ -428,7 +625,8 @@ const DefectDetailsSection = ({
                           
                             <button
                               onClick={() => handleRemoveDefectImage(pc, defect.id, index)}
-                              className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1"
+                               disabled={!isEditing}
+                              className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 disabled:bg-gray-200 disabled:dark:bg-gray-500"
                             >
                               <X size={14} />
                             </button>
@@ -443,7 +641,8 @@ const DefectDetailsSection = ({
                 <div className="mt-2 mb-2">
                   <button
                     onClick={() => handleAddDefectCard(pc)}
-                    className="flex items-center px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-white"
+                     disabled={!isEditing}
+                    className="flex items-center px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-white disabled:bg-gray-200 disabled:dark:bg-gray-500"
                   >
                     <PlusCircle size={18} className="mr-1" /> Add Defect for PC {pc}
                   </button>
@@ -457,7 +656,9 @@ const DefectDetailsSection = ({
             <h3 className="text-md font-semibold mb-2 dark:text-white">Additional Images (Max 5)</h3>
 
             <div className="flex items-center gap-4">
-              <button onClick={() => imageInputRef.current.click()} className="flex items-center px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">
+              <button onClick={() => imageInputRef.current.click()} 
+               disabled={!isEditing}
+              className="flex items-center px-4 py-2 bg-green-200 rounded-md hover:bg-gray-300 disabled:bg-gray-200 disabled:dark:bg-gray-500">
                 <Upload size={18} className="mr-2" /> Upload Images
               </button>
               
@@ -470,8 +671,9 @@ const DefectDetailsSection = ({
                 className="hidden"              
             />
              <button
+                  disabled={!isEditing}
                   // onClick={capture}
-                  className="flex items-center px-4 py-2 bg-blue-200 rounded-md hover:bg-blue-300"
+                  className="flex items-center px-4 py-2 bg-blue-200 rounded-md hover:bg-blue-300 disabled:bg-gray-200 disabled:dark:bg-gray-500"
                 >
                   <Camera size={18} className="mr-2" />Capture
 
@@ -486,12 +688,12 @@ const DefectDetailsSection = ({
                       <div key={index} className="relative">
                         <img
                           src={image.preview || image}
-                          alt={image.name}
+                          alt={image.name || "additional image"}
                           className="w-full h-24 object-cover rounded-md shadow-md dark:shadow-none cursor-pointer"
                           onClick={() => {
                             Swal.fire({
                               imageUrl: image.preview || image,
-                              imageAlt: image.name,
+                              imageAlt: image.name || "",
                               imageWidth: 600,
                               imageHeight: 400,
                             });
@@ -499,7 +701,8 @@ const DefectDetailsSection = ({
                         />
                         <button
                           onClick={() => handleRemoveImage(index)}
-                          className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1"
+                          disabled={!isEditing}
+                          className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 disabled:bg-gray-200 disabled:dark:bg-gray-500"
                         >
                           <X size={14} />
                         </button>
@@ -511,9 +714,27 @@ const DefectDetailsSection = ({
           </div>
           <div>
             <label htmlFor="comment" className="text-md font-semibold mb-2 block dark:text-white">Comments</label>
-            <textarea id="comment" value={comment} onChange={(e) => setComment(e.target.value)} rows="4" className="w-full p-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"></textarea>
+            <textarea id="comment" value={comment} onChange={(e) => setComment(e.target.value)} rows="4" 
+            disabled={!isEditing} className="w-full p-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:bg-gray-200 disabled:dark:bg-gray-500"></textarea>
           </div>
-
+          <div className="flex justify-end mt-6">
+            <button
+              className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
+              onClick={isSaved ? handleUpdateDefectDetails : handleSaveDefectDetails}
+              disabled={isSaved && !isEditing}
+              style={{ display: isSaved && !isEditing ? 'none' : 'inline-block' }}
+            >
+              Save
+            </button>
+            {isSaved && !isEditing && (
+              <button
+                className="px-6 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600"
+                onClick={() => setIsEditing(true)}
+              >
+                Edit
+              </button>
+            )}
+          </div>
 
         </div>
       )}

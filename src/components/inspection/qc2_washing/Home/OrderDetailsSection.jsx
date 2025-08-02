@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useState,useEffect} from "react";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../../config";
 
@@ -23,6 +23,7 @@ const OrderDetailsSection = ({
   colorOrderQty,
   activateNextSection,
   setRecordId,
+  setSavedSizes,
 }) => {
   const [isSaved, setIsSaved] = useState(false);
     const handleSave = async () => {
@@ -101,17 +102,44 @@ const OrderDetailsSection = ({
     fetchOrderDetailsByStyle(selectedOrder);
     setShowOrderNoSuggestions(false); // Hide suggestions immediately on click
   };
+  // Load saved measurement sizes
+  const loadSavedSizes = async (orderNo, color) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${color}`
+      );
+
+      if (!response.ok) {
+        // setSavedSizes([]);
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSavedSizes(data.savedSizes || []);
+        // console.log("Loaded saved sizes:", data.savedSizes);
+      }
+    } catch (error) {
+      console.error("Error loading saved sizes:", error);
+      setSavedSizes([]);
+    }
+  };
+
+   useEffect(() => {
+    if (formData.orderNo && formData.color) loadSavedSizes(formData.orderNo, formData.color);
+  }, [formData.orderNo, formData.color]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-4 border-b pb-2">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Order Details</h2>
-        <button 
+        {/* <button 
           onClick={onToggle}
           className="text-indigo-600 hover:text-indigo-800 font-medium"
         >
           {isVisible ? 'Hide' : 'Show'}
-        </button>
+        </button> */}
       </div>
          {isVisible && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 dark:text-white">

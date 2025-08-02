@@ -89,11 +89,10 @@ const InspectionDataSection = ({
   // --- Prevent user from entering more than washQty in any color shade row ---
   const handleParamInputChange = (rowIdx, field, value) => {
     setDefectData(prev => {
-      // If this is a color shade row and field is checkedQty
       const isColorShade = prev[rowIdx].parameter && prev[rowIdx].parameter.startsWith(PARAM_COLOR_SHADE);
       if (isColorShade && field === "checkedQty") {
         const qty = Number(washQty) || 0;
-        let newValue = Math.max(0, Math.min(Number(value), qty)); // Clamp between 0 and washQty
+        let newValue = Math.max(0, Math.min(Number(value), qty));
 
         // Calculate sum of other color shade checkedQtys
         const otherSum = prev.reduce((sum, item, i) =>
@@ -260,8 +259,6 @@ const handleUpdateInspection = async () => {
     formData.append('processData', JSON.stringify(processData));
     formData.append('defectData', JSON.stringify(defectDataWithPassRate));
 
-    const existingImagesMap = {};
-
     // 3. Append images
     inspectionData.forEach((item, idx) => {
       (item.comparisonImages || []).forEach((img, imgIdx) => {
@@ -376,21 +373,6 @@ function stripFileFromImages(inspectionData) {
   );
   const appearanceRow = defectData.find((d) => d.parameter === PARAM_APPEARANCE);
 
-  // Add new Color Shade row
-  // const handleAddColorShade = () => {
-  //   const nextIndex = colorShadeRows.length;
-  //   setDefectData((prev) => [
-  //     ...prev,
-  //     {
-  //       parameter: getColorShadeName(nextIndex),
-  //       checkedQty: 0,
-  //       failedQty: 0,
-  //       result: "",
-  //       remark: "",
-  //     },
-  //   ]);
-  // };
-
   // Remove a Color Shade row
   const handleRemoveColorShade = (idx) => {
     setDefectData((prev) => {
@@ -414,23 +396,6 @@ function stripFileFromImages(inspectionData) {
       );
     });
   };
-
-  // Handle input change for checkedQty/failedQty/remark
-  // const handleParamInputChange = (rowIdx, field, value) => {
-  //   setDefectData((prev) =>
-  //     prev.map((item, i) =>
-  //       i === rowIdx
-  //         ? {
-  //             ...item,
-  //             [field]:
-  //               field === "checkedQty" || field === "failedQty"
-  //                 ? value === "" ? "" : Math.max(0, Number(value))
-  //                 : value,
-  //           }
-  //         : item
-  //     )
-  //   );
-  // };
 
   // Calculate pass rate and result
   const getPassRate = (checkedQty, failedQty) => {
@@ -477,12 +442,12 @@ function stripFileFromImages(inspectionData) {
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-4 border-b pb-2">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Inspection Data</h2>
-        <button 
+        {/* <button 
           onClick={onToggle}
           className="text-indigo-600 hover:text-indigo-800 font-medium"
         >
           {isVisible ? 'Hide' : 'Show'}
-        </button>
+        </button> */}
       </div>
       {isVisible && (
         <>
