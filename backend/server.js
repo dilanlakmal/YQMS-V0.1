@@ -82,6 +82,7 @@ import createAuditCheckPointModel from "./models/AuditCheckPoint.js";
 
 import createBuyerSpecTemplateModel from "./models/BuyerSpecTemplate.js";
 import createANFMeasurementReportModel from "./models/ANFMeasurementReport.js";
+import createSizeCompletionStatusModel from "./models/SizeCompletionStatus.model.js";
 
 import createQCWashingDefectsModel from "./models/QCWashingDefectsModel.js";
 import createQCWashingCheckpointsModel from "./models/QCWashingCheckpointsModel.js";
@@ -259,6 +260,7 @@ const AuditCheckPoint = createAuditCheckPointModel(ymProdConnection);
 
 const BuyerSpecTemplate = createBuyerSpecTemplateModel(ymProdConnection);
 const ANFMeasurementReport = createANFMeasurementReportModel(ymProdConnection);
+const SizeCompletionStatus = createSizeCompletionStatusModel(ymProdConnection);
 
 const QCWashingDefects = createQCWashingDefectsModel(ymProdConnection);
 const QCWashingCheckList = createQCWashingCheckpointsModel(ymProdConnection);
@@ -23732,12 +23734,12 @@ app.post("/api/anf-measurement/reports", async (req, res) => {
   }
 });
 
-// --- NEW: Endpoint to update the status of a specific size in a report ---
+// --- MODIFIED: Endpoint to update the status of a specific size ---
 app.patch("/api/anf-measurement/reports/status", async (req, res) => {
   try {
-    const { inspectionDate, qcID, moNo, color, size, status } = req.body;
+    const { qcID, moNo, color, size, status, inspectionDate } = req.body;
 
-    // Validation
+    // --- Validation (no change) ---
     if (!inspectionDate || !qcID || !moNo || !color || !size || !status) {
       return res.status(400).json({ error: "Missing required fields." });
     }
@@ -23745,44 +23747,62 @@ app.patch("/api/anf-measurement/reports/status", async (req, res) => {
       return res.status(400).json({ error: "Invalid status value." });
     }
 
+    const sortedColors = [...color].sort();
+
+    // --- LOGIC FOR THE NEW PERSISTENT STATUS COLLECTION ---
+    if (status === "Completed") {
+      // If we are finishing the size, create/update the persistent status record.
+      // `findOneAndUpdate` with `upsert` is perfect here.
+      await SizeCompletionStatus.findOneAndUpdate(
+        { qcID, moNo, color: sortedColors, size },
+        { status: "Completed" },
+        { upsert: true, new: true, runValidators: true }
+      );
+    } else if (status === "In Progress") {
+      // If we are continuing (unlocking), delete the persistent status record.
+      await SizeCompletionStatus.deleteOne({
+        qcID,
+        moNo,
+        color: sortedColors,
+        size
+      });
+    }
+
+    // --- KEEP THE LOGIC TO UPDATE THE CURRENT DAY'S REPORT (if it exists) ---
+    // This is still useful for the specific report of that day.
     const reportDate = new Date(`${inspectionDate}T00:00:00.000Z`);
-    const filter = {
+    const reportFilter = {
       inspectionDate: reportDate,
       qcID,
       moNo,
-      color: { $all: color.sort(), $size: color.length }
+      color: { $all: sortedColors, $size: sortedColors.length }
     };
 
-    // Find the report and update the status of the specific size within the array
-    const result = await ANFMeasurementReport.updateOne(
-      { ...filter, "measurementDetails.size": size },
+    await ANFMeasurementReport.updateOne(
+      { ...reportFilter, "measurementDetails.size": size },
       { $set: { "measurementDetails.$.status": status } }
     );
-
-    if (result.matchedCount === 0) {
-      return res
-        .status(404)
-        .json({ error: "No matching report or size found to update." });
-    }
-    if (result.modifiedCount === 0) {
-      // This can happen if the status is already what you're trying to set it to
-      return res
-        .status(200)
-        .json({ message: "Status was already set to the desired value." });
-    }
+    // Note: We don't care if this update fails (e.g., no report for today yet).
+    // The persistent status is the most important part.
 
     res
       .status(200)
       .json({ message: `Size status successfully updated to '${status}'.` });
   } catch (error) {
     console.error("Error updating size status:", error);
+    if (error.code === 11000) {
+      // Catch potential race condition on unique index
+      return res
+        .status(409)
+        .json({ error: "This size status is already being updated." });
+    }
     res
       .status(500)
       .json({ error: "Failed to update size status.", details: error.message });
   }
 });
 
-// Endpoint to get existing measurement data for a specific size in a report
+// --- MODIFIED: Endpoint to get existing measurement data and PERSISTENT status ---
 app.get("/api/anf-measurement/existing-data", async (req, res) => {
   try {
     const { date, qcId, moNo, color, size } = req.query;
@@ -23793,48 +23813,45 @@ app.get("/api/anf-measurement/existing-data", async (req, res) => {
         .json({ error: "Missing required query parameters." });
     }
 
-    // --- FIX: Create a timezone-agnostic UTC date for the filter ---
-    const reportDate = new Date(`${date}T00:00:00.000Z`);
+    const colorArray = (Array.isArray(color) ? color : color.split(",")).sort();
 
-    // Colors can come as a comma-separated string from query params
-    const colorArray = Array.isArray(color) ? color : color.split(",");
-
-    // The unique key for finding the document, same as in the POST endpoint
-    const filter = {
-      //inspectionDate: new Date(new Date(date).setHours(0, 0, 0, 0)),
-      inspectionDate: reportDate, // Use the standardized UTC date
+    // --- QUERY 1: Check for a PERSISTENT "Completed" status ---
+    const persistentStatusDoc = await SizeCompletionStatus.findOne({
       qcID: qcId,
       moNo: moNo,
-      color: { $all: colorArray.sort(), $size: colorArray.length }
+      color: colorArray,
+      size: size
+    });
+
+    // --- QUERY 2: Get the measurement data FOR THE SPECIFIC DATE provided ---
+    let dailyMeasurements = [];
+    const reportDate = new Date(`${date}T00:00:00.000Z`);
+    const reportFilter = {
+      inspectionDate: reportDate,
+      qcID: qcId,
+      moNo: moNo,
+      color: { $all: colorArray, $size: colorArray.length }
     };
+    const report = await ANFMeasurementReport.findOne(reportFilter);
 
-    const report = await ANFMeasurementReport.findOne(filter);
-
-    if (!report) {
-      // No report found, so no existing data. Return empty.
-      // return res.json([]);
-      // --- MODIFIED: Return a default structure if no report is found ---
-      return res.json({ measurements: [], status: "In Progress" });
+    if (report) {
+      const sizeData = report.measurementDetails.find(
+        (detail) => detail.size === size
+      );
+      if (sizeData && sizeData.sizeMeasurementData) {
+        dailyMeasurements = sizeData.sizeMeasurementData;
+      }
     }
 
-    // Report found, now find the specific size's data within it
-    const sizeData = report.measurementDetails.find(
-      (detail) => detail.size === size
-    );
+    // --- FINAL LOGIC: Determine the status to send to the frontend ---
+    // If a persistent "Completed" record exists, the status is ALWAYS 'Completed'.
+    // Otherwise, it's 'In Progress'.
+    const finalStatus = persistentStatusDoc ? "Completed" : "In Progress";
 
-    if (!sizeData || !sizeData.sizeMeasurementData) {
-      // Report exists, but not for this size. Return empty.
-      //return res.json([]);
-      // --- MODIFIED: Return a default structure if the size is not in the report ---
-      return res.json({ measurements: [], status: "In Progress" });
-    }
-
-    // Success! Return the array of measured garments for that size
-    //res.json(sizeData.sizeMeasurementData);
-    // --- MODIFIED: Return an object containing both measurements and status ---
+    // Return the combined result
     res.json({
-      measurements: sizeData.sizeMeasurementData,
-      status: sizeData.status // This will be 'In Progress' or 'Completed'
+      measurements: dailyMeasurements,
+      status: finalStatus
     });
   } catch (error) {
     console.error("Error fetching existing measurement data:", error);
