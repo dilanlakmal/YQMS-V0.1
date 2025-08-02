@@ -226,25 +226,17 @@ const ANFMeasurementResultsViewFullReport = ({
                               </td>
                             </tr>
                             <tr>
-                              <td className="py-1.5 pr-2 font-medium text-gray-500 dark:text-gray-450">
-                                Order Qty (Size/Clr):
+                              <td className="py-1.5 pr-2 font-medium text-gray-500 dark:text-gray-500">
+                                Order Qty (Size):
                               </td>
                               <td className="py-1.5 text-gray-800 dark:text-gray-200">
                                 {itemData.orderQty_color}
                               </td>
                             </tr>
-                            {/* <tr>
-                            <td className="py-1 pr-2 font-medium text-gray-500">
-                              Status:
-                            </td>
-                            <td className="py-1 text-gray-700 dark:text-gray-400">
-                              {itemData.status}
-                            </td>
-                          </tr> */}
                           </tbody>
                         </table>
                       </div>
-                      {/* --- MODIFIED: Status Display --- */}
+                      {/* --- Status Display --- */}
                       <div>
                         <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
                           Inspection Status
