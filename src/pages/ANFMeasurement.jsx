@@ -4,6 +4,7 @@ import { useAuth } from "../components/authentication/AuthContext";
 import { Check, BarChart3, LayoutDashboard } from "lucide-react";
 import ANFMeasurementPageTitle from "../components/inspection/ANF_measurement/ANFMeasurementPageTitle";
 import ANFMeasurementInspectionForm from "../components/inspection/ANF_measurement/ANFMeasurementInspectionForm";
+import ANFMeasurementResults from "../components/inspection/ANF_measurement/ANFMeasurementResults";
 
 const PlaceholderComponent = ({ title }) => {
   return (
@@ -47,10 +48,10 @@ const ANFMeasurement = () => {
         )
       },
       {
-        id: "results",
+        id: "results-size",
         labelKey: "anfMeasurement.tabs.results",
         icon: <BarChart3 size={18} />,
-        component: <PlaceholderComponent title="Results" />
+        component: <ANFMeasurementResults />
       },
       {
         id: "dashboard",
@@ -68,7 +69,7 @@ const ANFMeasurement = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-screen-xl mx-auto">
+      <div className="max-w-screen-2xl mx-auto">
         <ANFMeasurementPageTitle user={user} />
 
         <div className="border-b border-gray-300 dark:border-gray-700">
