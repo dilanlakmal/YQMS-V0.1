@@ -25106,23 +25106,23 @@ app.put('/api/qc-washing/update/:recordId', async (req, res) => {
 });
 
 // GET - Get overall summary for a given orderNo and color
-app.get('/api/qc-washing/overall-summary/:orderNo/:color', async (req, res) => {
+app.get('/api/qc-washing/overall-summary-by-id/:recordId', async (req, res) => {
   try {
-    const { orderNo, color } = req.params;
-    const qcRecord = await QCWashing.findOne({ orderNo: orderNo });
-    if (!qcRecord || !qcRecord.colors) {
-      return res.status(404).json({ success: false, message: 'No data found for this order.' });
+    const { recordId } = req.params;
+    const qcRecord = await QCWashing.findById(recordId);
+    if (!qcRecord) {
+      return res.status(404).json({ success: false, message: 'No data found for this record.' });
     }
-    const colorData = qcRecord.colors.find(c => c.colorName === color);
-    if (!colorData) {
-      return res.status(404).json({ success: false, message: 'No data found for this color.' });
-    }
+
+    // Use root-level fields
+    const defectDetails = qcRecord.defectDetails || {};
+    const measurementDetails = qcRecord.measurementDetails || [];
 
     // Measurement points and checked pcs
     let measurementPoints = 0, measurementPass = 0, totalCheckedPcs = 0;
-    (colorData.measurementDetails || []).forEach(md => {
+    (measurementDetails || []).forEach(md => {
       if (Array.isArray(md.pcs)) {
-        totalCheckedPcs += md.pcs.length; // <-- FIXED: sum of pcs
+        totalCheckedPcs += md.pcs.length;
         md.pcs.forEach(pc => {
           (pc.measurementPoints || []).forEach(point => {
             if (point.result === 'pass' || point.result === 'fail') {
@@ -25137,25 +25137,23 @@ app.get('/api/qc-washing/overall-summary/:orderNo/:color', async (req, res) => {
     const passRate = measurementPoints > 0 ? ((measurementPass / measurementPoints) * 100).toFixed(2) : 0;
 
     // Defect details
-    const defectDetails = colorData.defectDetails || {};
     let rejectedDefectPcs = 0;
     let totalDefectCount = 0;
     if (Array.isArray(defectDetails.defectsByPc)) {
-      rejectedDefectPcs = defectDetails.defectsByPc.length; // <-- FIXED: count of PCs with defects
-     totalDefectCount = defectDetails.defectsByPc.reduce(
+      rejectedDefectPcs = defectDetails.defectsByPc.length;
+      totalDefectCount = defectDetails.defectsByPc.reduce(
         (sum, pc) => sum + (
           Array.isArray(pc.pcDefects)
             ? pc.pcDefects.reduce((defSum, defect) => defSum + (parseInt(defect.defectQty, 10) || 0), 0)
             : 0
         ), 0
-     )
+      );
     }
     const washQty = parseInt(defectDetails.washQty) || 0;
+    const checkedQty = defectDetails.checkedQty || "";
     const defectRate = totalCheckedPcs > 0 ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(1) : 0;
     const defectRatio = totalCheckedPcs > 0 ? ((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1) : 0;
-    const checkedQty = defectDetails.checkedQty || ""; 
 
-    // Overall result
     const measurementOverallResult = totalFail > 0 ? "Fail" : "Pass";
     const defectOverallResult = defectDetails.result || "N/A";
     let overallResult = "N/A";
@@ -25168,8 +25166,9 @@ app.get('/api/qc-washing/overall-summary/:orderNo/:color', async (req, res) => {
     res.json({
       success: true,
       summary: {
-        orderNo,
-        color,
+        recordId,
+        orderNo: qcRecord.orderNo,
+        color: qcRecord.color,
         totalCheckedPcs,
         checkedQty,
         washQty,
@@ -25188,10 +25187,36 @@ app.get('/api/qc-washing/overall-summary/:orderNo/:color', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching overall summary:', error);
+    console.error('Error fetching overall summary by id:', error);
     res.status(500).json({ success: false, message: 'Server error while fetching overall summary.' });
   }
 });
+
+
+app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
+  try {
+    const { recordId } = req.params;
+    const summary = req.body.summary || {};
+    const qcRecord = await QCWashing.findById(recordId);
+    if (!qcRecord) return res.status(404).json({ success: false, message: 'Record not found.' });
+
+    // Always set all fields, even if 0 or "N/A"
+    qcRecord.totalCheckedPcs = summary.totalCheckedPcs ?? 0;
+    qcRecord.rejectedDefectPcs = summary.rejectedDefectPcs ?? 0;
+    qcRecord.totalDefectCount = summary.totalDefectCount ?? 0;
+    qcRecord.defectRate = summary.defectRate ?? 0;
+    qcRecord.defectRatio = summary.defectRatio ?? 0;
+    qcRecord.overallFinalResult = summary.overallFinalResult ?? "N/A";
+
+    await qcRecord.save();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to save summary.' });
+  }
+});
+
+
+
 
 
 const getAqlLevelForBuyer = (buyer) => {
@@ -26005,6 +26030,43 @@ const uploadInspectionImage = multer({
   }
 });
 
+function normalizeInspectionImagePath(img) {
+  if (!img) return "";
+  // If new upload, img.file will be handled by fileMap logic in your code
+  if (img.preview && typeof img.preview === "string") {
+    if (img.preview.startsWith("/public/")) {
+      return img.preview;
+    }
+    if (img.preview.startsWith("/storage/")) {
+      return "/public" + img.preview;
+    }
+    if (img.preview.startsWith("http")) {
+      try {
+        const url = new URL(img.preview);
+        return url.pathname;
+      } catch (e) {
+        return img.preview;
+      }
+    }
+    // If it's just a filename (no slashes)
+    if (!img.preview.includes("/")) {
+      return `/public/storage/qc_washing_images/inspection/${img.preview}`;
+    }
+    // If it contains a slash but not at the start, treat as relative path
+    if (img.preview[0] !== "/") {
+      return `/public/storage/qc_washing_images/inspection/${img.preview}`;
+    }
+    // Fallback
+    return img.preview;
+  }
+  // Fallback: if img.name exists, reconstruct path
+  if (img.name && !img.name.includes("/")) {
+    return `/public/storage/qc_washing_images/inspection/${img.name}`;
+  }
+  return "";
+}
+
+
 app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (req, res) => {
   try {
     const { recordId } = req.body;
@@ -26046,9 +26108,12 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
         pointName: item.checkedList,
         decision: item.decision === "ok",
         comparison: (item.comparisonImages || []).map((img, imgIdx) => {
-          // Use uploaded relative path if available, else fallback to img.name
-          return fileMap[`comparisonImages_${idx}_${imgIdx}`] || img.name;
+          if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
+            return fileMap[`comparisonImages_${idx}_${imgIdx}`];
+          }
+          return normalizeInspectionImagePath(img);
         }),
+
         remark: item.remark,
       })),
       machineProcesses: Object.entries(processData || {}).map(([machineType, params]) => ({
@@ -26116,14 +26181,14 @@ app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async
     record.inspectionDetails = {
       ...record.inspectionDetails,
       checkedPoints: (inspectionData || []).map((item, idx) => {
-        const images = [];
-        (item.comparisonImages || []).forEach((img, imgIdx) => {
-          if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
-            images.push(fileMap[`comparisonImages_${idx}_${imgIdx}`]);
-          } else if (img.preview && typeof img.preview === "string") {
-            images.push(img.preview);
-          }
-        });
+        const images = (item.comparisonImages || []).map((img, imgIdx) => {
+            if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
+              return fileMap[`comparisonImages_${idx}_${imgIdx}`];
+            }
+            return normalizeInspectionImagePath(img);
+          });
+
+
         return {
           pointName: item.checkedList,
           decision: item.decision === "ok",
@@ -26204,8 +26269,10 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
         (pc.pcDefects || []).forEach((defect, defectIdx) => {
           if (defect.defectImages) {
             defect.defectImages = defect.defectImages.map((img, imgIdx) => {
-              // If file uploaded, use its path, else keep as is (for already saved images)
-              return fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`] || img.name;
+              return fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`]
+              || (typeof img === "object" && img !== null && img.name ? img.name : img)
+              || "";
+
             });
           }
         });
@@ -26213,7 +26280,7 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
     }
     if (defectDetails.additionalImages) {
       defectDetails.additionalImages = defectDetails.additionalImages.map((img, imgIdx) => {
-        return fileMap[`additionalImages_${imgIdx}`] || img.name;
+        return fileMap[`additionalImages_${imgIdx}`] || (typeof img === "object" && img !== null && img.name ? img.name : img) || "";
       });
     }
 

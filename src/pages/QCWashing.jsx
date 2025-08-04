@@ -11,15 +11,16 @@ import Swal from "sweetalert2";
 import imageCompression from "browser-image-compression";
 import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/SubmittedWashingData";
 
+const normalizeImageSrc = (src) => {
+  if (!src) return "";
+  if (typeof src === "string" && src.startsWith("data:")) return src;
+  if (typeof src === "string" && src.startsWith("/public/")) return src.replace(/^\/public/, "");
+  if (typeof src === "string" && src.startsWith("/storage/")) return src;
+  if (/^[A-Za-z0-9+/=]+$/.test(src) && src.length > 100) return `data:image/jpeg;base64,${src}`;
+  return src;
+};
 
 function transformDefectsByPc(savedDefectsByPc) {
-  const normalizeImageSrc = (src) => {
-    if (!src) return "";
-    return src.startsWith("data:") || src.startsWith("/storage/")
-      ? src
-      : `data:image/jpeg;base64,${src}`;
-  };
-
   if (Array.isArray(savedDefectsByPc)) {
     // Array from backend
     return savedDefectsByPc.reduce((acc, pcData) => {
@@ -72,8 +73,9 @@ function normalizeImagePreview(img) {
 }
 
 function calculateSummaryData(currentFormData) {
-  const currentDefectDetails = currentFormData.colors[0]?.defectDetails;
-  const currentMeasurementData = currentFormData.colors[0]?.measurementDetails;
+  // Use top-level fields, not colors[0]
+  const currentDefectDetails = currentFormData.defectDetails;
+  const currentMeasurementData = currentFormData.measurementDetails;
 
   let measurementPoints = 0;
   let measurementPass = 0;
@@ -97,19 +99,10 @@ function calculateSummaryData(currentFormData) {
     });
   }
 
-  // Always use Number() to ensure numeric values
   const checkedPcs = Number(currentDefectDetails?.checkedQty) || 0;
-  // const totalRejectPcs = currentDefectDetails?.defectsByPc
-  // ? currentDefectDetails.defectsByPc.filter(pc =>
-  //     Array.isArray(pc.pcDefects) && pc.pcDefects.length > 0
-  //   ).length
-  // : 0;
-  // const calculatedWashQty = Number(currentDefectDetails?.washQty) || 0;
   const rejectedDefectPcs = Array.isArray(currentDefectDetails?.defectsByPc)
-  ? currentDefectDetails.defectsByPc.length
-  : 0;
-
-  // Use pc.pcDefects for defect counting
+    ? currentDefectDetails.defectsByPc.length
+    : 0;
   const defectCount = currentDefectDetails?.defectsByPc
     ? currentDefectDetails.defectsByPc.reduce((sum, pc) => {
         return sum + (Array.isArray(pc.pcDefects)
@@ -121,8 +114,6 @@ function calculateSummaryData(currentFormData) {
     checkedPcs > 0
       ? ((defectCount / checkedPcs) * 100).toFixed(1)
       : 0;
-
-  // FIXED: Defect Ratio is now (rejectedDefectPcs / checkedPcs) * 100
   const defectRatio =
     checkedPcs > 0
       ? ((rejectedDefectPcs / checkedPcs) * 100).toFixed(1)
@@ -132,24 +123,24 @@ function calculateSummaryData(currentFormData) {
   const measurementOverallResult =
     measurementPoints - measurementPass > 0 ? "Fail" : "Pass";
   const defectOverallResult = currentDefectDetails?.result || "N/A";
-
   if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
     overallResult = "Fail";
   } else if (measurementOverallResult === "Pass" && defectOverallResult === "Pass") {
     overallResult = "Pass";
   } else {
-   overallResult = "N/A";
+    overallResult = "N/A";
   }
 
   return {
-    totalCheckedPcs: checkedPcs,
-    rejectedDefectPcs: rejectedDefectPcs,
-    totalDefectCount: defectCount,
+    totalCheckedPcs: checkedPcs || 0,
+    rejectedDefectPcs: rejectedDefectPcs || 0,
+    totalDefectCount: defectCount || 0,
     defectRate: parseFloat(defectRate) || 0,
     defectRatio: parseFloat(defectRatio) || 0,
-    overallFinalResult: overallResult,
+    overallFinalResult: overallResult || "N/A",
   };
 }
+
 
 function machineProcessesToObject(machineProcesses) {
   const obj = {};
@@ -247,21 +238,22 @@ const activateNextSection = (currentSection) => {
   });
 };
 
-  const fetchOverallSummary = async (orderNo, color) => {
-    if (!orderNo || !color) return;
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/overall-summary/${orderNo}/${color}`);
-      const data = await response.json();
-      if (data.success) {
-        setOverallSummary(data.summary);
-      } else {
-        setOverallSummary(null);
-      }
-    } catch (error) {
+  const fetchOverallSummary = async (recordId) => {
+  if (!recordId) return;
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/qc-washing/overall-summary-by-id/${recordId}`);
+    const data = await response.json();
+    if (data.success) {
+      setOverallSummary(data.summary);
+    } else {
       setOverallSummary(null);
-      console.error('Error fetching overall summary:', error);
     }
-  };
+  } catch (error) {
+    setOverallSummary(null);
+    console.error('Error fetching overall summary:', error);
+  }
+};
+
 
   // State: Inspection, Defect, Measurement
   const [inspectionData, setInspectionData] = useState([]);
@@ -355,10 +347,11 @@ const activateNextSection = (currentSection) => {
   }, [formData.aqlSampleSize, formData.inline, formData.daily]);
 
 useEffect(() => {
-  if (formData.orderNo && formData.color) {
-    fetchOverallSummary(formData.orderNo, formData.color);
+  if (recordId) {
+    fetchOverallSummary(recordId);
   }
-}, [formData.orderNo, formData.color, lastSaved]);
+}, [recordId, lastSaved]);
+
 
    // --- useEffect: Calculate AQL Status ---
   useEffect(() => {
@@ -404,6 +397,7 @@ useEffect(() => {
   fetchColorOrderQty();
 }, [formData.orderNo, formData.color]);
 
+// Example: When defectsByPc or measurementData changes
 
   // --- Helper Functions ---
   const processMeasurementData = (loadedMeasurements) => {
@@ -574,112 +568,6 @@ useEffect(() => {
         }
       }
       
-
-      // 2. Check for auto-saved data and load it
-      // const qcWashingResponse = await fetch(
-      //   `${API_BASE_URL}/api/qc-washing/load-saved/${orderNo}`
-      // );
-
-      // if (qcWashingResponse.ok) {
-      //   const qcWashingData = await qcWashingResponse.json();
-      //   if (qcWashingData.success && qcWashingData.savedData) {
-         
-      //     const saved = qcWashingData.savedData;
-
-      //     setFormData((prev) => ({
-      //       ...prev,
-      //       ...saved.formData,
-      //       reportType: saved.reportType,
-      //       date: saved.formData.date
-      //         ? saved.formData.date.split("T")[0]
-      //         : new Date().toISOString().split("T")[0],
-      //       orderQty: saved?.formData.orderQty || saved?.colors?.[0]?.orderDetails?.orderQty || prev.orderQty,
-      //       buyer: saved?.formData.buyer || saved?.colors?.[0]?.orderDetails?.buyer || prev.buyer,
-      //       aqlSampleSize: saved?.formData.aqlSampleSize || saved?.colors?.[0]?.orderDetails?.aqlSampleSize || prev.aqlSampleSize,
-      //       aqlAcceptedDefect: saved?.formData.aqlAcceptedDefect || saved?.colors?.[0]?.orderDetails?.aqlAcceptedDefect || prev.aqlAcceptedDefect,
-      //       aqlRejectedDefect: saved?.formData.aqlRejectedDefect || saved?.colors?.[0]?.orderDetails?.aqlRejectedDefect || prev.aqlRejectedDefect,
-      //       aqlLevelUsed: saved?.formData.aqlLevelUsed || saved?.colors?.[0]?.orderDetails?.aqlLevelUsed || "",
-      //     }));
-       
-
-      //     // Fetch all colors for the order/style, even when loading saved data
-      //     let colorResponse = await fetch(
-      //       `${API_BASE_URL}/api/qc-washing/order-details-by-style/${orderNo}`
-      //     );
-      //     let orderData = await colorResponse.json();
-
-      //     if (!orderData.success) {
-      //       colorResponse = await fetch(
-      //         `${API_BASE_URL}/api/qc-washing/order-details-by-order/${orderNo}`
-      //       );
-      //       orderData = await colorResponse.json();
-      //     }
-      //      if (orderData.success && orderData.colors) {
-      //       setColorOptions(orderData.colors);
-      //     } else if (saved.formData.color) {
-      //       // Fallback: if fetching all colors fails, at least ensure the saved color is an option
-      //       setColorOptions((prev) =>
-      //         prev.includes(saved.formData.color)
-      //           ? prev
-      //           : [...prev, saved.formData.color]
-      //       );
-      //     }
-
-      //     if (saved.inspectionData && saved.inspectionData.length > 0) {
-      //       setInspectionData(saved.inspectionData);
-      //     } else if (masterChecklist.length > 0) {
-      //       setInspectionData(initializeInspectionData(masterChecklist));
-      //     }
-
-      //     if (saved.processData && Array.isArray(saved.processData.machineProcesses)) {
-      //       setProcessData(machineProcessesToObject(saved.processData.machineProcesses));
-      //     }
-
-      //     if (saved.defectData && saved.defectData.length > 0) {
-      //       setDefectData(saved.defectData.map(param => ({
-      //         ...param,
-      //         parameter: param.parameter || param.parameterName || "",
-      //         ok: param.ok !== undefined ? param.ok : true,
-      //         no: param.no !== undefined ? param.no : false,
-      //         checkedQty: param.checkedQty || 0,
-      //         failedQty: param.failedQty || 0,
-      //         remark: param.remark || "",
-      //         checkboxes: param.checkboxes || {},
-      //       })));
-      //     }
-
-      //     if (saved.addedDefects) {
-      //       setAddedDefects(saved.addedDefects);
-      //     }
-
-      //     // Load defectsByPc and uploadedImages from saved data
-      //     if (saved.defectsByPc) {
-      //       setDefectsByPc(transformDefectsByPc(saved.defectsByPc));
-      //     }
-      //     if (saved.additionalImage) {
-      //       // If images were saved as base64 or URLs, ensure they are handled correctly for display
-      //       setUploadedImages(saved.additionalImage.map(img => ({
-      //        file: null, 
-      //         preview: normalizeImagePreview(img),
-      //         name: 'image.jpg'
-      //       })));
-      //       }
-
-      //     setComment(saved.comment || "");
-
-      //     // Set measurement data
-      //     setMeasurementData(processMeasurementData(saved.measurementDetails));
-      //     setShowMeasurementTable(true);
-
-      //     setAutoSaveId(saved._id);
-      //     if (saved.savedAt) {
-      //       setLastSaved(new Date(saved.savedAt));
-      //     }
-      //     setIsDataLoading(false);
-      //     return;
-      //   }
-      // }
-
       // 3. If not submitted, fetch order details from dt_orders
       let response = await fetch(
         `${API_BASE_URL}/api/qc-washing/order-details-by-style/${orderNo}`
@@ -756,9 +644,9 @@ useEffect(() => {
   (saved.inspectionDetails?.checkedPoints || []).map(item => ({
     checkedList: item.pointName || "",
     decision: item.decision === true ? "ok" : item.decision === false ? "no" : "",
-    comparisonImages: (item.comparison || []).map(img => ({
+    comparisonImages: (item.comparison || []).filter(Boolean).map(img => ({
       file: null,
-      preview: img,
+      preview: normalizeImageSrc(img),
       name: typeof img === "string" ? img.split('/').pop() : "image.jpg"
     })),
     remark: item.remark || "",
@@ -766,6 +654,7 @@ useEffect(() => {
     na: item.condition === "N/A" || false,
   }))
 );
+
 
 // 2. Process Data (Machine Processes)
 if (saved.inspectionDetails?.machineProcesses) {
@@ -789,13 +678,23 @@ if (saved.inspectionDetails?.machineProcesses) {
   }))
 );
     setAddedDefects(saved.addedDefects || []);
-    setDefectsByPc(transformDefectsByPc(saved.defectsByPc || {}));
-    setUploadedImages((saved.additionalImage || []).map(img => ({
-      file: null,
-      preview: img.preview || img,
-      name: img.name || (typeof img === "string" ? img.split('/').pop() : "image.jpg")
-    })));
-    setComment(saved.comment || "");
+    setDefectsByPc(transformDefectsByPc(saved.defectDetails?.defectsByPc || {}));
+    setUploadedImages(
+      (saved.defectDetails?.additionalImages || [])
+          .filter(Boolean)
+          .map(img => {
+            if (typeof img === "object" && img !== null) {
+              return { preview: img.preview || "", name: img.name || "image.jpg" };
+            }
+            if (typeof img === "string") {
+              return { preview: img, name: "image.jpg" };
+            }
+            return { preview: "", name: "image.jpg" };
+          })
+
+    );
+    setComment(saved.defectDetails?.comment || "");
+
     setMeasurementData(processMeasurementData(saved.measurementDetails || []));
     setSavedSizes((saved.measurementDetails || []).map(m => m.size));
     setRecordId(saved._id);
@@ -856,21 +755,29 @@ if (saved.inspectionDetails?.machineProcesses) {
       if (field === "firstOutput") {
         newState.inline = "";
         newState.daily = value;
+        newState.washQty = "";       
+        newState.checkedQty = ""; 
         if (value === "First Output") {
           fetchFirstOutputDetails();
         }
       } else if (field === "inline") {
         newState.firstOutput = "";
         newState.daily = value;
+        newState.washQty = "";       
+        newState.checkedQty = "";
       } else if (field === "daily") {
         if (value === "First Output") {
           newState.firstOutput = "First Output";
           newState.inline = "";
+          newState.washQty = "";       
+        newState.checkedQty = "";
           // Call the function to fetch details for First Output
           fetchFirstOutputDetails();
         } else if (value === "Inline") {
           newState.inline = "Inline";
           newState.firstOutput = "";
+          newState.washQty = "";       
+        newState.checkedQty = "";
         }
       }
 
@@ -1018,10 +925,6 @@ if (saved.inspectionDetails?.machineProcesses) {
           aqlRejectedDefect: "",
            aqlLevelUsed: "",
         }));
-        // console.warn(
-        //   "AQL data not found:",
-        //   data.message || "No AQL chart found for the given criteria."
-        // );
       }
     } catch (error) {
       console.error("Error fetching AQL data:", error);
@@ -1044,92 +947,92 @@ if (saved.inspectionDetails?.machineProcesses) {
     }, 100);
   };
 
-  const fetchAqlForParameter = async (orderNo, checkedQty, setDefectData, defectIndex) => {
-  if (!orderNo || !checkedQty) return;
+//   const fetchAqlForParameter = async (orderNo, checkedQty, setDefectData, defectIndex) => {
+//   if (!orderNo || !checkedQty) return;
 
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/api/qc-washing/aql-chart/parameter`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderNo: orderNo,
-          checkedQty: parseInt(checkedQty, 10) || 0,
-        }),
-      }
-    );
+//   try {
+//     const response = await fetch(
+//       `${API_BASE_URL}/api/qc-washing/aql-chart/parameter`,
+//       {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({
+//           orderNo: orderNo,
+//           checkedQty: parseInt(checkedQty, 10) || 0,
+//         }),
+//       }
+//     );
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({
-        message: `Request failed with status ${response.status}`,
-      }));
-      // console.error("AQL API Error:", errorData.message || "Unknown error");
-      // Optionally update defectData state to clear AQL values for this parameter
-      if (setDefectData && typeof defectIndex === "number") {
-        setDefectData(prev =>
-          prev.map((item, idx) =>
-            idx === defectIndex
-              ? { ...item, aqlAcceptedDefect: "", aqlLevelUsed: "", result: "" }
-              : item
-          )
-        );
-      }
-      return null;
-    }
+//     if (!response.ok) {
+//       const errorData = await response.json().catch(() => ({
+//         message: `Request failed with status ${response.status}`,
+//       }));
+//       // console.error("AQL API Error:", errorData.message || "Unknown error");
+//       // Optionally update defectData state to clear AQL values for this parameter
+//       if (setDefectData && typeof defectIndex === "number") {
+//         setDefectData(prev =>
+//           prev.map((item, idx) =>
+//             idx === defectIndex
+//               ? { ...item, aqlAcceptedDefect: "", aqlLevelUsed: "", result: "" }
+//               : item
+//           )
+//         );
+//       }
+//       return null;
+//     }
 
-    const data = await response.json();
+//     const data = await response.json();
 
-    if (data.success && data.aqlData) {
-      // Optionally update defectData state for this parameter
-      if (setDefectData && typeof defectIndex === "number") {
-        setDefectData(prev =>
-          prev.map((item, idx) =>
-            idx === defectIndex
-              ? {
-                  ...item,
-                  aqlAcceptedDefect: data.aqlData.acceptedDefect,
-                  aqlLevelUsed: data.aqlData.aqlLevelUsed,
-                  result:
-                    (Number(item.failedQty) || 0) <= data.aqlData.acceptedDefect
-                      ? "Pass"
-                      : "Fail",
-                }
-              : item
-          )
-        );
-      }
-      return data.aqlData;
-    } else {
-      if (setDefectData && typeof defectIndex === "number") {
-        setDefectData(prev =>
-          prev.map((item, idx) =>
-            idx === defectIndex
-              ? { ...item, aqlAcceptedDefect: "", aqlLevelUsed: "", result: "" }
-              : item
-          )
-        );
-      }
-      // console.warn(
-      //   "AQL data not found:",
-      //   data.message || "No AQL chart found for the given criteria."
-      // );
-      return null;
-    }
-  } catch (error) {
-    console.error("Error fetching AQL data:", error);
-    if (setDefectData && typeof defectIndex === "number") {
-      setDefectData(prev =>
-        prev.map((item, idx) =>
-          idx === defectIndex
-            ? { ...item, aqlAcceptedDefect: "", aqlLevelUsed: "", result: "" }
-            : item
-        )
-      );
-    }
-    return null;
-  }
-};
+//     if (data.success && data.aqlData) {
+//       // Optionally update defectData state for this parameter
+//       if (setDefectData && typeof defectIndex === "number") {
+//         setDefectData(prev =>
+//           prev.map((item, idx) =>
+//             idx === defectIndex
+//               ? {
+//                   ...item,
+//                   aqlAcceptedDefect: data.aqlData.acceptedDefect,
+//                   aqlLevelUsed: data.aqlData.aqlLevelUsed,
+//                   result:
+//                     (Number(item.failedQty) || 0) <= data.aqlData.acceptedDefect
+//                       ? "Pass"
+//                       : "Fail",
+//                 }
+//               : item
+//           )
+//         );
+//       }
+//       return data.aqlData;
+//     } else {
+//       if (setDefectData && typeof defectIndex === "number") {
+//         setDefectData(prev =>
+//           prev.map((item, idx) =>
+//             idx === defectIndex
+//               ? { ...item, aqlAcceptedDefect: "", aqlLevelUsed: "", result: "" }
+//               : item
+//           )
+//         );
+//       }
+//       // console.warn(
+//       //   "AQL data not found:",
+//       //   data.message || "No AQL chart found for the given criteria."
+//       // );
+//       return null;
+//     }
+//   } catch (error) {
+//     console.error("Error fetching AQL data:", error);
+//     if (setDefectData && typeof defectIndex === "number") {
+//       setDefectData(prev =>
+//         prev.map((item, idx) =>
+//           idx === defectIndex
+//             ? { ...item, aqlAcceptedDefect: "", aqlLevelUsed: "", result: "" }
+//             : item
+//         )
+//       );
+//     }
+//     return null;
+//   }
+// };
 
 
 
@@ -1285,6 +1188,20 @@ if (saved.inspectionDetails?.machineProcesses) {
     Swal.close();
   };
 
+  const autoSaveSummary = async (summary, recordId) => {
+  if (!recordId || !summary) return;
+  try {
+    await fetch(`${API_BASE_URL}/api/qc-washing/save-summary/${recordId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ summary }),
+    });
+  } catch (error) {
+    console.error("Failed to auto-save summary:", error);
+  }
+};
+
+
      // Function to calculate and update summary data (NEW/MODIFIED)
   // This function should be called whenever relevant data (defectDetails, measurementData) changes
   const updateSummaryData = (currentFormData) => {
@@ -1293,19 +1210,59 @@ if (saved.inspectionDetails?.machineProcesses) {
     ...prevData,
     ...summary,
   }));
+  if (recordId) {
+    autoSaveSummary(summary, recordId);
+  }
 };
 
-  // useEffect to trigger summary data update when relevant form data changes
-  useEffect(() => {
-    updateSummaryData(formData);
-  }, [
-    formData.colors[0]?.defectDetails?.checkedQty,
-    formData.colors[0]?.defectDetails?.washQty,
-    formData.colors[0]?.defectDetails?.result,
-    formData.colors[0]?.defectDetails?.defectsByPc,
-    formData.colors[0]?.measurementDetails,
-  ]);
-  
+useEffect(() => {
+  // Build up-to-date defectDetails and measurementDetails
+  const defectDetails = {
+    ...formData.defectDetails,
+    checkedQty: formData.checkedQty,
+    washQty: formData.washQty,
+    result: formData.result,
+    defectsByPc: Object.entries(defectsByPc).map(([pcNumber, pcDefects]) => ({
+      pcNumber,
+      pcDefects,
+    })),
+  };
+  const measurementDetails = [
+    ...measurementData.beforeWash.map((item) => ({ ...item, washType: "beforeWash" })),
+    ...measurementData.afterWash.map((item) => ({ ...item, washType: "afterWash" })),
+  ];
+
+  // Calculate summary from the latest data
+  const summary = calculateSummaryData({
+    ...formData,
+    defectDetails,
+    measurementDetails,
+  });
+
+  // Update formData with the latest defectDetails, measurementDetails, and summary
+  setFormData((prev) => ({
+    ...prev,
+    defectDetails,
+    measurementDetails,
+    ...summary,
+  }));
+
+  // Save summary to backend
+  console.log("Summary to save:", summary);
+  if (recordId) {
+    autoSaveSummary(summary, recordId);
+  }
+}, [
+  defectsByPc,
+  measurementData,
+  formData.checkedQty,
+  formData.washQty,
+  formData.result,
+  recordId,
+]);
+
+
+
 
   // Load color-specific data
   const loadColorSpecificData = async (orderNo, color) => {
@@ -1592,6 +1549,10 @@ if (saved.inspectionDetails?.machineProcesses) {
           defectStatus={formData.result} 
           activateNextSection={() => activateNextSection('defectDetails')}
           recordId={recordId}
+          defectsByPc={defectsByPc}
+          setDefectsByPc={setDefectsByPc}
+          comment={comment}
+          setComment={setComment}
         />
         )}
         {sectionVisibility.measurementDetails && (
@@ -1677,26 +1638,27 @@ if (saved.inspectionDetails?.machineProcesses) {
             onClick={async () => {
               try {
                 // --- 1. Recalculate summary with the latest state ---
+                const defectDetails = {
+                  ...formData.defectDetails,
+                  checkedQty: formData.checkedQty,
+                  washQty: formData.washQty,
+                  result: formData.result,
+                  defectsByPc: Object.entries(defectsByPc).map(([pcNumber, pcDefects]) => ({
+                    pcNumber,
+                    pcDefects,
+                  })),
+                };
+                const measurementDetails = [
+                  ...measurementData.beforeWash.map((item) => ({ ...item, washType: "beforeWash" })),
+                  ...measurementData.afterWash.map((item) => ({ ...item, washType: "afterWash" })),
+                ];
                 const summary = calculateSummaryData({
                   ...formData,
-                  colors: [{
-                    ...formData.colors[0],
-                    defectDetails: {
-                      ...formData.colors[0]?.defectDetails,
-                      checkedQty: formData.checkedQty,
-                      washQty: formData.washQty,
-                      result: formData.result,
-                      defectsByPc: Object.entries(defectsByPc).map(([pcNumber, pcDefects]) => ({
-                        pcNumber,
-                        pcDefects,
-                      })),
-                    },
-                    measurementDetails: [
-                      ...measurementData.beforeWash.map((item) => ({ ...item, washType: "beforeWash" })),
-                      ...measurementData.afterWash.map((item) => ({ ...item, washType: "afterWash" })),
-                    ],
-                  }]
+                  defectDetails,
+                  measurementDetails,
                 });
+
+
 
                 // --- 2. Build the submitData payload ---
                 const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
@@ -1712,7 +1674,7 @@ if (saved.inspectionDetails?.machineProcesses) {
                   totalPass,
                   totalFail,
                   passRate,
-                  ...summary, // <-- This ensures all summary fields are at the top level
+                  ...summary, 
                   submittedAt: new Date().toISOString(),
                   userId: user?.emp_id,
                   color: {

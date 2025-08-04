@@ -205,7 +205,8 @@ const InspectionDataSection = ({
           position: 'top-end', 
           toast: true
         });
-         setInspectionData(prev => stripFileFromImages(prev));
+        if (onLoadSavedDataById) onLoadSavedDataById(recordId);
+
         setIsSaved(true);
         setIsEditing(false);
         if (onLoadSavedDataById) onLoadSavedDataById(recordId);
@@ -289,7 +290,9 @@ const handleUpdateInspection = async () => {
         position: 'top-end',
         toast: true
       });
-       setInspectionData(prev => stripFileFromImages(prev));
+     if (onLoadSavedDataById) onLoadSavedDataById(recordId);
+
+
       setIsSaved(true);
       setIsEditing(false);
       // Optionally: activateNextSection();
@@ -318,19 +321,38 @@ const handleUpdateInspection = async () => {
   }
 };
 
-function stripFileFromImages(inspectionData) {
-  return inspectionData.map(item => ({
-    ...item,
-    comparisonImages: (item.comparisonImages || []).map(img => {
-      // If it was just uploaded, replace with only preview and name
-      if (img.preview && img.file) {
-        return { preview: img.preview, name: img.name };
-      }
-      // If it's already just a preview, keep as is
-      return img;
-    })
-  }));
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
+
+
+async function stripFileFromImagesAsync(inspectionData) {
+  return Promise.all(inspectionData.map(async item => ({
+    ...item,
+    comparisonImages: await Promise.all((item.comparisonImages || []).map(async img => {
+      if (img && typeof img === "object" && img.file) {
+        // Convert file to base64
+        const base64 = await fileToBase64(img.file);
+        return { preview: base64, name: img.name || "image.jpg" };
+      }
+      if (img && typeof img === "object" && img.preview) {
+        return { preview: img.preview, name: img.name || "image.jpg" };
+      }
+      if (typeof img === "string") {
+        return { preview: img, name: "image.jpg" };
+      }
+      return { preview: "", name: "image.jpg" };
+    }))
+  })));
+}
+
+
+
 
   // Handle decision change
   const handleDecisionChange = (index, value) => {
@@ -464,7 +486,7 @@ function stripFileFromImages(inspectionData) {
               </tr>
               </thead>
                  <tbody>
-              {inspectionData.map((item, idx) => (
+              {(Array.isArray(inspectionData) ? inspectionData : []).map((item, idx) => (
                 <tr key={idx}>
                   <td className="border px-4 py-2 dark:text-white">{item.checkedList}</td>
                   <td className="border px-4 py-2 text-center dark:text-white">

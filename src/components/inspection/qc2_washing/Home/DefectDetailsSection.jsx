@@ -16,18 +16,23 @@ const DefectDetailsSection = ({
   recordId,
   activateNextSection,
   onLoadSavedDataById,
+   addedDefects,
+  setAddedDefects,
+  selectedDefect,
+  setSelectedDefect,
+  defectQty,
+  setDefectQty,
+  uploadedImages,
+  setUploadedImages,
+  comment,
+  setComment,
+  defectsByPc,
+  setDefectsByPc,
 }) => {
   const imageInputRef = useRef(null);
   const { i18n } = useTranslation();
   const [isSaved, setIsSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(true);
-  const [defectsByPc, setDefectsByPc] =  useState({});
-  const [uploadedImages, setUploadedImages] = useState([]);
-  const [comment, setComment] = useState("");
-  const [selectedDefect, setSelectedDefect] = useState("");
-  const [defectQty, setDefectQty] = useState("");
-  const [addedDefects, setAddedDefects] = useState([]);
-
   // State is now managed by the parent QCWashingPage component
   
   const getDefectNameForDisplay = (d) => {
@@ -211,31 +216,34 @@ const DefectDetailsSection = ({
 
   
     function stripFileFromDefectImages(defectsByPc, uploadedImages) {
-      // Remove .file from defect images
-      const newDefectsByPc = {};
-      Object.entries(defectsByPc).forEach(([pc, pcDefects]) => {
-        newDefectsByPc[pc] = pcDefects.map(defect => ({
-          ...defect,
-          defectImages: (defect.defectImages || []).map(img => {
-            if (img.file && img.preview) {
-              // After upload, keep only preview and name
-              return { preview: img.preview, name: img.name };
-            }
-            return img;
-          })
-        }));
-      });
-
-      // Remove .file from additional images
-      const newUploadedImages = (uploadedImages || []).map(img => {
-        if (img.file && img.preview) {
-          return { preview: img.preview, name: img.name };
+  const newDefectsByPc = {};
+  Object.entries(defectsByPc).forEach(([pc, pcDefects]) => {
+    newDefectsByPc[pc] = pcDefects.map(defect => ({
+      ...defect,
+      defectImages: (defect.defectImages || []).map(img => {
+        if (img && typeof img === "object" && img.preview) {
+          return { preview: img.preview, name: img.name || "image.jpg" };
         }
-        return img;
-      });
-
-      return { newDefectsByPc, newUploadedImages };
+        if (typeof img === "string") {
+          return { preview: img, name: "image.jpg" };
+        }
+        return { preview: "", name: "image.jpg" };
+      })
+    }));
+  });
+  // Remove .file from additional images
+  const newUploadedImages = (uploadedImages || []).map(img => {
+    if (img && typeof img === "object" && img.preview) {
+      return { preview: img.preview, name: img.name || "image.jpg" };
     }
+    if (typeof img === "string") {
+      return { preview: img, name: "image.jpg" };
+    }
+    return { preview: "", name: "image.jpg" };
+  });
+  return { newDefectsByPc, newUploadedImages };
+}
+
 
     const handleSaveDefectDetails = async () => {
       if (!recordId) {
@@ -411,10 +419,6 @@ const DefectDetailsSection = ({
       }
     };
 
-    useEffect(() => {
-}, [defectsByPc]);
-useEffect(() => {
-}, [uploadedImages]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
@@ -609,19 +613,22 @@ useEffect(() => {
                       <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
                         {(defect.defectImages || []).map((image, index) => (
                           <div key={index} className="relative">
-                             <img
-                                  src={image.preview || image}
-                                  alt={image.name || "defect image"}
-                                  className="w-full h-24 object-cover rounded-md shadow-md dark:shadow-none cursor-pointer"
-                                  onClick={() => {
-                                    Swal.fire({
-                                      imageUrl: image.preview || image,
-                                      imageAlt: image.name || "",
-                                      imageWidth: 600,
-                                      imageHeight: 400,
-                                    });
-                                  }}
-                                />
+                               {image && (
+                                <img
+                                    src={image && typeof image === "object" ? image.preview : ""}
+                                    alt={image && typeof image === "object" ? image.name || "defect image" : "defect image"}
+                                    className="w-full h-24 object-cover rounded-md shadow-md dark:shadow-none cursor-pointer"
+                                    onClick={() => {
+                                      Swal.fire({
+                                        imageUrl: image && typeof image === "object" ? image.preview : "",
+                                        imageAlt: image && typeof image === "object" ? image.name || "" : "",
+                                        imageWidth: 600,
+                                        imageHeight: 400,
+                                      });
+                                    }}
+                                    onError={e => { e.target.src = "/no-image.png"; }}
+                                  />
+                              )}
                           
                             <button
                               onClick={() => handleRemoveDefectImage(pc, defect.id, index)}
@@ -687,8 +694,18 @@ useEffect(() => {
                     {uploadedImages.map((image, index) => (
                       <div key={index} className="relative">
                         <img
-                          src={image.preview || image}
-                          alt={image.name || "additional image"}
+                          src={
+                                typeof image === "object" && image !== null
+                                  ? image.preview || ""
+                                  : typeof image === "string"
+                                    ? image
+                                    : ""
+                              }
+                              alt={
+                                typeof image === "object" && image !== null
+                                  ? image.name || "additional image"
+                                  : "additional image"
+                              }
                           className="w-full h-24 object-cover rounded-md shadow-md dark:shadow-none cursor-pointer"
                           onClick={() => {
                             Swal.fire({
