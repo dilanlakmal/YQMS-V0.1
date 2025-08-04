@@ -15,7 +15,8 @@ const MeasurementDetailsSection = ({
   measurementData = { beforeWash: [], afterWash: [] },
   showMeasurementTable = true,
   onMeasurementEdit,
-  reportType
+  reportType,
+  recordId
 }) => {
   const [sizes, setSizes] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
@@ -731,6 +732,8 @@ const toggleSelectAllRows = (size, checked, tableType) => {
             measurementData={measurementData}
             showMeasurementTable={showMeasurementTable}
             reportType={reportType}
+            recordId={recordId}
+            API_BASE_URL={API_BASE_URL}
           />
       </div>
       {isVisible && (

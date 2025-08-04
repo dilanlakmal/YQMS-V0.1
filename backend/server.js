@@ -26411,6 +26411,31 @@ app.post('/api/qc-washing/measurement-save', async (req, res) => {
   }
 });
 
+app.post('/api/qc-washing/measurement-summary-autosave/:recordId', async (req, res) => {
+  try {
+    const { recordId } = req.params;
+    const summary = req.body.summary || {};
+
+    const qcRecord = await QCWashing.findById(recordId);
+    if (!qcRecord) return res.status(404).json({ success: false, message: 'Record not found.' });
+
+    // Save summary data as top-level fields (not under any summary object/array)
+    qcRecord.totalCheckedPoint = summary.totalCheckedPoints ?? 0;
+    qcRecord.totalPass = summary.totalPass ?? 0;
+    qcRecord.totalFail = summary.totalFail ?? 0;
+    qcRecord.passRate = summary.passRate ?? 0;
+    qcRecord.measurementOverallResult = summary.overallResult || "PENDING";
+
+    qcRecord.savedAt = new Date();
+    await qcRecord.save();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Measurement summary autosave error:', error);
+    res.status(500).json({ success: false, message: 'Failed to autosave measurement summary.' });
+  }
+});
+
+
 
 /* ------------------------------
    AI Chatbot Proxy Route

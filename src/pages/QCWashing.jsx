@@ -1254,7 +1254,7 @@ useEffect(() => {
   }));
 
   // Save summary to backend
-  console.log("Summary to save:", summary);
+  // console.log("Summary to save:", summary);
   if (recordId) {
     autoSaveSummary(summary, recordId);
   }
