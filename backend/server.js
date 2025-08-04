@@ -24578,62 +24578,62 @@ app.get('/api/qc-washing/order-details-by-order/:orderNo', async (req, res) => {
   }
 });
 
-function calculateSummaryFields(qcRecord, colorName) {
-  if (!qcRecord || !qcRecord.colors) return {};
+// function calculateSummaryFields(qcRecord, colorName) {
+//   if (!qcRecord || !qcRecord.colors) return {};
 
-  const colorData = qcRecord.colors.find(c => c.colorName === colorName);
-  if (!colorData) return {};
+//   const colorData = qcRecord.colors.find(c => c.colorName === colorName);
+//   if (!colorData) return {};
 
-  let measurementPoints = 0, measurementPass = 0, totalCheckedPcs = 0;
-  (colorData.measurementDetails || []).forEach(md => {
-    if (Array.isArray(md.pcs)) {
-      totalCheckedPcs += md.pcs.length;
-      md.pcs.forEach(pc => {
-        (pc.measurementPoints || []).forEach(point => {
-          if (point.result === 'pass' || point.result === 'fail') {
-            measurementPoints++;
-            if (point.result === 'pass') measurementPass++;
-          }
-        });
-      });
-    }
-  });
+//   let measurementPoints = 0, measurementPass = 0, totalCheckedPcs = 0;
+//   (colorData.measurementDetails || []).forEach(md => {
+//     if (Array.isArray(md.pcs)) {
+//       totalCheckedPcs += md.pcs.length;
+//       md.pcs.forEach(pc => {
+//         (pc.measurementPoints || []).forEach(point => {
+//           if (point.result === 'pass' || point.result === 'fail') {
+//             measurementPoints++;
+//             if (point.result === 'pass') measurementPass++;
+//           }
+//         });
+//       });
+//     }
+//   });
 
-  const defectDetails = colorData.defectDetails || {};
-  let rejectedDefectPcs = 0;
-  let totalDefectCount = 0;
-  if (Array.isArray(defectDetails.defectsByPc)) {
-    rejectedDefectPcs = defectDetails.defectsByPc.length;
-    totalDefectCount = defectDetails.defectsByPc.reduce(
-      (sum, pc) => sum + (
-        Array.isArray(pc.pcDefects)
-          ? pc.pcDefects.reduce((defSum, defect) => defSum + (parseInt(defect.defectQty, 10) || 0), 0)
-          : 0
-      ), 0
-    );
-  }
-  const defectRate = totalCheckedPcs > 0 ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(1) : 0;
-  const defectRatio = totalCheckedPcs > 0 ? ((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1) : 0;
+//   const defectDetails = colorData.defectDetails || {};
+//   let rejectedDefectPcs = 0;
+//   let totalDefectCount = 0;
+//   if (Array.isArray(defectDetails.defectsByPc)) {
+//     rejectedDefectPcs = defectDetails.defectsByPc.length;
+//     totalDefectCount = defectDetails.defectsByPc.reduce(
+//       (sum, pc) => sum + (
+//         Array.isArray(pc.pcDefects)
+//           ? pc.pcDefects.reduce((defSum, defect) => defSum + (parseInt(defect.defectQty, 10) || 0), 0)
+//           : 0
+//       ), 0
+//     );
+//   }
+//   const defectRate = totalCheckedPcs > 0 ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(1) : 0;
+//   const defectRatio = totalCheckedPcs > 0 ? ((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1) : 0;
 
-  const totalFail = measurementPoints - measurementPass;
-  const measurementOverallResult = totalFail > 0 ? "Fail" : "Pass";
-  const defectOverallResult = defectDetails.result || "N/A";
-  let overallFinalResult = "N/A";
-  if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
-    overallFinalResult = "Fail";
-  } else if (measurementOverallResult === "Pass" && defectOverallResult === "Pass") {
-    overallFinalResult = "Pass";
-  }
+//   const totalFail = measurementPoints - measurementPass;
+//   const measurementOverallResult = totalFail > 0 ? "Fail" : "Pass";
+//   const defectOverallResult = defectDetails.result || "N/A";
+//   let overallFinalResult = "N/A";
+//   if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
+//     overallFinalResult = "Fail";
+//   } else if (measurementOverallResult === "Pass" && defectOverallResult === "Pass") {
+//     overallFinalResult = "Pass";
+//   }
 
-  return {
-    totalCheckedPcs,
-    rejectedDefectPcs,
-    totalDefectCount,
-    defectRate: parseFloat(defectRate),
-    defectRatio: parseFloat(defectRatio),
-    overallFinalResult,
-  };
-}
+//   return {
+//     totalCheckedPcs,
+//     rejectedDefectPcs,
+//     totalDefectCount,
+//     defectRate: parseFloat(defectRate),
+//     defectRatio: parseFloat(defectRatio),
+//     overallFinalResult,
+//   };
+// }
 
 
 // Save size data
@@ -24761,120 +24761,120 @@ app.post('/api/qc-washing/submit', async (req, res) => {
 });
 
 
-app.post('/api/qc-washing/auto-save-color', uploadQcWashingFiles.array("images", 20), async (req, res) => {
-  try {
-    const { orderNo, reportType, washQty, checkedQty, totalCheckedPoint, totalPass, totalFail, passRate, colorName, colorData, userId } = req.body;
+// app.post('/api/qc-washing/auto-save-color', uploadQcWashingFiles.array("images", 20), async (req, res) => {
+//   try {
+//     const { orderNo, reportType, washQty, checkedQty, totalCheckedPoint, totalPass, totalFail, passRate, colorName, colorData, userId } = req.body;
 
-      // Handle file uploads
-     const savedImageUrls = [];
-      if (req.files?.length) {
-        for (const file of req.files) {
-          const url = saveUploadedFile(file);
-          savedImageUrls.push(url);
-        }
-      }
+//       // Handle file uploads
+//      const savedImageUrls = [];
+//       if (req.files?.length) {
+//         for (const file of req.files) {
+//           const url = saveUploadedFile(file);
+//           savedImageUrls.push(url);
+//         }
+//       }
 
-         // --- Normalize images for defectDetails ---
-     const normalizeImages = async (images) => {
-        const results = [];
-        for (const img of images || []) {
-          let imagePath;
-          if (typeof img === 'string') {
-            imagePath = img;
-          } else if (typeof img === 'object' && img.preview) {
-            imagePath = img.preview;
-          } else {
-            console.warn('Skipping invalid image:', img);
-            continue;
-          }
+//          // --- Normalize images for defectDetails ---
+//      const normalizeImages = async (images) => {
+//         const results = [];
+//         for (const img of images || []) {
+//           let imagePath;
+//           if (typeof img === 'string') {
+//             imagePath = img;
+//           } else if (typeof img === 'object' && img.preview) {
+//             imagePath = img.preview;
+//           } else {
+//             console.warn('Skipping invalid image:', img);
+//             continue;
+//           }
 
-          if (imagePath.startsWith("data:image")) {
-            // Base64: Save as new file
-            const saved = saveBase64Image(imagePath, "defect");
-            if (saved) results.push(saved);
-          } else if (imagePath.startsWith("/storage/qc_washing_images/")) {
-            // Already a saved path: just keep it, do NOT save again
-            results.push(imagePath);
-          // } else if (imagePath.startsWith("http")) {
-          //   // Remote image: download and save ONCE
-          //   const saved = await saveRemoteImage(imagePath, "defect");
-          //   if (saved) results.push(saved);
-          } else {
-            // Unknown format: skip
-            console.warn('Unknown image format, skipping:', imagePath);
-          }
-        }
-        return results;
-      };
-      // Merge uploaded image URLs into additionalImages
-     if (colorData?.defectDetails) {
-        // Save & normalize additionalImages
-        colorData.defectDetails.additionalImages = await normalizeImages([
-          ...(colorData.defectDetails.additionalImages || []),
-          ...savedImageUrls,
-        ]);
+//           if (imagePath.startsWith("data:image")) {
+//             // Base64: Save as new file
+//             const saved = saveBase64Image(imagePath, "defect");
+//             if (saved) results.push(saved);
+//           } else if (imagePath.startsWith("/storage/qc_washing_images/")) {
+//             // Already a saved path: just keep it, do NOT save again
+//             results.push(imagePath);
+//           // } else if (imagePath.startsWith("http")) {
+//           //   // Remote image: download and save ONCE
+//           //   const saved = await saveRemoteImage(imagePath, "defect");
+//           //   if (saved) results.push(saved);
+//           } else {
+//             // Unknown format: skip
+//             console.warn('Unknown image format, skipping:', imagePath);
+//           }
+//         }
+//         return results;
+//       };
+//       // Merge uploaded image URLs into additionalImages
+//      if (colorData?.defectDetails) {
+//         // Save & normalize additionalImages
+//         colorData.defectDetails.additionalImages = await normalizeImages([
+//           ...(colorData.defectDetails.additionalImages || []),
+//           ...savedImageUrls,
+//         ]);
 
-        // Save & normalize defectImages for each defect
-        if (colorData.defectDetails.defectsByPc) {
-          for (const pcEntry of colorData.defectDetails.defectsByPc) {
-            for (const defect of pcEntry.pcDefects || []) {
-              defect.defectImages = await normalizeImages(defect.defectImages);
-            }
-          }
-        }
-      }
+//         // Save & normalize defectImages for each defect
+//         if (colorData.defectDetails.defectsByPc) {
+//           for (const pcEntry of colorData.defectDetails.defectsByPc) {
+//             for (const defect of pcEntry.pcDefects || []) {
+//               defect.defectImages = await normalizeImages(defect.defectImages);
+//             }
+//           }
+//         }
+//       }
 
-    let qcRecord = await QCWashing.findOne({ orderNo: orderNo });
+//     let qcRecord = await QCWashing.findOne({ orderNo: orderNo });
 
-    if (!qcRecord) {
-      qcRecord = new QCWashing({
-        orderNo: orderNo,
-        isAutoSave: true,
-        userId: userId,
-        status: 'auto-saved',
-        colors: []
-      });
-    }
+//     if (!qcRecord) {
+//       qcRecord = new QCWashing({
+//         orderNo: orderNo,
+//         isAutoSave: true,
+//         userId: userId,
+//         status: 'auto-saved',
+//         colors: []
+//       });
+//     }
 
-    qcRecord.reportType = reportType;
-    qcRecord.washQty = washQty;
-    qcRecord.checkedQty = checkedQty;
-    qcRecord.totalCheckedPoint = totalCheckedPoint;
-    qcRecord.totalPass = totalPass;
-    qcRecord.totalFail = totalFail;
-    qcRecord.passRate = passRate;
-    let colorEntry = qcRecord.colors?.find(c => c.colorName === colorName);
+//     qcRecord.reportType = reportType;
+//     qcRecord.washQty = washQty;
+//     qcRecord.checkedQty = checkedQty;
+//     qcRecord.totalCheckedPoint = totalCheckedPoint;
+//     qcRecord.totalPass = totalPass;
+//     qcRecord.totalFail = totalFail;
+//     qcRecord.passRate = passRate;
+//     let colorEntry = qcRecord.colors?.find(c => c.colorName === colorName);
 
-    if (!colorEntry) {
-      if (!qcRecord.colors) qcRecord.colors = [];
-      colorEntry = {
-        colorName: colorName,
-        orderDetails: {},
-        inspectionDetails: {},
-        defectDetails: {}, // This will be populated from colorData
-        measurementDetails: []
-      };
-      qcRecord.colors.push(colorEntry);
-    }
+//     if (!colorEntry) {
+//       if (!qcRecord.colors) qcRecord.colors = [];
+//       colorEntry = {
+//         colorName: colorName,
+//         orderDetails: {},
+//         inspectionDetails: {},
+//         defectDetails: {}, // This will be populated from colorData
+//         measurementDetails: []
+//       };
+//       qcRecord.colors.push(colorEntry);
+//     }
 
-    if (colorData) {
-      colorEntry.orderDetails = colorData.orderDetails;
-      colorEntry.inspectionDetails = colorData.inspectionDetails;
-      colorEntry.defectDetails = colorData.defectDetails; // This now includes defectsByPc and additionalImages
-      colorEntry.measurementDetails = colorData.measurementDetails;
-    }
-    const summaryFields = calculateSummaryFields(qcRecord, colorName);
-    Object.assign(qcRecord, summaryFields);
+//     if (colorData) {
+//       colorEntry.orderDetails = colorData.orderDetails;
+//       colorEntry.inspectionDetails = colorData.inspectionDetails;
+//       colorEntry.defectDetails = colorData.defectDetails; // This now includes defectsByPc and additionalImages
+//       colorEntry.measurementDetails = colorData.measurementDetails;
+//     }
+//     const summaryFields = calculateSummaryFields(qcRecord, colorName);
+//     Object.assign(qcRecord, summaryFields);
 
-    qcRecord.savedAt = new Date();
-    await qcRecord.save();
+//     qcRecord.savedAt = new Date();
+//     await qcRecord.save();
 
-    res.json({ success: true, id: qcRecord._id, message: 'Color data auto-saved successfully' });
-  } catch (error) {
-    console.error('Auto-save color error:', error);
-    res.status(500).json({ success: false, message: 'Auto-save failed' });
-  }
-});
+//     res.json({ success: true, id: qcRecord._id, message: 'Color data auto-saved successfully' });
+//   } catch (error) {
+//     console.error('Auto-save color error:', error);
+//     res.status(500).json({ success: false, message: 'Auto-save failed' });
+//   }
+// });
 
 // Load color-specific data
 app.get('/api/qc-washing/load-color-data/:orderNo/:color', async (req, res) => {
@@ -25200,12 +25200,39 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
     const qcRecord = await QCWashing.findById(recordId);
     if (!qcRecord) return res.status(404).json({ success: false, message: 'Record not found.' });
 
-    // Always set all fields, even if 0 or "N/A"
-    qcRecord.totalCheckedPcs = summary.totalCheckedPcs ?? 0;
-    qcRecord.rejectedDefectPcs = summary.rejectedDefectPcs ?? 0;
-    qcRecord.totalDefectCount = summary.totalDefectCount ?? 0;
-    qcRecord.defectRate = summary.defectRate ?? 0;
-    qcRecord.defectRatio = summary.defectRatio ?? 0;
+    // Always recalculate totalCheckedPcs from measurementDetails
+    let totalCheckedPcs = 0;
+    if (Array.isArray(qcRecord.measurementDetails)) {
+      for (const size of qcRecord.measurementDetails) {
+        if (Array.isArray(size.pcs)) {
+          totalCheckedPcs += size.pcs.length;
+        }
+      }
+    }
+    qcRecord.totalCheckedPcs = totalCheckedPcs;
+
+    // Recalculate rejectedDefectPcs and totalDefectCount from defectDetails
+    let rejectedDefectPcs = 0;
+    let totalDefectCount = 0;
+    const defectDetails = qcRecord.defectDetails || {};
+    if (Array.isArray(defectDetails.defectsByPc)) {
+      rejectedDefectPcs = defectDetails.defectsByPc.length;
+      totalDefectCount = defectDetails.defectsByPc.reduce(
+        (sum, pc) => sum + (
+          Array.isArray(pc.pcDefects)
+            ? pc.pcDefects.reduce((defSum, defect) => defSum + (parseInt(defect.defectQty, 10) || 0), 0)
+            : 0
+        ), 0
+      );
+    }
+    qcRecord.rejectedDefectPcs = rejectedDefectPcs;
+    qcRecord.totalDefectCount = totalDefectCount;
+
+    // Calculate defectRate and defectRatio
+    qcRecord.defectRate = totalCheckedPcs > 0 ? (totalDefectCount / totalCheckedPcs) * 100 : 0;
+    qcRecord.defectRatio = totalCheckedPcs > 0 ? (rejectedDefectPcs / totalCheckedPcs) * 100 : 0;
+
+    // Use frontend's overallFinalResult if you want, or recalculate here
     qcRecord.overallFinalResult = summary.overallFinalResult ?? "N/A";
 
     await qcRecord.save();
@@ -25214,9 +25241,6 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to save summary.' });
   }
 });
-
-
-
 
 
 const getAqlLevelForBuyer = (buyer) => {

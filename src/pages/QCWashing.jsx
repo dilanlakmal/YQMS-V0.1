@@ -79,10 +79,12 @@ function calculateSummaryData(currentFormData) {
 
   let measurementPoints = 0;
   let measurementPass = 0;
+  let totalCheckedPcs = 0;
 
   if (currentMeasurementData && Array.isArray(currentMeasurementData)) {
     currentMeasurementData.forEach((data) => {
       if (data.pcs && Array.isArray(data.pcs)) {
+        totalCheckedPcs += data.pcs.length;
         data.pcs.forEach((pc) => {
           if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
             pc.measurementPoints.forEach((point) => {
@@ -99,10 +101,10 @@ function calculateSummaryData(currentFormData) {
     });
   }
 
-  const checkedPcs = Number(currentDefectDetails?.checkedQty) || 0;
   const rejectedDefectPcs = Array.isArray(currentDefectDetails?.defectsByPc)
     ? currentDefectDetails.defectsByPc.length
     : 0;
+
   const defectCount = currentDefectDetails?.defectsByPc
     ? currentDefectDetails.defectsByPc.reduce((sum, pc) => {
         return sum + (Array.isArray(pc.pcDefects)
@@ -110,19 +112,22 @@ function calculateSummaryData(currentFormData) {
           : 0);
       }, 0)
     : 0;
+
   const defectRate =
-    checkedPcs > 0
-      ? ((defectCount / checkedPcs) * 100).toFixed(1)
+    totalCheckedPcs > 0
+      ? ((defectCount / totalCheckedPcs) * 100).toFixed(1)
       : 0;
+
   const defectRatio =
-    checkedPcs > 0
-      ? ((rejectedDefectPcs / checkedPcs) * 100).toFixed(1)
+    totalCheckedPcs > 0
+      ? ((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1)
       : 0;
 
   let overallResult = "Pass";
   const measurementOverallResult =
     measurementPoints - measurementPass > 0 ? "Fail" : "Pass";
   const defectOverallResult = currentDefectDetails?.result || "N/A";
+
   if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
     overallResult = "Fail";
   } else if (measurementOverallResult === "Pass" && defectOverallResult === "Pass") {
@@ -132,7 +137,7 @@ function calculateSummaryData(currentFormData) {
   }
 
   return {
-    totalCheckedPcs: checkedPcs || 0,
+    totalCheckedPcs: totalCheckedPcs || 0,
     rejectedDefectPcs: rejectedDefectPcs || 0,
     totalDefectCount: defectCount || 0,
     defectRate: parseFloat(defectRate) || 0,
@@ -140,6 +145,7 @@ function calculateSummaryData(currentFormData) {
     overallFinalResult: overallResult || "N/A",
   };
 }
+
 
 
 function machineProcessesToObject(machineProcesses) {
