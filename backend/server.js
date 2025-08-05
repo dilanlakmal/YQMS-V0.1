@@ -26552,10 +26552,6 @@ app.delete(
    End Points - Supplier Issues Reports
 ------------------------------------------- */
 
-/* -------------------------------------------
-   End Points - Supplier Issues Reports
-------------------------------------------- */
-
 // NEW: GET an existing report based on key fields
 app.get("/api/supplier-issues/reports/find-existing", async (req, res) => {
   try {

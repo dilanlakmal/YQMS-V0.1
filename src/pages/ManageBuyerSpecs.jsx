@@ -2,7 +2,6 @@ import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ListPlus, Wrench } from "lucide-react";
 
-// Import the components for each tab
 import SelectDTSpecPageTitle from "../components/inspection/select_specs/SelectDTSpecPageTitle";
 import SelectDTBuyerSpec from "../components/inspection/select_specs/SelectDTBuyerSpec";
 import EditDTSpecs from "../components/inspection/select_specs/EditDTSpecs";
@@ -39,7 +38,9 @@ const ManageBuyerSpecs = () => {
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 p-1 sm:p-2 lg:p-3">
       <div className="max-w-screen-2xl mx-auto">
-        <SelectDTSpecPageTitle user={user} />
+        <div>
+          <SelectDTSpecPageTitle user={user} />
+        </div>
         <div className="border-b border-gray-300 dark:border-gray-700">
           <nav className="-mb-px flex space-x-4" aria-label="Tabs">
             {tabs.map((tab) => (
