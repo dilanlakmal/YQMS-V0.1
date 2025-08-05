@@ -41,30 +41,29 @@ import mongoose from "mongoose";
         comparison:[String],
         remark: String,
       }],
-      machineProcesses: [
-        {
-          machineType: String,
-          temperature: String,
-          time: String,
-          chemical: String // optional for Tumble Dry
+      machineProcesses: [{
+          machineType:String,
+          temperature: Number,
+          time:Number,
+          chemical: Number // optional for Tumble Dry
         }
       ],
       parameters: [{
         parameterName: String,
         checkedQty: { type: Number, default: 0 },
         defectQty: { type: Number, default: 0 },
-        passRate: { type: String, default: '0.00' },
+        passRate: { type: Number, default: 0.00 },
         result: { type: String, default: '' },
         remark: String,
       }]
     },
       defectDetails: {
-        checkedQty: String,
-        washQty: String,
+        checkedQty: Number,
+        washQty: Number,
         result: String,
-        aqlLevelUsed: String,
+        aqlLevelUsed: Number,
         defectsByPc: [{
-          pcNumber: String, // track PC number
+          pcNumber: Number, // track PC number
           pcDefects: [{
             defectId: String,
             defectName: String,
