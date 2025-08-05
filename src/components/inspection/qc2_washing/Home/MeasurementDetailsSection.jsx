@@ -132,8 +132,8 @@ const MeasurementDetailsSection = ({
   };
 
   const handleEditClick = (sizeToEdit) => {
-    const washTypeKey = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
-    const dataToEdit = (measurementData[washTypeKey] || []).find(item => item.size === sizeToEdit);
+    const before_after_wash_Key = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
+    const dataToEdit = (measurementData[before_after_wash_Key] || []).find(item => item.size === sizeToEdit);
 
     if (!dataToEdit) {
       console.error("Data to edit not found for size:", sizeToEdit);

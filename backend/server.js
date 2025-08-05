@@ -25629,7 +25629,7 @@ app.post("/api/qc-washing/orderData-save", async (req, res) => {
       orderNo: formData.orderNo,
       date: dateValue,
       color: formData.color,
-      washingType: formData.washingType,
+      washType: formData.washType,
       before_after_wash: formData.before_after_wash,
       factoryName: formData.factoryName, 
       reportType: formData.reportType,

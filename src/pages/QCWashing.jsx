@@ -175,7 +175,7 @@ const QCWashingPage = () => {
     checkedQty: "",
     color: "",
     washQty: "",
-    washingType: "Normal Wash",
+    washType: "Normal Wash",
     firstOutput: "",
     inline: "",
     reportType: "",
@@ -410,8 +410,8 @@ useEffect(() => {
   // --- Helper Functions ---
   const processMeasurementData = (loadedMeasurements) => {
     if (Array.isArray(loadedMeasurements)) {
-      const beforeWash = loadedMeasurements.filter((m) => m.washType === "beforeWash");
-      const afterWash = loadedMeasurements.filter((m) => m.washType === "afterWash");
+      const beforeWash = loadedMeasurements.filter((m) => m.before_after_wash === "beforeWash");
+      const afterWash = loadedMeasurements.filter((m) => m.before_after_wash === "afterWash");
       return { beforeWash, afterWash };
     }
     if (loadedMeasurements && (loadedMeasurements.beforeWash || loadedMeasurements.afterWash)) {
@@ -1094,16 +1094,16 @@ if (saved.inspectionDetails?.machineProcesses) {
  const handleSizeSubmit = async (transformedSizeData) => {
   try {
     // 1. Update local state as before
-    const washType = formData.before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
+    const before_after_wash = formData.before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
     setMeasurementData((prev) => {
-      const currentArray = prev[washType];
+      const currentArray = prev[before_after_wash];
       const existingIndex = currentArray.findIndex((item) => item.size === transformedSizeData.size);
       if (existingIndex >= 0) {
         const updated = [...currentArray];
         updated[existingIndex] = transformedSizeData;
-        return { ...prev, [washType]: updated };
+        return { ...prev, [before_after_wash]: updated };
       } else {
-        return { ...prev, [washType]: [...currentArray, transformedSizeData] };
+        return { ...prev, [before_after_wash]: [...currentArray, transformedSizeData] };
       }
     });
     setSavedSizes((prev) => {
@@ -1119,8 +1119,8 @@ if (saved.inspectionDetails?.machineProcesses) {
       Swal.fire("Order details must be saved first!", "", "warning");
       return;
     }
-    // Add washType to the data
-    const measurementDetail = { ...transformedSizeData, washType };
+    // Add before_after_wash to the data
+    const measurementDetail = { ...transformedSizeData, before_after_wash };
     const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-save`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1148,11 +1148,11 @@ if (saved.inspectionDetails?.machineProcesses) {
     setShowMeasurementTable(true);
     if (size) {
       setSavedSizes((prev) => prev.filter((s) => s !== size));
-      const washType =
+      const before_after_wash =
         formData.before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
       setMeasurementData((prev) => ({
         ...prev,
-        [washType]: prev[washType].filter((item) => item.size !== size),
+        [before_after_wash]: prev[before_after_wash].filter((item) => item.size !== size),
       }));
     }
   };
@@ -1247,8 +1247,8 @@ useEffect(() => {
     })),
   };
   const measurementDetails = [
-    ...measurementData.beforeWash.map((item) => ({ ...item, washType: "beforeWash" })),
-    ...measurementData.afterWash.map((item) => ({ ...item, washType: "afterWash" })),
+    ...measurementData.beforeWash.map((item) => ({ ...item, beforeWash: "beforeWash" })),
+    ...measurementData.afterWash.map((item) => ({ ...item, afterWash: "afterWash" })),
   ];
 
   // Calculate summary from the latest data
@@ -1623,7 +1623,7 @@ useEffect(() => {
                       checkedQty: "",
                       color: "",
                       washQty: "",
-                      washingType: "Normal Wash",
+                      washType: "Normal Wash",
                       firstOutput: false,
                       inline: false,
                       reportType: "",
@@ -1672,8 +1672,8 @@ useEffect(() => {
                   })),
                 };
                 const measurementDetails = [
-                  ...measurementData.beforeWash.map((item) => ({ ...item, washType: "beforeWash" })),
-                  ...measurementData.afterWash.map((item) => ({ ...item, washType: "afterWash" })),
+                  ...measurementData.before_after_wash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
+                  ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
                 ];
                 const summary = calculateSummaryData({
                   ...formData,
@@ -1763,8 +1763,8 @@ useEffect(() => {
                       additionalImages: await Promise.all(uploadedImages.map(img => imageToBase64(img))),
                     },
                     measurementDetails: [
-                      ...measurementData.beforeWash.map((item) => ({ ...item, washType: "beforeWash" })),
-                      ...measurementData.afterWash.map((item) => ({ ...item, washType: "afterWash" })),
+                      ...measurementData.before_after_wash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
+                      ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
                     ],
                   },
                 };

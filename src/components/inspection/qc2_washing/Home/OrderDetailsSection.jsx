@@ -35,7 +35,7 @@ const OrderDetailsSection = ({
       orderNo: formData.orderNo,
       date: formData.date,
       color: formData.color,
-      washingType: formData.washingType,
+      washType: formData.washType,
       before_after_wash: formData.before_after_wash, // Washing Method
       factoryName: formData.factoryName,
       reportType: formData.reportType,
@@ -289,8 +289,8 @@ const OrderDetailsSection = ({
          <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium dark:text-gray-300">Washing Type:</label>
             <select
-              value={formData.washingType}
-              onChange={(e) => handleInputChange("washingType", e.target.value)}
+              value={formData.washType}
+              onChange={(e) => handleInputChange("washType", e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                disabled={isSaved}
             >
