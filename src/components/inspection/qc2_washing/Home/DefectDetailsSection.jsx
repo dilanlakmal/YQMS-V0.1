@@ -449,7 +449,7 @@ const DefectDetailsSection = ({
               <input 
                 type="text" 
                 value={formData.checkedQty || ''}
-                readOnly={formData.daily === "Inline" || formData.firstOutput === "First Output"}
+                readOnly={formData.reportType === "Inline" || formData.firstOutput === "First Output"}
                 className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:bg-gray-200 disabled:dark:bg-gray-500"
                 placeholder={
                   formData.firstOutput === "First Output"
@@ -461,7 +461,7 @@ const DefectDetailsSection = ({
             </div>
            
             {/* AQL Information Display */}
-         {((formData.inline === 'Inline' || formData.daily === 'Inline') || formData.firstOutput === "First Output") && 
+         {((formData.inline === 'Inline' || formData.reportType === 'Inline') || formData.firstOutput === "First Output") && 
            (formData.aqlSampleSize || formData.aqlAcceptedDefect || formData.aqlRejectedDefect) && (
             <div className="md:col-span-2 bg-blue-50 dark:bg-slate-800 border border-blue-200 dark:border-slate-600 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">

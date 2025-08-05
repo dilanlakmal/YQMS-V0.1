@@ -36,9 +36,9 @@ const OrderDetailsSection = ({
       date: formData.date,
       color: formData.color,
       washingType: formData.washingType,
-      reportType: formData.reportType, // Washing Method
+      before_after_wash: formData.before_after_wash, // Washing Method
       factoryName: formData.factoryName,
-      daily: formData.daily,
+      reportType: formData.reportType,
       inspector: {
         empId: user?.emp_id
       }
@@ -357,8 +357,8 @@ const OrderDetailsSection = ({
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium">Befor/After Wash:</label>
             <select
-              value={formData.reportType || 'Before Wash'}
-              onChange={(e) => handleInputChange('reportType', e.target.value)}
+              value={formData.before_after_wash || 'Before Wash'}
+              onChange={(e) => handleInputChange('before_after_wash', e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
                disabled={isSaved}
             >

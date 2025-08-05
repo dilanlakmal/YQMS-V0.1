@@ -15,7 +15,7 @@ const MeasurementDetailsSection = ({
   measurementData = { beforeWash: [], afterWash: [] },
   showMeasurementTable = true,
   onMeasurementEdit,
-  reportType,
+ before_after_wash,
   recordId
 }) => {
   const [sizes, setSizes] = useState([]);
@@ -32,8 +32,10 @@ const MeasurementDetailsSection = ({
   const [showNumPad, setShowNumPad] = useState(false);
   const [currentCell, setCurrentCell] = useState({ size: null, table: null, rowIndex: null, colIndex: null });
   const [measurementValues, setMeasurementValues] = useState({});
+  const [noMeasurementData, setNoMeasurementData] = useState(false);
 
-  const currentWashMeasurements = (reportType === 'Before Wash' ? measurementData.beforeWash : measurementData.afterWash) || [];
+
+  const currentWashMeasurements = (before_after_wash === 'Before Wash' ? measurementData.beforeWash : measurementData.afterWash) || [];
 
   const transformMeasurementData = (size, qty, measurements, selectedRows, fullColumns, measurementSpecs, tableType) => {
     const pcs = [];
@@ -130,7 +132,7 @@ const MeasurementDetailsSection = ({
   };
 
   const handleEditClick = (sizeToEdit) => {
-    const washTypeKey = reportType === 'Before Wash' ? 'beforeWash' : 'afterWash';
+    const washTypeKey = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
     const dataToEdit = (measurementData[washTypeKey] || []).find(item => item.size === sizeToEdit);
 
     if (!dataToEdit) {
@@ -163,6 +165,7 @@ const MeasurementDetailsSection = ({
         onMeasurementEdit(sizeToEdit);
     }
   };
+  
   
   useEffect(() => {
     if (orderNo && color) {
@@ -208,6 +211,7 @@ const MeasurementDetailsSection = ({
       const data = await response.json();
       
       if (response.ok && data.success) {
+        setNoMeasurementData(!!data.isDefault);
         const beforeWashGrouped = data.beforeWashGrouped || {};
         const afterWashGrouped = data.afterWashGrouped || {};
         
@@ -225,9 +229,11 @@ const MeasurementDetailsSection = ({
         if (afterKeys.length > 0) setActiveAfterTab(afterKeys[0]);
         
       } else {
+         setNoMeasurementData(false);
         setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
       }
     } catch (error) {
+       setNoMeasurementData(false);
       console.error('Error fetching measurement specs:', error);
       setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
     }
@@ -268,7 +274,7 @@ const MeasurementDetailsSection = ({
     const newSize = { size: sizeStr, qty: 5 };
     setSelectedSizes(prev => [...prev, newSize]);
     // Set all measurement points to unselected for this size
-    const specs = reportType === 'Before Wash'
+    const specs = before_after_wash === 'Before Wash'
       ? (measurementSpecs.beforeWashGrouped[activeBeforeTab] || measurementSpecs.beforeWash)
       : (measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash);
     setSelectedRowsBySize(prev => ({
@@ -297,10 +303,10 @@ const MeasurementDetailsSection = ({
     updated[columnIndex] = !updated[columnIndex];
 
     if (updated[columnIndex]) {
-      const specs = reportType === 'Before Wash'
+      const specs = before_after_wash === 'Before Wash'
         ? (measurementSpecs.beforeWashGrouped[activeBeforeTab] || measurementSpecs.beforeWash)
         : (measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash);
-      const tableType = reportType === 'Before Wash' ? 'before' : 'after';
+      const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
       setMeasurementValues(prevValues => {
         const newValues = { ...prevValues };
         specs.forEach((spec, specIndex) => {
@@ -340,7 +346,7 @@ const toggleRowSelection = (size, rowIndex) => {
     // If now checked, set all related cells to 0
     if (updatedSelections[rowIndex]) {
       const qty = selectedSizes.find(s => s.size === size)?.qty || 1;
-      const tableType = reportType === 'Before Wash' ? 'before' : 'after';
+      const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
       setMeasurementValues(prevValues => {
         const newValues = { ...prevValues };
         for (let i = 0; i < qty; i++) {
@@ -380,23 +386,9 @@ const toggleSelectAllRows = (size, checked, tableType) => {
 };
 
 
-  const renderMeasurementTable = (size, qty) => {
-    if  (!measurementSpecs || 
-    ((!measurementSpecs.beforeWash || measurementSpecs.beforeWash.length === 0) && 
-     (!measurementSpecs.afterWash || measurementSpecs.afterWash.length === 0))
-  ) {
-      return (
-        <div className="mb-8" key={`table-${size}`}>
-          <h4 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
-            Size: {size} (Qty: {qty})
-          </h4>
-          <div className="text-sm text-gray-500 p-4 border border-gray-300 rounded">
-            No measurement specifications available
-          </div>
-        </div>
-      );
-    }
 
+  const renderMeasurementTable = (size, qty) => {
+   
     return (
       <div key={`measurement-${size}`} className="mb-8">
         <h4 className="text-lg font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-white">
@@ -404,7 +396,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
         </h4>
         
         {/* K1 Sheet - Before Wash */}
-        {reportType === 'Before Wash' && (
+        {before_after_wash === 'Before Wash' && (
           <div className="bg-blue-50 p-4 rounded-lg mb-4 dark:bg-gray-800 dark:text-white">
           <h5 className="text-sm font-medium mb-3">Before Wash</h5>
 
@@ -560,7 +552,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
         )}
 
         {/* K2 Sheet - After Wash */}
-        {reportType === 'After Wash' && (
+        {before_after_wash === 'After Wash' && (
           <>
             <div className="flex justify-end mb-2">
             <button
@@ -731,12 +723,22 @@ const toggleSelectAllRows = (size, checked, tableType) => {
       <SummaryCard
             measurementData={measurementData}
             showMeasurementTable={showMeasurementTable}
-            reportType={reportType}
+            before_after_wash={before_after_wash}
             recordId={recordId}
             API_BASE_URL={API_BASE_URL}
           />
       </div>
-      {isVisible && (
+      {noMeasurementData ? (
+      <div className="mb-8">
+        <h4 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
+          Measurement Details
+        </h4>
+        <div className="text-sm text-gray-500 p-4 border border-gray-300 rounded">
+          No measurement data are available for this style.
+        </div>
+      </div>
+    ) : (
+      isVisible && (
         <div className="space-y-6">
           {/* Display selected order and color */}
           {/* {orderNo && color && (
@@ -965,8 +967,8 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                           <button
                             onClick={() => {
                               const validationErrors = [];
-                              const tableType = reportType === 'Before Wash' ? 'before' : 'after';
-                              const specsForSubmit = reportType === 'Before Wash'
+                              const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
+                              const specsForSubmit = before_after_wash === 'Before Wash'
                                 ? (measurementSpecs.beforeWashGrouped[activeBeforeTab] || measurementSpecs.beforeWash || [])
                                 : (measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash || []);
 
@@ -1023,9 +1025,9 @@ const toggleSelectAllRows = (size, checked, tableType) => {
             </div>
           )}
         </div>
-      )}
+      )
+    )}
       
-      {/* Measurement NumPad */}
       {showNumPad && (
         <MeasurementNumPad
           onClose={() => setShowNumPad(false)}

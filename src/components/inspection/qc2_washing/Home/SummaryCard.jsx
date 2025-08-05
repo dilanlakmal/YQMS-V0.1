@@ -3,7 +3,7 @@ import React, { useEffect } from "react";
 const SummaryCard = ({
   measurementData,
   showMeasurementTable,
-  reportType,
+  before_after_wash,
   recordId,
   API_BASE_URL
 }) => {
@@ -13,7 +13,7 @@ const SummaryCard = ({
   let currentMeasurements = [];
 
   if (measurementData && typeof measurementData === "object") {
-    const washType = reportType === 'Before Wash' ? 'beforeWash' : 'afterWash';
+    const washType = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
     currentMeasurements = measurementData[washType] || [];
     currentMeasurements.forEach((data) => {
       if (data.pcs && Array.isArray(data.pcs)) {
@@ -94,7 +94,7 @@ const SummaryCard = ({
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
         Measurement Summary -{" "}
-        <span className="text-indigo-600">{reportType}</span>
+        <span className="text-indigo-600">{before_after_wash}</span>
       </h2>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 text-center">

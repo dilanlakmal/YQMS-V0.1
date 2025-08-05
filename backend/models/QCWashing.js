@@ -3,9 +3,9 @@ import mongoose from "mongoose";
   const QCWashingSchema = new mongoose.Schema({
     date: {type: Date,default: Date.now},
     orderNo: {type: String,required: true},
-    reportType: { type: String,default: 'Before Wash'},
-    checkedQty: {type: String},
-    washQty: {type: String},
+    before_after_wash: { type: String,default: 'Before Wash'},
+    checkedQty: {type: Number,default: 0},
+    washQty: {type: Number,default: 0},
     totalCheckedPoint: { type: Number,default: 0},
     totalPass: {type: Number,default: 0},
     totalFail: {type: Number,default: 0},
@@ -16,21 +16,24 @@ import mongoose from "mongoose";
     defectRate: { type: Number },
     defectRatio: { type: Number },
     overallFinalResult: { type: String },
-    aqlLevelUsed: { type: String },
-    orderQty: String,
-    colorOrderQty: Number,
-    color: String,
-    washingType: {type: String,default: 'Normal Wash'},
-    daily: String,
+    orderQty: { type: Number, default: 0 },
+    colorOrderQty: { type: Number, default: 0 },
+    color: { type: String, default: '' },
+    washType: {type: String,default: 'Normal Wash'},
+    reportType: String,
     buyer: String,
     factoryName: String,
-    aqlSampleSize: String,
-    aqlAcceptedDefect: String,
-    aqlRejectedDefect: String,
     colorName: String,
+    aql:[{
+      sampleSize: Number,
+      acceptedDefect: Number,
+      rejectedDefect: Number,
+      levelUsed: { type:Number, default: 0 },
+    }],
     inspector: {
-      engName: String, 
-      empId: String},
+      engName: String,
+      empId: String
+    },
     inspectionDetails: {
        checkedPoints: [{
         pointName: String,
@@ -72,43 +75,55 @@ import mongoose from "mongoose";
         additionalImages: [String],
         comment: String
       },
-      measurementDetails: [{
-        size: String,
-        qty: Number,
-        washType: {
-          type: String,
-          enum: ['beforeWash', 'afterWash'],
-          required: true
+      measurementDetails: [
+        {
+         measurementSizeSummary: {
+            size: String,
+            checkedPcs: Number,
+            checkedPoints: Number,
+            totalPass: Number,
+            totalFail: Number,
+            plusToleranceFailCount: Number,
+            minusToleranceFailCount: Number,
+            tolerancePlus: Number,
+            toleranceMinus: Number
+          },
+            measurement: {
+              size: String,
+              qty: Number,
+              before_after_wash: {
+                type: String,
+                enum: ['beforeWash', 'afterWash'],
+              required: true
+            },
+            pcs: [{
+              pcNumber: Number,
+              isFullColumn: Boolean,
+              measurementPoints: [{
+                pointName: String,
+                pointNo: Number, // from dt_order/specs
+                decimal: Number, // measured value as decimal
+                fraction: String, // measured value as fraction
+                specs: String,
+                toleranceMinus: Number, // decimal
+                tolerancePlus: Number,  // decimal
+                rowNo: Number, // instead of specIndex
+                result: { type: String, enum: ['pass', 'fail'], default: 'pass' }
+              }]
+            }],
+            selectedRows: [Boolean],
+            fullColumns: [Boolean],
+            measurements: mongoose.Schema.Types.Mixed,
+            savedAt: Date
+          }
         },
-      
-        pcs: [{
-          pcNumber: Number,
-          measurementPoints: [{
-            pointName: String,
-            value: String,
-            specs: String,
-            toleranceMinus: String,
-            tolerancePlus: String,
-            specIndex: Number,
-            isFullColumn: Boolean,
-            result: {
-              type: String,
-              enum: ['pass', 'fail'],
-              default: 'pass'
-            }
-          }]
-        }],
-        selectedRows: [Boolean],
-        fullColumns: [Boolean],
-        measurements: mongoose.Schema.Types.Mixed,
-        savedAt: Date
-      }],
+      ],
     isAutoSave: {
       type: Boolean,
       default: false
     },
     userId: String,
-    savedAt: Date,
+    // savedAt: Date,
     submittedAt: Date,
     status: {
       type: String,

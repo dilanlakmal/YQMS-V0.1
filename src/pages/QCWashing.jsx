@@ -178,15 +178,17 @@ const QCWashingPage = () => {
     washingType: "Normal Wash",
     firstOutput: "",
     inline: "",
-    daily: "",
+    reportType: "",
     buyer: "",
     factoryName: "YM",
-    reportType: "Before Wash",
+    before_after_wash: "Before Wash",
     result: "",
-    aqlSampleSize: "",
-    aqlAcceptedDefect: "",
-    aqlRejectedDefect: "",
-    aqlLevelUsed: "", 
+    aql:[{
+      aqlSampleSize: "",
+      aqlAcceptedDefect: "",
+      aqlRejectedDefect: "",
+      aqlLevelUsed: "",
+    }],
     colors: [
       {
         colorName: "",
@@ -281,7 +283,7 @@ const activateNextSection = (currentSection) => {
     checkedQty: param.checkedQty || 0,
     failedQty: param.failedQty || 0,
     remark: param.remark || "",
-    aqlAcceptedDefect: param.aqlAcceptedDefect || "",
+    acceptedDefect: param.aqlAcceptedDefect || "",
     checkboxes: param.checkboxes || {},
   }));
 }
@@ -347,10 +349,10 @@ const activateNextSection = (currentSection) => {
 
   // --- useEffect: Calculate Checked Qty ---
   useEffect(() => {
-    if ((formData.inline === "Inline" || formData.daily === "Inline") && formData.aqlSampleSize && formData.washQty) {
+    if ((formData.inline === "Inline" || formData.reportType === "Inline") && formData.aqlSampleSize && formData.washQty) {
       calculateCheckedQty(formData.washQty);
     }
-  }, [formData.aqlSampleSize, formData.inline, formData.daily]);
+  }, [formData.aqlSampleSize, formData.inline, formData.reportType]);
 
 useEffect(() => {
   if (recordId) {
@@ -361,7 +363,7 @@ useEffect(() => {
 
    // --- useEffect: Calculate AQL Status ---
   useEffect(() => {
-    if ((formData.inline === 'Inline' || formData.daily === 'Inline' || formData.firstOutput === "First Output" || formData.daily === 'First Output') && formData.aqlAcceptedDefect) {
+    if ((formData.inline === 'Inline' || formData.reportType === 'Inline' || formData.firstOutput === "First Output" || formData.reportType === 'First Output') && formData.aqlAcceptedDefect) {
         const totalDefects = Object.values(defectsByPc)
             .flat()
             .reduce((sum, defect) => sum + (parseInt(defect.defectQty, 10) || 0), 0);
@@ -380,7 +382,7 @@ useEffect(() => {
             setFormData(prev => ({ ...prev, result: '' }));
         }
     }
-  }, [defectsByPc, formData.aqlAcceptedDefect, formData.inline, formData.daily, formData.firstOutput, formData.result]);
+  }, [defectsByPc, formData.aqlAcceptedDefect, formData.inline, formData.reportType, formData.firstOutput, formData.result]);
 
   useEffect(() => {
   const fetchColorOrderQty = async () => {
@@ -637,13 +639,16 @@ useEffect(() => {
       ...prev,
       ...saved.formData, // or map fields as needed
       date: saved.formData?.date ? saved.formData.date.split("T")[0] : prev.date,
-      reportType: saved.reportType || prev.reportType,
+      before_after_wash: saved.before_after_wash || prev.before_after_wash,
       orderQty: saved.formData?.orderQty || prev.orderQty,
       buyer: saved.formData?.buyer || prev.buyer,
-      aqlSampleSize: saved.formData?.aqlSampleSize || prev.aqlSampleSize,
-      aqlAcceptedDefect: saved.formData?.aqlAcceptedDefect || prev.aqlAcceptedDefect,
-      aqlRejectedDefect: saved.formData?.aqlRejectedDefect || prev.aqlRejectedDefect,
-      aqlLevelUsed: saved.formData?.aqlLevelUsed || prev.aqlLevelUsed,
+      aql:
+      [{
+        sampleSize: saved.formData?.aqlSampleSize || prev.aqlSampleSize,
+        acceptedDefect: saved.formData?.aqlAcceptedDefect || prev.aqlAcceptedDefect,
+        rejectedDefect: saved.formData?.aqlRejectedDefect || prev.aqlRejectedDefect,
+        levelUsed: saved.formData?.aqlLevelUsed || prev.aqlLevelUsed,
+      }],
     }));
 
     setInspectionData(
@@ -679,7 +684,7 @@ if (saved.inspectionDetails?.machineProcesses) {
     remark: param.remark || "",
     ok: param.ok !== undefined ? param.ok : true,
     no: param.no !== undefined ? param.no : false,
-    aqlAcceptedDefect: param.aqlAcceptedDefect || "",
+    acceptedDefect: param.aqlAcceptedDefect || "",
     checkboxes: param.checkboxes || {},
   }))
 );
@@ -748,7 +753,7 @@ if (saved.inspectionDetails?.machineProcesses) {
         formData: {
           washQty: formData.washQty,
           checkedQty: formData.checkedQty,
-          reportType: formData.reportType,
+          before_after_wash: formData.before_after_wash,
         }
       };
       // Update the cache
@@ -757,10 +762,10 @@ if (saved.inspectionDetails?.machineProcesses) {
 
     setFormData((prev) => {
       const newState = { ...prev, [field]: value };
-      // When one checkbox is checked, uncheck the other and set daily field as string
+      // When one checkbox is checked, uncheck the other and set reportType field as string
       if (field === "firstOutput") {
         newState.inline = "";
-        newState.daily = value;
+        newState.reportType = value; 
         newState.washQty = "";       
         newState.checkedQty = ""; 
         if (value === "First Output") {
@@ -768,10 +773,10 @@ if (saved.inspectionDetails?.machineProcesses) {
         }
       } else if (field === "inline") {
         newState.firstOutput = "";
-        newState.daily = value;
+        newState.reportType = value;
         newState.washQty = "";       
         newState.checkedQty = "";
-      } else if (field === "daily") {
+      } else if (field === "reportType") {
         if (value === "First Output") {
           newState.firstOutput = "First Output";
           newState.inline = "";
@@ -787,7 +792,7 @@ if (saved.inspectionDetails?.machineProcesses) {
         }
       }
 
-      if (field === "daily" && value === "Inline" && formData.washQty) {
+      if (field === "reportType" && value === "Inline" && formData.washQty) {
           fetchAQLData(formData.washQty);
           calculateCheckedQty(formData.washQty);
         }
@@ -816,7 +821,7 @@ if (saved.inspectionDetails?.machineProcesses) {
     }
     if (field === "washQty" && value) {
       setTimeout(() => {
-        if (formData.inline === "Inline" || formData.daily === "Inline") {
+        if (formData.inline === "Inline" || formData.reportType === "Inline") {
           fetchAQLData(value);
           calculateCheckedQty(value);
         }
@@ -829,7 +834,7 @@ if (saved.inspectionDetails?.machineProcesses) {
     if (!orderNo) {
       Swal.fire('Missing Order No', 'Please enter an Order No before selecting First Output.', 'warning');
       // Uncheck the box to prevent inconsistent state
-      setFormData(prev => ({ ...prev, firstOutput: '', daily: '' }));
+      setFormData(prev => ({ ...prev, firstOutput: '', reportType: '' }));
       return;
     }
     try {
@@ -846,14 +851,14 @@ if (saved.inspectionDetails?.machineProcesses) {
         setFormData(prev => ({
           ...prev,
           // Set the checked Qty from the database
-          checkedQty: data.checkedQty.toString(),
+          checkedQty: data.checkedQty,
           // Set the AQL values
-          aqlSampleSize: data.aqlData.sampleSize.toString(),
-          aqlAcceptedDefect: data.aqlData.acceptedDefect.toString(),
-          aqlRejectedDefect: data.aqlData.rejectedDefect.toString(),
+          aql:[{sampleSize: data.aqlData.sampleSize,
+          acceptedDefect: data.aqlData.acceptedDefect,
+          rejectedDefect: data.aqlData.rejectedDefect,
           // Wash Qty can be set to checked Qty for consistency if needed
-          aqlLevelUsed: data.aqlData.aqlLevelUsed,
-          washQty: data.checkedQty.toString(),
+          levelUsed: data.aqlData.aqlLevelUsed}],
+          washQty: data.checkedQty,
         }));
       } else {
         Swal.fire({
@@ -866,10 +871,12 @@ if (saved.inspectionDetails?.machineProcesses) {
           ...prev,
           checkedQty: "",
           washQty: "",
-          aqlSampleSize: "",
-          aqlAcceptedDefect: "",
-          aqlRejectedDefect: "",
-           aqlLevelUsed: "",
+          aql: [{
+            sampleSize: "",
+            acceptedDefect: "",
+            rejectedDefect: "",
+            levelUsed: "",
+          }]
         }));
       }
     } catch (error) {
@@ -881,7 +888,7 @@ if (saved.inspectionDetails?.machineProcesses) {
   };
 
    // --- AQL & Checked Qty ---
-  // Fetch AQL data for inline daily field
+  // Fetch AQL data for inline reportType field
   const fetchAQLData = async (washQty) => {
    if (!washQty) return;
     const orderNo = formData.orderNo || formData.style;
@@ -906,10 +913,12 @@ if (saved.inspectionDetails?.machineProcesses) {
         console.error("AQL API Error:", errorData.message || "Unknown error");
         setFormData((prev) => ({
           ...prev,
-          aqlSampleSize: "",
-          aqlAcceptedDefect: "",
-          aqlRejectedDefect: "",
-          aqlLevelUsed: "",
+          aql: [{
+            sampleSize: "",
+            acceptedDefect: "",
+            rejectedDefect: "",
+            levelUsed: "",
+          }]
         }));
         return;
       }
@@ -918,18 +927,22 @@ if (saved.inspectionDetails?.machineProcesses) {
       if (data.success && data.aqlData) {
         setFormData((prev) => ({
           ...prev,
-          aqlSampleSize: data.aqlData.sampleSize.toString(),
-          aqlAcceptedDefect: data.aqlData.acceptedDefect.toString(),
-          aqlRejectedDefect: data.aqlData.rejectedDefect.toString(),
-          aqlLevelUsed: data.aqlData.aqlLevelUsed, 
+          aql: [{
+            sampleSize: data.aqlData.sampleSize,
+            acceptedDefect: data.aqlData.acceptedDefect,
+            rejectedDefect: data.aqlData.rejectedDefect,
+            levelUsed: data.aqlData.aqlLevelUsed,
+          }]
         }));
       } else {
          setFormData((prev) => ({
           ...prev,
-          aqlSampleSize: "",
-          aqlAcceptedDefect: "",
-          aqlRejectedDefect: "",
-           aqlLevelUsed: "",
+          aql: [{
+            sampleSize: "",
+            acceptedDefect: "",
+            rejectedDefect: "",
+            levelUsed: "",
+          }]
         }));
       }
     } catch (error) {
@@ -1081,7 +1094,7 @@ if (saved.inspectionDetails?.machineProcesses) {
  const handleSizeSubmit = async (transformedSizeData) => {
   try {
     // 1. Update local state as before
-    const washType = formData.reportType === "Before Wash" ? "beforeWash" : "afterWash";
+    const washType = formData.before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
     setMeasurementData((prev) => {
       const currentArray = prev[washType];
       const existingIndex = currentArray.findIndex((item) => item.size === transformedSizeData.size);
@@ -1136,7 +1149,7 @@ if (saved.inspectionDetails?.machineProcesses) {
     if (size) {
       setSavedSizes((prev) => prev.filter((s) => s !== size));
       const washType =
-        formData.reportType === "Before Wash" ? "beforeWash" : "afterWash";
+        formData.before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
       setMeasurementData((prev) => ({
         ...prev,
         [washType]: prev[washType].filter((item) => item.size !== size),
@@ -1313,21 +1326,23 @@ useEffect(() => {
                 ...prev,
                 ...colorData.orderDetails,
                 color: updatedColor,
-                reportType: colorData.orderDetails.reportType || prev.reportType,
+                before_after_wash: colorData.orderDetails.before_after_wash || prev.before_after_wash,
                 washQty: colorData.defectDetails?.washQty || prev.washQty,
                 checkedQty: colorData.defectDetails?.checkedQty || prev.checkedQty,
-                aqlSampleSize: colorData.orderDetails.aqlSampleSize
+                aql: [{
+                  sampleSize: colorData.orderDetails.aqlSampleSize
                   || colorData.inspectionDetails?.aqlSampleSize
                   || prev.aqlSampleSize,
-                aqlAcceptedDefect: colorData.orderDetails.aqlAcceptedDefect
+                  acceptedDefect: colorData.orderDetails.aqlAcceptedDefect
                   || colorData.inspectionDetails?.aqlAcceptedDefect
                   || prev.aqlAcceptedDefect,
-                aqlRejectedDefect: colorData.orderDetails.aqlRejectedDefect
+                  rejectedDefect: colorData.orderDetails.aqlRejectedDefect
                   || colorData.inspectionDetails?.aqlRejectedDefect
                   || prev.aqlRejectedDefect,
-                aqlLevelUsed: colorData.orderDetails.aqlLevelUsed
+                levelUsed: colorData.orderDetails.aqlLevelUsed
                   || colorData.inspectionDetails?.aqlLevelUsed
                   || prev.aqlLevelUsed, 
+                }]
               };
             });
           }
@@ -1488,7 +1503,7 @@ useEffect(() => {
           summary={overallSummary}
           measurementData={formData.colors[0]?.measurementDetails} 
           defectDetails={formData.colors[0]?.defectDetails} 
-          reportType={formData.reportType}
+          before_after_wash={formData.before_after_wash}
           showMeasurementTable={showMeasurementTable}
         />
         <OrderDetailsSection
@@ -1566,7 +1581,7 @@ useEffect(() => {
           onLoadSavedDataById={loadSavedDataById}
           orderNo={formData.orderNo || formData.style}
           color={formData.color}
-          reportType={formData.reportType}
+          before_after_wash={formData.before_after_wash}
           isVisible={sectionVisibility.measurementDetails}
           onToggle={() => toggleSection("measurementDetails")}
           savedSizes={savedSizes}
@@ -1611,14 +1626,16 @@ useEffect(() => {
                       washingType: "Normal Wash",
                       firstOutput: false,
                       inline: false,
-                      daily: "",
+                      reportType: "",
                       buyer: "",
                       factoryName: "YM",
                       result: "",
-                      aqlSampleSize: "",
-                      aqlAcceptedDefect: "",
-                      aqlRejectedDefect: "",
-                      
+                      aql: [{
+                        sampleSize: "",
+                        acceptedDefect: "",
+                        rejectedDefect: "",
+                        levelUsed: "",
+                      }]
                     });
                     setInspectionData(
                       initializeInspectionData(masterChecklist)
@@ -1668,21 +1685,28 @@ useEffect(() => {
 
                 // --- 2. Build the submitData payload ---
                 const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
-
+                const aql = [{
+                  sampleSize: Number(formData.aqlSampleSize) || 0,
+                  acceptedDefect: Number(formData.aqlAcceptedDefect) || 0,
+                  rejectedDefect: Number(formData.aqlRejectedDefect) || 0,
+                  levelUsed: Number(formData.aqlLevelUsed) || 0
+                }];
                 const submitData = {
                   orderNo: formData.orderNo || formData.style,
                   date: formData.date,
                   colorName: formData.color,
-                  reportType: formData.reportType,
+                  before_after_wash: formData.before_after_wash,
                   washQty: formData.washQty,
                   checkedQty: formData.checkedQty,
                   totalCheckedPoint,
                   totalPass,
                   totalFail,
                   passRate,
+                  aql,
                   ...summary, 
                   submittedAt: new Date().toISOString(),
                   userId: user?.emp_id,
+                  
                   color: {
                     orderDetails: {
                       ...formData,
