@@ -81,21 +81,6 @@ const ActionMenu = ({ item, onViewReport }) => {
                 </button>
               )}
             </Menu.Item>
-            {/* <Menu.Item>
-              {({ active }) => (
-                <button
-                  onClick={() => handleAction("View Full Report")}
-                  className={`${
-                    active
-                      ? "bg-indigo-500 text-white"
-                      : "text-gray-900 dark:text-gray-200"
-                  } group flex rounded-md items-center w-full px-2 py-2 text-sm`}
-                >
-                  <FileText className="w-5 h-5 mr-2" />
-                  View Full Report
-                </button>
-              )}
-            </Menu.Item> */}
             <Menu.Item>
               {({ active }) => (
                 <button
@@ -135,7 +120,7 @@ const ActionMenu = ({ item, onViewReport }) => {
   );
 };
 
-const ANFMeasurementResults = () => {
+const ANFMeasurementResults = ({ dataProcessor = (data) => data }) => {
   const { user } = useAuth();
   const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -224,9 +209,16 @@ const ANFMeasurementResults = () => {
     }
   }, [filters.startDate, filters.endDate]);
 
+  // --- MODIFIED: Apply the dataProcessor function here ---
+  const processedData = useMemo(() => {
+    // The prop function is called here.
+    // If not provided, it defaults to (data) => data, returning the original data.
+    return dataProcessor(data);
+  }, [data, dataProcessor]);
+
   // --- filteredData logic ---
   const filteredData = useMemo(() => {
-    return data.filter((item) => {
+    return processedData.filter((item) => {
       const buyerMatch =
         filters.buyer.value === "All" || item.buyer === filters.buyer.value;
       const moMatch =
@@ -238,7 +230,7 @@ const ANFMeasurementResults = () => {
         item.colors.includes(filters.color.value);
       return buyerMatch && moMatch && qcMatch && colorMatch;
     });
-  }, [data, filters.buyer, filters.moNo, filters.color, filters.qcID]);
+  }, [processedData, filters.buyer, filters.moNo, filters.color, filters.qcID]);
 
   // Reset to page 1 when filters change ---
   useEffect(() => {

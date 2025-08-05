@@ -613,6 +613,13 @@ function Home() {
             description: "QA Random Checks"
           },
           {
+            path: "/qc-accuracy-ver2",
+            roles: ["QA"],
+            image: "assets/Home/qc-accuracy.png",
+            title: "QC Output",
+            description: "QC Output | Sunrise & Old Barcode System"
+          },
+          {
             path: "/training",
             roles: ["System Administration"],
             image: "assets/Home/training.jpg",

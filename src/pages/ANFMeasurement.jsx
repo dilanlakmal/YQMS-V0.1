@@ -1,10 +1,18 @@
 import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../components/authentication/AuthContext";
-import { Check, BarChart3, LayoutDashboard } from "lucide-react";
+import {
+  Check,
+  BarChart3,
+  LayoutDashboard,
+  FileBarChart,
+  UserCheck
+} from "lucide-react";
 import ANFMeasurementPageTitle from "../components/inspection/ANF_measurement/ANFMeasurementPageTitle";
 import ANFMeasurementInspectionForm from "../components/inspection/ANF_measurement/ANFMeasurementInspectionForm";
 import ANFMeasurementResults from "../components/inspection/ANF_measurement/ANFMeasurementResults";
+import ANFMeasurementQCDailyReport from "../components/inspection/ANF_measurement/ANFMeasurementQCDailyReport";
+import ANFMeasurementBuyerReportSize from "../components/inspection/ANF_measurement/ANFMeasurementBuyerReportSize";
 
 const PlaceholderComponent = ({ title }) => {
   return (
@@ -52,6 +60,18 @@ const ANFMeasurement = () => {
         labelKey: "anfMeasurement.tabs.results",
         icon: <BarChart3 size={18} />,
         component: <ANFMeasurementResults />
+      },
+      {
+        id: "qc-daily-report",
+        labelKey: "anfMeasurement.tabs.qcDailyReport",
+        icon: <FileBarChart size={18} />,
+        component: <ANFMeasurementQCDailyReport />
+      },
+      {
+        id: "buyer-report-size",
+        labelKey: "anfMeasurement.tabs.buyerReportSize",
+        icon: <UserCheck size={18} />,
+        component: <ANFMeasurementBuyerReportSize />
       },
       {
         id: "dashboard",
