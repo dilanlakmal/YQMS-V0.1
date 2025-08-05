@@ -3,7 +3,6 @@ import { X, ShieldCheck, Users as UsersIcon, Tag } from "lucide-react";
 import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
 import { API_BASE_URL } from "../../config";
-import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 export default function RoleManagement() {
