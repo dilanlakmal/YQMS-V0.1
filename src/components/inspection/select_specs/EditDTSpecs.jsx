@@ -13,7 +13,7 @@ import {
   EyeOff,
   Filter
 } from "lucide-react";
-import SuccessToast from "../ANF_measurement/SuccessToast";
+import SuccessToast from "./SuccessToast";
 
 // Helper function can be moved to a shared utils file
 const decimalToFractionString = (decimal) => {

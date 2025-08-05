@@ -43,7 +43,6 @@ import UploadYorksysOrders from "./pages/UploadYorksysOrders.jsx";
 import YQMSTrainingSchedule from "./pages/YQMSTrainingSchedule.jsx";
 import YQMSExam from "./pages/YQMSExam.jsx";
 import CuttingInline from "./pages/CuttingInline.jsx";
-//import SelectDTBuyerSpec from "./components/inspection/select_specs/SelectDTBuyerSpec.jsx";
 import ManageBuyerSpecs from "./pages/ManageBuyerSpecs.jsx";
 import ANFMeasurement from "./pages/ANFMeasurement.jsx";
 import ANFMeasurementVer2 from "./pages/ANFMeasurementVer2.jsx";
