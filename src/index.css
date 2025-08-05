@@ -21,7 +21,7 @@ body {
 
 @font-face {
   font-family: "Khmer OS";
-  src: url("./fonts/KhmerOS.ttf") format("truetype");
+  src: url("/fonts/Khmer-Regular.ttf") format("truetype");
 }
 
 .react-datepicker-popper-z-50 {

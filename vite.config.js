@@ -8,8 +8,16 @@ export default defineConfig({
     host: "0.0.0.0", // This will allow you to access the server from another device
     port: 3001,
     open: true,
+    assetsInclude: ["**/*.ttf"],
     build: {
-      chunkSizeWarningLimit: 20000
+      minify: false,
+      sourcemap: true,
+      chunkSizeWarningLimit: 20000,
+      rollupOptions: {
+        manualChunks: {
+          "jspdf-autotable": ["jspdf-autotable"]
+        }
+      }
     },
     https: {
       key: fs.readFileSync(
