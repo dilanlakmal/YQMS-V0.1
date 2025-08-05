@@ -43,10 +43,12 @@ import UploadYorksysOrders from "./pages/UploadYorksysOrders.jsx";
 import YQMSTrainingSchedule from "./pages/YQMSTrainingSchedule.jsx";
 import YQMSExam from "./pages/YQMSExam.jsx";
 import CuttingInline from "./pages/CuttingInline.jsx";
-import SelectDTBuyerSpec from "./pages/SelectDTBuyerSpec.jsx";
+//import SelectDTBuyerSpec from "./components/inspection/select_specs/SelectDTBuyerSpec.jsx";
+import ManageBuyerSpecs from "./pages/ManageBuyerSpecs.jsx";
 import ANFMeasurement from "./pages/ANFMeasurement.jsx";
 import ANFMeasurementVer2 from "./pages/ANFMeasurementVer2.jsx";
 import CEMasterList from "./pages/CEMasterList.jsx";
+import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurement/ANFMeasurementQCViewFullReport.jsx";
 //import QCWashingPage from "./pages/QCWashing.jsx";
 
 //Languages
@@ -415,8 +417,12 @@ function AppContent() {
                 element={<UploadWashingSpecs />}
               />
               {/* <Route path="/qcWashing" element={<QCWashingPage />} /> */}
-              <Route path="/select-dt-specs" element={<SelectDTBuyerSpec />} />
+              <Route path="/select-dt-specs" element={<ManageBuyerSpecs />} />
               <Route path="/anf-washing" element={<ANFMeasurement />} />
+              <Route
+                path="/anf-washing/qc-full-report/:pageId"
+                element={<ANFMeasurementQCViewFullReport />}
+              />
               <Route
                 path="/anf-washing-ver2"
                 element={<ANFMeasurementVer2 />}

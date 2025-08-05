@@ -23493,6 +23493,96 @@ app.post("/api/buyer-spec-templates", async (req, res) => {
   }
 });
 
+// Endpoint to get all MO Nos from the buyer spec templates for the edit dropdown
+app.get("/api/buyer-spec-templates/mo-options", async (req, res) => {
+  try {
+    const monos = await BuyerSpecTemplate.find({}, { moNo: 1, _id: 0 }).sort({
+      moNo: 1
+    });
+    res.json(monos.map((m) => m.moNo));
+  } catch (error) {
+    console.error("Error fetching MO options for templates:", error);
+    res.status(500).json({ error: "Failed to fetch MO options" });
+  }
+});
+
+// Endpoint to fetch data for both tables on the Edit page
+app.get("/api/edit-specs-data/:moNo", async (req, res) => {
+  const { moNo } = req.params;
+  if (!moNo) {
+    return res.status(400).json({ error: "MO Number is required." });
+  }
+
+  try {
+    // 1. Fetch from BuyerSpecTemplate collection
+    const templateData = await BuyerSpecTemplate.findOne({ moNo: moNo }).lean();
+
+    // 2. Fetch AfterWashSpecs from dt_orders collection
+    const orderData = await ymEcoConnection.db
+      .collection("dt_orders")
+      .findOne(
+        { Order_No: moNo },
+        { projection: { AfterWashSpecs: 1, _id: 0 } }
+      );
+
+    // Check if AfterWashSpecs exist and are valid
+    const patternData =
+      orderData &&
+      Array.isArray(orderData.AfterWashSpecs) &&
+      orderData.AfterWashSpecs.length > 0
+        ? orderData
+        : null;
+
+    if (!templateData && !patternData) {
+      return res.status(404).json({
+        error: `No spec data found for MO No: ${moNo} in any source.`
+      });
+    }
+
+    res.json({ templateData, patternData });
+  } catch (error) {
+    console.error(`Error fetching edit spec data for MO ${moNo}:`, error);
+    res
+      .status(500)
+      .json({ error: "Failed to fetch data.", details: error.message });
+  }
+});
+
+// Endpoint to UPDATE an existing buyer spec template
+app.put("/api/buyer-spec-templates/:moNo", async (req, res) => {
+  const { moNo } = req.params;
+  const { specData } = req.body;
+
+  if (!specData) {
+    return res.status(400).json({ error: "specData is required for update." });
+  }
+
+  try {
+    const updatedTemplate = await BuyerSpecTemplate.findOneAndUpdate(
+      { moNo: moNo },
+      { $set: { specData: specData } },
+      { new: true, runValidators: true } // new: true returns the modified document
+    );
+
+    if (!updatedTemplate) {
+      return res
+        .status(404)
+        .json({ error: "Template not found for the given MO No." });
+    }
+
+    res.status(200).json({
+      message: "Spec template updated successfully.",
+      data: updatedTemplate
+    });
+  } catch (error) {
+    console.error("Error updating spec template:", error);
+    res.status(500).json({
+      error: "Failed to update spec template.",
+      details: error.message
+    });
+  }
+});
+
 /* -------------------------------------------
    End Points - ANF Digital Measurement
 ------------------------------------------- */
@@ -24152,6 +24242,144 @@ app.get("/api/anf-measurement/results/full-report-detail", async (req, res) => {
     });
   }
 });
+
+/* -------------------------------------------
+   End Points - ANF QC Daily Report
+------------------------------------------- */
+
+// Endpoint to get all daily reports (each document is a report)
+app.get("/api/anf-measurement/qc-daily-reports", async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ error: "Start date and end date are required." });
+    }
+
+    const start = new Date(`${startDate}T00:00:00.000Z`);
+    const end = new Date(`${endDate}T23:59:59.999Z`);
+
+    const reports = await ANFMeasurementReport.find({
+      inspectionDate: { $gte: start, $lte: end }
+    }).sort({ inspectionDate: -1, qcID: 1 }); // Sort by most recent first
+
+    res.json(reports);
+  } catch (error) {
+    console.error("Error fetching QC daily reports:", error);
+    res.status(500).json({ error: "Failed to fetch QC daily reports" });
+  }
+});
+
+// Endpoint to get DYNAMIC filter options based on a date range
+app.get("/api/anf-measurement/qc-daily-reports/filters", async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ error: "Start and end date are required." });
+    }
+
+    const start = new Date(`${startDate}T00:00:00.000Z`);
+    const end = new Date(`${endDate}T23:59:59.999Z`);
+
+    // Find all reports within the date range
+    const reports = await ANFMeasurementReport.find(
+      { inspectionDate: { $gte: start, $lte: end } },
+      { buyer: 1, moNo: 1, color: 1, qcID: 1, _id: 0 } // Project only necessary fields
+    ).lean();
+
+    // Process the data to get unique values and relationships
+    const buyers = new Set();
+    const moNos = new Set();
+    const colors = new Set();
+    const qcIDs = new Set();
+    const moToColorsMap = {};
+
+    reports.forEach((report) => {
+      buyers.add(report.buyer);
+      moNos.add(report.moNo);
+      qcIDs.add(report.qcID);
+
+      if (!moToColorsMap[report.moNo]) {
+        moToColorsMap[report.moNo] = new Set();
+      }
+      report.color.forEach((c) => {
+        colors.add(c);
+        moToColorsMap[report.moNo].add(c);
+      });
+    });
+
+    // Convert the map's sets to arrays
+    for (const mo in moToColorsMap) {
+      moToColorsMap[mo] = Array.from(moToColorsMap[mo]).sort();
+    }
+
+    res.json({
+      buyerOptions: Array.from(buyers).sort(),
+      moOptions: Array.from(moNos).sort(),
+      colorOptions: Array.from(colors).sort(),
+      qcOptions: Array.from(qcIDs).sort(),
+      moToColorsMap: moToColorsMap
+    });
+  } catch (error) {
+    console.error("Error fetching dynamic filter options:", error);
+    res.status(500).json({ error: "Failed to fetch dynamic filter options" });
+  }
+});
+
+// --- NEW Endpoint for the QC Daily Full Report Page ---
+app.get(
+  "/api/anf-measurement/qc-daily-report/detail/:pageId",
+  async (req, res) => {
+    try {
+      const { pageId } = req.params;
+      if (!pageId) {
+        return res.status(400).json({ error: "Page ID is required." });
+      }
+
+      // Deconstruct the pageId: e.g., "2023-10-27-QC001-MO12345"
+      const parts = pageId.split("-");
+      if (parts.length < 3) {
+        return res.status(400).json({ error: "Invalid Page ID format." });
+      }
+
+      const inspectionDateStr = parts.slice(0, 3).join("-"); // Reassembles the date string
+      const qcID = parts[3];
+      const moNo = parts.slice(4).join("-"); // Join the rest in case MO No has hyphens
+
+      // Find the specific report document
+      const report = await ANFMeasurementReport.findOne({
+        // Use a regex to match the date part of the ISODate
+        inspectionDate: {
+          $gte: new Date(inspectionDateStr),
+          $lt: new Date(
+            new Date(inspectionDateStr).setDate(
+              new Date(inspectionDateStr).getDate() + 1
+            )
+          )
+        },
+        qcID: qcID,
+        moNo: moNo
+      }).lean(); // .lean() for a plain JS object, faster for read-only ops
+
+      if (!report) {
+        return res
+          .status(404)
+          .json({ error: "Report not found for the specified criteria." });
+      }
+
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching full QC daily report:", error);
+      res.status(500).json({
+        error: "Failed to fetch full report.",
+        details: error.message
+      });
+    }
+  }
+);
 
 /* ------------------------------
    QC-Washing enpoint Start
