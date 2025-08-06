@@ -603,7 +603,6 @@
     "manual": "Manual",
     "samplingStandardAQL": "Sampling standard: AQL 1.0",
     "panel": "Garment Type",
-    "selectGarmentType": "Select a Garment Type",
     "select_panel": "Select Panel",
     "size": "Size",
     "select_size": "Select Size",
@@ -854,7 +853,15 @@
     "totalCount": "Total Rejects",
     "totalNegTol": "Total Neg. TOL",
     "totalPosTol": "Total Pos. TOL",
-    "noMeasurementIssuesFound": "No issues recorded"
+    "noMeasurementIssuesFound": "No issues recorded",
+    "selectBuyer": "Buyer",
+    "selectMoNo": "MO",
+    "selectTableNo": "Table",
+    "selectColor": "Color",
+    "selectSpreadTable": "Spread Table",
+    "selectMaterial": "Material",
+    "selectGarmentType": "Garment Type",
+    "selectQcId": "QC ID"
   },
 
   "cuttingReport": {

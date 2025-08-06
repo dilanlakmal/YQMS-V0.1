@@ -13,6 +13,7 @@ import ANFMeasurementInspectionForm from "../components/inspection/ANF_measureme
 import ANFMeasurementResults from "../components/inspection/ANF_measurement/ANFMeasurementResults";
 import ANFMeasurementQCDailyReport from "../components/inspection/ANF_measurement/ANFMeasurementQCDailyReport";
 import ANFMeasurementBuyerReportSize from "../components/inspection/ANF_measurement/ANFMeasurementBuyerReportSize";
+import ANFStyleView from "../components/inspection/ANF_measurement/ANFStyleView";
 
 const PlaceholderComponent = ({ title }) => {
   return (
@@ -66,6 +67,12 @@ const ANFMeasurement = () => {
         labelKey: "anfMeasurement.tabs.qcDailyReport",
         icon: <FileBarChart size={18} />,
         component: <ANFMeasurementQCDailyReport />
+      },
+      {
+        id: "style-view",
+        labelKey: "anfMeasurement.tabs.styleView",
+        icon: <FileBarChart size={18} />,
+        component: <ANFStyleView />
       },
       {
         id: "buyer-report-size",

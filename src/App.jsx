@@ -48,6 +48,7 @@ import ANFMeasurement from "./pages/ANFMeasurement.jsx";
 import ANFMeasurementVer2 from "./pages/ANFMeasurementVer2.jsx";
 import CEMasterList from "./pages/CEMasterList.jsx";
 import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurement/ANFMeasurementQCViewFullReport.jsx";
+import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFStyleViewFullReport";
 //import QCWashingPage from "./pages/QCWashing.jsx";
 
 //Languages
@@ -422,6 +423,12 @@ function AppContent() {
                 path="/anf-washing/qc-full-report/:pageId"
                 element={<ANFMeasurementQCViewFullReport />}
               />
+
+              <Route
+                path="/anf-washing/style-full-report/:moNo"
+                element={<ANFStyleViewFullReport />}
+              />
+
               <Route
                 path="/anf-washing-ver2"
                 element={<ANFMeasurementVer2 />}
