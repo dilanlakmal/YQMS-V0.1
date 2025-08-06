@@ -340,19 +340,20 @@ const OrderDetailsSection = ({
 
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium dark:text-gray-300">Factory Name:</label>
-            <select
-              value={formData.factoryName}
-              onChange={(e) => handleInputChange("factoryName", e.target.value)}
-              className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-               disabled={isSaved}
-            >
-              <option value="YM">YM</option>
-              {subFactories.map((factory, index) => (
-                <option key={index} value={factory.factory}>
-                  {factory.factory}
-                </option>
-              ))}
-            </select>
+              <select
+                value={formData.factoryName}
+                onChange={e => setFormData(prev => ({ ...prev, factoryName: e.target.value }))}
+                className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                disabled={isSaved}
+              >
+                
+                {subFactories.map(factory => (
+                  <option key={factory} value={factory}>
+                    {factory}
+                  </option>
+                ))}
+              </select>
+
           </div>
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium">Befor/After Wash:</label>

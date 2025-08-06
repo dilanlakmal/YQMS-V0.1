@@ -481,14 +481,30 @@ useEffect(() => {
   };
 
   const fetchSubFactories = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/subcon-factories`);
-      const data = await response.json();
-      setSubFactories(data);
-    } catch (error) {
-      console.error("Error fetching factories:", error);
+  try {
+    // Fetch only the "Washing" factory type from SupplierIssuesDefect
+    const response = await fetch(`${API_BASE_URL}/api/supplier-issues/defects/Washing`);
+    const data = await response.json();
+    if (data && Array.isArray(data.factoryList)) {
+      setSubFactories(data.factoryList);
+      // Set default factoryName in formData to "YM" if present, else first in list
+      setFormData(prev => ({
+        ...prev,
+        factoryName: data.factoryList.includes("YM")
+          ? "YM"
+          : (data.factoryList[0] || "")
+      }));
+    } else {
+      setSubFactories([]);
+      setFormData(prev => ({ ...prev, factoryName: "" }));
     }
-  };
+  } catch (error) {
+    setSubFactories([]);
+    setFormData(prev => ({ ...prev, factoryName: "" }));
+    console.error("Error fetching Washing factories:", error);
+  }
+};
+
 
   const fetchWashingDefects = async () => {
     try {
