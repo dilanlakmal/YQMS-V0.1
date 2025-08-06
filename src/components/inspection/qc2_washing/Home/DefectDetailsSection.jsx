@@ -34,7 +34,7 @@ const DefectDetailsSection = ({
   const [isSaved, setIsSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(true);
   const aql = formData.aql && formData.aql[0];
-  console.log("AQL array in DefectDetailsSection:", formData.aql);
+  // console.log("AQL array in DefectDetailsSection:", formData.aql);
 
   // State is now managed by the parent QCWashingPage component
   

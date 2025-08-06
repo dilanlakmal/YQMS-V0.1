@@ -414,15 +414,15 @@ const toggleSelectAllRows = (size, checked, tableType) => {
 
           {Object.keys(measurementSpecs.beforeWashGrouped).length > 1 && (
             <div className="mb-3">
-              <label className="mr-2 text-sm font-medium">K Value:</label>
+              <label className="mr-2 text-sm font-medium ">K Value:</label>
               <select
                 value={activeBeforeTab}
                 onChange={e => setActiveBeforeTab(e.target.value)}
-                className="px-2 py-1 border rounded text-sm"
+                className="px-2 py-1 border rounded text-sm dark:text-white dark:bg-gray-800"
               >
                 {Object.keys(measurementSpecs.beforeWashGrouped).map(kValue => (
-                  <option key={kValue} value={kValue}>
-                    {kValue === 'NA' ? 'General' : `K-${kValue}`}
+                  <option className="dark:bg-gray-800 dark:text-white" key={kValue} value={kValue}>
+                    {kValue === 'NA' ? 'General' : `${kValue}`}
                   </option>
                 ))}
               </select>
@@ -588,11 +588,11 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                 <select
                   value={activeAfterTab}
                   onChange={e => setActiveAfterTab(e.target.value)}
-                  className="px-2 py-1 border rounded text-sm"
+                  className="px-2 py-1 border rounded text-sm dark:text-white dark:bg-gray-800"
                 >
                   {Object.keys(measurementSpecs.afterWashGrouped).map(kValue => (
-                    <option key={kValue} value={kValue}>
-                      {kValue === 'NA' ? 'General' : `K-${kValue}`}
+                    <option className ="dark:bg-gray-800 dark:text-white" key={kValue} value={kValue}>
+                      {kValue === 'NA' ? 'General' : `${kValue}`}
                     </option>
                   ))}
                 </select>

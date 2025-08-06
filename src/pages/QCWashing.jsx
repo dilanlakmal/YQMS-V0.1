@@ -443,16 +443,18 @@ useEffect(() => {
 
   // --- Helper Functions ---
   const processMeasurementData = (loadedMeasurements) => {
-    if (Array.isArray(loadedMeasurements)) {
-      const beforeWash = loadedMeasurements.filter((m) => m.before_after_wash === "beforeWash");
-      const afterWash = loadedMeasurements.filter((m) => m.before_after_wash === "afterWash");
-      return { beforeWash, afterWash };
-    }
-    if (loadedMeasurements && (loadedMeasurements.beforeWash || loadedMeasurements.afterWash)) {
-      return { beforeWash: loadedMeasurements.beforeWash || [], afterWash: loadedMeasurements.afterWash || [] };
-    }
-    return { beforeWash: [], afterWash: [] };
-  };
+  if (Array.isArray(loadedMeasurements)) {
+    // Extract the .measurement object from each entry
+    const measurements = loadedMeasurements
+      .map(m => m.measurement)
+      .filter(Boolean);
+
+    const beforeWash = measurements.filter(m => m.before_after_wash === "beforeWash");
+    const afterWash = measurements.filter(m => m.before_after_wash === "afterWash");
+    return { beforeWash, afterWash };
+  }
+  return { beforeWash: [], afterWash: [] };
+};
 
   const initializeInspectionData = (checklist = []) => {
     if (!Array.isArray(checklist)) return [];
