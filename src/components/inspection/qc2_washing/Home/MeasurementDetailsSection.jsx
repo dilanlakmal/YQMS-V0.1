@@ -37,64 +37,76 @@ const MeasurementDetailsSection = ({
 
   const currentWashMeasurements = (before_after_wash === 'Before Wash' ? measurementData.beforeWash : measurementData.afterWash) || [];
 
-  const transformMeasurementData = (size, qty, measurements, selectedRows, fullColumns, measurementSpecs, tableType) => {
-    const pcs = [];
-    for (let pcIndex = 0; pcIndex < qty; pcIndex++) {
-      const measurementPoints = [];
-      const isFullColumn = fullColumns?.[pcIndex] || false;
-      
-      measurementSpecs.forEach((spec, specIndex) => {
-        const isRowIndividuallySelected = selectedRows?.[specIndex] ?? true;
-        
-        if (!isFullColumn && !isRowIndividuallySelected) return;
-        
-        const cellKey = `${size}-${tableType}-${specIndex}-${pcIndex}`;
-        const measurementValue = measurements?.[cellKey];
-        
-        let result = '';
-        if (measurementValue && typeof measurementValue.decimal === 'number') {
-          const measuredDeviation = measurementValue.decimal;
-          const tolMinus = spec.ToleranceMinus || '0';
-          const tolPlus = spec.TolerancePlus || '0';
-          const tolMinusValue = fractionToDecimal(tolMinus);
-          const tolPlusValue = fractionToDecimal(tolPlus);
+  const transformMeasurementData = (
+  size,
+  qty,
+  measurements,
+  selectedRows,
+  fullColumns,
+  measurementSpecs,
+  tableType,
+  kvalue
+) => {
+  const pcs = [];
+  for (let pcIndex = 0; pcIndex < qty; pcIndex++) {
+    const measurementPoints = [];
+    const isFullColumn = fullColumns?.[pcIndex] || false;
 
-          if (!isNaN(tolMinusValue) && !isNaN(tolPlusValue)) {
-            if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
-              result = 'pass';
-            } else {
-              result = 'fail';
-            }
+    measurementSpecs.forEach((spec, specIndex) => {
+      const isRowIndividuallySelected = selectedRows?.[specIndex] ?? true;
+      if (!isFullColumn && !isRowIndividuallySelected) return;
+
+      const cellKey = `${size}-${tableType}-${specIndex}-${pcIndex}`;
+      const measurementValue = measurements?.[cellKey];
+
+      let result = '';
+      if (measurementValue && typeof measurementValue.decimal === 'number') {
+        const measuredDeviation = measurementValue.decimal;
+        const tolMinus = spec.ToleranceMinus || '0';
+        const tolPlus = spec.TolerancePlus || '0';
+        const tolMinusValue = fractionToDecimal(tolMinus);
+        const tolPlusValue = fractionToDecimal(tolPlus);
+        if (!isNaN(tolMinusValue) && !isNaN(tolPlusValue)) {
+          if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
+            result = 'pass';
+          } else {
+            result = 'fail';
           }
         }
-        
-        measurementPoints.push({
-          pointName: spec.MeasurementPointEngName || `Point ${specIndex + 1}`,
-          value: measurementValue?.decimal ?? (measurementValue?.fraction || ''),
-          specs: spec.Specs?.fraction || spec.Specs || '-',
-          toleranceMinus: spec.ToleranceMinus || '0',
-          tolerancePlus: spec.TolerancePlus || '0',
-          specIndex: specIndex,
-          isFullColumn: fullColumns?.[pcIndex] || false,
-          result: result,
-        });
+      }
+
+      measurementPoints.push({
+        pointName: spec.MeasurementPointEngName || `Point ${specIndex + 1}`,
+        pointNo: specIndex + 1,
+        rowNo: specIndex,
+        // decimal: measurementValue?.decimal ?? null,
+        // fraction: measurementValue?.fraction ?? '',
+        measured_value_decimal: measurementValue?.decimal ?? null,
+        measured_value_fraction: measurementValue?.fraction ?? '',
+        specs: spec.Specs?.fraction || spec.Specs || '-',
+        toleranceMinus: fractionToDecimal(spec.ToleranceMinus || '0'),
+        tolerancePlus: fractionToDecimal(spec.TolerancePlus || '0'),
+        result: result,
       });
-      
-      pcs.push({
-        pcNumber: pcIndex + 1,
-        measurementPoints: measurementPoints
-      });
-    }
-    
-    return {
-      size: size,
-      qty: qty,
-      pcs: pcs,
-      selectedRows: selectedRows,
-      fullColumns: fullColumns,
-      measurements: measurements,
-    };
+    });
+
+    pcs.push({
+      pcNumber: pcIndex + 1,
+      measurementPoints: measurementPoints,
+    });
+  }
+
+  return {
+    size: size,
+    qty: qty,
+    pcs: pcs,
+    selectedRows: selectedRows,
+    fullColumns: fullColumns,
+    kvalue: kvalue,
   };
+};
+
+
 
     const fractionToDecimal = (frac) => {
     if (typeof frac !== 'string' || !frac || frac.trim() === '-') return NaN;
@@ -972,6 +984,9 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                                 ? (measurementSpecs.beforeWashGrouped[activeBeforeTab] || measurementSpecs.beforeWash || [])
                                 : (measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash || []);
 
+                              const kvalue = before_after_wash === 'Before Wash' ? activeBeforeTab : activeAfterTab;
+
+
                               const isFullColumnChecked = fullColumnsBySize[size] || [];
                               const isRowSelected = selectedRowsBySize[size] || Array(specsForSubmit.length).fill(true);
 
@@ -1009,7 +1024,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                                 return;
                               }
 
-                               const transformedData = transformMeasurementData(size, qty, measurementValues, selectedRowsBySize[size], fullColumnsBySize[size], specsForSubmit, tableType);
+                               const transformedData = transformMeasurementData(size, qty, measurementValues, selectedRowsBySize[size], fullColumnsBySize[size], specsForSubmit, tableType, kvalue);
                               onSizeSubmit(transformedData);
                             }}
                             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"

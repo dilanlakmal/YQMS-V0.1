@@ -90,6 +90,7 @@ import mongoose from "mongoose";
             measurement: {
               size: String,
               qty: Number,
+              kvalue:String,
               before_after_wash: {
                 type: String,
                 enum: ['beforeWash', 'afterWash'],
@@ -100,20 +101,20 @@ import mongoose from "mongoose";
               isFullColumn: Boolean,
               measurementPoints: [{
                 pointName: String,
-                pointNo: Number, // from dt_order/specs
-                decimal: Number, // measured value as decimal
-                fraction: String, // measured value as fraction
+                pointNo: Number, 
+                // decimal: Number, 
+                // fraction: String, 
                 specs: String,
-                toleranceMinus: Number, // decimal
-                tolerancePlus: Number,  // decimal
+                toleranceMinus: Number, 
+                tolerancePlus: Number,  
                 rowNo: Number, // instead of specIndex
+                measured_value_decimal: Number,
+                measured_value_fraction: String,
                 result: { type: String, enum: ['pass', 'fail'], default: 'pass' }
               }]
             }],
-            selectedRows: [Boolean],
-            fullColumns: [Boolean],
-            measurements: mongoose.Schema.Types.Mixed,
-            savedAt: Date
+            
+            
           }
         },
       ],

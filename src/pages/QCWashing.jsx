@@ -160,6 +160,24 @@ function machineProcessesToObject(machineProcesses) {
   return obj;
 }
 
+function fractionToDecimal(fraction) {
+  if (typeof fraction === "number") return fraction;
+  if (!fraction || typeof fraction !== "string") return 0;
+  // Remove + or - for parsing, but keep sign
+  let sign = 1;
+  let str = fraction.trim();
+  if (str.startsWith('-')) { sign = -1; str = str.slice(1); }
+  if (str.startsWith('+')) { str = str.slice(1); }
+  if (str === "" || str === "-") return 0;
+  if (str.includes('/')) {
+    const [num, den] = str.split('/').map(Number);
+    if (!isNaN(num) && !isNaN(den) && den !== 0) {
+      return sign * (num / den);
+    }
+  }
+  const parsed = parseFloat(str);
+  return isNaN(parsed) ? 0 : sign * parsed;
+}
 
 
 const QCWashingPage = () => {
@@ -1108,55 +1126,65 @@ if (saved.inspectionDetails?.machineProcesses) {
 
   // Handle measurement size save with nested structure
  const handleSizeSubmit = async (transformedSizeData) => {
-  try {
-    // 1. Update local state as before
-    const before_after_wash = formData.before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
-    setMeasurementData((prev) => {
-      const currentArray = prev[before_after_wash];
-      const existingIndex = currentArray.findIndex((item) => item.size === transformedSizeData.size);
-      if (existingIndex >= 0) {
+        try {
+        const before_after_wash = formData.before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
+
+        // 1. Update local measurement data and saved sizes
+        setMeasurementData((prev) => {
+        const currentArray = prev[before_after_wash];
+        const existingIndex = currentArray.findIndex((item) => item.size === transformedSizeData.size);
+        if (existingIndex >= 0) {
         const updated = [...currentArray];
         updated[existingIndex] = transformedSizeData;
         return { ...prev, [before_after_wash]: updated };
-      } else {
+        }else {
         return { ...prev, [before_after_wash]: [...currentArray, transformedSizeData] };
-      }
-    });
-    setSavedSizes((prev) => {
-      if (!prev.includes(transformedSizeData.size)) {
-        return [...prev, transformedSizeData.size];
-      }
-      return prev;
-    });
-    setShowMeasurementTable(true);
+        }
+        });
 
-    // 2. Save to backend
-    if (!recordId) {
-      Swal.fire("Order details must be saved first!", "", "warning");
-      return;
-    }
-    // Add before_after_wash to the data
-    const measurementDetail = { ...transformedSizeData, before_after_wash };
-    const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-save`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+        setSavedSizes((prev) => {
+        if (!prev.includes(transformedSizeData.size)) {
+        return [...prev, transformedSizeData.size];
+        }
+        return prev;
+        });
+
+        // 2. Remove the just-saved size from selectedSizes to hide its input table
+        if (typeof setSelectedSizes === "function") {
+        setSelectedSizes((prev) => prev.filter((s) => s.size !== transformedSizeData.size));
+        }
+
+        setShowMeasurementTable(true);
+        // 3. Save to backend
+        if (!recordId) {
+        Swal.fire("Order details must be saved first!", "", "warning");
+        return;
+        }
+
+        const measurementDetail = { ...transformedSizeData, before_after_wash };
+        const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
         recordId,
         measurementDetail
-      })
-    });
-    const result = await response.json();
-    if (result.success) {
-      Swal.fire("Success", `Size data saved to database!`, "success");
-      if (typeof loadSavedDataById === "function") loadSavedDataById(recordId);
-    } else {
-      Swal.fire("Error", result.message || "Failed to save measurement data", "error");
-    }
-  } catch (error) {
-    console.error("Error saving size:", error);
-    Swal.fire("Error", "Failed to save size data", "error");
-  }
-};
+        })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+        Swal.fire("Success", `Size data saved to database!`, "success");
+        // Optionally reload all saved data for full consistency:
+        // if (typeof loadSavedDataById === "function") loadSavedDataById(recordId);
+        } else {
+        Swal.fire("Error", result.message || "Failed to save measurement data", "error");
+        }
+        } catch (error) {
+        console.error("Error saving size:", error);
+        Swal.fire("Error", "Failed to save size data", "error");
+        }
+        };
+
 
 
   // Handle measurement data edit

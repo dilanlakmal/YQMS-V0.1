@@ -26078,33 +26078,37 @@ function calculateMeasurementSizeSummary(measurementDetail) {
   if (!measurementDetail || !Array.isArray(measurementDetail.pcs)) {
     return {};
   }
-
   let checkedPcs = measurementDetail.pcs.length;
   let checkedPoints = 0;
   let totalPass = 0;
   let totalFail = 0;
   let plusToleranceFailCount = 0;
   let minusToleranceFailCount = 0;
-  let tolerancePlus = 0;
-  let toleranceMinus = 0;
 
   measurementDetail.pcs.forEach(pc => {
     (pc.measurementPoints || []).forEach(point => {
       checkedPoints++;
       if (point.result === 'pass') totalPass++;
-      if (point.result === 'fail') totalFail++;
+      if (point.result === 'fail') {
+        totalFail++;
+        // Only count fail points for plus/minus tolerance
+        const value = typeof point.measured_value_decimal === 'number'
+          ? point.measured_value_decimal
+          : parseFloat(point.measured_value_decimal);
+        const specs = typeof point.specs === 'number'
+          ? point.specs
+          : parseFloat(point.specs);
+        const tolMinus = typeof point.toleranceMinus === 'number'
+          ? point.toleranceMinus
+          : parseFloat(point.toleranceMinus);
+        const tolPlus = typeof point.tolerancePlus === 'number'
+          ? point.tolerancePlus
+          : parseFloat(point.tolerancePlus);
 
-      // Count plus/minus tolerance fails
-      const value = typeof point.value === 'number' ? point.value : parseFloat(point.value);
-      const specs = typeof point.specs === 'number' ? point.specs : parseFloat(point.specs);
-      const tolMinus = typeof point.toleranceMinus === 'number' ? point.toleranceMinus : parseFloat(point.toleranceMinus);
-      const tolPlus = typeof point.tolerancePlus === 'number' ? point.tolerancePlus : parseFloat(point.tolerancePlus);
-
-      if (!isNaN(value) && !isNaN(specs)) {
-        if (!isNaN(tolPlus) && value > specs + tolPlus) plusToleranceFailCount++;
-        if (!isNaN(tolMinus) && value < specs + tolMinus) minusToleranceFailCount++;
-        if (!isNaN(tolPlus)) tolerancePlus = tolPlus;
-        if (!isNaN(tolMinus)) toleranceMinus = tolMinus;
+        if (!isNaN(value) && !isNaN(specs)) {
+          if (!isNaN(tolPlus) && value > tolPlus) plusToleranceFailCount++;
+          if (!isNaN(tolMinus) && value < tolMinus) minusToleranceFailCount++;
+        }
       }
     });
   });
@@ -26117,10 +26121,9 @@ function calculateMeasurementSizeSummary(measurementDetail) {
     totalFail,
     plusToleranceFailCount,
     minusToleranceFailCount,
-    tolerancePlus,
-    toleranceMinus
   };
 }
+
 
 // Save or update measurement details for a record
 app.post('/api/qc-washing/measurement-save', async (req, res) => {
@@ -26189,10 +26192,6 @@ app.post('/api/qc-washing/measurement-summary-autosave/:recordId', async (req, r
     res.status(500).json({ success: false, message: 'Failed to autosave measurement summary.' });
   }
 });
-
-
-
-
 
 /* ------------------------------
    AI Chatbot Proxy Route
