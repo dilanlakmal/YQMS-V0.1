@@ -22,12 +22,85 @@ import {
 } from "lucide-react";
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import DatePicker from "react-datepicker";
+import Select from "react-select";
 import "react-datepicker/dist/react-datepicker.css";
 import { useTranslation } from "react-i18next";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../config";
 import CuttingReportDetailView from "../cutting/report/CuttingReportDetailView";
 import CuttingReportFollowUp from "../cutting/CuttingReportFollowUp";
+
+// --- START: NEW SEARCHABLE DROPDOWN COMPONENT ---
+const customStyles = {
+  control: (provided) => ({
+    ...provided,
+    minHeight: "42px",
+    height: "42px",
+    border: "1px solid #d1d5db",
+    borderRadius: "0.5rem",
+    boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)"
+  }),
+  valueContainer: (provided) => ({
+    ...provided,
+    height: "42px",
+    padding: "0 8px"
+  }),
+  input: (provided) => ({
+    ...provided,
+    margin: "0px"
+  }),
+  indicatorsContainer: (provided) => ({
+    ...provided,
+    height: "42px"
+  }),
+  menu: (provided) => ({
+    ...provided,
+    zIndex: 20
+  })
+};
+
+const SearchableFilterDropdown = ({
+  name,
+  label,
+  options,
+  value,
+  onChange,
+  placeholder,
+  isMulti = false
+}) => {
+  const formattedOptions = options.map((opt) =>
+    typeof opt === "object" &&
+    opt.hasOwnProperty("value") &&
+    opt.hasOwnProperty("label")
+      ? opt
+      : { value: opt, label: opt }
+  );
+
+  const selectedValue =
+    formattedOptions.find((opt) => opt.value === value) || null;
+
+  const handleChange = (selectedOption) => {
+    onChange(name, selectedOption ? selectedOption.value : "");
+  };
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700">{label}</label>
+      <Select
+        name={name}
+        options={formattedOptions}
+        value={selectedValue}
+        onChange={handleChange}
+        placeholder={placeholder || `Search...`}
+        isClearable
+        isMulti={isMulti}
+        className="mt-1 text-sm"
+        styles={customStyles}
+      />
+    </div>
+  );
+};
+// --- END: NEW SEARCHABLE DROPDOWN COMPONENT ---
 
 // Function to determine result status (remains the same)
 const getResultStatus = (
@@ -211,6 +284,12 @@ const CuttingReport = () => {
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
+  // --- 2. NEW HANDLER FOR REACT-SELECT ---
+  // This handler receives the name and value directly from our wrapper component
+  const handleSelectChange = (name, value) => {
+    setFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
   const handleDateChange = (name, date) => {
     if (
       name === "endDate" &&
@@ -328,58 +407,83 @@ const CuttingReport = () => {
               isClearable
             />
           </div>
-          {renderFilterDropdown(
-            "buyer",
-            t("cutting.buyer"),
-            filterOptions.buyers
-          )}
-          {renderFilterDropdown("moNo", t("cutting.moNo"), filterOptions.moNos)}
-          {renderFilterDropdown(
-            "tableNo",
-            t("cutting.tableNo"),
-            filterOptions.tableNos
-          )}
-          {renderFilterDropdown(
-            "color",
-            t("cutting.color"),
-            filterOptions.colors
-          )}
-          {renderFilterDropdown(
-            "garmentType",
-            t("cutting.garmentType"),
-            filterOptions.garmentTypes
-          )}
-          {renderFilterDropdown(
-            "spreadTable",
-            t("cutting.spreadTable"),
-            filterOptions.spreadTables
-          )}
-          {renderFilterDropdown(
-            "material",
-            t("cutting.material"),
-            filterOptions.materials
-          )}
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              {t("cutting.qcId")}
-            </label>
-            <select
-              name="qcId"
-              value={filters.qcId}
-              onChange={handleFilterChange}
-              className="mt-1 w-full p-2 border border-gray-300 rounded-lg shadow-sm text-sm"
-            >
-              <option value="">{t("common.all")}</option>
-              {filterOptions.qcInspectors.map((qc) => (
-                <option key={qc.emp_id} value={qc.emp_id}>
-                  {qc.emp_id} -{" "}
-                  {i18n.language === "km" && qc.kh_name
-                    ? qc.kh_name
-                    : qc.eng_name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SearchableFilterDropdown
+            name="buyer"
+            label={t("cutting.buyer")}
+            options={filterOptions.buyers}
+            value={filters.buyer}
+            onChange={handleSelectChange}
+            placeholder={t("cutting.selectBuyer")}
+          />
+
+          <SearchableFilterDropdown
+            name="moNo"
+            label={t("cutting.moNo")}
+            options={filterOptions.moNos}
+            value={filters.moNo}
+            onChange={handleSelectChange}
+            placeholder={t("cutting.selectMoNo")}
+          />
+
+          <SearchableFilterDropdown
+            name="tableNo"
+            label={t("cutting.tableNo")}
+            options={filterOptions.tableNos}
+            value={filters.tableNo}
+            onChange={handleSelectChange}
+            placeholder={t("cutting.selectTableNo")}
+          />
+
+          <SearchableFilterDropdown
+            name="color"
+            label={t("cutting.color")}
+            options={filterOptions.colors}
+            value={filters.color}
+            onChange={handleSelectChange}
+            placeholder={t("cutting.selectColor")}
+          />
+
+          <SearchableFilterDropdown
+            name="garmentType"
+            label={t("cutting.garmentType")}
+            options={filterOptions.garmentTypes}
+            value={filters.garmentType}
+            onChange={handleSelectChange}
+            placeholder={t("cutting.selectGarmentType")}
+          />
+
+          <SearchableFilterDropdown
+            name="spreadTable"
+            label={t("cutting.spreadTable")}
+            options={filterOptions.spreadTables}
+            value={filters.spreadTable}
+            onChange={handleSelectChange}
+            placeholder={t("cutting.selectSpreadTable")}
+          />
+
+          <SearchableFilterDropdown
+            name="material"
+            label={t("cutting.material")}
+            options={filterOptions.materials}
+            value={filters.material}
+            onChange={handleSelectChange}
+            placeholder={t("cutting.selectMaterial")}
+          />
+          {/* Special handling for QC ID as it's an object array */}
+          <SearchableFilterDropdown
+            name="qcId"
+            label={t("cutting.qcId")}
+            options={filterOptions.qcInspectors.map((qc) => ({
+              value: qc.emp_id,
+              label: `${qc.emp_id} - ${
+                i18n.language === "km" && qc.kh_name ? qc.kh_name : qc.eng_name
+              }`
+            }))}
+            value={filters.qcId}
+            onChange={handleSelectChange}
+            placeholder={t("cutting.selectQcId")}
+          />
+
           <div className="flex items-end col-span-1 xl:col-span-2 space-x-2">
             <button
               onClick={handleSearch}
