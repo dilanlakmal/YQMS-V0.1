@@ -61,7 +61,7 @@ import mongoose from "mongoose";
         checkedQty: Number,
         washQty: Number,
         result: String,
-        aqlLevelUsed: Number,
+        levelUsed: Number,
         defectsByPc: [{
           pcNumber: Number, // track PC number
           pcDefects: [{

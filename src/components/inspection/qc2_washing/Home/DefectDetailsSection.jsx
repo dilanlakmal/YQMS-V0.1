@@ -33,6 +33,9 @@ const DefectDetailsSection = ({
   const { i18n } = useTranslation();
   const [isSaved, setIsSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(true);
+  const aql = formData.aql && formData.aql[0];
+  console.log("AQL array in DefectDetailsSection:", formData.aql);
+
   // State is now managed by the parent QCWashingPage component
   
   const getDefectNameForDisplay = (d) => {
@@ -256,7 +259,7 @@ const DefectDetailsSection = ({
           checkedQty: formData.checkedQty,
           washQty: formData.washQty,
           result: defectStatus,
-          aqlLevelUsed: formData.aqlLevelUsed,
+          levelUsed: formData.levelUsed,
           defectsByPc: [],
           additionalImages: [],
           comment,
@@ -354,7 +357,7 @@ const DefectDetailsSection = ({
           checkedQty: formData.checkedQty,
           washQty: formData.washQty,
           result: defectStatus,
-          aqlLevelUsed: formData.aqlLevelUsed,
+          levelUsed: formData.levelUsed,
           defectsByPc: [],
           additionalImages: [],
           comment,
@@ -419,7 +422,6 @@ const DefectDetailsSection = ({
       }
     };
 
-
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -461,35 +463,34 @@ const DefectDetailsSection = ({
             </div>
            
             {/* AQL Information Display */}
-         {((formData.inline === 'Inline' || formData.reportType === 'Inline') || formData.firstOutput === "First Output") && 
-           (formData.aqlSampleSize || formData.aqlAcceptedDefect || formData.aqlRejectedDefect) && (
-            <div className="md:col-span-2 bg-blue-50 dark:bg-slate-800 border border-blue-200 dark:border-slate-600 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">
-                AQL Information (Level II, AQL {formData.aqlLevelUsed || 'N/A'})
-              </h3>
-              <div className="grid grid-cols-4 gap-4 text-sm">
-                <div>
-                  <span className="font-medium text-blue-700 dark:text-blue-300">Sample Size:</span>
-                  <span className="ml-2 text-blue-900 dark:text-blue-200">{formData.aqlSampleSize || 'N/A'}</span>
+             {((formData.inline === 'Inline' || formData.reportType === 'Inline') || formData.firstOutput === "First Output") && 
+                (aql?.sampleSize || aql?.acceptedDefect || aql?.rejectedDefect) && (
+                <div className="md:col-span-2 bg-blue-50 dark:bg-slate-800 border border-blue-200 dark:border-slate-600 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">
+                    AQL Information (Level II, AQL {aql?.levelUsed || 'N/A'})
+                  </h3>
+                  <div className="grid grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium text-blue-700 dark:text-blue-300">Sample Size:</span>
+                      <span className="ml-2 text-blue-900 dark:text-blue-200">{aql?.sampleSize || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-blue-700 dark:text-blue-300">Accepted Defect:</span>
+                      <span className="ml-2 text-blue-900 dark:text-blue-200">{aql?.acceptedDefect || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-blue-700 dark:text-blue-300">Rejected Defect:</span>
+                      <span className="ml-2 text-blue-900 dark:text-blue-200">{aql?.rejectedDefect || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-blue-700 dark:text-blue-300">Status:</span>
+                      <span className={`ml-2 px-2 py-1 rounded-full text-xs font-bold ${statusColorClass}`}>
+                        {defectStatus || 'N/A'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="font-medium text-blue-700 dark:text-blue-300">Accepted Defect:</span>
-                  <span className="ml-2 text-blue-900 dark:text-blue-200">{formData.aqlAcceptedDefect || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-blue-700 dark:text-blue-300">Rejected Defect:</span>
-                  <span className="ml-2 text-blue-900 dark:text-blue-200">{formData.aqlRejectedDefect || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-blue-700 dark:text-blue-300">Status:</span>
-                  <span className={`ml-2 px-2 py-1 rounded-full text-xs font-bold ${statusColorClass}`}>
-                    {defectStatus || 'N/A'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-          )}
+            )}
           </div>
 
           <div className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600">

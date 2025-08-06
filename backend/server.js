@@ -24993,7 +24993,7 @@ app.post('/api/qc-washing/aql-chart/find-by-sample-size', async (req, res) => {
         sampleSize: aqlChart.SampleSize, // Return the actual sample size from the chart
         acceptedDefect: aqlEntry.AcceptDefect,
         rejectedDefect: aqlEntry.RejectDefect,
-        aqlLevelUsed: aqlLevel
+        levelUsed: aqlLevel
       }
     });
 
@@ -25050,7 +25050,7 @@ app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
         sampleSize: aqlChart.SampleSize,
         acceptedDefect: aqlEntry.AcceptDefect,
         rejectedDefect: aqlEntry.RejectDefect,
-        aqlLevelUsed: aqlLevel 
+        levelUsed: aqlLevel 
       }
     });
   } catch (error) {
@@ -25107,7 +25107,7 @@ app.post('/api/qc-washing/first-output-details', async (req, res) => {
         sampleSize: aqlChart.SampleSize,
         acceptedDefect: aqlEntry.AcceptDefect,
         rejectedDefect: aqlEntry.RejectDefect,
-        aqlLevelUsed: aqlLevel
+        levelUsed: aqlLevel
       }
     });
 

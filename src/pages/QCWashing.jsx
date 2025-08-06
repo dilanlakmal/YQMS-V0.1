@@ -184,27 +184,23 @@ const QCWashingPage = () => {
     before_after_wash: "Before Wash",
     result: "",
     aql:[{
-      aqlSampleSize: "",
-      aqlAcceptedDefect: "",
-      aqlRejectedDefect: "",
-      aqlLevelUsed: "",
+      sampleSize: "",
+      acceptedDefect: "",
+      rejectedDefect: "",
+      levelUsed: "",
     }],
-    colors: [
-      {
-        colorName: "",
-        orderDetails: {},
-        inspectionDetails: {},
-        defectDetails: {
-          checkedQty: "",
-          washQty: "",
-          result: "",
-          defectsByPc: [],
-          additionalImages: [],
-          comment: "",
-        },
-        measurementDetails: [],
-      },
-    ],
+    
+    inspectionDetails: {},
+    defectDetails: {
+      checkedQty: "",
+      washQty: "",
+      result: "",
+      defectsByPc: [],
+      additionalImages: [],
+      comment: "",
+    },
+    measurementDetails: [],
+     
     totalCheckedPcs: 0,
     rejectedDefectPcs: 0,
     totalDefectCount: 0,
@@ -233,6 +229,8 @@ const QCWashingPage = () => {
   measurementDetails: false,
 });
 const [recordId, setRecordId] = useState(null);
+  const aql = formData.aql && formData.aql[0];
+
 
 // Function to activate the next section
 const activateNextSection = (currentSection) => {
@@ -348,11 +346,26 @@ const activateNextSection = (currentSection) => {
 
 
   // --- useEffect: Calculate Checked Qty ---
-  useEffect(() => {
-    if ((formData.inline === "Inline" || formData.reportType === "Inline") && formData.aqlSampleSize && formData.washQty) {
-      calculateCheckedQty(formData.washQty);
+ useEffect(() => {
+  const aql = formData.aql && formData.aql[0];
+  if (
+    (formData.inline === "Inline" || formData.reportType === "Inline") &&
+    aql?.sampleSize &&
+    formData.washQty
+  ) {
+    const newCheckedQty = Math.min(
+      parseInt(formData.washQty, 10),
+      parseInt(aql.sampleSize, 10)
+    ).toString();
+    if (formData.checkedQty !== newCheckedQty) {
+      setFormData(prev => ({
+        ...prev,
+        checkedQty: newCheckedQty
+      }));
     }
-  }, [formData.aqlSampleSize, formData.inline, formData.reportType]);
+  }
+}, [formData.aql, formData.washQty, formData.inline, formData.reportType]);
+
 
 useEffect(() => {
   if (recordId) {
@@ -363,26 +376,29 @@ useEffect(() => {
 
    // --- useEffect: Calculate AQL Status ---
   useEffect(() => {
-    if ((formData.inline === 'Inline' || formData.reportType === 'Inline' || formData.firstOutput === "First Output" || formData.reportType === 'First Output') && formData.aqlAcceptedDefect) {
-        const totalDefects = Object.values(defectsByPc)
-            .flat()
-            .reduce((sum, defect) => sum + (parseInt(defect.defectQty, 10) || 0), 0);
-        
-        const acceptedDefectCount = parseInt(formData.aqlAcceptedDefect, 10);
+  const aql = formData.aql && formData.aql[0];
+  if (
+    (formData.inline === 'Inline' || formData.reportType === 'Inline' || formData.firstOutput === "First Output" || formData.reportType === 'First Output')
+    && aql?.acceptedDefect
+  ) {
+    const totalDefects = Object.values(defectsByPc)
+      .flat()
+      .reduce((sum, defect) => sum + (parseInt(defect.defectQty, 10) || 0), 0);
 
-        if (!isNaN(acceptedDefectCount)) {
-            const newStatus = totalDefects <= acceptedDefectCount ? 'Pass' : 'Fail';
-            if (newStatus !== formData.result) {
-                setFormData(prev => ({ ...prev, result: newStatus }));
-            }
-        }
-    } else {
-        // If not an AQL check, reset the status
-        if (formData.result) { 
-            setFormData(prev => ({ ...prev, result: '' }));
-        }
+    const acceptedDefectCount = parseInt(aql.acceptedDefect, 10);
+    if (!isNaN(acceptedDefectCount)) {
+      const newStatus = totalDefects <= acceptedDefectCount ? 'Pass' : 'Fail';
+      if (newStatus !== formData.result) {
+        setFormData(prev => ({ ...prev, result: newStatus }));
+      }
     }
-  }, [defectsByPc, formData.aqlAcceptedDefect, formData.inline, formData.reportType, formData.firstOutput, formData.result]);
+  } else {
+    if (formData.result) {
+      setFormData(prev => ({ ...prev, result: '' }));
+    }
+  }
+}, [defectsByPc, formData.aql, formData.inline, formData.reportType, formData.firstOutput, formData.result]);
+
 
   useEffect(() => {
   const fetchColorOrderQty = async () => {
@@ -642,13 +658,12 @@ useEffect(() => {
       before_after_wash: saved.before_after_wash || prev.before_after_wash,
       orderQty: saved.formData?.orderQty || prev.orderQty,
       buyer: saved.formData?.buyer || prev.buyer,
-      aql:
-      [{
-        sampleSize: saved.formData?.aqlSampleSize || prev.aqlSampleSize,
-        acceptedDefect: saved.formData?.aqlAcceptedDefect || prev.aqlAcceptedDefect,
-        rejectedDefect: saved.formData?.aqlRejectedDefect || prev.aqlRejectedDefect,
-        levelUsed: saved.formData?.aqlLevelUsed || prev.aqlLevelUsed,
-      }],
+     aql: [{
+          sampleSize: saved.formData?.aqlSampleSize || prev.aql?.[0]?.sampleSize || "",
+          acceptedDefect: saved.formData?.aqlAcceptedDefect || prev.aql?.[0]?.acceptedDefect || "",
+          rejectedDefect: saved.formData?.aqlRejectedDefect || prev.aql?.[0]?.rejectedDefect || "",
+          levelUsed: saved.formData?.aqlLevelUsed || prev.aql?.[0]?.levelUsed || "",
+        }],
     }));
 
     setInspectionData(
@@ -951,20 +966,21 @@ if (saved.inspectionDetails?.machineProcesses) {
   };
 
   // Calculate checked qty based on wash qty and AQL data
-  const calculateCheckedQty = (washQty) => {
-    setTimeout(() => {
-      setFormData((prev) => {
-        if (prev.aqlSampleSize && washQty) {
-          const checkedQty = Math.min(
-            parseInt(washQty),
-            parseInt(prev.aqlSampleSize)
-          );
-          return { ...prev, checkedQty: checkedQty.toString() };
-        }
-        return prev;
-      });
-    }, 100);
-  };
+ const calculateCheckedQty = (washQty) => {
+  setTimeout(() => {
+    setFormData((prev) => {
+      const aql = prev.aql && prev.aql[0];
+      if (aql?.sampleSize && washQty) {
+        const checkedQty = Math.min(
+          parseInt(washQty),
+          parseInt(aql.sampleSize)
+        );
+        return { ...prev, checkedQty: checkedQty.toString() };
+      }
+      return prev;
+    });
+  }, 100);
+};
 
 //   const fetchAqlForParameter = async (orderNo, checkedQty, setDefectData, defectIndex) => {
 //   if (!orderNo || !checkedQty) return;
@@ -1501,8 +1517,8 @@ useEffect(() => {
         <>
         <OverAllSummaryCard
           summary={overallSummary}
-          measurementData={formData.colors[0]?.measurementDetails} 
-          defectDetails={formData.colors[0]?.defectDetails} 
+          measurementData={formData.measurementDetails} 
+          defectDetails={formData.defectDetails} 
           before_after_wash={formData.before_after_wash}
           showMeasurementTable={showMeasurementTable}
         />
@@ -1685,12 +1701,13 @@ useEffect(() => {
 
                 // --- 2. Build the submitData payload ---
                 const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
-                const aql = [{
-                  sampleSize: Number(formData.aqlSampleSize) || 0,
-                  acceptedDefect: Number(formData.aqlAcceptedDefect) || 0,
-                  rejectedDefect: Number(formData.aqlRejectedDefect) || 0,
-                  levelUsed: Number(formData.aqlLevelUsed) || 0
-                }];
+                const aql = formData.aql && formData.aql[0];
+              const submitAql = [{
+                sampleSize: Number(aql?.sampleSize) || 0,
+                acceptedDefect: Number(aql?.acceptedDefect) || 0,
+                rejectedDefect: Number(aql?.rejectedDefect) || 0,
+                levelUsed: Number(aql?.levelUsed) || 0
+              }];
                 const submitData = {
                   orderNo: formData.orderNo || formData.style,
                   date: formData.date,
@@ -1702,7 +1719,7 @@ useEffect(() => {
                   totalPass,
                   totalFail,
                   passRate,
-                  aql,
+                  submitAql,
                   ...summary, 
                   submittedAt: new Date().toISOString(),
                   userId: user?.emp_id,
