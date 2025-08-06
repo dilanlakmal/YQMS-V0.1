@@ -22,7 +22,7 @@ export default defineConfig({
     }
   },
   build: {
-    minify: false, // Use esbuild for minification
+    //minify: false, // Use esbuild for minification
     sourcemap: true,
     chunkSizeWarningLimit: 20000,
     rollupOptions: {

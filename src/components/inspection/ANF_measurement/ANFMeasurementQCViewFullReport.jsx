@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, Fragment } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../config";
@@ -45,50 +45,6 @@ const SummaryCard = ({
     <div className="text-center">
       <p className={`text-2xl font-bold ${colorClass}`}>{value}</p>
     </div>
-  </div>
-);
-
-const SizeTallyTable = ({ sizeDetail, dynamicColumns }) => (
-  <div className="overflow-x-auto">
-    <table className="min-w-full text-xs border-collapse">
-      <thead className="bg-gray-100 dark:bg-gray-700">
-        <tr /* ... header row ... */></tr>
-      </thead>
-      <tbody>
-        {sizeDetail.buyerSpecData.map((spec) => {
-          const tolMinus = fractionToDecimal(spec.tolNeg_fraction);
-          const tolPlus = fractionToDecimal(spec.tolPos_fraction);
-          return (
-            <tr
-              key={spec.no}
-              className="dark:odd:bg-gray-800 dark:even:bg-gray-800/50"
-            >
-              {/* ... table cells for spec data ... */}
-              {dynamicColumns.map((col) => {
-                const count = sizeDetail.measurementsTally[spec.no]?.[col] || 0;
-                const colDecimal = fractionToDecimal(col);
-                const isInTolerance =
-                  colDecimal >= tolMinus && colDecimal <= tolPlus;
-                const cellBg =
-                  count > 0
-                    ? isInTolerance
-                      ? "bg-green-100 dark:bg-green-900/40"
-                      : "bg-red-100 dark:bg-red-900/40"
-                    : "";
-                return (
-                  <td
-                    key={col}
-                    className={`p-2 border dark:border-gray-600 text-center font-bold ${cellBg}`}
-                  >
-                    {count > 0 ? count : ""}
-                  </td>
-                );
-              })}
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
   </div>
 );
 
@@ -425,6 +381,66 @@ const ANFMeasurementQCViewFullReport = () => {
                 />
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* --- MODIFIED Section 3: Measurement Summary by Size --- */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+          <h2 className="text-lg font-bold mb-4 border-b pb-2 dark:border-gray-700">
+            Measurement Summary by Size
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-gray-700/60">
+                <tr className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">
+                  <th className="p-3 text-left">Size</th>
+                  <th className="p-3 text-center">Checked</th>
+                  <th className="p-3 text-center">OK</th>
+                  <th className="p-3 text-center">Reject</th>
+                  <th className="p-3 text-center">Points</th>
+                  <th className="p-3 text-center">Pass</th>
+                  <th className="p-3 text-center">Issues</th>
+                  <th className="p-3 text-center">TOL+</th>
+                  <th className="p-3 text-center">TOL-</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.measurementDetails.map((sizeDetail, index) => (
+                  <tr
+                    key={index}
+                    className="border-b last:border-b-0 dark:border-gray-700"
+                  >
+                    <td className="p-3 font-bold text-indigo-600 dark:text-indigo-400">
+                      {sizeDetail.size}
+                    </td>
+                    <td className="p-3 text-center font-semibold text-gray-800 dark:text-gray-200">
+                      {sizeDetail.sizeSummary.garmentDetailsCheckedQty}
+                    </td>
+                    <td className="p-3 text-center font-semibold text-green-600 dark:text-green-400">
+                      {sizeDetail.sizeSummary.garmentDetailsOKGarment}
+                    </td>
+                    <td className="p-3 text-center font-semibold text-red-600 dark:text-red-400">
+                      {sizeDetail.sizeSummary.garmentDetailsRejected}
+                    </td>
+                    <td className="p-3 text-center font-semibold text-gray-800 dark:text-gray-200">
+                      {sizeDetail.sizeSummary.measurementDetailsPoints}
+                    </td>
+                    <td className="p-3 text-center font-semibold text-green-600 dark:text-green-400">
+                      {sizeDetail.sizeSummary.measurementDetailsPass}
+                    </td>
+                    <td className="p-3 text-center font-semibold text-red-600 dark:text-red-400">
+                      {sizeDetail.sizeSummary.measurementDetailsTotalIssues}
+                    </td>
+                    <td className="p-3 text-center font-semibold text-rose-500">
+                      {sizeDetail.sizeSummary.measurementDetailsTolPositive}
+                    </td>
+                    <td className="p-3 text-center font-semibold text-red-500">
+                      {sizeDetail.sizeSummary.measurementDetailsTolNegative}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 

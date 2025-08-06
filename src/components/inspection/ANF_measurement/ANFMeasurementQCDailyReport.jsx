@@ -18,8 +18,8 @@ import {
 } from "lucide-react";
 import { Menu, Transition } from "@headlessui/react";
 import { Fragment } from "react";
-import { PDFDownloadLink } from "@react-pdf/renderer";
-import ANFMeasurementQCViewPDF from "./ANFMeasurementQCViewPDF";
+//import { PDFDownloadLink } from "@react-pdf/renderer";
+//import ANFMeasurementQCViewPDF from "./ANFMeasurementQCViewPDF";
 
 // Helper function to create a URL-safe ID
 const createPageId = (date, qcId, moNo) => {
@@ -35,12 +35,26 @@ const ActionMenu = ({ item }) => {
   const pageId = createPageId(item.inspectionDate, item.qcID, item.moNo);
   const reportUrl = `/anf-washing/qc-full-report/${pageId}`;
 
+  // handleAction function ---
+  const handleAction = (action) => {
+    alert(`${action} clicked for MO: ${item.moNo}`);
+    // Future logic for these actions will go here
+  };
+
   return (
     <Menu as="div" className="relative inline-block text-left">
       <Menu.Button className="inline-flex justify-center w-full p-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none">
         <MoreVertical className="w-5 h-5" />
       </Menu.Button>
-      <Transition as={Fragment} /* ... */>
+      <Transition
+        as={Fragment}
+        enter="transition ease-out duration-100"
+        enterFrom="transform opacity-0 scale-95"
+        enterTo="transform opacity-100 scale-100"
+        leave="transition ease-in duration-75"
+        leaveFrom="transform opacity-100 scale-100"
+        leaveTo="transform opacity-0 scale-95"
+      >
         <Menu.Items className="absolute right-0 z-10 w-56 mt-2 origin-top-right bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
           <div className="px-1 py-1">
             <Menu.Item>
@@ -124,6 +138,14 @@ const ANFMeasurementQCDailyReport = () => {
 
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
+
+  // --- NEW: State to ensure we are rendering on the client ---
+  const [isClient, setIsClient] = useState(false);
+
+  // --- NEW: This effect runs only once on the client after the component mounts ---
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Fetch master data based on date range
   useEffect(() => {
@@ -338,7 +360,41 @@ const ANFMeasurementQCDailyReport = () => {
                 placeholder="All QCs"
               />
             </div>
-            <div className="lg:col-span-1">
+
+            {/* --- MODIFIED: PDF Download Button --- */}
+            {/* <div className="lg:col-span-1">
+              {isClient && filteredData.length > 0 ? (
+                <PDFDownloadLink
+                  document={<ANFMeasurementQCViewPDF data={filteredData} />}
+                  fileName={`ANF_QC_Report_${format(
+                    new Date(),
+                    "yyyy-MM-dd"
+                  )}.pdf`}
+                >
+                  {({ loading }) => (
+                    <button
+                      disabled={loading}
+                      className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <FileDown className="h-5 w-5" />
+                      )}
+                    </button>
+                  )}
+                </PDFDownloadLink>
+              ) : (
+                <button
+                  disabled
+                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-400 disabled:cursor-not-allowed"
+                >
+                  <FileDown className="h-5 w-5" />
+                </button>
+              )}
+            </div> */}
+
+            {/* <div className="lg:col-span-1">
               <PDFDownloadLink
                 document={<ANFMeasurementQCViewPDF data={filteredData} />}
                 fileName={`ANF_QC_Report_${format(
@@ -359,7 +415,7 @@ const ANFMeasurementQCDailyReport = () => {
                   </button>
                 )}
               </PDFDownloadLink>
-            </div>
+            </div> */}
           </div>
         </div>
 

@@ -38,7 +38,8 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
     "Live Dashboard",
     "Power BI",
     "QC1 Sunrise",
-    "ANF QA"
+    "ANF QA",
+    "QA"
   ];
 
   // Array of allowed working statuses that can modify roles.
