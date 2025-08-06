@@ -1665,7 +1665,7 @@ useEffect(() => {
         )} */}
 
         <div className="flex justify-end space-x-4">
-          <button
+          {/* <button
             className="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
             onClick={() => {
               if (autoSaveId) {
@@ -1717,7 +1717,7 @@ useEffect(() => {
             }}
           >
             Reset
-          </button>
+          </button> */}
           <button
             className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
             onClick={async () => {
