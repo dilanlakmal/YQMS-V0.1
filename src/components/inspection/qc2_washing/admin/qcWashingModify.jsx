@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import QCWashingDefectsTab from "./QCWashingDefectsTab";
 import QCWashingFirstOutputTab from "./QCWashingFirstOutputTab";
+import QCWashingCheckpointsTab from "./QCWashingCheckpointsTab";
 
 const QcWashingModify = () => {
   const [activeTab, setActiveTab] = useState("defects");
