@@ -96,27 +96,27 @@ const SummaryCard = ({
         Measurement Summary -{" "}
         <span className="text-indigo-600">{before_after_wash}</span>
       </h2>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 text-center">
-          <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
             {totalCheckedPoints}
           </div>
-          <div className="text-sm text-blue-700 dark:text-blue-300">Measurement Points</div>
+          <div className="text-sm text-blue-700 dark:text-white">Measur Points</div>
         </div>
-        <div className="bg-green-50 dark:bg-green-700 border border-green-200 dark:border-green-600 rounded-lg p-4 text-center">
-          <div className="text-4xl font-bold text-green-600 dark:text-green-400">{totalPass}</div>
-          <div className="text-sm text-green-700 dark:text-green-300">Pass</div>
+        <div className="bg-green-50 dark:bg-green-800 border border-green-200 dark:border-green-400 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-green-600 dark:text-green-200">{totalPass}</div>
+          <div className="text-sm text-green-700 dark:text-white">Pass</div>
         </div>
         <div className="bg-red-50 dark:bg-red-700 border border-red-200 dark:border-red-600 rounded-lg p-4 text-center">
-          <div className="text-4xl font-bold text-red-600 dark:text-red-400">{totalFail}</div>
-          <div className="text-sm text-red-700 dark:text-red-300">Fail</div>
+          <div className="text-2xl font-bold text-red-600 dark:text-red-200">{totalFail}</div>
+          <div className="text-sm text-red-700 dark:text-white">Fail</div>
         </div>
         <div className="bg-yellow-50 dark:bg-yellow-700 border border-yellow-200 dark:border-yellow-600 rounded-lg p-4 text-center">
-          <div className="text-4xl font-bold text-yellow-600 dark:text-yellow-400">{passRate}%</div>
-          <div className="text-sm text-yellow-700 dark:text-yellow-300">Pass Rate</div>
+          <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-200">{passRate}%</div>
+          <div className="text-sm text-yellow-700 dark:text-white">Pass Rate</div>
         </div>
         <div className={`${resultBgColor} dark:bg-gray-700 dark:border-gray-600 rounded-lg p-4 text-center`}>
-          <div className={`text-4xl font-bold ${resultColor} dark:text-white`}>
+          <div className={`text-2xl font-bold ${resultColor} dark:text-white`}>
             {overallResult}
           </div>
           <div className={`text-sm ${resultColor} dark:text-gray-300`}>Result</div>
