@@ -73,26 +73,39 @@ function normalizeImagePreview(img) {
 }
 
 function calculateSummaryData(currentFormData) {
-  // Use top-level fields, not colors[0]
   const currentDefectDetails = currentFormData.defectDetails;
   const currentMeasurementData = currentFormData.measurementDetails;
 
-  let measurementPoints = 0;
-  let measurementPass = 0;
+  // 1. Calculate totalCheckedPcs
   let totalCheckedPcs = 0;
 
-  if (currentMeasurementData && Array.isArray(currentMeasurementData)) {
+  if (Array.isArray(currentMeasurementData)) {
+    const pcSet = new Set();
     currentMeasurementData.forEach((data) => {
-      if (data.pcs && Array.isArray(data.pcs)) {
-        totalCheckedPcs += data.pcs.length;
-        data.pcs.forEach((pc) => {
-          if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
+      if (data.measurement && Array.isArray(data.measurement.pcs)) {
+        data.measurement.pcs.forEach((pc) => {
+          if (pc.pcNumber !== undefined && pc.pcNumber !== null) {
+            pcSet.add(pc.pcNumber);
+          }
+        });
+      }
+    });
+    totalCheckedPcs = pcSet.size;
+  }
+
+
+  // 2. Calculate measurement points and passes
+  let measurementPoints = 0;
+  let measurementPass = 0;
+  if (Array.isArray(currentMeasurementData)) {
+    currentMeasurementData.forEach((data) => {
+      if (data.measurement && Array.isArray(data.measurement.pcs)) {
+        data.measurement.pcs.forEach((pc) => {
+          if (Array.isArray(pc.measurementPoints)) {
             pc.measurementPoints.forEach((point) => {
               if (point.result === 'pass' || point.result === 'fail') {
                 measurementPoints++;
-                if (point.result === 'pass') {
-                  measurementPass++;
-                }
+                if (point.result === 'pass') measurementPass++;
               }
             });
           }
@@ -101,28 +114,38 @@ function calculateSummaryData(currentFormData) {
     });
   }
 
+  // 3. Defect calculations
   const rejectedDefectPcs = Array.isArray(currentDefectDetails?.defectsByPc)
     ? currentDefectDetails.defectsByPc.length
     : 0;
 
   const defectCount = currentDefectDetails?.defectsByPc
     ? currentDefectDetails.defectsByPc.reduce((sum, pc) => {
-        return sum + (Array.isArray(pc.pcDefects)
-          ? pc.pcDefects.reduce((defSum, defect) => defSum + (parseInt(defect.defectQty, 10) || 0), 0)
-          : 0);
+        return (
+          sum +
+          (Array.isArray(pc.pcDefects)
+            ? pc.pcDefects.reduce(
+                (defSum, defect) =>
+                  defSum + (parseInt(defect.defectQty, 10) || 0),
+                0
+              )
+            : 0)
+        );
       }, 0)
     : 0;
 
+  // 4. Defect rate and ratio
   const defectRate =
     totalCheckedPcs > 0
-      ? ((defectCount / totalCheckedPcs) * 100).toFixed(1)
+      ? Number(((defectCount / totalCheckedPcs) * 100).toFixed(1))
       : 0;
 
   const defectRatio =
     totalCheckedPcs > 0
-      ? ((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1)
+      ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
       : 0;
 
+  // 5. Result logic
   let overallResult = "Pass";
   const measurementOverallResult =
     measurementPoints - measurementPass > 0 ? "Fail" : "Pass";
@@ -130,22 +153,33 @@ function calculateSummaryData(currentFormData) {
 
   if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
     overallResult = "Fail";
-  } else if (measurementOverallResult === "Pass" && defectOverallResult === "Pass") {
+  } else if (
+    measurementOverallResult === "Pass" &&
+    defectOverallResult === "Pass"
+  ) {
     overallResult = "Pass";
   } else {
     overallResult = "N/A";
   }
+  console.log({
+    totalCheckedPcs,
+    rejectedDefectPcs,
+    defectCount,
+    defectRate,
+    defectRatio
+  });
 
   return {
     totalCheckedPcs: totalCheckedPcs || 0,
     rejectedDefectPcs: rejectedDefectPcs || 0,
     totalDefectCount: defectCount || 0,
-    defectRate: parseFloat(defectRate) || 0,
-    defectRatio: parseFloat(defectRatio) || 0,
+    defectRate,
+    defectRatio,
     overallFinalResult: overallResult || "N/A",
+    overallResult,
   };
+  
 }
-
 
 
 function machineProcessesToObject(machineProcesses) {

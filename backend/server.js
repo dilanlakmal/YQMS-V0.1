@@ -24809,80 +24809,34 @@ app.get('/api/qc-washing/overall-summary-by-id/:recordId', async (req, res) => {
   try {
     const { recordId } = req.params;
     const qcRecord = await QCWashing.findById(recordId);
+
     if (!qcRecord) {
       return res.status(404).json({ success: false, message: 'No data found for this record.' });
     }
 
-    // Use root-level fields
-    const defectDetails = qcRecord.defectDetails || {};
-    const measurementDetails = qcRecord.measurementDetails || [];
-
-    // Measurement points and checked pcs
-    let measurementPoints = 0, measurementPass = 0, totalCheckedPcs = 0;
-    (measurementDetails || []).forEach(md => {
-      if (Array.isArray(md.pcs)) {
-        totalCheckedPcs += md.pcs.length;
-        md.pcs.forEach(pc => {
-          (pc.measurementPoints || []).forEach(point => {
-            if (point.result === 'pass' || point.result === 'fail') {
-              measurementPoints++;
-              if (point.result === 'pass') measurementPass++;
-            }
-          });
-        });
-      }
-    });
-    const totalFail = measurementPoints - measurementPass;
-    const passRate = measurementPoints > 0 ? ((measurementPass / measurementPoints) * 100).toFixed(2) : 0;
-
-    // Defect details
-    let rejectedDefectPcs = 0;
-    let totalDefectCount = 0;
-    if (Array.isArray(defectDetails.defectsByPc)) {
-      rejectedDefectPcs = defectDetails.defectsByPc.length;
-      totalDefectCount = defectDetails.defectsByPc.reduce(
-        (sum, pc) => sum + (
-          Array.isArray(pc.pcDefects)
-            ? pc.pcDefects.reduce((defSum, defect) => defSum + (parseInt(defect.defectQty, 10) || 0), 0)
-            : 0
-        ), 0
-      );
-    }
-    const washQty = parseInt(defectDetails.washQty) || 0;
-    const checkedQty = defectDetails.checkedQty || "";
-    const defectRate = totalCheckedPcs > 0 ? ((totalDefectCount / totalCheckedPcs) * 100).toFixed(1) : 0;
-    const defectRatio = totalCheckedPcs > 0 ? ((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1) : 0;
-
-    const measurementOverallResult = totalFail > 0 ? "Fail" : "Pass";
-    const defectOverallResult = defectDetails.result || "N/A";
-    let overallResult = "N/A";
-    if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
-      overallResult = "Fail";
-    } else if (measurementOverallResult === "Pass" && defectOverallResult === "Pass") {
-      overallResult = "Pass";
-    }
-
+    // Use saved summary fields if available, fallback to 0 or "N/A"
     res.json({
       success: true,
       summary: {
         recordId,
         orderNo: qcRecord.orderNo,
         color: qcRecord.color,
-        totalCheckedPcs,
-        checkedQty,
-        washQty,
-        rejectedDefectPcs,
-        totalDefectCount,
-        defectRate,
-        defectRatio,
-        overallResult,
-        passRate,
-        measurementPoints,
-        measurementPass,
-        totalFail,
-        measurementOverallResult,
-        defectOverallResult,
-        defectDetails,
+        totalCheckedPcs: qcRecord.totalCheckedPcs ?? 0,
+        checkedQty: qcRecord.checkedQty ?? "",
+        washQty: qcRecord.washQty ?? "",
+        rejectedDefectPcs: qcRecord.rejectedDefectPcs ?? 0,
+        totalDefectCount: qcRecord.totalDefectCount ?? 0,
+        defectRate: qcRecord.defectRate ?? 0,
+        defectRatio: qcRecord.defectRatio ?? 0,
+        overallResult: qcRecord.overallFinalResult ?? qcRecord.overallResult ?? "N/A",
+        // Optionally include these if you want to show them in the UI:
+        passRate: qcRecord.passRate ?? "",
+        measurementPoints: qcRecord.measurementPoints ?? "",
+        measurementPass: qcRecord.measurementPass ?? "",
+        totalFail: qcRecord.totalFail ?? "",
+        measurementOverallResult: qcRecord.measurementOverallResult ?? "",
+        defectOverallResult: qcRecord.defectDetails?.result ?? "N/A",
+        defectDetails: qcRecord.defectDetails ?? {},
       }
     });
   } catch (error) {
@@ -24890,6 +24844,7 @@ app.get('/api/qc-washing/overall-summary-by-id/:recordId', async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error while fetching overall summary.' });
   }
 });
+
 
 
 app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
@@ -24902,11 +24857,17 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
     // Always recalculate totalCheckedPcs from measurementDetails
     let totalCheckedPcs = 0;
     if (Array.isArray(qcRecord.measurementDetails)) {
+      const pcSet = new Set();
       for (const size of qcRecord.measurementDetails) {
-        if (Array.isArray(size.pcs)) {
-          totalCheckedPcs += size.pcs.length;
+        if (size.measurement && Array.isArray(size.measurement.pcs)) {
+          for (const pc of size.measurement.pcs) {
+            if (pc.pcNumber !== undefined && pc.pcNumber !== null) {
+              pcSet.add(pc.pcNumber);
+            }
+          }
         }
       }
+      totalCheckedPcs = pcSet.size;
     }
     qcRecord.totalCheckedPcs = totalCheckedPcs;
 

@@ -4,10 +4,11 @@ import { WashingMachine, ClipboardCheck } from "lucide-react";
 const OverAllSummaryCard = ({ summary }) => {
   if (!summary) {
     return (
-      <div className="bg-white shadow-lg rounded-lg p-6 mb-8 border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-800 mb-6">Overall Summary</h2>
-        <div className="text-center text-gray-500">No summary data available.</div>
+      <div className="bg-white dark:bg-gray-800 shadow-lg   rounded-lg p-6 mb-8 border border-gray-200 dark:border-gray-700">
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-6">Overall Summary</h2>
+        <div className="text-center text-gray-500 dark:text-gray-300">No summary data available.</div>
       </div>
+
     );
   }
 
