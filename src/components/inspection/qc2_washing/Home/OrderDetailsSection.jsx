@@ -91,7 +91,10 @@ const OrderDetailsSection = ({
 
     // 5. If not exists, proceed to save as new
     const saveData = {
-      formData,
+      formData: {
+        ...formData,
+        colorOrderQty: colorOrderQty
+      },
       userId: user?.emp_id,
       savedAt: new Date().toISOString(),
     };
@@ -195,6 +198,7 @@ const OrderDetailsSection = ({
    useEffect(() => {
     if (formData.orderNo && formData.color) loadSavedSizes(formData.orderNo, formData.color);
   }, [formData.orderNo, formData.color]);
+
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">

@@ -25613,6 +25613,7 @@ app.post("/api/qc-washing/orderData-save", async (req, res) => {
       // Create new record
       record = new QCWashing({
         ...formData,
+        colorOrderQty: formData.colorOrderQty,
         userId,
         savedAt,
         status: "draft"
