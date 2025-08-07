@@ -63,7 +63,8 @@ import mongoose from "mongoose";
         result: String,
         levelUsed: Number,
         defectsByPc: [{
-          pcNumber: Number, // track PC number
+          pcNumber: Number, 
+          isFullColumn: Boolean,
           pcDefects: [{
             defectId: String,
             defectName: String,
@@ -113,8 +114,8 @@ import mongoose from "mongoose";
                 result: { type: String, enum: ['pass', 'fail'], default: 'pass' }
               }]
             }],
-            
-            
+             selectedRows: [Boolean],
+             fullColumns: [Boolean],
           }
         },
       ],

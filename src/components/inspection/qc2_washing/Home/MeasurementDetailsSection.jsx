@@ -11,6 +11,7 @@ const MeasurementDetailsSection = ({
   isVisible,
   onToggle,
   savedSizes = [],
+  setSavedSizes,
   onSizeSubmit,
   measurementData = { beforeWash: [], afterWash: [] },
   showMeasurementTable = true,
@@ -92,6 +93,7 @@ const MeasurementDetailsSection = ({
 
     pcs.push({
       pcNumber: pcIndex + 1,
+      isFullColumn: fullColumns?.[pcIndex] || false,
       measurementPoints: measurementPoints,
     });
   }
@@ -143,41 +145,46 @@ const MeasurementDetailsSection = ({
     return isNegative ? -total : total;
   };
 
-  const handleEditClick = (sizeToEdit) => {
-    const before_after_wash_Key = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
-    const dataToEdit = (measurementData[before_after_wash_Key] || []).find(item => item.size === sizeToEdit);
+const handleEditClick = (sizeToEdit) => {
+  const before_after_wash_Key = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
+  const dataToEdit = (measurementData[before_after_wash_Key] || []).find(item => item.size === sizeToEdit);
+  if (!dataToEdit) return;
 
-    if (!dataToEdit) {
-      console.error("Data to edit not found for size:", sizeToEdit);
-      return;
+  setSavedSizes(prev => prev.filter(s => s !== sizeToEdit));
+  setSelectedSizes(prev => {
+    if (prev.some(s => s.size === sizeToEdit)) {
+      return prev.map(s => s.size === sizeToEdit ? { ...s, qty: dataToEdit.qty } : s);
     }
+    return [...prev, { size: sizeToEdit, qty: dataToEdit.qty }];
+  });
 
-    setSelectedSizes(prev => {
-        if (prev.some(s => s.size === sizeToEdit)) {
-            return prev.map(s => s.size === sizeToEdit ? { ...s, qty: dataToEdit.qty } : s);
-        }
-        return [...prev, { size: sizeToEdit, qty: dataToEdit.qty }];
+  // --- Reset UI state for this size ---
+  setSelectedRowsBySize(prev => {
+    const next = { ...prev };
+    delete next[sizeToEdit];
+    return next;
+  });
+  setFullColumnsBySize(prev => {
+    const next = { ...prev };
+    delete next[sizeToEdit];
+    return next;
+  });
+  setMeasurementValues(prev => {
+    const newValues = { ...prev };
+    Object.keys(newValues).forEach(key => {
+      if (key.startsWith(`${sizeToEdit}-before-`) || key.startsWith(`${sizeToEdit}-after-`)) {
+        delete newValues[key];
+      }
     });
+    return newValues;
+  });
 
-    if (dataToEdit.measurements) {
-        setMeasurementValues(prev => ({
-            ...prev,
-            ...dataToEdit.measurements
-        }));
-    }
+  // --- Hydrate only from the saved record ---
+  hydrateMeasurementUIFromSavedData([dataToEdit], before_after_wash === 'Before Wash' ? 'before' : 'after');
 
-    if (dataToEdit.selectedRows) {
-        setSelectedRowsBySize(prev => ({ ...prev, [sizeToEdit]: dataToEdit.selectedRows }));
-    }
-    if (dataToEdit.fullColumns) {
-        setFullColumnsBySize(prev => ({ ...prev, [sizeToEdit]: dataToEdit.fullColumns }));
-    }
+  if (onMeasurementEdit) onMeasurementEdit(sizeToEdit);
+};
 
-    if (onMeasurementEdit) {
-        onMeasurementEdit(sizeToEdit);
-    }
-  };
-  
   
   useEffect(() => {
     if (orderNo && color) {
@@ -216,6 +223,52 @@ const MeasurementDetailsSection = ({
       setLoading(false);
     }
   };
+
+  function hydrateMeasurementUIFromSavedData(dataArr, tableType) {
+  dataArr.forEach((data) => {
+    const { size, qty, pcs } = data;
+    if (!size || !pcs) return;
+
+    // Find the number of measurement points (rows)
+    const numRows = pcs[0]?.measurementPoints?.length || 0;
+    // Find the number of columns (pcs)
+    const numCols = pcs.length;
+
+    // 1. Build measurementValues
+    let newMeasurementValues = {};
+
+    // 2. Build selectedRows: default all to false, set to true if any value exists
+    let newSelectedRows = Array(numRows).fill(false);
+
+    // 3. Build fullColumns: default all to false, set to true if all rows are filled
+    let newFullColumns = Array(numCols).fill(false);
+
+    for (let rowIndex = 0; rowIndex < numRows; rowIndex++) {
+      for (let colIndex = 0; colIndex < numCols; colIndex++) {
+        const point = pcs[colIndex].measurementPoints[rowIndex];
+        if (point && point.measured_value_fraction !== undefined && point.measured_value_fraction !== "") {
+          newSelectedRows[rowIndex] = true; // Mark this row as selected
+          // Set measurement value
+          const cellKey = `${size}-${tableType}-${rowIndex}-${colIndex}`;
+          newMeasurementValues[cellKey] = {
+            decimal: point.measured_value_decimal,
+            fraction: point.measured_value_fraction
+          };
+        }
+      }
+    }
+    // Hydrate fullColumns from saved isFullColumn property
+    for (let colIndex = 0; colIndex < numCols; colIndex++) {
+      newFullColumns[colIndex] = !!pcs[colIndex].isFullColumn;
+    }
+
+
+    // Set state
+    setMeasurementValues(prev => ({ ...prev, ...newMeasurementValues }));
+    setSelectedRowsBySize(prev => ({ ...prev, [size]: newSelectedRows }));
+    setFullColumnsBySize(prev => ({ ...prev, [size]: newFullColumns }));
+  });
+}
 
   const fetchMeasurementSpecs = async () => {
     try {
@@ -397,6 +450,13 @@ const toggleSelectAllRows = (size, checked, tableType) => {
   }));
 };
 
+useEffect(() => {
+  if (!measurementData || (!measurementData.beforeWash && !measurementData.afterWash)) return;
+  const currentTable = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
+  const dataArr = measurementData[currentTable] || [];
+  hydrateMeasurementUIFromSavedData(dataArr, before_after_wash === 'Before Wash' ? 'before' : 'after');
+}, [measurementData, before_after_wash]);
+
 
 
   const renderMeasurementTable = (size, qty) => {
@@ -487,7 +547,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                   const specs = (spec.Specs?.fraction || spec.Specs || '-').toString().trim();
                   const tolMinus = (spec.ToleranceMinus || '-').toString().trim();
                   const tolPlus = (spec.TolerancePlus || '-').toString().trim();
-                  const isSelected = selectedRowsBySize[size]?.[index] ?? true;
+                  const isSelected = selectedRowsBySize[size]?.[index] === true;
                   const shouldHide = hideUnselectedRowsBySize[size] && !isSelected;
 
                   if (shouldHide) return null;
@@ -515,7 +575,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                           const cellKey = `${size}-before-${index}-${i}`;
                           const value = measurementValues[cellKey];
 
-                          const isFull = fullColumnsBySize[size]?.[i] || false;
+                          const isFull = fullColumnsBySize[size]?.[i] === true;
                           const isRowSelected = selectedRowsBySize[size]?.[index] ?? true;
                           const isEnabled = isFull || isRowSelected;
 
@@ -637,7 +697,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
 
               <tbody>
                 {(measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash)?.map((spec, index) => {
-                  const isSelected = selectedRowsBySize[size]?.[index] ?? true;
+                  const isSelected = selectedRowsBySize[size]?.[index] === true;
                   const shouldHide = hideUnselectedRowsBySize[size] && !isSelected;
                   const area = spec.MeasurementPointEngName || `Point ${index + 1}`;
                   const specs = (spec.Specs?.fraction || spec.Specs || '-').toString().trim();
@@ -672,7 +732,7 @@ const toggleSelectAllRows = (size, checked, tableType) => {
                       {[...Array(qty)].map((_, i) => {
                         const cellKey = `${size}-after-${index}-${i}`;
                         const value = measurementValues[cellKey];
-                        const isFull = fullColumnsBySize[size]?.[i] || false;
+                        const isFull = fullColumnsBySize[size]?.[i] === true;
                         const isRowSelected = selectedRowsBySize[size]?.[index] ?? true;
                         const isEnabled = isFull || isRowSelected;
                         const cellColorClass = !isEnabled

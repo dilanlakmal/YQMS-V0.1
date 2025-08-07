@@ -1681,6 +1681,7 @@ useEffect(() => {
           isVisible={sectionVisibility.measurementDetails}
           onToggle={() => toggleSection("measurementDetails")}
           savedSizes={savedSizes}
+          setSavedSizes={setSavedSizes}
           onSizeSubmit={handleSizeSubmit}
           measurementData={measurementData}
           showMeasurementTable={showMeasurementTable}
