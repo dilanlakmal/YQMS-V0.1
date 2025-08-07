@@ -10,14 +10,7 @@ import {
   Target,
   Check,
   TrendingUp,
-  Percent,
-  Tag,
-  User,
-  Shirt,
-  Package,
-  Ship,
-  Globe,
-  MapPin
+  Percent
 } from "lucide-react";
 
 // --- Helper & Sub-components ---
@@ -145,6 +138,22 @@ const TallyTable = ({ tallyData }) => {
   );
 };
 
+// --- NEW, COMPACT InfoBlock component for the horizontal layout ---
+const InfoBlock = ({ label, value, isHighlighted = false }) => (
+  <div>
+    <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+    <p
+      className={`font-semibold ${
+        isHighlighted
+          ? "text-lg text-indigo-500 dark:text-indigo-400"
+          : "text-gray-800 dark:text-gray-200"
+      }`}
+    >
+      {value}
+    </p>
+  </div>
+);
+
 // --- MAIN PAGE COMPONENT ---
 const ANFStyleViewFullReport = () => {
   const { moNo } = useParams();
@@ -176,17 +185,39 @@ const ANFStyleViewFullReport = () => {
   const { orderDetails, inspectorData, summaryByColor, detailsByColor } =
     reportData || {};
 
+  // --- MODIFIED: allSizes calculation to preserve original order ---
   const allSizes = useMemo(() => {
-    if (!orderDetails?.orderColors) return [];
-    const sizes = new Set();
-    orderDetails.orderColors.forEach((c) =>
-      c.OrderQty.forEach((q) => sizes.add(Object.keys(q)[0].split(";")[0]))
-    );
-    // A simple alpha-numeric sort for sizes
-    return Array.from(sizes).sort((a, b) =>
-      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
-    );
+    if (!orderDetails?.orderColors || orderDetails.orderColors.length === 0) {
+      return [];
+    }
+    // The sizes are in an array of objects like [{ XS: 123 }, { S: 456 }].
+    // We just need to get the key from each object.
+    // We can reliably get the order from the first color's OrderQty array.
+    const firstColorOrderQty = orderDetails.orderColors[0].OrderQty;
+
+    // Map over this array and extract the key (the size name) from each object.
+    const orderedSizes = firstColorOrderQty.map((sizeObj) => {
+      const sizeName = Object.keys(sizeObj)[0];
+      // Remove the extra characters like ';1' if they exist
+      return sizeName.split(";")[0];
+    });
+
+    return orderedSizes;
   }, [orderDetails]);
+
+  // --- NEW: Transform arrays into Maps for efficient lookup ---
+  const detailsByColorProcessed = useMemo(() => {
+    if (!detailsByColor) return [];
+    return detailsByColor.map((detail) => ({
+      ...detail,
+      summaryBySizeMap: new Map(
+        detail.summaryBySize.map((item) => [item.size, item])
+      ),
+      tallyBySizeMap: new Map(
+        detail.tallyBySize.map((item) => [item.size, item])
+      )
+    }));
+  }, [detailsByColor]);
 
   if (isLoading)
     return (
@@ -210,88 +241,69 @@ const ANFStyleViewFullReport = () => {
 
         {/* --- Order Details Section --- */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-bold mb-4 border-b pb-2 dark:border-gray-700">
-            Order Details
-          </h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div>
-              <p className="text-sm">
-                <span className="font-semibold text-gray-500 dark:text-gray-400 w-28 inline-block">
-                  MO No:
-                </span>{" "}
-                <span className="font-bold text-lg">{orderDetails.moNo}</span>
-              </p>
-              <p className="text-sm">
-                <span className="font-semibold text-gray-500 dark:text-gray-400 w-28 inline-block">
-                  Buyer:
-                </span>{" "}
-                {orderDetails.buyer} ANF
-              </p>
-              <p className="text-sm">
-                <span className="font-semibold text-gray-500 dark:text-gray-400 w-28 inline-block">
-                  Cust. Style:
-                </span>{" "}
-                {orderDetails.custStyle}
-              </p>
-              <p className="text-sm">
-                <span className="font-semibold text-gray-500 dark:text-gray-400 w-28 inline-block">
-                  Order Qty:
-                </span>{" "}
-                <span className="font-bold">{orderDetails.orderQty_style}</span>
-              </p>
-              <p className="text-sm">
-                <span className="font-semibold text-gray-500 dark:text-gray-400 w-28 inline-block">
-                  Mode:
-                </span>{" "}
-                {orderDetails.mode}
-              </p>
-              <p className="text-sm">
-                <span className="font-semibold text-gray-500 dark:text-gray-400 w-28 inline-block">
-                  Country:
-                </span>{" "}
-                {orderDetails.country}
-              </p>
-              <p className="text-sm">
-                <span className="font-semibold text-gray-500 dark:text-gray-400 w-28 inline-block">
-                  Origin:
-                </span>{" "}
-                {orderDetails.origin}
-              </p>
-            </div>
-            <div className="overflow-x-auto border rounded-lg dark:border-gray-700">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100 dark:bg-gray-700">
-                  <tr>
-                    <th className="p-2 text-left font-bold">Color</th>
-                    {allSizes.map((size) => (
-                      <th key={size} className="p-2 text-center font-bold">
-                        {size}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y dark:divide-gray-600">
-                  {orderDetails.orderColors.map((color) => {
-                    const sizeMap = new Map(
-                      color.OrderQty.map((q) => [
-                        Object.keys(q)[0].split(";")[0],
-                        Object.values(q)[0]
-                      ])
-                    );
-                    return (
-                      <tr key={color.Color}>
-                        <td className="p-2 font-semibold">{color.Color}</td>
-                        {allSizes.map((size) => (
-                          <td key={size} className="p-2 text-center">
-                            {sizeMap.get(size) || 0}
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+          <h2 className="text-xl font-bold mb-4">Order Details</h2>
+          {/* Horizontal Info Blocks */}
+          <div className="grid grid-cols-3 sm:grid-cols-5 xl:grid-cols-7 gap-x-6 gap-y-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+            <InfoBlock label="MO No:" value={orderDetails.moNo} isHighlighted />
+            <InfoBlock label="Buyer:" value={orderDetails.buyer} />
+            <InfoBlock label="Cust. Style:" value={orderDetails.custStyle} />
+            <InfoBlock
+              label="Order Qty:"
+              value={orderDetails.orderQty_style}
+              isHighlighted
+            />
+            <InfoBlock label="Mode:" value={orderDetails.mode} />
+            <InfoBlock label="Country:" value={orderDetails.country} />
+            <InfoBlock label="Origin:" value={orderDetails.origin} />
+          </div>
+
+          {/* Size/Color Table with new styling */}
+          <div className="overflow-x-auto bg-gray-100 dark:bg-blue-900 p-4 rounded-lg">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-300 dark:border-gray-600">
+                  <th className="p-3 text-left font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider text-xs w-1/3">
+                    Color
+                  </th>
+                  {allSizes.map((size) => (
+                    <th
+                      key={size}
+                      className="p-3 text-center font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider text-xs"
+                    >
+                      {size}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {orderDetails.orderColors.map((color) => {
+                  const sizeMap = new Map(
+                    color.OrderQty.map((q) => [
+                      Object.keys(q)[0].split(";")[0],
+                      Object.values(q)[0]
+                    ])
+                  );
+                  return (
+                    <tr
+                      key={color.Color}
+                      className="border-b last:border-b-0 bg-gray-300 border-gray-200 dark:bg-blue-800 dark:border-blue-700"
+                    >
+                      <td className="p-3 font-semibold text-gray-800 dark:text-gray-200">
+                        {color.Color}
+                      </td>
+                      {allSizes.map((size) => (
+                        <td
+                          key={size}
+                          className="p-3 text-center font-semibold text-gray-600 dark:text-gray-300"
+                        >
+                          {sizeMap.get(size) || 0}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -520,9 +532,11 @@ const ANFStyleViewFullReport = () => {
         </div>
 
         {/* --- MODIFIED: Detailed Breakdown by Color Section --- */}
-        {detailsByColor &&
-          detailsByColor.map((detail) => {
+
+        {detailsByColorProcessed &&
+          detailsByColorProcessed.map((detail) => {
             // --- FIX #1: Safely access summaryCards and provide a default empty object ---
+            // --- FIX #2: use detailsByColorProcessed instead of detailsByColor for mapping ---
             const summary = detail.summaryCards || {};
 
             const passRateGarment =
@@ -537,6 +551,16 @@ const ANFStyleViewFullReport = () => {
                     summary.measurementDetailsPoints) *
                   100
                 : null;
+
+            // Create a new array of sizes that actually have inspection data for this color.
+            const inspectedSizesForColor = allSizes.filter((size) => {
+              const sizeData = detail.summaryBySizeMap.get(size);
+              // Keep the size if data exists for it AND its checked quantity is greater than 0
+              return (
+                sizeData && sizeData.sizeSummary?.garmentDetailsCheckedQty > 0
+              );
+            });
+
             return (
               <div
                 key={detail.color}
@@ -616,7 +640,7 @@ const ANFStyleViewFullReport = () => {
                 </div>
 
                 {/* --- FIX #3: Check if summaryBySize exists before rendering its table --- */}
-                {detail.summaryBySize && detail.summaryBySize.length > 0 && (
+                {inspectedSizesForColor.length > 0 && (
                   <div className="overflow-x-auto mb-8">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50 dark:bg-gray-700/60 text-xs uppercase">
@@ -671,9 +695,15 @@ const ANFStyleViewFullReport = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {detail.summaryBySize.map((sizeSummary) => {
+                        {/* --- MODIFICATION: Iterate over allSizes, not detail.summaryBySize --- */}
+                        {inspectedSizesForColor.map((size) => {
                           // --- FIX #4: Safely access nested sizeSummary object ---
-                          const s = sizeSummary.sizeSummary || {};
+                          // Look up the data for this size from our pre-processed Map
+                          const sizeSummaryData =
+                            detail.summaryBySizeMap.get(size);
+                          const s = sizeSummaryData
+                            ? sizeSummaryData.sizeSummary
+                            : {};
                           const passG =
                             s.garmentDetailsCheckedQty > 0
                               ? (
@@ -692,11 +722,11 @@ const ANFStyleViewFullReport = () => {
                               : "N/A";
                           return (
                             <tr
-                              key={sizeSummary.size}
+                              key={size}
                               className="border-b last:border-b-0 dark:border-gray-700 text-center"
                             >
                               <td className="p-2 font-bold text-left">
-                                {sizeSummary.size}
+                                {size}
                               </td>
                               <td className="p-2">
                                 {s.garmentDetailsCheckedQty || 0}
@@ -733,19 +763,28 @@ const ANFStyleViewFullReport = () => {
                 )}
 
                 {/* --- FIX #5: Check if tallyBySize exists before rendering its section --- */}
-                {detail.tallyBySize && detail.tallyBySize.length > 0 && (
-                  <>
-                    <hr className="my-8 border-dashed dark:border-gray-600" />
-                    {detail.tallyBySize.map((sizeTally) => (
-                      <div key={sizeTally.size} className="mt-8">
-                        <h3 className="text-lg font-bold text-indigo-600 dark:text-indigo-400 mb-4">
-                          Size: {sizeTally.size} - Measurement Data
-                        </h3>
-                        <TallyTable tallyData={sizeTally} />
-                      </div>
-                    ))}
-                  </>
-                )}
+                {detail.tallyBySizeMap.size &&
+                  detail.tallyBySizeMap.size > 0 && (
+                    <>
+                      <hr className="my-8 border-dashed dark:border-gray-600" />
+                      {/* --- MODIFICATION: Iterate over allSizes, not detail.tallyBySize --- */}
+                      {allSizes.map((size) => {
+                        // Look up the tally data for this size
+                        const sizeTally = detail.tallyBySizeMap.get(size);
+                        // Only render the TallyTable if data exists for this size
+                        if (!sizeTally) return null;
+
+                        return (
+                          <div key={sizeTally.size} className="mt-8">
+                            <h3 className="text-lg font-bold text-indigo-600 dark:text-indigo-400 mb-4">
+                              Size: {sizeTally.size} - Measurement Data
+                            </h3>
+                            <TallyTable tallyData={sizeTally} />
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
               </div>
             );
           })}
