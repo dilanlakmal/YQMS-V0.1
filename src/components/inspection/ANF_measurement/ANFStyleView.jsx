@@ -16,8 +16,10 @@ import {
 } from "lucide-react";
 import { Menu, Transition } from "@headlessui/react";
 
+//className="absolute right-0 z-10 w-56 mt-2 origin-top-right bg-white dark:bg-gray-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+
 // Reusable Action Menu for Style View
-const ActionMenu = ({ item }) => {
+const ActionMenu = ({ item, isLastRow }) => {
   const reportUrl = `/anf-washing/style-full-report/${item.moNo}`;
   const handleAction = (action) => {
     alert(`${action} clicked for MO: ${item.moNo}`);
@@ -37,7 +39,15 @@ const ActionMenu = ({ item }) => {
         leaveFrom="transform opacity-100 scale-100"
         leaveTo="transform opacity-0 scale-95"
       >
-        <Menu.Items className="absolute right-0 z-10 w-56 mt-2 origin-top-right bg-white dark:bg-gray-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+        <Menu.Items
+          className={`absolute right-0 z-10 w-56 mt-2 origin-top-right bg-white dark:bg-gray-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none
+            ${
+              isLastRow
+                ? "bottom-full mb-2 origin-bottom-right"
+                : "origin-top-right"
+            }
+          `}
+        >
           <div className="px-1 py-1">
             <Menu.Item>
               {({ active }) => (
@@ -345,7 +355,7 @@ const ANFStyleView = () => {
                     </td>
                   </tr>
                 ) : (
-                  paginatedData.map((item) => {
+                  paginatedData.map((item, index) => {
                     const summary = item.summary;
                     const passRateGarment =
                       summary?.checkedQty > 0
@@ -361,6 +371,9 @@ const ANFStyleView = () => {
                             100
                           ).toFixed(2) + "%"
                         : "N/A";
+
+                    // --- Find the last row ---
+                    const isLastRow = index === paginatedData.length - 1;
                     return (
                       <tr
                         key={item.moNo}
@@ -406,7 +419,7 @@ const ANFStyleView = () => {
                           {passRatePoints}
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <ActionMenu item={item} />
+                          <ActionMenu item={item} isLastRow={isLastRow} />
                         </td>
                       </tr>
                     );

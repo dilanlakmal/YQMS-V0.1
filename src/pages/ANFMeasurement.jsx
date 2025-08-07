@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../components/authentication/AuthContext";
 import {
@@ -6,14 +6,19 @@ import {
   BarChart3,
   LayoutDashboard,
   FileBarChart,
-  UserCheck
+  UserCheck,
+  Loader2
 } from "lucide-react";
 import ANFMeasurementPageTitle from "../components/inspection/ANF_measurement/ANFMeasurementPageTitle";
 import ANFMeasurementInspectionForm from "../components/inspection/ANF_measurement/ANFMeasurementInspectionForm";
 import ANFMeasurementResults from "../components/inspection/ANF_measurement/ANFMeasurementResults";
 import ANFMeasurementQCDailyReport from "../components/inspection/ANF_measurement/ANFMeasurementQCDailyReport";
 import ANFMeasurementBuyerReportSize from "../components/inspection/ANF_measurement/ANFMeasurementBuyerReportSize";
-import ANFStyleView from "../components/inspection/ANF_measurement/ANFStyleView";
+
+// --- DYNAMICALLY IMPORT the component due to heavy content ---
+const ANFStyleView = lazy(() =>
+  import("../components/inspection/ANF_measurement/ANFStyleView")
+);
 
 const PlaceholderComponent = ({ title }) => {
   return (
@@ -27,6 +32,13 @@ const PlaceholderComponent = ({ title }) => {
     </div>
   );
 };
+
+// --- simple loading component for Suspense ---
+const TabLoader = () => (
+  <div className="flex justify-center items-center h-64">
+    <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+  </div>
+);
 
 const ANFMeasurement = () => {
   const { t } = useTranslation();
@@ -72,8 +84,14 @@ const ANFMeasurement = () => {
         id: "style-view",
         labelKey: "anfMeasurement.tabs.styleView",
         icon: <FileBarChart size={18} />,
-        component: <ANFStyleView />
+        // --- WRAP the lazy component in Suspense ---
+        component: (
+          <Suspense fallback={<TabLoader />}>
+            <ANFStyleView />
+          </Suspense>
+        )
       },
+
       {
         id: "buyer-report-size",
         labelKey: "anfMeasurement.tabs.buyerReportSize",
