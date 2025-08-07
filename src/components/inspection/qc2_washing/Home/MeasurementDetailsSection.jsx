@@ -39,76 +39,73 @@ const MeasurementDetailsSection = ({
   const currentWashMeasurements = (before_after_wash === 'Before Wash' ? measurementData.beforeWash : measurementData.afterWash) || [];
 
   const transformMeasurementData = (
-  size,
-  qty,
-  measurements,
-  selectedRows,
-  fullColumns,
-  measurementSpecs,
-  tableType,
-  kvalue
-) => {
-  const pcs = [];
-  for (let pcIndex = 0; pcIndex < qty; pcIndex++) {
-    const measurementPoints = [];
-    const isFullColumn = fullColumns?.[pcIndex] || false;
+      size,
+      qty,
+      measurements,
+      selectedRows,
+      fullColumns,
+      measurementSpecs,
+      tableType,
+      kvalue
+    ) => {
+      const pcs = [];
+      for (let pcIndex = 0; pcIndex < qty; pcIndex++) {
+        const measurementPoints = [];
+        const isFullColumn = fullColumns?.[pcIndex] || false;
+        measurementSpecs.forEach((spec, specIndex) => {
+          // Only include if full, or row is selected
+          const isRowIndividuallySelected = selectedRows?.[specIndex] ?? false;
+          if (!isFullColumn && !isRowIndividuallySelected) return;
 
-    measurementSpecs.forEach((spec, specIndex) => {
-      const isRowIndividuallySelected = selectedRows?.[specIndex] ?? true;
-      if (!isFullColumn && !isRowIndividuallySelected) return;
+          const cellKey = `${size}-${tableType}-${specIndex}-${pcIndex}`;
+          const measurementValue = measurements?.[cellKey];
 
-      const cellKey = `${size}-${tableType}-${specIndex}-${pcIndex}`;
-      const measurementValue = measurements?.[cellKey];
-
-      let result = '';
-      if (measurementValue && typeof measurementValue.decimal === 'number') {
-        const measuredDeviation = measurementValue.decimal;
-        const tolMinus = spec.ToleranceMinus || '0';
-        const tolPlus = spec.TolerancePlus || '0';
-        const tolMinusValue = fractionToDecimal(tolMinus);
-        const tolPlusValue = fractionToDecimal(tolPlus);
-        if (!isNaN(tolMinusValue) && !isNaN(tolPlusValue)) {
-          if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
-            result = 'pass';
-          } else {
-            result = 'fail';
+          let result = '';
+          if (measurementValue && typeof measurementValue.decimal === 'number') {
+            const measuredDeviation = measurementValue.decimal;
+            const tolMinus = spec.ToleranceMinus || '0';
+            const tolPlus = spec.TolerancePlus || '0';
+            const tolMinusValue = fractionToDecimal(tolMinus);
+            const tolPlusValue = fractionToDecimal(tolPlus);
+            if (!isNaN(tolMinusValue) && !isNaN(tolPlusValue)) {
+              if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
+                result = 'pass';
+              } else {
+                result = 'fail';
+              }
+            }
           }
-        }
+
+          // Only push if result is 'pass' or 'fail'
+          if (result === 'pass' || result === 'fail') {
+            measurementPoints.push({
+              pointName: spec.MeasurementPointEngName || `Point ${specIndex + 1}`,
+              pointNo: specIndex + 1,
+              rowNo: specIndex,
+              measured_value_decimal: measurementValue?.decimal ?? null,
+              measured_value_fraction: measurementValue?.fraction ?? '',
+              specs: spec.Specs?.fraction || spec.Specs || '-',
+              toleranceMinus: fractionToDecimal(spec.ToleranceMinus || '0'),
+              tolerancePlus: fractionToDecimal(spec.TolerancePlus || '0'),
+              result: result,
+            });
+          }
+        });
+        pcs.push({
+          pcNumber: pcIndex + 1,
+          isFullColumn: isFullColumn,
+          measurementPoints: measurementPoints,
+        });
       }
-
-      measurementPoints.push({
-        pointName: spec.MeasurementPointEngName || `Point ${specIndex + 1}`,
-        pointNo: specIndex + 1,
-        rowNo: specIndex,
-        // decimal: measurementValue?.decimal ?? null,
-        // fraction: measurementValue?.fraction ?? '',
-        measured_value_decimal: measurementValue?.decimal ?? null,
-        measured_value_fraction: measurementValue?.fraction ?? '',
-        specs: spec.Specs?.fraction || spec.Specs || '-',
-        toleranceMinus: fractionToDecimal(spec.ToleranceMinus || '0'),
-        tolerancePlus: fractionToDecimal(spec.TolerancePlus || '0'),
-        result: result,
-      });
-    });
-
-    pcs.push({
-      pcNumber: pcIndex + 1,
-      isFullColumn: fullColumns?.[pcIndex] || false,
-      measurementPoints: measurementPoints,
-    });
-  }
-
-  return {
-    size: size,
-    qty: qty,
-    pcs: pcs,
-    selectedRows: selectedRows,
-    fullColumns: fullColumns,
-    kvalue: kvalue,
-  };
-};
-
-
+      return {
+        size: size,
+        qty: qty,
+        pcs: pcs,
+        selectedRows: selectedRows,
+        fullColumns: fullColumns,
+        kvalue: kvalue,
+      };
+    };
 
     const fractionToDecimal = (frac) => {
     if (typeof frac !== 'string' || !frac || frac.trim() === '-') return NaN;
@@ -226,7 +223,7 @@ const handleEditClick = (sizeToEdit) => {
 
   function hydrateMeasurementUIFromSavedData(dataArr, tableType) {
   dataArr.forEach((data) => {
-    const { size, qty, pcs } = data;
+    const { size, qty, pcs, selectedRows, fullColumns } = data;
     if (!size || !pcs) return;
 
     // Find the number of measurement points (rows)
@@ -237,38 +234,34 @@ const handleEditClick = (sizeToEdit) => {
     // 1. Build measurementValues
     let newMeasurementValues = {};
 
-    // 2. Build selectedRows: default all to false, set to true if any value exists
-    let newSelectedRows = Array(numRows).fill(false);
+    // 2. Use selectedRows from saved data, or default to all false
+    let newSelectedRows = Array.isArray(selectedRows)
+      ? [...selectedRows]
+      : Array(numRows).fill(false);
 
-    // 3. Build fullColumns: default all to false, set to true if all rows are filled
-    let newFullColumns = Array(numCols).fill(false);
+    // 3. Use fullColumns from saved data, or default to all false
+    let newFullColumns = Array.isArray(fullColumns)
+      ? [...fullColumns]
+      : Array(numCols).fill(false);
 
-    for (let rowIndex = 0; rowIndex < numRows; rowIndex++) {
-      for (let colIndex = 0; colIndex < numCols; colIndex++) {
-        const point = pcs[colIndex].measurementPoints[rowIndex];
-        if (point && point.measured_value_fraction !== undefined && point.measured_value_fraction !== "") {
-          newSelectedRows[rowIndex] = true; // Mark this row as selected
-          // Set measurement value
-          const cellKey = `${size}-${tableType}-${rowIndex}-${colIndex}`;
-          newMeasurementValues[cellKey] = {
-            decimal: point.measured_value_decimal,
-            fraction: point.measured_value_fraction
-          };
-        }
-      }
-    }
-    // Hydrate fullColumns from saved isFullColumn property
+    // 4. Set measurement values for all points
     for (let colIndex = 0; colIndex < numCols; colIndex++) {
-      newFullColumns[colIndex] = !!pcs[colIndex].isFullColumn;
+      pcs[colIndex].measurementPoints.forEach((point) => {
+        const rowIndex = point.rowNo;
+        const cellKey = `${size}-${tableType}-${rowIndex}-${colIndex}`;
+        newMeasurementValues[cellKey] = {
+          decimal: point.measured_value_decimal,
+          fraction: point.measured_value_fraction
+        };
+      });
     }
 
-
-    // Set state
     setMeasurementValues(prev => ({ ...prev, ...newMeasurementValues }));
     setSelectedRowsBySize(prev => ({ ...prev, [size]: newSelectedRows }));
     setFullColumnsBySize(prev => ({ ...prev, [size]: newFullColumns }));
   });
 }
+
 
   const fetchMeasurementSpecs = async () => {
     try {
@@ -555,11 +548,11 @@ useEffect(() => {
                   return (
                     <tr key={`k1-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-600">
                       <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleRowSelection(size, index)}
-                        />
+                          <input
+                            type="checkbox"
+                            checked={selectedRowsBySize[size]?.[index] === true}
+                            onChange={() => toggleRowSelection(size, index)}
+                          />
                       </td>
                      <td className="border border-gray-300 px-2 py-1 dark:bg-gray-800 dark:text-white">{area}</td>
                       <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
@@ -576,7 +569,7 @@ useEffect(() => {
                           const value = measurementValues[cellKey];
 
                           const isFull = fullColumnsBySize[size]?.[i] === true;
-                          const isRowSelected = selectedRowsBySize[size]?.[index] ?? true;
+                          const isRowSelected = selectedRowsBySize[size]?.[index] === true;
                           const isEnabled = isFull || isRowSelected;
 
                           const cellColorClass = !isEnabled
@@ -715,7 +708,7 @@ useEffect(() => {
                       <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
                         <input
                           type="checkbox"
-                          checked={isSelected}
+                          checked={selectedRowsBySize[size]?.[index] === true}
                           onChange={() => toggleRowSelection(size, index)}
                         />
                       </td>
