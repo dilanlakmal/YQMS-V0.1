@@ -25835,22 +25835,24 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
     const qcRecord = await QCWashing.findById(recordId);
     if (!qcRecord) return res.status(404).json({ success: false, message: 'Record not found.' });
 
-    // Old calculation (keep as fallback)
     let totalCheckedPcs = 0;
-    if (Array.isArray(qcRecord.measurementDetails)) {
-      const pcSet = new Set();
-      for (const size of qcRecord.measurementDetails) {
-        if (size.measurement && Array.isArray(size.measurement.pcs)) {
-          for (const pc of size.measurement.pcs) {
-            if (pc.pcNumber !== undefined && pc.pcNumber !== null) {
-              pcSet.add(pc.pcNumber);
+      if (Array.isArray(qcRecord.measurementDetails)) {
+        // If measurementDetails is an array of size objects with qty
+        for (const size of qcRecord.measurementDetails) {
+          if (typeof size.qty === "number") {
+            totalCheckedPcs += size.qty;
+          }
+          // If measurementDetails is an array of {measurement: [sizes]}
+          if (Array.isArray(size.measurement)) {
+            for (const m of size.measurement) {
+              if (typeof m.qty === "number") {
+                totalCheckedPcs += m.qty;
+              }
             }
           }
         }
       }
-      totalCheckedPcs = pcSet.size;
-    }
-
+      
     let rejectedDefectPcs = 0;
     let totalDefectCount = 0;
     const defectDetails = qcRecord.defectDetails || {};
