@@ -1170,7 +1170,8 @@
     "allEmpIds": "All EMP IDs",
     "operatorId": "Operator ID",
     "allMoNos": "All MO Nos",
-    "factory": "Factory"
+    "factory": "Factory",
+    "selectFactoryName": "Select Factory"
   },
 
   "sccdaily": {
@@ -1400,7 +1401,7 @@
     "slotInspectionSubmittedSuccess": "Elastic inspection for slot submitted successfully."
   },
   "sccEMBReport": {
-    "title": "Embroidery Inspection Report",
+    "title": "Embroidery / Printing Inspection Report",
     "factoryName": "Factory Name",
     "batchNo": "Batch No.",
     "inspectionDetails": "Inspection Details",
