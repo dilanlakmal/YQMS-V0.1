@@ -74,35 +74,33 @@ function normalizeImagePreview(img) {
 
 function calculateSummaryData(currentFormData) {
   const currentDefectDetails = currentFormData.defectDetails;
-  const currentMeasurementData = currentFormData.measurementDetails;
+  const currentMeasurementDetails = currentFormData.measurementDetails;
+    let measurementArray = [];
+    if (currentMeasurementDetails && typeof currentMeasurementDetails === "object") {
+      measurementArray = currentMeasurementDetails.measurement || [];
+    } else if (Array.isArray(currentMeasurementDetails)) {
+      // fallback for old data
+      measurementArray = currentMeasurementDetails;
+    }
 
-  // 1. Calculate totalCheckedPcs
-  let totalCheckedPcs = 0;
-
-  if (Array.isArray(currentMeasurementData)) {
-    const pcSet = new Set();
-    currentMeasurementData.forEach((data) => {
-      if (data.measurement && Array.isArray(data.measurement.pcs)) {
-        data.measurement.pcs.forEach((pc) => {
-          if (pc.pcNumber !== undefined && pc.pcNumber !== null) {
-            pcSet.add(pc.pcNumber);
-          }
-        });
-      }
+    // 1. Calculate totalCheckedPcs from measurement data qty
+    let totalCheckedPcs = 0;
+    measurementArray.forEach(data => {
+      if (typeof data.qty === "number") totalCheckedPcs += data.qty;
     });
-    totalCheckedPcs = pcSet.size;
-  }
+    // Fallback to checkedQty if no measurement data
+    if (totalCheckedPcs === 0) {
+      totalCheckedPcs = parseInt(currentFormData.checkedQty, 10) || 0;
+    }
 
-
-  // 2. Calculate measurement points and passes
-  let measurementPoints = 0;
-  let measurementPass = 0;
-  if (Array.isArray(currentMeasurementData)) {
-    currentMeasurementData.forEach((data) => {
-      if (data.measurement && Array.isArray(data.measurement.pcs)) {
-        data.measurement.pcs.forEach((pc) => {
+    // 2. Calculate measurement points and passes
+    let measurementPoints = 0;
+    let measurementPass = 0;
+    measurementArray.forEach(data => {
+      if (Array.isArray(data.pcs)) {
+        data.pcs.forEach(pc => {
           if (Array.isArray(pc.measurementPoints)) {
-            pc.measurementPoints.forEach((point) => {
+            pc.measurementPoints.forEach(point => {
               if (point.result === 'pass' || point.result === 'fail') {
                 measurementPoints++;
                 if (point.result === 'pass') measurementPass++;
@@ -112,7 +110,6 @@ function calculateSummaryData(currentFormData) {
         });
       }
     });
-  }
 
   // 3. Defect calculations
   const rejectedDefectPcs = Array.isArray(currentDefectDetails?.defectsByPc)
@@ -161,13 +158,7 @@ function calculateSummaryData(currentFormData) {
   } else {
     overallResult = "N/A";
   }
-  console.log({
-    totalCheckedPcs,
-    rejectedDefectPcs,
-    defectCount,
-    defectRate,
-    defectRatio
-  });
+  
 
   return {
     totalCheckedPcs: totalCheckedPcs || 0,
@@ -791,8 +782,21 @@ if (saved.inspectionDetails?.machineProcesses) {
     );
     setComment(saved.defectDetails?.comment || "");
 
-    setMeasurementData(processMeasurementData(saved.measurementDetails || []));
-    setSavedSizes((saved.measurementDetails || []).map(m => m.size));
+    setMeasurementData({
+      beforeWash: (saved.measurementDetails?.measurement || []).filter(m => m.before_after_wash === "beforeWash"),
+      afterWash: (saved.measurementDetails?.measurement || []).filter(m => m.before_after_wash === "afterWash"),
+    });
+    let sizes = [];
+    if (saved.measurementDetails) {
+      if (Array.isArray(saved.measurementDetails)) {
+        // Old structure
+        sizes = saved.measurementDetails.map(m => m.size);
+      } else if (typeof saved.measurementDetails === "object" && Array.isArray(saved.measurementDetails.measurement)) {
+        // New structure
+        sizes = saved.measurementDetails.measurement.map(m => m.size);
+      }
+    }
+    setSavedSizes(sizes);
     setRecordId(saved._id);
     if (saved.savedAt) setLastSaved(new Date(saved.savedAt));
     Swal.fire({
@@ -1316,6 +1320,19 @@ if (saved.inspectionDetails?.machineProcesses) {
   }
 };
 
+const autoSaveOverallSummary = async (summary, recordId) => {
+  if (!recordId || !summary) return;
+  try {
+    await fetch(`${API_BASE_URL}/api/qc-washing/measurement-summary-autosave/${recordId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ summary }),
+    });
+  } catch (error) {
+    console.error("Failed to auto-save overall summary:", error);
+  }
+};
+
 
      // Function to calculate and update summary data (NEW/MODIFIED)
   // This function should be called whenever relevant data (defectDetails, measurementData) changes
@@ -1330,6 +1347,7 @@ if (saved.inspectionDetails?.machineProcesses) {
   }
 };
 
+
 useEffect(() => {
   // Build up-to-date defectDetails and measurementDetails
   const defectDetails = {
@@ -1342,19 +1360,23 @@ useEffect(() => {
       pcDefects,
     })),
   };
-  const measurementDetails = [
-    ...measurementData.beforeWash.map((item) => ({ ...item, beforeWash: "beforeWash" })),
-    ...measurementData.afterWash.map((item) => ({ ...item, afterWash: "afterWash" })),
-  ];
+
+  // Build measurementDetails from measurementData
+  const measurementDetails = {
+    measurement: [
+      ...measurementData.beforeWash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
+      ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
+    ],
+    // Optionally add measurementSizeSummary if you use it
+  };
 
   // Calculate summary from the latest data
   const summary = calculateSummaryData({
     ...formData,
     defectDetails,
-    measurementDetails,
+    measurementDetails, // <-- always use this!
   });
 
-  // Update formData with the latest defectDetails, measurementDetails, and summary
   setFormData((prev) => ({
     ...prev,
     defectDetails,
@@ -1363,9 +1385,8 @@ useEffect(() => {
   }));
 
   // Save summary to backend
-  // console.log("Summary to save:", summary);
   if (recordId) {
-    autoSaveSummary(summary, recordId);
+     autoSaveSummary(summary, recordId);
   }
 }, [
   defectsByPc,
@@ -1596,7 +1617,10 @@ useEffect(() => {
          {activeTab === 'newInspection' && (
         <>
         <OverAllSummaryCard
-          summary={overallSummary}
+         
+           summary={{
+              ...formData,
+            }}
           measurementData={formData.measurementDetails} 
           defectDetails={formData.defectDetails} 
           before_after_wash={formData.before_after_wash}
@@ -1768,10 +1792,12 @@ useEffect(() => {
                     pcDefects,
                   })),
                 };
-                const measurementDetails = [
-                  ...measurementData.before_after_wash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
-                  ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
-                ];
+                const measurementDetails = {
+                  measurement: [
+                    ...measurementData.beforeWash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
+                    ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
+                  ]
+                };
                 const summary = calculateSummaryData({
                   ...formData,
                   defectDetails,
@@ -1801,7 +1827,12 @@ useEffect(() => {
                   totalFail,
                   passRate,
                   submitAql,
-                  ...summary, 
+                  totalCheckedPcs: summary.totalCheckedPcs,
+                  rejectedDefectPcs: summary.rejectedDefectPcs,
+                  totalDefectCount: summary.totalDefectCount,
+                  defectRate: summary.defectRate,
+                  defectRatio: summary.defectRatio,
+                  overallFinalResult: summary.overallFinalResult,
                   submittedAt: new Date().toISOString(),
                   userId: user?.emp_id,
                   
@@ -1860,10 +1891,12 @@ useEffect(() => {
                       comment: comment,
                       additionalImages: await Promise.all(uploadedImages.map(img => imageToBase64(img))),
                     },
-                    measurementDetails: [
-                      ...measurementData.before_after_wash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
-                      ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
-                    ],
+                    measurementDetails: {
+                      measurement: [
+                        ...measurementData.beforeWash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
+                        ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
+                      ]
+                    },
                   },
                 };
                 // --- 3. Submit to the server ---

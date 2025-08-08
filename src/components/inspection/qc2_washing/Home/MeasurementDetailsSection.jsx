@@ -970,7 +970,7 @@ useEffect(() => {
                 {currentWashMeasurements.map((data, index) => (
                   <div key={`saved-${index}`} className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-medium text-gray-800 text-xs">Size: {data.size} (Qty: {data.qty})</h4>
+                      <h4 className="font-medium text-gray-800 text-xs">{data.size} : {data.qty}</h4>
                       <div className="flex space-x-2">
                         <button
                           onClick={() => handleEditClick(data.size)}

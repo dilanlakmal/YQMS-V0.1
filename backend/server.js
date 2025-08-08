@@ -24845,8 +24845,6 @@ app.get('/api/qc-washing/overall-summary-by-id/:recordId', async (req, res) => {
   }
 });
 
-
-
 app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
   try {
     const { recordId } = req.params;
@@ -24854,7 +24852,7 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
     const qcRecord = await QCWashing.findById(recordId);
     if (!qcRecord) return res.status(404).json({ success: false, message: 'Record not found.' });
 
-    // Always recalculate totalCheckedPcs from measurementDetails
+    // Old calculation (keep as fallback)
     let totalCheckedPcs = 0;
     if (Array.isArray(qcRecord.measurementDetails)) {
       const pcSet = new Set();
@@ -24869,9 +24867,7 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
       }
       totalCheckedPcs = pcSet.size;
     }
-    qcRecord.totalCheckedPcs = totalCheckedPcs;
 
-    // Recalculate rejectedDefectPcs and totalDefectCount from defectDetails
     let rejectedDefectPcs = 0;
     let totalDefectCount = 0;
     const defectDetails = qcRecord.defectDetails || {};
@@ -24885,14 +24881,13 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
         ), 0
       );
     }
-    qcRecord.rejectedDefectPcs = rejectedDefectPcs;
-    qcRecord.totalDefectCount = totalDefectCount;
 
-    // Calculate defectRate and defectRatio
-    qcRecord.defectRate = totalCheckedPcs > 0 ? (totalDefectCount / totalCheckedPcs) * 100 : 0;
-    qcRecord.defectRatio = totalCheckedPcs > 0 ? (rejectedDefectPcs / totalCheckedPcs) * 100 : 0;
-
-    // Use frontend's overallFinalResult if you want, or recalculate here
+    // Use summary values if present, fallback to calculated
+    qcRecord.totalCheckedPcs = summary.totalCheckedPcs ?? totalCheckedPcs;
+    qcRecord.rejectedDefectPcs = summary.rejectedDefectPcs ?? rejectedDefectPcs;
+    qcRecord.totalDefectCount = summary.totalDefectCount ?? totalDefectCount;
+    qcRecord.defectRate = summary.defectRate ?? (qcRecord.totalCheckedPcs > 0 ? (qcRecord.totalDefectCount / qcRecord.totalCheckedPcs) * 100 : 0);
+    qcRecord.defectRatio = summary.defectRatio ?? (qcRecord.totalCheckedPcs > 0 ? (qcRecord.rejectedDefectPcs / qcRecord.totalCheckedPcs) * 100 : 0);
     qcRecord.overallFinalResult = summary.overallFinalResult ?? "N/A";
 
     await qcRecord.save();
@@ -24901,7 +24896,6 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to save summary.' });
   }
 });
-
 
 const getAqlLevelForBuyer = (buyer) => {
   if (!buyer) return 1.0;
@@ -26099,35 +26093,31 @@ app.post('/api/qc-washing/measurement-save', async (req, res) => {
     if (!recordId || !measurementDetail) {
       return res.status(400).json({ success: false, message: "Missing recordId or measurementDetail" });
     }
-
-    // --- Ensure before_after_wash is present ---
     if (!measurementDetail.before_after_wash) {
       return res.status(400).json({ success: false, message: "before_after_wash is required in measurementDetail" });
     }
-
-    // Find the record
     const record = await QCWashing.findById(recordId);
     if (!record) {
       return res.status(404).json({ success: false, message: "Record not found" });
     }
-
-    // Remove any existing measurement for this size & before_after_wash
-    record.measurementDetails = (record.measurementDetails || []).filter(md =>
-      !(md.measurement && md.measurement.size === measurementDetail.size && md.measurement.before_after_wash === measurementDetail.before_after_wash)
+    // Ensure measurementDetails is an object with two arrays
+    if (!record.measurementDetails) {
+      record.measurementDetails = { measurement: [], measurementSizeSummary: [] };
+    }
+    // Remove existing
+    record.measurementDetails.measurement = (record.measurementDetails.measurement || []).filter(
+      m => !(m.size === measurementDetail.size && m.before_after_wash === measurementDetail.before_after_wash)
     );
-
-    // Calculate the summary
+    record.measurementDetails.measurementSizeSummary = (record.measurementDetails.measurementSizeSummary || []).filter(
+      s => !(s.size === measurementDetail.size && s.before_after_wash === measurementDetail.before_after_wash)
+    );
+    // Calculate summary
     const summary = calculateMeasurementSizeSummary(measurementDetail);
-
-    // Add the new/updated measurement with summary
-    record.measurementDetails.push({
-      measurementSizeSummary: summary,
-      measurement: measurementDetail
-    });
-
+    // Add new
+    record.measurementDetails.measurement.push(measurementDetail);
+    record.measurementDetails.measurementSizeSummary.push(summary);
     record.savedAt = new Date();
     await record.save();
-
     res.json({ success: true, message: "Measurement detail saved", measurementDetails: record.measurementDetails });
   } catch (err) {
     console.error('Measurement save error:', err);
@@ -26136,22 +26126,23 @@ app.post('/api/qc-washing/measurement-save', async (req, res) => {
 });
 
 
+
 app.post('/api/qc-washing/measurement-summary-autosave/:recordId', async (req, res) => {
   try {
     const { recordId } = req.params;
     const summary = req.body.summary || {};
-
     const qcRecord = await QCWashing.findById(recordId);
     if (!qcRecord) return res.status(404).json({ success: false, message: 'Record not found.' });
 
-    // Save summary data as top-level fields (not under any summary object/array)
-    qcRecord.totalCheckedPoint = summary.totalCheckedPoints ?? 0;
+    // Accept both totalCheckedPoints and totalCheckedPcs for compatibility
+    qcRecord.totalCheckedPoint = summary.totalCheckedPoints ?? summary.totalCheckedPcs ?? 0;
+    qcRecord.totalCheckedPcs = summary.totalCheckedPcs ?? summary.totalCheckedPoints ?? 0; 
     qcRecord.totalPass = summary.totalPass ?? 0;
     qcRecord.totalFail = summary.totalFail ?? 0;
     qcRecord.passRate = summary.passRate ?? 0;
-    qcRecord.measurementOverallResult = summary.overallResult || "PENDING";
-
+    qcRecord.measurementOverallResult = summary.overallResult || summary.overallFinalResult || "PENDING";
     qcRecord.savedAt = new Date();
+
     await qcRecord.save();
     res.json({ success: true });
   } catch (error) {
@@ -26159,6 +26150,8 @@ app.post('/api/qc-washing/measurement-summary-autosave/:recordId', async (req, r
     res.status(500).json({ success: false, message: 'Failed to autosave measurement summary.' });
   }
 });
+
+
 
 /* -------------------------------------------
    End Points - Supplier Issues Configuration

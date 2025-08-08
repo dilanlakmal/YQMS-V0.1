@@ -1,145 +1,148 @@
 import mongoose from "mongoose";
 
-  const QCWashingSchema = new mongoose.Schema({
-    date: {type: Date,default: Date.now},
-    orderNo: {type: String,required: true},
-    before_after_wash: { type: String,default: 'Before Wash'},
-    checkedQty: {type: Number,default: 0},
-    washQty: {type: Number,default: 0},
-    totalCheckedPoint: { type: Number,default: 0},
-    totalPass: {type: Number,default: 0},
-    totalFail: {type: Number,default: 0},
-    passRate: {type: Number,default: 0},
-    totalCheckedPcs: { type: Number, default: 0  },
-    rejectedDefectPcs: { type: Number, default: 0  },
-    totalDefectCount: { type: Number, default: 0  },
-    defectRate: { type: Number },
-    defectRatio: { type: Number },
-    overallFinalResult: { type: String },
-    orderQty: { type: Number, default: 0 },
-    colorOrderQty: { type: Number, default: 0 },
-    color: { type: String, default: '' },
-    washType: {type: String,default: 'Normal Wash'},
-    reportType: String,
-    buyer: String,
-    factoryName: String,
-    colorName: String,
-    aql:[{
-      sampleSize: Number,
-      acceptedDefect: Number,
-      rejectedDefect: Number,
-      levelUsed: { type:Number, default: 0 },
+// --- Subschemas ---
+
+const MeasurementSizeSummarySchema = new mongoose.Schema({
+  size: String,
+  checkedPcs: Number,
+  checkedPoints: Number,
+  totalPass: Number,
+  totalFail: Number,
+  plusToleranceFailCount: Number,
+  minusToleranceFailCount: Number,
+  tolerancePlus: Number,
+  toleranceMinus: Number
+}, { _id: false });
+
+const MeasurementPointSchema = new mongoose.Schema({
+  pointName: String,
+  pointNo: Number,
+  specs: String,
+  toleranceMinus: Number,
+  tolerancePlus: Number,
+  rowNo: Number,
+  measured_value_decimal: Number,
+  measured_value_fraction: String,
+  result: { type: String, enum: ['pass', 'fail'], default: 'pass' }
+}, { _id: false });
+
+const PcsSchema = new mongoose.Schema({
+  pcNumber: Number,
+  isFullColumn: Boolean,
+  measurementPoints: [MeasurementPointSchema]
+}, { _id: false });
+
+const MeasurementSchema = new mongoose.Schema({
+  size: String,
+  qty: Number,
+  kvalue: String,
+  before_after_wash: {
+    type: String,
+    enum: ['beforeWash', 'afterWash'],
+    required: true
+  },
+  pcs: [PcsSchema],
+  selectedRows: [Boolean],
+  fullColumns: [Boolean]
+}, { _id: false });
+
+const MeasurementDetailsSchema = new mongoose.Schema({
+  measurementSizeSummary: [MeasurementSizeSummarySchema],
+  measurement: [MeasurementSchema]
+}, { _id: false });
+
+// --- Main Schema ---
+
+const QCWashingSchema = new mongoose.Schema({
+  date: { type: Date, default: Date.now },
+  orderNo: { type: String, required: true },
+  before_after_wash: { type: String, default: 'Before Wash' },
+  checkedQty: { type: Number, default: 0 },
+  washQty: { type: Number, default: 0 },
+  totalCheckedPoint: { type: Number, default: 0 },
+  totalPass: { type: Number, default: 0 },
+  totalFail: { type: Number, default: 0 },
+  passRate: { type: Number, default: 0 },
+  totalCheckedPcs: { type: Number, default: 0 },
+  rejectedDefectPcs: { type: Number, default: 0 },
+  totalDefectCount: { type: Number, default: 0 },
+  defectRate: { type: Number, default: 0.00 },
+  defectRatio: { type: Number, default: 0.00 },
+  overallFinalResult: { type: String },
+  orderQty: { type: Number, default: 0 },
+  colorOrderQty: { type: Number, default: 0 },
+  color: { type: String, default: '' },
+  washType: { type: String, default: 'Normal Wash' },
+  reportType: String,
+  buyer: String,
+  factoryName: String,
+  colorName: String,
+  aql: [{
+    sampleSize: Number,
+    acceptedDefect: Number,
+    rejectedDefect: Number,
+    levelUsed: { type: Number, default: 0 }
+  }],
+  inspector: {
+    engName: String,
+    empId: String
+  },
+  inspectionDetails: {
+    checkedPoints: [{
+      pointName: String,
+      decision: Boolean,
+      comparison: [String],
+      remark: String
     }],
-    inspector: {
-      engName: String,
-      empId: String
-    },
-    inspectionDetails: {
-       checkedPoints: [{
-        pointName: String,
-        decision: Boolean,
-        comparison:[String],
-        remark: String,
-      }],
-      machineProcesses: [{
-          machineType:String,
-          temperature: Number,
-          time:Number,
-          chemical: Number // optional for Tumble Dry
-        }
-      ],
-      parameters: [{
-        parameterName: String,
-        checkedQty: { type: Number, default: 0 },
-        defectQty: { type: Number, default: 0 },
-        passRate: { type: Number, default: 0.00 },
-        result: { type: String, default: '' },
-        remark: String,
+    machineProcesses: [{
+      machineType: String,
+      temperature: Number,
+      time: Number,
+      chemical: Number
+    }],
+    parameters: [{
+      parameterName: String,
+      checkedQty: { type: Number, default: 0 },
+      defectQty: { type: Number, default: 0 },
+      passRate: { type: Number, default: 0.00 },
+      result: { type: String, default: '' },
+      remark: String
+    }]
+  },
+  defectDetails: {
+    checkedQty: Number,
+    washQty: Number,
+    result: String,
+    levelUsed: Number,
+    defectsByPc: [{
+      pcNumber: Number,
+      isFullColumn: Boolean,
+      pcDefects: [{
+        defectId: String,
+        defectName: String,
+        defectQty: Number,
+        defectImages: [String]
       }]
-    },
-      defectDetails: {
-        checkedQty: Number,
-        washQty: Number,
-        result: String,
-        levelUsed: Number,
-        defectsByPc: [{
-          pcNumber: Number, 
-          isFullColumn: Boolean,
-          pcDefects: [{
-            defectId: String,
-            defectName: String,
-            defectQty: Number,
-            defectImages: [String]
-          }]
-        }],
-        additionalImages: [String],
-        comment: String
-      },
-      measurementDetails: [
-        {
-         measurementSizeSummary: {
-            size: String,
-            checkedPcs: Number,
-            checkedPoints: Number,
-            totalPass: Number,
-            totalFail: Number,
-            plusToleranceFailCount: Number,
-            minusToleranceFailCount: Number,
-            tolerancePlus: Number,
-            toleranceMinus: Number
-          },
-            measurement: {
-              size: String,
-              qty: Number,
-              kvalue:String,
-              before_after_wash: {
-                type: String,
-                enum: ['beforeWash', 'afterWash'],
-              required: true
-            },
-            pcs: [{
-              pcNumber: Number,
-              isFullColumn: Boolean,
-              measurementPoints: [{
-                pointName: String,
-                pointNo: Number, 
-                // decimal: Number, 
-                // fraction: String, 
-                specs: String,
-                toleranceMinus: Number, 
-                tolerancePlus: Number,  
-                rowNo: Number, // instead of specIndex
-                measured_value_decimal: Number,
-                measured_value_fraction: String,
-                result: { type: String, enum: ['pass', 'fail'], default: 'pass' }
-              }]
-            }],
-             selectedRows: [Boolean],
-             fullColumns: [Boolean],
-          }
-        },
-      ],
-    isAutoSave: {
-      type: Boolean,
-      default: false
-    },
-    userId: String,
-    // savedAt: Date,
-    submittedAt: Date,
-    status: {
-      type: String,
-      enum: ['draft', 'auto-saved', 'submitted', 'approved', 'rejected'],
-      default: 'draft'
-    }
-  }, {
-    timestamps: true
-  });
+    }],
+    additionalImages: [String],
+    comment: String
+  },
+  measurementDetails: MeasurementDetailsSchema, 
+  isAutoSave: { type: Boolean, default: false },
+  userId: String,
+  submittedAt: Date,
+  status: {
+    type: String,
+    enum: ['draft', 'auto-saved', 'submitted', 'approved', 'rejected'],
+    default: 'draft'
+  }
+}, { timestamps: true });
 
-  QCWashingSchema.pre('save', function(next) {
-    if (this.totalCheckedPoint > 0) {
-      this.passRate = Math.round((this.totalPass / this.totalCheckedPoint) * 100);
-    }
-    next();
-  });
+QCWashingSchema.pre('save', function(next) {
+  if (this.totalCheckedPoint > 0) {
+    this.passRate = Math.round((this.totalPass / this.totalCheckedPoint) * 100);
+  }
+  next();
+});
 
-  export default (connection) => connection.model("QCWashing", QCWashingSchema);
+export default (connection) => connection.model("QCWashing", QCWashingSchema);
