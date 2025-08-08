@@ -102,6 +102,7 @@ const initialElasticReportState = {
 
 const initialEMBReportState = {
   _id: null,
+  reportType: "EMB",
   inspectionDate: new Date(),
   factoryName: "",
   moNo: "",
@@ -701,6 +702,7 @@ const SCCPage = () => {
           const reportDataFromChild = payloadToSend;
           // Basic validation
           if (
+            !reportDataFromChild.reportType ||
             !reportDataFromChild.inspectionDate ||
             !reportDataFromChild.factoryName ||
             !reportDataFromChild.moNo

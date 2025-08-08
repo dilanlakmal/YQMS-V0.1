@@ -15,6 +15,11 @@ const MAX_REMARKS_LENGTH = 250;
 
 const embReportSchema = new mongoose.Schema(
   {
+    reportType: {
+      type: String,
+      required: true,
+      enum: ["EMB", "Printing", "EMB + Print"]
+    },
     inspectionDate: { type: Date, required: true },
     factoryName: {
       type: String,
@@ -69,6 +74,7 @@ const embReportSchema = new mongoose.Schema(
 
 embReportSchema.index(
   {
+    reportType: 1,
     inspectionDate: 1,
     factoryName: 1,
     moNo: 1,
