@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
-// import { useTranslation } from "react-i18next";
 import { API_BASE_URL } from "../../config";
 import OrderDetailsSection from "../components/inspection/qc2_washing/Home/OrderDetailsSection";
 import InspectionDataSection from "../components/inspection/qc2_washing/Home/InspectionDataSection";
@@ -22,7 +21,7 @@ const normalizeImageSrc = (src) => {
 
 function transformDefectsByPc(savedDefectsByPc) {
   if (Array.isArray(savedDefectsByPc)) {
-    // Array from backend
+
     return savedDefectsByPc.reduce((acc, pcData) => {
       const pcNumber = pcData.pcNumber;
       if (pcNumber) {
@@ -41,7 +40,7 @@ function transformDefectsByPc(savedDefectsByPc) {
       return acc;
     }, {});
   }
-  // Already an object
+  
   if (typeof savedDefectsByPc === "object" && savedDefectsByPc !== null) {
     const result = {};
     Object.keys(savedDefectsByPc).forEach(pc => {
@@ -66,7 +65,6 @@ function normalizeImagePreview(img) {
   if (!img) return "";
   if (typeof img === "string") return img;
   if (typeof img === "object" && img.preview) {
-    // If img.preview is a string, return it. If it's an object, return its .preview property.
     return typeof img.preview === "string" ? img.preview : (img.preview.preview || "");
   }
   return "";
@@ -79,7 +77,6 @@ function calculateSummaryData(currentFormData) {
     if (currentMeasurementDetails && typeof currentMeasurementDetails === "object") {
       measurementArray = currentMeasurementDetails.measurement || [];
     } else if (Array.isArray(currentMeasurementDetails)) {
-      // fallback for old data
       measurementArray = currentMeasurementDetails;
     }
 
@@ -88,7 +85,6 @@ function calculateSummaryData(currentFormData) {
     measurementArray.forEach(data => {
       if (typeof data.qty === "number") totalCheckedPcs += data.qty;
     });
-    // Fallback to checkedQty if no measurement data
     if (totalCheckedPcs === 0) {
       totalCheckedPcs = parseInt(currentFormData.checkedQty, 10) || 0;
     }
@@ -159,7 +155,6 @@ function calculateSummaryData(currentFormData) {
     overallResult = "N/A";
   }
   
-
   return {
     totalCheckedPcs: totalCheckedPcs || 0,
     rejectedDefectPcs: rejectedDefectPcs || 0,
@@ -171,7 +166,6 @@ function calculateSummaryData(currentFormData) {
   };
   
 }
-
 
 function machineProcessesToObject(machineProcesses) {
   const obj = {};
@@ -203,7 +197,6 @@ function fractionToDecimal(fraction) {
   const parsed = parseFloat(str);
   return isNaN(parsed) ? 0 : sign * parsed;
 }
-
 
 const QCWashingPage = () => {
   // Hooks
@@ -464,12 +457,10 @@ useEffect(() => {
   fetchColorOrderQty();
 }, [formData.orderNo, formData.color]);
 
-// Example: When defectsByPc or measurementData changes
 
   // --- Helper Functions ---
   const processMeasurementData = (loadedMeasurements) => {
   if (Array.isArray(loadedMeasurements)) {
-    // Extract the .measurement object from each entry
     const measurements = loadedMeasurements
       .map(m => m.measurement)
       .filter(Boolean);
@@ -509,12 +500,10 @@ useEffect(() => {
 
   const fetchSubFactories = async () => {
   try {
-    // Fetch only the "Washing" factory type from SupplierIssuesDefect
     const response = await fetch(`${API_BASE_URL}/api/supplier-issues/defects/Washing`);
     const data = await response.json();
     if (data && Array.isArray(data.factoryList)) {
       setSubFactories(data.factoryList);
-      // Set default factoryName in formData to "YM" if present, else first in list
       setFormData(prev => ({
         ...prev,
         factoryName: data.factoryList.includes("YM")
@@ -545,17 +534,16 @@ useEffect(() => {
 
   // Renamed and updated to use /api/search-mono for order number suggestions
   const fetchOrderNoSuggestions = async (searchTerm) => {
-    if (!searchTerm || searchTerm.length < 2) { // Only search if at least 2 characters typed
+    if (!searchTerm || searchTerm.length < 2) { 
       setOrderNoSuggestions([]);
       return;
     }
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/search-mono?term=${searchTerm}` // Use the new endpoint
+        `${API_BASE_URL}/api/search-mono?term=${searchTerm}`
       );
       if (response.ok) {
         const data = await response.json();
-        // Assuming the endpoint returns an array of order numbers directly
         setOrderNoSuggestions(data || []);
       } else {
         setOrderNoSuggestions([]);
@@ -598,7 +586,6 @@ useEffect(() => {
       return;
     }
     try {
-      // You may need to create this endpoint on your backend.
       const response = await fetch(
         `${API_BASE_URL}/api/qc-washing/styles/search/${searchTerm}`
       );
@@ -619,7 +606,6 @@ useEffect(() => {
 
   const fetchOrderDetailsByStyle = async (orderNo) => {
     if (!orderNo) {
-      // Clear related fields if styleNo is cleared
       setColorOptions([]);
       setFormData((prev) => ({
         ...prev,
@@ -647,9 +633,8 @@ useEffect(() => {
             `The record for Order No '${orderNo}' has already been submitted and cannot be edited.`,
             "info"
           );
-          // Clear the input to prevent re-triggering
           setFormData((prev) => ({ ...prev, orderNo: "", style: "" }));
-          return; // Stop further processing
+          return; 
         }
       }
       
@@ -679,7 +664,6 @@ useEffect(() => {
               : ""),
         }));
       } else {
-        // If no order details found in dt_orders, it's a critical error.
         throw new Error(
           orderData.message || "Style/Order not found in master records."
         );
@@ -714,7 +698,7 @@ useEffect(() => {
     // --- Transform and set all relevant states as before ---
     setFormData(prev => ({
       ...prev,
-      ...saved.formData, // or map fields as needed
+      ...saved.formData,
       date: saved.formData?.date ? saved.formData.date.split("T")[0] : prev.date,
       before_after_wash: saved.before_after_wash || prev.before_after_wash,
       orderQty: saved.formData?.orderQty || prev.orderQty,
@@ -789,10 +773,8 @@ if (saved.inspectionDetails?.machineProcesses) {
     let sizes = [];
     if (saved.measurementDetails) {
       if (Array.isArray(saved.measurementDetails)) {
-        // Old structure
         sizes = saved.measurementDetails.map(m => m.size);
       } else if (typeof saved.measurementDetails === "object" && Array.isArray(saved.measurementDetails.measurement)) {
-        // New structure
         sizes = saved.measurementDetails.measurement.map(m => m.size);
       }
     }
@@ -818,7 +800,6 @@ if (saved.inspectionDetails?.machineProcesses) {
 
     // --- Form Handlers ---
   const handleInputChange = (field, value) => {
-     // --- Fetch order suggestions ---
     if (field === "orderNo") {
       fetchOrderNoSuggestions(value);
       setShowOrderNoSuggestions(true);
@@ -827,7 +808,6 @@ if (saved.inspectionDetails?.machineProcesses) {
     // --- Cache state before changing color ---
     if (field === 'color' && value !== formData.color && formData.color) {
       const outgoingColor = formData.color;
-      // Capture the current UI state for the color we are leaving
       const currentStateForColor = {
         inspectionData,
         processData,
@@ -837,21 +817,18 @@ if (saved.inspectionDetails?.machineProcesses) {
         measurementData,
         uploadedImages,
         savedSizes,
-        defectsByPc, // Capture defectsByPc
-        // also capture relevant form data fields
+        defectsByPc, 
         formData: {
           washQty: formData.washQty,
           checkedQty: formData.checkedQty,
           before_after_wash: formData.before_after_wash,
         }
       };
-      // Update the cache
       setColorDataCache(prevCache => ({ ...prevCache, [outgoingColor]: currentStateForColor }));
     }
 
     setFormData((prev) => {
       const newState = { ...prev, [field]: value };
-      // When one checkbox is checked, uncheck the other and set reportType field as string
       if (field === "firstOutput") {
         newState.inline = "";
         newState.reportType = value; 
@@ -871,7 +848,6 @@ if (saved.inspectionDetails?.machineProcesses) {
           newState.inline = "";
           newState.washQty = "";       
         newState.checkedQty = "";
-          // Call the function to fetch details for First Output
           fetchFirstOutputDetails();
         } else if (value === "Inline") {
           newState.inline = "Inline";
@@ -886,7 +862,6 @@ if (saved.inspectionDetails?.machineProcesses) {
           calculateCheckedQty(formData.washQty);
         }
 
-      // Handle color change - reset color-specific data
       if (field === "color" && value !== prev.color) {
         if (value && (prev.orderNo || prev.style)) {
           setTimeout(
@@ -899,7 +874,6 @@ if (saved.inspectionDetails?.machineProcesses) {
       return newState;
     });
 
-    // Handle async operations after state update
     if (
       field === "inline" &&
       value &&
@@ -922,30 +896,25 @@ if (saved.inspectionDetails?.machineProcesses) {
     const orderNo = formData.orderNo || formData.style;
     if (!orderNo) {
       Swal.fire('Missing Order No', 'Please enter an Order No before selecting First Output.', 'warning');
-      // Uncheck the box to prevent inconsistent state
       setFormData(prev => ({ ...prev, firstOutput: '', reportType: '' }));
       return;
     }
     try {
       setIsDataLoading(true);
-     // This endpoint must be changed to a POST on the backend to accept the orderNo
       const response = await fetch(`${API_BASE_URL}/api/qc-washing/first-output-details`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderNo: orderNo }) // Send orderNo for buyer-specific AQL
+        body: JSON.stringify({ orderNo: orderNo })
       });
       const data = await response.json();
 
       if (response.ok && data.success) {
         setFormData(prev => ({
           ...prev,
-          // Set the checked Qty from the database
           checkedQty: data.checkedQty,
-          // Set the AQL values
           aql:[{sampleSize: data.aqlData.sampleSize,
           acceptedDefect: data.aqlData.acceptedDefect,
           rejectedDefect: data.aqlData.rejectedDefect,
-          // Wash Qty can be set to checked Qty for consistency if needed
           levelUsed: data.aqlData.aqlLevelUsed}],
           washQty: data.checkedQty,
         }));
@@ -1056,95 +1025,6 @@ if (saved.inspectionDetails?.machineProcesses) {
   }, 100);
 };
 
-//   const fetchAqlForParameter = async (orderNo, checkedQty, setDefectData, defectIndex) => {
-//   if (!orderNo || !checkedQty) return;
-
-//   try {
-//     const response = await fetch(
-//       `${API_BASE_URL}/api/qc-washing/aql-chart/parameter`,
-//       {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({
-//           orderNo: orderNo,
-//           checkedQty: parseInt(checkedQty, 10) || 0,
-//         }),
-//       }
-//     );
-
-//     if (!response.ok) {
-//       const errorData = await response.json().catch(() => ({
-//         message: `Request failed with status ${response.status}`,
-//       }));
-//       // console.error("AQL API Error:", errorData.message || "Unknown error");
-//       // Optionally update defectData state to clear AQL values for this parameter
-//       if (setDefectData && typeof defectIndex === "number") {
-//         setDefectData(prev =>
-//           prev.map((item, idx) =>
-//             idx === defectIndex
-//               ? { ...item, aqlAcceptedDefect: "", aqlLevelUsed: "", result: "" }
-//               : item
-//           )
-//         );
-//       }
-//       return null;
-//     }
-
-//     const data = await response.json();
-
-//     if (data.success && data.aqlData) {
-//       // Optionally update defectData state for this parameter
-//       if (setDefectData && typeof defectIndex === "number") {
-//         setDefectData(prev =>
-//           prev.map((item, idx) =>
-//             idx === defectIndex
-//               ? {
-//                   ...item,
-//                   aqlAcceptedDefect: data.aqlData.acceptedDefect,
-//                   aqlLevelUsed: data.aqlData.aqlLevelUsed,
-//                   result:
-//                     (Number(item.failedQty) || 0) <= data.aqlData.acceptedDefect
-//                       ? "Pass"
-//                       : "Fail",
-//                 }
-//               : item
-//           )
-//         );
-//       }
-//       return data.aqlData;
-//     } else {
-//       if (setDefectData && typeof defectIndex === "number") {
-//         setDefectData(prev =>
-//           prev.map((item, idx) =>
-//             idx === defectIndex
-//               ? { ...item, aqlAcceptedDefect: "", aqlLevelUsed: "", result: "" }
-//               : item
-//           )
-//         );
-//       }
-//       // console.warn(
-//       //   "AQL data not found:",
-//       //   data.message || "No AQL chart found for the given criteria."
-//       // );
-//       return null;
-//     }
-//   } catch (error) {
-//     console.error("Error fetching AQL data:", error);
-//     if (setDefectData && typeof defectIndex === "number") {
-//       setDefectData(prev =>
-//         prev.map((item, idx) =>
-//           idx === defectIndex
-//             ? { ...item, aqlAcceptedDefect: "", aqlLevelUsed: "", result: "" }
-//             : item
-//         )
-//       );
-//     }
-//     return null;
-//   }
-// };
-
-
-
   // --- Measurement ---
   // Calculate totals from Measurement Data to match the Summary Card
   const getMeasurementStats = () => {
@@ -1181,66 +1061,81 @@ if (saved.inspectionDetails?.machineProcesses) {
   };
 
   // Handle measurement size save with nested structure
- const handleSizeSubmit = async (transformedSizeData) => {
-        try {
-        const before_after_wash = formData.before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
+  const handleSizeSubmit = async (transformedSizeData) => {
+    try {
+      const before_after_wash =
+        formData.before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
 
-        // 1. Update local measurement data and saved sizes
-        setMeasurementData((prev) => {
+      // 1. Update local measurement data and saved sizes
+      setMeasurementData((prev) => {
         const currentArray = prev[before_after_wash];
-        const existingIndex = currentArray.findIndex((item) => item.size === transformedSizeData.size);
+        const existingIndex = currentArray.findIndex(
+          (item) => item.size === transformedSizeData.size
+        );
         if (existingIndex >= 0) {
-        const updated = [...currentArray];
-        updated[existingIndex] = transformedSizeData;
-        return { ...prev, [before_after_wash]: updated };
-        }else {
-        return { ...prev, [before_after_wash]: [...currentArray, transformedSizeData] };
+          const updated = [...currentArray];
+          updated[existingIndex] = transformedSizeData;
+          return { ...prev, [before_after_wash]: updated };
+        } else {
+          return {
+            ...prev,
+            [before_after_wash]: [...currentArray, transformedSizeData],
+          };
         }
-        });
+      });
 
-        setSavedSizes((prev) => {
+      setSavedSizes((prev) => {
         if (!prev.includes(transformedSizeData.size)) {
-        return [...prev, transformedSizeData.size];
+          return [...prev, transformedSizeData.size];
         }
         return prev;
-        });
+      });
 
-        // 2. Remove the just-saved size from selectedSizes to hide its input table
-        if (typeof setSelectedSizes === "function") {
-        setSelectedSizes((prev) => prev.filter((s) => s.size !== transformedSizeData.size));
-        }
+      // 2. Remove the just-saved size from selectedSizes to hide its input table
+      if (typeof setSelectedSizes === "function") {
+        setSelectedSizes((prev) =>
+          prev.filter((s) => s.size !== transformedSizeData.size)
+        );
+      }
 
-        setShowMeasurementTable(true);
-        // 3. Save to backend
-        if (!recordId) {
+      setShowMeasurementTable(true);
+
+      // 3. Save to backend
+      if (!recordId) {
         Swal.fire("Order details must be saved first!", "", "warning");
         return;
+      }
+
+      const measurementDetail = { ...transformedSizeData, before_after_wash };
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/measurement-save`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recordId,
+            measurementDetail,
+          }),
         }
+      );
 
-        const measurementDetail = { ...transformedSizeData, before_after_wash };
-        const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-save`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-        recordId,
-        measurementDetail
-        })
-        });
+      const result = await response.json();
 
-        const result = await response.json();
-        if (result.success) {
+      if (result.success) {
         Swal.fire("Success", `Size data saved to database!`, "success");
-        // Optionally reload all saved data for full consistency:
-        // if (typeof loadSavedDataById === "function") loadSavedDataById(recordId);
-        } else {
-        Swal.fire("Error", result.message || "Failed to save measurement data", "error");
-        }
-        } catch (error) {
-        console.error("Error saving size:", error);
-        Swal.fire("Error", "Failed to save size data", "error");
-        }
-        };
-
+      } else {
+        Swal.fire(
+          "Error",
+          result.message || "Failed to save measurement data",
+          "error"
+        );
+      }
+    } catch (error) {
+      console.error("Error saving size:", error);
+      Swal.fire("Error", "Failed to save size data", "error");
+    }
+  };
 
 
   // Handle measurement data edit
@@ -1335,70 +1230,62 @@ const autoSaveOverallSummary = async (summary, recordId) => {
 
 
      // Function to calculate and update summary data (NEW/MODIFIED)
-  // This function should be called whenever relevant data (defectDetails, measurementData) changes
   const updateSummaryData = (currentFormData) => {
   const summary = calculateSummaryData(currentFormData);
-  setFormData((prevData) => ({
-    ...prevData,
-    ...summary,
-  }));
-  if (recordId) {
-    autoSaveSummary(summary, recordId);
-  }
-};
-
-
-useEffect(() => {
-  // Build up-to-date defectDetails and measurementDetails
-  const defectDetails = {
-    ...formData.defectDetails,
-    checkedQty: formData.checkedQty,
-    washQty: formData.washQty,
-    result: formData.result,
-    defectsByPc: Object.entries(defectsByPc).map(([pcNumber, pcDefects]) => ({
-      pcNumber,
-      pcDefects,
-    })),
+    setFormData((prevData) => ({
+      ...prevData,
+      ...summary,
+    }));
+    if (recordId) {
+      autoSaveSummary(summary, recordId);
+    }
   };
 
-  // Build measurementDetails from measurementData
-  const measurementDetails = {
-    measurement: [
-      ...measurementData.beforeWash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
-      ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
-    ],
-    // Optionally add measurementSizeSummary if you use it
-  };
 
-  // Calculate summary from the latest data
-  const summary = calculateSummaryData({
-    ...formData,
-    defectDetails,
-    measurementDetails, // <-- always use this!
-  });
+    useEffect(() => {
+      const defectDetails = {
+        ...formData.defectDetails,
+        checkedQty: formData.checkedQty,
+        washQty: formData.washQty,
+        result: formData.result,
+        defectsByPc: Object.entries(defectsByPc).map(([pcNumber, pcDefects]) => ({
+          pcNumber,
+          pcDefects,
+        })),
+      };
 
-  setFormData((prev) => ({
-    ...prev,
-    defectDetails,
-    measurementDetails,
-    ...summary,
-  }));
+      const measurementDetails = {
+        measurement: [
+          ...measurementData.beforeWash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
+          ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
+        ],
+      };
 
-  // Save summary to backend
-  if (recordId) {
-     autoSaveSummary(summary, recordId);
-  }
-}, [
-  defectsByPc,
-  measurementData,
-  formData.checkedQty,
-  formData.washQty,
-  formData.result,
-  recordId,
-]);
+      // Calculate summary from the latest data
+      const summary = calculateSummaryData({
+        ...formData,
+        defectDetails,
+        measurementDetails, 
+      });
 
+      setFormData((prev) => ({
+        ...prev,
+        defectDetails,
+        measurementDetails,
+        ...summary,
+      }));
 
-
+      if (recordId) {
+        autoSaveSummary(summary, recordId);
+      }
+    }, [
+      defectsByPc,
+      measurementData,
+      formData.checkedQty,
+      formData.washQty,
+      formData.result,
+      recordId,
+    ]);
 
   // Load color-specific data
   const loadColorSpecificData = async (orderNo, color) => {
@@ -1416,7 +1303,7 @@ useEffect(() => {
       setDefectsByPc(cachedData.defectsByPc || {}); 
       setFormData(prev => ({
         ...prev,
-        ...(cachedData.formData || {}) // Restore color-specific form data
+        ...(cachedData.formData || {}) 
       }));
       return; 
     }
@@ -1516,7 +1403,6 @@ useEffect(() => {
           }
 
         } else {
-          // console.log(`No saved data found for color "${color}". Using a clean form.`);
           setInspectionData(initializeInspectionData(masterChecklist));
           setProcessData({ machineType: "", temperature: "", time: "", chemical: "" });
           setDefectData(normalizeDefectData(defaultDefectData));
@@ -1550,7 +1436,6 @@ useEffect(() => {
       );
 
       if (!response.ok) {
-        // setSavedSizes([]);
         return;
       }
 
@@ -1558,7 +1443,6 @@ useEffect(() => {
 
       if (data.success) {
         setSavedSizes(data.savedSizes || []);
-        // console.log("Loaded saved sizes:", data.savedSizes);
       }
     } catch (error) {
       console.error("Error loading saved sizes:", error);
@@ -1586,8 +1470,6 @@ useEffect(() => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 p-2 sm:p-4 md:p-6">
       
         <PageTitle />
-      
-      {/* Tab Navigation */}
         <div className="flex justify-center mb-6 mt-4">
           <button
             className={`px-6 py-2 rounded-l-md font-medium ${
@@ -1610,8 +1492,6 @@ useEffect(() => {
            Report
           </button>
         </div>
-
-        {/* Conditionally Render Content Based on Active Tab */}
        
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-6 dark:bg-slate-900">
          {activeTab === 'newInspection' && (
@@ -1716,67 +1596,7 @@ useEffect(() => {
         />
         )}
 
-        {/* Auto-save status */}
-        {/* {lastSaved && (
-          <div className="text-center text-sm text-gray-600 dark:text-gray-300">
-            Last auto-saved: {lastSaved.toLocaleTimeString()}
-          </div>
-        )} */}
-
         <div className="flex justify-end space-x-4">
-          {/* <button
-            className="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-            onClick={() => {
-              if (autoSaveId) {
-                Swal.fire({
-                  title: "Reset Form?",
-                  text: "This will clear all current data. Auto-saved data will remain available.",
-                  icon: "warning",
-                  showCancelButton: true,
-                  confirmButtonText: "Reset",
-                }).then((result) => {
-                  if (result.isConfirmed) {
-                    setFormData({
-                      date: new Date().toISOString().split("T")[0],
-                      orderNo: "",
-                      style: "",
-                      orderQty: "",
-                      checkedQty: "",
-                      color: "",
-                      washQty: "",
-                      washType: "Normal Wash",
-                      firstOutput: false,
-                      inline: false,
-                      reportType: "",
-                      buyer: "",
-                      factoryName: "YM",
-                      result: "",
-                      aql: [{
-                        sampleSize: "",
-                        acceptedDefect: "",
-                        rejectedDefect: "",
-                        levelUsed: "",
-                      }]
-                    });
-                    setInspectionData(
-                      initializeInspectionData(masterChecklist)
-                    );
-                    setProcessData({machineType: "", temperature: "", time: "", chemical: "" });
-                    setDefectData(normalizeDefectData(defaultDefectData));
-
-                    setAddedDefects([]);
-                    setUploadedImages([]);
-                    setComment("");
-                    setMeasurementData({ beforeWash: [], afterWash: [] });
-                    setDefectsByPc({});
-                    setShowMeasurementTable(true);
-                  }
-                });
-              }
-            }}
-          >
-            Reset
-          </button> */}
           <button
             className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
             onClick={async () => {
