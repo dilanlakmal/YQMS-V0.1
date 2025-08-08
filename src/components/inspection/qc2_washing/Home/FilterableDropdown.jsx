@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
 const FilterableDropdown = ({ 
   value, 
@@ -65,6 +66,14 @@ const FilterableDropdown = ({
       )}
     </div>
   );
+};
+FilterableDropdown.propTypes = {
+  value: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+  options: PropTypes.array.isRequired,
+  onFilter: PropTypes.func.isRequired,
+  placeholder: PropTypes.string,
+  className: PropTypes.string
 };
 
 export default FilterableDropdown;

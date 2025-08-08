@@ -1,4 +1,5 @@
 import {useState,useEffect} from "react";
+import PropTypes from "prop-types";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../../config";
 
@@ -395,6 +396,30 @@ const OrderDetailsSection = ({
           </div>
     </div>
   );
+};
+OrderDetailsSection.propTypes = {
+  formData: PropTypes.object.isRequired,
+  setFormData: PropTypes.func.isRequired,
+  handleInputChange: PropTypes.func.isRequired,
+  fetchOrderDetailsByStyle: PropTypes.func.isRequired,
+  colorOptions: PropTypes.array,
+  subFactories: PropTypes.array,
+  user: PropTypes.object,
+  isVisible: PropTypes.bool,
+  onToggle: PropTypes.func,
+  styleSuggestions: PropTypes.array,
+  fetchMatchingStyles: PropTypes.func,
+  setStyleSuggestions: PropTypes.func,
+  orderNumbers: PropTypes.array,
+  filterOrderNumbers: PropTypes.func,
+  orderNoSuggestions: PropTypes.array,
+  showOrderNoSuggestions: PropTypes.bool,
+  setShowOrderNoSuggestions: PropTypes.func,
+  colorOrderQty: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  activateNextSection: PropTypes.func,
+  setRecordId: PropTypes.func,
+  setSavedSizes: PropTypes.func,
+  onLoadSavedDataById: PropTypes.func,
 };
 
 export default OrderDetailsSection;

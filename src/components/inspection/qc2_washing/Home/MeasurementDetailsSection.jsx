@@ -4,6 +4,7 @@ import { API_BASE_URL } from "../../../../../config";
 import Swal from "sweetalert2";
 import MeasurementNumPad from "../../cutting/MeasurementNumPad";
 import SummaryCard from "../Home/SummaryCard";
+import PropTypes from "prop-types";
 
 const MeasurementDetailsSection = ({
   orderNo,
@@ -1112,6 +1113,23 @@ useEffect(() => {
       )}
     </div>
   );
+};
+MeasurementDetailsSection.propTypes = {
+  orderNo: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  color: PropTypes.string,
+  isVisible: PropTypes.bool,
+  onToggle: PropTypes.func,
+  savedSizes: PropTypes.array,
+  setSavedSizes: PropTypes.func,
+  onSizeSubmit: PropTypes.func,
+  measurementData: PropTypes.shape({
+    beforeWash: PropTypes.array,
+    afterWash: PropTypes.array,
+  }),
+  showMeasurementTable: PropTypes.bool,
+  onMeasurementEdit: PropTypes.func,
+  before_after_wash: PropTypes.string,
+  recordId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
 
 export default MeasurementDetailsSection;

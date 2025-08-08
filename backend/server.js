@@ -3,6 +3,8 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import express from "express";
 import fs from "fs";
+import gracefulFs from 'graceful-fs';
+gracefulFs.gracefulify(fs);
 import https from "https"; 
 import axios from "axios";
 import jwt from "jsonwebtoken";
@@ -80,8 +82,6 @@ import createANFMeasurementReportModel from "./models/ANFMeasurementReport.js";
 import createSizeCompletionStatusModel from "./models/SizeCompletionStatus.model.js";
 
 import createQCWorkersModel from "./models/QCWorkers.js";
-import createSupplierIssuesDefectModel from "./models/SupplierIssuesDefect.js";
-
 import createSupplierIssuesDefectModel from "./models/SupplierIssuesDefect.js";
 import createSupplierIssueReportModel from "./models/SupplierIssueReport.js";
 
@@ -25266,19 +25266,7 @@ app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
   const collection = ymEcoConnection.db.collection("dt_orders");
 
   try {
-    const config = await SupplierIssuesDefect.findOne({
-      factoryType: req.params.factoryType
-    });
-    if (!config) {
-      return res.status(404).json({ error: "Configuration not found." });
-    }
-    // Sort defect list by the 'no' field
-    config.defectList.sort((a, b) => a.no - b.no);
-    res.json(config);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch configuration." });
-  }
-});
+    const orders = await collection.find({ Order_No: orderNo }).toArray();
 
     if (!orders || orders.length === 0) {
       return res.status(404).json({ success: false, message: `Style '${orderNo}' not found.` });
@@ -26421,323 +26409,148 @@ app.delete("/api/qc-washing-defects/:id", async (req, res) => {
 // PUT - Replace image for an existing QC Washing defect
 app.put("/api/qc-washing-defects/:id/image",uploadQC2_washing_image.single("defectImage"), async (req, res) => {
     try {
-      const { factoryType } = req.params;
-      const { oldName, newName } = req.body;
-      if (!oldName || !newName) {
+      const { id } = req.params;
+      if (!req.file) {
         return res
           .status(400)
-          .json({ error: "Old and new factory names are required." });
+          .json({ success: false, message: "No new image file provided." });
       }
-      const result = await SupplierIssuesDefect.updateOne(
-        { factoryType, factoryList: oldName },
-        { $set: { "factoryList.$": newName } }
-      );
-      if (result.nModified === 0)
-        return res
-          .status(404)
-          .json({ error: "Factory name not found or no change made." });
-      res.status(200).json({ message: "Factory name updated successfully." });
-    } catch (error) {
-      res
-        .status(500)
-        .json({ error: "Server error while updating factory name." });
-    }
-  }
-);
-
-// DELETE a Factory Name
-app.delete(
-  "/api/supplier-issues/defects/:factoryType/factories",
-  async (req, res) => {
-    try {
-      const { factoryType } = req.params;
-      const { factoryName } = req.body;
-      const result = await SupplierIssuesDefect.updateOne(
-        { factoryType },
-        { $pull: { factoryList: factoryName } }
-      );
-      if (result.nModified === 0)
-        return res.status(404).json({ error: "Factory name not found." });
-      res.status(200).json({ message: "Factory name deleted successfully." });
-    } catch (error) {
-      res
-        .status(500)
-        .json({ error: "Server error while deleting factory name." });
-    }
-  }
-);
-
-// POST (add) a new Defect to a specific Factory Type's list
-app.post(
-  "/api/supplier-issues/defects/:factoryType/defects",
-  async (req, res) => {
-    try {
-      const { factoryType } = req.params;
-      const { defectNameEng, defectNameKhmer, defectNameChi } = req.body;
-      if (!defectNameEng) {
+      if (!mongoose.Types.ObjectId.isValid(id)) {
         return res
           .status(400)
-          .json({ error: "Defect Name (English) is required." });
+          .json({ success: false, message: "Invalid defect ID." });
       }
-
-      const config = await SupplierIssuesDefect.findOne({ factoryType });
-      if (!config) {
-        return res.status(404).json({ error: "Factory type not found." });
-      }
-
-      const nextNo =
-        config.defectList.length > 0
-          ? Math.max(...config.defectList.map((d) => d.no)) + 1
-          : 1;
-
-      const newDefect = {
-        no: nextNo,
-        defectNameEng,
-        defectNameKhmer,
-        defectNameChi
-      };
-
-      await SupplierIssuesDefect.updateOne(
-        { factoryType },
-        { $push: { defectList: newDefect } }
-      );
-      res
-        .status(201)
-        .json({ message: "Defect added successfully.", defect: newDefect });
-    } catch (error) {
-      res.status(500).json({ error: "Server error while adding defect." });
-    }
-  }
-);
-
-// PUT (update) a Defect
-app.put(
-  "/api/supplier-issues/defects/:factoryType/defects/:defectId",
-  async (req, res) => {
-    try {
-      const { factoryType, defectId } = req.params;
-      const updateData = req.body;
-
-      const updateFields = {};
-      for (const key in updateData) {
-        updateFields[`defectList.$.${key}`] = updateData[key];
-      }
-
-      const result = await SupplierIssuesDefect.updateOne(
-        { factoryType, "defectList._id": defectId },
-        { $set: updateFields }
-      );
-
-      if (result.nModified === 0)
+      const defect = await QCWashingDefects.findById(id);
+      if (!defect) {
         return res
           .status(404)
-          .json({ error: "Defect not found or no change made." });
-      res.status(200).json({ message: "Defect updated successfully." });
-    } catch (error) {
-      res.status(500).json({ error: "Server error while updating defect." });
-    }
-  }
-);
-
-// DELETE a Defect
-app.delete(
-  "/api/supplier-issues/defects/:factoryType/defects/:defectId",
-  async (req, res) => {
-    try {
-      const { factoryType, defectId } = req.params;
-
-      const result = await SupplierIssuesDefect.updateOne(
-        { factoryType },
-        { $pull: { defectList: { _id: defectId } } }
+          .json({ success: false, message: "Defect not found." });
+      }
+      if (defect.image) {
+        const oldImagePath = path.join(__dirname, "public", defect.image);
+        if (fs.existsSync(oldImagePath)) {
+          await fs.promises.unlink(oldImagePath);
+        }
+      }
+      const uploadPath = path.join(
+        __dirname,
+        "public",
+        "storage",
+        "qc_washing_images"
       );
-
-      if (result.nModified === 0)
-        return res.status(404).json({ error: "Defect not found." });
-      res.status(200).json({ message: "Defect deleted successfully." });
+      const fileExtension = path.extname(req.file.originalname);
+      const newFilename = `qc-washing-defect-${Date.now()}-${Math.round(
+        Math.random() * 1e9
+      )}${fileExtension}`;
+      const fullFilePath = path.join(uploadPath, newFilename);
+      await fs.promises.writeFile(fullFilePath, req.file.buffer);
+      const newRelativeUrl = `/storage/qc_washing_images/${newFilename}`;
+      defect.image = newRelativeUrl;
+      const updatedDefect = await defect.save();
+      res.status(200).json({
+        success: true,
+        message: "Image replaced successfully.",
+        defect: updatedDefect
+      });
     } catch (error) {
-      res.status(500).json({ error: "Server error while deleting defect." });
+      console.error("Error replacing QC Washing defect image:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error while replacing image."
+      });
     }
   }
 );
 
-/* -------------------------------------------
-   End Points - Supplier Issues Reports
-------------------------------------------- */
-
-// NEW: GET an existing report based on key fields
-app.get("/api/supplier-issues/reports/find-existing", async (req, res) => {
+// DELETE - Delete image from an existing QC Washing defect
+app.delete("/api/qc-washing-defects/:id/image", async (req, res) => {
   try {
-    const { reportDate, inspectorId, factoryType, factoryName, moNo, colors } =
-      req.query;
-
-    if (
-      !reportDate ||
-      !inspectorId ||
-      !factoryType ||
-      !factoryName ||
-      !moNo ||
-      !colors
-    ) {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res
         .status(400)
-        .json({ error: "Missing required query parameters." });
+        .json({ success: false, message: "Invalid defect ID." });
     }
-
-    const searchDate = new Date(reportDate);
-    searchDate.setUTCHours(0, 0, 0, 0);
-
-    const colorArray = Array.isArray(colors) ? colors : colors.split(",");
-
-    const filter = {
-      reportDate: searchDate,
-      inspectorId,
-      factoryType,
-      factoryName,
-      moNo,
-      colors: { $all: colorArray, $size: colorArray.length }
-    };
-
-    const report = await SupplierIssueReport.findOne(filter);
-
-    if (!report) {
-      return res.status(404).json({ message: "No existing report found." });
+    const defect = await QCWashingDefects.findById(id);
+    if (!defect) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Defect not found." });
     }
-
-    res.json(report);
-  } catch (error) {
-    console.error("Error finding existing report:", error);
-    res.status(500).json({ error: "Failed to fetch existing report data." });
-  }
-});
-
-// UPDATED: POST endpoint now handles creating AND updating (upsert)
-app.post("/api/supplier-issues/reports", async (req, res) => {
-  try {
-    const {
-      reportDate,
-      inspectorId,
-      factoryType,
-      factoryName,
-      moNo,
-      colors,
-      ...updateData
-    } = req.body;
-
-    // Standardize date to midnight UTC for consistent querying
-    const searchDate = new Date(reportDate);
-    searchDate.setUTCHours(0, 0, 0, 0);
-
-    const filter = {
-      reportDate: searchDate,
-      inspectorId,
-      factoryType,
-      factoryName,
-      moNo,
-      // Ensure color array matching is order-agnostic
-      colors: { $all: colors.sort(), $size: colors.length }
-    };
-
-    // Add the sorted colors to the data that will be set
-    const finalUpdateData = {
-      ...updateData,
-      colors: colors.sort(), // Store colors consistently
-      reportDate: searchDate // Store standardized date
-    };
-
-    const options = {
-      new: true, // Return the modified document
-      upsert: true, // Create a new doc if no match is found
-      runValidators: true
-    };
-
-    const updatedReport = await SupplierIssueReport.findOneAndUpdate(
-      filter,
-      { $set: finalUpdateData },
-      options
-    );
-
-    res
-      .status(200)
-      .json({ message: "Report saved successfully", data: updatedReport });
-  } catch (error) {
-    console.error("Error saving supplier issue report:", error);
-    res
-      .status(400)
-      .json({ error: "Failed to save report.", details: error.message });
-  }
-});
-
-// --- NEW ENDPOINT 1: Get filtered supplier issue reports ---
-app.get("/api/supplier-issues/reports/summary", async (req, res) => {
-  try {
-    const {
-      startDate,
-      endDate,
-      moNos,
-      colors,
-      qcIds,
-      factoryType,
-      factoryNames
-    } = req.query;
-
-    const filter = {};
-
-    // 1. Date Range Filter
-    if (startDate || endDate) {
-      filter.reportDate = {};
-      if (startDate) {
-        filter.reportDate.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        // To include the whole end day, set to end of day
-        const endOfDay = new Date(endDate);
-        endOfDay.setUTCHours(23, 59, 59, 999);
-        filter.reportDate.$lte = endOfDay;
-      }
+    if (!defect.image) {
+      return res
+        .status(200)
+        .json({ success: true, message: "No image to delete." });
     }
-
-    // 2. Array Filters ($in operator)
-    if (moNos) filter.moNo = { $in: moNos.split(",") };
-    if (colors) filter.colors = { $in: colors.split(",") };
-    if (qcIds) filter.inspectorId = { $in: qcIds.split(",") };
-    if (factoryNames) filter.factoryName = { $in: factoryNames.split(",") };
-
-    // 3. Single Value Filter
-    if (factoryType) filter.factoryType = factoryType;
-
-    const reports = await SupplierIssueReport.find(filter)
-      .sort({ reportDate: -1, createdAt: -1 })
-      .lean();
-
-    res.json(reports);
-  } catch (error) {
-    console.error("Error fetching supplier issue reports summary:", error);
-    res.status(500).json({ error: "Failed to fetch report data." });
-  }
-});
-
-// --- NEW ENDPOINT 2: Get all available options for filters ---
-app.get("/api/supplier-issues/report-options", async (req, res) => {
-  try {
-    const [moNos, colors, qcIds, factoryTypes, factoryNames] =
-      await Promise.all([
-        SupplierIssueReport.distinct("moNo"),
-        SupplierIssueReport.distinct("colors"),
-        SupplierIssueReport.distinct("inspectorId"),
-        SupplierIssueReport.distinct("factoryType"),
-        SupplierIssueReport.distinct("factoryName")
-      ]);
-
-    res.json({
-      moNos: moNos.sort(),
-      colors: colors.sort(),
-      qcIds: qcIds.sort(),
-      factoryTypes: factoryTypes.sort(),
-      factoryNames: factoryNames.sort()
+    const imagePath = path.join(__dirname, "public", defect.image);
+    if (fs.existsSync(imagePath)) {
+      await fs.promises.unlink(imagePath);
+    }
+    defect.image = "";
+    const updatedDefect = await defect.save();
+    res.status(200).json({
+      success: true,
+      message: "Image deleted successfully.",
+      defect: updatedDefect
     });
   } catch (error) {
-    console.error("Error fetching report filter options:", error);
-    res.status(500).json({ error: "Failed to fetch filter options." });
+    console.error("Error deleting QC Washing defect image:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while deleting image." });
+  }
+});
+
+// GET all first output records
+app.get("/api/qc-washing-first-outputs", async (req, res) => {
+  try {
+    const outputs = await QCWashingFirstOutput.find().sort({ date: -1 });
+    res.json(outputs);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching records", error });
+  }
+});
+
+// POST a new first output record
+app.post("/api/qc-washing-first-outputs", async (req, res) => {
+  try {
+    const newOutput = new QCWashingFirstOutput(req.body);
+    const savedOutput = await newOutput.save();
+    res.status(201).json(savedOutput);
+  } catch (error) {
+    res.status(400).json({ message: "Error creating record", error });
+  }
+});
+
+// PUT (update) a first output record by ID
+app.put("/api/qc-washing-first-outputs/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedOutput = await QCWashingFirstOutput.findByIdAndUpdate(
+      id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+    if (!updatedOutput) {
+      return res.status(404).json({ message: "Record not found" });
+    }
+    res.json(updatedOutput);
+  } catch (error) {
+    res.status(400).json({ message: "Error updating record", error });
+  }
+});
+
+// DELETE a first output record by ID
+app.delete("/api/qc-washing-first-outputs/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedOutput = await QCWashingFirstOutput.findByIdAndDelete(id);
+    if (!deletedOutput) {
+      return res.status(404).json({ message: "Record not found" });
+    }
+    res.json({ message: "Record deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting record", error });
   }
 });
 
@@ -26764,6 +26577,7 @@ app.post("/api/qc-washing/orderData-save", async (req, res) => {
       factoryName: formData.factoryName, 
       reportType: formData.reportType,
       inline: formData.inline,
+      washQty: formData.washQty,
       "inspector.empId": userId || formData.inspector?.empId
     };
     Object.keys(query).forEach(
@@ -26809,6 +26623,7 @@ app.post("/api/qc-washing/find-existing", async (req, res) => {
       before_after_wash,
       factoryName,
       reportType,
+      washQty,
       inspectorId
     } = req.body;
 
@@ -26824,6 +26639,7 @@ app.post("/api/qc-washing/find-existing", async (req, res) => {
       washType,
       before_after_wash,
       factoryName,
+      washQty,
       "inspector.empId": inspectorId,
       // For inspection report, you may want to match either firstOutput or inline
       // If you want to match both, use both fields
@@ -27543,6 +27359,186 @@ app.delete(
   }
 );
 
+/* -------------------------------------------
+   End Points - Supplier Issues Reports
+------------------------------------------- */
+
+// NEW: GET an existing report based on key fields
+app.get("/api/supplier-issues/reports/find-existing", async (req, res) => {
+  try {
+    const { reportDate, inspectorId, factoryType, factoryName, moNo, colors } =
+      req.query;
+
+    if (
+      !reportDate ||
+      !inspectorId ||
+      !factoryType ||
+      !factoryName ||
+      !moNo ||
+      !colors
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Missing required query parameters." });
+    }
+
+    const searchDate = new Date(reportDate);
+    searchDate.setUTCHours(0, 0, 0, 0);
+
+    const colorArray = Array.isArray(colors) ? colors : colors.split(",");
+
+    const filter = {
+      reportDate: searchDate,
+      inspectorId,
+      factoryType,
+      factoryName,
+      moNo,
+      colors: { $all: colorArray, $size: colorArray.length }
+    };
+
+    const report = await SupplierIssueReport.findOne(filter);
+
+    if (!report) {
+      return res.status(404).json({ message: "No existing report found." });
+    }
+
+    res.json(report);
+  } catch (error) {
+    console.error("Error finding existing report:", error);
+    res.status(500).json({ error: "Failed to fetch existing report data." });
+  }
+});
+
+// UPDATED: POST endpoint now handles creating AND updating (upsert)
+app.post("/api/supplier-issues/reports", async (req, res) => {
+  try {
+    const {
+      reportDate,
+      inspectorId,
+      factoryType,
+      factoryName,
+      moNo,
+      colors,
+      ...updateData
+    } = req.body;
+
+    // Standardize date to midnight UTC for consistent querying
+    const searchDate = new Date(reportDate);
+    searchDate.setUTCHours(0, 0, 0, 0);
+
+    const filter = {
+      reportDate: searchDate,
+      inspectorId,
+      factoryType,
+      factoryName,
+      moNo,
+      // Ensure color array matching is order-agnostic
+      colors: { $all: colors.sort(), $size: colors.length }
+    };
+
+    // Add the sorted colors to the data that will be set
+    const finalUpdateData = {
+      ...updateData,
+      colors: colors.sort(), // Store colors consistently
+      reportDate: searchDate // Store standardized date
+    };
+
+    const options = {
+      new: true, // Return the modified document
+      upsert: true, // Create a new doc if no match is found
+      runValidators: true
+    };
+
+    const updatedReport = await SupplierIssueReport.findOneAndUpdate(
+      filter,
+      { $set: finalUpdateData },
+      options
+    );
+
+    res
+      .status(200)
+      .json({ message: "Report saved successfully", data: updatedReport });
+  } catch (error) {
+    console.error("Error saving supplier issue report:", error);
+    res
+      .status(400)
+      .json({ error: "Failed to save report.", details: error.message });
+  }
+});
+
+// --- NEW ENDPOINT 1: Get filtered supplier issue reports ---
+app.get("/api/supplier-issues/reports/summary", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      moNos,
+      colors,
+      qcIds,
+      factoryType,
+      factoryNames
+    } = req.query;
+
+    const filter = {};
+
+    // 1. Date Range Filter
+    if (startDate || endDate) {
+      filter.reportDate = {};
+      if (startDate) {
+        filter.reportDate.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        // To include the whole end day, set to end of day
+        const endOfDay = new Date(endDate);
+        endOfDay.setUTCHours(23, 59, 59, 999);
+        filter.reportDate.$lte = endOfDay;
+      }
+    }
+
+    // 2. Array Filters ($in operator)
+    if (moNos) filter.moNo = { $in: moNos.split(",") };
+    if (colors) filter.colors = { $in: colors.split(",") };
+    if (qcIds) filter.inspectorId = { $in: qcIds.split(",") };
+    if (factoryNames) filter.factoryName = { $in: factoryNames.split(",") };
+
+    // 3. Single Value Filter
+    if (factoryType) filter.factoryType = factoryType;
+
+    const reports = await SupplierIssueReport.find(filter)
+      .sort({ reportDate: -1, createdAt: -1 })
+      .lean();
+
+    res.json(reports);
+  } catch (error) {
+    console.error("Error fetching supplier issue reports summary:", error);
+    res.status(500).json({ error: "Failed to fetch report data." });
+  }
+});
+
+// --- NEW ENDPOINT 2: Get all available options for filters ---
+app.get("/api/supplier-issues/report-options", async (req, res) => {
+  try {
+    const [moNos, colors, qcIds, factoryTypes, factoryNames] =
+      await Promise.all([
+        SupplierIssueReport.distinct("moNo"),
+        SupplierIssueReport.distinct("colors"),
+        SupplierIssueReport.distinct("inspectorId"),
+        SupplierIssueReport.distinct("factoryType"),
+        SupplierIssueReport.distinct("factoryName")
+      ]);
+
+    res.json({
+      moNos: moNos.sort(),
+      colors: colors.sort(),
+      qcIds: qcIds.sort(),
+      factoryTypes: factoryTypes.sort(),
+      factoryNames: factoryNames.sort()
+    });
+  } catch (error) {
+    console.error("Error fetching report filter options:", error);
+    res.status(500).json({ error: "Failed to fetch filter options." });
+  }
+});
 /* ------------------------------
    AI Chatbot Proxy Route
 ------------------------------ */

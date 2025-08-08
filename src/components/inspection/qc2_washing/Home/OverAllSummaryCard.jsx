@@ -1,4 +1,5 @@
 import React from "react";
+import PropTypes from "prop-types";
 import { WashingMachine, ClipboardCheck } from "lucide-react";
 
 const OverAllSummaryCard = ({ summary }) => {
@@ -112,6 +113,21 @@ const OverAllSummaryCard = ({ summary }) => {
       </div>
     </div>
   );
+};
+OverAllSummaryCard.propTypes = {
+  summary: PropTypes.shape({
+    orderNo: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    color: PropTypes.string,
+    totalCheckedPcs: PropTypes.number,
+    checkedQty: PropTypes.number,
+    washQty: PropTypes.number,
+    rejectedDefectPcs: PropTypes.number,
+    totalDefectCount: PropTypes.number,
+    defectRate: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    defectRatio: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    overallFinalResult: PropTypes.string,
+    overallResult: PropTypes.string,
+  }),
 };
 
 export default OverAllSummaryCard;

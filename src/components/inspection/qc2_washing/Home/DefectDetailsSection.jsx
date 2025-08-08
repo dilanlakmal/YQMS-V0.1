@@ -1,4 +1,5 @@
 import  { useRef,useState,useEffect } from "react";
+import PropTypes from "prop-types";
 import { Plus, Trash2, Camera, X, PlusCircle, Upload, Minus, Eye, EyeOff  } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useTranslation } from "react-i18next";
@@ -758,6 +759,29 @@ const DefectDetailsSection = ({
       )}
     </div>
   );
+};
+DefectDetailsSection.propTypes = {
+  formData: PropTypes.object.isRequired,
+  handleInputChange: PropTypes.func,
+  defectOptions: PropTypes.array,
+  isVisible: PropTypes.bool,
+  onToggle: PropTypes.func,
+  defectStatus: PropTypes.string,
+  recordId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  activateNextSection: PropTypes.func,
+  onLoadSavedDataById: PropTypes.func,
+  addedDefects: PropTypes.array,
+  setAddedDefects: PropTypes.func,
+  selectedDefect: PropTypes.any,
+  setSelectedDefect: PropTypes.func,
+  defectQty: PropTypes.any,
+  setDefectQty: PropTypes.func,
+  uploadedImages: PropTypes.array,
+  setUploadedImages: PropTypes.func,
+  comment: PropTypes.string,
+  setComment: PropTypes.func,
+  defectsByPc: PropTypes.object,
+  setDefectsByPc: PropTypes.func,
 };
 
 export default DefectDetailsSection;

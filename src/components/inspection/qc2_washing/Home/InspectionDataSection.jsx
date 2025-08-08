@@ -2,6 +2,7 @@ import {useState, useRef,  useEffect} from 'react';
 import { FaThermometerHalf, FaClock, FaFlask, FaPlus, FaTrash, FaMinus, FaUpload, FaCamera } from "react-icons/fa";
 import { API_BASE_URL } from "../../../../../config";
 import Swal from 'sweetalert2';
+import PropTypes from 'prop-types';
 
 const PARAM_APPEARANCE = "Appearance";
 const PARAM_COLOR_SHADE = "Color Shade";
@@ -856,6 +857,22 @@ async function stripFileFromImagesAsync(inspectionData) {
     </div>
     </>
   );
+};
+InspectionDataSection.propTypes = {
+  inspectionData: PropTypes.array.isRequired,
+  setInspectionData: PropTypes.func.isRequired,
+  processData: PropTypes.object.isRequired,
+  setProcessData: PropTypes.func.isRequired,
+  defectData: PropTypes.array.isRequired,
+  isVisible: PropTypes.bool.isRequired,
+  onToggle: PropTypes.func,
+  machineType: PropTypes.string,
+  setMachineType: PropTypes.func,
+  washQty: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  setDefectData: PropTypes.func.isRequired,
+  recordId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  activateNextSection: PropTypes.func,
+  onLoadSavedDataById: PropTypes.func,
 };
 
 export default InspectionDataSection;

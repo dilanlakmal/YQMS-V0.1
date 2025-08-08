@@ -1,4 +1,5 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
+import PropTypes from "prop-types";
 
 const SummaryCard = ({
   measurementData,
@@ -121,9 +122,16 @@ const SummaryCard = ({
           </div>
           <div className={`text-sm ${resultColor} dark:text-gray-300`}>Result</div>
         </div>
-      </div> */}
+      </div> 
     </div>
   );
+};
+SummaryCard.propTypes = {
+  measurementData: PropTypes.object,
+  showMeasurementTable: PropTypes.bool,
+  before_after_wash: PropTypes.string,
+  recordId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  API_BASE_URL: PropTypes.string
 };
 
 export default SummaryCard;

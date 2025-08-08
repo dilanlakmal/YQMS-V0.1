@@ -201,10 +201,12 @@ function fractionToDecimal(fraction) {
 const QCWashingPage = () => {
   // Hooks
   const { user } = useAuth();
+  const dateValue = new Date().toISOString().split("T")[0];
+
 
   // State: Form Data
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split("T")[0],
+    date: dateValue,
     orderNo: "",
     style: "",
     orderQty: "",
@@ -1043,7 +1045,7 @@ if (saved.inspectionDetails?.machineProcesses) {
           parseInt(washQty),
           parseInt(aql.sampleSize)
         );
-        return { ...prev, checkedQty: checkedQty.toString() };
+        return { ...prev, checkedQty: checkedQty };
       }
       return prev;
     });
@@ -1525,6 +1527,8 @@ const autoSaveOverallSummary = async (summary, recordId) => {
          
            summary={{
               ...formData,
+              checkedQty: Number(formData.checkedQty) || 0,
+              washQty: Number(formData.washQty) || 0,
             }}
           measurementData={formData.measurementDetails} 
           defectDetails={formData.defectDetails} 
