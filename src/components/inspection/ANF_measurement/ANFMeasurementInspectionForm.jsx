@@ -7,6 +7,7 @@ import { useAuth } from "../../authentication/AuthContext";
 import { API_BASE_URL } from "../../../../config";
 import MeasurementNumPad from "../cutting/MeasurementNumPad";
 import ANFMeasurementPreview from "./ANFMeasurementPreview";
+import SuccessToast from "./SuccessToast";
 import {
   ChevronLeft,
   ChevronRight,
@@ -24,8 +25,11 @@ import {
   Eye,
   EyeOff,
   Save,
-  Loader2
+  Loader2,
+  Lock,
+  Unlock
 } from "lucide-react";
+import Swal from "sweetalert2";
 
 // --- MeasurementCell Component ---
 const MeasurementCell = ({
@@ -134,7 +138,13 @@ const ANFMeasurementInspectionForm = ({
   const [activeCell, setActiveCell] = useState(null);
   const [isOrderDetailsVisible, setIsOrderDetailsVisible] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isLoadingSizeData, setIsLoadingSizeData] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+
+  // --- NEW: State to track the status of the currently selected size ---
+  const [currentSizeStatus, setCurrentSizeStatus] = useState("In Progress");
+  const [isStatusUpdating, setIsStatusUpdating] = useState(false);
 
   // Helper function to update a specific field in the parent's state
   const updateState = useCallback(
@@ -198,26 +208,133 @@ const ANFMeasurementInspectionForm = ({
   }, [selectedMo, updateState]);
 
   useEffect(() => {
-    if (selectedMo && selectedSize) {
-      axios
-        .get(`${API_BASE_URL}/api/anf-measurement/spec-table`, {
-          params: { moNo: selectedMo.value, size: selectedSize.value },
-          withCredentials: true
-        })
-        .then((res) => {
-          setSpecTableData(res.data);
-          const initialGarmentData = {};
-          res.data.forEach((row) => {
-            initialGarmentData[row.orderNo] = { decimal: null, fraction: "0" };
-          });
-          updateState("garments", [initialGarmentData]);
+    const fetchSizeData = async () => {
+      if (selectedMo && selectedSize) {
+        setIsLoadingSizeData(true);
+
+        // --- NEW: Reset status when fetching new size data ---
+        setCurrentSizeStatus("In Progress");
+
+        try {
+          // --- Step 1: Fetch the spec table (this is required for both new and existing data) ---
+          const specRes = await axios.get(
+            `${API_BASE_URL}/api/anf-measurement/spec-table`,
+            {
+              params: { moNo: selectedMo.value, size: selectedSize.value },
+              withCredentials: true
+            }
+          );
+          const fetchedSpecTable = specRes.data;
+          setSpecTableData(fetchedSpecTable);
+
+          // --- Step 2: Fetch existing measurement data for this size ---
+          const existingDataRes = await axios.get(
+            `${API_BASE_URL}/api/anf-measurement/existing-data`,
+            {
+              params: {
+                date: inspectionDate.toISOString().split("T")[0],
+                qcId: user.emp_id,
+                moNo: selectedMo.value,
+                color: selectedColors.map((c) => c.value).join(","), // Pass colors as comma-separated string
+                size: selectedSize.value
+              },
+              withCredentials: true
+            }
+          );
+
+          //const existingGarmentsData = existingDataRes.data;
+          // --- MODIFIED: Destructure both measurements and status from the response ---
+          const { measurements: existingGarmentsData, status: loadedStatus } =
+            existingDataRes.data;
+
+          // --- NEW: Set the status from the loaded data ---
+          setCurrentSizeStatus(loadedStatus || "In Progress");
+
+          // --- Step 3: Process the data ---
+          if (
+            Array.isArray(existingGarmentsData) &&
+            existingGarmentsData.length > 0
+          ) {
+            // DATA FOUND: Transform it to frontend state format
+            const loadedGarments = existingGarmentsData.map(
+              (backendGarment) => {
+                const frontendGarment = {};
+                backendGarment.measurements.forEach((measurement) => {
+                  const specRow = fetchedSpecTable.find(
+                    (s) => s.orderNo === measurement.orderNo
+                  );
+                  if (specRow) {
+                    // Re-calculate the ABSOLUTE decimal value from the saved DEVIATION
+                    // Frontend state requires the absolute value for the cell color logic
+                    const absoluteDecimal =
+                      specRow.specValueDecimal + measurement.decimalValue;
+                    frontendGarment[measurement.orderNo] = {
+                      decimal: absoluteDecimal,
+                      fraction: measurement.fractionValue
+                    };
+                  }
+                });
+                return frontendGarment;
+              }
+            );
+
+            // If any garments were empty, fill with default values
+            if (loadedGarments.length === 0) {
+              // Fallback to new garment logic if transform fails
+              const initialGarmentData = {};
+              fetchedSpecTable.forEach((row) => {
+                initialGarmentData[row.orderNo] = {
+                  decimal: null,
+                  fraction: "0"
+                };
+              });
+              updateState("garments", [initialGarmentData]);
+              updateState("currentGarmentIndex", 0);
+            } else {
+              updateState("garments", loadedGarments);
+              updateState("currentGarmentIndex", loadedGarments.length - 1); // Set to the last garment
+            }
+          } else {
+            // NO DATA FOUND: Initialize a new, empty garment
+            const initialGarmentData = {};
+            fetchedSpecTable.forEach((row) => {
+              initialGarmentData[row.orderNo] = {
+                decimal: null,
+                fraction: "0"
+              };
+            });
+            updateState("garments", [initialGarmentData]);
+            updateState("currentGarmentIndex", 0);
+          }
+        } catch (err) {
+          console.error("Error fetching spec or existing data:", err);
+          setSpecTableData([]); // Clear on error
+          updateState("garments", [{}]);
           updateState("currentGarmentIndex", 0);
-        })
-        .catch((err) => console.error("Error fetching spec table data:", err));
-    } else {
-      setSpecTableData([]);
-    }
-  }, [selectedMo, selectedSize]);
+        } finally {
+          setIsLoadingSizeData(false);
+        }
+      } else {
+        // Clear table if size is deselected
+        setSpecTableData([]);
+        setCurrentSizeStatus("In Progress"); // Reset status if size is cleared
+        updateState("garments", [{}]);
+        updateState("currentGarmentIndex", 0);
+      }
+    };
+
+    fetchSizeData();
+  }, [
+    selectedMo,
+    selectedSize,
+    selectedColors,
+    inspectionDate,
+    user,
+    updateState
+  ]); // Add dependencies
+
+  // --- NEW: Helper variable for readability ---
+  const isSizeCompleted = currentSizeStatus === "Completed";
 
   // --- calculates and stores the final measurement ---
   const handleNumpadInput = (deviationDecimal, deviationFraction) => {
@@ -281,57 +398,116 @@ const ANFMeasurementInspectionForm = ({
   }, [orderQtyBySelectedColor]);
 
   const summaryStats = useMemo(() => {
-    if (specTableData.length === 0) return {};
-    const totalGarmentsChecked = garments.length;
-    const totalMeasurementPoints = specTableData.length * totalGarmentsChecked;
-    let totalPosTol = 0,
-      totalNegTol = 0,
-      totalOkGarments = 0;
+    if (specTableData.length === 0 || garments.length === 0) {
+      // ... (no change to this part)
+      return {
+        totalGarmentsChecked: garments.length,
+        totalMeasurementPoints: 0,
+        totalPosTol: 0,
+        totalNegTol: 0,
+        totalIssuesPoints: 0,
+        totalOkGarments: 0,
+        totalIssuesGarments: 0,
+        passRateByGarment: "0.00",
+        passRateByPoints: "0.00",
+        totalOkPoints: 0,
+        defectRate: "0.00"
+      };
+    }
+
+    // --- GARMENT LOGIC (This part is correct and remains unchanged) ---
+    let totalOkGarments = 0;
     garments.forEach((garment) => {
-      let isGarmentOk = true;
+      let isGarmentRejected = false;
+      if (typeof garment !== "object" || garment === null) return;
+
       specTableData.forEach((spec) => {
         const measurement = garment[spec.orderNo];
-        if (measurement?.decimal !== null) {
+        if (
+          measurement &&
+          measurement.decimal !== null &&
+          measurement.decimal !== undefined
+        ) {
           const diff = measurement.decimal - spec.specValueDecimal;
-          if (diff > spec.tolPlus) {
-            totalPosTol++;
-            isGarmentOk = false;
-          } else if (diff < spec.tolMinus) {
-            totalNegTol++;
-            isGarmentOk = false;
+          if (diff > spec.tolPlus || diff < spec.tolMinus) {
+            isGarmentRejected = true;
           }
         }
       });
-      if (isGarmentOk) totalOkGarments++;
+      if (!isGarmentRejected) {
+        totalOkGarments++;
+      }
     });
-    const totalIssuesPoints = totalPosTol + totalNegTol;
-    const totalOkPoints = totalMeasurementPoints - totalIssuesPoints;
+    const totalGarmentsChecked = garments.length;
     const totalIssuesGarments = totalGarmentsChecked - totalOkGarments;
     const passRateByGarment =
       totalGarmentsChecked > 0
         ? ((totalOkGarments / totalGarmentsChecked) * 100).toFixed(2)
         : "0.00";
-    const passRateByPoints =
-      totalMeasurementPoints > 0
-        ? ((totalOkPoints / totalMeasurementPoints) * 100).toFixed(2)
-        : "0.00";
     const defectRate =
       totalGarmentsChecked > 0
         ? ((totalIssuesGarments / totalGarmentsChecked) * 100).toFixed(2)
         : "0.00";
+    // --- END OF GARMENT LOGIC ---
 
+    // --- START: CORRECTED POINT CALCULATION LOGIC ---
+    let totalPosTol = 0;
+    let totalNegTol = 0;
+    let totalIssuesPoints = 0;
+
+    // Loop through every possible measurement point
+    garments.forEach((garment) => {
+      if (typeof garment !== "object" || garment === null) return;
+      specTableData.forEach((spec) => {
+        const measurement = garment[spec.orderNo];
+
+        // We only care about points that have an explicit, non-null value.
+        // Unmeasured points are considered "Pass" by default for this calculation.
+        if (
+          measurement &&
+          measurement.decimal !== null &&
+          measurement.decimal !== undefined
+        ) {
+          const diff = measurement.decimal - spec.specValueDecimal;
+
+          if (diff > spec.tolPlus) {
+            totalPosTol++;
+          } else if (diff < spec.tolMinus) {
+            totalNegTol++;
+          }
+        }
+      });
+    });
+
+    // The total number of points is simply garments * spec points.
+    const totalMeasurementPoints = garments.length * specTableData.length;
+
+    // Total issues is the sum of tolerance failures.
+    totalIssuesPoints = totalPosTol + totalNegTol;
+
+    // Pass points are all the points that are not issues.
+    const totalOkPoints = totalMeasurementPoints - totalIssuesPoints;
+
+    const passRateByPoints =
+      totalMeasurementPoints > 0
+        ? ((totalOkPoints / totalMeasurementPoints) * 100).toFixed(2)
+        : "0.00";
+    // --- END OF CORRECTED POINT LOGIC ---
+
+    // Return the combined results
     return {
       totalGarmentsChecked,
-      totalMeasurementPoints,
-      totalPosTol,
-      totalNegTol,
-      totalIssuesPoints,
       totalOkGarments,
       totalIssuesGarments,
       passRateByGarment,
-      passRateByPoints,
+      defectRate,
+      // Point stats:
+      totalMeasurementPoints,
       totalOkPoints,
-      defectRate
+      totalIssuesPoints,
+      totalPosTol,
+      totalNegTol,
+      passRateByPoints
     };
   }, [garments, specTableData]);
 
@@ -352,9 +528,17 @@ const ANFMeasurementInspectionForm = ({
     }
     setIsSaving(true);
 
+    // This helper function correctly handles timezone offsets to get the right day.
+    const toLocalISOString = (date) => {
+      const offset = date.getTimezoneOffset();
+      const adjustedDate = new Date(date.getTime() - offset * 60 * 1000);
+      return adjustedDate.toISOString().split("T")[0];
+    };
+
     // 1. Construct the payload
     const payload = {
-      inspectionDate,
+      //inspectionDate,
+      inspectionDate: toLocalISOString(inspectionDate),
       qcID: user.emp_id,
       moNo: selectedMo.value,
       buyer: buyer,
@@ -420,17 +604,19 @@ const ANFMeasurementInspectionForm = ({
       await axios.post(`${API_BASE_URL}/api/anf-measurement/reports`, payload, {
         withCredentials: true
       });
-      Swal.fire(
-        "Success!",
-        "Measurement data for this size has been saved.",
-        "success"
-      );
+      // Instead of Swal, set toast state to true
+      setShowSuccessToast(true);
+      // Swal.fire(
+      //   "Success!",
+      //   "Measurement data for this size has been saved.",
+      //   "success"
+      // );
 
-      // 3. Reset for next size
-      updateState("selectedSize", null);
-      setSpecTableData([]);
-      updateState("garments", [{}]);
-      updateState("currentGarmentIndex", 0);
+      // // 3. Reset for next size
+      // updateState("selectedSize", null);
+      // setSpecTableData([]);
+      // updateState("garments", [{}]);
+      // updateState("currentGarmentIndex", 0);
     } catch (error) {
       console.error("Error saving inspection data:", error);
       Swal.fire(
@@ -441,6 +627,81 @@ const ANFMeasurementInspectionForm = ({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // --- new button handlers ---
+  const updateSizeStatus = async (newStatus) => {
+    // --- Central function to call the new PATCH endpoint ---
+    if (!selectedMo || !selectedSize || selectedColors.length === 0) return;
+
+    setIsStatusUpdating(true);
+    try {
+      const payload = {
+        inspectionDate: inspectionState.inspectionDate
+          .toISOString()
+          .split("T")[0],
+        qcID: user.emp_id,
+        moNo: selectedMo.value,
+        color: selectedColors.map((c) => c.value),
+        size: selectedSize.value,
+        status: newStatus
+      };
+      await axios.patch(
+        `${API_BASE_URL}/api/anf-measurement/reports/status`,
+        payload,
+        {
+          withCredentials: true
+        }
+      );
+      // On success, update the local state
+      setCurrentSizeStatus(newStatus);
+      Swal.fire(
+        "Success",
+        `This size has been marked as '${newStatus}'.`,
+        "success"
+      );
+    } catch (error) {
+      console.error("Error updating size status:", error);
+      Swal.fire(
+        "Error",
+        "Failed to update the status. Please try again.",
+        "error"
+      );
+    } finally {
+      setIsStatusUpdating(false);
+    }
+  };
+
+  const handleFinishSize = () => {
+    Swal.fire({
+      title: "Are you sure?",
+      text: "Finishing this size will lock it from further editing. You will need to unlock it to make changes.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, finish it!"
+    }).then((result) => {
+      if (result.isConfirmed) {
+        updateSizeStatus("Completed");
+      }
+    });
+  };
+
+  const handleContinueSize = () => {
+    Swal.fire({
+      title: "Unlock this size?",
+      text: "This size is marked as 'Completed'. Do you want to unlock it to continue or modify the inspection?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, unlock it!"
+    }).then((result) => {
+      if (result.isConfirmed) {
+        updateSizeStatus("In Progress");
+      }
+    });
   };
 
   const selectStyles = {
@@ -592,18 +853,26 @@ const ANFMeasurementInspectionForm = ({
         <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md flex justify-between items-end flex-wrap gap-4">
           {/* Size Dropdown */}
           <div className="w-full sm:w-auto sm:min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Size
-            </label>
-            <Select
-              options={sizeOptions}
-              value={selectedSize}
-              onChange={(val) => updateState("selectedSize", val)}
-              isDisabled={!selectedMo}
-              isClearable
-              placeholder="Select..."
-              styles={selectStyles}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Size
+              </label>
+              <Select
+                options={sizeOptions}
+                value={selectedSize}
+                onChange={(val) => updateState("selectedSize", val)}
+                isDisabled={!selectedMo || isLoadingSizeData} // Disable while loading
+                //isDisabled={!selectedMo}
+                isClearable
+                placeholder={isLoadingSizeData ? "Loading..." : "Select..."}
+                //placeholder="Select..."
+                styles={selectStyles}
+              />
+            </div>
+            {/* NEW: Loading spinner */}
+            {isLoadingSizeData && (
+              <Loader2 className="animate-spin text-indigo-500" />
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -616,9 +885,40 @@ const ANFMeasurementInspectionForm = ({
                 <Eye size={16} className="mr-2" />
                 Preview
               </button>
+
+              {/* --- NEW: Conditional Buttons for Finish/Continue --- */}
+              {!isSizeCompleted ? (
+                <button
+                  onClick={handleFinishSize}
+                  disabled={isSaving || isStatusUpdating}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 disabled:bg-green-400"
+                >
+                  {isStatusUpdating ? (
+                    <Loader2 size={16} className="mr-2 animate-spin" />
+                  ) : (
+                    <Lock size={16} className="mr-2" />
+                  )}
+                  Finish Size
+                </button>
+              ) : (
+                <button
+                  onClick={handleContinueSize}
+                  disabled={isSaving || isStatusUpdating}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-300"
+                >
+                  {isStatusUpdating ? (
+                    <Loader2 size={16} className="mr-2 animate-spin" />
+                  ) : (
+                    <Unlock size={16} className="mr-2" />
+                  )}
+                  Continue Size
+                </button>
+              )}
+
               <button
                 onClick={handleSave}
-                disabled={isSaving}
+                //disabled={isSaving}
+                disabled={isSaving || isStatusUpdating || isSizeCompleted}
                 className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-500 disabled:cursor-not-allowed"
               >
                 {isSaving ? (
@@ -657,6 +957,7 @@ const ANFMeasurementInspectionForm = ({
               {currentGarmentIndex > 0 && (
                 <button
                   onClick={() => removeGarment(currentGarmentIndex)}
+                  disabled={isSizeCompleted} // --- MODIFIED
                   className="p-2 text-red-500 hover:bg-red-100 rounded-md"
                 >
                   <Trash2 size={16} />
@@ -676,6 +977,7 @@ const ANFMeasurementInspectionForm = ({
               </button>
               <button
                 onClick={addGarment}
+                disabled={isSizeCompleted} // --- MODIFIED
                 className="ml-4 px-3 py-2 text-sm bg-indigo-600 text-white rounded-md"
               >
                 Next Garment
@@ -737,11 +1039,19 @@ const ANFMeasurementInspectionForm = ({
                       specDecimal={row.specValueDecimal}
                       tol={{ minus: row.tolMinus, plus: row.tolPlus }}
                       onClick={() => {
-                        setActiveCell({
-                          garmentIndex: currentGarmentIndex,
-                          orderNo: row.orderNo
-                        });
-                        setIsNumpadOpen(true);
+                        // --- MODIFIED: Only open numpad if size is not completed ---
+                        if (!isSizeCompleted) {
+                          setActiveCell({
+                            garmentIndex: currentGarmentIndex,
+                            orderNo: row.orderNo
+                          });
+                          setIsNumpadOpen(true);
+                        }
+                        // setActiveCell({
+                        //   garmentIndex: currentGarmentIndex,
+                        //   orderNo: row.orderNo
+                        // });
+                        // setIsNumpadOpen(true);
                       }}
                     />
                   </tr>
@@ -913,6 +1223,13 @@ const ANFMeasurementInspectionForm = ({
           onInput={handleNumpadInput}
         />
       )}
+
+      {/* --- RENDER THE TOAST COMPONENT AT THE END --- */}
+      <SuccessToast
+        isOpen={showSuccessToast}
+        message="Data for this size has been saved!"
+        onClose={() => setShowSuccessToast(false)}
+      />
     </div>
   );
 };

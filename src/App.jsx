@@ -44,9 +44,13 @@ import UploadYorksysOrders from "./pages/UploadYorksysOrders.jsx";
 import YQMSTrainingSchedule from "./pages/YQMSTrainingSchedule.jsx";
 import YQMSExam from "./pages/YQMSExam.jsx";
 import CuttingInline from "./pages/CuttingInline.jsx";
-import SelectDTBuyerSpec from "./pages/SelectDTBuyerSpec.jsx";
+import ManageBuyerSpecs from "./pages/ManageBuyerSpecs.jsx";
 import ANFMeasurement from "./pages/ANFMeasurement.jsx";
+import ANFMeasurementVer2 from "./pages/ANFMeasurementVer2.jsx";
 import CEMasterList from "./pages/CEMasterList.jsx";
+import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurement/ANFMeasurementQCViewFullReport.jsx";
+import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFStyleViewFullReport";
+//import QCWashingPage from "./pages/QCWashing.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -70,6 +74,8 @@ import QCAccuracy from "./pages/QCAccuracy.jsx";
 
 import QAAudit from "./pages/QAAudit.jsx";
 import QC2UploadData from "./pages/QC2UploadData.jsx";
+
+import SupplierIssues from "./pages/SupplierIssues.jsx";
 
 export const BluetoothContext = createContext(null);
 
@@ -413,9 +419,24 @@ function AppContent() {
                 path="/upload-beforewash-specs"
                 element={<UploadWashingSpecs />}
               />
-              <Route path="/qcWashing" element={<QCWashingPage />} />
-              <Route path="/select-dt-specs" element={<SelectDTBuyerSpec />} />
+              {/* <Route path="/qcWashing" element={<QCWashingPage />} /> */}
+              <Route path="/select-dt-specs" element={<ManageBuyerSpecs />} />
               <Route path="/anf-washing" element={<ANFMeasurement />} />
+              <Route
+                path="/anf-washing/qc-full-report/:pageId"
+                element={<ANFMeasurementQCViewFullReport />}
+              />
+
+              <Route
+                path="/anf-washing/style-full-report/:moNo"
+                element={<ANFStyleViewFullReport />}
+              />
+
+              <Route
+                path="/anf-washing-ver2"
+                element={<ANFMeasurementVer2 />}
+              />
+              <Route path="/supplier-issues" element={<SupplierIssues />} />
               <Route path="/master-list" element={<CEMasterList />} />
               <Route path="/qa-yorksys" element={<UploadYorksysOrders />} />
               <Route path="/training" element={<YQMSTrainingSchedule />} />

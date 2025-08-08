@@ -412,7 +412,7 @@ const QAAccuracyResults = () => {
                     className={`col-span-2 p-3 rounded-lg flex justify-between items-center ${color}`}
                   >
                     <div>
-                      <p className="text-xs font-medium">Accuracy / Grade</p>
+                      <p className="text-xs font-medium">Pass Rate / Grade</p>
                       <p className="text-2xl font-bold">
                         {qc.stats.accuracy.toFixed(2)}%
                       </p>

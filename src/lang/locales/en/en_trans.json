@@ -38,7 +38,9 @@
     "select_dt_specs": "Select DT Specs",
     "anf_washing": "QC AW Washing",
     "qcWashing": "QC Washing.",
-    "qc2_upload_data": "QC2 Upload Data"
+    "qc2_upload_data": "QC2 Upload Data",
+    "anf_washing_version2": "AW Washing - V2",
+    "supplier-issues": "Supplier Issues"
   },
 
   "nav": {
@@ -602,7 +604,6 @@
     "manual": "Manual",
     "samplingStandardAQL": "Sampling standard: AQL 1.0",
     "panel": "Garment Type",
-    "selectGarmentType": "Select a Garment Type",
     "select_panel": "Select Panel",
     "size": "Size",
     "select_size": "Select Size",
@@ -853,7 +854,15 @@
     "totalCount": "Total Rejects",
     "totalNegTol": "Total Neg. TOL",
     "totalPosTol": "Total Pos. TOL",
-    "noMeasurementIssuesFound": "No issues recorded"
+    "noMeasurementIssuesFound": "No issues recorded",
+    "selectBuyer": "Buyer",
+    "selectMoNo": "MO",
+    "selectTableNo": "Table",
+    "selectColor": "Color",
+    "selectSpreadTable": "Spread Table",
+    "selectMaterial": "Material",
+    "selectGarmentType": "Garment Type",
+    "selectQcId": "QC ID"
   },
 
   "cuttingReport": {
@@ -1518,24 +1527,6 @@
     "failedToFetch": "Failed to fetch EMB defects."
   },
 
-  "systemAdmin": {
-    "title": "System Administration",
-    "subtitle": "Manage system configurations and master data.",
-    "rovingDefects": "Roving Defects",
-    "rovingPairing": "Roving Pairing",
-    "cuttingPoints": "Cutting Modify Points",
-    "cuttingAdding": "Cutting - Add Points",
-    "cuttingFabricDefects": "Cutting Fabric Defects",
-    "sccHeatTransferDefects": "HT Defects",
-    "manageCuttingReports": "Manage Cutting Reports",
-    "qc2Defects": "QC2 Defects",
-    "sccOperators": "SCC Operators",
-    "auditCheckpointsTab": "Audit Checkpoints",
-    "qcWashingTab": "QC Washing",
-    "qadefects": "QA Defects",
-    "qastandarddefects": "QA Standard Defects",
-    "contentComingSoon": "This section is under development. Content will be available soon."
-  },
   "sccOperators": {
     "settingsTitle": "Machine & Operator Settings",
     "htMachines": "HT Machines Count",
@@ -1977,5 +1968,24 @@
     "minor": "Minor",
     "major": "Major",
     "critical": "Critical"
+  },
+  "systemAdmin": {
+    "title": "System Administration",
+    "subtitle": "Manage system configurations and master data.",
+    "rovingDefects": "Roving Defects",
+    "rovingPairing": "Roving Pairing",
+    "cuttingPoints": "Cutting Modify Points",
+    "cuttingAdding": "Cutting - Add Points",
+    "cuttingFabricDefects": "Cutting Fabric Defects",
+    "sccHeatTransferDefects": "HT Defects",
+    "manageCuttingReports": "Manage Cutting Reports",
+    "qc2Defects": "QC2 Defects",
+    "sccOperators": "SCC Operators",
+    "auditCheckpointsTab": "Audit Checkpoints",
+    "qadefects": "QA Defects",
+    "qastandarddefects": "QA Standard Defects",
+    "qcWashingTab": "Washing QC",
+    "supplierIssuesTab": "Supplier Issues",
+    "contentComingSoon": "This section is under development. Content will be available soon."
   }
 }

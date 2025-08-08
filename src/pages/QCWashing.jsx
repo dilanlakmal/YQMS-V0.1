@@ -458,6 +458,31 @@ useEffect(() => {
 }, [formData.orderNo, formData.color]);
 
 
+  useEffect(() => {
+    const fetchColorOrderQty = async () => {
+      if (!formData.orderNo || !formData.color) {
+        setColorOrderQty(null);
+        return;
+      }
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc-washing/order-color-qty/${
+            formData.orderNo
+          }/${encodeURIComponent(formData.color)}`
+        );
+        const data = await response.json();
+        if (data.success) {
+          setColorOrderQty(data.colorOrderQty);
+        } else {
+          setColorOrderQty(null);
+        }
+      } catch (error) {
+        setColorOrderQty(null);
+      }
+    };
+    fetchColorOrderQty();
+  }, [formData.orderNo, formData.color]);
+
   // --- Helper Functions ---
   const processMeasurementData = (loadedMeasurements) => {
   if (Array.isArray(loadedMeasurements)) {

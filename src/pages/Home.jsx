@@ -185,10 +185,24 @@ function Home() {
           },
           {
             path: "/anf-washing",
-            roles: ["QA"],
+            roles: ["ANF QA"],
             image: "assets/Home/anf-washing.png",
             title: t("home.anf_washing"),
             description: "QC After Wash Measurements"
+          },
+          {
+            path: "/anf-washing-ver2",
+            roles: ["ANF QA"],
+            image: "assets/Home/anf-washing-ver2.png",
+            title: t("home.anf_washing_version2"),
+            description: "QC AW Measurements - Version 2"
+          },
+          {
+            path: "/supplier-issues",
+            roles: ["Supplier QC"],
+            image: "assets/Home/supplier-issues.png",
+            title: t("home.supplier-issues"),
+            description: "Supplier Issues Sub-Con Fty"
           }
         ]
       },
@@ -211,6 +225,13 @@ function Home() {
             image: "assets/Home/qcc.png",
             title: t("home.qc1_inspection"),
             description: "QC1 Inspection Point"
+          },
+          {
+            path: "/qc1-subcon-inspection",
+            roles: ["QC1 Sub Con"],
+            image: "assets/Home/qcc.png",
+            title: t("home.qc1_inspection"),
+            description: "QC1 Sub Con Inspection"
           },
           {
             path: "/inline-emp",
@@ -245,8 +266,15 @@ function Home() {
             path: "/qc-accuracy",
             roles: ["QA"],
             image: "assets/Home/qc-accuracy.png",
-            title: "QC Accuracy",
+            title: "QA Random Inspection",
             description: "QA Random Checks"
+          },
+          {
+            path: "/qc-accuracy-ver2",
+            roles: ["QA"],
+            image: "assets/Home/qc-accuracy.png",
+            title: "QC Output",
+            description: "QC Output | Sunrise & Old Barcode System"
           },
           {
             path: "/training",

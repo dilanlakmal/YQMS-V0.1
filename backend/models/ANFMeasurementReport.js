@@ -38,6 +38,13 @@ const BuyerSpecDataSchema = new mongoose.Schema(
 const SizeMeasurementDetailsSchema = new mongoose.Schema(
   {
     size: { type: String, required: true },
+    // --- NEW: Add a status field with a default value ---
+    status: {
+      type: String,
+      enum: ["In Progress", "Completed"],
+      default: "In Progress",
+      required: true
+    },
     sizeSummary: {
       garmentDetailsCheckedQty: { type: Number, default: 0 },
       garmentDetailsOKGarment: { type: Number, default: 0 },
@@ -82,7 +89,10 @@ const ANFMeasurementReportSchema = new mongoose.Schema(
       measurementDetailsTolNegative: { type: Number, default: 0 }
     }
   },
-  { timestamps: true }
+  {
+    // Enable timestamps (createdAt, updatedAt)
+    timestamps: true
+  }
 );
 
 // Create a compound index to ensure uniqueness for a given inspection session

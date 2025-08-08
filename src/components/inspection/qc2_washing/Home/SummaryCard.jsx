@@ -121,7 +121,7 @@ const SummaryCard = ({
           </div>
           <div className={`text-sm ${resultColor} dark:text-gray-300`}>Result</div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };

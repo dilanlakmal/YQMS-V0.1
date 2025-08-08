@@ -1,7 +1,5 @@
-// src/components/inspection/cutting/report/CuttingReportQCViewPDF.jsx
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable"; // <--- CORRECTED IMPORT
-import { decimalToFraction } from "../../../../utils/fractionUtils"; // Adjust path
+import autoTable from "jspdf-autotable";
+import { decimalToFraction } from "../../../../utils/fractionUtils";
 
 const getPdfLocalizedText = (eng, khmer, chinese, currentLang) => {
   if (currentLang === "km" && khmer) return khmer;

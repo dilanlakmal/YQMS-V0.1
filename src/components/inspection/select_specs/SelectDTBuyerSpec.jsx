@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import Select from "react-select";
-import { API_BASE_URL } from "../../config";
+import { API_BASE_URL } from "../../../../config";
 import { Eye, Search, X, CheckCircle } from "lucide-react";
-import BuyerSpecPreview from "../components/inspection/select_specs/BuyerSpecPreview";
-import SelectDTSpecPageTitle from "../components/inspection/select_specs/SelectDTSpecPageTitle";
-import { useAuth } from "../components/authentication/AuthContext";
+import BuyerSpecPreview from "./BuyerSpecPreview";
 
 // Helper function to derive buyer from MO number
 const getBuyerFromMoNumber = (moNo) => {
@@ -20,7 +18,6 @@ const getBuyerFromMoNumber = (moNo) => {
 };
 
 const SelectDTBuyerSpec = () => {
-  const { user } = useAuth();
   const [buyer, setBuyer] = useState({ value: "ANF", label: "ANF" });
   const [moNo, setMoNo] = useState(null);
   const [moOptions, setMoOptions] = useState([]);
@@ -155,8 +152,6 @@ const SelectDTBuyerSpec = () => {
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-black dark:text-gray-200 p-4 sm:p-6 lg:p-8">
       <div className="max-w-screen-2xl mx-auto">
-        <SelectDTSpecPageTitle user={user} />
-
         <div className="max-w-2xl mx-auto p-4 bg-gray-300 dark:bg-gray-600 rounded-lg shadow-md mb-8">
           <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100">
             Filters

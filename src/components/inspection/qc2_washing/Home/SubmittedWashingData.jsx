@@ -10,7 +10,9 @@ const SubmittedWashingDataPage = () => {
     const fetchSubmittedData = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch(`${API_BASE_URL}/api/qc-washing/all-submitted`);
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc-washing/all-submitted`
+        );
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
