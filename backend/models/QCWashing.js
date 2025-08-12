@@ -1,163 +1,163 @@
 import mongoose from "mongoose";
 
-const QCWashingSchema = new mongoose.Schema(
+// --- Subschemas ---
+
+const MeasurementSizeSummarySchema = new mongoose.Schema(
   {
-    date: {
-      type: Date,
-      default: Date.now
-    },
-    orderNo: {
+    size: String,
+    checkedPcs: Number,
+    checkedPoints: Number,
+    totalPass: Number,
+    totalFail: Number,
+    plusToleranceFailCount: Number,
+    minusToleranceFailCount: Number,
+    tolerancePlus: Number,
+    toleranceMinus: Number
+  },
+  { _id: false }
+);
+
+const MeasurementPointSchema = new mongoose.Schema(
+  {
+    pointName: String,
+    pointNo: Number,
+    specs: String,
+    toleranceMinus: Number,
+    tolerancePlus: Number,
+    rowNo: Number,
+    measured_value_decimal: Number,
+    measured_value_fraction: String,
+    result: { type: String, enum: ["pass", "fail"], default: "pass" }
+  },
+  { _id: false }
+);
+
+const PcsSchema = new mongoose.Schema(
+  {
+    pcNumber: Number,
+    isFullColumn: Boolean,
+    measurementPoints: [MeasurementPointSchema]
+  },
+  { _id: false }
+);
+
+const MeasurementSchema = new mongoose.Schema(
+  {
+    size: String,
+    qty: Number,
+    kvalue: String,
+    before_after_wash: {
       type: String,
+      enum: ["beforeWash", "afterWash"],
       required: true
     },
-    reportType: {
-      type: String,
-      default: "Before Wash"
-    },
-    checkedQty: { type: String },
-    washQty: { type: String },
-    totalCheckedPoint: {
-      type: Number,
-      default: 0
-    },
-    totalPass: {
-      type: Number,
-      default: 0
-    },
-    totalFail: {
-      type: Number,
-      default: 0
-    },
-    passRate: {
-      type: Number,
-      default: 0
-    },
+    pcs: [PcsSchema],
+    selectedRows: [Boolean],
+    fullColumns: [Boolean]
+  },
+  { _id: false }
+);
+
+const MeasurementDetailsSchema = new mongoose.Schema(
+  {
+    measurementSizeSummary: [MeasurementSizeSummarySchema],
+    measurement: [MeasurementSchema]
+  },
+  { _id: false }
+);
+
+// --- Main Schema ---
+
+const QCWashingSchema = new mongoose.Schema(
+  {
+    date: { type: Date, default: Date.now },
+    orderNo: { type: String, required: true },
+    before_after_wash: { type: String, default: "Before Wash" },
+    checkedQty: { type: Number, default: 0 },
+    washQty: { type: Number, default: 0 },
+    totalCheckedPoint: { type: Number, default: 0 },
+    totalPass: { type: Number, default: 0 },
+    totalFail: { type: Number, default: 0 },
+    passRate: { type: Number, default: 0 },
     totalCheckedPcs: { type: Number, default: 0 },
     rejectedDefectPcs: { type: Number, default: 0 },
     totalDefectCount: { type: Number, default: 0 },
-    defectRate: { type: Number },
-    defectRatio: { type: Number },
+    defectRate: { type: Number, default: 0.0 },
+    defectRatio: { type: Number, default: 0.0 },
     overallFinalResult: { type: String },
-    aqlLevelUsed: { type: String },
-    colors: [
+    orderQty: { type: Number, default: 0 },
+    colorOrderQty: { type: Number, default: 0 },
+    color: { type: String, default: "" },
+    washType: { type: String, default: "Normal Wash" },
+    reportType: String,
+    buyer: String,
+    factoryName: String,
+    colorName: String,
+    aql: [
       {
-        colorName: String,
-        orderDetails: {
-          orderQty: String,
-          color: String,
-          washingType: {
-            type: String,
-            default: "Normal Wash"
-          },
-          daily: String,
-          buyer: String,
-          factoryName: String,
-          reportType: {
-            type: String,
-            default: "Before Wash"
-          },
-          aqlSampleSize: String,
-          aqlAcceptedDefect: String,
-          aqlRejectedDefect: String,
-          aqlLevelUsed: String,
-          inspector: {
-            engName: String,
-            empId: String
-          }
-        },
-        inspectionDetails: {
-          temp: String,
-          time: String,
-          chemical: String,
-          checkedPoints: [
-            {
-              pointName: String,
-              approvedDate: String,
-              condition: String,
-              remark: String
-            }
-          ],
-          parameters: [
-            {
-              parameterName: String,
-              checkedQty: { type: Number, default: 0 },
-              failedQty: { type: Number, default: 0 },
-              passRate: { type: String, default: "0.00" },
-              result: { type: String, default: "" },
-              remark: String,
-              ok: { type: Boolean, default: true },
-              no: { type: Boolean, default: false },
-              checkboxes: mongoose.Schema.Types.Mixed,
-              aqlAcceptedDefect: Number,
-              aqlLevelUsed: String
-            }
-          ]
-        },
-        defectDetails: {
-          checkedQty: String,
-          washQty: String,
-          result: String,
-          aqlLevelUsed: String,
-          defectsByPc: [
-            {
-              pcNumber: String, // track PC number
-              pcDefects: [
-                {
-                  defectName: String,
-                  defectQty: Number,
-                  defectImages: [String]
-                }
-              ]
-            }
-          ],
-          additionalImages: [String],
-          comment: String
-        },
-        measurementDetails: [
-          {
-            size: String,
-            qty: Number,
-            washType: {
-              type: String,
-              enum: ["beforeWash", "afterWash"],
-              required: true
-            },
-
-            pcs: [
-              {
-                pcNumber: Number,
-                measurementPoints: [
-                  {
-                    pointName: String,
-                    value: String,
-                    specs: String,
-                    toleranceMinus: String,
-                    tolerancePlus: String,
-                    specIndex: Number,
-                    isFullColumn: Boolean,
-                    result: {
-                      type: String,
-                      enum: ["pass", "fail"],
-                      default: "pass"
-                    }
-                  }
-                ]
-              }
-            ],
-            selectedRows: [Boolean],
-            fullColumns: [Boolean],
-            measurements: mongoose.Schema.Types.Mixed,
-            savedAt: Date
-          }
-        ]
+        sampleSize: Number,
+        acceptedDefect: Number,
+        rejectedDefect: Number,
+        levelUsed: { type: Number, default: 0 }
       }
     ],
-    isAutoSave: {
-      type: Boolean,
-      default: false
+    inspector: {
+      engName: String,
+      empId: String
     },
+    inspectionDetails: {
+      checkedPoints: [
+        {
+          pointName: String,
+          decision: Boolean,
+          comparison: [String],
+          remark: String
+        }
+      ],
+      machineProcesses: [
+        {
+          machineType: String,
+          temperature: Number,
+          time: Number,
+          chemical: Number
+        }
+      ],
+      parameters: [
+        {
+          parameterName: String,
+          checkedQty: { type: Number, default: 0 },
+          defectQty: { type: Number, default: 0 },
+          passRate: { type: Number, default: 0.0 },
+          result: { type: String, default: "" },
+          remark: String
+        }
+      ]
+    },
+    defectDetails: {
+      checkedQty: Number,
+      washQty: Number,
+      result: String,
+      levelUsed: Number,
+      defectsByPc: [
+        {
+          pcNumber: Number,
+          isFullColumn: Boolean,
+          pcDefects: [
+            {
+              defectId: String,
+              defectName: String,
+              defectQty: Number,
+              defectImages: [String]
+            }
+          ]
+        }
+      ],
+      additionalImages: [String],
+      comment: String
+    },
+    measurementDetails: MeasurementDetailsSchema,
+    isAutoSave: { type: Boolean, default: false },
     userId: String,
-    savedAt: Date,
     submittedAt: Date,
     status: {
       type: String,
@@ -165,9 +165,7 @@ const QCWashingSchema = new mongoose.Schema(
       default: "draft"
     }
   },
-  {
-    timestamps: true
-  }
+  { timestamps: true }
 );
 
 QCWashingSchema.pre("save", function (next) {
