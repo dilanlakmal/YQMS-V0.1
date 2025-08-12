@@ -648,22 +648,22 @@ useEffect(() => {
       setIsDataLoading(true);
 
       // 1. Check if the record has already been submitted
-      const submittedResponse = await fetch(
-        `${API_BASE_URL}/api/qc-washing/load-submitted/${orderNo}`
-      );
+      // const submittedResponse = await fetch(
+      //   `${API_BASE_URL}/api/qc-washing/load-submitted/${orderNo}`
+      // );
 
-      if (submittedResponse.ok) {
-        const submittedData = await submittedResponse.json();
-        if (submittedData.success && submittedData.data) {
-          Swal.fire(
-            "Record Submitted",
-            `The record for Order No '${orderNo}' has already been submitted and cannot be edited.`,
-            "info"
-          );
-          setFormData((prev) => ({ ...prev, orderNo: "", style: "" }));
-          return; 
-        }
-      }
+      // if (submittedResponse.ok) {
+      //   const submittedData = await submittedResponse.json();
+      //   if (submittedData.success && submittedData.data) {
+      //     Swal.fire(
+      //       "Record Submitted",
+      //       `The record for Order No '${orderNo}' has already been submitted and cannot be edited.`,
+      //       "info"
+      //     );
+      //     setFormData((prev) => ({ ...prev, orderNo: "", style: "" }));
+      //     return; 
+      //   }
+      // }
       
       // 3. If not submitted, fetch order details from dt_orders
       let response = await fetch(
