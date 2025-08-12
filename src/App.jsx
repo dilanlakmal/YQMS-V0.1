@@ -49,7 +49,7 @@ import ANFMeasurementVer2 from "./pages/ANFMeasurementVer2.jsx";
 import CEMasterList from "./pages/CEMasterList.jsx";
 import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurement/ANFMeasurementQCViewFullReport.jsx";
 import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFStyleViewFullReport";
-//import QCWashingPage from "./pages/QCWashing.jsx";
+import QCWashingPage from "./pages/QCWashing.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -416,7 +416,7 @@ function AppContent() {
                 path="/upload-beforewash-specs"
                 element={<UploadWashingSpecs />}
               />
-              {/* <Route path="/qcWashing" element={<QCWashingPage />} /> */}
+              <Route path="/qcWashing" element={<QCWashingPage />} />
               <Route path="/select-dt-specs" element={<ManageBuyerSpecs />} />
               <Route path="/anf-washing" element={<ANFMeasurement />} />
               <Route

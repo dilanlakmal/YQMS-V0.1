@@ -1,14 +1,15 @@
 import React from "react";
+import PropTypes from "prop-types";
 import { WashingMachine, ClipboardCheck } from "lucide-react";
 
 const OverAllSummaryCard = ({ summary }) => {
   if (!summary) {
     return (
-      <div className="bg-white shadow-lg rounded-lg p-6 mb-8 border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-800 mb-6">
+      <div className="bg-white dark:bg-gray-800 shadow-lg   rounded-lg p-6 mb-8 border border-gray-200 dark:border-gray-700">
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-6">
           Overall Summary
         </h2>
-        <div className="text-center text-gray-500">
+        <div className="text-center text-gray-500 dark:text-gray-300">
           No summary data available.
         </div>
       </div>
@@ -121,6 +122,21 @@ const OverAllSummaryCard = ({ summary }) => {
       </div>
     </div>
   );
+};
+OverAllSummaryCard.propTypes = {
+  summary: PropTypes.shape({
+    orderNo: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    color: PropTypes.string,
+    totalCheckedPcs: PropTypes.number,
+    checkedQty: PropTypes.number,
+    washQty: PropTypes.number,
+    rejectedDefectPcs: PropTypes.number,
+    totalDefectCount: PropTypes.number,
+    defectRate: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    defectRatio: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    overallFinalResult: PropTypes.string,
+    overallResult: PropTypes.string
+  })
 };
 
 export default OverAllSummaryCard;
