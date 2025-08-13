@@ -609,7 +609,8 @@ const DefectDetailsSection = ({
                         </button>
                        
                         <span
-                          className="text-xs  dark:bg-gray-800 px-2 py-1 rounded shadow text-gray-600 dark:text-gray-300"
+                          className="text-xs  dark:bg-gray-800 
+                          px-2 py-1 rounded shadow text-gray-600 dark:text-gray-300"
                           style={{ zIndex: 2 }}
                         >
                           {(defect.defectImages || []).length} / 5 selected

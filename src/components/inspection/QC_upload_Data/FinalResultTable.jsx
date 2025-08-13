@@ -1,145 +1,195 @@
-import React, { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
+const PREVIEW_ROW_LIMIT = 100;
 
-const ExcelUploader = ({ label, onDataLoaded }) => {
-  const [fileName, setFileName] = useState('');
-  const [tableData, setTableData] = useState([]);
-  const [showPreview, setShowPreview] = useState(false);
-  const fileInputRef = useRef();
-
-  const handleFile = (file) => {
-    setFileName(file.name);
-    setShowPreview(false); // Hide preview on new upload
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const data = e.target.result;
-      const workbook = XLSX.read(data, { type: 'binary' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const json = XLSX.utils.sheet_to_json(worksheet);
-      setTableData(json);
-      onDataLoaded(json);
-    };
-    reader.readAsBinaryString(file);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0]);
+function flattenByInspectionQCMono(data) {
+  const rows = [];
+  data.forEach(item => {
+    // Find all unique MONo in Output_data
+    const monoSet = new Set();
+    if (Array.isArray(item.Output_data)) {
+      item.Output_data.forEach(o => {
+        if (o.MONo) monoSet.add(o.MONo);
+      });
     }
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
-
-  const handleChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFile(e.target.files[0]);
+    if (Array.isArray(item.Defect_data)) {
+      item.Defect_data.forEach(d => {
+        if (d.MONo) monoSet.add(d.MONo);
+      });
     }
-  };
+    // For each MONo, create a row
+    if (monoSet.size === 0) monoSet.add('-');
+    monoSet.forEach(mono => {
+      // Filter Output_data and Defect_data for this MONo
+      const outputData = Array.isArray(item.Output_data)
+        ? item.Output_data.filter(o =>
+            (o.MONo || o['款号'] || o['ModelNo'] || o['MoNo'] || o['StyleNo'] || o['Style_No'] || o['型号'] || '-') === mono
+          )
+        : [];
+      const defectData = Array.isArray(item.Defect_data)
+        ? item.Defect_data.filter(d => d.MONo === mono)
+        : [];
+      rows.push({
+        ...item,
+        MONo: mono,
+        Output_data: outputData,
+        Defect_data: defectData,
+      });
+    });
+  });
+  return rows;
+}
 
-  const handleClick = () => {
-    fileInputRef.current.click();
-  };
+function groupByInspectionAndQC(data) {
+      const map = new Map();
+      data.forEach(item => {
+        const key = `${item.Inspection_date}|${item.QC_ID}`;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(item);
+      });
+      return Array.from(map.entries()).map(([key, items]) => {
+        const monoMap = new Map();
+        items.forEach(item => {
+          const mono = item.MONo || '-';
+          if (!monoMap.has(mono)) monoMap.set(mono, []);
+          monoMap.get(mono).push(item);
+        });
+        const rows = Array.from(monoMap.entries()).map(([MONo, monoItems]) => ({
+          MONo,
+          Output_data: monoItems.flatMap(i => i.Output_data || []),
+          Defect_data: monoItems.flatMap(i => i.Defect_data || []),
+          Seq_No: monoItems[0]?.Seq_No || monoItems[0]?.SeqNo || '',
+        }));
+        const [Inspection_date, QC_ID] = key.split('|');
+        return { Inspection_date, QC_ID, rows };
+      });
+    }
 
-  const handleRemoveFile = () => {
-    setFileName('');
-    setTableData([]);
-    setShowPreview(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    onDataLoaded([]); // Notify parent that data is cleared
-  };
+function renderOutputData(outputData) {
+  if (!Array.isArray(outputData) || outputData.length === 0) return <span>-</span>;
+  const groupMap = new Map();
+  outputData.forEach(o => {
+    const key = `${o.Color}|${o.Size}`;
+    if (!groupMap.has(key)) {
+      groupMap.set(key, { Color: o.Color, Size: o.Size, Qty: 0 });
+    }
+    groupMap.get(key).Qty += Number(o.Qty) || 0;
+  });
+  const grouped = Array.from(groupMap.values());
+  return (
+    <table className="border border-gray-200 dark:border-gray-700 mb-1">
+      <thead>
+        <tr>
+          <th className="px-1 py-0.5 border">Color</th>
+          <th className="px-1 py-0.5 border">Size</th>
+          <th className="px-1 py-0.5 border">Qty</th>
+        </tr>
+      </thead>
+      <tbody>
+        {grouped.map((o, i) => (
+          <tr key={i}>
+            <td className="px-1 py-0.5 border">{o.Color}</td>
+            <td className="px-1 py-0.5 border">{o.Size}</td>
+            <td className="px-1 py-0.5 border">{o.Qty}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
-  const handleClosePreview = () => {
-    setShowPreview(false);
-  };
+function renderDefectData(defectData) {
+  if (!Array.isArray(defectData) || defectData.length === 0) return <span>-</span>;
+  // Flatten all DefectDetails arrays if present, else use defectData directly
+  let details = [];
+  if (defectData[0]?.DefectDetails) {
+    defectData.forEach(d => {
+      if (Array.isArray(d.DefectDetails)) {
+        details.push(...d.DefectDetails);
+      }
+    });
+  } else {
+    details = defectData;
+  }
+  // Group by Defect_code & Defect_name
+  const groupMap = new Map();
+  details.forEach(dd => {
+    const key = `${dd.Defect_code}|${dd.Defect_name}`;
+    if (!groupMap.has(key)) {
+      groupMap.set(key, { Defect_code: dd.Defect_code, Defect_name: dd.Defect_name, Qty: 0 });
+    }
+    groupMap.get(key).Qty += Number(dd.Qty) || 0;
+  });
+  const grouped = Array.from(groupMap.values());
+  return (
+    <table className="border border-gray-200 dark:border-gray-700 mb-1">
+      <thead>
+        <tr>
+          <th className="px-1 py-0.5 border">Defect Code</th>
+          <th className="px-1 py-0.5 border">Defect Name</th>
+          <th className="px-1 py-0.5 border">Qty</th>
+        </tr>
+      </thead>
+      <tbody>
+        {grouped.map((dd, i) => (
+          <tr key={i}>
+            <td className="px-1 py-0.5 border">{dd.Defect_code}</td>
+            <td className="px-1 py-0.5 border">{dd.Defect_name}</td>
+            <td className="px-1 py-0.5 border">{dd.Qty}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+const FinalResultTable = ({ data }) => {
+  if (!Array.isArray(data) || data.length === 0) return <div>No data</div>;
+
+  const flatRows = flattenByInspectionQCMono(data);
+  const grouped = groupByInspectionAndQC(flatRows);
 
   return (
-    <div className="bg-white rounded-lg shadow p-4 mb-4 border border-gray-200 w-full">
-      <h3 className="text-lg font-semibold mb-2 text-blue-700">{label} Upload</h3>
-      <div
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        className="flex flex-col items-center justify-center border-2 border-dashed border-blue-300 rounded-lg p-6 cursor-pointer hover:bg-blue-50 transition w-full"
-        onClick={handleClick}
-      >
-        <input
-          type="file"
-          onChange={handleChange}
-          accept=".xlsx, .xls"
-          style={{ display: 'none' }}
-          ref={fileInputRef}
-        />
-        <p className="text-gray-600 mb-2">Drag and drop an Excel file here, or click to select</p>
-        <span className="inline-block bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm font-medium">
-          Select File
-        </span>
+    <div>
+      <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+        Showing first {PREVIEW_ROW_LIMIT} groups of {grouped.length}
       </div>
-      {fileName && (
-        <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2">
-          <p className="text-sm text-gray-700">
-            <span className="font-medium">File:</span> {fileName}
-          </p>
-          <button
-            className="ml-0 sm:ml-2 bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-medium hover:bg-red-200 transition"
-            onClick={handleRemoveFile}
-            type="button"
-          >
-            Remove File
-          </button>
-        </div>
-      )}
-      {tableData.length > 0 && !showPreview && (
-        <button
-          className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-4 rounded transition"
-          onClick={() => setShowPreview(true)}
-          type="button"
-        >
-          Preview
-        </button>
-      )}
-      {showPreview && tableData.length > 0 && (
-        <div className="max-h-64 overflow-y-auto mt-4">
-          <div className="flex justify-between items-center mb-2">
-            <h4 className="font-semibold text-gray-700">Uploaded Data</h4>
-            <button
-              className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium hover:bg-gray-300 transition"
-              onClick={handleClosePreview}
-              type="button"
-            >
-              Close Preview
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-xs border border-gray-200">
-              <thead className="bg-gray-100">
-                <tr>
-                  {Object.keys(tableData[0]).map((key) => (
-                    <th key={key} className="px-2 py-1 border border-gray-200 text-left font-medium text-gray-600">
-                      {key}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tableData.map((row, index) => (
-                  <tr key={index} className="even:bg-gray-50">
-                    {Object.values(row).map((value, i) => (
-                      <td key={i} className="px-2 py-1 border border-gray-200">
-                        {typeof value === 'object' ? JSON.stringify(value) : value}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <table className="min-w-full text-xs border border-gray-200 dark:border-gray-700">
+        <thead>
+          <tr>
+            <th className="px-2 py-1 border">Inspection Date</th>
+            <th className="px-2 py-1 border">QC ID</th>
+            <th className="px-2 py-1 border">MONo</th>
+            <th className="px-2 py-1 border">Seq_No</th>
+            <th className="px-2 py-1 border">Output Data</th>
+            <th className="px-2 py-1 border">Defect Data</th>
+          </tr>
+        </thead>
+        <tbody>
+          {grouped.slice(0, PREVIEW_ROW_LIMIT).map((group, groupIdx) =>
+            group.rows.map((row, rowIdx) => (
+              <tr key={groupIdx + '-' + rowIdx} className="even:bg-gray-50 dark:even:bg-gray-800">
+                {rowIdx === 0 && (
+                  <>
+                    <td className="px-2 py-1 border" rowSpan={group.rows.length}>
+                      {group.Inspection_date ? new Date(group.Inspection_date).toLocaleDateString() : ''}
+                    </td>
+                    <td className="px-2 py-1 border" rowSpan={group.rows.length}>
+                      {group.QC_ID}
+                    </td>
+                  </>
+                )}
+                <td className="px-2 py-1 border">{row.MONo}</td>
+                <td className="px-2 py-1 border">
+                  {Array.isArray(row.Seq_No) ? row.Seq_No.join(', ') : row.Seq_No}
+                </td>
+                <td className="px-2 py-1 border">{renderOutputData(row.Output_data)}</td>
+                <td className="px-2 py-1 border">{renderDefectData(row.Defect_data)}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   );
 };
 
-export default ExcelUploader;
+export default FinalResultTable;

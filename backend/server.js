@@ -84,6 +84,7 @@ import createSizeCompletionStatusModel from "./models/SizeCompletionStatus.model
 import createQCWorkersModel from "./models/QCWorkers.js";
 import createSupplierIssuesDefectModel from "./models/SupplierIssuesDefect.js";
 import createSupplierIssueReportModel from "./models/SupplierIssueReport.js";
+import createQC2OlderDefectModel from "./models/QC2_Older_Defects.js";
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
@@ -260,6 +261,7 @@ const SupplierIssuesDefect = createSupplierIssuesDefectModel(ymProdConnection);
 (ymProdConnection);
 const QCWorkers = createQCWorkersModel(ymProdConnection);
 const SupplierIssueReport = createSupplierIssueReportModel(ymProdConnection);
+const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -1444,7 +1446,7 @@ app.post("/api/sync-cutpanel-orders", async (req, res) => {
 
 /* 
 
-
+/*---------------------------------------------------------------------------------------
 
 * ------------------------------
     Manual Sync Endpoint & Server Start
@@ -1678,7 +1680,7 @@ async function syncQC1WorkerData(startDate = "2025-07-01", endDate = new Date())
     console.log(`QC1_Worker sync: Matched ${result.matchedCount}, Upserted ${result.upsertedCount}, Modified ${result.modifiedCount}`);
   }
 }
-
+/*--------------------------------------------------------------------------------*/
 
 
 // 1. On server start, fetch all data from 2025-07-10 to today
@@ -27541,6 +27543,268 @@ app.get("/api/supplier-issues/report-options", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch filter options." });
   }
 });
+
+
+/* ------------------------------
+  QC2-Upload-Data
+------------------------------ */
+// Key function
+  function makeKey(row) {
+    return [
+      row.Inspection_date || '',
+      row.QC_ID || ''
+    ].join("|");
+  }
+  
+app.post('/api/upload-qc2-data', async (req, res) => {
+  try {
+    const { outputData, defectData } = req.body;
+    const allDefects = await QC2OlderDefect.find({}).lean();
+    const allDefectsArr = allDefects.map(d => ({
+      defectName: (d.defectName || '').trim().toLowerCase(),
+      defectCode: d.defectCode,
+      English: (d.English || '').trim().toLowerCase(),
+      Khmer: (d.Khmer || '').trim().toLowerCase(),
+      Chinese: (d.Chinese || '').trim().toLowerCase(),
+    }));
+    // Standardize field names
+    const outputRows = outputData.map(row => ({
+      ...row,
+      Inspection_date: row['日期'] || row['BillDate'] || '',
+      QC_ID: row['工号'] || row['EmpID'] || '',
+      WorkLine: row['组名'] || row['WorkLine'] || '',
+      MONo: row['款号'] || row['ModelNo'] || row['MoNo'] || row['StyleNo'] || row['Style_No'] || row['型号'] || '',
+      SeqNo: row['工序号'] || row['SeqNo'] || '',
+      ColorNo: row['颜色'] || row['ColorNo'] || '',
+      ColorName: row['颜色'] || row['ColorName'] || '',
+      SizeName: row['尺码'] || row['SizeName'] || '',
+      Qty: row['数量'] || row['Qty'] || 0,
+    }));
+
+    const defectRows = defectData.map(row => {
+      const defectNameRaw = (row['疵点名称'] || row['ReworkName'] || '').trim().toLowerCase();
+
+      // Try to match by any language part, both directions
+      let found = allDefectsArr.find(d =>
+        defectNameRaw === d.defectName ||
+        (d.English && defectNameRaw.includes(d.English)) ||
+        (d.Khmer && defectNameRaw.includes(d.Khmer)) ||
+        (d.Chinese && defectNameRaw.includes(d.Chinese)) ||
+        (d.English && d.English.includes(defectNameRaw)) ||
+        (d.Khmer && d.Khmer.includes(defectNameRaw)) ||
+        (d.Chinese && d.Chinese.includes(defectNameRaw))
+      );
+
+      let defectCode = found ? found.defectCode : '';
+
+      return {
+        ...row,
+        Inspection_date: row['日期'] || row['dDate'] || '',
+        QC_ID: row['工号'] || row['EmpID_QC'] || '',
+        WorkLine: row['组名'] || row['WorkLine'] || '',
+        MONo: row['款号'] || row['ModelNo'] || row['MoNo'] || row['StyleNo'] || row['Style_No'] || row['型号'] || '',
+        ColorNo: row['颜色'] || row['ColorNo'] || '',
+        ColorName: row['颜色'] || row['ColorName'] || '',
+        SizeName: row['尺码'] || row['SizeName'] || '',
+        ReworkCode: defectCode, 
+        ReworkName: defectNameRaw,
+        Defect_Qty: row['数量'] || row['Defect_Qty'] || 0,
+      };
+    });
+
+
+    // Build outputMap
+    const outputMap = new Map();
+    for (const row of outputRows) {
+      const key = makeKey(row);
+      if (!outputMap.has(key)) outputMap.set(key, []);
+      outputMap.get(key).push(row);
+    }
+
+    // Build defectMap
+    const defectMap = new Map();
+    for (const row of defectRows) {
+      const key = makeKey(row);
+      if (!defectMap.has(key)) defectMap.set(key, []);
+      defectMap.get(key).push(row);
+    }
+
+    // Merge and Build Documents
+    const docs = new Map();
+    const allKeys = new Set([...outputMap.keys(), ...defectMap.keys()]);
+
+    for (const key of allKeys) {
+      const outputRows = outputMap.get(key) || [];
+      const defectRows = defectMap.get(key) || [];
+      const [Inspection_date_str, QC_ID_raw] = key.split("|");
+      const QC_ID = QC_ID_raw === "6335" ? "YM6335" : QC_ID_raw;
+      const Inspection_date = Inspection_date_str ? new Date(Inspection_date_str + "T00:00:00Z") : null;
+
+      // Output grouping
+      const outputGroup = {};
+      for (const r of outputRows) {
+        const oKey = [r.WorkLine, r.MONo, r.ColorName, r.SizeName].join("|");
+        if (!outputGroup[oKey]) outputGroup[oKey] = [];
+        outputGroup[oKey].push(r);
+      }
+      const Output_data = Object.values(outputGroup).map(rows => ({
+        Line_no: rows[0]?.WorkLine || '',
+        MONo: rows[0]?.MONo || '',
+        Color: rows[0]?.ColorName || '',
+        Size: rows[0]?.SizeName || '',
+        Qty: rows.reduce((sum, r) => sum + Number(r.Qty || 0), 0)
+      }));
+      // Output summary
+      const outputSummaryMap = new Map();
+      for (const o of Output_data) {
+        const key = `${o.Line_no}|${o.MONo}`;
+        if (!outputSummaryMap.has(key)) {
+          outputSummaryMap.set(key, { Line: o.Line_no, MONo: o.MONo, Qty: 0 });
+        }
+        outputSummaryMap.get(key).Qty += o.Qty;
+      }
+      const Output_data_summary = Array.from(outputSummaryMap.values());
+      const TotalOutput = Output_data_summary.reduce((sum, o) => sum + o.Qty, 0);
+
+      // Defect grouping
+      const defectGroup = {};
+      for (const d of defectRows) {
+        const dKey = [d.WorkLine, d.MONo, d.ColorName, d.SizeName].join("|");
+        if (!defectGroup[dKey]) defectGroup[dKey] = [];
+        defectGroup[dKey].push(d);
+      }
+      const Defect_data = Object.entries(defectGroup).map(([dKey, rows]) => {
+        let TotalDefect = 0;
+        const defectDetailsMap = new Map();
+        for (const d of rows) {
+          const ddKey = d.ReworkCode + "|" + d.ReworkName;
+          if (!defectDetailsMap.has(ddKey)) {
+            defectDetailsMap.set(ddKey, {
+              Defect_code: d.ReworkCode || '',
+              Defect_name: d.ReworkName || '',
+              Qty: 0
+            });
+          }
+          defectDetailsMap.get(ddKey).Qty += Number(d.Defect_Qty || 0);
+          TotalDefect += Number(d.Defect_Qty || 0);
+        }
+        const [Line_no, MONo, Color, Size] = dKey.split("|");
+        return {
+          Line_no: Line_no || '',
+          MONo: MONo || '',
+          Color: Color || '',
+          Size: Size || '',
+          Defect_qty: TotalDefect,
+          DefectDetails: Array.from(defectDetailsMap.values())
+        };
+      });
+      // Defect summary
+      const defectSummaryMap = new Map();
+      for (const d of Defect_data) {
+        const key = `${d.Line_no}|${d.MONo}`;
+        if (!defectSummaryMap.has(key)) {
+          defectSummaryMap.set(key, { Line_no: d.Line_no, MONo: d.MONo, Defect_Qty: 0, Defect_Details: [] });
+        }
+        defectSummaryMap.get(key).Defect_Qty += d.Defect_qty;
+        // Merge DefectDetails by code/name
+        const detailsMap = new Map(defectSummaryMap.get(key).Defect_Details.map(dd => [
+          `${dd.Defect_code}|${dd.Defect_name}`, { ...dd }
+        ]));
+        for (const dd of d.DefectDetails) {
+          const ddKey = `${dd.Defect_code}|${dd.Defect_name}`;
+          if (!detailsMap.has(ddKey)) {
+            detailsMap.set(ddKey, { ...dd });
+          } else {
+            detailsMap.get(ddKey).Qty += dd.Qty;
+          }
+        }
+        defectSummaryMap.get(key).Defect_Details = Array.from(detailsMap.values());
+      }
+      const Defect_data_summary = Array.from(defectSummaryMap.values());
+      const TotalDefect = Defect_data_summary.reduce((sum, d) => sum + d.Defect_Qty, 0);
+
+      docs.set(key, {
+        Inspection_date,
+        QC_ID,
+        report_type: "Inline Finishing",
+        Seq_No: [
+          ...new Set(
+            outputRows.map(r => Number(r.SeqNo || 0))
+          )
+        ],
+        TotalOutput,
+        TotalDefect,
+        Output_data,
+        Output_data_summary,
+        Defect_data,
+        Defect_data_summary
+      });
+    }
+
+    // Save to MongoDB
+    const finalDocs = Array.from(docs.values());
+    // const bulkOps = finalDocs.map(doc => ({
+    //   updateOne: {
+    //     filter: {
+    //       Inspection_date: doc.Inspection_date,
+    //       QC_ID: doc.QC_ID
+    //     },
+    //     update: { $set: doc },
+    //     upsert: true
+    //   }
+    // }));
+    // if (bulkOps.length) {
+    //   await QCWorkers.bulkWrite(bulkOps);
+    // }
+    res.json(finalDocs); // Return the saved docs for preview
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to process and save QC2 data.' });
+  }
+});
+
+// routes/qc2.js (add this to the same file)
+app.get('/api/fetch-qc2-data', async (req, res) => {
+  try {
+     const results = await QCWorkers.find({}).lean();
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch QC2 data.' });
+  }
+});
+
+app.post('/api/manual-save-qc2-data', async (req, res) => {
+  try {
+    const { finalDocs } = req.body; // Expecting an array of processed docs
+
+    if (!Array.isArray(finalDocs) || finalDocs.length === 0) {
+      return res.status(400).json({ error: 'No data to save.' });
+    }
+
+    const bulkOps = finalDocs.map(doc => ({
+      updateOne: {
+        filter: {
+          Inspection_date: doc.Inspection_date,
+          QC_ID: doc.QC_ID
+        },
+        update: { $set: doc },
+        upsert: true
+      }
+    }));
+
+    if (bulkOps.length) {
+      await QCWorkers.bulkWrite(bulkOps);
+    }
+
+    res.json({ success: true, count: bulkOps.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to manually save QC2 data.' });
+  }
+});
+
+
+
 /* ------------------------------
    AI Chatbot Proxy Route
 ------------------------------ */
