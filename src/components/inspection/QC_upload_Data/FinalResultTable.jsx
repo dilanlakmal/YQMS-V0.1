@@ -64,7 +64,10 @@ function groupByInspectionAndQC(data) {
     }
 
 function renderOutputData(outputData) {
-  if (!Array.isArray(outputData) || outputData.length === 0) return <span>-</span>;
+  if (!Array.isArray(outputData) || outputData.length === 0) {
+    return <span className="text-gray-400 dark:text-gray-500 italic">No data</span>;
+  }
+
   const groupMap = new Map();
   outputData.forEach(o => {
     const key = `${o.Color}|${o.Size}`;
@@ -74,31 +77,33 @@ function renderOutputData(outputData) {
     groupMap.get(key).Qty += Number(o.Qty) || 0;
   });
   const grouped = Array.from(groupMap.values());
+
   return (
-    <table className="border border-gray-200 dark:border-gray-700 mb-1">
-      <thead>
-        <tr>
-          <th className="px-1 py-0.5 border">Color</th>
-          <th className="px-1 py-0.5 border">Size</th>
-          <th className="px-1 py-0.5 border">Qty</th>
-        </tr>
-      </thead>
-      <tbody>
+    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 rounded-lg p-3 shadow-sm border border-blue-200 dark:border-gray-600">
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        <div className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-center">Color</div>
+        <div className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-center">Size</div>
+        <div className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-center">Qty</div>
+      </div>
+      <div className="space-y-1">
         {grouped.map((o, i) => (
-          <tr key={i}>
-            <td className="px-1 py-0.5 border">{o.Color}</td>
-            <td className="px-1 py-0.5 border">{o.Size}</td>
-            <td className="px-1 py-0.5 border">{o.Qty}</td>
-          </tr>
+          <div key={i} className="grid grid-cols-3 gap-2 bg-white dark:bg-gray-700 rounded px-2 py-1 shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-xs text-gray-700 dark:text-gray-200 text-center">{o.Color || '-'}</div>
+            <div className="text-xs text-gray-700 dark:text-gray-200 text-center">{o.Size || '-'}</div>
+            <div className="text-xs font-semibold text-green-600 dark:text-green-400 text-center bg-green-50 dark:bg-green-900/20 rounded px-1">{o.Qty}</div>
+          </div>
         ))}
-      </tbody>
-    </table>
+      </div>
+    </div>
   );
 }
 
+
 function renderDefectData(defectData) {
-  if (!Array.isArray(defectData) || defectData.length === 0) return <span>-</span>;
-  // Flatten all DefectDetails arrays if present, else use defectData directly
+  if (!Array.isArray(defectData) || defectData.length === 0) {
+    return <span className="text-gray-400 dark:text-gray-500 italic">No defects</span>;
+  }
+
   let details = [];
   if (defectData[0]?.DefectDetails) {
     defectData.forEach(d => {
@@ -109,7 +114,7 @@ function renderDefectData(defectData) {
   } else {
     details = defectData;
   }
-  // Group by Defect_code & Defect_name
+
   const groupMap = new Map();
   details.forEach(dd => {
     const key = `${dd.Defect_code}|${dd.Defect_name}`;
@@ -119,75 +124,107 @@ function renderDefectData(defectData) {
     groupMap.get(key).Qty += Number(dd.Qty) || 0;
   });
   const grouped = Array.from(groupMap.values());
+
   return (
-    <table className="border border-gray-200 dark:border-gray-700 mb-1">
-      <thead>
-        <tr>
-          <th className="px-1 py-0.5 border">Defect Code</th>
-          <th className="px-1 py-0.5 border">Defect Name</th>
-          <th className="px-1 py-0.5 border">Qty</th>
-        </tr>
-      </thead>
-      <tbody>
+    <div className="bg-gradient-to-br from-red-50 to-pink-50 dark:from-gray-800 dark:to-red-900/20 rounded-lg p-3 shadow-sm border border-red-200 dark:border-red-700/50">
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        <div className="text-xs font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded text-center">Code</div>
+        <div className="text-xs font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded text-center">Defect Name</div>
+        <div className="text-xs font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded text-center">Qty</div>
+      </div>
+      <div className="space-y-1">
         {grouped.map((dd, i) => (
-          <tr key={i}>
-            <td className="px-1 py-0.5 border">{dd.Defect_code}</td>
-            <td className="px-1 py-0.5 border">{dd.Defect_name}</td>
-            <td className="px-1 py-0.5 border">{dd.Qty}</td>
-          </tr>
+          <div key={i} className="grid grid-cols-3 gap-2 bg-white dark:bg-gray-700 rounded px-2 py-1 shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-xs text-gray-700 dark:text-gray-200 text-center font-mono">{dd.Defect_code || '-'}</div>
+            <div className="text-xs text-gray-700 dark:text-gray-200 text-center">{dd.Defect_name || '-'}</div>
+            <div className="text-xs font-semibold text-red-600 dark:text-red-400 text-center bg-red-50 dark:bg-red-900/20 rounded px-1">{dd.Qty}</div>
+          </div>
         ))}
-      </tbody>
-    </table>
+      </div>
+    </div>
   );
 }
 
+
 const FinalResultTable = ({ data }) => {
-  if (!Array.isArray(data) || data.length === 0) return <div>No data</div>;
+  if (!Array.isArray(data) || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center p-8 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
+        <div className="text-center">
+          <div className="text-gray-400 dark:text-gray-500 text-lg mb-2">📊</div>
+          <div className="text-gray-600 dark:text-gray-400 font-medium">No data available</div>
+        </div>
+      </div>
+    );
+  }
 
   const flatRows = flattenByInspectionQCMono(data);
   const grouped = groupByInspectionAndQC(flatRows);
 
   return (
-    <div>
-      <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-        Showing first {PREVIEW_ROW_LIMIT} groups of {grouped.length}
+    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-800 dark:to-indigo-800 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-white font-semibold text-sm">QC Inspection Results</h3>
+          <div className="text-blue-100 text-xs bg-blue-700/30 px-2 py-1 rounded">
+            Showing {Math.min(PREVIEW_ROW_LIMIT, grouped.length)} of {grouped.length} groups
+          </div>
+          
+        </div>
       </div>
-      <table className="min-w-full text-xs border border-gray-200 dark:border-gray-700">
-        <thead>
-          <tr>
-            <th className="px-2 py-1 border">Inspection Date</th>
-            <th className="px-2 py-1 border">QC ID</th>
-            <th className="px-2 py-1 border">MONo</th>
-            <th className="px-2 py-1 border">Seq_No</th>
-            <th className="px-2 py-1 border">Output Data</th>
-            <th className="px-2 py-1 border">Defect Data</th>
-          </tr>
-        </thead>
-        <tbody>
-          {grouped.slice(0, PREVIEW_ROW_LIMIT).map((group, groupIdx) =>
-            group.rows.map((row, rowIdx) => (
-              <tr key={groupIdx + '-' + rowIdx} className="even:bg-gray-50 dark:even:bg-gray-800">
-                {rowIdx === 0 && (
-                  <>
-                    <td className="px-2 py-1 border" rowSpan={group.rows.length}>
-                      {group.Inspection_date ? new Date(group.Inspection_date).toLocaleDateString() : ''}
-                    </td>
-                    <td className="px-2 py-1 border" rowSpan={group.rows.length}>
-                      {group.QC_ID}
-                    </td>
-                  </>
-                )}
-                <td className="px-2 py-1 border">{row.MONo}</td>
-                <td className="px-2 py-1 border">
-                  {Array.isArray(row.Seq_No) ? row.Seq_No.join(', ') : row.Seq_No}
-                </td>
-                <td className="px-2 py-1 border">{renderOutputData(row.Output_data)}</td>
-                <td className="px-2 py-1 border">{renderDefectData(row.Defect_data)}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+      
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-xs">
+          <thead className="bg-gray-50 dark:bg-gray-800">
+            <tr>
+              <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">📅 Inspection Date</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">👤 QC ID</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">🏷️ MONo</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">🔢 Seq No</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">📦 Output Data</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">⚠️ Defect Data</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+            {grouped.slice(0, PREVIEW_ROW_LIMIT).map((group, groupIdx) =>
+              group.rows.map((row, rowIdx) => (
+                <tr key={groupIdx + '-' + rowIdx} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  {rowIdx === 0 && (
+                    <>
+                      <td className="px-4 py-3 border-r border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20" rowSpan={group.rows.length}>
+                        <div className="font-medium text-blue-700 dark:text-blue-300">
+                          {group.Inspection_date ? new Date(group.Inspection_date).toLocaleDateString() : 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 border-r border-gray-200 dark:border-gray-700 bg-green-50 dark:bg-green-900/20" rowSpan={group.rows.length}>
+                        <div className="font-mono font-medium text-green-700 dark:text-green-300">
+                          {group.QC_ID || 'N/A'}
+                        </div>
+                      </td>
+                    </>
+                  )}
+                  <td className="px-4 py-3 border-r border-gray-200 dark:border-gray-700">
+                    <span className="font-mono text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                      {row.MONo || 'N/A'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 border-r border-gray-200 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      {Array.isArray(row.Seq_No) ? row.Seq_No.join(', ') : row.Seq_No || 'N/A'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 border-r border-gray-200 dark:border-gray-700">
+                    {renderOutputData(row.Output_data)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {renderDefectData(row.Defect_data)}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

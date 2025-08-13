@@ -27572,7 +27572,7 @@ app.post('/api/upload-qc2-data', async (req, res) => {
       ...row,
       Inspection_date: row['日期'] || row['BillDate'] || '',
       QC_ID: row['工号'] || row['EmpID'] || '',
-      WorkLine: row['组名'] || row['WorkLine'] || '',
+      WorkLine: row['打菲组别'] || row['Batch Group'] || row['组名'] || row['WorkLine'] || '',
       MONo: row['款号'] || row['ModelNo'] || row['MoNo'] || row['StyleNo'] || row['Style_No'] || row['型号'] || '',
       SeqNo: row['工序号'] || row['SeqNo'] || '',
       ColorNo: row['颜色'] || row['ColorNo'] || '',
@@ -27601,7 +27601,7 @@ app.post('/api/upload-qc2-data', async (req, res) => {
         ...row,
         Inspection_date: row['日期'] || row['dDate'] || '',
         QC_ID: row['工号'] || row['EmpID_QC'] || '',
-        WorkLine: row['组名'] || row['WorkLine'] || '',
+        WorkLine: row['组名'] || row['WorkLine'] || 'N/A',
         MONo: row['款号'] || row['ModelNo'] || row['MoNo'] || row['StyleNo'] || row['Style_No'] || row['型号'] || '',
         ColorNo: row['颜色'] || row['ColorNo'] || '',
         ColorName: row['颜色'] || row['ColorName'] || '',
@@ -27802,8 +27802,6 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
     res.status(500).json({ error: 'Failed to manually save QC2 data.' });
   }
 });
-
-
 
 /* ------------------------------
    AI Chatbot Proxy Route
