@@ -622,57 +622,62 @@ async function stripFileFromImagesAsync(inspectionData) {
               {(Array.isArray(inspectionData) ? inspectionData : []).map((item, idx) => (
                 <tr key={idx}>
                   <td className="border px-4 py-2 dark:text-white">{item.checkedList}</td>
-                  <td className="border px-4 py-2 text-center dark:text-white">
-                    {item.checkedList === "Fiber" ? (
-                      <div className="flex items-center">
-                        <label>
-                          <input
-                            type="checkbox"
-                            name={`decision-${idx}`}
-                            checked={item.decision === "ok"}
-                            onChange={() => handleDecisionChange(idx, "ok")}
-                            disabled={!isEditing}
-                            className="mr-1"
-                          /> Ok
-                        </label>
-                        {[1, 2, 3].map(num => (
-                          <label key={num} className="ml-2">
+                    <td className="px-2 p-1 border border-gray-200">
+                      {item.checkedList === "Fiber" ? (
+                        <div className="flex flex-wrap gap-3">
+                          <label className="flex space-x-2 cursor-pointer">
                             <input
                               type="checkbox"
                               name={`decision-${idx}`}
-                              checked={item.decision === String(num)}
-                              onChange={() => handleDecisionChange(idx, String(num))}
+                              checked={item.decision === "ok"}
+                              onChange={() => handleDecisionChange(idx, "ok")}
                               disabled={!isEditing}
-                              className="mr-1"
-                            /> {num}
+                              className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                            />
+                            <span className="text-sm font-medium text-green-600">OK</span>
                           </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex items-center">
-                        <label>
-                          <input
-                            type="checkbox"
-                            name={`decision-${idx}`}
-                            checked={item.decision === "ok"}
-                            onChange={() => handleDecisionChange(idx, "ok")}
-                            disabled={!isEditing}
-                            className="mr-1"
-                          /> Ok
-                        </label>
-                        <label className="ml-2">
-                          <input
-                            type="checkbox"
-                            name={`decision-${idx}`}
-                            checked={item.decision === "no"}
-                            onChange={() => handleDecisionChange(idx, "no")}
-                            disabled={!isEditing}
-                            className="mr-1"
-                          /> No
-                        </label>
-                      </div>
-                    )}
-                  </td>
+                          {[1, 2, 3].map(num => (
+                            <label key={num} className="flex i space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                name={`decision-${idx}`}
+                                checked={item.decision === String(num)}
+                                onChange={() => handleDecisionChange(idx, String(num))}
+                                disabled={!isEditing}
+                                className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
+                              />
+                              <span className="text-sm font-medium dark:text-white">{num}</span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <label className="flex space-x-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              name={`decision-${idx}`}
+                              checked={item.decision === "ok"}
+                              onChange={() => handleDecisionChange(idx, "ok")}
+                              disabled={!isEditing}
+                              className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                            />
+                            <span className="text-sm font-medium text-green-600">OK</span>
+                          </label>
+                          <label className="flex space-x-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              name={`decision-${idx}`}
+                              checked={item.decision === "no"}
+                              onChange={() => handleDecisionChange(idx, "no")}
+                              disabled={!isEditing}
+                              className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
+                            />
+                            <span className="text-sm font-medium text-red-600">NO</span>
+                          </label>
+                        </div>
+                      )}
+                    </td>
+
 
                   <td className="border px-4 py-2 text-center grid grid-cols-1 md:grid-cols-2 gap-2">
                     {/* Upload Button */}
@@ -795,13 +800,13 @@ async function stripFileFromImagesAsync(inspectionData) {
                             {param.key === "softener" && <FaTint className="text-pink-500" />}
                             <span className="font-medium dark:text-white">{param.label}</span>
                           </div>
-                          <span className="text-sm text-gray-500 dark:text-gray-400">{param.unit}</span>
+                          <span className="text-sm text-gray-500 dark:text-gray-100">{param.unit}</span>
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-3 md:grid-cols-3 gap-3">
                           {/* Standard Value */}
                           <div className="text-center">
-                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Standard</label>
+                            <label className="block text-xs text-gray-600 dark:text-gray-100 mb-1">Standard</label>
                             <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded font-mono text-sm dark:text-white">
                               {standardValue}
                             </div>
@@ -809,7 +814,7 @@ async function stripFileFromImagesAsync(inspectionData) {
                           
                           {/* Actual Value */}
                           <div className="text-center">
-                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Actual</label>
+                            <label className="block text-xs text-gray-600 dark:text-gray-100 mb-1">Actual</label>
                             <input
                               type="text"
                               value={actualValue}
@@ -822,7 +827,7 @@ async function stripFileFromImagesAsync(inspectionData) {
                           
                           {/* Status */}
                           <div className="text-center">
-                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Status</label>
+                            <label className="block text-xs text-gray-600 dark:text-gray-100 mb-1">Status</label>
                             <div className="flex justify-center space-x-4">
                               <label className="flex items-center cursor-pointer">
                                 <input
