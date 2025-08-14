@@ -1,7 +1,5 @@
 import mongoose from "mongoose";
 
-// --- Subschemas ---
-
 const MeasurementSizeSummarySchema = new mongoose.Schema({
   size: String,
   checkedPcs: Number,

@@ -21,7 +21,6 @@ const normalizeImageSrc = (src) => {
 
 function transformDefectsByPc(savedDefectsByPc) {
   if (Array.isArray(savedDefectsByPc)) {
-
     return savedDefectsByPc.reduce((acc, pcData) => {
       const pcNumber = pcData.pcNumber;
       if (pcNumber) {
@@ -204,7 +203,6 @@ const QCWashingPage = () => {
   const { user } = useAuth();
   const dateValue = new Date().toISOString().split("T")[0];
 
-
   // State: Form Data
   const [formData, setFormData] = useState({
     date: dateValue,
@@ -370,7 +368,6 @@ const fetchOverallSummary = async (recordId) => {
     setSectionVisibility((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
-
   const imageToBase64 = (imageObject) => {
     if (!imageObject) {
       return Promise.resolve(null);
@@ -483,6 +480,31 @@ useEffect(() => {
   fetchColorOrderQty();
 }, [formData.orderNo, formData.color]);
 
+
+  useEffect(() => {
+    const fetchColorOrderQty = async () => {
+      if (!formData.orderNo || !formData.color) {
+        setColorOrderQty(null);
+        return;
+      }
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc-washing/order-color-qty/${
+            formData.orderNo
+          }/${encodeURIComponent(formData.color)}`
+        );
+        const data = await response.json();
+        if (data.success) {
+          setColorOrderQty(data.colorOrderQty);
+        } else {
+          setColorOrderQty(null);
+        }
+      } catch (error) {
+        setColorOrderQty(null);
+      }
+    };
+    fetchColorOrderQty();
+  }, [formData.orderNo, formData.color]);
 
   useEffect(() => {
     const fetchColorOrderQty = async () => {

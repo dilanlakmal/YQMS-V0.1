@@ -861,7 +861,6 @@ async function stripFileFromImagesAsync(inspectionData) {
               </div>
             ))}
           </div>
-
           <div className="mt-8 pt-6 border-t border-gray-200">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse border border-gray-300 dark:border-gray-600">

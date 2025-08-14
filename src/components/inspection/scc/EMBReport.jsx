@@ -17,7 +17,7 @@ import { useTranslation } from "react-i18next";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../config";
 import { useAuth } from "../../authentication/AuthContext";
-import DefectBox from "./DefectBoxHT"; // Reusing the same DefectBox component
+import DefectBoxEMB from "./DefectBoxEMB";
 import SCCImageUpload from "./SCCImageUpload";
 
 const inputBaseClasses =
@@ -69,7 +69,8 @@ const EMBReport = ({
 
   // Component State
   const [showDefectBox, setShowDefectBox] = useState(false);
-  const [availableEmbDefects, setAvailableEmbDefects] = useState([]);
+  const [availableDefects, setAvailableDefects] = useState([]); // <-- MODIFIED: Generic name
+  //const [availableEmbDefects, setAvailableEmbDefects] = useState([]);
   const [isSubmittingData, setIsSubmittingData] = useState(false);
 
   // Refs
@@ -145,25 +146,45 @@ const EMBReport = ({
     }
   }, [formData.defects, formData.aqlData, onFormDataChange]);
 
+  // --- MODIFIED: useEffect to fetch defects based on reportType ---
   useEffect(() => {
     const fetchDefectsList = async () => {
+      if (!formData.reportType) {
+        setAvailableDefects([]);
+        return;
+      }
+
       setDefectsLoading(true);
+      let endpoint = "";
+      if (formData.reportType === "EMB") {
+        endpoint = "/api/scc/emb-defects";
+      } else if (formData.reportType === "Printing") {
+        endpoint = "/api/scc/printing-defects";
+      } else if (formData.reportType === "EMB + Print") {
+        endpoint = "/api/scc/all-defects";
+      }
+
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/scc/emb-defects`);
-        setAvailableEmbDefects(response.data || []);
+        const response = await axios.get(`${API_BASE_URL}${endpoint}`);
+        setAvailableDefects(response.data || []);
       } catch (error) {
-        console.error(t("sccEMBReport.errorFetchingDefects"), error);
+        console.error(
+          `Error fetching defects for ${formData.reportType}:`,
+          error
+        );
         Swal.fire(
           t("scc.error"),
           t("sccEMBReport.errorFetchingDefectsMsg"),
           "error"
         );
+        setAvailableDefects([]);
       } finally {
         setDefectsLoading(false);
       }
     };
+
     fetchDefectsList();
-  }, [t]);
+  }, [formData.reportType, t]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -209,6 +230,17 @@ const EMBReport = ({
       }
     }
     onFormDataChange(newFormData);
+  };
+
+  // --- NEW: Handler for report type change ---
+  const handleReportTypeChange = (e) => {
+    // When changing report type, we must clear the existing defects
+    onFormDataChange({
+      ...formData,
+      reportType: e.target.value,
+      defects: [],
+      defectsQty: 0
+    });
   };
 
   const handleDateChange = (date) =>
@@ -547,6 +579,7 @@ const EMBReport = ({
 
   const handleSubmit = async () => {
     const {
+      reportType,
       inspectionDate,
       factoryName,
       moNo,
@@ -559,6 +592,7 @@ const EMBReport = ({
       totalBundle
     } = formData;
     if (
+      !reportType ||
       !inspectionDate ||
       !factoryName ||
       !moNo ||
@@ -619,7 +653,7 @@ const EMBReport = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-3">
         <div>
           <label htmlFor="embInspDate" className={labelClasses}>
             {t("scc.date")}
@@ -638,6 +672,26 @@ const EMBReport = ({
             id="embInspDate"
           />
         </div>
+
+        {/* --- NEW: Report Type Dropdown --- */}
+        <div>
+          <label htmlFor="embReportType" className={labelClasses}>
+            {t("sccEMBReport.reportType", "Report Type")}
+          </label>
+          <select
+            id="embReportType"
+            name="reportType"
+            value={formData.reportType || ""}
+            onChange={handleReportTypeChange} // Use the new handler
+            className={`${inputFieldClasses} py-1.5`}
+            required
+          >
+            <option value="EMB">EMB</option>
+            <option value="Printing">Printing</option>
+            <option value="EMB + Print">EMB + Print</option>
+          </select>
+        </div>
+
         <div>
           <label htmlFor="embFactoryName" className={labelClasses}>
             {t("sccEMBReport.factoryName")}
@@ -650,7 +704,7 @@ const EMBReport = ({
             className={`${inputFieldClasses} py-1.5`}
             required
           >
-            <option value="">{t("scc.select")}</option>
+            <option value="">{t("scc.selectFactoryName")}</option>
             {FACTORY_NAMES.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -1046,9 +1100,9 @@ const EMBReport = ({
       </div>
 
       {showDefectBox && (
-        <DefectBox
+        <DefectBoxEMB
           defects={formData.defects || []}
-          availableDefects={availableEmbDefects}
+          availableDefects={availableDefects} // Pass the dynamically fetched defects
           onClose={() => setShowDefectBox(false)}
           onAddDefect={handleAddDefectToReport}
           onRemoveDefect={handleRemoveDefectFromReport}
