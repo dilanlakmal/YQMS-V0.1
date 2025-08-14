@@ -802,53 +802,58 @@ useEffect(() => {
 // 2. Process Data (Machine Processes)
 // In your loadSavedDataById function, update the machine processes handling:
 if (saved.inspectionDetails?.machineProcesses) {
-  const processDataFromSaved = {};
-  
-  saved.inspectionDetails.machineProcesses.forEach(machine => {
-    const machineType = machine.machineType;
-    processDataFromSaved[machineType] = {};
-    
-    // Extract the parameters based on machine type
-    const parameters = machineType === "Washing Machine" 
-      ? ["temperature", "time", "silicon", "softener"]
-      : ["temperature", "time"];
-    
-    parameters.forEach(param => {
-      if (machine[param]) {
-        // Set standard values
-        setStandardValues(prev => ({
-          ...prev,
-          [machineType]: {
-            ...prev[machineType],
-            [param]: machine[param].standardValue || ""
-          }
-        }));
+      const processDataFromSaved = {};
+      
+      saved.inspectionDetails.machineProcesses.forEach(machine => {
+        const machineType = machine.machineType;
+        processDataFromSaved[machineType] = {};
         
-        // Set actual values
-        setActualValues(prev => ({
-          ...prev,
-          [machineType]: {
-            ...prev[machineType],
-            [param]: machine[param].actualValue || ""
-          }
-        }));
+        const parameters = machineType === "Washing Machine" 
+          ? ["temperature", "time", "silicon", "softener"]
+          : ["temperature", "time"];
         
-        // Set machine status
-        setMachineStatus(prev => ({
-          ...prev,
-          [machineType]: {
-            ...prev[machineType],
-            [param]: {
-              ok: machine[param].status?.ok || false,
-              no: machine[param].status?.no || false
-            }
+        parameters.forEach(param => {
+          if (machine[param]) {
+            // Handle standard values - preserve 0 as "0"
+            const standardValue = machine[param].standardValue;
+            const standardStr = standardValue === null || standardValue === undefined ? "" : String(standardValue);
+            
+            // Handle actual values - preserve 0 as "0" 
+            const actualValue = machine[param].actualValue;
+            const actualStr = actualValue === null || actualValue === undefined ? "" : String(actualValue);
+            
+            setStandardValues(prev => ({
+              ...prev,
+              [machineType]: {
+                ...prev[machineType],
+                [param]: standardStr
+              }
+            }));
+            
+            setActualValues(prev => ({
+              ...prev,
+              [machineType]: {
+                ...prev[machineType],
+                [param]: actualStr
+              }
+            }));
+            
+            setMachineStatus(prev => ({
+              ...prev,
+              [machineType]: {
+                ...prev[machineType],
+                [param]: {
+                  ok: machine[param].status?.ok || false,
+                  no: machine[param].status?.no || false
+                }
+              }
+            }));
           }
-        }));
-      }
-    });
-  });
-  
-  setProcessData(processDataFromSaved);
+        });
+      });
+      
+      setProcessData(processDataFromSaved);
+    
 }
 setDefectData(
   (saved.inspectionDetails?.parameters || []).map(param => ({

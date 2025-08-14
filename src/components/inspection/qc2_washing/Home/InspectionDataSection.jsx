@@ -3,6 +3,7 @@ import { FaThermometerHalf, FaClock, FaFlask, FaPlus, FaTrash, FaMinus, FaUpload
 import { API_BASE_URL } from "../../../../../config";
 import Swal from 'sweetalert2';
 import PropTypes from 'prop-types';
+import { useTranslation } from "react-i18next";
 
 const PARAM_APPEARANCE = "Appearance";
 const PARAM_COLOR_SHADE = "Color Shade";
@@ -61,6 +62,7 @@ const InspectionDataSection = ({
   const [previewImage, setPreviewImage] = useState(null);
   const [isSaved, setIsSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(true);
+  const { t } = useTranslation();
 
   
 
@@ -75,15 +77,37 @@ useEffect(() => {
       if (data.success) {
         const standardRecord = data.data.find(record => record.washType === washType);
         if (standardRecord) {
-          setStandardValues({
-            "Washing Machine": standardRecord.washingMachine || { temperature: "", time: "", silicon: "", softener: "" },
-            "Tumble Dry": standardRecord.tumbleDry || { temperature: "", time: "" }
+          const washingMachineDefaults = { temperature: "", time: "", silicon: "", softener: "" };
+          const tumbleDryDefaults = { temperature: "", time: "" };
+          
+          const washingMachineValues = { ...washingMachineDefaults, ...standardRecord.washingMachine };
+          const tumbleDryValues = { ...tumbleDryDefaults, ...standardRecord.tumbleDry };
+          
+          // Properly handle 0 values - keep them as "0" string, not empty
+          Object.keys(washingMachineValues).forEach(key => {
+            if (washingMachineValues[key] === null || washingMachineValues[key] === undefined) {
+              washingMachineValues[key] = "";
+            } else {
+              washingMachineValues[key] = String(washingMachineValues[key]);
+            }
           });
           
-          // Initialize actual values with standard values when OK is selected
+          Object.keys(tumbleDryValues).forEach(key => {
+            if (tumbleDryValues[key] === null || tumbleDryValues[key] === undefined) {
+              tumbleDryValues[key] = "";
+            } else {
+              tumbleDryValues[key] = String(tumbleDryValues[key]);
+            }
+          });
+          
+          setStandardValues({
+            "Washing Machine": washingMachineValues,
+            "Tumble Dry": tumbleDryValues
+          });
+          
           setActualValues({
-            "Washing Machine": standardRecord.washingMachine || { temperature: "", time: "", silicon: "", softener: "" },
-            "Tumble Dry": standardRecord.tumbleDry || { temperature: "", time: "" }
+            "Washing Machine": washingMachineValues,
+            "Tumble Dry": tumbleDryValues
           });
         }
       }
@@ -91,9 +115,9 @@ useEffect(() => {
       console.error("Error fetching standard values:", error);
     }
   };
-
   fetchStandardValues();
-}, [washType]);
+}, [washType, setStandardValues, setActualValues]);
+
 
 
   useEffect(() => {
@@ -119,18 +143,15 @@ useEffect(() => {
       )
     );
   }
-  // Appearance logic
   setDefectData(prev =>
     prev.map(item =>
       item.parameter === PARAM_APPEARANCE
-        // Only set if not already set or is zero
         ? { ...item, checkedQty: (item.checkedQty && item.checkedQty !== 0) ? item.checkedQty : qty }
         : item
     )
   );
 }, [washQty, defectData.length]);
 
-  // --- Prevent user from entering more than washQty in any color shade row ---
   const handleParamInputChange = (rowIdx, field, value) => {
     setDefectData(prev => {
       const isColorShade = prev[rowIdx].parameter && prev[rowIdx].parameter.startsWith(PARAM_COLOR_SHADE);
@@ -145,19 +166,16 @@ useEffect(() => {
             : sum
         , 0);
 
-        // Prevent total from exceeding washQty
         if (otherSum + newValue > qty) {
           newValue = Math.max(0, qty - otherSum);
         }
 
-        // If user tries to enter more than allowed, set to max possible
         return prev.map((item, i) =>
           i === rowIdx
             ? { ...item, checkedQty: newValue }
             : item
         );
       } else {
-        // All other cases (failedQty, remark, non-color-shade)
         return prev.map((item, i) =>
           i === rowIdx
             ? {
@@ -186,7 +204,6 @@ useEffect(() => {
           remark: "",
         },
       ];
-      // Reset all color shade checkedQty to 0
       return newRows.map(item =>
         item.parameter && item.parameter.startsWith(PARAM_COLOR_SHADE)
           ? { ...item, checkedQty: 0 }
@@ -207,17 +224,18 @@ const handleStatusChange = (machineType, param, status) => {
     }
   }));
 
-  // If OK is selected, set actual value to standard value
   if (status === 'ok') {
+    const standardVal = standardValues[machineType][param];
+    // Ensure 0 values are preserved as "0" string
+    const valueToSet = standardVal === null || standardVal === undefined ? "" : String(standardVal);
     setActualValues(prev => ({
       ...prev,
       [machineType]: {
         ...prev[machineType],
-        [param]: standardValues[machineType][param] || ""
+        [param]: valueToSet
       }
     }));
   }
-  // If No is selected, clear the actual value field
   else if (status === 'no') {
     setActualValues(prev => ({
       ...prev,
@@ -229,8 +247,9 @@ const handleStatusChange = (machineType, param, status) => {
   }
 };
 
+
 const handleActualValueChange = (machineType, param, value) => {
-  // Update the actual value
+  // Update the actual value - keep 0 as "0" string, not empty
   setActualValues(prev => ({
     ...prev,
     [machineType]: {
@@ -239,20 +258,12 @@ const handleActualValueChange = (machineType, param, value) => {
     }
   }));
 
-  // Auto-update status based on value comparison with standard
   const standardValue = standardValues[machineType][param];
   
-  // Convert both values to strings for comparison to handle number/string differences
-  const standardStr = String(standardValue || "").trim();
-  const actualStr = String(value || "").trim();
+  const standardStr = standardValue === null || standardValue === undefined ? "" : String(standardValue).trim();
+  const actualStr = value === null || value === undefined ? "" : String(value).trim();
   
-  console.log(`Comparing: "${actualStr}" === "${standardStr}"`, actualStr === standardStr); // Debug log
-  
-  // If actual value equals standard value, set to OK (regardless of previous status)
-  // If actual value is different from standard value, set to No
-  // If actual value is empty, don't change the status automatically
   if (actualStr !== "" && actualStr === standardStr) {
-    console.log("Setting to OK"); // Debug log
     setMachineStatus(prev => ({
       ...prev,
       [machineType]: {
@@ -264,7 +275,6 @@ const handleActualValueChange = (machineType, param, value) => {
       }
     }));
   } else if (actualStr !== "" && actualStr !== standardStr) {
-    console.log("Setting to No"); // Debug log
     setMachineStatus(prev => ({
       ...prev,
       [machineType]: {
@@ -276,15 +286,14 @@ const handleActualValueChange = (machineType, param, value) => {
       }
     }));
   }
-  // If value is empty, don't change the status automatically
 };
-
 
   const handleSaveInspection = async () => {
   if (!recordId) {
     alert("Order details must be saved first!");
     return;
   }
+  
   try {
     // 1. Calculate passRate/result for each defect
     const defectDataWithPassRate = defectData.map(item => {
@@ -292,11 +301,29 @@ const handleActualValueChange = (machineType, param, value) => {
       const failedQty = Number(item.failedQty) || 0;
       const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
       const result = passRate >= 95 ? "Pass" : passRate >= 90 ? "Pass" : "Fail";
+
       return {
         ...item,
         passRate,
         result,
       };
+    });
+
+    // Process actualValues to ensure 0 values are preserved
+    const processedActualValues = {};
+    Object.keys(actualValues).forEach(machineType => {
+      processedActualValues[machineType] = {};
+      Object.keys(actualValues[machineType]).forEach(param => {
+        const value = actualValues[machineType][param];
+        // Convert empty strings to null, but preserve "0" as 0
+        if (value === "") {
+          processedActualValues[machineType][param] = null;
+        } else if (value === "0" || value === 0) {
+          processedActualValues[machineType][param] = 0;
+        } else {
+          processedActualValues[machineType][param] = value;
+        }
+      });
     });
 
     // 2. Build FormData
@@ -306,7 +333,7 @@ const handleActualValueChange = (machineType, param, value) => {
     formData.append('processData', JSON.stringify(processData));
     formData.append('defectData', JSON.stringify(defectDataWithPassRate));
     formData.append('standardValues', JSON.stringify(standardValues));
-    formData.append('actualValues', JSON.stringify(actualValues));
+    formData.append('actualValues', JSON.stringify(processedActualValues)); // Use processed values
     formData.append('machineStatus', JSON.stringify(machineStatus));
     
     // 3. Append images
@@ -326,32 +353,30 @@ const handleActualValueChange = (machineType, param, value) => {
 
     const result = await response.json();
     if (result.success) {
-        Swal.fire({
-          icon: 'success',
-          title: 'Inspection data saved!',
-          showConfirmButton: false,
-          timer: 1000, 
-          timerProgressBar: true,
-          position: 'top-end', 
-          toast: true
-        });
-        if (onLoadSavedDataById) onLoadSavedDataById(recordId);
-
-        setIsSaved(true);
-        setIsEditing(false);
-        if (onLoadSavedDataById) onLoadSavedDataById(recordId);
-        if (activateNextSection) activateNextSection();
-      } else {
-        Swal.fire({
-          icon: 'error',
-          title: result.message || "Failed to save inspection data",
-          showConfirmButton: false,
-          timer: 2000,
-          timerProgressBar: true,
-          position: 'top-end',
-          toast: true
-        });
-      }
+      Swal.fire({
+        icon: 'success',
+        title: 'Inspection data saved!',
+        showConfirmButton: false,
+        timer: 1000, 
+        timerProgressBar: true,
+        position: 'top-end', 
+        toast: true
+      });
+      if (onLoadSavedDataById) onLoadSavedDataById(recordId);
+      setIsSaved(true);
+      setIsEditing(false);
+      if (activateNextSection) activateNextSection();
+    } else {
+      Swal.fire({
+        icon: 'error',
+        title: result.message || "Failed to save inspection data",
+        showConfirmButton: false,
+        timer: 2000,
+        timerProgressBar: true,
+        position: 'top-end',
+        toast: true
+      });
+    }
   } catch (err) {
     Swal.fire({
       icon: 'error',
@@ -362,7 +387,6 @@ const handleActualValueChange = (machineType, param, value) => {
       position: 'top-end',
       toast: true
     });
-    console.error(err);
   }
 };
 
@@ -371,6 +395,7 @@ const handleUpdateInspection = async () => {
     alert("Order details must be saved first!");
     return;
   }
+  
   try {
     // 1. Calculate passRate/result for each defect
     const defectDataWithPassRate = defectData.map(item => {
@@ -378,11 +403,29 @@ const handleUpdateInspection = async () => {
       const failedQty = Number(item.failedQty) || 0;
       const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
       const result = passRate >= 95 ? "Pass" : passRate >= 90 ? "Pass" : "Fail";
+
       return {
         ...item,
         passRate,
         result,
       };
+    });
+
+    // Process actualValues to ensure 0 values are preserved
+    const processedActualValues = {};
+    Object.keys(actualValues).forEach(machineType => {
+      processedActualValues[machineType] = {};
+      Object.keys(actualValues[machineType]).forEach(param => {
+        const value = actualValues[machineType][param];
+        // Convert empty strings to null, but preserve "0" as 0
+        if (value === "") {
+          processedActualValues[machineType][param] = null;
+        } else if (value === "0" || value === 0) {
+          processedActualValues[machineType][param] = 0;
+        } else {
+          processedActualValues[machineType][param] = value;
+        }
+      });
     });
 
     // 2. Build FormData
@@ -392,7 +435,7 @@ const handleUpdateInspection = async () => {
     formData.append('processData', JSON.stringify(processData));
     formData.append('defectData', JSON.stringify(defectDataWithPassRate));
     formData.append('standardValues', JSON.stringify(standardValues));
-    formData.append('actualValues', JSON.stringify(actualValues));
+    formData.append('actualValues', JSON.stringify(processedActualValues)); // Use processed values
     formData.append('machineStatus', JSON.stringify(machineStatus));
 
     // 3. Append images
@@ -404,7 +447,6 @@ const handleUpdateInspection = async () => {
       });
     });
 
-
     // 4. Send to backend (NEW ENDPOINT)
     const response = await fetch(`${API_BASE_URL}/api/qc-washing/inspection-update`, {
       method: "POST",
@@ -412,7 +454,6 @@ const handleUpdateInspection = async () => {
     });
 
     const result = await response.json();
-
     if (result.success) {
       Swal.fire({
         icon: 'success',
@@ -423,12 +464,9 @@ const handleUpdateInspection = async () => {
         position: 'top-end',
         toast: true
       });
-     if (onLoadSavedDataById) onLoadSavedDataById(recordId);
-
-
+      if (onLoadSavedDataById) onLoadSavedDataById(recordId);
       setIsSaved(true);
       setIsEditing(false);
-      // Optionally: activateNextSection();
     } else {
       Swal.fire({
         icon: 'error',
@@ -453,6 +491,7 @@ const handleUpdateInspection = async () => {
     console.error(err);
   }
 };
+
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -484,17 +523,43 @@ async function stripFileFromImagesAsync(inspectionData) {
   })));
 }
 
-
-
-
   // Handle decision change
-  const handleDecisionChange = (index, value) => {
-    setInspectionData(prev =>
-      prev.map((item, i) =>
-        i === index ? { ...item, decision: value } : item
-      )
-    );
-  };
+  // Handle decision change with auto-fill remark only for Fiber
+const handleDecisionChange = (index, value) => {
+  setInspectionData(prev =>
+    prev.map((item, i) => {
+      if (i === index) {
+        let autoRemark = item.remark; // Keep existing remark by default
+        
+        // Auto-fill remark ONLY when checkedList is "Fiber"
+        if (item.checkedList === "Fiber") {
+          switch (value) {
+            case "1":
+              autoRemark = t("qcWashing.fiber 01");
+              break;
+            case "2":
+              autoRemark = t("qcWashing.fiber 02");
+              break;
+            case "3":
+              autoRemark = t("qcWashing.fiber 03");
+              break;
+            default:
+              autoRemark = "";
+          }
+        }
+        // For all other checkedList items, remark remains unchanged
+        
+        return { 
+          ...item, 
+          decision: value,
+          remark: autoRemark
+        };
+      }
+      return item;
+    })
+  );
+};
+
 
   // Handle image upload/capture
   const handleImageChange = (index, files) => {
@@ -512,6 +577,34 @@ async function stripFileFromImagesAsync(inspectionData) {
       )
     );
   };
+
+  // Add this useEffect after your existing useEffects
+useEffect(() => {
+  // Update existing fiber remarks when language changes
+  setInspectionData(prev =>
+    prev.map(item => {
+      if (item.checkedList === "Fiber" && item.decision && item.decision !== "ok") {
+        let newRemark = "";
+        switch (item.decision) {
+          case "1":
+            newRemark = t("qcWashing.fiber 01");
+            break;
+          case "2":
+            newRemark = t("qcWashing.fiber 02");
+            break;
+          case "3":
+            newRemark = t("qcWashing.fiber 03");
+            break;
+          default:
+            newRemark = item.remark; // Keep existing remark for other cases
+        }
+        return { ...item, remark: newRemark };
+      }
+      return item;
+    })
+  );
+}, [t, setInspectionData]); // Depend on 't' to trigger when language changes
+
 
   // Remove image
   const handleRemoveImage = (index, imgIdx) => {
@@ -808,7 +901,7 @@ async function stripFileFromImagesAsync(inspectionData) {
                           <div className="text-center">
                             <label className="block text-xs text-gray-600 dark:text-gray-100 mb-1">Standard</label>
                             <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded font-mono text-sm dark:text-white">
-                              {standardValue}
+                              {standardValue === "" || standardValue === null || standardValue === undefined ? "" : standardValue}
                             </div>
                           </div>
                           
@@ -817,7 +910,7 @@ async function stripFileFromImagesAsync(inspectionData) {
                             <label className="block text-xs text-gray-600 dark:text-gray-100 mb-1">Actual</label>
                             <input
                               type="text"
-                              value={actualValue}
+                              value={actualValue === null || actualValue === undefined ? "" : String(actualValue)}
                               onChange={(e) => handleActualValueChange(type.value, param.key, e.target.value)}
                               disabled={!isEditing}
                               className="w-full px-3 py-2 text-sm border rounded text-center font-mono dark:bg-gray-600 dark:text-white dark:border-gray-500 disabled:bg-gray-200 dark:disabled:bg-gray-700"

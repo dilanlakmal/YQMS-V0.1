@@ -26834,16 +26834,20 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
     Object.entries(machineTypes).forEach(([machineType, parameters]) => {
       const machineProcess = { machineType };
       
-      parameters.forEach(param => {
-        machineProcess[param] = {
-          actualValue: actualValues[machineType]?.[param] || "",
-          standardValue: standardValues[machineType]?.[param] || "",
-          status: {
-            ok: machineStatus[machineType]?.[param]?.ok || false,
-            no: machineStatus[machineType]?.[param]?.no || false
-          }
-        };
-      });
+        parameters.forEach(param => {
+          const actualVal = actualValues[machineType]?.[param];
+          const standardVal = standardValues[machineType]?.[param];
+          
+          machineProcess[param] = {
+            actualValue: actualVal === null || actualVal === undefined ? "" : actualVal,
+            standardValue: standardVal === null || standardVal === undefined ? "" : standardVal,
+            status: {
+              ok: machineStatus[machineType]?.[param]?.ok || false,
+              no: machineStatus[machineType]?.[param]?.no || false
+            }
+          };
+        });
+
       
       machineProcesses.push(machineProcess);
     });
@@ -26936,16 +26940,20 @@ app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async
     Object.entries(machineTypes).forEach(([machineType, parameters]) => {
       const machineProcess = { machineType };
       
-      parameters.forEach(param => {
-        machineProcess[param] = {
-          actualValue: actualValues[machineType]?.[param] || "",
-          standardValue: standardValues[machineType]?.[param] || "",
-          status: {
-            ok: machineStatus[machineType]?.[param]?.ok || false,
-            no: machineStatus[machineType]?.[param]?.no || false
-          }
-        };
-      });
+        parameters.forEach(param => {
+          const actualVal = actualValues[machineType]?.[param];
+          const standardVal = standardValues[machineType]?.[param];
+          
+          machineProcess[param] = {
+            actualValue: actualVal === null || actualVal === undefined ? "" : actualVal,
+            standardValue: standardVal === null || standardVal === undefined ? "" : standardVal,
+            status: {
+              ok: machineStatus[machineType]?.[param]?.ok || false,
+              no: machineStatus[machineType]?.[param]?.no || false
+            }
+          };
+        });
+
       
       machineProcesses.push(machineProcess);
     });

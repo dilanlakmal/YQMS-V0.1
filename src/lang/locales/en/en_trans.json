@@ -1988,5 +1988,11 @@
     "qcWashingTab": "Washing QC",
     "supplierIssuesTab": "Supplier Issues",
     "contentComingSoon": "This section is under development. Content will be available soon."
+  },
+
+  "qcWashing":{
+    "fiber 01": "Cleaning must be done by fabric mill.",
+    "fiber 02": "YM doing the cleaning, front & back side.",
+    "fiber 03": "Randomly 2-3 pcs back side hairly can acceptable."
   }
 }
