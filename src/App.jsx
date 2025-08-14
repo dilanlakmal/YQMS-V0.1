@@ -50,7 +50,7 @@ import ANFMeasurementVer2 from "./pages/ANFMeasurementVer2.jsx";
 import CEMasterList from "./pages/CEMasterList.jsx";
 import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurement/ANFMeasurementQCViewFullReport.jsx";
 import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFStyleViewFullReport";
-import QCWashingPage from "./pages/QCWashing.jsx";
+
 
 //Languages
 import "../src/lang/i18n";
