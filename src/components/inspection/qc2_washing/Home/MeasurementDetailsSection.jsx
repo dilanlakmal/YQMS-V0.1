@@ -37,17 +37,22 @@ const MeasurementDetailsSection = ({
   const [noMeasurementData, setNoMeasurementData] = useState(false);
   const [lastSelectedPattern, setLastSelectedPattern] = useState({
       beforeWash: null,
-      afterWash: null
+      afterWash: null,
+      beforeWashKValue: null,  
+      afterWashKValue: null 
     });
 
   const currentWashMeasurements = (before_after_wash === 'Before Wash' ? measurementData.beforeWash : measurementData.afterWash) || [];
 
   const saveMeasurementPattern = (size, selectedRows, tableType) => {
   const washType = tableType === 'before' ? 'beforeWash' : 'afterWash';
+  const kValueField = tableType === 'before' ? 'beforeWashKValue' : 'afterWashKValue';
+  const currentKValue = tableType === 'before' ? activeBeforeTab : activeAfterTab;
   
   setLastSelectedPattern(prev => ({
     ...prev,
-    [washType]: selectedRows
+    [washType]: selectedRows,
+    [kValueField]: currentKValue 
   }));
 };
 
@@ -345,14 +350,35 @@ const handleEditClick = (sizeToEdit) => {
     const newSize = { size: sizeStr, qty: 5 };
     setSelectedSizes(prev => [...prev, newSize]);
     
-    // Get the appropriate specs for the current wash type
-    const specs = before_after_wash === 'Before Wash'
-      ? (measurementSpecs.beforeWashGrouped[activeBeforeTab] || measurementSpecs.beforeWash)
-      : (measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash);
-    
-    // Get the last pattern for the current wash type
+    // Get the wash type and corresponding saved pattern
     const washType = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
+    const kValueField = before_after_wash === 'Before Wash' ? 'beforeWashKValue' : 'afterWashKValue'; // DEFINE IT HERE
     const lastPattern = lastSelectedPattern[washType];
+    const lastKValue = lastSelectedPattern[kValueField];
+    
+    // If we have a saved K-value, apply it
+    if (lastKValue) {
+      if (before_after_wash === 'Before Wash') {
+        // Check if the saved K-value exists in current options
+        if (Object.keys(measurementSpecs.beforeWashGrouped).includes(lastKValue)) {
+          setActiveBeforeTab(lastKValue);
+        }
+      } else {
+        // Check if the saved K-value exists in current options
+        if (Object.keys(measurementSpecs.afterWashGrouped).includes(lastKValue)) {
+          setActiveAfterTab(lastKValue);
+        }
+      }
+    }
+    
+    // Get the appropriate specs for the current wash type (using potentially updated K-value)
+    const currentKValue = before_after_wash === 'Before Wash' ? 
+      (lastKValue && Object.keys(measurementSpecs.beforeWashGrouped).includes(lastKValue) ? lastKValue : activeBeforeTab) :
+      (lastKValue && Object.keys(measurementSpecs.afterWashGrouped).includes(lastKValue) ? lastKValue : activeAfterTab);
+    
+    const specs = before_after_wash === 'Before Wash'
+      ? (measurementSpecs.beforeWashGrouped[currentKValue] || measurementSpecs.beforeWash)
+      : (measurementSpecs.afterWashGrouped[currentKValue] || measurementSpecs.afterWash);
     
     // If we have a saved pattern and it matches the current specs length, use it
     // Otherwise, default to all unselected
@@ -388,7 +414,6 @@ const handleEditClick = (sizeToEdit) => {
     }
   }
 };
-
 
   const removeSize = (size) => {
     setSelectedSizes(prev => prev.filter(s => s.size !== size));
@@ -501,12 +526,18 @@ useEffect(() => {
 // Function to check if current selection matches the saved pattern
 const isPatternAutoApplied = (size) => {
   const washType = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
+  const kValueField = before_after_wash === 'Before Wash' ? 'beforeWashKValue' : 'afterWashKValue';
   const lastPattern = lastSelectedPattern[washType];
+  const lastKValue = lastSelectedPattern[kValueField];
   const currentSelection = selectedRowsBySize[size];
+  const currentKValue = before_after_wash === 'Before Wash' ? activeBeforeTab : activeAfterTab;
   
-  if (!lastPattern || !currentSelection) return false;
+if (!lastPattern || !currentSelection || !lastKValue) return false;
   
-  return JSON.stringify(lastPattern) === JSON.stringify(currentSelection);
+  const patternMatches = JSON.stringify(lastPattern) === JSON.stringify(currentSelection);
+  const kValueMatches = lastKValue === currentKValue;
+  
+  return patternMatches && kValueMatches;
 };
 
 
