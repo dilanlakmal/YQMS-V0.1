@@ -35,9 +35,21 @@ const MeasurementDetailsSection = ({
   const [currentCell, setCurrentCell] = useState({ size: null, table: null, rowIndex: null, colIndex: null });
   const [measurementValues, setMeasurementValues] = useState({});
   const [noMeasurementData, setNoMeasurementData] = useState(false);
-
+  const [lastSelectedPattern, setLastSelectedPattern] = useState({
+      beforeWash: null,
+      afterWash: null
+    });
 
   const currentWashMeasurements = (before_after_wash === 'Before Wash' ? measurementData.beforeWash : measurementData.afterWash) || [];
+
+  const saveMeasurementPattern = (size, selectedRows, tableType) => {
+  const washType = tableType === 'before' ? 'beforeWash' : 'afterWash';
+  
+  setLastSelectedPattern(prev => ({
+    ...prev,
+    [washType]: selectedRows
+  }));
+};
 
   const transformMeasurementData = (
       size,
@@ -332,16 +344,51 @@ const handleEditClick = (sizeToEdit) => {
   if (!selectedSizes.find(s => s.size === sizeStr)) {
     const newSize = { size: sizeStr, qty: 5 };
     setSelectedSizes(prev => [...prev, newSize]);
-    // Set all measurement points to unselected for this size
+    
+    // Get the appropriate specs for the current wash type
     const specs = before_after_wash === 'Before Wash'
       ? (measurementSpecs.beforeWashGrouped[activeBeforeTab] || measurementSpecs.beforeWash)
       : (measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash);
+    
+    // Get the last pattern for the current wash type
+    const washType = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
+    const lastPattern = lastSelectedPattern[washType];
+    
+    // If we have a saved pattern and it matches the current specs length, use it
+    // Otherwise, default to all unselected
+    const initialSelection = (lastPattern && lastPattern.length === specs.length) 
+      ? [...lastPattern]  // Copy the last pattern
+      : Array(specs.length).fill(false);  // Default to all unselected
+    
     setSelectedRowsBySize(prev => ({
       ...prev,
-      [sizeStr]: Array(specs.length).fill(false)
+      [sizeStr]: initialSelection
     }));
+    
+    // If we applied a pattern, also initialize the measurement values for selected rows
+    if (lastPattern && lastPattern.length === specs.length) {
+      const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
+      setMeasurementValues(prevValues => {
+        const newValues = { ...prevValues };
+        
+        // Initialize values for selected rows
+        lastPattern.forEach((isSelected, rowIndex) => {
+          if (isSelected) {
+            for (let colIndex = 0; colIndex < 5; colIndex++) { // Default qty is 5
+              const cellKey = `${sizeStr}-${tableType}-${rowIndex}-${colIndex}`;
+              if (!newValues[cellKey]) {
+                newValues[cellKey] = { decimal: 0, fraction: '0' };
+              }
+            }
+          }
+        });
+        
+        return newValues;
+      });
+    }
   }
 };
+
 
   const removeSize = (size) => {
     setSelectedSizes(prev => prev.filter(s => s.size !== size));
@@ -451,6 +498,16 @@ useEffect(() => {
   hydrateMeasurementUIFromSavedData(dataArr, before_after_wash === 'Before Wash' ? 'before' : 'after');
 }, [measurementData, before_after_wash]);
 
+// Function to check if current selection matches the saved pattern
+const isPatternAutoApplied = (size) => {
+  const washType = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
+  const lastPattern = lastSelectedPattern[washType];
+  const currentSelection = selectedRowsBySize[size];
+  
+  if (!lastPattern || !currentSelection) return false;
+  
+  return JSON.stringify(lastPattern) === JSON.stringify(currentSelection);
+};
 
 
   const renderMeasurementTable = (size, qty) => {
@@ -460,6 +517,13 @@ useEffect(() => {
         <h4 className="text-lg font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-white">
           Size: {size} (Qty: {qty})
         </h4>
+
+        {isPatternAutoApplied(size) && (
+          <div className="mb-2 p-2 bg-blue-100 border border-blue-300 rounded text-sm text-blue-700 dark:bg-blue-900 dark:text-blue-200">
+            <span className="font-medium">📋 Pattern Applied:</span> Measurement points from previous size have been automatically selected. You can modify them as needed.
+          </div>
+        )}
+
         
         {/* K1 Sheet - Before Wash */}
         {before_after_wash === 'Before Wash' && (
@@ -1079,6 +1143,7 @@ useEffect(() => {
                               }
 
                                const transformedData = transformMeasurementData(size, qty, measurementValues, selectedRowsBySize[size], fullColumnsBySize[size], specsForSubmit, tableType, kvalue);
+                               saveMeasurementPattern(size, selectedRowsBySize[size], tableType);
                               onSizeSubmit(transformedData);
                             }}
                             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"

@@ -173,7 +173,8 @@ function machineProcessesToObject(machineProcesses) {
     obj[proc.machineType] = {
       temperature: proc.temperature || "",
       time: proc.time || "",
-      chemical: proc.chemical || ""
+      silicon: proc.silicon || "",
+      softener: proc.softener || ""
     };
   });
   return obj;
@@ -282,7 +283,8 @@ const activateNextSection = (currentSection) => {
   });
 };
 
-  const fetchOverallSummary = async (recordId) => {
+  
+const fetchOverallSummary = async (recordId) => {
   if (!recordId) return;
   try {
     const response = await fetch(`${API_BASE_URL}/api/qc-washing/overall-summary-by-id/${recordId}`);
@@ -298,11 +300,10 @@ const activateNextSection = (currentSection) => {
   }
 };
 
-
   // State: Inspection, Defect, Measurement
   const [inspectionData, setInspectionData] = useState([]);
   const [processData, setProcessData] = useState({
-  "Washing Machine": { temperature: "", time: "", chemical: "" },
+  "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
   "Tumble Dry": { temperature: "", time: "" }
 });
   const defaultDefectData = [
@@ -340,6 +341,29 @@ const activateNextSection = (currentSection) => {
 
   // State: Cache for color-specific data to prevent data loss on switching
   const [colorDataCache, setColorDataCache] = useState({});
+
+  const [standardValues, setStandardValues] = useState({
+    "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+    "Tumble Dry": { temperature: "", time: "" }
+  });
+
+  const [actualValues, setActualValues] = useState({
+    "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+    "Tumble Dry": { temperature: "", time: "" }
+  });
+
+  const [machineStatus, setMachineStatus] = useState({
+    "Washing Machine": {
+      temperature: { ok: true, no: false },
+      time: { ok: true, no: false },
+      silicon: { ok: true, no: false },
+      softener: { ok: true, no: false }
+    },
+    "Tumble Dry": {
+      temperature: { ok: true, no: false },
+      time: { ok: true, no: false }
+    }
+  });
 
   // Section Toggle
   const toggleSection = (section) => {
@@ -734,14 +758,14 @@ useEffect(() => {
           sampleSize: saved.formData?.aqlSampleSize || prev.aql?.[0]?.sampleSize || "",
           acceptedDefect: saved.formData?.aqlAcceptedDefect || prev.aql?.[0]?.acceptedDefect || "",
           rejectedDefect: saved.formData?.aqlRejectedDefect || prev.aql?.[0]?.rejectedDefect || "",
-          levelUsed: saved.formData?.aqlLevelUsed || prev.aql?.[0]?.levelUsed || "",
+          levelUsed: saved.aql?.[0]?.levelUsed || saved.formData?.aqlLevelUsed || "",
         }],
     }));
 
     setInspectionData(
   (saved.inspectionDetails?.checkedPoints || []).map(item => ({
     checkedList: item.pointName || "",
-    decision: item.decision === true ? "ok" : item.decision === false ? "no" : "",
+    decision: item.decision === true ? "ok" : item.decision === false ? "no" : item.decision || "",
     comparisonImages: (item.comparison || []).filter(Boolean).map(img => ({
       file: null,
       preview: normalizeImageSrc(img),
@@ -753,15 +777,58 @@ useEffect(() => {
   }))
 );
 
-
 // 2. Process Data (Machine Processes)
+// In your loadSavedDataById function, update the machine processes handling:
 if (saved.inspectionDetails?.machineProcesses) {
-  setProcessData(machineProcessesToObject(saved.inspectionDetails.machineProcesses));
+  const processDataFromSaved = {};
+  
+  saved.inspectionDetails.machineProcesses.forEach(machine => {
+    const machineType = machine.machineType;
+    processDataFromSaved[machineType] = {};
+    
+    // Extract the parameters based on machine type
+    const parameters = machineType === "Washing Machine" 
+      ? ["temperature", "time", "silicon", "softener"]
+      : ["temperature", "time"];
+    
+    parameters.forEach(param => {
+      if (machine[param]) {
+        // Set standard values
+        setStandardValues(prev => ({
+          ...prev,
+          [machineType]: {
+            ...prev[machineType],
+            [param]: machine[param].standardValue || ""
+          }
+        }));
+        
+        // Set actual values
+        setActualValues(prev => ({
+          ...prev,
+          [machineType]: {
+            ...prev[machineType],
+            [param]: machine[param].actualValue || ""
+          }
+        }));
+        
+        // Set machine status
+        setMachineStatus(prev => ({
+          ...prev,
+          [machineType]: {
+            ...prev[machineType],
+            [param]: {
+              ok: machine[param].status?.ok || false,
+              no: machine[param].status?.no || false
+            }
+          }
+        }));
+      }
+    });
+  });
+  
+  setProcessData(processDataFromSaved);
 }
-    if (saved.processData && Array.isArray(saved.processData.machineProcesses)) {
-      setProcessData(machineProcessesToObject(saved.processData.machineProcesses));
-    }
-    setDefectData(
+setDefectData(
   (saved.inspectionDetails?.parameters || []).map(param => ({
     parameter: param.parameterName || param.parameter || "",
     checkedQty: param.checkedQty || 0,
@@ -775,6 +842,7 @@ if (saved.inspectionDetails?.machineProcesses) {
     checkboxes: param.checkboxes || {},
   }))
 );
+
     setAddedDefects(saved.addedDefects || []);
     setDefectsByPc(transformDefectsByPc(saved.defectDetails?.defectsByPc || {}));
     setUploadedImages(
@@ -942,7 +1010,7 @@ if (saved.inspectionDetails?.machineProcesses) {
           aql:[{sampleSize: data.aqlData.sampleSize,
           acceptedDefect: data.aqlData.acceptedDefect,
           rejectedDefect: data.aqlData.rejectedDefect,
-          levelUsed: data.aqlData.aqlLevelUsed}],
+          levelUsed: data.aqlData.levelUsed}],
           washQty: data.checkedQty,
         }));
       } else {
@@ -1016,7 +1084,7 @@ if (saved.inspectionDetails?.machineProcesses) {
             sampleSize: data.aqlData.sampleSize,
             acceptedDefect: data.aqlData.acceptedDefect,
             rejectedDefect: data.aqlData.rejectedDefect,
-            levelUsed: data.aqlData.aqlLevelUsed,
+            levelUsed: data.aqlData.levelUsed,
           }]
         }));
       } else {
@@ -1582,6 +1650,13 @@ const autoSaveOverallSummary = async (summary, recordId) => {
           setDefectData={setDefectData} 
           activateNextSection={() => activateNextSection('inspectionData')}
           recordId={recordId}
+          washType={formData.washType}
+          standardValues={standardValues}
+          setStandardValues={setStandardValues}
+          actualValues={actualValues}
+          setActualValues={setActualValues}
+          machineStatus={machineStatus}
+          setMachineStatus={setMachineStatus}
         />
         )}
         {sectionVisibility.defectDetails && (

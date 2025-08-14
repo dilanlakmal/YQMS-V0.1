@@ -1,5 +1,5 @@
 import {useState, useRef,  useEffect} from 'react';
-import { FaThermometerHalf, FaClock, FaFlask, FaPlus, FaTrash, FaMinus, FaUpload, FaCamera } from "react-icons/fa";
+import { FaThermometerHalf, FaClock, FaFlask, FaPlus, FaTrash, FaMinus, FaUpload, FaCamera, FaTint } from "react-icons/fa";
 import { API_BASE_URL } from "../../../../../config";
 import Swal from 'sweetalert2';
 import PropTypes from 'prop-types';
@@ -18,7 +18,8 @@ const machineTypes = [
     parameters: [
       { key: "temperature", label: "Temp", unit: "°C" },
       { key: "time", label: "Time", unit: "min" },
-      { key: "chemical", label: "Chem", unit: "gram" },
+      { key: "silicon", label: "Silicon", unit: "gram" },
+      { key: "softener", label: "Softener", unit: "gram" },
     ],
   },
   {
@@ -46,6 +47,13 @@ const InspectionDataSection = ({
   recordId,
   activateNextSection,
    onLoadSavedDataById,
+   washType,
+   standardValues,
+  setStandardValues,
+  actualValues,
+  setActualValues,
+  machineStatus,
+  setMachineStatus,
 }) => {
 
   const uploadRefs = useRef([]);
@@ -53,6 +61,40 @@ const InspectionDataSection = ({
   const [previewImage, setPreviewImage] = useState(null);
   const [isSaved, setIsSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(true);
+
+  
+
+useEffect(() => {
+  const fetchStandardValues = async () => {
+    if (!washType) return;
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/standards`);
+      const data = await response.json();
+      
+      if (data.success) {
+        const standardRecord = data.data.find(record => record.washType === washType);
+        if (standardRecord) {
+          setStandardValues({
+            "Washing Machine": standardRecord.washingMachine || { temperature: "", time: "", silicon: "", softener: "" },
+            "Tumble Dry": standardRecord.tumbleDry || { temperature: "", time: "" }
+          });
+          
+          // Initialize actual values with standard values when OK is selected
+          setActualValues({
+            "Washing Machine": standardRecord.washingMachine || { temperature: "", time: "", silicon: "", softener: "" },
+            "Tumble Dry": standardRecord.tumbleDry || { temperature: "", time: "" }
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching standard values:", error);
+    }
+  };
+
+  fetchStandardValues();
+}, [washType]);
+
 
   useEffect(() => {
   const qty = Number(washQty);
@@ -153,6 +195,90 @@ const InspectionDataSection = ({
     });
   };
 
+const handleStatusChange = (machineType, param, status) => {
+  setMachineStatus(prev => ({
+    ...prev,
+    [machineType]: {
+      ...prev[machineType],
+      [param]: {
+        ok: status === 'ok',
+        no: status === 'no'
+      }
+    }
+  }));
+
+  // If OK is selected, set actual value to standard value
+  if (status === 'ok') {
+    setActualValues(prev => ({
+      ...prev,
+      [machineType]: {
+        ...prev[machineType],
+        [param]: standardValues[machineType][param] || ""
+      }
+    }));
+  }
+  // If No is selected, clear the actual value field
+  else if (status === 'no') {
+    setActualValues(prev => ({
+      ...prev,
+      [machineType]: {
+        ...prev[machineType],
+        [param]: ""
+      }
+    }));
+  }
+};
+
+const handleActualValueChange = (machineType, param, value) => {
+  // Update the actual value
+  setActualValues(prev => ({
+    ...prev,
+    [machineType]: {
+      ...prev[machineType],
+      [param]: value
+    }
+  }));
+
+  // Auto-update status based on value comparison with standard
+  const standardValue = standardValues[machineType][param];
+  
+  // Convert both values to strings for comparison to handle number/string differences
+  const standardStr = String(standardValue || "").trim();
+  const actualStr = String(value || "").trim();
+  
+  console.log(`Comparing: "${actualStr}" === "${standardStr}"`, actualStr === standardStr); // Debug log
+  
+  // If actual value equals standard value, set to OK (regardless of previous status)
+  // If actual value is different from standard value, set to No
+  // If actual value is empty, don't change the status automatically
+  if (actualStr !== "" && actualStr === standardStr) {
+    console.log("Setting to OK"); // Debug log
+    setMachineStatus(prev => ({
+      ...prev,
+      [machineType]: {
+        ...prev[machineType],
+        [param]: {
+          ok: true,
+          no: false
+        }
+      }
+    }));
+  } else if (actualStr !== "" && actualStr !== standardStr) {
+    console.log("Setting to No"); // Debug log
+    setMachineStatus(prev => ({
+      ...prev,
+      [machineType]: {
+        ...prev[machineType],
+        [param]: {
+          ok: false,
+          no: true
+        }
+      }
+    }));
+  }
+  // If value is empty, don't change the status automatically
+};
+
 
   const handleSaveInspection = async () => {
   if (!recordId) {
@@ -179,6 +305,9 @@ const InspectionDataSection = ({
     formData.append('inspectionData', JSON.stringify(inspectionData));
     formData.append('processData', JSON.stringify(processData));
     formData.append('defectData', JSON.stringify(defectDataWithPassRate));
+    formData.append('standardValues', JSON.stringify(standardValues));
+    formData.append('actualValues', JSON.stringify(actualValues));
+    formData.append('machineStatus', JSON.stringify(machineStatus));
     
     // 3. Append images
     inspectionData.forEach((item, idx) => {
@@ -262,6 +391,9 @@ const handleUpdateInspection = async () => {
     formData.append('inspectionData', JSON.stringify(inspectionData));
     formData.append('processData', JSON.stringify(processData));
     formData.append('defectData', JSON.stringify(defectDataWithPassRate));
+    formData.append('standardValues', JSON.stringify(standardValues));
+    formData.append('actualValues', JSON.stringify(actualValues));
+    formData.append('machineStatus', JSON.stringify(machineStatus));
 
     // 3. Append images
     inspectionData.forEach((item, idx) => {
@@ -491,27 +623,57 @@ async function stripFileFromImagesAsync(inspectionData) {
                 <tr key={idx}>
                   <td className="border px-4 py-2 dark:text-white">{item.checkedList}</td>
                   <td className="border px-4 py-2 text-center dark:text-white">
-                    <label className="dark:border-gray-600 dark:text-white">
-                      <input
-                        type="checkbox"
-                        name={`decision-${idx}`}
-                        checked={item.decision === "ok"}
-                        onChange={() => handleDecisionChange(idx, "ok")}
-                        className="mr-2 dark:bg-gray-700 dark:checked:bg-indigo-500 dark:border-gray-600 dark:text-white disabled:bg-gray-400"
-                        disabled={!isEditing}
-                      /> Ok
-                    </label>
-                    <label className="ml-2 dark:border-gray-600 dark:text-white">
-                      <input
-                        type="checkbox"
-                        name={`decision-${idx}`}
-                        checked={item.decision === "no"}
-                        onChange={() => handleDecisionChange(idx, "no")}
-                        className="mr-2 dark:bg-gray-700 dark:checked:bg-indigo-500 dark:border-gray-600 dark:text-white disabled:bg-gray-400"
-                        disabled={!isEditing}
-                      /> No
-                    </label>
+                    {item.checkedList === "Fiber" ? (
+                      <div className="flex items-center">
+                        <label>
+                          <input
+                            type="checkbox"
+                            name={`decision-${idx}`}
+                            checked={item.decision === "ok"}
+                            onChange={() => handleDecisionChange(idx, "ok")}
+                            disabled={!isEditing}
+                            className="mr-1"
+                          /> Ok
+                        </label>
+                        {[1, 2, 3].map(num => (
+                          <label key={num} className="ml-2">
+                            <input
+                              type="checkbox"
+                              name={`decision-${idx}`}
+                              checked={item.decision === String(num)}
+                              onChange={() => handleDecisionChange(idx, String(num))}
+                              disabled={!isEditing}
+                              className="mr-1"
+                            /> {num}
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center">
+                        <label>
+                          <input
+                            type="checkbox"
+                            name={`decision-${idx}`}
+                            checked={item.decision === "ok"}
+                            onChange={() => handleDecisionChange(idx, "ok")}
+                            disabled={!isEditing}
+                            className="mr-1"
+                          /> Ok
+                        </label>
+                        <label className="ml-2">
+                          <input
+                            type="checkbox"
+                            name={`decision-${idx}`}
+                            checked={item.decision === "no"}
+                            onChange={() => handleDecisionChange(idx, "no")}
+                            disabled={!isEditing}
+                            className="mr-1"
+                          /> No
+                        </label>
+                      </div>
+                    )}
                   </td>
+
                   <td className="border px-4 py-2 text-center grid grid-cols-1 md:grid-cols-2 gap-2">
                     {/* Upload Button */}
                     <button
@@ -602,57 +764,99 @@ async function stripFileFromImagesAsync(inspectionData) {
             </tbody>
             </table>
           </div>
-          <div className="mb-4 mt-4 grid gap-4 grid-cols-2 md:grid-cols-3">
+          <div className="mb-4 mt-4 grid gap-4 grid-cols-1 md:grid-cols-2">
             {machineTypes.map((type) => (
               <div
                 key={type.value}
-                className="bg-gray-50 dark:bg-gray-700 rounded-lg shadow p-3 flex flex-col "
+                className="bg-gray-50 dark:bg-gray-700 rounded-lg shadow p-3 flex flex-col"
               >
-                <div className="flex items-center space-x-2 mb-2">
+                <div className="flex items-center space-x-2 mb-3">
                   <span className="text-lg font-semibold dark:text-white">{type.label}</span>
                 </div>
-                <div className="flex flex-col space-y-2">
-                  {type.parameters.map((param) => (
-                    <div key={param.key} className="flex items-center space-x-1">
-                      {/* Icon */}
-                      {param.key === "temperature" && (
-                        <FaThermometerHalf className="text-blue-500" />
-                      )}
-                      {param.key === "time" && (
-                        <FaClock className="text-yellow-500" />
-                      )}
-                      {param.key === "chemical" && (
-                        <FaFlask className="text-green-500" />
-                      )}
-                      {/* Label */}
-                      <label className="text-sm font-medium dark:text-white min-w-[70px]">
-                        {param.label}:
-                      </label>
-                      {/* Input */}
-                      <input
-                        // type="number"
-                        // placeholder={param.label}
-                        value={processData[type.value]?.[param.key] || ""}
-                        onChange={e =>
-                          setProcessData(prev => ({
-                            ...prev,
-                            [type.value]: {
-                              ...prev[type.value],
-                              [param.key]: e.target.value
-                            }
-                          }))
-                        }
-                        className="w-12 md:w-24 px-3 py-2 border rounded-md dark:bg-gray-500 dark:text-white dark:border-gray-600 disabled:bg-gray-400"
-                        disabled={!isEditing}
-                      />
-                      {/* Unit */}
-                      <span className="text-sm dark:text-white">{param.unit}</span>
-                    </div>
-                  ))}
+                
+                <div className="space-y-4">
+                  {type.parameters.map((param) => {
+                    const isOk = machineStatus[type.value]?.[param.key]?.ok;
+                    const isNo = machineStatus[type.value]?.[param.key]?.no;
+                    const actualValue = actualValues[type.value]?.[param.key] || "";
+                    const standardValue = standardValues[type.value]?.[param.key] || "";
+                    
+                    return (
+                      <div key={param.key} className={`p-3 rounded-lg border-2 transition-colors ${
+                        isOk ? 'border-green-400 bg-green-50 dark:bg-green-900/20' : 
+                        isNo ? 'border-red-400 bg-red-50 dark:bg-red-900/20' : 
+                        'border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-600'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            {param.key === "temperature" && <FaThermometerHalf className="text-blue-500" />}
+                            {param.key === "time" && <FaClock className="text-yellow-500" />}
+                            {param.key === "silicon" && <FaFlask className="text-purple-500" />}
+                            {param.key === "softener" && <FaTint className="text-pink-500" />}
+                            <span className="font-medium dark:text-white">{param.label}</span>
+                          </div>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">{param.unit}</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {/* Standard Value */}
+                          <div className="text-center">
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Standard</label>
+                            <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded font-mono text-sm dark:text-white">
+                              {standardValue}
+                            </div>
+                          </div>
+                          
+                          {/* Actual Value */}
+                          <div className="text-center">
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Actual</label>
+                            <input
+                              type="text"
+                              value={actualValue}
+                              onChange={(e) => handleActualValueChange(type.value, param.key, e.target.value)}
+                              disabled={!isEditing}
+                              className="w-full px-3 py-2 text-sm border rounded text-center font-mono dark:bg-gray-600 dark:text-white dark:border-gray-500 disabled:bg-gray-200 dark:disabled:bg-gray-700"
+                              placeholder="Enter value"
+                            />
+                          </div>
+                          
+                          {/* Status */}
+                          <div className="text-center">
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Status</label>
+                            <div className="flex justify-center space-x-4">
+                              <label className="flex items-center cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name={`${type.value}-${param.key}`}
+                                  checked={isOk}
+                                  onChange={() => handleStatusChange(type.value, param.key, 'ok')}
+                                  disabled={!isEditing}
+                                  className="mr-1 text-green-500"
+                                />
+                                <span className="text-sm text-green-600 dark:text-green-400">OK</span>
+                              </label>
+                              <label className="flex items-center cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name={`${type.value}-${param.key}`}
+                                  checked={isNo}
+                                  onChange={() => handleStatusChange(type.value, param.key, 'no')}
+                                  disabled={!isEditing}
+                                  className="mr-1 text-red-500"
+                                />
+                                <span className="text-sm text-red-600 dark:text-red-400">No</span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
           </div>
+
           <div className="mt-8 pt-6 border-t border-gray-200">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse border border-gray-300 dark:border-gray-600">
@@ -873,6 +1077,13 @@ InspectionDataSection.propTypes = {
   recordId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   activateNextSection: PropTypes.func,
   onLoadSavedDataById: PropTypes.func,
+  washType: PropTypes.string,
+  standardValues: PropTypes.object.isRequired,
+  setStandardValues: PropTypes.func.isRequired,
+  actualValues: PropTypes.object.isRequired,
+  setActualValues: PropTypes.func.isRequired,
+  machineStatus: PropTypes.object.isRequired,
+  setMachineStatus: PropTypes.func.isRequired,
 };
 
 export default InspectionDataSection;

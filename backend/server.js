@@ -85,6 +85,7 @@ import createQCWorkersModel from "./models/QCWorkers.js";
 import createSupplierIssuesDefectModel from "./models/SupplierIssuesDefect.js";
 import createSupplierIssueReportModel from "./models/SupplierIssueReport.js";
 import createQC2OlderDefectModel from "./models/QC2_Older_Defects.js";
+import createQCWashingMachineStandard from "./models/qcWashingStanderd.js";
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
@@ -262,6 +263,7 @@ const SupplierIssuesDefect = createSupplierIssuesDefectModel(ymProdConnection);
 const QCWorkers = createQCWorkersModel(ymProdConnection);
 const SupplierIssueReport = createSupplierIssueReportModel(ymProdConnection);
 const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
+const QCWashingMachineStandard = createQCWashingMachineStandard(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -26558,6 +26560,38 @@ app.delete("/api/qc-washing-first-outputs/:id", async (req, res) => {
   }
 });
 
+// POST /api/qc-washing/standards
+app.post('/api/qc-washing/standards', async (req, res) => {
+  try {
+    const { washType, washingMachine, tumbleDry } = req.body;
+    if (!washType) return res.status(400).json({ success: false, message: "washType is required" });
+
+    let record = await QCWashingMachineStandard.findOne({ washType });
+    if (record) {
+      record.washingMachine = washingMachine;
+      record.tumbleDry = tumbleDry;
+      await record.save();
+    } else {
+      record = await QCWashingMachineStandard.create({ washType, washingMachine, tumbleDry });
+    }
+    res.json({ success: true, data: record });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/qc-washing/standards
+app.get('/api/qc-washing/standards', async (req, res) => {
+  try {
+    const records = await QCWashingMachineStandard.find({});
+    res.json({ success: true, data: records });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+
+
 //New QC_Washing Endpoints
 
 app.post("/api/qc-washing/orderData-save", async (req, res) => {
@@ -26737,6 +26771,10 @@ function normalizeInspectionImagePath(img) {
 
 
 app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (req, res) => {
+  const standardValues = JSON.parse(req.body.standardValues || '{}');
+  const actualValues = JSON.parse(req.body.actualValues || '{}');
+  const machineStatus = JSON.parse(req.body.machineStatus || '{}');
+
   try {
     const { recordId } = req.body;
     const inspectionData = JSON.parse(req.body.inspectionData || '[]');
@@ -26747,20 +26785,18 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
       return res.status(400).json({ success: false, message: "recordId is required" });
     }
 
-    // Ensure upload directory exists
+    // Handle file uploads (existing code)
     const uploadDir = path.join(__dirname, '../public/storage/qc_washing_images/inspection');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
 
-    // Map uploaded files by fieldname and write them to disk
     const fileMap = {};
     for (const file of (req.files || [])) {
       const fileExtension = path.extname(file.originalname);
       const newFilename = `inspection-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
       const fullFilePath = path.join(uploadDir, newFilename);
       await fs.promises.writeFile(fullFilePath, file.buffer);
-      // Save relative path for DB
       fileMap[file.fieldname] = `/public/storage/qc_washing_images/inspection/${newFilename}`;
     }
 
@@ -26770,25 +26806,49 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
       record = new QCWashing({ _id: recordId });
     }
 
-    // Build checkedPoints with correct image URLs
+    // Build machine processes with the new structure
+    const machineProcesses = [];
+    
+    // Define the machine types and their parameters
+    const machineTypes = {
+      "Washing Machine": ["temperature", "time", "silicon", "softener"],
+      "Tumble Dry": ["temperature", "time"]
+    };
+
+    Object.entries(machineTypes).forEach(([machineType, parameters]) => {
+      const machineProcess = { machineType };
+      
+      parameters.forEach(param => {
+        machineProcess[param] = {
+          actualValue: actualValues[machineType]?.[param] || "",
+          standardValue: standardValues[machineType]?.[param] || "",
+          status: {
+            ok: machineStatus[machineType]?.[param]?.ok || false,
+            no: machineStatus[machineType]?.[param]?.no || false
+          }
+        };
+      });
+      
+      machineProcesses.push(machineProcess);
+    });
+
+    // Build the inspection details
     record.inspectionDetails = {
       ...record.inspectionDetails,
       checkedPoints: (inspectionData || []).map((item, idx) => ({
         pointName: item.checkedList,
-        decision: item.decision === "ok",
+        decision: item.decision,
         comparison: (item.comparisonImages || []).map((img, imgIdx) => {
           if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
             return fileMap[`comparisonImages_${idx}_${imgIdx}`];
           }
           return normalizeInspectionImagePath(img);
         }),
-
         remark: item.remark,
       })),
-      machineProcesses: Object.entries(processData || {}).map(([machineType, params]) => ({
-        machineType,
-        ...params,
-      })),
+      
+      machineProcesses: machineProcesses,
+
       parameters: (defectData || []).map(item => ({
         parameterName: item.parameter,
         checkedQty: item.checkedQty,
@@ -26805,6 +26865,7 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
     await record.save();
 
     res.json({ success: true, message: "Inspection data saved" });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
@@ -26812,63 +26873,88 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
 });
 
 app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async (req, res) => {
+  const standardValues = JSON.parse(req.body.standardValues || '{}');
+  const actualValues = JSON.parse(req.body.actualValues || '{}');
+  const machineStatus = JSON.parse(req.body.machineStatus || '{}');
+
   try {
     const { recordId } = req.body;
     const inspectionData = JSON.parse(req.body.inspectionData || '[]');
     const processData = JSON.parse(req.body.processData || '{}');
     const defectData = JSON.parse(req.body.defectData || '[]');
-    const existingImagesMap = JSON.parse(req.body.existingImagesMap || '{}');
 
     if (!recordId) {
       return res.status(400).json({ success: false, message: "recordId is required" });
     }
 
-    // Ensure upload directory exists
+    // Handle file uploads (existing code)
     const uploadDir = path.join(__dirname, '../public/storage/qc_washing_images/inspection');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
 
-    // Map uploaded files by fieldname and write them to disk
     const fileMap = {};
     for (const file of (req.files || [])) {
       const fileExtension = path.extname(file.originalname);
       const newFilename = `inspection-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
       const fullFilePath = path.join(uploadDir, newFilename);
       await fs.promises.writeFile(fullFilePath, file.buffer);
-      // Save relative path for DB
       fileMap[file.fieldname] = `/public/storage/qc_washing_images/inspection/${newFilename}`;
     }
 
-    // Find the record (do not create if not found)
+    // Find the record
     let record = await QCWashing.findById(recordId);
     if (!record) {
       return res.status(404).json({ success: false, message: "Record not found for update" });
     }
 
-    // Build checkedPoints with correct image URLs
+    // Build machine processes with the new structure
+    const machineProcesses = [];
+    
+    // Define the machine types and their parameters
+    const machineTypes = {
+      "Washing Machine": ["temperature", "time", "silicon", "softener"],
+      "Tumble Dry": ["temperature", "time"]
+    };
+
+    Object.entries(machineTypes).forEach(([machineType, parameters]) => {
+      const machineProcess = { machineType };
+      
+      parameters.forEach(param => {
+        machineProcess[param] = {
+          actualValue: actualValues[machineType]?.[param] || "",
+          standardValue: standardValues[machineType]?.[param] || "",
+          status: {
+            ok: machineStatus[machineType]?.[param]?.ok || false,
+            no: machineStatus[machineType]?.[param]?.no || false
+          }
+        };
+      });
+      
+      machineProcesses.push(machineProcess);
+    });
+
+    // Build the inspection details
     record.inspectionDetails = {
       ...record.inspectionDetails,
       checkedPoints: (inspectionData || []).map((item, idx) => {
         const images = (item.comparisonImages || []).map((img, imgIdx) => {
-            if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
-              return fileMap[`comparisonImages_${idx}_${imgIdx}`];
-            }
-            return normalizeInspectionImagePath(img);
-          });
-
+          if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
+            return fileMap[`comparisonImages_${idx}_${imgIdx}`];
+          }
+          return normalizeInspectionImagePath(img);
+        });
 
         return {
           pointName: item.checkedList,
-          decision: item.decision === "ok",
+          decision: item.decision,
           comparison: images,
           remark: item.remark,
         };
       }),
-      machineProcesses: Object.entries(processData || {}).map(([machineType, params]) => ({
-        machineType,
-        ...params,
-      })),
+      
+      machineProcesses: machineProcesses,
+
       parameters: (defectData || []).map(item => ({
         parameterName: item.parameter,
         checkedQty: item.checkedQty,
@@ -26880,12 +26966,10 @@ app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async
     };
 
     record.savedAt = new Date();
-    // Optionally update status if needed
-    // record.status = 'draft';
-
     await record.save();
 
     res.json({ success: true, message: "Inspection data updated" });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server error" });

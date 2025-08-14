@@ -48,28 +48,30 @@ const QCWashingCheckpointForm = ({ onCheckpointAdded }) => {
   };
 
   return (
-    <div className="p-4 sm:p-6 bg-white rounded-xl shadow-lg">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">
+    <div className="p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg dark:shadow-gray-900/20">
+      <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
         Add New Checkpoint
       </h2>
+      
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Checkpoint Name *
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Checkpoint Name <span className="text-red-500 dark:text-red-400">*</span>
           </label>
           <input
             type="text"
             value={checkpointName}
             onChange={(e) => setCheckpointName(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 dark:focus:border-indigo-400 placeholder-gray-400 dark:placeholder-gray-500 transition-colors duration-200"
             placeholder="Enter checkpoint name"
             required
           />
         </div>
+        
         <button
           type="submit"
           disabled={isSubmitting || !checkpointName.trim()}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 dark:bg-indigo-700 text-white rounded-md hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 dark:focus:ring-offset-gray-800 transition-colors duration-200"
         >
           {isSubmitting ? (
             <Loader2 className="h-4 w-4 animate-spin" />

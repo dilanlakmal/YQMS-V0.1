@@ -14,7 +14,7 @@ const outputHeaderTranslations = {
   '工序名': 'Process Name',
   '数量': 'Quantity',
   '日期': 'Date',
-  '打菲组别': 'Batch Group',
+  '打菲组别': 'Line No',
   '打菲日期': 'Batch Date',
 };
 

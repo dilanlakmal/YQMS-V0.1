@@ -19,8 +19,8 @@ const LabeledInput = ({
   const { t } = useTranslation();
   return (
     <div className="flex flex-col">
-      <label htmlFor={id} className="mb-1 text-xs font-medium text-gray-700">
-        {labelKey} {required && <span className="text-red-500">*</span>}
+      <label htmlFor={id} className="mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">
+        {labelKey} {required && <span className="text-red-500 dark:text-red-400">*</span>}
       </label>
       <input
         id={id}
@@ -30,7 +30,7 @@ const LabeledInput = ({
         onChange={onChange}
         required={required}
         placeholder={placeholderKey}
-        className="block w-full text-sm rounded-md shadow-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3"
+        className="block w-full text-sm rounded-md shadow-sm border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 py-2 px-3 placeholder-gray-400 dark:placeholder-gray-500"
       />
     </div>
   );
@@ -41,9 +41,10 @@ const QCWashingFirstOutputForm = ({ onOutputAdded }) => {
   const initialState = {
     quantity: "",
   };
+
   const [newOutput, setNewOutput] = useState(initialState);
   const [isSaving, setIsSaving] = useState(false);
-    const { user } = useAuth();
+  const { user } = useAuth();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -55,13 +56,14 @@ const QCWashingFirstOutputForm = ({ onOutputAdded }) => {
     setIsSaving(true);
 
     try {
-     const outputData = {
+      const outputData = {
         ...newOutput,
         addedBy: {
           emp_id: user?.emp_id,
           eng_name: user?.eng_name,
         },
       };
+
       await axios.post(`${API_BASE_URL}/api/qc-washing-first-outputs`, outputData);
 
       Swal.fire({
@@ -69,8 +71,10 @@ const QCWashingFirstOutputForm = ({ onOutputAdded }) => {
         title: t("common.success"),
         text: "First output record added successfully"
       });
+
       setNewOutput(initialState);
       if (onOutputAdded) onOutputAdded();
+
     } catch (error) {
       Swal.fire({
         icon: "error",
@@ -83,11 +87,11 @@ const QCWashingFirstOutputForm = ({ onOutputAdded }) => {
   };
 
   return (
-    <div className="mb-8 p-4 sm:p-6 bg-white rounded-xl shadow-lg">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">
+    <div className="mb-8 p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg dark:shadow-gray-900/20">
+      <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
         Add New First Output Check Record
       </h2>
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6 border px-2 py-1 rounded bg-gray-100  dark:bg-gray-600 dark:text-white dark:border-gray-500">
         <div className="max-w-xs">
           <LabeledInput
             id="quantity"
@@ -95,16 +99,14 @@ const QCWashingFirstOutputForm = ({ onOutputAdded }) => {
             name="quantity"
             value={newOutput.quantity}
             onChange={handleInputChange}
-            type="number"
             required
           />
         </div>
-
         <div className="flex justify-end pt-4">
           <button
             type="submit"
             disabled={isSaving}
-            className="flex items-center justify-center px-6 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="flex items-center justify-center px-6 py-2 bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:bg-gray-400 dark:disabled:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 dark:focus:ring-offset-gray-800 transition-colors duration-200"
           >
             {isSaving ? (
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />

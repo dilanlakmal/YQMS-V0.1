@@ -19,8 +19,8 @@ const LabeledInput = ({
   const { t } = useTranslation();
   return (
     <div className="flex flex-col">
-      <label htmlFor={id} className="mb-1 text-xs font-medium text-gray-700">
-        {labelKey} {required && <span className="text-red-500">*</span>}
+      <label htmlFor={id} className="mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">
+        {labelKey} {required && <span className="text-red-500 dark:text-red-400">*</span>}
       </label>
       <input
         id={id}
@@ -31,7 +31,11 @@ const LabeledInput = ({
         required={required}
         placeholder={placeholderKey}
         readOnly={readOnly}
-        className={`block w-full text-sm rounded-md shadow-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 ${readOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
+        className={`block w-full text-sm rounded-md border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500 dark:focus:ring-indigo-400 py-2 px-3 placeholder-gray-400 dark:placeholder-gray-500 transition-colors duration-200 ${
+          readOnly 
+            ? "bg-gray-100 dark:bg-gray-600 cursor-not-allowed text-gray-500 dark:text-gray-400" 
+            : ""
+        }`}
       />
     </div>
   );
@@ -46,6 +50,7 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
     chinese: "",
     image: ""
   };
+
   const [newDefect, setNewDefect] = useState(initialState);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
@@ -104,16 +109,19 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSaving(true);
+
     let imageUrl = "";
 
     try {
       if (imageFile) {
         const formData = new FormData();
         formData.append("defectImage", imageFile);
+
         const uploadRes = await axios.post(
           `${API_BASE_URL}/api/qc-washing-defects/upload-image`,
           formData
         );
+
         if (uploadRes.data.success) {
           imageUrl = uploadRes.data.url;
         } else {
@@ -122,6 +130,7 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
       }
 
       const finalPayload = { ...newDefect, image: imageUrl };
+
       await axios.post(`${API_BASE_URL}/api/qc-washing-defects`, finalPayload);
 
       Swal.fire({
@@ -129,10 +138,12 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
         title: t("common.success"),
         text: "Washing defect added successfully"
       });
+
       setNewDefect(initialState);
       removeImage();
       if (onDefectAdded) onDefectAdded();
       fetchNextCode();
+
     } catch (error) {
       Swal.fire({
         icon: "error",
@@ -145,10 +156,11 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
   };
 
   return (
-    <div className="mb-8 p-4 sm:p-6 bg-white rounded-xl shadow-lg">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">
+    <div className="mb-8 p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg dark:shadow-gray-900/20">
+      <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
         Add New QC Washing Defect
       </h2>
+      
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <LabeledInput
@@ -170,6 +182,7 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
             onChange={handleInputChange}
             required
           />
+          
           <LabeledInput
             id="khmer"
             labelKey="Khmer"
@@ -178,6 +191,7 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
             onChange={handleInputChange}
             required
           />
+          
           <LabeledInput
             id="chinese"
             labelKey="Chinese"
@@ -185,11 +199,10 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
             value={newDefect.chinese}
             onChange={handleInputChange}
           />
-         
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Image
           </label>
           <div className="mt-1 flex items-center gap-4">
@@ -198,31 +211,30 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
                 <img
                   src={imagePreview}
                   alt="Preview"
-                  className="h-20 w-20 object-cover rounded-md shadow-sm"
+                  className="h-20 w-20 object-cover rounded-md shadow-sm dark:shadow-gray-900/50"
                 />
                 <button
                   type="button"
                   onClick={removeImage}
-                  className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 hover:bg-red-700 focus:outline-none"
+                  className="absolute -top-2 -right-2 bg-red-600 dark:bg-red-700 text-white rounded-full p-0.5 hover:bg-red-700 dark:hover:bg-red-600 focus:outline-none transition-colors duration-200"
                 >
                   <X size={14} strokeWidth={3} />
                 </button>
               </div>
             ) : (
-              <div className="h-20 w-20 bg-gray-100 rounded-md flex items-center justify-center border-2 border-dashed">
-                <ImageIcon className="text-gray-400 h-8 w-8" />
+              <div className="h-20 w-20 bg-gray-100 dark:bg-gray-700 rounded-md flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-500">
+                <ImageIcon className="text-gray-400 dark:text-gray-500 h-8 w-8" />
               </div>
             )}
-
+            
             <div className="flex flex-col justify-center">
               <button
                 type="button"
                 onClick={() => fileInputRef.current.click()}
-                className="py-2 px-4 rounded-md border-0 text-sm font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors"
+                className="py-2 px-4 rounded-md border-0 text-sm font-semibold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors duration-200"
               >
                 Choose File
               </button>
-
               <input
                 type="file"
                 ref={fileInputRef}
@@ -232,7 +244,7 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
                 className="hidden"
               />
               {imageFile && (
-                <p className="text-xs text-gray-500 mt-1 truncate max-w-[200px]">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-[200px]">
                   {imageFile.name}
                 </p>
               )}
@@ -244,7 +256,7 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
           <button
             type="submit"
             disabled={isSaving}
-            className="flex items-center justify-center px-6 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="flex items-center justify-center px-6 py-2 bg-blue-600 dark:bg-blue-700 text-white font-medium rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:bg-gray-400 dark:disabled:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 dark:focus:ring-offset-gray-800 transition-colors duration-200"
           >
             {isSaving ? (
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
