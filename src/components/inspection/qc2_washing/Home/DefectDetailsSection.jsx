@@ -37,7 +37,8 @@ const DefectDetailsSection = ({
   comment,
   setComment,
   defectsByPc,
-  setDefectsByPc
+  setDefectsByPc,
+  normalizeImageSrc
 }) => {
   const imageInputRef = useRef(null);
   const { i18n } = useTranslation();
@@ -324,19 +325,30 @@ const DefectDetailsSection = ({
               return img.preview || img;
             }
           );
+
+          // Find the defect object to get the proper name
+          const defectObj = defectOptions.find(
+            (opt) => opt._id === defect.selectedDefect
+          );
+          const properDefectName = defectObj
+            ? getDefectNameForDisplay(defectObj)
+            : "";
+
           pcDefectsArr.push({
             defectId: defect.selectedDefect,
-            defectName: defect.defectName,
+            defectName: properDefectName, // Use the proper defect name, not the ID
             defectQty: defect.defectQty,
             defectImages
           });
         });
+
         defectDetails.defectsByPc.push({
           pcNumber,
           pcDefects: pcDefectsArr
         });
       });
 
+      // Rest of your code remains the same...
       // Additional images
       (uploadedImages || []).forEach((img, imgIdx) => {
         if (img.file) {
@@ -357,8 +369,8 @@ const DefectDetailsSection = ({
           body: formDataObj
         }
       );
-      const result = await response.json();
 
+      const result = await response.json();
       if (result.success) {
         Swal.fire({
           icon: "success",
@@ -368,24 +380,24 @@ const DefectDetailsSection = ({
           position: "top-end",
           showConfirmButton: false
         });
+
+        // Update the state with the saved data
         const { defectsByPc: backendDefectsByPc, additionalImages } =
           result.data || {};
         setDefectsByPc(
           (backendDefectsByPc || []).reduce((acc, pc) => {
-            acc[pc.pcNumber] = (pc.pcDefects || []).map((defect) => {
-              // Find the defect option by _id
-              const defectObj = defectOptions.find(
-                (opt) =>
-                  opt._id === defect.selectedDefect ||
-                  opt._id === defect.defectId
-              );
+            acc[pc.pcNumber] = (pc.pcDefects || []).map((defect, index) => {
               return {
-                ...defect,
-                selectedDefect: defect.selectedDefect || defect.defectId || "",
-                defectName:
-                  defect.defectName ||
-                  (defectObj ? getDefectNameForDisplay(defectObj) : "")
-                // keep other fields as is
+                id: index + 1,
+                selectedDefect: defect.defectId || "",
+                defectName: defect.defectName || "", // This should now have the proper name
+                defectQty: defect.defectQty || "",
+                isBodyVisible: true,
+                defectImages: (defect.defectImages || []).map((imgStr) => ({
+                  file: null,
+                  preview: normalizeImageSrc(imgStr),
+                  name: "image.jpg"
+                }))
               };
             });
             return acc;
@@ -457,13 +469,23 @@ const DefectDetailsSection = ({
               return img.preview || img;
             }
           );
+
+          // Find the defect object to get the proper name
+          const defectObj = defectOptions.find(
+            (opt) => opt._id === defect.selectedDefect
+          );
+          const properDefectName = defectObj
+            ? getDefectNameForDisplay(defectObj)
+            : "";
+
           pcDefectsArr.push({
             defectId: defect.selectedDefect,
-            defectName: defect.defectName,
+            defectName: properDefectName, // Use the proper defect name, not the ID
             defectQty: defect.defectQty,
             defectImages
           });
         });
+
         defectDetails.defectsByPc.push({
           pcNumber,
           pcDefects: pcDefectsArr
@@ -713,6 +735,10 @@ const DefectDetailsSection = ({
                                   </option>
                                 ))}
                               </select>
+                              {/* Display the selected defect name */}
+                              {/* {defect.defectName && (
+                          <p className="text-xs text-gray-500 mt-1">Selected: {defect.defectName}</p>
+                        )} */}
                             </div>
                             <div className="w-full md:w-40">
                               <label className="text-xs font-medium dark:text-gray-300">
@@ -1039,7 +1065,8 @@ DefectDetailsSection.propTypes = {
   comment: PropTypes.string,
   setComment: PropTypes.func,
   defectsByPc: PropTypes.object,
-  setDefectsByPc: PropTypes.func
+  setDefectsByPc: PropTypes.func,
+  normalizeImageSrc: PropTypes.func
 };
 
 export default DefectDetailsSection;
