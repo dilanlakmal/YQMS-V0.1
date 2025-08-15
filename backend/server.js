@@ -27018,6 +27018,7 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
   try {
     const { recordId } = req.body;
     const defectDetails = JSON.parse(req.body.defectDetails || '{}');
+
     if (!recordId) return res.status(400).json({ success: false, message: "Missing recordId" });
 
     // Ensure upload directory exists
@@ -27029,11 +27030,10 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
     // Map uploaded files by fieldname and write them to disk
     const fileMap = {};
     for (const file of (req.files || [])) {
-     let fileExtension = path.extname(file.originalname);
-  if (!fileExtension) {
-    // fallback to .jpg if no extension is found
-    fileExtension = '.jpg';
-  }
+      let fileExtension = path.extname(file.originalname);
+      if (!fileExtension) {
+        fileExtension = '.jpg';
+      }
       const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
       const fullFilePath = path.join(uploadDir, newFilename);
       await fs.promises.writeFile(fullFilePath, file.buffer);
@@ -27044,17 +27044,23 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
     if (defectDetails.defectsByPc) {
       defectDetails.defectsByPc.forEach((pc, pcIdx) => {
         (pc.pcDefects || []).forEach((defect, defectIdx) => {
+          // Ensure defectName is preserved
+          if (!defect.defectName && defect.defectId) {
+            // You might want to fetch the defect name from your defects collection
+            // For now, we'll keep it as is
+          }
+          
           if (defect.defectImages) {
             defect.defectImages = defect.defectImages.map((img, imgIdx) => {
               return fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`]
               || (typeof img === "object" && img !== null && img.name ? img.name : img)
               || "";
-
             });
           }
         });
       });
     }
+
     if (defectDetails.additionalImages) {
       defectDetails.additionalImages = defectDetails.additionalImages.map((img, imgIdx) => {
         return fileMap[`additionalImages_${imgIdx}`] || (typeof img === "object" && img !== null && img.name ? img.name : img) || "";
@@ -27067,7 +27073,9 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
       { 'defectDetails': defectDetails, updatedAt: new Date() },
       { new: true }
     );
+
     if (!doc) return res.status(404).json({ success: false, message: "Record not found" });
+
     res.json({ success: true, data: doc.defectDetails });
   } catch (err) {
     console.error('Defect details save error:', err);

@@ -177,6 +177,7 @@ const DefectDetailsSection = ({
   }));
 };
 
+
   
     const handleDefectImageChange = async (pc, defectId, e) => {
       const files = Array.from(e.target.files);
@@ -281,19 +282,26 @@ const DefectDetailsSection = ({
               }
               return img.preview || img; 
             });
+
+            // Find the defect object to get the proper name
+            const defectObj = defectOptions.find(opt => opt._id === defect.selectedDefect);
+            const properDefectName = defectObj ? getDefectNameForDisplay(defectObj) : "";
+
             pcDefectsArr.push({
               defectId: defect.selectedDefect,
-              defectName: defect.defectName,
+              defectName: properDefectName, // Use the proper defect name, not the ID
               defectQty: defect.defectQty,
               defectImages,
             });
           });
+
           defectDetails.defectsByPc.push({
             pcNumber,
             pcDefects: pcDefectsArr,
           });
         });
 
+        // Rest of your code remains the same...
         // Additional images
         (uploadedImages || []).forEach((img, imgIdx) => {
           if (img.file) {
@@ -311,21 +319,27 @@ const DefectDetailsSection = ({
           method: "POST",
           body: formDataObj,
         });
-        const result = await response.json();
 
+        const result = await response.json();
         if (result.success) {
           Swal.fire({ icon: 'success', title: 'Defect details saved!', timer: 1000, toast: true, position: 'top-end', showConfirmButton: false });
+          
+          // Update the state with the saved data
           const { defectsByPc: backendDefectsByPc, additionalImages } = result.data || {};
           setDefectsByPc(
             (backendDefectsByPc || []).reduce((acc, pc) => {
-              acc[pc.pcNumber] = (pc.pcDefects || []).map(defect => {
-                // Find the defect option by _id
-                const defectObj = defectOptions.find(opt => opt._id === defect.selectedDefect || opt._id === defect.defectId);
+              acc[pc.pcNumber] = (pc.pcDefects || []).map((defect, index) => {
                 return {
-                  ...defect,
-                  selectedDefect: defect.selectedDefect || defect.defectId || "",
-                  defectName: defect.defectName || (defectObj ? getDefectNameForDisplay(defectObj) : ""),
-                  // keep other fields as is
+                  id: index + 1,
+                  selectedDefect: defect.defectId || "",
+                  defectName: defect.defectName || "", // This should now have the proper name
+                  defectQty: defect.defectQty || "",
+                  isBodyVisible: true,
+                  defectImages: (defect.defectImages || []).map(imgStr => ({
+                    file: null,
+                    preview: normalizeImageSrc(imgStr),
+                    name: "image.jpg"
+                  }))
                 };
               });
               return acc;
@@ -345,7 +359,6 @@ const DefectDetailsSection = ({
         console.error(err);
       }
     };
-
 
     const handleUpdateDefectDetails = async () => {
       if (!recordId) {
@@ -379,13 +392,19 @@ const DefectDetailsSection = ({
               }
               return img.preview || img;
             });
+
+            // Find the defect object to get the proper name
+            const defectObj = defectOptions.find(opt => opt._id === defect.selectedDefect);
+            const properDefectName = defectObj ? getDefectNameForDisplay(defectObj) : "";
+
             pcDefectsArr.push({
               defectId: defect.selectedDefect,
-              defectName: defect.defectName,
+              defectName: properDefectName, // Use the proper defect name, not the ID
               defectQty: defect.defectQty,
               defectImages,
             });
           });
+
           defectDetails.defectsByPc.push({
             pcNumber,
             pcDefects: pcDefectsArr,
@@ -542,7 +561,7 @@ const DefectDetailsSection = ({
                           value={defect.selectedDefect}
                           onChange={(e) => handleDefectChange(pc, defect.id, 'selectedDefect', e.target.value)}
                           className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:bg-gray-200 disabled:dark:bg-gray-500"
-                           disabled={!isEditing}
+                          disabled={!isEditing}
                         >
                           <option value="">-- Select a defect --</option>
                           {defectOptions.map(d => (
@@ -551,6 +570,10 @@ const DefectDetailsSection = ({
                             </option>
                           ))}
                         </select>
+                        {/* Display the selected defect name */}
+                        {/* {defect.defectName && (
+                          <p className="text-xs text-gray-500 mt-1">Selected: {defect.defectName}</p>
+                        )} */}
                       </div>
                       <div className="w-full md:w-40">
                         <label className="text-xs font-medium dark:text-gray-300">Quantity</label>
