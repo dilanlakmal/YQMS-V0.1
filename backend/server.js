@@ -1690,13 +1690,13 @@ async function syncQC1WorkerData(startDate = "2025-07-01", endDate = new Date())
 
 
 // 1. On server start, fetch all data from 2025-07-10 to today
-syncQC1WorkerData("2025-07-01", new Date())
-  .then(() => {
-    console.log("✅ Initial QC1 Worker Data Sync completed (all data).");
-  })
-  .catch((err) => {
-    console.error("❌ Initial QC1 Worker Data Sync failed:", err);
-  });
+// syncQC1WorkerData("2025-07-01", new Date())
+//   .then(() => {
+//     console.log("✅ Initial QC1 Worker Data Sync completed (all data).");
+//   })
+//   .catch((err) => {
+//     console.error("❌ Initial QC1 Worker Data Sync failed:", err);
+//   });
 
 // Schedule to run every day at 11:00 PM
 cron.schedule("0 23 * * *", () => {
@@ -27680,7 +27680,6 @@ app.post('/api/upload-qc2-data', async (req, res) => {
       'Wash',
       'WASH',
       'wash',
-      // Add more washing line identifiers as needed
     ];
     
     // Function to check if a line is washing-related
@@ -27914,9 +27913,6 @@ app.post('/api/upload-qc2-data', async (req, res) => {
     const finalDocs = Array.from(docs.values());
     const washingQtyDocs = Array.from(washingQtyData.values());
 
-    console.log(`Generated ${finalDocs.length} QC documents`);
-    console.log(`Generated ${washingQtyDocs.length} washing quantity documents (washing lines only)`);
-
     res.json({ finalDocs, washingQtyDocs });
 
   } catch (err) {
@@ -27956,7 +27952,6 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
       }
     }));
 
-    // Washing quantity data bulk operations (only washing data, no Line_no field)
     let washingBulkOps = [];
     if (Array.isArray(washingQtyData) && washingQtyData.length > 0) {
       washingBulkOps = washingQtyData.map(doc => ({
@@ -27966,7 +27961,6 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
             QC_ID: doc.QC_ID,
             Style_No: doc.Style_No,
             Color: doc.Color
-            // Note: No Line_no in filter since it's not stored
           },
           update: { $set: doc },
           upsert: true
@@ -27974,16 +27968,12 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
       }));
     }
 
-    console.log(`Saving ${bulkOps.length} QC records`);
-    console.log(`Saving ${washingBulkOps.length} washing quantity records (washing lines only)`);
-
     // Execute both bulk operations
     const results = [];
     
     if (bulkOps.length > 0) {
       try {
         const qcResult = await QCWorkers.bulkWrite(bulkOps);
-        console.log('QC bulk write result:', qcResult);
         results.push({ type: 'QC', result: qcResult });
       } catch (qcError) {
         console.error('QC bulk write error:', qcError);
@@ -27997,7 +27987,6 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
     if (washingBulkOps.length > 0) {
       try {
         const washingResult = await QCWashingQtyOld.bulkWrite(washingBulkOps);
-        console.log('Washing bulk write result:', washingResult);
         results.push({ type: 'Washing', result: washingResult });
       } catch (washingError) {
         console.error('Washing bulk write error:', washingError);
@@ -28023,8 +28012,6 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
     });
   }
 });
-
-
 
 // New endpoint to fetch washing quantity data
 app.get('/api/fetch-washing-qty-data', async (req, res) => {
