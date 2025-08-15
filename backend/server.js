@@ -87,6 +87,7 @@ import createSupplierIssuesDefectModel from "./models/SupplierIssuesDefect.js";
 import createSupplierIssueReportModel from "./models/SupplierIssueReport.js";
 import createQC2OlderDefectModel from "./models/QC2_Older_Defects.js";
 import createQCWashingMachineStandard from "./models/qcWashingStanderd.js";
+import createQCWashingQtyOldSchema from "./models/QCWashingQtyOld.js";
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
@@ -266,6 +267,7 @@ const QCWorkers = createQCWorkersModel(ymProdConnection);
 const SupplierIssueReport = createSupplierIssueReportModel(ymProdConnection);
 const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
 const QCWashingMachineStandard = createQCWashingMachineStandard(ymProdConnection);
+const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -27044,11 +27046,6 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
     if (defectDetails.defectsByPc) {
       defectDetails.defectsByPc.forEach((pc, pcIdx) => {
         (pc.pcDefects || []).forEach((defect, defectIdx) => {
-          // Ensure defectName is preserved
-          if (!defect.defectName && defect.defectId) {
-            // You might want to fetch the defect name from your defects collection
-            // For now, we'll keep it as is
-          }
           
           if (defect.defectImages) {
             defect.defectImages = defect.defectImages.map((img, imgIdx) => {
@@ -27077,6 +27074,7 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
     if (!doc) return res.status(404).json({ success: false, message: "Record not found" });
 
     res.json({ success: true, data: doc.defectDetails });
+
   } catch (err) {
     console.error('Defect details save error:', err);
     res.status(500).json({ success: false, message: err.message });
@@ -27745,6 +27743,7 @@ app.post('/api/upload-qc2-data', async (req, res) => {
 
     // Merge and Build Documents
     const docs = new Map();
+    const washingQtyData = new Map(); 
     const allKeys = new Set([...outputMap.keys(), ...defectMap.keys()]);
 
     for (const key of allKeys) {
@@ -27779,6 +27778,31 @@ app.post('/api/upload-qc2-data', async (req, res) => {
       }
       const Output_data_summary = Array.from(outputSummaryMap.values());
       const TotalOutput = Output_data_summary.reduce((sum, o) => sum + o.Qty, 0);
+
+      const washingQtyMap = new Map();
+      for (const o of Output_data) {
+        const washKey = `${Inspection_date_str}|${QC_ID}|${o.MONo}|${o.Color}`;
+        if (!washingQtyMap.has(washKey)) {
+          washingQtyMap.set(washKey, {
+            Inspection_date: Inspection_date,
+            QC_ID: QC_ID,
+            Style_No: o.MONo,
+            Color: o.Color,
+            Wash_Qty: 0
+          });
+        }
+        washingQtyMap.get(washKey).Wash_Qty += o.Qty;
+      }
+
+      // Add to global washing quantity data map
+      for (const [washKey, washData] of washingQtyMap) {
+        if (!washingQtyData.has(washKey)) {
+          washingQtyData.set(washKey, washData);
+        } else {
+          washingQtyData.get(washKey).Wash_Qty += washData.Wash_Qty;
+        }
+      }
+
 
       // Defect grouping
       const defectGroup = {};
@@ -27857,6 +27881,7 @@ app.post('/api/upload-qc2-data', async (req, res) => {
 
     // Save to MongoDB
     const finalDocs = Array.from(docs.values());
+    const washingQtyDocs = Array.from(washingQtyData.values());
     // const bulkOps = finalDocs.map(doc => ({
     //   updateOne: {
     //     filter: {
@@ -27870,7 +27895,7 @@ app.post('/api/upload-qc2-data', async (req, res) => {
     // if (bulkOps.length) {
     //   await QCWorkers.bulkWrite(bulkOps);
     // }
-    res.json(finalDocs); // Return the saved docs for preview
+   res.json({ finalDocs, washingQtyDocs }); // Return the saved docs for preview
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to process and save QC2 data.' });
@@ -27889,16 +27914,17 @@ app.get('/api/fetch-qc2-data', async (req, res) => {
 
 app.post('/api/manual-save-qc2-data', async (req, res) => {
   try {
-    const { finalDocs } = req.body; // Expecting an array of processed docs
+    const { finalDocs, washingQtyData } = req.body;
 
     if (!Array.isArray(finalDocs) || finalDocs.length === 0) {
-      return res.status(400).json({ error: 'No data to save.' });
+      return res.status(400).json({ error: 'No QC data to save.' });
     }
 
+    // Fix date handling for QC data
     const bulkOps = finalDocs.map(doc => ({
       updateOne: {
         filter: {
-          Inspection_date: doc.Inspection_date,
+          Inspection_date: doc.Inspection_date instanceof Date ? doc.Inspection_date : new Date(doc.Inspection_date),
           QC_ID: doc.QC_ID
         },
         update: { $set: doc },
@@ -27906,14 +27932,76 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
       }
     }));
 
-    if (bulkOps.length) {
-      await QCWorkers.bulkWrite(bulkOps);
+    let washingBulkOps = [];
+    if (Array.isArray(washingQtyData) && washingQtyData.length > 0) {
+      washingBulkOps = washingQtyData.map(doc => ({
+        updateOne: {
+          filter: {
+            Inspection_date: doc.Inspection_date instanceof Date ? doc.Inspection_date : new Date(doc.Inspection_date),
+            QC_ID: doc.QC_ID,
+            Style_No: doc.Style_No,
+            Color: doc.Color
+          },
+          update: { $set: doc },
+          upsert: true
+        }
+      }));
     }
 
-    res.json({ success: true, count: bulkOps.length });
+    // Execute both bulk operations with better error handling
+    const results = [];
+    
+    if (bulkOps.length > 0) {
+      try {
+        const qcResult = await QCWorkers.bulkWrite(bulkOps);
+        results.push({ type: 'QC', result: qcResult });
+      } catch (qcError) {
+        console.error('QC bulk write error:', qcError);
+        return res.status(500).json({ 
+          error: 'Failed to save QC data', 
+          details: qcError.message 
+        });
+      }
+    }
+
+    if (washingBulkOps.length > 0) {
+      try {
+        const washingResult = await QCWashingQtyOld.bulkWrite(washingBulkOps);
+        results.push({ type: 'Washing', result: washingResult });
+      } catch (washingError) {
+        console.error('Washing bulk write error:', washingError);
+        return res.status(500).json({ 
+          error: 'Failed to save washing data', 
+          details: washingError.message 
+        });
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      qcDataCount: bulkOps.length,
+      washingQtyCount: washingBulkOps.length,
+      results: results
+    });
+
+  } catch (err) {
+    console.error('Manual save error:', err);
+    res.status(500).json({ 
+      error: 'Failed to manually save QC2 data.',
+      details: err.message
+    });
+  }
+});
+
+
+// New endpoint to fetch washing quantity data
+app.get('/api/fetch-washing-qty-data', async (req, res) => {
+  try {
+    const results = await QCWashingQtyOld.find({}).lean();
+    res.json(results);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to manually save QC2 data.' });
+    res.status(500).json({ error: 'Failed to fetch washing quantity data.' });
   }
 });
 

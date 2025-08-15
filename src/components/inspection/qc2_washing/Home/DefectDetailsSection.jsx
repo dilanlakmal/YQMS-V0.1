@@ -251,196 +251,237 @@ const DefectDetailsSection = ({
 
 
     const handleSaveDefectDetails = async () => {
-      if (!recordId) {
-        Swal.fire("Order details must be saved first!", "", "warning");
-        return;
-      }
-      try {
-        // 1. Build defectDetails object
-        const defectDetails = {
-          checkedQty: formData.checkedQty,
-          washQty: formData.washQty,
-          result: defectStatus,
-          levelUsed: formData.levelUsed,
-          defectsByPc: [],
-          additionalImages: [],
-          comment,
-        };
-
-        // 2. Build FormData and collect files
-        const formDataObj = new FormData();
-        formDataObj.append("recordId", recordId);
-
-        // For each PC and defect, handle images
-        Object.entries(defectsByPc).forEach(([pcNumber, pcDefects], pcIdx) => {
-          const pcDefectsArr = [];
-          pcDefects.forEach((defect, defectIdx) => {
-            const defectImages = (defect.defectImages || []).map((img, imgIdx) => {
-              if (img.file) {
-                formDataObj.append(`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`, img.file);
-                return null; 
-              }
-              return img.preview || img; 
-            });
-
-            // Find the defect object to get the proper name
-            const defectObj = defectOptions.find(opt => opt._id === defect.selectedDefect);
-            const properDefectName = defectObj ? getDefectNameForDisplay(defectObj) : "";
-
-            pcDefectsArr.push({
-              defectId: defect.selectedDefect,
-              defectName: properDefectName, // Use the proper defect name, not the ID
-              defectQty: defect.defectQty,
-              defectImages,
-            });
-          });
-
-          defectDetails.defectsByPc.push({
-            pcNumber,
-            pcDefects: pcDefectsArr,
-          });
-        });
-
-        // Rest of your code remains the same...
-        // Additional images
-        (uploadedImages || []).forEach((img, imgIdx) => {
-          if (img.file) {
-            formDataObj.append(`additionalImages_${imgIdx}`, img.file);
-            defectDetails.additionalImages.push(null);
-          } else {
-            defectDetails.additionalImages.push(img.preview || img);
-          }
-        });
-
-        formDataObj.append("defectDetails", JSON.stringify(defectDetails));
-
-        // 3. Send to backend
-        const response = await fetch(`${API_BASE_URL}/api/qc-washing/defect-details-save`, {
-          method: "POST",
-          body: formDataObj,
-        });
-
-        const result = await response.json();
-        if (result.success) {
-          Swal.fire({ icon: 'success', title: 'Defect details saved!', timer: 1000, toast: true, position: 'top-end', showConfirmButton: false });
-          
-          // Update the state with the saved data
-          const { defectsByPc: backendDefectsByPc, additionalImages } = result.data || {};
-          setDefectsByPc(
-            (backendDefectsByPc || []).reduce((acc, pc) => {
-              acc[pc.pcNumber] = (pc.pcDefects || []).map((defect, index) => {
-                return {
-                  id: index + 1,
-                  selectedDefect: defect.defectId || "",
-                  defectName: defect.defectName || "", // This should now have the proper name
-                  defectQty: defect.defectQty || "",
-                  isBodyVisible: true,
-                  defectImages: (defect.defectImages || []).map(imgStr => ({
-                    file: null,
-                    preview: normalizeImageSrc(imgStr),
-                    name: "image.jpg"
-                  }))
-                };
-              });
-              return acc;
-            }, {})
-          );
-
-          setUploadedImages(additionalImages || []);
-          setIsSaved(true);
-          setIsEditing(false);
-          if (onLoadSavedDataById) onLoadSavedDataById(recordId);
-          if (activateNextSection) activateNextSection();
-        } else {
-          Swal.fire({ icon: 'error', title: result.message || "Failed to save defect details", timer: 2000, toast: true, position: 'top-end', showConfirmButton: false });
-        }
-      } catch (err) {
-        Swal.fire({ icon: 'error', title: "Error saving defect details", timer: 2000, toast: true, position: 'top-end', showConfirmButton: false });
-        console.error(err);
-      }
+  if (!recordId) {
+    Swal.fire("Order details must be saved first!", "", "warning");
+    return;
+  }
+  try {
+    // 1. Build defectDetails object
+    const defectDetails = {
+      checkedQty: formData.checkedQty,
+      washQty: formData.washQty,
+      result: defectStatus,
+      levelUsed: formData.levelUsed,
+      defectsByPc: [],
+      additionalImages: [],
+      comment,
     };
+
+    // 2. Build FormData and collect files
+    const formDataObj = new FormData();
+    formDataObj.append("recordId", recordId);
+
+    // For each PC and defect, handle images
+    Object.entries(defectsByPc).forEach(([pcNumber, pcDefects], pcIdx) => {
+      const pcDefectsArr = [];
+      pcDefects.forEach((defect, defectIdx) => {
+        const defectImages = (defect.defectImages || []).map((img, imgIdx) => {
+          if (img.file) {
+            formDataObj.append(`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`, img.file);
+            return null; 
+          }
+          return img.preview || img; 
+        });
+
+        // Find the defect object to get the English name
+        const defectObj = defectOptions.find(opt => opt._id === defect.selectedDefect);
+        
+        pcDefectsArr.push({
+          defectId: defect.selectedDefect,
+          defectName: defectObj ? defectObj.english : "", // Always save English name
+          defectQty: defect.defectQty,
+          defectImages,
+        });
+      });
+
+      defectDetails.defectsByPc.push({
+        pcNumber,
+        pcDefects: pcDefectsArr,
+      });
+    });
+
+    // Additional images handling remains the same...
+    (uploadedImages || []).forEach((img, imgIdx) => {
+      if (img.file) {
+        formDataObj.append(`additionalImages_${imgIdx}`, img.file);
+        defectDetails.additionalImages.push(null);
+      } else {
+        defectDetails.additionalImages.push(img.preview || img);
+      }
+    });
+
+    formDataObj.append("defectDetails", JSON.stringify(defectDetails));
+
+    // 3. Send to backend
+    const response = await fetch(`${API_BASE_URL}/api/qc-washing/defect-details-save`, {
+      method: "POST",
+      body: formDataObj,
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      Swal.fire({ 
+        icon: 'success', 
+        title: 'Defect details saved!', 
+        timer: 1000, 
+        toast: true, 
+        position: 'top-end', 
+        showConfirmButton: false 
+      });
+      
+      // Update the state with the saved data - but display localized names
+      const { defectsByPc: backendDefectsByPc, additionalImages } = result.data || {};
+      setDefectsByPc(
+        (backendDefectsByPc || []).reduce((acc, pc) => {
+          acc[pc.pcNumber] = (pc.pcDefects || []).map((defect, index) => {
+            // Find the defect object to get the localized display name
+            const defectObj = defectOptions.find(opt => opt.english === defect.defectName);
+            
+            return {
+              id: index + 1,
+              selectedDefect: defect.defectId || "",
+              defectName: defectObj ? getDefectNameForDisplay(defectObj) : defect.defectName, // Display localized name
+              defectQty: defect.defectQty || "",
+              isBodyVisible: true,
+              defectImages: (defect.defectImages || []).map(imgStr => ({
+                file: null,
+                preview: normalizeImageSrc(imgStr),
+                name: "image.jpg"
+              }))
+            };
+          });
+          return acc;
+        }, {})
+      );
+
+      setUploadedImages(additionalImages || []);
+      setIsSaved(true);
+      setIsEditing(false);
+      if (onLoadSavedDataById) onLoadSavedDataById(recordId);
+      if (activateNextSection) activateNextSection();
+    } else {
+      Swal.fire({ 
+        icon: 'error', 
+        title: result.message || "Failed to save defect details", 
+        timer: 2000, 
+        toast: true, 
+        position: 'top-end', 
+        showConfirmButton: false 
+      });
+    }
+  } catch (err) {
+    Swal.fire({ 
+      icon: 'error', 
+      title: "Error saving defect details", 
+      timer: 2000, 
+      toast: true, 
+      position: 'top-end', 
+      showConfirmButton: false 
+    });
+    console.error(err);
+  }
+};
 
     const handleUpdateDefectDetails = async () => {
-      if (!recordId) {
-        Swal.fire("Order details must be saved first!", "", "warning");
-        return;
-      }
-      try {
-        // 1. Build defectDetails object
-        const defectDetails = {
-          checkedQty: formData.checkedQty,
-          washQty: formData.washQty,
-          result: defectStatus,
-          levelUsed: formData.levelUsed,
-          defectsByPc: [],
-          additionalImages: [],
-          comment,
-        };
-
-        // 2. Build FormData and collect files
-        const formDataObj = new FormData();
-        formDataObj.append("recordId", recordId);
-
-        // For each PC and defect, handle images
-        Object.entries(defectsByPc).forEach(([pcNumber, pcDefects], pcIdx) => {
-          const pcDefectsArr = [];
-          pcDefects.forEach((defect, defectIdx) => {
-            const defectImages = (defect.defectImages || []).map((img, imgIdx) => {
-              if (img.file) {
-                formDataObj.append(`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`, img.file);
-                return null; 
-              }
-              return img.preview || img;
-            });
-
-            // Find the defect object to get the proper name
-            const defectObj = defectOptions.find(opt => opt._id === defect.selectedDefect);
-            const properDefectName = defectObj ? getDefectNameForDisplay(defectObj) : "";
-
-            pcDefectsArr.push({
-              defectId: defect.selectedDefect,
-              defectName: properDefectName, // Use the proper defect name, not the ID
-              defectQty: defect.defectQty,
-              defectImages,
-            });
-          });
-
-          defectDetails.defectsByPc.push({
-            pcNumber,
-            pcDefects: pcDefectsArr,
-          });
-        });
-
-        // Additional images
-        (uploadedImages || []).forEach((img, imgIdx) => {
-          if (img.file) {
-            formDataObj.append(`additionalImages_${imgIdx}`, img.file);
-            defectDetails.additionalImages.push(null);
-          } else {
-            defectDetails.additionalImages.push(img.preview || img);
-          }
-        });
-
-        formDataObj.append("defectDetails", JSON.stringify(defectDetails));
-
-        const response = await fetch(`${API_BASE_URL}/api/qc-washing/defect-details-update`, {
-          method: "POST",
-          body: formDataObj,
-        });
-        const result = await response.json();
-        if (result.success) {
-          Swal.fire({ icon: 'success', title: 'Defect details updated!', timer: 1000, toast: true, position: 'top-end', showConfirmButton: false });
-          stripFileFromDefectImages(defectsByPc, uploadedImages);
-          setIsSaved(true);
-          setIsEditing(false);
-        } else {
-          Swal.fire({ icon: 'error', title: result.message || "Failed to update defect details", timer: 2000, toast: true, position: 'top-end', showConfirmButton: false });
-        }
-      } catch (err) {
-        Swal.fire({ icon: 'error', title: "Error updating defect details", timer: 2000, toast: true, position: 'top-end', showConfirmButton: false });
-        console.error(err);
-      }
+  if (!recordId) {
+    Swal.fire("Order details must be saved first!", "", "warning");
+    return;
+  }
+  try {
+    // Same logic as save, but for update
+    const defectDetails = {
+      checkedQty: formData.checkedQty,
+      washQty: formData.washQty,
+      result: defectStatus,
+      levelUsed: formData.levelUsed,
+      defectsByPc: [],
+      additionalImages: [],
+      comment,
     };
+
+    const formDataObj = new FormData();
+    formDataObj.append("recordId", recordId);
+
+    Object.entries(defectsByPc).forEach(([pcNumber, pcDefects], pcIdx) => {
+      const pcDefectsArr = [];
+      pcDefects.forEach((defect, defectIdx) => {
+        const defectImages = (defect.defectImages || []).map((img, imgIdx) => {
+          if (img.file) {
+            formDataObj.append(`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`, img.file);
+            return null; 
+          }
+          return img.preview || img;
+        });
+
+        // Find the defect object to get the English name
+        const defectObj = defectOptions.find(opt => opt._id === defect.selectedDefect);
+
+        pcDefectsArr.push({
+          defectId: defect.selectedDefect,
+          defectName: defectObj ? defectObj.english : "", // Always save English name
+          defectQty: defect.defectQty,
+          defectImages,
+        });
+      });
+
+      defectDetails.defectsByPc.push({
+        pcNumber,
+        pcDefects: pcDefectsArr,
+      });
+    });
+
+    // Additional images
+    (uploadedImages || []).forEach((img, imgIdx) => {
+      if (img.file) {
+        formDataObj.append(`additionalImages_${imgIdx}`, img.file);
+        defectDetails.additionalImages.push(null);
+      } else {
+        defectDetails.additionalImages.push(img.preview || img);
+      }
+    });
+
+    formDataObj.append("defectDetails", JSON.stringify(defectDetails));
+
+    const response = await fetch(`${API_BASE_URL}/api/qc-washing/defect-details-update`, {
+      method: "POST",
+      body: formDataObj,
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      Swal.fire({ 
+        icon: 'success', 
+        title: 'Defect details updated!', 
+        timer: 1000, 
+        toast: true, 
+        position: 'top-end', 
+        showConfirmButton: false 
+      });
+      stripFileFromDefectImages(defectsByPc, uploadedImages);
+      setIsSaved(true);
+      setIsEditing(false);
+    } else {
+      Swal.fire({ 
+        icon: 'error', 
+        title: result.message || "Failed to update defect details", 
+        timer: 2000, 
+        toast: true, 
+        position: 'top-end', 
+        showConfirmButton: false 
+      });
+    }
+  } catch (err) {
+    Swal.fire({ 
+      icon: 'error', 
+      title: "Error updating defect details", 
+      timer: 2000, 
+      toast: true, 
+      position: 'top-end', 
+      showConfirmButton: false 
+    });
+    console.error(err);
+  }
+};
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">

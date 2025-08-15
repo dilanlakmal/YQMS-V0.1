@@ -15,6 +15,7 @@ const QC2UploadData = () => {
   const [loading, setLoading] = useState(false);
   const [allResults, setAllResults] = useState([]);
   const [uploadProgress, setUploadProgress] = useState({ output: false, defect: false });
+  const [washingQtyData, setWashingQtyData] = useState([]);
 
   const handleFinalResult = async (skipLoading, skipSetState) => {
     if (outputData.length === 0 || defectData.length === 0) {
@@ -29,8 +30,20 @@ const QC2UploadData = () => {
         body: JSON.stringify({ outputData, defectData }),
       });
       const data = await response.json();
-      if (!skipSetState) setFinalResult(data); 
+          if (data.finalDocs && data.washingQtyDocs) {
+      if (!skipSetState) {
+        setFinalResult(data.finalDocs);
+        setWashingQtyData(data.washingQtyDocs);
+      }
       return data;
+    } else {
+      // Handle old response structure (if backend returns array directly)
+      if (!skipSetState) {
+        setFinalResult(data);
+        setWashingQtyData([]);
+      }
+      return { finalDocs: data, washingQtyDocs: [] };
+    }
     } catch (error) {
       console.error('Error fetching final result:', error);
       alert('Failed to process data.');
@@ -71,7 +84,10 @@ const QC2UploadData = () => {
         const response = await fetch(`${API_BASE_URL}/api/manual-save-qc2-data`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ finalDocs: dataToSave }),
+          body: JSON.stringify({ 
+            finalDocs: dataToSave,
+            washingQtyData: washingQtyData || []
+           }),
         });
         const data = await response.json();
         if (data.success) {
@@ -79,7 +95,7 @@ const QC2UploadData = () => {
           Swal.fire({
             icon: 'success',
             title: 'Saved!',
-            text: `Saved ${data.count} records successfully!`,
+            text: `Saved ${data.qcDataCount} QC records and ${data.washingQtyCount} washing records successfully!`,
             showConfirmButton: false,
             timer: 2000
           });
@@ -87,7 +103,7 @@ const QC2UploadData = () => {
           Swal.fire({
             icon: 'error',
             title: 'Error',
-            text: data.error || 'Failed to save.',
+            text: data.error || data.details || 'Failed to save.',
             showConfirmButton: false,
             timer: 2000
           });
@@ -173,20 +189,46 @@ const QC2UploadData = () => {
         <div className="flex flex-wrap justify-center gap-4 mb-8">
           {/* Save Button */}
          <button
-            onClick={async () => {
+             onClick={async () => {
               if (outputData.length === 0 || defectData.length === 0) {
                 alert('Please upload both Output and Defect files.');
                 return;
               }
+
               setLoadingSave(true);
-              let result = finalResult;
-              if (!result || !Array.isArray(result) || result.length === 0) {
-                result = await handleFinalResult(true, true); 
+              
+              try {
+                let result = finalResult;
+                
+                if (!result || !Array.isArray(result) || result.length === 0) {
+                  const processedData = await handleFinalResult(true, true);
+                  
+                  if (processedData) {
+                    result = processedData.finalDocs || processedData;
+                    // Update washing data if available
+                    if (processedData.washingQtyDocs) {
+                      setWashingQtyData(processedData.washingQtyDocs);
+                    }
+                  }
+                }
+
+                if (result && Array.isArray(result) && result.length > 0) {
+                  await handleManualSave(result, true);
+                } else {
+                  alert('No valid data to save.');
+                }
+              } catch (error) {
+                console.error('Save process error:', error);
+                Swal.fire({
+                  icon: 'error',
+                  title: 'Error',
+                  text: 'Failed to process and save data.',
+                  showConfirmButton: false,
+                  timer: 2000
+                });
+              } finally {
+                setLoadingSave(false);
               }
-              if (result && Array.isArray(result) && result.length > 0) {
-                await handleManualSave(result, true);
-              }
-              setLoadingSave(false);
             }}
             disabled={loadingSave || loadingProcess || loadingFetch || outputData.length === 0 || defectData.length === 0}
             className="group relative px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 dark:from-orange-500 dark:to-red-500 hover:from-orange-700 hover:to-red-700 dark:hover:from-orange-600 dark:hover:to-red-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
