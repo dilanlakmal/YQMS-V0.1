@@ -212,6 +212,41 @@ useEffect(() => {
     });
   };
 
+  // Helper function to get English fiber remarks
+const getFiberRemarkInEnglish = (decision) => {
+  const englishRemarks = {
+    "1": "Cleaning must be done by fabric mill.", 
+    "2": "YM doing the cleaning, front & back side.", 
+    "3": "Randomly 2-3 pcs back side hairly can acceptable."  
+  };
+  
+  return englishRemarks[decision] || "";
+};
+
+const convertEnglishToCurrentLanguage = (englishRemark, t) => {
+  const englishToDecisionMap = {
+    "Cleaning must be done by fabric mill.": "1",
+    "YM doing the cleaning, front & back side.": "2", 
+    "Randomly 2-3 pcs back side hairly can acceptable.": "3"
+  };
+  
+  const decision = englishToDecisionMap[englishRemark];
+  if (decision) {
+    switch (decision) {
+      case "1":
+        return t("qcWashing.fiber 01");
+      case "2":
+        return t("qcWashing.fiber 02");
+      case "3":
+        return t("qcWashing.fiber 03");
+      default:
+        return englishRemark;
+    }
+  }
+  
+  return englishRemark; // Return original if not a fiber remark
+};
+
 const handleStatusChange = (machineType, param, status) => {
   setMachineStatus(prev => ({
     ...prev,
@@ -315,7 +350,6 @@ const handleActualValueChange = (machineType, param, value) => {
       processedActualValues[machineType] = {};
       Object.keys(actualValues[machineType]).forEach(param => {
         const value = actualValues[machineType][param];
-        // Convert empty strings to null, but preserve "0" as 0
         if (value === "") {
           processedActualValues[machineType][param] = null;
         } else if (value === "0" || value === 0) {
@@ -326,14 +360,25 @@ const handleActualValueChange = (machineType, param, value) => {
       });
     });
 
+    // Convert fiber remarks to English before saving
+    const inspectionDataForSave = inspectionData.map(item => {
+      if (item.checkedList === "Fiber" && item.decision && ["1", "2", "3"].includes(item.decision)) {
+        return {
+          ...item,
+          remark: getFiberRemarkInEnglish(item.decision) // Use English version
+        };
+      }
+      return item;
+    });
+
     // 2. Build FormData
     const formData = new FormData();
     formData.append('recordId', recordId);
-    formData.append('inspectionData', JSON.stringify(inspectionData));
+    formData.append('inspectionData', JSON.stringify(inspectionDataForSave)); // Use converted data
     formData.append('processData', JSON.stringify(processData));
     formData.append('defectData', JSON.stringify(defectDataWithPassRate));
     formData.append('standardValues', JSON.stringify(standardValues));
-    formData.append('actualValues', JSON.stringify(processedActualValues)); // Use processed values
+    formData.append('actualValues', JSON.stringify(processedActualValues));
     formData.append('machineStatus', JSON.stringify(machineStatus));
     
     // 3. Append images
@@ -417,7 +462,6 @@ const handleUpdateInspection = async () => {
       processedActualValues[machineType] = {};
       Object.keys(actualValues[machineType]).forEach(param => {
         const value = actualValues[machineType][param];
-        // Convert empty strings to null, but preserve "0" as 0
         if (value === "") {
           processedActualValues[machineType][param] = null;
         } else if (value === "0" || value === 0) {
@@ -428,14 +472,25 @@ const handleUpdateInspection = async () => {
       });
     });
 
+    // Convert fiber remarks to English before saving
+    const inspectionDataForSave = inspectionData.map(item => {
+      if (item.checkedList === "Fiber" && item.decision && ["1", "2", "3"].includes(item.decision)) {
+        return {
+          ...item,
+          remark: getFiberRemarkInEnglish(item.decision) // Use English version
+        };
+      }
+      return item;
+    });
+
     // 2. Build FormData
     const formData = new FormData();
     formData.append('recordId', recordId);
-    formData.append('inspectionData', JSON.stringify(inspectionData));
+    formData.append('inspectionData', JSON.stringify(inspectionDataForSave)); // Use converted data
     formData.append('processData', JSON.stringify(processData));
     formData.append('defectData', JSON.stringify(defectDataWithPassRate));
     formData.append('standardValues', JSON.stringify(standardValues));
-    formData.append('actualValues', JSON.stringify(processedActualValues)); // Use processed values
+    formData.append('actualValues', JSON.stringify(processedActualValues));
     formData.append('machineStatus', JSON.stringify(machineStatus));
 
     // 3. Append images
@@ -447,7 +502,7 @@ const handleUpdateInspection = async () => {
       });
     });
 
-    // 4. Send to backend (NEW ENDPOINT)
+    // 4. Send to backend
     const response = await fetch(`${API_BASE_URL}/api/qc-washing/inspection-update`, {
       method: "POST",
       body: formData,
@@ -491,7 +546,6 @@ const handleUpdateInspection = async () => {
     console.error(err);
   }
 };
-
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -579,32 +633,40 @@ const handleDecisionChange = (index, value) => {
   };
 
   // Add this useEffect after your existing useEffects
+
 useEffect(() => {
-  // Update existing fiber remarks when language changes
   setInspectionData(prev =>
     prev.map(item => {
-      if (item.checkedList === "Fiber" && item.decision && item.decision !== "ok") {
-        let newRemark = "";
-        switch (item.decision) {
-          case "1":
-            newRemark = t("qcWashing.fiber 01");
-            break;
-          case "2":
-            newRemark = t("qcWashing.fiber 02");
-            break;
-          case "3":
-            newRemark = t("qcWashing.fiber 03");
-            break;
-          default:
-            newRemark = item.remark; // Keep existing remark for other cases
+      if (item.checkedList === "Fiber" && item.remark) {
+    
+        const translatedRemark = convertEnglishToCurrentLanguage(item.remark, t);
+       
+        if (translatedRemark !== item.remark) {
+          return { ...item, remark: translatedRemark };
         }
-        return { ...item, remark: newRemark };
+        
+        if (item.decision && item.decision !== "ok") {
+          let newRemark = "";
+          switch (item.decision) {
+            case "1":
+              newRemark = t("qcWashing.fiber 01");
+              break;
+            case "2":
+              newRemark = t("qcWashing.fiber 02");
+              break;
+            case "3":
+              newRemark = t("qcWashing.fiber 03");
+              break;
+            default:
+              newRemark = item.remark; 
+          }
+          return { ...item, remark: newRemark };
+        }
       }
       return item;
     })
   );
-}, [t, setInspectionData]); // Depend on 't' to trigger when language changes
-
+}, [t]); 
 
   // Remove image
   const handleRemoveImage = (index, imgIdx) => {
