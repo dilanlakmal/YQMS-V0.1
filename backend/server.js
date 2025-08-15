@@ -27671,6 +27671,24 @@ app.get("/api/supplier-issues/report-options", async (req, res) => {
 app.post('/api/upload-qc2-data', async (req, res) => {
   try {
     const { outputData, defectData } = req.body;
+    
+    // Define washing line identifiers
+    const washingLineIdentifiers = [
+      'Washing',
+      'WASHING', 
+      'washing',
+      'Wash',
+      'WASH',
+      'wash',
+      // Add more washing line identifiers as needed
+    ];
+    
+    // Function to check if a line is washing-related
+    const isWashingLine = (lineName) => {
+      if (!lineName) return false;
+      return washingLineIdentifiers.includes(lineName.trim());
+    };
+
     const allDefects = await QC2OlderDefect.find({}).lean();
     const allDefectsArr = allDefects.map(d => ({
       defectName: (d.defectName || '').trim().toLowerCase(),
@@ -27679,7 +27697,8 @@ app.post('/api/upload-qc2-data', async (req, res) => {
       Khmer: (d.Khmer || '').trim().toLowerCase(),
       Chinese: (d.Chinese || '').trim().toLowerCase(),
     }));
-    // Standardize field names
+
+    // Standardize field names (existing code)
     const outputRows = outputData.map(row => ({
       ...row,
       Inspection_date: row['日期'] || row['BillDate'] || '',
@@ -27695,8 +27714,6 @@ app.post('/api/upload-qc2-data', async (req, res) => {
 
     const defectRows = defectData.map(row => {
       const defectNameRaw = (row['疵点名称'] || row['ReworkName'] || '').trim().toLowerCase();
-
-      // Try to match by any language part, both directions
       let found = allDefectsArr.find(d =>
         defectNameRaw === d.defectName ||
         (d.English && defectNameRaw.includes(d.English)) ||
@@ -27724,8 +27741,7 @@ app.post('/api/upload-qc2-data', async (req, res) => {
       };
     });
 
-
-    // Build outputMap
+    // Build outputMap and defectMap (existing code)
     const outputMap = new Map();
     for (const row of outputRows) {
       const key = makeKey(row);
@@ -27733,7 +27749,6 @@ app.post('/api/upload-qc2-data', async (req, res) => {
       outputMap.get(key).push(row);
     }
 
-    // Build defectMap
     const defectMap = new Map();
     for (const row of defectRows) {
       const key = makeKey(row);
@@ -27744,22 +27759,25 @@ app.post('/api/upload-qc2-data', async (req, res) => {
     // Merge and Build Documents
     const docs = new Map();
     const washingQtyData = new Map(); 
+
     const allKeys = new Set([...outputMap.keys(), ...defectMap.keys()]);
 
     for (const key of allKeys) {
       const outputRows = outputMap.get(key) || [];
       const defectRows = defectMap.get(key) || [];
+
       const [Inspection_date_str, QC_ID_raw] = key.split("|");
       const QC_ID = QC_ID_raw === "6335" ? "YM6335" : QC_ID_raw;
       const Inspection_date = Inspection_date_str ? new Date(Inspection_date_str + "T00:00:00Z") : null;
 
-      // Output grouping
+      // Output grouping (existing code)
       const outputGroup = {};
       for (const r of outputRows) {
         const oKey = [r.WorkLine, r.MONo, r.ColorName, r.SizeName].join("|");
         if (!outputGroup[oKey]) outputGroup[oKey] = [];
         outputGroup[oKey].push(r);
       }
+
       const Output_data = Object.values(outputGroup).map(rows => ({
         Line_no: rows[0]?.WorkLine || '',
         MONo: rows[0]?.MONo || '',
@@ -27767,7 +27785,8 @@ app.post('/api/upload-qc2-data', async (req, res) => {
         Size: rows[0]?.SizeName || '',
         Qty: rows.reduce((sum, r) => sum + Number(r.Qty || 0), 0)
       }));
-      // Output summary
+
+      // Output summary (existing code)
       const outputSummaryMap = new Map();
       for (const o of Output_data) {
         const key = `${o.Line_no}|${o.MONo}`;
@@ -27776,25 +27795,32 @@ app.post('/api/upload-qc2-data', async (req, res) => {
         }
         outputSummaryMap.get(key).Qty += o.Qty;
       }
+
       const Output_data_summary = Array.from(outputSummaryMap.values());
       const TotalOutput = Output_data_summary.reduce((sum, o) => sum + o.Qty, 0);
 
+      // MODIFIED: Only create washing quantity data for washing lines
+      // But don't include Line_no in the washing data structure
       const washingQtyMap = new Map();
       for (const o of Output_data) {
-        const washKey = `${Inspection_date_str}|${QC_ID}|${o.MONo}|${o.Color}`;
-        if (!washingQtyMap.has(washKey)) {
-          washingQtyMap.set(washKey, {
-            Inspection_date: Inspection_date,
-            QC_ID: QC_ID,
-            Style_No: o.MONo,
-            Color: o.Color,
-            Wash_Qty: 0
-          });
+        // Only process if this is a washing line
+        if (isWashingLine(o.Line_no)) {
+          const washKey = `${Inspection_date_str}|${QC_ID}|${o.MONo}|${o.Color}`;
+          if (!washingQtyMap.has(washKey)) {
+            washingQtyMap.set(washKey, {
+              Inspection_date: Inspection_date,
+              QC_ID: QC_ID,
+              Style_No: o.MONo,
+              Color: o.Color,
+              Wash_Qty: 0
+              // Note: Line_no is NOT included here
+            });
+          }
+          washingQtyMap.get(washKey).Wash_Qty += o.Qty;
         }
-        washingQtyMap.get(washKey).Wash_Qty += o.Qty;
       }
 
-      // Add to global washing quantity data map
+      // Add to global washing quantity data map (only washing lines)
       for (const [washKey, washData] of washingQtyMap) {
         if (!washingQtyData.has(washKey)) {
           washingQtyData.set(washKey, washData);
@@ -27803,17 +27829,18 @@ app.post('/api/upload-qc2-data', async (req, res) => {
         }
       }
 
-
-      // Defect grouping
+      // Rest of the existing code for defects processing...
       const defectGroup = {};
       for (const d of defectRows) {
         const dKey = [d.WorkLine, d.MONo, d.ColorName, d.SizeName].join("|");
         if (!defectGroup[dKey]) defectGroup[dKey] = [];
         defectGroup[dKey].push(d);
       }
+
       const Defect_data = Object.entries(defectGroup).map(([dKey, rows]) => {
         let TotalDefect = 0;
         const defectDetailsMap = new Map();
+
         for (const d of rows) {
           const ddKey = d.ReworkCode + "|" + d.ReworkName;
           if (!defectDetailsMap.has(ddKey)) {
@@ -27826,6 +27853,7 @@ app.post('/api/upload-qc2-data', async (req, res) => {
           defectDetailsMap.get(ddKey).Qty += Number(d.Defect_Qty || 0);
           TotalDefect += Number(d.Defect_Qty || 0);
         }
+
         const [Line_no, MONo, Color, Size] = dKey.split("|");
         return {
           Line_no: Line_no || '',
@@ -27836,6 +27864,7 @@ app.post('/api/upload-qc2-data', async (req, res) => {
           DefectDetails: Array.from(defectDetailsMap.values())
         };
       });
+
       // Defect summary
       const defectSummaryMap = new Map();
       for (const d of Defect_data) {
@@ -27844,10 +27873,11 @@ app.post('/api/upload-qc2-data', async (req, res) => {
           defectSummaryMap.set(key, { Line_no: d.Line_no, MONo: d.MONo, Defect_Qty: 0, Defect_Details: [] });
         }
         defectSummaryMap.get(key).Defect_Qty += d.Defect_qty;
-        // Merge DefectDetails by code/name
+
         const detailsMap = new Map(defectSummaryMap.get(key).Defect_Details.map(dd => [
           `${dd.Defect_code}|${dd.Defect_name}`, { ...dd }
         ]));
+
         for (const dd of d.DefectDetails) {
           const ddKey = `${dd.Defect_code}|${dd.Defect_name}`;
           if (!detailsMap.has(ddKey)) {
@@ -27856,8 +27886,10 @@ app.post('/api/upload-qc2-data', async (req, res) => {
             detailsMap.get(ddKey).Qty += dd.Qty;
           }
         }
+
         defectSummaryMap.get(key).Defect_Details = Array.from(detailsMap.values());
       }
+
       const Defect_data_summary = Array.from(defectSummaryMap.values());
       const TotalDefect = Defect_data_summary.reduce((sum, d) => sum + d.Defect_Qty, 0);
 
@@ -27879,28 +27911,20 @@ app.post('/api/upload-qc2-data', async (req, res) => {
       });
     }
 
-    // Save to MongoDB
     const finalDocs = Array.from(docs.values());
     const washingQtyDocs = Array.from(washingQtyData.values());
-    // const bulkOps = finalDocs.map(doc => ({
-    //   updateOne: {
-    //     filter: {
-    //       Inspection_date: doc.Inspection_date,
-    //       QC_ID: doc.QC_ID
-    //     },
-    //     update: { $set: doc },
-    //     upsert: true
-    //   }
-    // }));
-    // if (bulkOps.length) {
-    //   await QCWorkers.bulkWrite(bulkOps);
-    // }
-   res.json({ finalDocs, washingQtyDocs }); // Return the saved docs for preview
+
+    console.log(`Generated ${finalDocs.length} QC documents`);
+    console.log(`Generated ${washingQtyDocs.length} washing quantity documents (washing lines only)`);
+
+    res.json({ finalDocs, washingQtyDocs });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to process and save QC2 data.' });
   }
 });
+
 
 // routes/qc2.js (add this to the same file)
 app.get('/api/fetch-qc2-data', async (req, res) => {
@@ -27920,7 +27944,7 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
       return res.status(400).json({ error: 'No QC data to save.' });
     }
 
-    // Fix date handling for QC data
+    // QC data bulk operations
     const bulkOps = finalDocs.map(doc => ({
       updateOne: {
         filter: {
@@ -27932,6 +27956,7 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
       }
     }));
 
+    // Washing quantity data bulk operations (only washing data, no Line_no field)
     let washingBulkOps = [];
     if (Array.isArray(washingQtyData) && washingQtyData.length > 0) {
       washingBulkOps = washingQtyData.map(doc => ({
@@ -27941,6 +27966,7 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
             QC_ID: doc.QC_ID,
             Style_No: doc.Style_No,
             Color: doc.Color
+            // Note: No Line_no in filter since it's not stored
           },
           update: { $set: doc },
           upsert: true
@@ -27948,12 +27974,16 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
       }));
     }
 
-    // Execute both bulk operations with better error handling
+    console.log(`Saving ${bulkOps.length} QC records`);
+    console.log(`Saving ${washingBulkOps.length} washing quantity records (washing lines only)`);
+
+    // Execute both bulk operations
     const results = [];
     
     if (bulkOps.length > 0) {
       try {
         const qcResult = await QCWorkers.bulkWrite(bulkOps);
+        console.log('QC bulk write result:', qcResult);
         results.push({ type: 'QC', result: qcResult });
       } catch (qcError) {
         console.error('QC bulk write error:', qcError);
@@ -27967,6 +27997,7 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
     if (washingBulkOps.length > 0) {
       try {
         const washingResult = await QCWashingQtyOld.bulkWrite(washingBulkOps);
+        console.log('Washing bulk write result:', washingResult);
         results.push({ type: 'Washing', result: washingResult });
       } catch (washingError) {
         console.error('Washing bulk write error:', washingError);
@@ -27992,6 +28023,7 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
     });
   }
 });
+
 
 
 // New endpoint to fetch washing quantity data

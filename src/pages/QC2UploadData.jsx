@@ -11,7 +11,6 @@ const QC2UploadData = () => {
   const [loadingSave, setLoadingSave] = useState(false);
   const [loadingProcess, setLoadingProcess] = useState(false);
   const [loadingFetch, setLoadingFetch] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const [allResults, setAllResults] = useState([]);
   const [uploadProgress, setUploadProgress] = useState({ output: false, defect: false });
@@ -22,28 +21,32 @@ const QC2UploadData = () => {
       alert('Please upload both Output and Defect files.');
       return null;
     }
+
     if (!skipLoading) setLoadingProcess(true);
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/upload-qc2-data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ outputData, defectData }),
       });
+
       const data = await response.json();
-          if (data.finalDocs && data.washingQtyDocs) {
-      if (!skipSetState) {
-        setFinalResult(data.finalDocs);
-        setWashingQtyData(data.washingQtyDocs);
+      
+      if (data.finalDocs && data.washingQtyDocs) {
+        if (!skipSetState) {
+          setFinalResult(data.finalDocs);
+          setWashingQtyData(data.washingQtyDocs);
+        }
+        return data;
+      } else {
+        // Handle old response structure (if backend returns array directly)
+        if (!skipSetState) {
+          setFinalResult(data);
+          setWashingQtyData([]);
+        }
+        return { finalDocs: data, washingQtyDocs: [] };
       }
-      return data;
-    } else {
-      // Handle old response structure (if backend returns array directly)
-      if (!skipSetState) {
-        setFinalResult(data);
-        setWashingQtyData([]);
-      }
-      return { finalDocs: data, washingQtyDocs: [] };
-    }
     } catch (error) {
       console.error('Error fetching final result:', error);
       alert('Failed to process data.');
@@ -53,74 +56,89 @@ const QC2UploadData = () => {
     }
   };
 
-
   const fetchAllResults = async () => {
-  setLoading(true); 
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/fetch-qc2-data`);
-    const data = await response.json();
-    if (Array.isArray(data)) {
-      setFinalResult(data);
-    } else {
-      setFinalResult([]);
-      alert(data?.error || "Unexpected server response.");
-    }
-  } catch (error) {
-    alert('Failed to fetch saved QC2 data.');
-  } finally {
-    setLoading(false);
-  }
-};
-
-// In your QC2UploadData component
-  const handleManualSave = async (resultToSave, skipLoading) => {
-      const dataToSave = resultToSave || finalResult;
-      if (!dataToSave || !Array.isArray(dataToSave) || dataToSave.length === 0) {
-        alert('No data to save.');
-        return;
+    setLoading(true); 
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/fetch-qc2-data`);
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setFinalResult(data);
+      } else {
+        setFinalResult([]);
+        alert(data?.error || "Unexpected server response.");
       }
-      if (!skipLoading) setLoadingSave(true);
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/manual-save-qc2-data`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            finalDocs: dataToSave,
-            washingQtyData: washingQtyData || []
-           }),
-        });
-        const data = await response.json();
-        if (data.success) {
-          // SweetAlert2: show success and auto-close after 2 seconds
-          Swal.fire({
-            icon: 'success',
-            title: 'Saved!',
-            text: `Saved ${data.qcDataCount} QC records and ${data.washingQtyCount} washing records successfully!`,
-            showConfirmButton: false,
-            timer: 2000
-          });
-        } else {
-          Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: data.error || data.details || 'Failed to save.',
-            showConfirmButton: false,
-            timer: 2000
-          });
-        }
-      } catch (error) {
+    } catch (error) {
+      alert('Failed to fetch saved QC2 data.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Updated handleManualSave to accept washing data as parameter
+  const handleManualSave = async (resultToSave, washingDataToSave, skipLoading) => {
+    const dataToSave = resultToSave || finalResult;
+    const washingToSave = washingDataToSave || washingQtyData || [];
+
+    console.log('handleManualSave called with:');
+    console.log('- QC data length:', dataToSave?.length);
+    console.log('- Washing data length:', washingToSave?.length);
+
+    if (!dataToSave || !Array.isArray(dataToSave) || dataToSave.length === 0) {
+      alert('No data to save.');
+      return;
+    }
+
+    if (!skipLoading) setLoadingSave(true);
+
+    try {
+      const requestBody = { 
+        finalDocs: dataToSave,
+        washingQtyData: washingToSave
+      };
+
+      console.log('Sending request with:', {
+        finalDocsCount: requestBody.finalDocs.length,
+        washingQtyDataCount: requestBody.washingQtyData.length
+      });
+
+      const response = await fetch(`${API_BASE_URL}/api/manual-save-qc2-data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
         Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Failed to save data.',
+          icon: 'success',
+          title: 'Saved!',
+          text: `Saved ${data.qcDataCount} QC records and ${data.washingQtyCount} washing records successfully!`,
           showConfirmButton: false,
           timer: 2000
         });
-      } finally {
-        if (!skipLoading) setLoadingSave(false);
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: data.error || data.details || 'Failed to save.',
+          showConfirmButton: false,
+          timer: 2000
+        });
       }
-    };
-
+    } catch (error) {
+      console.error('Save error:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to save data.',
+        showConfirmButton: false,
+        timer: 2000
+      });
+    } finally {
+      if (!skipLoading) setLoadingSave(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 transition-all duration-300">
@@ -188,8 +206,8 @@ const QC2UploadData = () => {
         {/* Action Buttons */}
         <div className="flex flex-wrap justify-center gap-4 mb-8">
           {/* Save Button */}
-         <button
-             onClick={async () => {
+          <button
+            onClick={async () => {
               if (outputData.length === 0 || defectData.length === 0) {
                 alert('Please upload both Output and Defect files.');
                 return;
@@ -199,21 +217,26 @@ const QC2UploadData = () => {
               
               try {
                 let result = finalResult;
+                let washingData = washingQtyData; // Get current washing data
                 
+                // If no processed data exists, process it first
                 if (!result || !Array.isArray(result) || result.length === 0) {
+                  console.log('Processing data first...');
                   const processedData = await handleFinalResult(true, true);
                   
                   if (processedData) {
                     result = processedData.finalDocs || processedData;
-                    // Update washing data if available
-                    if (processedData.washingQtyDocs) {
-                      setWashingQtyData(processedData.washingQtyDocs);
-                    }
+                    washingData = processedData.washingQtyDocs || []; // Get washing data from response
+                    
+                    console.log('Processed data received:');
+                    console.log('- QC records:', result?.length);
+                    console.log('- Washing records:', washingData?.length);
                   }
                 }
 
                 if (result && Array.isArray(result) && result.length > 0) {
-                  await handleManualSave(result, true);
+                  // Pass washing data directly to save function
+                  await handleManualSave(result, washingData, true);
                 } else {
                   alert('No valid data to save.');
                 }
@@ -276,31 +299,6 @@ const QC2UploadData = () => {
               )}
             </span>
           </button>
-
-          {/* Submitted Data Button */}
-          {/* <button
-            onClick={async () => {
-              setLoadingFetch(true);
-              await fetchAllResults();
-              setLoadingFetch(false);
-            }}
-            disabled={loadingFetch || loadingSave || loadingProcess}
-            className="group relative px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-500 dark:to-emerald-500 hover:from-green-700 hover:to-emerald-700 dark:hover:from-green-600 dark:hover:to-emerald-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span className="flex items-center">
-              {loadingFetch ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                  Loading...
-                </>
-              ) : (
-                <>
-                  <span className="mr-2">📋</span>
-                  Submitted Data
-                </>
-              )}
-            </span>
-          </button> */}
         </div>
 
         {/* Results Section */}
@@ -327,9 +325,16 @@ const QC2UploadData = () => {
               <div className="overflow-x-auto">
                 <FinalResultTable data={finalResult} />
               </div>
-              
-              
             </div>
+          </div>
+        )}
+
+        {/* Debug Info */}
+        {washingQtyData.length > 0 && (
+          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              Debug: {washingQtyData.length} washing records ready to save
+            </p>
           </div>
         )}
       </div>
