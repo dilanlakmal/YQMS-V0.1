@@ -26668,6 +26668,90 @@ app.post("/api/qc-washing/orderData-save", async (req, res) => {
   }
 });
 
+app.get('/api/qc-washing/check-measurement-details/:orderNo', async (req, res) => {
+  try {
+    const { orderNo } = req.params;
+    
+    if (!orderNo) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Order number is required',
+        hasMeasurement: false 
+      });
+    }
+
+    const collection = ymEcoConnection.db.collection("dt_orders");
+
+    // Find the order first
+    const order = await collection.findOne({
+      $or: [
+        { Order_No: orderNo },
+        { Style: orderNo }
+      ]
+    });
+
+    if (!order) {
+      return res.json({
+        success: true,
+        hasMeasurement: false,
+        message: 'Order not found',
+        debug: {
+          orderNo: orderNo,
+          foundRecord: false
+        }
+      });
+    }
+
+    // Check if measurement specs exist and have valid data
+    const hasBeforeWashSpecs = Array.isArray(order.BeforeWashSpecs) && 
+        order.BeforeWashSpecs.length > 0 &&
+        order.BeforeWashSpecs.some(spec => 
+          spec.MeasurementPointEngName && 
+          spec.MeasurementPointEngName.trim() !== ""
+        );
+
+    const hasAfterWashSpecs = Array.isArray(order.AfterWashSpecs) && 
+          order.AfterWashSpecs.length > 0 &&
+          order.AfterWashSpecs.some(spec => 
+            spec.MeasurementPointEngName && 
+            spec.MeasurementPointEngName.trim() !== ""
+          );
+
+    const hasMeasurement = hasBeforeWashSpecs || hasAfterWashSpecs;
+
+    res.json({
+      success: true,
+      hasMeasurement: hasMeasurement,
+      message: hasMeasurement 
+        ? 'Measurement details found' 
+        : 'No measurement details found for this order',
+      debug: {
+        orderNo: orderNo,
+        foundRecord: true,
+        measurementStructure: {
+          hasBeforeWashSpecs: hasBeforeWashSpecs,
+          hasAfterWashSpecs: hasAfterWashSpecs,
+          beforeWashSpecsCount: order.BeforeWashSpecs?.length || 0,
+          afterWashSpecsCount: order.AfterWashSpecs?.length || 0,
+          orderData: {
+            Order_No: order.Order_No,
+            Style: order.Style
+          }
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error checking measurement details:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while checking measurement details',
+      hasMeasurement: false,
+      error: error.message
+    });
+  }
+});
+
 app.post("/api/qc-washing/find-existing", async (req, res) => {
  
   try {
@@ -26697,8 +26781,6 @@ app.post("/api/qc-washing/find-existing", async (req, res) => {
       factoryName,
       washQty,
       "inspector.empId": inspectorId,
-      // For inspection report, you may want to match either firstOutput or inline
-      // If you want to match both, use both fields
       reportType,
     };
 

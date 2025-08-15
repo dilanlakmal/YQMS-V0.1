@@ -79,10 +79,6 @@ const QC2UploadData = () => {
     const dataToSave = resultToSave || finalResult;
     const washingToSave = washingDataToSave || washingQtyData || [];
 
-    console.log('handleManualSave called with:');
-    console.log('- QC data length:', dataToSave?.length);
-    console.log('- Washing data length:', washingToSave?.length);
-
     if (!dataToSave || !Array.isArray(dataToSave) || dataToSave.length === 0) {
       alert('No data to save.');
       return;
@@ -95,11 +91,6 @@ const QC2UploadData = () => {
         finalDocs: dataToSave,
         washingQtyData: washingToSave
       };
-
-      console.log('Sending request with:', {
-        finalDocsCount: requestBody.finalDocs.length,
-        washingQtyDataCount: requestBody.washingQtyData.length
-      });
 
       const response = await fetch(`${API_BASE_URL}/api/manual-save-qc2-data`, {
         method: 'POST',
