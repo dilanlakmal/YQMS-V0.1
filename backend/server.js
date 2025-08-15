@@ -26832,12 +26832,6 @@ app.post(
       if (defectDetails.defectsByPc) {
         defectDetails.defectsByPc.forEach((pc, pcIdx) => {
           (pc.pcDefects || []).forEach((defect, defectIdx) => {
-            // Ensure defectName is preserved
-            if (!defect.defectName && defect.defectId) {
-              // You might want to fetch the defect name from your defects collection
-              // For now, we'll keep it as is
-            }
-
             if (defect.defectImages) {
               defect.defectImages = defect.defectImages.map((img, imgIdx) => {
                 return (
