@@ -132,66 +132,71 @@ const QCWashingCheckpointsTab = () => {
     <div className="space-y-8">
       <QCWashingCheckpointForm onCheckpointAdded={fetchCheckpoints} />
 
-      <div className="p-4 sm:p-6 bg-white rounded-xl shadow-lg">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">
+      <div className="p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg dark:shadow-gray-900/20">
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
           Checkpoints List
         </h2>
+
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Checkpoint Name
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Added By
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Added Date
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Last Updated By
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Updated Date
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {isLoading ? (
                 <tr>
                   <td colSpan="6" className="text-center py-10">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-indigo-600" />
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-indigo-600 dark:text-indigo-400" />
                   </td>
                 </tr>
               ) : (
                 checkpoints.map((checkpoint) => (
-                  <tr key={checkpoint._id} className="hover:bg-gray-50">
+                  <tr
+                    key={checkpoint._id}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                  >
                     {editRowId === checkpoint._id ? (
                       <>
                         <td className="px-2 py-1">
                           <input
                             value={editedCheckpoint.name || ""}
                             onChange={handleInputChange}
-                            className="w-full p-1 border rounded text-sm"
+                            className="w-full p-1 border border-gray-300 dark:border-gray-500 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-colors duration-200"
                             placeholder="Checkpoint name"
                           />
                         </td>
-                        <td className="px-4 py-2 text-sm">
+                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                           {checkpoint.addedBy?.eng_name || "-"}
                         </td>
-                        <td className="px-4 py-2 text-sm">
+                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                           {checkpoint.createdAt
                             ? formatDate(checkpoint.createdAt)
                             : "-"}
                         </td>
-                        <td className="px-4 py-2 text-sm">
+                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                           {checkpoint.updatedBy?.eng_name || "-"}
                         </td>
-                        <td className="px-4 py-2 text-sm">
+                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                           {checkpoint.updatedAt
                             ? formatDate(checkpoint.updatedAt)
                             : "-"}
@@ -199,14 +204,18 @@ const QCWashingCheckpointsTab = () => {
                         <td className="px-4 py-2 whitespace-nowrap text-center">
                           <button
                             onClick={() => handleSave(checkpoint._id)}
-                            className="p-1.5 text-green-600 rounded-full hover:bg-green-100 disabled:opacity-50"
+                            className="p-1.5 text-green-600 dark:text-green-400 rounded-full hover:bg-green-100 dark:hover:bg-green-900/30 disabled:opacity-50 transition-colors duration-200"
                             disabled={isSaving === checkpoint._id}
                           >
-                            <Save size={18} />
+                            {isSaving === checkpoint._id ? (
+                              <Loader2 size={18} className="animate-spin" />
+                            ) : (
+                              <Save size={18} />
+                            )}
                           </button>
                           <button
                             onClick={handleCancelEdit}
-                            className="p-1.5 text-gray-600 rounded-full hover:bg-gray-100"
+                            className="p-1.5 text-gray-600 dark:text-gray-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                           >
                             <XCircle size={18} />
                           </button>
@@ -214,21 +223,21 @@ const QCWashingCheckpointsTab = () => {
                       </>
                     ) : (
                       <>
-                        <td className="px-4 py-2 text-sm font-medium">
+                        <td className="px-4 py-2 text-sm font-medium text-gray-900 dark:text-gray-100">
                           {checkpoint.name}
                         </td>
-                        <td className="px-4 py-2 text-sm">
+                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                           {checkpoint.addedBy?.eng_name || "-"}
                         </td>
-                        <td className="px-4 py-2 text-sm">
+                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                           {checkpoint.createdAt
                             ? formatDate(checkpoint.createdAt)
                             : "-"}
                         </td>
-                        <td className="px-4 py-2 text-sm">
+                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                           {checkpoint.updatedBy?.eng_name || "-"}
                         </td>
-                        <td className="px-4 py-2 text-sm">
+                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                           {checkpoint.updatedAt
                             ? formatDate(checkpoint.updatedAt)
                             : "-"}
@@ -236,16 +245,20 @@ const QCWashingCheckpointsTab = () => {
                         <td className="px-4 py-2 whitespace-nowrap text-center">
                           <button
                             onClick={() => handleEdit(checkpoint)}
-                            className="p-1.5 text-indigo-600 rounded-full hover:bg-indigo-100"
+                            className="p-1.5 text-indigo-600 dark:text-indigo-400 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors duration-200"
                           >
                             <Edit3 size={18} />
                           </button>
                           <button
                             onClick={() => handleDelete(checkpoint._id)}
                             disabled={isSaving === checkpoint._id}
-                            className="p-1.5 text-red-600 rounded-full hover:bg-red-100 disabled:opacity-50"
+                            className="p-1.5 text-red-600 dark:text-red-400 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 disabled:opacity-50 transition-colors duration-200"
                           >
-                            <Trash2 size={18} />
+                            {isSaving === checkpoint._id ? (
+                              <Loader2 size={18} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={18} />
+                            )}
                           </button>
                         </td>
                       </>

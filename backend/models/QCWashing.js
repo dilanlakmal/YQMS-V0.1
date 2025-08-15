@@ -109,7 +109,7 @@ const QCWashingSchema = new mongoose.Schema(
       checkedPoints: [
         {
           pointName: String,
-          decision: Boolean,
+          decision: { type: String },
           comparison: [String],
           remark: String
         }
@@ -117,11 +117,41 @@ const QCWashingSchema = new mongoose.Schema(
       machineProcesses: [
         {
           machineType: String,
-          temperature: Number,
-          time: Number,
-          chemical: Number
+          temperature: {
+            actualValue: Number,
+            standardValue: Number,
+            status: {
+              ok: { type: Boolean, default: false },
+              no: { type: Boolean, default: false }
+            }
+          },
+          time: {
+            actualValue: Number,
+            standardValue: Number,
+            status: {
+              ok: { type: Boolean, default: false },
+              no: { type: Boolean, default: false }
+            }
+          },
+          silicon: {
+            actualValue: Number,
+            standardValue: Number,
+            status: {
+              ok: { type: Boolean, default: false },
+              no: { type: Boolean, default: false }
+            }
+          },
+          softener: {
+            actualValue: Number,
+            standardValue: Number,
+            status: {
+              ok: { type: Boolean, default: false },
+              no: { type: Boolean, default: false }
+            }
+          }
         }
       ],
+
       parameters: [
         {
           parameterName: String,
