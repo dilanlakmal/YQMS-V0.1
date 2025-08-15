@@ -94,9 +94,9 @@ import createSupplierIssuesDefectModel from "./models/SupplierIssuesDefect.js";
 import createSupplierIssueReportModel from "./models/SupplierIssueReport.js";
 
 import createQCWashingMachineStandard from "./models/qcWashingStanderd.js";
-import createQC2OlderDefectModel from "./models/QC2_Older_Defects.js";
-import createQCWashingQtyOldSchema from "./models/QCWashingQtyOld.js";
-import createQCWorkersModel from "./models/QCWorkers.js";
+// import createQC2OlderDefectModel from "./models/QC2_Older_Defects.js";
+// import createQCWashingQtyOldSchema from "./models/QCWashingQtyOld.js";
+// import createQCWorkersModel from "./models/QCWorkers.js";
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
@@ -279,9 +279,9 @@ const SupplierIssueReport = createSupplierIssueReportModel(ymProdConnection);
 
 const QCWashingMachineStandard =
   createQCWashingMachineStandard(ymProdConnection);
-const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
-const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
-const QCWorkers = createQCWorkersModel(ymProdConnection);
+// const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
+// const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
+// const QCWorkers = createQCWorkersModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -26673,6 +26673,93 @@ app.post("/api/qc-washing/orderData-save", async (req, res) => {
   }
 });
 
+app.get(
+  "/api/qc-washing/check-measurement-details/:orderNo",
+  async (req, res) => {
+    try {
+      const { orderNo } = req.params;
+
+      if (!orderNo) {
+        return res.status(400).json({
+          success: false,
+          message: "Order number is required",
+          hasMeasurement: false
+        });
+      }
+
+      const collection = ymEcoConnection.db.collection("dt_orders");
+
+      // Find the order first
+      const order = await collection.findOne({
+        $or: [{ Order_No: orderNo }, { Style: orderNo }]
+      });
+
+      if (!order) {
+        return res.json({
+          success: true,
+          hasMeasurement: false,
+          message: "Order not found",
+          debug: {
+            orderNo: orderNo,
+            foundRecord: false
+          }
+        });
+      }
+
+      // Check if measurement specs exist and have valid data
+      const hasBeforeWashSpecs =
+        Array.isArray(order.BeforeWashSpecs) &&
+        order.BeforeWashSpecs.length > 0 &&
+        order.BeforeWashSpecs.some(
+          (spec) =>
+            spec.MeasurementPointEngName &&
+            spec.MeasurementPointEngName.trim() !== ""
+        );
+
+      const hasAfterWashSpecs =
+        Array.isArray(order.AfterWashSpecs) &&
+        order.AfterWashSpecs.length > 0 &&
+        order.AfterWashSpecs.some(
+          (spec) =>
+            spec.MeasurementPointEngName &&
+            spec.MeasurementPointEngName.trim() !== ""
+        );
+
+      const hasMeasurement = hasBeforeWashSpecs || hasAfterWashSpecs;
+
+      res.json({
+        success: true,
+        hasMeasurement: hasMeasurement,
+        message: hasMeasurement
+          ? "Measurement details found"
+          : "No measurement details found for this order",
+        debug: {
+          orderNo: orderNo,
+          foundRecord: true,
+          measurementStructure: {
+            hasBeforeWashSpecs: hasBeforeWashSpecs,
+            hasAfterWashSpecs: hasAfterWashSpecs,
+            beforeWashSpecsCount: order.BeforeWashSpecs?.length || 0,
+            afterWashSpecsCount: order.AfterWashSpecs?.length || 0,
+            orderData: {
+              Order_No: order.Order_No,
+              Style: order.Style
+            }
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Error checking measurement details:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error while checking measurement details",
+        hasMeasurement: false,
+        error: error.message
+      });
+    }
+  }
+);
+
 app.post("/api/qc-washing/find-existing", async (req, res) => {
   try {
     const {
@@ -26701,8 +26788,6 @@ app.post("/api/qc-washing/find-existing", async (req, res) => {
       factoryName,
       washQty,
       "inspector.empId": inspectorId,
-      // For inspection report, you may want to match either firstOutput or inline
-      // If you want to match both, use both fields
       reportType
     };
 
@@ -27783,425 +27868,425 @@ app.get("/api/supplier-issues/report-options", async (req, res) => {
   }
 });
 
-/* ------------------------------
-  QC2-Upload-Data
------------------------------- */
-// Key function
-function makeKey(row) {
-  return [row.Inspection_date || "", row.QC_ID || ""].join("|");
-}
+// /* ------------------------------
+//   QC2-Upload-Data
+// ------------------------------ */
+// // Key function
+// function makeKey(row) {
+//   return [row.Inspection_date || "", row.QC_ID || ""].join("|");
+// }
 
-app.post("/api/upload-qc2-data", async (req, res) => {
-  try {
-    const { outputData, defectData } = req.body;
+// app.post("/api/upload-qc2-data", async (req, res) => {
+//   try {
+//     const { outputData, defectData } = req.body;
 
-    // Define washing line identifiers
-    const washingLineIdentifiers = [
-      "Washing",
-      "WASHING",
-      "washing",
-      "Wash",
-      "WASH",
-      "wash"
-      // Add more washing line identifiers as needed
-    ];
+//     // Define washing line identifiers
+//     const washingLineIdentifiers = [
+//       "Washing",
+//       "WASHING",
+//       "washing",
+//       "Wash",
+//       "WASH",
+//       "wash"
+//       // Add more washing line identifiers as needed
+//     ];
 
-    // Function to check if a line is washing-related
-    const isWashingLine = (lineName) => {
-      if (!lineName) return false;
-      return washingLineIdentifiers.includes(lineName.trim());
-    };
+//     // Function to check if a line is washing-related
+//     const isWashingLine = (lineName) => {
+//       if (!lineName) return false;
+//       return washingLineIdentifiers.includes(lineName.trim());
+//     };
 
-    const allDefects = await QC2OlderDefect.find({}).lean();
-    const allDefectsArr = allDefects.map((d) => ({
-      defectName: (d.defectName || "").trim().toLowerCase(),
-      defectCode: d.defectCode,
-      English: (d.English || "").trim().toLowerCase(),
-      Khmer: (d.Khmer || "").trim().toLowerCase(),
-      Chinese: (d.Chinese || "").trim().toLowerCase()
-    }));
+//     const allDefects = await QC2OlderDefect.find({}).lean();
+//     const allDefectsArr = allDefects.map((d) => ({
+//       defectName: (d.defectName || "").trim().toLowerCase(),
+//       defectCode: d.defectCode,
+//       English: (d.English || "").trim().toLowerCase(),
+//       Khmer: (d.Khmer || "").trim().toLowerCase(),
+//       Chinese: (d.Chinese || "").trim().toLowerCase()
+//     }));
 
-    // Standardize field names (existing code)
-    const outputRows = outputData.map((row) => ({
-      ...row,
-      Inspection_date: row["日期"] || row["BillDate"] || "",
-      QC_ID: row["工号"] || row["EmpID"] || "",
-      WorkLine:
-        row["打菲组别"] ||
-        row["Batch Group"] ||
-        row["组名"] ||
-        row["WorkLine"] ||
-        "",
-      MONo:
-        row["款号"] ||
-        row["ModelNo"] ||
-        row["MoNo"] ||
-        row["StyleNo"] ||
-        row["Style_No"] ||
-        row["型号"] ||
-        "",
-      SeqNo: row["工序号"] || row["SeqNo"] || "",
-      ColorNo: row["颜色"] || row["ColorNo"] || "",
-      ColorName: row["颜色"] || row["ColorName"] || "",
-      SizeName: row["尺码"] || row["SizeName"] || "",
-      Qty: row["数量"] || row["Qty"] || 0
-    }));
+//     // Standardize field names (existing code)
+//     const outputRows = outputData.map((row) => ({
+//       ...row,
+//       Inspection_date: row["日期"] || row["BillDate"] || "",
+//       QC_ID: row["工号"] || row["EmpID"] || "",
+//       WorkLine:
+//         row["打菲组别"] ||
+//         row["Batch Group"] ||
+//         row["组名"] ||
+//         row["WorkLine"] ||
+//         "",
+//       MONo:
+//         row["款号"] ||
+//         row["ModelNo"] ||
+//         row["MoNo"] ||
+//         row["StyleNo"] ||
+//         row["Style_No"] ||
+//         row["型号"] ||
+//         "",
+//       SeqNo: row["工序号"] || row["SeqNo"] || "",
+//       ColorNo: row["颜色"] || row["ColorNo"] || "",
+//       ColorName: row["颜色"] || row["ColorName"] || "",
+//       SizeName: row["尺码"] || row["SizeName"] || "",
+//       Qty: row["数量"] || row["Qty"] || 0
+//     }));
 
-    const defectRows = defectData.map((row) => {
-      const defectNameRaw = (row["疵点名称"] || row["ReworkName"] || "")
-        .trim()
-        .toLowerCase();
-      let found = allDefectsArr.find(
-        (d) =>
-          defectNameRaw === d.defectName ||
-          (d.English && defectNameRaw.includes(d.English)) ||
-          (d.Khmer && defectNameRaw.includes(d.Khmer)) ||
-          (d.Chinese && defectNameRaw.includes(d.Chinese)) ||
-          (d.English && d.English.includes(defectNameRaw)) ||
-          (d.Khmer && d.Khmer.includes(defectNameRaw)) ||
-          (d.Chinese && d.Chinese.includes(defectNameRaw))
-      );
+//     const defectRows = defectData.map((row) => {
+//       const defectNameRaw = (row["疵点名称"] || row["ReworkName"] || "")
+//         .trim()
+//         .toLowerCase();
+//       let found = allDefectsArr.find(
+//         (d) =>
+//           defectNameRaw === d.defectName ||
+//           (d.English && defectNameRaw.includes(d.English)) ||
+//           (d.Khmer && defectNameRaw.includes(d.Khmer)) ||
+//           (d.Chinese && defectNameRaw.includes(d.Chinese)) ||
+//           (d.English && d.English.includes(defectNameRaw)) ||
+//           (d.Khmer && d.Khmer.includes(defectNameRaw)) ||
+//           (d.Chinese && d.Chinese.includes(defectNameRaw))
+//       );
 
-      let defectCode = found ? found.defectCode : "";
+//       let defectCode = found ? found.defectCode : "";
 
-      return {
-        ...row,
-        Inspection_date: row["日期"] || row["dDate"] || "",
-        QC_ID: row["工号"] || row["EmpID_QC"] || "",
-        WorkLine: row["组名"] || row["WorkLine"] || "N/A",
-        MONo:
-          row["款号"] ||
-          row["ModelNo"] ||
-          row["MoNo"] ||
-          row["StyleNo"] ||
-          row["Style_No"] ||
-          row["型号"] ||
-          "",
-        ColorNo: row["颜色"] || row["ColorNo"] || "",
-        ColorName: row["颜色"] || row["ColorName"] || "",
-        SizeName: row["尺码"] || row["SizeName"] || "",
-        ReworkCode: defectCode,
-        ReworkName: defectNameRaw,
-        Defect_Qty: row["数量"] || row["Defect_Qty"] || 0
-      };
-    });
+//       return {
+//         ...row,
+//         Inspection_date: row["日期"] || row["dDate"] || "",
+//         QC_ID: row["工号"] || row["EmpID_QC"] || "",
+//         WorkLine: row["组名"] || row["WorkLine"] || "N/A",
+//         MONo:
+//           row["款号"] ||
+//           row["ModelNo"] ||
+//           row["MoNo"] ||
+//           row["StyleNo"] ||
+//           row["Style_No"] ||
+//           row["型号"] ||
+//           "",
+//         ColorNo: row["颜色"] || row["ColorNo"] || "",
+//         ColorName: row["颜色"] || row["ColorName"] || "",
+//         SizeName: row["尺码"] || row["SizeName"] || "",
+//         ReworkCode: defectCode,
+//         ReworkName: defectNameRaw,
+//         Defect_Qty: row["数量"] || row["Defect_Qty"] || 0
+//       };
+//     });
 
-    // Build outputMap and defectMap (existing code)
-    const outputMap = new Map();
-    for (const row of outputRows) {
-      const key = makeKey(row);
-      if (!outputMap.has(key)) outputMap.set(key, []);
-      outputMap.get(key).push(row);
-    }
+//     // Build outputMap and defectMap (existing code)
+//     const outputMap = new Map();
+//     for (const row of outputRows) {
+//       const key = makeKey(row);
+//       if (!outputMap.has(key)) outputMap.set(key, []);
+//       outputMap.get(key).push(row);
+//     }
 
-    const defectMap = new Map();
-    for (const row of defectRows) {
-      const key = makeKey(row);
-      if (!defectMap.has(key)) defectMap.set(key, []);
-      defectMap.get(key).push(row);
-    }
+//     const defectMap = new Map();
+//     for (const row of defectRows) {
+//       const key = makeKey(row);
+//       if (!defectMap.has(key)) defectMap.set(key, []);
+//       defectMap.get(key).push(row);
+//     }
 
-    // Merge and Build Documents
-    const docs = new Map();
-    const washingQtyData = new Map();
+//     // Merge and Build Documents
+//     const docs = new Map();
+//     const washingQtyData = new Map();
 
-    const allKeys = new Set([...outputMap.keys(), ...defectMap.keys()]);
+//     const allKeys = new Set([...outputMap.keys(), ...defectMap.keys()]);
 
-    for (const key of allKeys) {
-      const outputRows = outputMap.get(key) || [];
-      const defectRows = defectMap.get(key) || [];
+//     for (const key of allKeys) {
+//       const outputRows = outputMap.get(key) || [];
+//       const defectRows = defectMap.get(key) || [];
 
-      const [Inspection_date_str, QC_ID_raw] = key.split("|");
-      const QC_ID = QC_ID_raw === "6335" ? "YM6335" : QC_ID_raw;
-      const Inspection_date = Inspection_date_str
-        ? new Date(Inspection_date_str + "T00:00:00Z")
-        : null;
+//       const [Inspection_date_str, QC_ID_raw] = key.split("|");
+//       const QC_ID = QC_ID_raw === "6335" ? "YM6335" : QC_ID_raw;
+//       const Inspection_date = Inspection_date_str
+//         ? new Date(Inspection_date_str + "T00:00:00Z")
+//         : null;
 
-      // Output grouping (existing code)
-      const outputGroup = {};
-      for (const r of outputRows) {
-        const oKey = [r.WorkLine, r.MONo, r.ColorName, r.SizeName].join("|");
-        if (!outputGroup[oKey]) outputGroup[oKey] = [];
-        outputGroup[oKey].push(r);
-      }
+//       // Output grouping (existing code)
+//       const outputGroup = {};
+//       for (const r of outputRows) {
+//         const oKey = [r.WorkLine, r.MONo, r.ColorName, r.SizeName].join("|");
+//         if (!outputGroup[oKey]) outputGroup[oKey] = [];
+//         outputGroup[oKey].push(r);
+//       }
 
-      const Output_data = Object.values(outputGroup).map((rows) => ({
-        Line_no: rows[0]?.WorkLine || "",
-        MONo: rows[0]?.MONo || "",
-        Color: rows[0]?.ColorName || "",
-        Size: rows[0]?.SizeName || "",
-        Qty: rows.reduce((sum, r) => sum + Number(r.Qty || 0), 0)
-      }));
+//       const Output_data = Object.values(outputGroup).map((rows) => ({
+//         Line_no: rows[0]?.WorkLine || "",
+//         MONo: rows[0]?.MONo || "",
+//         Color: rows[0]?.ColorName || "",
+//         Size: rows[0]?.SizeName || "",
+//         Qty: rows.reduce((sum, r) => sum + Number(r.Qty || 0), 0)
+//       }));
 
-      // Output summary (existing code)
-      const outputSummaryMap = new Map();
-      for (const o of Output_data) {
-        const key = `${o.Line_no}|${o.MONo}`;
-        if (!outputSummaryMap.has(key)) {
-          outputSummaryMap.set(key, { Line: o.Line_no, MONo: o.MONo, Qty: 0 });
-        }
-        outputSummaryMap.get(key).Qty += o.Qty;
-      }
+//       // Output summary (existing code)
+//       const outputSummaryMap = new Map();
+//       for (const o of Output_data) {
+//         const key = `${o.Line_no}|${o.MONo}`;
+//         if (!outputSummaryMap.has(key)) {
+//           outputSummaryMap.set(key, { Line: o.Line_no, MONo: o.MONo, Qty: 0 });
+//         }
+//         outputSummaryMap.get(key).Qty += o.Qty;
+//       }
 
-      const Output_data_summary = Array.from(outputSummaryMap.values());
-      const TotalOutput = Output_data_summary.reduce(
-        (sum, o) => sum + o.Qty,
-        0
-      );
+//       const Output_data_summary = Array.from(outputSummaryMap.values());
+//       const TotalOutput = Output_data_summary.reduce(
+//         (sum, o) => sum + o.Qty,
+//         0
+//       );
 
-      // MODIFIED: Only create washing quantity data for washing lines
-      // But don't include Line_no in the washing data structure
-      const washingQtyMap = new Map();
-      for (const o of Output_data) {
-        // Only process if this is a washing line
-        if (isWashingLine(o.Line_no)) {
-          const washKey = `${Inspection_date_str}|${QC_ID}|${o.MONo}|${o.Color}`;
-          if (!washingQtyMap.has(washKey)) {
-            washingQtyMap.set(washKey, {
-              Inspection_date: Inspection_date,
-              QC_ID: QC_ID,
-              Style_No: o.MONo,
-              Color: o.Color,
-              Wash_Qty: 0
-              // Note: Line_no is NOT included here
-            });
-          }
-          washingQtyMap.get(washKey).Wash_Qty += o.Qty;
-        }
-      }
+//       // MODIFIED: Only create washing quantity data for washing lines
+//       // But don't include Line_no in the washing data structure
+//       const washingQtyMap = new Map();
+//       for (const o of Output_data) {
+//         // Only process if this is a washing line
+//         if (isWashingLine(o.Line_no)) {
+//           const washKey = `${Inspection_date_str}|${QC_ID}|${o.MONo}|${o.Color}`;
+//           if (!washingQtyMap.has(washKey)) {
+//             washingQtyMap.set(washKey, {
+//               Inspection_date: Inspection_date,
+//               QC_ID: QC_ID,
+//               Style_No: o.MONo,
+//               Color: o.Color,
+//               Wash_Qty: 0
+//               // Note: Line_no is NOT included here
+//             });
+//           }
+//           washingQtyMap.get(washKey).Wash_Qty += o.Qty;
+//         }
+//       }
 
-      // Add to global washing quantity data map (only washing lines)
-      for (const [washKey, washData] of washingQtyMap) {
-        if (!washingQtyData.has(washKey)) {
-          washingQtyData.set(washKey, washData);
-        } else {
-          washingQtyData.get(washKey).Wash_Qty += washData.Wash_Qty;
-        }
-      }
+//       // Add to global washing quantity data map (only washing lines)
+//       for (const [washKey, washData] of washingQtyMap) {
+//         if (!washingQtyData.has(washKey)) {
+//           washingQtyData.set(washKey, washData);
+//         } else {
+//           washingQtyData.get(washKey).Wash_Qty += washData.Wash_Qty;
+//         }
+//       }
 
-      // Rest of the existing code for defects processing...
-      const defectGroup = {};
-      for (const d of defectRows) {
-        const dKey = [d.WorkLine, d.MONo, d.ColorName, d.SizeName].join("|");
-        if (!defectGroup[dKey]) defectGroup[dKey] = [];
-        defectGroup[dKey].push(d);
-      }
+//       // Rest of the existing code for defects processing...
+//       const defectGroup = {};
+//       for (const d of defectRows) {
+//         const dKey = [d.WorkLine, d.MONo, d.ColorName, d.SizeName].join("|");
+//         if (!defectGroup[dKey]) defectGroup[dKey] = [];
+//         defectGroup[dKey].push(d);
+//       }
 
-      const Defect_data = Object.entries(defectGroup).map(([dKey, rows]) => {
-        let TotalDefect = 0;
-        const defectDetailsMap = new Map();
+//       const Defect_data = Object.entries(defectGroup).map(([dKey, rows]) => {
+//         let TotalDefect = 0;
+//         const defectDetailsMap = new Map();
 
-        for (const d of rows) {
-          const ddKey = d.ReworkCode + "|" + d.ReworkName;
-          if (!defectDetailsMap.has(ddKey)) {
-            defectDetailsMap.set(ddKey, {
-              Defect_code: d.ReworkCode || "",
-              Defect_name: d.ReworkName || "",
-              Qty: 0
-            });
-          }
-          defectDetailsMap.get(ddKey).Qty += Number(d.Defect_Qty || 0);
-          TotalDefect += Number(d.Defect_Qty || 0);
-        }
+//         for (const d of rows) {
+//           const ddKey = d.ReworkCode + "|" + d.ReworkName;
+//           if (!defectDetailsMap.has(ddKey)) {
+//             defectDetailsMap.set(ddKey, {
+//               Defect_code: d.ReworkCode || "",
+//               Defect_name: d.ReworkName || "",
+//               Qty: 0
+//             });
+//           }
+//           defectDetailsMap.get(ddKey).Qty += Number(d.Defect_Qty || 0);
+//           TotalDefect += Number(d.Defect_Qty || 0);
+//         }
 
-        const [Line_no, MONo, Color, Size] = dKey.split("|");
-        return {
-          Line_no: Line_no || "",
-          MONo: MONo || "",
-          Color: Color || "",
-          Size: Size || "",
-          Defect_qty: TotalDefect,
-          DefectDetails: Array.from(defectDetailsMap.values())
-        };
-      });
+//         const [Line_no, MONo, Color, Size] = dKey.split("|");
+//         return {
+//           Line_no: Line_no || "",
+//           MONo: MONo || "",
+//           Color: Color || "",
+//           Size: Size || "",
+//           Defect_qty: TotalDefect,
+//           DefectDetails: Array.from(defectDetailsMap.values())
+//         };
+//       });
 
-      // Defect summary
-      const defectSummaryMap = new Map();
-      for (const d of Defect_data) {
-        const key = `${d.Line_no}|${d.MONo}`;
-        if (!defectSummaryMap.has(key)) {
-          defectSummaryMap.set(key, {
-            Line_no: d.Line_no,
-            MONo: d.MONo,
-            Defect_Qty: 0,
-            Defect_Details: []
-          });
-        }
-        defectSummaryMap.get(key).Defect_Qty += d.Defect_qty;
+//       // Defect summary
+//       const defectSummaryMap = new Map();
+//       for (const d of Defect_data) {
+//         const key = `${d.Line_no}|${d.MONo}`;
+//         if (!defectSummaryMap.has(key)) {
+//           defectSummaryMap.set(key, {
+//             Line_no: d.Line_no,
+//             MONo: d.MONo,
+//             Defect_Qty: 0,
+//             Defect_Details: []
+//           });
+//         }
+//         defectSummaryMap.get(key).Defect_Qty += d.Defect_qty;
 
-        const detailsMap = new Map(
-          defectSummaryMap
-            .get(key)
-            .Defect_Details.map((dd) => [
-              `${dd.Defect_code}|${dd.Defect_name}`,
-              { ...dd }
-            ])
-        );
+//         const detailsMap = new Map(
+//           defectSummaryMap
+//             .get(key)
+//             .Defect_Details.map((dd) => [
+//               `${dd.Defect_code}|${dd.Defect_name}`,
+//               { ...dd }
+//             ])
+//         );
 
-        for (const dd of d.DefectDetails) {
-          const ddKey = `${dd.Defect_code}|${dd.Defect_name}`;
-          if (!detailsMap.has(ddKey)) {
-            detailsMap.set(ddKey, { ...dd });
-          } else {
-            detailsMap.get(ddKey).Qty += dd.Qty;
-          }
-        }
+//         for (const dd of d.DefectDetails) {
+//           const ddKey = `${dd.Defect_code}|${dd.Defect_name}`;
+//           if (!detailsMap.has(ddKey)) {
+//             detailsMap.set(ddKey, { ...dd });
+//           } else {
+//             detailsMap.get(ddKey).Qty += dd.Qty;
+//           }
+//         }
 
-        defectSummaryMap.get(key).Defect_Details = Array.from(
-          detailsMap.values()
-        );
-      }
+//         defectSummaryMap.get(key).Defect_Details = Array.from(
+//           detailsMap.values()
+//         );
+//       }
 
-      const Defect_data_summary = Array.from(defectSummaryMap.values());
-      const TotalDefect = Defect_data_summary.reduce(
-        (sum, d) => sum + d.Defect_Qty,
-        0
-      );
+//       const Defect_data_summary = Array.from(defectSummaryMap.values());
+//       const TotalDefect = Defect_data_summary.reduce(
+//         (sum, d) => sum + d.Defect_Qty,
+//         0
+//       );
 
-      docs.set(key, {
-        Inspection_date,
-        QC_ID,
-        report_type: "Inline Finishing",
-        Seq_No: [...new Set(outputRows.map((r) => Number(r.SeqNo || 0)))],
-        TotalOutput,
-        TotalDefect,
-        Output_data,
-        Output_data_summary,
-        Defect_data,
-        Defect_data_summary
-      });
-    }
+//       docs.set(key, {
+//         Inspection_date,
+//         QC_ID,
+//         report_type: "Inline Finishing",
+//         Seq_No: [...new Set(outputRows.map((r) => Number(r.SeqNo || 0)))],
+//         TotalOutput,
+//         TotalDefect,
+//         Output_data,
+//         Output_data_summary,
+//         Defect_data,
+//         Defect_data_summary
+//       });
+//     }
 
-    const finalDocs = Array.from(docs.values());
-    const washingQtyDocs = Array.from(washingQtyData.values());
+//     const finalDocs = Array.from(docs.values());
+//     const washingQtyDocs = Array.from(washingQtyData.values());
 
-    console.log(`Generated ${finalDocs.length} QC documents`);
-    console.log(
-      `Generated ${washingQtyDocs.length} washing quantity documents (washing lines only)`
-    );
+//     console.log(`Generated ${finalDocs.length} QC documents`);
+//     console.log(
+//       `Generated ${washingQtyDocs.length} washing quantity documents (washing lines only)`
+//     );
 
-    res.json({ finalDocs, washingQtyDocs });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to process and save QC2 data." });
-  }
-});
+//     res.json({ finalDocs, washingQtyDocs });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Failed to process and save QC2 data." });
+//   }
+// });
 
-// routes/qc2.js (add this to the same file)
-app.get("/api/fetch-qc2-data", async (req, res) => {
-  try {
-    const results = await QCWorkers.find({}).lean();
-    res.json(results);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch QC2 data." });
-  }
-});
+// // routes/qc2.js (add this to the same file)
+// app.get("/api/fetch-qc2-data", async (req, res) => {
+//   try {
+//     const results = await QCWorkers.find({}).lean();
+//     res.json(results);
+//   } catch (err) {
+//     res.status(500).json({ error: "Failed to fetch QC2 data." });
+//   }
+// });
 
-app.post("/api/manual-save-qc2-data", async (req, res) => {
-  try {
-    const { finalDocs, washingQtyData } = req.body;
+// app.post("/api/manual-save-qc2-data", async (req, res) => {
+//   try {
+//     const { finalDocs, washingQtyData } = req.body;
 
-    if (!Array.isArray(finalDocs) || finalDocs.length === 0) {
-      return res.status(400).json({ error: "No QC data to save." });
-    }
+//     if (!Array.isArray(finalDocs) || finalDocs.length === 0) {
+//       return res.status(400).json({ error: "No QC data to save." });
+//     }
 
-    // QC data bulk operations
-    const bulkOps = finalDocs.map((doc) => ({
-      updateOne: {
-        filter: {
-          Inspection_date:
-            doc.Inspection_date instanceof Date
-              ? doc.Inspection_date
-              : new Date(doc.Inspection_date),
-          QC_ID: doc.QC_ID
-        },
-        update: { $set: doc },
-        upsert: true
-      }
-    }));
+//     // QC data bulk operations
+//     const bulkOps = finalDocs.map((doc) => ({
+//       updateOne: {
+//         filter: {
+//           Inspection_date:
+//             doc.Inspection_date instanceof Date
+//               ? doc.Inspection_date
+//               : new Date(doc.Inspection_date),
+//           QC_ID: doc.QC_ID
+//         },
+//         update: { $set: doc },
+//         upsert: true
+//       }
+//     }));
 
-    // Washing quantity data bulk operations (only washing data, no Line_no field)
-    let washingBulkOps = [];
-    if (Array.isArray(washingQtyData) && washingQtyData.length > 0) {
-      washingBulkOps = washingQtyData.map((doc) => ({
-        updateOne: {
-          filter: {
-            Inspection_date:
-              doc.Inspection_date instanceof Date
-                ? doc.Inspection_date
-                : new Date(doc.Inspection_date),
-            QC_ID: doc.QC_ID,
-            Style_No: doc.Style_No,
-            Color: doc.Color
-            // Note: No Line_no in filter since it's not stored
-          },
-          update: { $set: doc },
-          upsert: true
-        }
-      }));
-    }
+//     // Washing quantity data bulk operations (only washing data, no Line_no field)
+//     let washingBulkOps = [];
+//     if (Array.isArray(washingQtyData) && washingQtyData.length > 0) {
+//       washingBulkOps = washingQtyData.map((doc) => ({
+//         updateOne: {
+//           filter: {
+//             Inspection_date:
+//               doc.Inspection_date instanceof Date
+//                 ? doc.Inspection_date
+//                 : new Date(doc.Inspection_date),
+//             QC_ID: doc.QC_ID,
+//             Style_No: doc.Style_No,
+//             Color: doc.Color
+//             // Note: No Line_no in filter since it's not stored
+//           },
+//           update: { $set: doc },
+//           upsert: true
+//         }
+//       }));
+//     }
 
-    console.log(`Saving ${bulkOps.length} QC records`);
-    console.log(
-      `Saving ${washingBulkOps.length} washing quantity records (washing lines only)`
-    );
+//     console.log(`Saving ${bulkOps.length} QC records`);
+//     console.log(
+//       `Saving ${washingBulkOps.length} washing quantity records (washing lines only)`
+//     );
 
-    // Execute both bulk operations
-    const results = [];
+//     // Execute both bulk operations
+//     const results = [];
 
-    if (bulkOps.length > 0) {
-      try {
-        const qcResult = await QCWorkers.bulkWrite(bulkOps);
-        console.log("QC bulk write result:", qcResult);
-        results.push({ type: "QC", result: qcResult });
-      } catch (qcError) {
-        console.error("QC bulk write error:", qcError);
-        return res.status(500).json({
-          error: "Failed to save QC data",
-          details: qcError.message
-        });
-      }
-    }
+//     if (bulkOps.length > 0) {
+//       try {
+//         const qcResult = await QCWorkers.bulkWrite(bulkOps);
+//         console.log("QC bulk write result:", qcResult);
+//         results.push({ type: "QC", result: qcResult });
+//       } catch (qcError) {
+//         console.error("QC bulk write error:", qcError);
+//         return res.status(500).json({
+//           error: "Failed to save QC data",
+//           details: qcError.message
+//         });
+//       }
+//     }
 
-    if (washingBulkOps.length > 0) {
-      try {
-        const washingResult = await QCWashingQtyOld.bulkWrite(washingBulkOps);
-        console.log("Washing bulk write result:", washingResult);
-        results.push({ type: "Washing", result: washingResult });
-      } catch (washingError) {
-        console.error("Washing bulk write error:", washingError);
-        return res.status(500).json({
-          error: "Failed to save washing data",
-          details: washingError.message
-        });
-      }
-    }
+//     if (washingBulkOps.length > 0) {
+//       try {
+//         const washingResult = await QCWashingQtyOld.bulkWrite(washingBulkOps);
+//         console.log("Washing bulk write result:", washingResult);
+//         results.push({ type: "Washing", result: washingResult });
+//       } catch (washingError) {
+//         console.error("Washing bulk write error:", washingError);
+//         return res.status(500).json({
+//           error: "Failed to save washing data",
+//           details: washingError.message
+//         });
+//       }
+//     }
 
-    res.json({
-      success: true,
-      qcDataCount: bulkOps.length,
-      washingQtyCount: washingBulkOps.length,
-      results: results
-    });
-  } catch (err) {
-    console.error("Manual save error:", err);
-    res.status(500).json({
-      error: "Failed to manually save QC2 data.",
-      details: err.message
-    });
-  }
-});
+//     res.json({
+//       success: true,
+//       qcDataCount: bulkOps.length,
+//       washingQtyCount: washingBulkOps.length,
+//       results: results
+//     });
+//   } catch (err) {
+//     console.error("Manual save error:", err);
+//     res.status(500).json({
+//       error: "Failed to manually save QC2 data.",
+//       details: err.message
+//     });
+//   }
+// });
 
-// New endpoint to fetch washing quantity data
-app.get("/api/fetch-washing-qty-data", async (req, res) => {
-  try {
-    const results = await QCWashingQtyOld.find({}).lean();
-    res.json(results);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch washing quantity data." });
-  }
-});
+// // New endpoint to fetch washing quantity data
+// app.get("/api/fetch-washing-qty-data", async (req, res) => {
+//   try {
+//     const results = await QCWashingQtyOld.find({}).lean();
+//     res.json(results);
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Failed to fetch washing quantity data." });
+//   }
+// });
 
 /* ------------------------------
    AI Chatbot Proxy Route

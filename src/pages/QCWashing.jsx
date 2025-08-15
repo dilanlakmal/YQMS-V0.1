@@ -279,9 +279,9 @@ const QCWashingPage = () => {
   const [colorOrderQty, setColorOrderQty] = useState(null);
   const [sectionVisibility, setSectionVisibility] = useState({
     orderDetails: true,
-    measurementDetails: false,
     inspectionData: false,
-    defectDetails: false
+    defectDetails: false,
+    measurementDetails: false
   });
   const [recordId, setRecordId] = useState(null);
   const aql = formData.aql && formData.aql[0];
@@ -291,9 +291,9 @@ const QCWashingPage = () => {
     setSectionVisibility((prev) => {
       const order = [
         "orderDetails",
-        "measurementDetails",
         "inspectionData",
-        "defectDetails"
+        "defectDetails",
+        "measurementDetails"
       ];
       const idx = order.indexOf(currentSection);
       if (idx !== -1 && idx < order.length - 1) {
@@ -897,14 +897,16 @@ const QCWashingPage = () => {
         `${API_BASE_URL}/api/qc-washing/load-saved-by-id/${id}`
       );
       const data = await response.json();
+
       if (!data.success || !data.savedData) {
         Swal.fire("No saved data found", "", "info");
         setIsDataLoading(false);
         return;
       }
+
       const saved = data.savedData;
 
-      // --- Transform and set all relevant states as before ---
+      // Set form data
       setFormData((prev) => ({
         ...prev,
         ...saved.formData,
@@ -932,73 +934,79 @@ const QCWashingPage = () => {
         ]
       }));
 
-      // In your loadSavedDataById function, replace the setInspectionData call with:
-      const loadedInspectionData = (
-        saved.inspectionDetails?.checkedPoints || []
-      ).map((item) => ({
-        checkedList: item.pointName || "",
-        decision:
-          item.decision === true
-            ? "ok"
-            : item.decision === false
-            ? "no"
-            : item.decision || "",
-        comparisonImages: (item.comparison || [])
-          .filter(Boolean)
-          .map((img) => ({
-            file: null,
-            preview: normalizeImageSrc(img),
-            name: typeof img === "string" ? img.split("/").pop() : "image.jpg"
-          })),
-        remark: item.remark || "",
-        approvedDate: item.approvedDate || "",
-        na: item.condition === "N/A" || false
-      }));
+      // Handle inspection data - initialize with defaults if no saved data
+      if (
+        saved.inspectionDetails?.checkedPoints &&
+        saved.inspectionDetails.checkedPoints.length > 0
+      ) {
+        const loadedInspectionData = saved.inspectionDetails.checkedPoints.map(
+          (item) => ({
+            checkedList: item.pointName || "",
+            decision:
+              item.decision === true
+                ? "ok"
+                : item.decision === false
+                ? "no"
+                : item.decision || "",
+            comparisonImages: (item.comparison || [])
+              .filter(Boolean)
+              .map((img) => ({
+                file: null,
+                preview: normalizeImageSrc(img),
+                name:
+                  typeof img === "string" ? img.split("/").pop() : "image.jpg"
+              })),
+            remark: item.remark || "",
+            approvedDate: item.approvedDate || "",
+            na: item.condition === "N/A" || false
+          })
+        );
 
-      // Convert English fiber remarks to current language immediately after loading
-      const translatedInspectionData = loadedInspectionData.map((item) => {
-        if (item.checkedList === "Fiber" && item.remark) {
-          const translatedRemark = convertEnglishToCurrentLanguage(
-            item.remark,
-            t
-          );
-          if (translatedRemark !== item.remark) {
-            return { ...item, remark: translatedRemark };
-          }
-
-          // Handle decision-based remarks
-          if (item.decision && item.decision !== "ok") {
-            let newRemark = "";
-            switch (item.decision) {
-              case "1":
-                newRemark = t("qcWashing.fiber 01");
-                break;
-              case "2":
-                newRemark = t("qcWashing.fiber 02");
-                break;
-              case "3":
-                newRemark = t("qcWashing.fiber 03");
-                break;
-              default:
-                newRemark = item.remark;
+        const translatedInspectionData = loadedInspectionData.map((item) => {
+          if (item.checkedList === "Fiber" && item.remark) {
+            const translatedRemark = convertEnglishToCurrentLanguage(
+              item.remark,
+              t
+            );
+            if (translatedRemark !== item.remark) {
+              return { ...item, remark: translatedRemark };
             }
-            return { ...item, remark: newRemark };
+
+            if (item.decision && item.decision !== "ok") {
+              let newRemark = "";
+              switch (item.decision) {
+                case "1":
+                  newRemark = t("qcWashing.fiber 01");
+                  break;
+                case "2":
+                  newRemark = t("qcWashing.fiber 02");
+                  break;
+                case "3":
+                  newRemark = t("qcWashing.fiber 03");
+                  break;
+                default:
+                  newRemark = item.remark;
+              }
+              return { ...item, remark: newRemark };
+            }
           }
-        }
-        return item;
-      });
+          return item;
+        });
 
-      setInspectionData(translatedInspectionData);
+        setInspectionData(translatedInspectionData);
+      } else {
+        // Initialize with default values from masterChecklist if no saved inspection data
+        setInspectionData(initializeInspectionData(masterChecklist));
+      }
 
-      // 2. Process Data (Machine Processes)
-      // In your loadSavedDataById function, update the machine processes handling:
-      if (saved.inspectionDetails?.machineProcesses) {
-        const processDataFromSaved = {};
-
+      // Handle machine processes - initialize with defaults if no saved data
+      if (
+        saved.inspectionDetails?.machineProcesses &&
+        saved.inspectionDetails.machineProcesses.length > 0
+      ) {
+        // Process saved machine data as before
         saved.inspectionDetails.machineProcesses.forEach((machine) => {
           const machineType = machine.machineType;
-          processDataFromSaved[machineType] = {};
-
           const parameters =
             machineType === "Washing Machine"
               ? ["temperature", "time", "silicon", "softener"]
@@ -1006,14 +1014,12 @@ const QCWashingPage = () => {
 
           parameters.forEach((param) => {
             if (machine[param]) {
-              // Handle standard values - preserve 0 as "0"
               const standardValue = machine[param].standardValue;
               const standardStr =
                 standardValue === null || standardValue === undefined
                   ? ""
                   : String(standardValue);
 
-              // Handle actual values - preserve 0 as "0"
               const actualValue = machine[param].actualValue;
               const actualStr =
                 actualValue === null || actualValue === undefined
@@ -1049,24 +1055,65 @@ const QCWashingPage = () => {
             }
           });
         });
-
-        setProcessData(processDataFromSaved);
+      } else {
+        // Initialize with default machine values if no saved machine data
+        setStandardValues({
+          "Washing Machine": {
+            temperature: "",
+            time: "",
+            silicon: "",
+            softener: ""
+          },
+          "Tumble Dry": { temperature: "", time: "" }
+        });
+        setActualValues({
+          "Washing Machine": {
+            temperature: "",
+            time: "",
+            silicon: "",
+            softener: ""
+          },
+          "Tumble Dry": { temperature: "", time: "" }
+        });
+        setMachineStatus({
+          "Washing Machine": {
+            temperature: { ok: true, no: false },
+            time: { ok: true, no: false },
+            silicon: { ok: true, no: false },
+            softener: { ok: true, no: false }
+          },
+          "Tumble Dry": {
+            temperature: { ok: true, no: false },
+            time: { ok: true, no: false }
+          }
+        });
       }
-      setDefectData(
-        (saved.inspectionDetails?.parameters || []).map((param) => ({
-          parameter: param.parameterName || param.parameter || "",
-          checkedQty: param.checkedQty || 0,
-          failedQty: param.defectQty || param.failedQty || 0,
-          passRate: param.passRate || "",
-          result: param.result || "",
-          remark: param.remark || "",
-          ok: param.ok !== undefined ? param.ok : true,
-          no: param.no !== undefined ? param.no : false,
-          acceptedDefect: param.aqlAcceptedDefect || "",
-          checkboxes: param.checkboxes || {}
-        }))
-      );
 
+      // Handle defect data - initialize with defaults if no saved data
+      if (
+        saved.inspectionDetails?.parameters &&
+        saved.inspectionDetails.parameters.length > 0
+      ) {
+        setDefectData(
+          saved.inspectionDetails.parameters.map((param) => ({
+            parameter: param.parameterName || param.parameter || "",
+            checkedQty: param.checkedQty || 0,
+            failedQty: param.defectQty || param.failedQty || 0,
+            passRate: param.passRate || "",
+            result: param.result || "",
+            remark: param.remark || "",
+            ok: param.ok !== undefined ? param.ok : true,
+            no: param.no !== undefined ? param.no : false,
+            acceptedDefect: param.aqlAcceptedDefect || "",
+            checkboxes: param.checkboxes || {}
+          }))
+        );
+      } else {
+        // Initialize with default defect data if no saved defect data
+        setDefectData(normalizeDefectData(defaultDefectData));
+      }
+
+      // Continue with other data loading...
       setAddedDefects(saved.addedDefects || []);
       setDefectsByPc(
         transformDefectsByPc(saved.defectDetails?.defectsByPc || {})
@@ -1088,7 +1135,6 @@ const QCWashingPage = () => {
           })
       );
       setComment(saved.defectDetails?.comment || "");
-
       setMeasurementData({
         beforeWash: (saved.measurementDetails?.measurement || []).filter(
           (m) => m.before_after_wash === "beforeWash"
@@ -1097,6 +1143,7 @@ const QCWashingPage = () => {
           (m) => m.before_after_wash === "afterWash"
         )
       });
+
       let sizes = [];
       if (saved.measurementDetails) {
         if (Array.isArray(saved.measurementDetails)) {
@@ -1111,6 +1158,7 @@ const QCWashingPage = () => {
       setSavedSizes(sizes);
       setRecordId(saved._id);
       if (saved.savedAt) setLastSaved(new Date(saved.savedAt));
+
       Swal.fire({
         icon: "success",
         title: "Saved data loaded!",
@@ -1489,7 +1537,6 @@ const QCWashingPage = () => {
 
       if (result.success) {
         Swal.fire("Success", `Size data saved to database!`, "success");
-        activateNextSection("measurementDetails");
       } else {
         Swal.fire(
           "Error",
@@ -1923,6 +1970,20 @@ const QCWashingPage = () => {
       loadSavedSizes(formData.orderNo, formData.color);
   }, [formData.orderNo, formData.color]);
 
+  useEffect(() => {
+    if (recordId && masterChecklist.length > 0) {
+      // Ensure inspection data is properly initialized if it's empty
+      if (!inspectionData || inspectionData.length === 0) {
+        setInspectionData(initializeInspectionData(masterChecklist));
+      }
+
+      // Ensure defect data is properly initialized if it's empty
+      if (!defectData || defectData.length === 0) {
+        setDefectData(normalizeDefectData(defaultDefectData));
+      }
+    }
+  }, [recordId, masterChecklist.length]);
+
   const PageTitle = () => (
     <div className="text-center">
       <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
@@ -2006,28 +2067,6 @@ const QCWashingPage = () => {
               activateNextSection={() => activateNextSection("orderDetails")}
               setRecordId={setRecordId}
             />
-            {sectionVisibility.measurementDetails && (
-              <MeasurementDetailsSection
-                onLoadSavedDataById={loadSavedDataById}
-                orderNo={formData.orderNo || formData.style}
-                color={formData.color}
-                before_after_wash={formData.before_after_wash}
-                isVisible={sectionVisibility.measurementDetails}
-                onToggle={() => toggleSection("measurementDetails")}
-                savedSizes={savedSizes}
-                setSavedSizes={setSavedSizes}
-                onSizeSubmit={handleSizeSubmit}
-                measurementData={measurementData}
-                showMeasurementTable={showMeasurementTable}
-                onMeasurementEdit={handleMeasurementEdit}
-                onMeasurementChange={handleMeasurementChange}
-                activateNextSection={() =>
-                  activateNextSection("measurementDetails")
-                }
-                recordId={recordId}
-              />
-            )}
-
             {sectionVisibility.inspectionData && (
               <InspectionDataSection
                 onLoadSavedDataById={loadSavedDataById}
@@ -2075,6 +2114,25 @@ const QCWashingPage = () => {
                 comment={comment}
                 setComment={setComment}
                 normalizeImageSrc={normalizeImageSrc}
+              />
+            )}
+            {sectionVisibility.measurementDetails && (
+              <MeasurementDetailsSection
+                onLoadSavedDataById={loadSavedDataById}
+                orderNo={formData.orderNo || formData.style}
+                color={formData.color}
+                before_after_wash={formData.before_after_wash}
+                isVisible={sectionVisibility.measurementDetails}
+                onToggle={() => toggleSection("measurementDetails")}
+                savedSizes={savedSizes}
+                setSavedSizes={setSavedSizes}
+                onSizeSubmit={handleSizeSubmit}
+                measurementData={measurementData}
+                showMeasurementTable={showMeasurementTable}
+                onMeasurementEdit={handleMeasurementEdit}
+                onMeasurementChange={handleMeasurementChange}
+                activateNextSection={() => activateNextSection("defectDetails")}
+                recordId={recordId}
               />
             )}
 

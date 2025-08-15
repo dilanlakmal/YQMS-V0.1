@@ -29,15 +29,110 @@ const OrderDetailsSection = ({
   onLoadSavedDataById
 }) => {
   const [isSaved, setIsSaved] = useState(false);
+
+  const checkMeasurementDetails = async (orderNo) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/check-measurement-details/${orderNo}`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+
+      const result = await response.json();
+
+      return result;
+    } catch (error) {
+      console.error("Error checking measurement details:", error);
+      return { success: false, hasMeasurement: false };
+    }
+  };
+
+  // Function to clear the form
+  const clearForm = () => {
+    setFormData({
+      date: new Date().toISOString().split("T")[0],
+      orderNo: "",
+      style: "",
+      orderQty: "",
+      checkedQty: "",
+      color: "",
+      washQty: "",
+      washType: "Normal Wash",
+      firstOutput: "",
+      inline: "",
+      reportType: "",
+      buyer: "",
+      factoryName: "YM",
+      before_after_wash: "Before Wash",
+      result: "",
+      aql: [
+        {
+          sampleSize: "",
+          acceptedDefect: "",
+          rejectedDefect: "",
+          levelUsed: ""
+        }
+      ],
+      inspectionDetails: {},
+      defectDetails: {
+        checkedQty: "",
+        washQty: "",
+        result: "",
+        defectsByPc: [],
+        additionalImages: [],
+        comment: ""
+      },
+      measurementDetails: [],
+      totalCheckedPcs: 0,
+      rejectedDefectPcs: 0,
+      totalDefectCount: 0,
+      defectRate: 0,
+      defectRatio: 0,
+      overallFinalResult: "N/A"
+    });
+
+    // Clear other related states if needed
+    if (setSavedSizes) setSavedSizes([]);
+    if (setRecordId) setRecordId(null);
+    setIsSaved(false);
+  };
+
   const handleSave = async () => {
     try {
-      // 1. Build the unique key for checking existing record
+      if (!formData.orderNo) {
+        Swal.fire({
+          icon: "warning",
+          title: "Missing Order Number",
+          text: "Please enter an Order Number before saving.",
+          confirmButtonText: "OK"
+        });
+        return;
+      }
+
+      const measurementCheck = await checkMeasurementDetails(formData.orderNo);
+
+      if (!measurementCheck.success || !measurementCheck.hasMeasurement) {
+        const result = await Swal.fire({
+          icon: "error",
+          title: "No Measurement Details Found",
+          text: `No measurement details are available for MoNo: ${formData.orderNo}. Please ensure measurement data exists before proceeding.`,
+          confirmButtonText: "OK",
+          showCancelButton: false
+        });
+        if (result.isConfirmed) {
+          clearForm();
+        }
+        return;
+      }
+
       const uniqueKey = {
         orderNo: formData.orderNo,
         date: formData.date,
         color: formData.color,
         washType: formData.washType,
-        before_after_wash: formData.before_after_wash, // Washing Method
+        before_after_wash: formData.before_after_wash,
         factoryName: formData.factoryName,
         reportType: formData.reportType,
         inspector: {
@@ -45,7 +140,6 @@ const OrderDetailsSection = ({
         }
       };
 
-      // 2. Check if a record already exists
       const checkRes = await fetch(
         `${API_BASE_URL}/api/qc-washing/find-existing`,
         {
@@ -54,10 +148,9 @@ const OrderDetailsSection = ({
           body: JSON.stringify(uniqueKey)
         }
       );
-      const checkData = await checkRes.json();
 
+      const checkData = await checkRes.json();
       if (checkData.success && checkData.exists) {
-        // 3. Prompt user: edit or cancel
         const result = await Swal.fire({
           icon: "info",
           title: "Order details already saved",
@@ -68,16 +161,19 @@ const OrderDetailsSection = ({
         });
 
         if (result.isConfirmed) {
-          // 4. Load the existing record into the form (map as needed)
           const record = checkData.record;
           setFormData({
             ...formData,
-            ...record // You may need to map fields if structure differs
+            ...record
           });
           setRecordId(record._id);
           setIsSaved(true);
-          if (onLoadSavedDataById) onLoadSavedDataById(record._id);
-          // Activate the next section
+
+          // Load the existing record data
+          if (onLoadSavedDataById) {
+            await onLoadSavedDataById(record._id);
+          }
+
           if (activateNextSection) activateNextSection();
 
           Swal.fire({
@@ -92,7 +188,7 @@ const OrderDetailsSection = ({
         }
       }
 
-      // 5. If not exists, proceed to save as new
+      // Save as new record
       const saveData = {
         formData: {
           ...formData,
@@ -112,7 +208,6 @@ const OrderDetailsSection = ({
       );
 
       const result = await response.json();
-
       if (result.success) {
         Swal.fire({
           icon: "success",
