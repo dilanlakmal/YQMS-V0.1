@@ -265,9 +265,10 @@ const QCWashingPage = () => {
   const [colorOrderQty, setColorOrderQty] = useState(null);
   const [sectionVisibility, setSectionVisibility] = useState({
   orderDetails: true,
+  measurementDetails: false,
   inspectionData: false,
   defectDetails: false,
-  measurementDetails: false,
+  
 });
 const [recordId, setRecordId] = useState(null);
   const aql = formData.aql && formData.aql[0];
@@ -276,7 +277,7 @@ const [recordId, setRecordId] = useState(null);
 // Function to activate the next section
 const activateNextSection = (currentSection) => {
   setSectionVisibility((prev) => {
-    const order = ['orderDetails', 'inspectionData', 'defectDetails', 'measurementDetails'];
+    const order = ['orderDetails', 'measurementDetails', 'inspectionData', 'defectDetails'];
     const idx = order.indexOf(currentSection);
     if (idx !== -1 && idx < order.length - 1) {
       return { ...prev, [order[idx + 1]]: true };
@@ -1357,6 +1358,7 @@ setDefectData(
 
       if (result.success) {
         Swal.fire("Success", `Size data saved to database!`, "success");
+        activateNextSection('measurementDetails');
       } else {
         Swal.fire(
           "Error",
@@ -1811,6 +1813,26 @@ const autoSaveOverallSummary = async (summary, recordId) => {
           activateNextSection={() => activateNextSection('orderDetails')}
            setRecordId={setRecordId}
         />
+        {sectionVisibility.measurementDetails && (
+        <MeasurementDetailsSection
+          onLoadSavedDataById={loadSavedDataById}
+          orderNo={formData.orderNo || formData.style}
+          color={formData.color}
+          before_after_wash={formData.before_after_wash}
+          isVisible={sectionVisibility.measurementDetails}
+          onToggle={() => toggleSection("measurementDetails")}
+          savedSizes={savedSizes}
+          setSavedSizes={setSavedSizes}
+          onSizeSubmit={handleSizeSubmit}
+          measurementData={measurementData}
+          showMeasurementTable={showMeasurementTable}
+          onMeasurementEdit={handleMeasurementEdit}
+          onMeasurementChange={handleMeasurementChange}
+          activateNextSection={() => activateNextSection('measurementDetails')}
+          recordId={recordId}
+        />
+        )}
+
         {sectionVisibility.inspectionData && (
         <InspectionDataSection
           onLoadSavedDataById={loadSavedDataById}
@@ -1856,25 +1878,6 @@ const autoSaveOverallSummary = async (summary, recordId) => {
           comment={comment}
           setComment={setComment}
           normalizeImageSrc={normalizeImageSrc} 
-        />
-        )}
-        {sectionVisibility.measurementDetails && (
-        <MeasurementDetailsSection
-          onLoadSavedDataById={loadSavedDataById}
-          orderNo={formData.orderNo || formData.style}
-          color={formData.color}
-          before_after_wash={formData.before_after_wash}
-          isVisible={sectionVisibility.measurementDetails}
-          onToggle={() => toggleSection("measurementDetails")}
-          savedSizes={savedSizes}
-          setSavedSizes={setSavedSizes}
-          onSizeSubmit={handleSizeSubmit}
-          measurementData={measurementData}
-          showMeasurementTable={showMeasurementTable}
-          onMeasurementEdit={handleMeasurementEdit}
-          onMeasurementChange={handleMeasurementChange}
-          activateNextSection={() => activateNextSection('defectDetails')}
-          recordId={recordId}
         />
         )}
 
