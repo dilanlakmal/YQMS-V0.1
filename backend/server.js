@@ -93,6 +93,8 @@ import createQCWashingModel from "./models/QCWashing.js";
 import createSupplierIssuesDefectModel from "./models/SupplierIssuesDefect.js";
 import createSupplierIssueReportModel from "./models/SupplierIssueReport.js";
 
+import createQCWashingMachineStandard from "./models/qcWashingStanderd.js";
+
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
 
@@ -271,6 +273,9 @@ const QCWashing = createQCWashingModel(ymProdConnection);
 
 const SupplierIssuesDefect = createSupplierIssuesDefectModel(ymProdConnection);
 const SupplierIssueReport = createSupplierIssueReportModel(ymProdConnection);
+
+const QCWashingMachineStandard =
+  createQCWashingMachineStandard(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -24820,12 +24825,10 @@ app.get("/api/qc-washing/order-details-by-style/:orderNo", async (req, res) => {
     });
   } catch (error) {
     console.error(`Error fetching order details for style ${orderNo}:`, error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Server error while fetching order details."
-      });
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching order details."
+    });
   }
 });
 
@@ -24862,12 +24865,10 @@ app.get("/api/qc-washing/order-color-qty/:orderNo/:color", async (req, res) => {
       `Error fetching color order qty for ${orderNo} / ${color}:`,
       error
     );
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Server error while fetching color order qty."
-      });
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching color order qty."
+    });
   }
 });
 
@@ -25108,12 +25109,10 @@ app.get(
         `Error fetching measurement specs for Mono ${orderNo} :`,
         error
       );
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "Server error while fetching measurement specs."
-        });
+      res.status(500).json({
+        success: false,
+        message: "Server error while fetching measurement specs."
+      });
     }
   }
 );
@@ -25260,12 +25259,10 @@ app.post("/api/qc-washing/submit", async (req, res) => {
     }).sort({ updatedAt: -1 });
 
     if (!latestAutoSave) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "No auto-save record found to submit."
-        });
+      return res.status(404).json({
+        success: false,
+        message: "No auto-save record found to submit."
+      });
     }
 
     latestAutoSave.isAutoSave = false;
@@ -25281,14 +25278,12 @@ app.post("/api/qc-washing/submit", async (req, res) => {
     });
   } catch (error) {
     console.error("Submit error:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to submit data",
-        error: error.message,
-        stack: error.stack
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to submit data",
+      error: error.message,
+      stack: error.stack
+    });
   }
 });
 
@@ -25472,12 +25467,10 @@ app.get("/api/qc-washing/overall-summary-by-id/:recordId", async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching overall summary by id:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Server error while fetching overall summary."
-      });
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching overall summary."
+    });
   }
 });
 
@@ -25582,12 +25575,10 @@ app.post("/api/qc-washing/aql-chart/find-by-sample-size", async (req, res) => {
     const sampleSizeNum = parseInt(firstOutputRecord.quantity, 10);
 
     if (isNaN(sampleSizeNum) || sampleSizeNum <= 0) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "A valid sample size must be provided."
-        });
+      return res.status(400).json({
+        success: false,
+        message: "A valid sample size must be provided."
+      });
     }
 
     const buyer = await getBuyerFromMoNumber(orderNo);
@@ -25602,24 +25593,20 @@ app.post("/api/qc-washing/aql-chart/find-by-sample-size", async (req, res) => {
       .lean();
 
     if (!aqlChart) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: `No AQL chart found for a sample size of ${sampleSizeNum} or greater.`
-        });
+      return res.status(404).json({
+        success: false,
+        message: `No AQL chart found for a sample size of ${sampleSizeNum} or greater.`
+      });
     }
 
     // Find the specific AQL entry for level 1.0 within the document.
     const aqlEntry = aqlChart.AQL.find((aql) => aql.level === aqlLevel);
 
     if (!aqlEntry) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "AQL level  ${aqlLevel} not found for the matching chart."
-        });
+      return res.status(404).json({
+        success: false,
+        message: "AQL level  ${aqlLevel} not found for the matching chart."
+      });
     }
 
     // Respond with the data in the format expected by the frontend.
@@ -25634,12 +25621,10 @@ app.post("/api/qc-washing/aql-chart/find-by-sample-size", async (req, res) => {
     });
   } catch (error) {
     console.error("AQL lookup by sample size error:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Server error while fetching AQL details by sample size."
-      });
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching AQL details by sample size."
+    });
   }
 });
 // AQL data endpoint
@@ -25648,12 +25633,10 @@ app.post("/api/qc-washing/aql-chart/find", async (req, res) => {
     const { lotSize, orderNo } = req.body;
 
     if (!lotSize || isNaN(lotSize)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Lot size (wash Qty) is required and must be a number."
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Lot size (wash Qty) is required and must be a number."
+      });
     }
     const lotSizeNum = parseInt(lotSize, 10);
 
@@ -25669,24 +25652,20 @@ app.post("/api/qc-washing/aql-chart/find", async (req, res) => {
     }).lean();
 
     if (!aqlChart) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "No AQL chart found for the given lot size."
-        });
+      return res.status(404).json({
+        success: false,
+        message: "No AQL chart found for the given lot size."
+      });
     }
 
     // Find the specific AQL entry for level  within the document.
     const aqlEntry = aqlChart.AQL.find((aql) => aql.level === aqlLevel);
 
     if (!aqlEntry) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "AQL level  ${aqlLevel} not found for the matching chart."
-        });
+      return res.status(404).json({
+        success: false,
+        message: "AQL level  ${aqlLevel} not found for the matching chart."
+      });
     }
 
     res.json({
@@ -25700,12 +25679,10 @@ app.post("/api/qc-washing/aql-chart/find", async (req, res) => {
     });
   } catch (error) {
     console.error("AQL calculation error:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Server error while fetching AQL details."
-      });
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching AQL details."
+    });
   }
 });
 
@@ -25714,12 +25691,10 @@ app.post("/api/qc-washing/first-output-details", async (req, res) => {
     const { orderNo } = req.body;
 
     if (!orderNo) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Order No is required to fetch first output details."
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Order No is required to fetch first output details."
+      });
     }
 
     // 1. Find the latest 'First Output' record to get the quantity.
@@ -25729,13 +25704,11 @@ app.post("/api/qc-washing/first-output-details", async (req, res) => {
       .lean();
 
     if (!firstOutputRecord) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message:
-            "No 'First Output' quantity has been set in the admin settings."
-        });
+      return res.status(404).json({
+        success: false,
+        message:
+          "No 'First Output' quantity has been set in the admin settings."
+      });
     }
 
     const sampleSizeNum = parseInt(firstOutputRecord.quantity, 10);
@@ -25754,24 +25727,20 @@ app.post("/api/qc-washing/first-output-details", async (req, res) => {
       .lean();
 
     if (!aqlChart) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "No AQL chart found for the given lot size."
-        });
+      return res.status(404).json({
+        success: false,
+        message: "No AQL chart found for the given lot size."
+      });
     }
 
     // 4. Find the specific AQL entry for the buyer's AQL level.
     const aqlEntry = aqlChart.AQL.find((aql) => aql.level === aqlLevel);
 
     if (!aqlEntry) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: `AQL level ${aqlLevel} not found for the matching chart.`
-        });
+      return res.status(404).json({
+        success: false,
+        message: `AQL level ${aqlLevel} not found for the matching chart.`
+      });
     }
 
     // 5. Respond with the data in the format expected by the frontend.
@@ -25787,12 +25756,10 @@ app.post("/api/qc-washing/first-output-details", async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching first output details:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Server error while fetching first output details."
-      });
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching first output details."
+    });
   }
 });
 
@@ -25928,12 +25895,10 @@ app.post("/api/qc-washing-checklist", async (req, res) => {
 
     const newCheckList = new QCWashingCheckList(req.body);
     await newCheckList.save();
-    res
-      .status(201)
-      .json({
-        message: "Check list item added successfully",
-        checkList: newCheckList
-      });
+    res.status(201).json({
+      message: "Check list item added successfully",
+      checkList: newCheckList
+    });
   } catch (error) {
     console.error("Error adding check list item:", error);
     if (error.code === 11000) {
@@ -25987,12 +25952,10 @@ app.put("/api/qc-washing-checklist/:id", async (req, res) => {
       return res.status(404).json({ message: "Check list item not found." });
     }
 
-    res
-      .status(200)
-      .json({
-        message: "Check list item updated successfully",
-        checkList: updatedItem
-      });
+    res.status(200).json({
+      message: "Check list item updated successfully",
+      checkList: updatedItem
+    });
   } catch (error) {
     console.error("Error updating check list item:", error);
     if (error.code === 11000) {
@@ -26000,12 +25963,10 @@ app.put("/api/qc-washing-checklist/:id", async (req, res) => {
         .status(409)
         .json({ message: "Update failed due to duplicate code." });
     }
-    res
-      .status(500)
-      .json({
-        message: "Failed to update check list item",
-        error: error.message
-      });
+    res.status(500).json({
+      message: "Failed to update check list item",
+      error: error.message
+    });
   }
 });
 
@@ -26025,12 +25986,10 @@ app.delete("/api/qc-washing-checklist/:id", async (req, res) => {
     res.status(200).json({ message: "Check list item deleted successfully" });
   } catch (error) {
     console.error("Error deleting check list item:", error);
-    res
-      .status(500)
-      .json({
-        message: "Failed to delete check list item",
-        error: error.message
-      });
+    res.status(500).json({
+      message: "Failed to delete check list item",
+      error: error.message
+    });
   }
 });
 
@@ -26087,24 +26046,20 @@ app.post("/api/qc-washing-defects", async (req, res) => {
     }
     const newDefect = new QCWashingDefects(req.body);
     await newDefect.save();
-    res
-      .status(201)
-      .json({
-        message: "QC Washing defect added successfully",
-        defect: newDefect
-      });
+    res.status(201).json({
+      message: "QC Washing defect added successfully",
+      defect: newDefect
+    });
   } catch (error) {
     console.error("Error adding QC Washing defect:", error);
     if (error.code === 11000)
       return res
         .status(409)
         .json({ message: "Duplicate entry. Defect code or name might exist." });
-    res
-      .status(500)
-      .json({
-        message: "Failed to add QC Washing defect",
-        error: error.message
-      });
+    res.status(500).json({
+      message: "Failed to add QC Washing defect",
+      error: error.message
+    });
   }
 });
 
@@ -26159,12 +26114,10 @@ app.put("/api/qc-washing-defects/:id", async (req, res) => {
       return res
         .status(409)
         .json({ message: "Update failed due to duplicate code or name." });
-    res
-      .status(500)
-      .json({
-        message: "Failed to update QC Washing defect",
-        error: error.message
-      });
+    res.status(500).json({
+      message: "Failed to update QC Washing defect",
+      error: error.message
+    });
   }
 });
 
@@ -26194,12 +26147,10 @@ app.delete("/api/qc-washing-defects/:id", async (req, res) => {
     });
   } catch (error) {
     console.error("Error deleting QC Washing defect:", error);
-    res
-      .status(500)
-      .json({
-        message: "Failed to delete QC Washing defect",
-        error: error.message
-      });
+    res.status(500).json({
+      message: "Failed to delete QC Washing defect",
+      error: error.message
+    });
   }
 });
 
@@ -26354,6 +26305,43 @@ app.delete("/api/qc-washing-first-outputs/:id", async (req, res) => {
   }
 });
 
+// POST /api/qc-washing/standards
+app.post("/api/qc-washing/standards", async (req, res) => {
+  try {
+    const { washType, washingMachine, tumbleDry } = req.body;
+    if (!washType)
+      return res
+        .status(400)
+        .json({ success: false, message: "washType is required" });
+
+    let record = await QCWashingMachineStandard.findOne({ washType });
+    if (record) {
+      record.washingMachine = washingMachine;
+      record.tumbleDry = tumbleDry;
+      await record.save();
+    } else {
+      record = await QCWashingMachineStandard.create({
+        washType,
+        washingMachine,
+        tumbleDry
+      });
+    }
+    res.json({ success: true, data: record });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/qc-washing/standards
+app.get("/api/qc-washing/standards", async (req, res) => {
+  try {
+    const records = await QCWashingMachineStandard.find({});
+    res.json({ success: true, data: records });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 //New QC_Washing Endpoints
 
 app.post("/api/qc-washing/orderData-save", async (req, res) => {
@@ -26414,12 +26402,10 @@ app.post("/api/qc-washing/orderData-save", async (req, res) => {
     res.json({ success: true, id: record._id });
   } catch (err) {
     console.error("OrderData-save error:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Server error while saving order data."
-      });
+    res.status(500).json({
+      success: false,
+      message: "Server error while saving order data."
+    });
   }
 });
 
@@ -26547,6 +26533,10 @@ app.post(
   "/api/qc-washing/inspection-save",
   uploadInspectionImage.any(),
   async (req, res) => {
+    const standardValues = JSON.parse(req.body.standardValues || "{}");
+    const actualValues = JSON.parse(req.body.actualValues || "{}");
+    const machineStatus = JSON.parse(req.body.machineStatus || "{}");
+
     try {
       const { recordId } = req.body;
       const inspectionData = JSON.parse(req.body.inspectionData || "[]");
@@ -26559,7 +26549,7 @@ app.post(
           .json({ success: false, message: "recordId is required" });
       }
 
-      // Ensure upload directory exists
+      // Handle file uploads (existing code)
       const uploadDir = path.join(
         __dirname,
         "../public/storage/qc_washing_images/inspection"
@@ -26568,7 +26558,6 @@ app.post(
         fs.mkdirSync(uploadDir, { recursive: true });
       }
 
-      // Map uploaded files by fieldname and write them to disk
       const fileMap = {};
       for (const file of req.files || []) {
         const fileExtension = path.extname(file.originalname);
@@ -26577,7 +26566,6 @@ app.post(
         )}${fileExtension}`;
         const fullFilePath = path.join(uploadDir, newFilename);
         await fs.promises.writeFile(fullFilePath, file.buffer);
-        // Save relative path for DB
         fileMap[
           file.fieldname
         ] = `/public/storage/qc_washing_images/inspection/${newFilename}`;
@@ -26589,27 +26577,56 @@ app.post(
         record = new QCWashing({ _id: recordId });
       }
 
-      // Build checkedPoints with correct image URLs
+      // Build machine processes with the new structure
+      const machineProcesses = [];
+
+      // Define the machine types and their parameters
+      const machineTypes = {
+        "Washing Machine": ["temperature", "time", "silicon", "softener"],
+        "Tumble Dry": ["temperature", "time"]
+      };
+
+      Object.entries(machineTypes).forEach(([machineType, parameters]) => {
+        const machineProcess = { machineType };
+
+        parameters.forEach((param) => {
+          const actualVal = actualValues[machineType]?.[param];
+          const standardVal = standardValues[machineType]?.[param];
+
+          machineProcess[param] = {
+            actualValue:
+              actualVal === null || actualVal === undefined ? "" : actualVal,
+            standardValue:
+              standardVal === null || standardVal === undefined
+                ? ""
+                : standardVal,
+            status: {
+              ok: machineStatus[machineType]?.[param]?.ok || false,
+              no: machineStatus[machineType]?.[param]?.no || false
+            }
+          };
+        });
+
+        machineProcesses.push(machineProcess);
+      });
+
+      // Build the inspection details
       record.inspectionDetails = {
         ...record.inspectionDetails,
         checkedPoints: (inspectionData || []).map((item, idx) => ({
           pointName: item.checkedList,
-          decision: item.decision === "ok",
+          decision: item.decision,
           comparison: (item.comparisonImages || []).map((img, imgIdx) => {
             if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
               return fileMap[`comparisonImages_${idx}_${imgIdx}`];
             }
             return normalizeInspectionImagePath(img);
           }),
-
           remark: item.remark
         })),
-        machineProcesses: Object.entries(processData || {}).map(
-          ([machineType, params]) => ({
-            machineType,
-            ...params
-          })
-        ),
+
+        machineProcesses: machineProcesses,
+
         parameters: (defectData || []).map((item) => ({
           parameterName: item.parameter,
           checkedQty: item.checkedQty,
@@ -26637,12 +26654,15 @@ app.post(
   "/api/qc-washing/inspection-update",
   uploadInspectionImage.any(),
   async (req, res) => {
+    const standardValues = JSON.parse(req.body.standardValues || "{}");
+    const actualValues = JSON.parse(req.body.actualValues || "{}");
+    const machineStatus = JSON.parse(req.body.machineStatus || "{}");
+
     try {
       const { recordId } = req.body;
       const inspectionData = JSON.parse(req.body.inspectionData || "[]");
       const processData = JSON.parse(req.body.processData || "{}");
       const defectData = JSON.parse(req.body.defectData || "[]");
-      const existingImagesMap = JSON.parse(req.body.existingImagesMap || "{}");
 
       if (!recordId) {
         return res
@@ -26650,7 +26670,7 @@ app.post(
           .json({ success: false, message: "recordId is required" });
       }
 
-      // Ensure upload directory exists
+      // Handle file uploads (existing code)
       const uploadDir = path.join(
         __dirname,
         "../public/storage/qc_washing_images/inspection"
@@ -26659,7 +26679,6 @@ app.post(
         fs.mkdirSync(uploadDir, { recursive: true });
       }
 
-      // Map uploaded files by fieldname and write them to disk
       const fileMap = {};
       for (const file of req.files || []) {
         const fileExtension = path.extname(file.originalname);
@@ -26668,13 +26687,12 @@ app.post(
         )}${fileExtension}`;
         const fullFilePath = path.join(uploadDir, newFilename);
         await fs.promises.writeFile(fullFilePath, file.buffer);
-        // Save relative path for DB
         fileMap[
           file.fieldname
         ] = `/public/storage/qc_washing_images/inspection/${newFilename}`;
       }
 
-      // Find the record (do not create if not found)
+      // Find the record
       let record = await QCWashing.findById(recordId);
       if (!record) {
         return res
@@ -26682,7 +26700,40 @@ app.post(
           .json({ success: false, message: "Record not found for update" });
       }
 
-      // Build checkedPoints with correct image URLs
+      // Build machine processes with the new structure
+      const machineProcesses = [];
+
+      // Define the machine types and their parameters
+      const machineTypes = {
+        "Washing Machine": ["temperature", "time", "silicon", "softener"],
+        "Tumble Dry": ["temperature", "time"]
+      };
+
+      Object.entries(machineTypes).forEach(([machineType, parameters]) => {
+        const machineProcess = { machineType };
+
+        parameters.forEach((param) => {
+          const actualVal = actualValues[machineType]?.[param];
+          const standardVal = standardValues[machineType]?.[param];
+
+          machineProcess[param] = {
+            actualValue:
+              actualVal === null || actualVal === undefined ? "" : actualVal,
+            standardValue:
+              standardVal === null || standardVal === undefined
+                ? ""
+                : standardVal,
+            status: {
+              ok: machineStatus[machineType]?.[param]?.ok || false,
+              no: machineStatus[machineType]?.[param]?.no || false
+            }
+          };
+        });
+
+        machineProcesses.push(machineProcess);
+      });
+
+      // Build the inspection details
       record.inspectionDetails = {
         ...record.inspectionDetails,
         checkedPoints: (inspectionData || []).map((item, idx) => {
@@ -26695,17 +26746,14 @@ app.post(
 
           return {
             pointName: item.checkedList,
-            decision: item.decision === "ok",
+            decision: item.decision,
             comparison: images,
             remark: item.remark
           };
         }),
-        machineProcesses: Object.entries(processData || {}).map(
-          ([machineType, params]) => ({
-            machineType,
-            ...params
-          })
-        ),
+
+        machineProcesses: machineProcesses,
+
         parameters: (defectData || []).map((item) => ({
           parameterName: item.parameter,
           checkedQty: item.checkedQty,
@@ -26717,9 +26765,6 @@ app.post(
       };
 
       record.savedAt = new Date();
-      // Optionally update status if needed
-      // record.status = 'draft';
-
       await record.save();
 
       res.json({ success: true, message: "Inspection data updated" });
@@ -26971,20 +27016,16 @@ app.post("/api/qc-washing/measurement-save", async (req, res) => {
   try {
     const { recordId, measurementDetail } = req.body;
     if (!recordId || !measurementDetail) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Missing recordId or measurementDetail"
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Missing recordId or measurementDetail"
+      });
     }
     if (!measurementDetail.before_after_wash) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "before_after_wash is required in measurementDetail"
-        });
+      return res.status(400).json({
+        success: false,
+        message: "before_after_wash is required in measurementDetail"
+      });
     }
     const record = await QCWashing.findById(recordId);
     if (!record) {
@@ -27066,12 +27107,10 @@ app.post(
       res.json({ success: true });
     } catch (error) {
       console.error("Measurement summary autosave error:", error);
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "Failed to autosave measurement summary."
-        });
+      res.status(500).json({
+        success: false,
+        message: "Failed to autosave measurement summary."
+      });
     }
   }
 );

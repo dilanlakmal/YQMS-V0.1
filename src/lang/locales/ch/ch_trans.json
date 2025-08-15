@@ -1286,5 +1286,11 @@
     "uploadImage": "上传图片",
     "removeImage": "移除图片",
     "viewImage": "查看图片"
+  },
+
+  "qcWashing": {
+    "fiber 01": "布厂处理.",
+    "fiber 02": "YM安排用吸毛机里外吹毛.",
+    "fiber 03": "零散不规则的2-3毛粒可以接受。"
   }
 }

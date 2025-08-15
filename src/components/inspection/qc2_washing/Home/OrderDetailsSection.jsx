@@ -421,7 +421,7 @@ const OrderDetailsSection = ({
           </div>
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium dark:text-gray-300">
-              Wash Qty:
+              Estimate Wash Qty:
             </label>
             <input
               type="number"

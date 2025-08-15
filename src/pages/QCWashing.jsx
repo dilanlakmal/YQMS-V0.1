@@ -9,6 +9,7 @@ import OverAllSummaryCard from "../components/inspection/qc2_washing/Home/OverAl
 import Swal from "sweetalert2";
 import imageCompression from "browser-image-compression";
 import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/SubmittedWashingData";
+import { useTranslation } from "react-i18next";
 
 const normalizeImageSrc = (src) => {
   if (!src) return "";
@@ -179,7 +180,8 @@ function machineProcessesToObject(machineProcesses) {
     obj[proc.machineType] = {
       temperature: proc.temperature || "",
       time: proc.time || "",
-      chemical: proc.chemical || ""
+      silicon: proc.silicon || "",
+      softener: proc.softener || ""
     };
   });
   return obj;
@@ -212,6 +214,7 @@ function fractionToDecimal(fraction) {
 const QCWashingPage = () => {
   // Hooks
   const { user } = useAuth();
+  const { t } = useTranslation();
   const dateValue = new Date().toISOString().split("T")[0];
 
   // State: Form Data
@@ -319,7 +322,7 @@ const QCWashingPage = () => {
   // State: Inspection, Defect, Measurement
   const [inspectionData, setInspectionData] = useState([]);
   const [processData, setProcessData] = useState({
-    "Washing Machine": { temperature: "", time: "", chemical: "" },
+    "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
     "Tumble Dry": { temperature: "", time: "" }
   });
   const defaultDefectData = [
@@ -378,6 +381,65 @@ const QCWashingPage = () => {
 
   // State: Cache for color-specific data to prevent data loss on switching
   const [colorDataCache, setColorDataCache] = useState({});
+
+  const [standardValues, setStandardValues] = useState({
+    "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+    "Tumble Dry": { temperature: "", time: "" }
+  });
+
+  const [actualValues, setActualValues] = useState({
+    "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+    "Tumble Dry": { temperature: "", time: "" }
+  });
+
+  const [machineStatus, setMachineStatus] = useState({
+    "Washing Machine": {
+      temperature: { ok: true, no: false },
+      time: { ok: true, no: false },
+      silicon: { ok: true, no: false },
+      softener: { ok: true, no: false }
+    },
+    "Tumble Dry": {
+      temperature: { ok: true, no: false },
+      time: { ok: true, no: false }
+    }
+  });
+
+  // Helper function to get English fiber remarks
+  const getFiberRemarkInEnglish = (decision) => {
+    const englishRemarks = {
+      1: "Cleaning must be done by fabric mill.",
+      2: "YM doing the cleaning, front & back side.",
+      3: "Randomly 2-3 pcs back side hairly can acceptable."
+    };
+
+    return englishRemarks[decision] || "";
+  };
+
+  // Helper function to convert English fiber remarks to current language
+  const convertEnglishToCurrentLanguage = (englishRemark, t) => {
+    const englishToDecisionMap = {
+      "Cleaning must be done by fabric mill.": "1",
+      "YM doing the cleaning, front & back side.": "2",
+      "Randomly 2-3 pcs back side hairly can acceptable.": "3"
+    };
+
+    const decision = englishToDecisionMap[englishRemark];
+    if (decision) {
+      switch (decision) {
+        case "1":
+          return t("qcWashing.fiber 01");
+        case "2":
+          return t("qcWashing.fiber 02");
+        case "3":
+          return t("qcWashing.fiber 03");
+        default:
+          return englishRemark;
+      }
+    }
+
+    return englishRemark; // Return original if not a fiber remark
+  };
 
   // Section Toggle
   const toggleSection = (section) => {
@@ -530,6 +592,72 @@ const QCWashingPage = () => {
     };
     fetchColorOrderQty();
   }, [formData.orderNo, formData.color]);
+
+  useEffect(() => {
+    const fetchColorOrderQty = async () => {
+      if (!formData.orderNo || !formData.color) {
+        setColorOrderQty(null);
+        return;
+      }
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc-washing/order-color-qty/${
+            formData.orderNo
+          }/${encodeURIComponent(formData.color)}`
+        );
+        const data = await response.json();
+        if (data.success) {
+          setColorOrderQty(data.colorOrderQty);
+        } else {
+          setColorOrderQty(null);
+        }
+      } catch (error) {
+        setColorOrderQty(null);
+      }
+    };
+    fetchColorOrderQty();
+  }, [formData.orderNo, formData.color]);
+
+  // Add useEffect to handle language changes for fiber remarks
+  useEffect(() => {
+    // Update existing fiber remarks when language changes OR when inspection data is loaded
+    setInspectionData((prev) =>
+      prev.map((item) => {
+        if (item.checkedList === "Fiber" && item.remark) {
+          // First, try to convert English remarks to current language
+          const translatedRemark = convertEnglishToCurrentLanguage(
+            item.remark,
+            t
+          );
+
+          // If it was translated (different from original), use the translation
+          if (translatedRemark !== item.remark) {
+            return { ...item, remark: translatedRemark };
+          }
+
+          // If it's a decision-based remark, update based on decision
+          if (item.decision && item.decision !== "ok") {
+            let newRemark = "";
+            switch (item.decision) {
+              case "1":
+                newRemark = t("qcWashing.fiber 01");
+                break;
+              case "2":
+                newRemark = t("qcWashing.fiber 02");
+                break;
+              case "3":
+                newRemark = t("qcWashing.fiber 03");
+                break;
+              default:
+                newRemark = item.remark; // Keep existing remark for other cases
+            }
+            return { ...item, remark: newRemark };
+          }
+        }
+        return item;
+      })
+    );
+  }, [t, inspectionData.length]); // Add inspectionData.length as dependency
 
   // --- Helper Functions ---
   const processMeasurementData = (loadedMeasurements) => {
@@ -797,42 +925,130 @@ const QCWashingPage = () => {
               prev.aql?.[0]?.rejectedDefect ||
               "",
             levelUsed:
-              saved.formData?.aqlLevelUsed || prev.aql?.[0]?.levelUsed || ""
+              saved.aql?.[0]?.levelUsed || saved.formData?.aqlLevelUsed || ""
           }
         ]
       }));
 
-      setInspectionData(
-        (saved.inspectionDetails?.checkedPoints || []).map((item) => ({
-          checkedList: item.pointName || "",
-          decision:
-            item.decision === true ? "ok" : item.decision === false ? "no" : "",
-          comparisonImages: (item.comparison || [])
-            .filter(Boolean)
-            .map((img) => ({
-              file: null,
-              preview: normalizeImageSrc(img),
-              name: typeof img === "string" ? img.split("/").pop() : "image.jpg"
-            })),
-          remark: item.remark || "",
-          approvedDate: item.approvedDate || "",
-          na: item.condition === "N/A" || false
-        }))
-      );
+      // In your loadSavedDataById function, replace the setInspectionData call with:
+      const loadedInspectionData = (
+        saved.inspectionDetails?.checkedPoints || []
+      ).map((item) => ({
+        checkedList: item.pointName || "",
+        decision:
+          item.decision === true
+            ? "ok"
+            : item.decision === false
+            ? "no"
+            : item.decision || "",
+        comparisonImages: (item.comparison || [])
+          .filter(Boolean)
+          .map((img) => ({
+            file: null,
+            preview: normalizeImageSrc(img),
+            name: typeof img === "string" ? img.split("/").pop() : "image.jpg"
+          })),
+        remark: item.remark || "",
+        approvedDate: item.approvedDate || "",
+        na: item.condition === "N/A" || false
+      }));
+
+      // Convert English fiber remarks to current language immediately after loading
+      const translatedInspectionData = loadedInspectionData.map((item) => {
+        if (item.checkedList === "Fiber" && item.remark) {
+          const translatedRemark = convertEnglishToCurrentLanguage(
+            item.remark,
+            t
+          );
+          if (translatedRemark !== item.remark) {
+            return { ...item, remark: translatedRemark };
+          }
+
+          // Handle decision-based remarks
+          if (item.decision && item.decision !== "ok") {
+            let newRemark = "";
+            switch (item.decision) {
+              case "1":
+                newRemark = t("qcWashing.fiber 01");
+                break;
+              case "2":
+                newRemark = t("qcWashing.fiber 02");
+                break;
+              case "3":
+                newRemark = t("qcWashing.fiber 03");
+                break;
+              default:
+                newRemark = item.remark;
+            }
+            return { ...item, remark: newRemark };
+          }
+        }
+        return item;
+      });
+
+      setInspectionData(translatedInspectionData);
 
       // 2. Process Data (Machine Processes)
+      // In your loadSavedDataById function, update the machine processes handling:
       if (saved.inspectionDetails?.machineProcesses) {
-        setProcessData(
-          machineProcessesToObject(saved.inspectionDetails.machineProcesses)
-        );
-      }
-      if (
-        saved.processData &&
-        Array.isArray(saved.processData.machineProcesses)
-      ) {
-        setProcessData(
-          machineProcessesToObject(saved.processData.machineProcesses)
-        );
+        const processDataFromSaved = {};
+
+        saved.inspectionDetails.machineProcesses.forEach((machine) => {
+          const machineType = machine.machineType;
+          processDataFromSaved[machineType] = {};
+
+          const parameters =
+            machineType === "Washing Machine"
+              ? ["temperature", "time", "silicon", "softener"]
+              : ["temperature", "time"];
+
+          parameters.forEach((param) => {
+            if (machine[param]) {
+              // Handle standard values - preserve 0 as "0"
+              const standardValue = machine[param].standardValue;
+              const standardStr =
+                standardValue === null || standardValue === undefined
+                  ? ""
+                  : String(standardValue);
+
+              // Handle actual values - preserve 0 as "0"
+              const actualValue = machine[param].actualValue;
+              const actualStr =
+                actualValue === null || actualValue === undefined
+                  ? ""
+                  : String(actualValue);
+
+              setStandardValues((prev) => ({
+                ...prev,
+                [machineType]: {
+                  ...prev[machineType],
+                  [param]: standardStr
+                }
+              }));
+
+              setActualValues((prev) => ({
+                ...prev,
+                [machineType]: {
+                  ...prev[machineType],
+                  [param]: actualStr
+                }
+              }));
+
+              setMachineStatus((prev) => ({
+                ...prev,
+                [machineType]: {
+                  ...prev[machineType],
+                  [param]: {
+                    ok: machine[param].status?.ok || false,
+                    no: machine[param].status?.no || false
+                  }
+                }
+              }));
+            }
+          });
+        });
+
+        setProcessData(processDataFromSaved);
       }
       setDefectData(
         (saved.inspectionDetails?.parameters || []).map((param) => ({
@@ -848,6 +1064,7 @@ const QCWashingPage = () => {
           checkboxes: param.checkboxes || {}
         }))
       );
+
       setAddedDefects(saved.addedDefects || []);
       setDefectsByPc(
         transformDefectsByPc(saved.defectDetails?.defectsByPc || {})
@@ -1037,7 +1254,7 @@ const QCWashingPage = () => {
               sampleSize: data.aqlData.sampleSize,
               acceptedDefect: data.aqlData.acceptedDefect,
               rejectedDefect: data.aqlData.rejectedDefect,
-              levelUsed: data.aqlData.aqlLevelUsed
+              levelUsed: data.aqlData.levelUsed
             }
           ],
           washQty: data.checkedQty
@@ -1122,7 +1339,7 @@ const QCWashingPage = () => {
               sampleSize: data.aqlData.sampleSize,
               acceptedDefect: data.aqlData.acceptedDefect,
               rejectedDefect: data.aqlData.rejectedDefect,
-              levelUsed: data.aqlData.aqlLevelUsed
+              levelUsed: data.aqlData.levelUsed
             }
           ]
         }));
@@ -1516,14 +1733,63 @@ const QCWashingPage = () => {
               };
             });
           }
-          setInspectionData(
+          // In loadColorSpecificData function, replace the setInspectionData call with:
+          const loadedInspectionData =
             colorData.inspectionDetails?.checkedPoints?.map((point) => ({
               checkedList: point.pointName,
+              decision:
+                point.decision === true
+                  ? "ok"
+                  : point.decision === false
+                  ? "no"
+                  : point.decision || "",
+              comparisonImages: (point.comparison || [])
+                .filter(Boolean)
+                .map((img) => ({
+                  file: null,
+                  preview: normalizeImageSrc(img),
+                  name:
+                    typeof img === "string" ? img.split("/").pop() : "image.jpg"
+                })),
               approvedDate: point.approvedDate || "",
               na: point.condition === "N/A",
               remark: point.remark || ""
-            })) || initializeInspectionData(masterChecklist)
-          );
+            })) || initializeInspectionData(masterChecklist);
+
+          // Convert English fiber remarks to current language immediately after loading
+          const translatedInspectionData = loadedInspectionData.map((item) => {
+            if (item.checkedList === "Fiber" && item.remark) {
+              const translatedRemark = convertEnglishToCurrentLanguage(
+                item.remark,
+                t
+              );
+              if (translatedRemark !== item.remark) {
+                return { ...item, remark: translatedRemark };
+              }
+
+              // Handle decision-based remarks
+              if (item.decision && item.decision !== "ok") {
+                let newRemark = "";
+                switch (item.decision) {
+                  case "1":
+                    newRemark = t("qcWashing.fiber 01");
+                    break;
+                  case "2":
+                    newRemark = t("qcWashing.fiber 02");
+                    break;
+                  case "3":
+                    newRemark = t("qcWashing.fiber 03");
+                    break;
+                  default:
+                    newRemark = item.remark;
+                }
+                return { ...item, remark: newRemark };
+              }
+            }
+            return item;
+          });
+
+          setInspectionData(translatedInspectionData);
 
           const colorOrderQty = colorData.orderDetails?.colorOrderQty || null;
           setColorOrderQty(colorOrderQty);
@@ -1755,6 +2021,13 @@ const QCWashingPage = () => {
                   activateNextSection("inspectionData")
                 }
                 recordId={recordId}
+                washType={formData.washType}
+                standardValues={standardValues}
+                setStandardValues={setStandardValues}
+                actualValues={actualValues}
+                setActualValues={setActualValues}
+                machineStatus={machineStatus}
+                setMachineStatus={setMachineStatus}
               />
             )}
             {sectionVisibility.defectDetails && (
