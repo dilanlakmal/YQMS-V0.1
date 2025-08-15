@@ -326,17 +326,14 @@ const DefectDetailsSection = ({
             }
           );
 
-          // Find the defect object to get the proper name
+          // Find the defect object to get the English name
           const defectObj = defectOptions.find(
             (opt) => opt._id === defect.selectedDefect
           );
-          const properDefectName = defectObj
-            ? getDefectNameForDisplay(defectObj)
-            : "";
 
           pcDefectsArr.push({
             defectId: defect.selectedDefect,
-            defectName: properDefectName, // Use the proper defect name, not the ID
+            defectName: defectObj ? defectObj.english : "", // Always save English name
             defectQty: defect.defectQty,
             defectImages
           });
@@ -348,8 +345,7 @@ const DefectDetailsSection = ({
         });
       });
 
-      // Rest of your code remains the same...
-      // Additional images
+      // Additional images handling remains the same...
       (uploadedImages || []).forEach((img, imgIdx) => {
         if (img.file) {
           formDataObj.append(`additionalImages_${imgIdx}`, img.file);
@@ -381,16 +377,23 @@ const DefectDetailsSection = ({
           showConfirmButton: false
         });
 
-        // Update the state with the saved data
+        // Update the state with the saved data - but display localized names
         const { defectsByPc: backendDefectsByPc, additionalImages } =
           result.data || {};
         setDefectsByPc(
           (backendDefectsByPc || []).reduce((acc, pc) => {
             acc[pc.pcNumber] = (pc.pcDefects || []).map((defect, index) => {
+              // Find the defect object to get the localized display name
+              const defectObj = defectOptions.find(
+                (opt) => opt.english === defect.defectName
+              );
+
               return {
                 id: index + 1,
                 selectedDefect: defect.defectId || "",
-                defectName: defect.defectName || "", // This should now have the proper name
+                defectName: defectObj
+                  ? getDefectNameForDisplay(defectObj)
+                  : defect.defectName, // Display localized name
                 defectQty: defect.defectQty || "",
                 isBodyVisible: true,
                 defectImages: (defect.defectImages || []).map((imgStr) => ({
@@ -438,7 +441,7 @@ const DefectDetailsSection = ({
       return;
     }
     try {
-      // 1. Build defectDetails object
+      // Same logic as save, but for update
       const defectDetails = {
         checkedQty: formData.checkedQty,
         washQty: formData.washQty,
@@ -449,11 +452,9 @@ const DefectDetailsSection = ({
         comment
       };
 
-      // 2. Build FormData and collect files
       const formDataObj = new FormData();
       formDataObj.append("recordId", recordId);
 
-      // For each PC and defect, handle images
       Object.entries(defectsByPc).forEach(([pcNumber, pcDefects], pcIdx) => {
         const pcDefectsArr = [];
         pcDefects.forEach((defect, defectIdx) => {
@@ -470,17 +471,14 @@ const DefectDetailsSection = ({
             }
           );
 
-          // Find the defect object to get the proper name
+          // Find the defect object to get the English name
           const defectObj = defectOptions.find(
             (opt) => opt._id === defect.selectedDefect
           );
-          const properDefectName = defectObj
-            ? getDefectNameForDisplay(defectObj)
-            : "";
 
           pcDefectsArr.push({
             defectId: defect.selectedDefect,
-            defectName: properDefectName, // Use the proper defect name, not the ID
+            defectName: defectObj ? defectObj.english : "", // Always save English name
             defectQty: defect.defectQty,
             defectImages
           });
@@ -511,6 +509,7 @@ const DefectDetailsSection = ({
           body: formDataObj
         }
       );
+
       const result = await response.json();
       if (result.success) {
         Swal.fire({
