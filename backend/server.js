@@ -94,6 +94,9 @@ import createSupplierIssuesDefectModel from "./models/SupplierIssuesDefect.js";
 import createSupplierIssueReportModel from "./models/SupplierIssueReport.js";
 
 import createQCWashingMachineStandard from "./models/qcWashingStanderd.js";
+import createQC2OlderDefectModel from "./models/QC2_Older_Defects.js";
+import createQCWashingQtyOldSchema from "./models/QCWashingQtyOld.js";
+import createQCWorkersModel from "./models/QCWorkers.js";
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
@@ -276,6 +279,9 @@ const SupplierIssueReport = createSupplierIssueReportModel(ymProdConnection);
 
 const QCWashingMachineStandard =
   createQCWashingMachineStandard(ymProdConnection);
+const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
+const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
+const QCWorkers = createQCWorkersModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -1459,6 +1465,264 @@ app.use((req, res, next) => {
 // });
 
 /* -------------------------------------------------------------------------------------------------------------------------------------------------
+
+// * ------------------------------
+//     Manual Sync Endpoint & Server Start
+//  ------------------------------ */
+
+// const formatDateSQL = (date) => {
+//   const d = new Date(date);
+//   return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,"0")}-${d.getDate().toString().padStart(2,"0")}`;
+// };
+
+// async function syncQC1WorkerData(startDate = "2025-07-01", endDate = new Date()) {
+//   await ensurePoolConnected(poolYMDataStore, "YMDataStore");
+//   const request = poolYMDataStore.request();
+
+//   // Output Data
+//   const outputQuery = `
+//     SELECT
+//       CONVERT(varchar, BillDate, 23) AS BillDate,
+//       EmpID,
+//       WorkLine,
+//       MONo,
+//       SeqNo,
+//       ColorNo,
+//       ColorName,
+//       SizeName,
+//       SUM(Qty) AS Qty
+//     FROM YMDataStore.SunRise_G.tWork2025
+//     WHERE TRY_CAST(SeqNo AS INT) IN (38,39)
+//       AND BillDate >= '${formatDateSQL(startDate)}'
+//       AND BillDate <= '${formatDateSQL(endDate)}'
+//      AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+//     GROUP BY BillDate, EmpID, WorkLine, MONo, SeqNo, ColorNo, ColorName, SizeName
+//   `;
+//   const outputResult = await request.query(outputQuery);
+
+//   // Defect Data
+//   const defectQuery = `
+//     SELECT
+//       CONVERT(varchar, dDate, 23) AS dDate,
+//       EmpID_QC,
+//       WorkLine,
+//       MONo,
+//       ColorNo,
+//       ColorName,
+//       SizeName,
+//       ReworkCode,
+//       ReworkName,
+//       SUM(QtyRework) AS Defect_Qty
+//     FROM YMDataStore.SUNRISE.RS18
+//     WHERE dDate >= '${formatDateSQL(startDate)}'
+//       AND dDate <= '${formatDateSQL(endDate)}'
+//       AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+//   AND TRY_CAST(ReworkCode AS INT) BETWEEN 1 AND 44
+//     GROUP BY dDate, EmpID_QC, WorkLine, MONo,  ColorNo, ColorName, SizeName, ReworkCode, ReworkName
+//   `;
+//   const defectResult = await request.query(defectQuery);
+
+//   // Standardize field names for easier mapping
+//   const outputRows = outputResult.recordset.map(row => ({
+//     ...row,
+//     Inspection_date: row.BillDate,
+//     QC_ID: row.EmpID
+//   }));
+
+//   const defectRows = defectResult.recordset.map(row => ({
+//     ...row,
+//     Inspection_date: row.dDate,
+//     QC_ID: row.EmpID_QC
+//   }));
+
+//   // Use a unified key for both output and defect data
+//   function makeKey(row) {
+//     return [
+//       row.Inspection_date,
+//       row.QC_ID
+//     ].join("|");
+//   }
+
+//   // Build outputMap
+//   const outputMap = new Map();
+//   for (const row of outputRows) {
+//     const key = makeKey(row);
+//     if (!outputMap.has(key)) outputMap.set(key, []);
+//     outputMap.get(key).push(row);
+//   }
+
+//   // Build defectMap
+//   const defectMap = new Map();
+//   for (const row of defectRows) {
+//     const key = makeKey(row);
+//     if (!defectMap.has(key)) defectMap.set(key, []);
+//     defectMap.get(key).push(row);
+//   }
+
+//   // Merge and Build Documents
+//   const docs = new Map();
+//   const allKeys = new Set([...outputMap.keys(), ...defectMap.keys()]);
+
+//   for (const key of allKeys) {
+//     const outputRows = outputMap.get(key) || [];
+//     const defectRows = defectMap.get(key) || [];
+//     const [Inspection_date_str, QC_ID_raw] = key.split("|");
+
+//     // 1. QC_ID renaming
+//     const QC_ID = QC_ID_raw === "6335" ? "YM6335" : QC_ID_raw;
+
+//     // 2. Date as Date object, time 00:00:00
+//     const Inspection_date = new Date(Inspection_date_str + "T00:00:00Z");
+
+//     // Output grouping (group by line/mo/color/size)
+//     const outputGroup = {};
+//     for (const r of outputRows) {
+//       const oKey = [r.WorkLine, r.MONo, r.ColorName, r.SizeName].join("|");
+//       if (!outputGroup[oKey]) outputGroup[oKey] = [];
+//       outputGroup[oKey].push(r);
+//     }
+//     const Output_data = Object.values(outputGroup).map(rows => ({
+//       Line_no: rows[0].WorkLine,
+//       MONo: rows[0].MONo,
+//       Color: rows[0].ColorName,
+//       Size: rows[0].SizeName,
+//       Qty: rows.reduce((sum, r) => sum + Number(r.Qty), 0)
+//     }));
+//    // Group Output_data by (Line_no, MONo)
+//       const outputSummaryMap = new Map();
+//       for (const o of Output_data) {
+//         const key = `${o.Line_no}|${o.MONo}`;
+//         if (!outputSummaryMap.has(key)) {
+//           outputSummaryMap.set(key, { Line: o.Line_no, MONo: o.MONo, Qty: 0 });
+//         }
+//         outputSummaryMap.get(key).Qty += o.Qty;
+//       }
+//       const Output_data_summary = Array.from(outputSummaryMap.values());
+
+//     const TotalOutput = Output_data_summary.reduce((sum, o) => sum + o.Qty, 0);
+
+//     // Defect grouping (group by line/mo/color/size)
+//     const defectGroup = {};
+//     for (const d of defectRows) {
+//       const dKey = [d.WorkLine, d.MONo, d.ColorName, d.SizeName].join("|");
+//       if (!defectGroup[dKey]) defectGroup[dKey] = [];
+//       defectGroup[dKey].push(d);
+//     }
+//     const Defect_data = Object.entries(defectGroup).map(([dKey, rows]) => {
+//       let TotalDefect = 0;
+//       const defectDetailsMap = new Map();
+//       for (const d of rows) {
+//         const ddKey = d.ReworkCode + "|" + d.ReworkName;
+//         if (!defectDetailsMap.has(ddKey)) {
+//           defectDetailsMap.set(ddKey, {
+//             Defect_code: Number(d.ReworkCode),
+//             Defect_name: d.ReworkName,
+//             Qty: 0
+//           });
+//         }
+//         defectDetailsMap.get(ddKey).Qty += Number(d.Defect_Qty);
+//         TotalDefect += Number(d.Defect_Qty);
+//       }
+//       const [Line_no, MONo, Color, Size] = dKey.split("|");
+//       return {
+//         Line_no,
+//         MONo,
+//         Color,
+//         Size,
+//         Defect_qty: TotalDefect,
+//         DefectDetails: Array.from(defectDetailsMap.values())
+//       };
+//     });
+//     // Group Defect_data by (Line_no, MONo)
+//       const defectSummaryMap = new Map();
+//       for (const d of Defect_data) {
+//         const key = `${d.Line_no}|${d.MONo}`;
+//         if (!defectSummaryMap.has(key)) {
+//           defectSummaryMap.set(key, { Line_no: d.Line_no, MONo: d.MONo, Defect_Qty: 0, Defect_Details: [] });
+//         }
+//         // Sum defect qty
+//         defectSummaryMap.get(key).Defect_Qty += d.Defect_qty;
+
+//         // Merge DefectDetails by code/name
+//         const detailsMap = new Map(defectSummaryMap.get(key).Defect_Details.map(dd => [
+//           `${dd.Defect_code}|${dd.Defect_name}`, { ...dd }
+//         ]));
+//         for (const dd of d.DefectDetails) {
+//           const ddKey = `${dd.Defect_code}|${dd.Defect_name}`;
+//           if (!detailsMap.has(ddKey)) {
+//             detailsMap.set(ddKey, { ...dd });
+//           } else {
+//             detailsMap.get(ddKey).Qty += dd.Qty;
+//           }
+//         }
+//         defectSummaryMap.get(key).Defect_Details = Array.from(detailsMap.values());
+//       }
+//       const Defect_data_summary = Array.from(defectSummaryMap.values());
+
+//     const TotalDefect = Defect_data_summary.reduce((sum, d) => sum + d.Defect_Qty, 0);
+
+//     // 3. Add report_type
+//     docs.set(key, {
+//       Inspection_date,
+//       QC_ID,
+//       report_type: "Inline Sewing",
+//       Seq_No: [
+//         ...new Set(
+//           outputRows.map(r => Number(r.SeqNo))
+//         )
+//       ],
+
+//       TotalOutput,
+//       TotalDefect,
+//       Output_data,
+//       Output_data_summary,
+//       Defect_data,
+//       Defect_data_summary
+//     });
+//   }
+
+//   // Save to MongoDB
+//   const finalDocs = Array.from(docs.values());
+//   const bulkOps = finalDocs.map(doc => ({
+//     updateOne: {
+//       filter: {
+//         Inspection_date: doc.Inspection_date,
+//         QC_ID: doc.QC_ID
+//       },
+//       update: { $set: doc },
+//       upsert: true
+//     }
+//   }));
+//   if (bulkOps.length) {
+//     const result = await QCWorkers.bulkWrite(bulkOps);
+//     console.log(`QC1_Worker sync: Matched ${result.matchedCount}, Upserted ${result.upsertedCount}, Modified ${result.modifiedCount}`);
+//   }
+// }
+// /*--------------------------------------------------------------------------------*/
+
+// // 1. On server start, fetch all data from 2025-07-10 to today
+// syncQC1WorkerData("2025-07-01", new Date())
+//   .then(() => {
+//     console.log("✅ Initial QC1 Worker Data Sync completed (all data).");
+//   })
+//   .catch((err) => {
+//     console.error("❌ Initial QC1 Worker Data Sync failed:", err);
+//   });
+
+// // Schedule to run every day at 11:00 PM
+// cron.schedule("0 23 * * *", () => {
+//   const endDate = new Date();
+//   const startDate = new Date();
+//   startDate.setDate(endDate.getDate() - 2); // last 3 days: today, yesterday, day before
+
+//   syncQC1WorkerData(startDate, endDate)
+//     .then(() => {
+//       console.log("✅ QC1 Worker Data Sync completed (last 3 days, scheduled 11pm).");
+//     })
+//     .catch((err) => {
+//       console.error("❌ QC1 Worker Data Sync failed (last 3 days, scheduled 11pm):", err);
+//     });
+// });
 
 /* ------------------------------
    New Endpoints for CutPanelOrders
@@ -27516,6 +27780,426 @@ app.get("/api/supplier-issues/report-options", async (req, res) => {
   } catch (error) {
     console.error("Error fetching report filter options:", error);
     res.status(500).json({ error: "Failed to fetch filter options." });
+  }
+});
+
+/* ------------------------------
+  QC2-Upload-Data
+------------------------------ */
+// Key function
+function makeKey(row) {
+  return [row.Inspection_date || "", row.QC_ID || ""].join("|");
+}
+
+app.post("/api/upload-qc2-data", async (req, res) => {
+  try {
+    const { outputData, defectData } = req.body;
+
+    // Define washing line identifiers
+    const washingLineIdentifiers = [
+      "Washing",
+      "WASHING",
+      "washing",
+      "Wash",
+      "WASH",
+      "wash"
+      // Add more washing line identifiers as needed
+    ];
+
+    // Function to check if a line is washing-related
+    const isWashingLine = (lineName) => {
+      if (!lineName) return false;
+      return washingLineIdentifiers.includes(lineName.trim());
+    };
+
+    const allDefects = await QC2OlderDefect.find({}).lean();
+    const allDefectsArr = allDefects.map((d) => ({
+      defectName: (d.defectName || "").trim().toLowerCase(),
+      defectCode: d.defectCode,
+      English: (d.English || "").trim().toLowerCase(),
+      Khmer: (d.Khmer || "").trim().toLowerCase(),
+      Chinese: (d.Chinese || "").trim().toLowerCase()
+    }));
+
+    // Standardize field names (existing code)
+    const outputRows = outputData.map((row) => ({
+      ...row,
+      Inspection_date: row["日期"] || row["BillDate"] || "",
+      QC_ID: row["工号"] || row["EmpID"] || "",
+      WorkLine:
+        row["打菲组别"] ||
+        row["Batch Group"] ||
+        row["组名"] ||
+        row["WorkLine"] ||
+        "",
+      MONo:
+        row["款号"] ||
+        row["ModelNo"] ||
+        row["MoNo"] ||
+        row["StyleNo"] ||
+        row["Style_No"] ||
+        row["型号"] ||
+        "",
+      SeqNo: row["工序号"] || row["SeqNo"] || "",
+      ColorNo: row["颜色"] || row["ColorNo"] || "",
+      ColorName: row["颜色"] || row["ColorName"] || "",
+      SizeName: row["尺码"] || row["SizeName"] || "",
+      Qty: row["数量"] || row["Qty"] || 0
+    }));
+
+    const defectRows = defectData.map((row) => {
+      const defectNameRaw = (row["疵点名称"] || row["ReworkName"] || "")
+        .trim()
+        .toLowerCase();
+      let found = allDefectsArr.find(
+        (d) =>
+          defectNameRaw === d.defectName ||
+          (d.English && defectNameRaw.includes(d.English)) ||
+          (d.Khmer && defectNameRaw.includes(d.Khmer)) ||
+          (d.Chinese && defectNameRaw.includes(d.Chinese)) ||
+          (d.English && d.English.includes(defectNameRaw)) ||
+          (d.Khmer && d.Khmer.includes(defectNameRaw)) ||
+          (d.Chinese && d.Chinese.includes(defectNameRaw))
+      );
+
+      let defectCode = found ? found.defectCode : "";
+
+      return {
+        ...row,
+        Inspection_date: row["日期"] || row["dDate"] || "",
+        QC_ID: row["工号"] || row["EmpID_QC"] || "",
+        WorkLine: row["组名"] || row["WorkLine"] || "N/A",
+        MONo:
+          row["款号"] ||
+          row["ModelNo"] ||
+          row["MoNo"] ||
+          row["StyleNo"] ||
+          row["Style_No"] ||
+          row["型号"] ||
+          "",
+        ColorNo: row["颜色"] || row["ColorNo"] || "",
+        ColorName: row["颜色"] || row["ColorName"] || "",
+        SizeName: row["尺码"] || row["SizeName"] || "",
+        ReworkCode: defectCode,
+        ReworkName: defectNameRaw,
+        Defect_Qty: row["数量"] || row["Defect_Qty"] || 0
+      };
+    });
+
+    // Build outputMap and defectMap (existing code)
+    const outputMap = new Map();
+    for (const row of outputRows) {
+      const key = makeKey(row);
+      if (!outputMap.has(key)) outputMap.set(key, []);
+      outputMap.get(key).push(row);
+    }
+
+    const defectMap = new Map();
+    for (const row of defectRows) {
+      const key = makeKey(row);
+      if (!defectMap.has(key)) defectMap.set(key, []);
+      defectMap.get(key).push(row);
+    }
+
+    // Merge and Build Documents
+    const docs = new Map();
+    const washingQtyData = new Map();
+
+    const allKeys = new Set([...outputMap.keys(), ...defectMap.keys()]);
+
+    for (const key of allKeys) {
+      const outputRows = outputMap.get(key) || [];
+      const defectRows = defectMap.get(key) || [];
+
+      const [Inspection_date_str, QC_ID_raw] = key.split("|");
+      const QC_ID = QC_ID_raw === "6335" ? "YM6335" : QC_ID_raw;
+      const Inspection_date = Inspection_date_str
+        ? new Date(Inspection_date_str + "T00:00:00Z")
+        : null;
+
+      // Output grouping (existing code)
+      const outputGroup = {};
+      for (const r of outputRows) {
+        const oKey = [r.WorkLine, r.MONo, r.ColorName, r.SizeName].join("|");
+        if (!outputGroup[oKey]) outputGroup[oKey] = [];
+        outputGroup[oKey].push(r);
+      }
+
+      const Output_data = Object.values(outputGroup).map((rows) => ({
+        Line_no: rows[0]?.WorkLine || "",
+        MONo: rows[0]?.MONo || "",
+        Color: rows[0]?.ColorName || "",
+        Size: rows[0]?.SizeName || "",
+        Qty: rows.reduce((sum, r) => sum + Number(r.Qty || 0), 0)
+      }));
+
+      // Output summary (existing code)
+      const outputSummaryMap = new Map();
+      for (const o of Output_data) {
+        const key = `${o.Line_no}|${o.MONo}`;
+        if (!outputSummaryMap.has(key)) {
+          outputSummaryMap.set(key, { Line: o.Line_no, MONo: o.MONo, Qty: 0 });
+        }
+        outputSummaryMap.get(key).Qty += o.Qty;
+      }
+
+      const Output_data_summary = Array.from(outputSummaryMap.values());
+      const TotalOutput = Output_data_summary.reduce(
+        (sum, o) => sum + o.Qty,
+        0
+      );
+
+      // MODIFIED: Only create washing quantity data for washing lines
+      // But don't include Line_no in the washing data structure
+      const washingQtyMap = new Map();
+      for (const o of Output_data) {
+        // Only process if this is a washing line
+        if (isWashingLine(o.Line_no)) {
+          const washKey = `${Inspection_date_str}|${QC_ID}|${o.MONo}|${o.Color}`;
+          if (!washingQtyMap.has(washKey)) {
+            washingQtyMap.set(washKey, {
+              Inspection_date: Inspection_date,
+              QC_ID: QC_ID,
+              Style_No: o.MONo,
+              Color: o.Color,
+              Wash_Qty: 0
+              // Note: Line_no is NOT included here
+            });
+          }
+          washingQtyMap.get(washKey).Wash_Qty += o.Qty;
+        }
+      }
+
+      // Add to global washing quantity data map (only washing lines)
+      for (const [washKey, washData] of washingQtyMap) {
+        if (!washingQtyData.has(washKey)) {
+          washingQtyData.set(washKey, washData);
+        } else {
+          washingQtyData.get(washKey).Wash_Qty += washData.Wash_Qty;
+        }
+      }
+
+      // Rest of the existing code for defects processing...
+      const defectGroup = {};
+      for (const d of defectRows) {
+        const dKey = [d.WorkLine, d.MONo, d.ColorName, d.SizeName].join("|");
+        if (!defectGroup[dKey]) defectGroup[dKey] = [];
+        defectGroup[dKey].push(d);
+      }
+
+      const Defect_data = Object.entries(defectGroup).map(([dKey, rows]) => {
+        let TotalDefect = 0;
+        const defectDetailsMap = new Map();
+
+        for (const d of rows) {
+          const ddKey = d.ReworkCode + "|" + d.ReworkName;
+          if (!defectDetailsMap.has(ddKey)) {
+            defectDetailsMap.set(ddKey, {
+              Defect_code: d.ReworkCode || "",
+              Defect_name: d.ReworkName || "",
+              Qty: 0
+            });
+          }
+          defectDetailsMap.get(ddKey).Qty += Number(d.Defect_Qty || 0);
+          TotalDefect += Number(d.Defect_Qty || 0);
+        }
+
+        const [Line_no, MONo, Color, Size] = dKey.split("|");
+        return {
+          Line_no: Line_no || "",
+          MONo: MONo || "",
+          Color: Color || "",
+          Size: Size || "",
+          Defect_qty: TotalDefect,
+          DefectDetails: Array.from(defectDetailsMap.values())
+        };
+      });
+
+      // Defect summary
+      const defectSummaryMap = new Map();
+      for (const d of Defect_data) {
+        const key = `${d.Line_no}|${d.MONo}`;
+        if (!defectSummaryMap.has(key)) {
+          defectSummaryMap.set(key, {
+            Line_no: d.Line_no,
+            MONo: d.MONo,
+            Defect_Qty: 0,
+            Defect_Details: []
+          });
+        }
+        defectSummaryMap.get(key).Defect_Qty += d.Defect_qty;
+
+        const detailsMap = new Map(
+          defectSummaryMap
+            .get(key)
+            .Defect_Details.map((dd) => [
+              `${dd.Defect_code}|${dd.Defect_name}`,
+              { ...dd }
+            ])
+        );
+
+        for (const dd of d.DefectDetails) {
+          const ddKey = `${dd.Defect_code}|${dd.Defect_name}`;
+          if (!detailsMap.has(ddKey)) {
+            detailsMap.set(ddKey, { ...dd });
+          } else {
+            detailsMap.get(ddKey).Qty += dd.Qty;
+          }
+        }
+
+        defectSummaryMap.get(key).Defect_Details = Array.from(
+          detailsMap.values()
+        );
+      }
+
+      const Defect_data_summary = Array.from(defectSummaryMap.values());
+      const TotalDefect = Defect_data_summary.reduce(
+        (sum, d) => sum + d.Defect_Qty,
+        0
+      );
+
+      docs.set(key, {
+        Inspection_date,
+        QC_ID,
+        report_type: "Inline Finishing",
+        Seq_No: [...new Set(outputRows.map((r) => Number(r.SeqNo || 0)))],
+        TotalOutput,
+        TotalDefect,
+        Output_data,
+        Output_data_summary,
+        Defect_data,
+        Defect_data_summary
+      });
+    }
+
+    const finalDocs = Array.from(docs.values());
+    const washingQtyDocs = Array.from(washingQtyData.values());
+
+    console.log(`Generated ${finalDocs.length} QC documents`);
+    console.log(
+      `Generated ${washingQtyDocs.length} washing quantity documents (washing lines only)`
+    );
+
+    res.json({ finalDocs, washingQtyDocs });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to process and save QC2 data." });
+  }
+});
+
+// routes/qc2.js (add this to the same file)
+app.get("/api/fetch-qc2-data", async (req, res) => {
+  try {
+    const results = await QCWorkers.find({}).lean();
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch QC2 data." });
+  }
+});
+
+app.post("/api/manual-save-qc2-data", async (req, res) => {
+  try {
+    const { finalDocs, washingQtyData } = req.body;
+
+    if (!Array.isArray(finalDocs) || finalDocs.length === 0) {
+      return res.status(400).json({ error: "No QC data to save." });
+    }
+
+    // QC data bulk operations
+    const bulkOps = finalDocs.map((doc) => ({
+      updateOne: {
+        filter: {
+          Inspection_date:
+            doc.Inspection_date instanceof Date
+              ? doc.Inspection_date
+              : new Date(doc.Inspection_date),
+          QC_ID: doc.QC_ID
+        },
+        update: { $set: doc },
+        upsert: true
+      }
+    }));
+
+    // Washing quantity data bulk operations (only washing data, no Line_no field)
+    let washingBulkOps = [];
+    if (Array.isArray(washingQtyData) && washingQtyData.length > 0) {
+      washingBulkOps = washingQtyData.map((doc) => ({
+        updateOne: {
+          filter: {
+            Inspection_date:
+              doc.Inspection_date instanceof Date
+                ? doc.Inspection_date
+                : new Date(doc.Inspection_date),
+            QC_ID: doc.QC_ID,
+            Style_No: doc.Style_No,
+            Color: doc.Color
+            // Note: No Line_no in filter since it's not stored
+          },
+          update: { $set: doc },
+          upsert: true
+        }
+      }));
+    }
+
+    console.log(`Saving ${bulkOps.length} QC records`);
+    console.log(
+      `Saving ${washingBulkOps.length} washing quantity records (washing lines only)`
+    );
+
+    // Execute both bulk operations
+    const results = [];
+
+    if (bulkOps.length > 0) {
+      try {
+        const qcResult = await QCWorkers.bulkWrite(bulkOps);
+        console.log("QC bulk write result:", qcResult);
+        results.push({ type: "QC", result: qcResult });
+      } catch (qcError) {
+        console.error("QC bulk write error:", qcError);
+        return res.status(500).json({
+          error: "Failed to save QC data",
+          details: qcError.message
+        });
+      }
+    }
+
+    if (washingBulkOps.length > 0) {
+      try {
+        const washingResult = await QCWashingQtyOld.bulkWrite(washingBulkOps);
+        console.log("Washing bulk write result:", washingResult);
+        results.push({ type: "Washing", result: washingResult });
+      } catch (washingError) {
+        console.error("Washing bulk write error:", washingError);
+        return res.status(500).json({
+          error: "Failed to save washing data",
+          details: washingError.message
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      qcDataCount: bulkOps.length,
+      washingQtyCount: washingBulkOps.length,
+      results: results
+    });
+  } catch (err) {
+    console.error("Manual save error:", err);
+    res.status(500).json({
+      error: "Failed to manually save QC2 data.",
+      details: err.message
+    });
+  }
+});
+
+// New endpoint to fetch washing quantity data
+app.get("/api/fetch-washing-qty-data", async (req, res) => {
+  try {
+    const results = await QCWashingQtyOld.find({}).lean();
+    res.json(results);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch washing quantity data." });
   }
 });
 
