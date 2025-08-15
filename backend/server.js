@@ -26796,6 +26796,7 @@ app.post(
     try {
       const { recordId } = req.body;
       const defectDetails = JSON.parse(req.body.defectDetails || "{}");
+
       if (!recordId)
         return res
           .status(400)
@@ -26815,7 +26816,6 @@ app.post(
       for (const file of req.files || []) {
         let fileExtension = path.extname(file.originalname);
         if (!fileExtension) {
-          // fallback to .jpg if no extension is found
           fileExtension = ".jpg";
         }
         const newFilename = `defect-${Date.now()}-${Math.round(
@@ -26832,6 +26832,12 @@ app.post(
       if (defectDetails.defectsByPc) {
         defectDetails.defectsByPc.forEach((pc, pcIdx) => {
           (pc.pcDefects || []).forEach((defect, defectIdx) => {
+            // Ensure defectName is preserved
+            if (!defect.defectName && defect.defectId) {
+              // You might want to fetch the defect name from your defects collection
+              // For now, we'll keep it as is
+            }
+
             if (defect.defectImages) {
               defect.defectImages = defect.defectImages.map((img, imgIdx) => {
                 return (
@@ -26846,6 +26852,7 @@ app.post(
           });
         });
       }
+
       if (defectDetails.additionalImages) {
         defectDetails.additionalImages = defectDetails.additionalImages.map(
           (img, imgIdx) => {
@@ -26866,10 +26873,12 @@ app.post(
         { defectDetails: defectDetails, updatedAt: new Date() },
         { new: true }
       );
+
       if (!doc)
         return res
           .status(404)
           .json({ success: false, message: "Record not found" });
+
       res.json({ success: true, data: doc.defectDetails });
     } catch (err) {
       console.error("Defect details save error:", err);

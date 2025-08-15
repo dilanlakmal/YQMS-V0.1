@@ -30,6 +30,7 @@ function transformDefectsByPc(savedDefectsByPc) {
         acc[pcNumber] = (pcData.pcDefects || []).map((defect, index) => ({
           id: index + 1,
           selectedDefect: defect.defectId || defect.selectedDefect || "",
+          defectName: defect.defectName || "", // Add this line
           defectQty: defect.defectQty || "",
           isBodyVisible: true,
           defectImages: (defect.defectImages || []).map((imgStr) => ({
@@ -49,6 +50,7 @@ function transformDefectsByPc(savedDefectsByPc) {
       result[pc] = (savedDefectsByPc[pc] || []).map((defect, index) => ({
         id: defect.id || index + 1,
         selectedDefect: defect.defectId || defect.selectedDefect || "",
+        defectName: defect.defectName || "", // Add this line
         defectQty: defect.defectQty || "",
         isBodyVisible:
           defect.isBodyVisible !== undefined ? defect.isBodyVisible : true,
@@ -2049,6 +2051,7 @@ const QCWashingPage = () => {
                 setDefectsByPc={setDefectsByPc}
                 comment={comment}
                 setComment={setComment}
+                normalizeImageSrc={normalizeImageSrc}
               />
             )}
             {sectionVisibility.measurementDetails && (
