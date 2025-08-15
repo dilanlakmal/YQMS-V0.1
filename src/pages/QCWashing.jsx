@@ -1855,6 +1855,7 @@ const autoSaveOverallSummary = async (summary, recordId) => {
           setDefectsByPc={setDefectsByPc}
           comment={comment}
           setComment={setComment}
+          normalizeImageSrc={normalizeImageSrc} 
         />
         )}
         {sectionVisibility.measurementDetails && (

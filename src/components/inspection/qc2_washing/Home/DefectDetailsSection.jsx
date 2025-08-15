@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 import imageCompression from 'browser-image-compression';
 import { API_BASE_URL } from "../../../../../config";
 
-
 const DefectDetailsSection = ({ 
   formData,
   handleInputChange,
@@ -29,6 +28,7 @@ const DefectDetailsSection = ({
   setComment,
   defectsByPc,
   setDefectsByPc,
+  normalizeImageSrc,
 }) => {
   const imageInputRef = useRef(null);
   const { i18n } = useTranslation();
@@ -809,6 +809,7 @@ DefectDetailsSection.propTypes = {
   setComment: PropTypes.func,
   defectsByPc: PropTypes.object,
   setDefectsByPc: PropTypes.func,
+  normalizeImageSrc: PropTypes.func, 
 };
 
 export default DefectDetailsSection;
