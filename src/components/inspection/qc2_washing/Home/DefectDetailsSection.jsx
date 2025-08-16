@@ -20,7 +20,7 @@ const DefectDetailsSection = ({
   formData,
   handleInputChange,
   defectOptions,
-  isVisible,
+  isVisible = false,
   onToggle,
   defectStatus,
   recordId,
@@ -552,12 +552,12 @@ const DefectDetailsSection = ({
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
           Defect Details
         </h2>
-        {/* <button
+        <button
           onClick={onToggle}
           className="text-indigo-600 hover:text-indigo-800 font-medium"
         >
-          {isVisible ? 'Hide' : 'Show'}
-        </button> */}
+          {isVisible ? "Hide" : "Show"}
+        </button>
       </div>
       {isVisible && (
         <div className="space-y-6">

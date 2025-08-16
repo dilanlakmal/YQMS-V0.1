@@ -72,6 +72,7 @@ import CuttingPage from "./pages/Cutting.jsx";
 import QCAccuracy from "./pages/QCAccuracy.jsx";
 
 import QAAudit from "./pages/QAAudit.jsx";
+import QC2UploadData from "./pages/QC2UploadData.jsx";
 
 import SupplierIssues from "./pages/SupplierIssues.jsx";
 
@@ -439,6 +440,7 @@ function AppContent() {
               <Route path="/training" element={<YQMSTrainingSchedule />} />
               <Route path="/exam" element={<YQMSExam />} />
               <Route path="/cutting-inline" element={<CuttingInline />} />
+              <Route path="/qc2-upload-data" element={<QC2UploadData />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />
