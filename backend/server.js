@@ -25668,7 +25668,7 @@ app.post('/api/qc-washing/submit', async (req, res) => {
     }
     const latestAutoSave = await QCWashing.findOne({
       orderNo,
-      status: "draft"
+      status: "processing"
     }).sort({ updatedAt: -1 });
 
     if (!latestAutoSave) {
@@ -25857,24 +25857,23 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
     const qcRecord = await QCWashing.findById(recordId);
     if (!qcRecord) return res.status(404).json({ success: false, message: 'Record not found.' });
 
+    // Calculate totalCheckedPcs correctly from measurement data
     let totalCheckedPcs = 0;
-      if (Array.isArray(qcRecord.measurementDetails)) {
-        // If measurementDetails is an array of size objects with qty
-        for (const size of qcRecord.measurementDetails) {
-          if (typeof size.qty === "number") {
-            totalCheckedPcs += size.qty;
-          }
-          // If measurementDetails is an array of {measurement: [sizes]}
-          if (Array.isArray(size.measurement)) {
-            for (const m of size.measurement) {
-              if (typeof m.qty === "number") {
-                totalCheckedPcs += m.qty;
-              }
-            }
-          }
+    if (qcRecord.measurementDetails && qcRecord.measurementDetails.measurement) {
+      // Sum up the qty from each size measurement
+      qcRecord.measurementDetails.measurement.forEach(measurement => {
+        if (typeof measurement.qty === "number") {
+          totalCheckedPcs += measurement.qty;
         }
-      }
-      
+      });
+    }
+
+    // If no measurement data, use checkedQty as fallback
+    if (totalCheckedPcs === 0) {
+      totalCheckedPcs = parseInt(qcRecord.checkedQty, 10) || 0;
+    }
+
+    // Calculate defect statistics
     let rejectedDefectPcs = 0;
     let totalDefectCount = 0;
     const defectDetails = qcRecord.defectDetails || {};
@@ -25899,10 +25898,12 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
 
     await qcRecord.save();
     res.json({ success: true });
+
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to save summary.' });
   }
 });
+
 
 const getAqlLevelForBuyer = (buyer) => {
   if (!buyer) return 1.0;
@@ -26650,14 +26651,14 @@ app.post("/api/qc-washing/orderData-save", async (req, res) => {
         colorOrderQty: formData.colorOrderQty,
         userId,
         savedAt,
-        status: "draft"
+        status: "processing"
       });
     } else {
       // Update existing record
       Object.assign(record, formData);
       record.userId = userId;
       record.savedAt = savedAt;
-      record.status = "draft";
+      record.status = "processing";
     }
 
     await record.save();
@@ -26964,7 +26965,7 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
     };
 
     record.savedAt = new Date();
-    record.status = 'draft';
+    record.status = 'processing';
 
     await record.save();
 

@@ -27,8 +27,12 @@ const OrderDetailsSection = ({
   setRecordId,
   setSavedSizes,
   onLoadSavedDataById,
+  isSaved: externalIsSaved,
+  setIsSaved: setExternalIsSaved,
 }) => {
-  const [isSaved, setIsSaved] = useState(false);
+  // const [isSaved, setIsSaved] = useState(false);
+  const isSaved = externalIsSaved || false;
+  const setIsSaved = setExternalIsSaved || (() => {});
 
    const checkMeasurementDetails = async (orderNo) => {
   try {

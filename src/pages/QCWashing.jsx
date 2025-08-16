@@ -75,39 +75,45 @@ function normalizeImagePreview(img) {
 function calculateSummaryData(currentFormData) {
   const currentDefectDetails = currentFormData.defectDetails;
   const currentMeasurementDetails = currentFormData.measurementDetails;
-    let measurementArray = [];
-    if (currentMeasurementDetails && typeof currentMeasurementDetails === "object") {
-      measurementArray = currentMeasurementDetails.measurement || [];
-    } else if (Array.isArray(currentMeasurementDetails)) {
-      measurementArray = currentMeasurementDetails;
-    }
 
-    // 1. Calculate totalCheckedPcs from measurement data qty
-    let totalCheckedPcs = 0;
-    measurementArray.forEach(data => {
-      if (typeof data.qty === "number") totalCheckedPcs += data.qty;
-    });
-    if (totalCheckedPcs === 0) {
-      totalCheckedPcs = parseInt(currentFormData.checkedQty, 10) || 0;
-    }
+  let measurementArray = [];
+  if (currentMeasurementDetails && typeof currentMeasurementDetails === "object") {
+    measurementArray = currentMeasurementDetails.measurement || [];
+  } else if (Array.isArray(currentMeasurementDetails)) {
+    measurementArray = currentMeasurementDetails;
+  }
 
-    // 2. Calculate measurement points and passes
-    let measurementPoints = 0;
-    let measurementPass = 0;
-    measurementArray.forEach(data => {
-      if (Array.isArray(data.pcs)) {
-        data.pcs.forEach(pc => {
-          if (Array.isArray(pc.measurementPoints)) {
-            pc.measurementPoints.forEach(point => {
-              if (point.result === 'pass' || point.result === 'fail') {
-                measurementPoints++;
-                if (point.result === 'pass') measurementPass++;
-              }
-            });
-          }
-        });
-      }
-    });
+  // 1. Calculate totalCheckedPcs from measurement data qty (FIXED)
+  let totalCheckedPcs = 0;
+  measurementArray.forEach(data => {
+    // Use qty field which represents the number of pieces checked for each size
+    if (typeof data.qty === "number") {
+      totalCheckedPcs += data.qty;
+    }
+  });
+
+  // If no measurement data, fallback to checkedQty from form
+  if (totalCheckedPcs === 0) {
+    totalCheckedPcs = parseInt(currentFormData.checkedQty, 10) || 0;
+  }
+
+  // 2. Calculate measurement points and passes (for measurement statistics only)
+  let measurementPoints = 0;
+  let measurementPass = 0;
+  measurementArray.forEach(data => {
+    if (Array.isArray(data.pcs)) {
+      data.pcs.forEach(pc => {
+        if (Array.isArray(pc.measurementPoints)) {
+          pc.measurementPoints.forEach(point => {
+            if (point.result === 'pass' || point.result === 'fail') {
+              measurementPoints++;
+              if (point.result === 'pass') measurementPass++;
+            }
+          });
+        }
+      });
+    }
+  });
 
   // 3. Defect calculations
   const rejectedDefectPcs = Array.isArray(currentDefectDetails?.defectsByPc)
@@ -129,7 +135,7 @@ function calculateSummaryData(currentFormData) {
       }, 0)
     : 0;
 
-  // 4. Defect rate and ratio
+  // 4. Defect rate and ratio (use totalCheckedPcs, not measurementPoints)
   const defectRate =
     totalCheckedPcs > 0
       ? Number(((defectCount / totalCheckedPcs) * 100).toFixed(1))
@@ -158,15 +164,17 @@ function calculateSummaryData(currentFormData) {
   }
   
   return {
-    totalCheckedPcs: totalCheckedPcs || 0,
+    totalCheckedPcs: totalCheckedPcs || 0, // This should be the sum of qty from each size
     rejectedDefectPcs: rejectedDefectPcs || 0,
     totalDefectCount: defectCount || 0,
     defectRate,
     defectRatio,
     overallFinalResult: overallResult || "N/A",
     overallResult,
+    // Additional fields for measurement statistics
+    measurementPoints: measurementPoints || 0,
+    measurementPass: measurementPass || 0,
   };
-  
 }
 
 function machineProcessesToObject(machineProcesses) {
@@ -269,6 +277,7 @@ const QCWashingPage = () => {
 //   defectDetails: false,
 //   measurementDetails: false,
 // });
+const [orderSectionSaved, setOrderSectionSaved] = useState(false);
 const [recordId, setRecordId] = useState(null);
   const aql = formData.aql && formData.aql[0];
 
@@ -1521,6 +1530,120 @@ const autoSaveOverallSummary = async (summary, recordId) => {
     }
   };
 
+  const clearFormData = () => {
+    // Reset form data to initial state
+    setFormData({
+      date: new Date().toISOString().split("T")[0],
+      orderNo: "",
+      style: "",
+      orderQty: "",
+      checkedQty: "",
+      color: "",
+      washQty: "",
+      washType: "Normal Wash",
+      firstOutput: "",
+      inline: "",
+      reportType: "",
+      buyer: "",
+      factoryName: subFactories.includes("YM") ? "YM" : (subFactories[0] || ""),
+      before_after_wash: "Before Wash",
+      result: "",
+      aql:[{
+        sampleSize: "",
+        acceptedDefect: "",
+        rejectedDefect: "",
+        levelUsed: "",
+      }],
+      
+      inspectionDetails: {},
+      defectDetails: {
+        checkedQty: "",
+        washQty: "",
+        result: "",
+        defectsByPc: [],
+        additionalImages: [],
+        comment: "",
+      },
+      measurementDetails: [],
+      
+      totalCheckedPcs: 0,
+      rejectedDefectPcs: 0,
+      totalDefectCount: 0,
+      defectRate: 0,
+      defectRatio: 0,
+      overallFinalResult: "N/A",
+    });
+
+    // Reset all other states
+    setOrderNoSuggestions([]);
+    setShowOrderNoSuggestions(false);
+    setStyleSuggestions([]);
+    
+    // Re-initialize inspection data with master checklist
+    if (masterChecklist && masterChecklist.length > 0) {
+      setInspectionData(initializeInspectionData(masterChecklist));
+    } else {
+      setInspectionData([]);
+    }
+    
+    setProcessData({
+      "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+      "Tumble Dry": { temperature: "", time: "" }
+    });
+    setDefectData(normalizeDefectData(defaultDefectData));
+    setAddedDefects([]);
+    setUploadedImages([]);
+    setComment("");
+    setSavedSizes([]);
+    setMeasurementData({ beforeWash: [], afterWash: [] });
+    setDefectsByPc({});
+    setColorDataCache({});
+    setRecordId(null);
+    setAutoSaveId(null);
+    setLastSaved(null);
+    setOverallSummary(null);
+    setColorOrderQty(null);
+
+    // Reset section visibility
+    setOrderSectionVisible(true);
+    setDefectSectionVisible(false);
+    setInspectionSectionVisible(false);
+    setMeasurementSectionVisible(false);
+    setInspectionContentVisible(false);
+    setDefectContentVisible(false);
+    setMeasurementContentVisible(false);
+    setOrderSectionSaved(false);
+
+    // Reset machine values
+    setStandardValues({
+      "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+      "Tumble Dry": { temperature: "", time: "" }
+    });
+    setActualValues({
+      "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+      "Tumble Dry": { temperature: "", time: "" }
+    });
+    setMachineStatus({
+      "Washing Machine": {
+        temperature: { ok: true, no: false },
+        time: { ok: true, no: false },
+        silicon: { ok: true, no: false },
+        softener: { ok: true, no: false }
+      },
+      "Tumble Dry": {
+        temperature: { ok: true, no: false },
+        time: { ok: true, no: false }
+      }
+    });
+
+    // Reset loading state
+    setIsDataLoading(false);
+    
+    // Clear colorOptions after a small delay to ensure form is ready
+    setTimeout(() => {
+      setColorOptions([]);
+    }, 100);
+  };
 
     useEffect(() => {
       const defectDetails = {
@@ -1871,6 +1994,8 @@ const autoSaveOverallSummary = async (summary, recordId) => {
           measurementData={measurementData}
           uploadedImages={uploadedImages}
           setRecordId={setRecordId}
+          isSaved={orderSectionSaved}
+          setIsSaved={setOrderSectionSaved}
         />
 
         {inspectionSectionVisible && (
@@ -1945,6 +2070,24 @@ const autoSaveOverallSummary = async (summary, recordId) => {
           <button
             className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
             onClick={async () => {
+              // Show confirmation dialog first
+              const result = await Swal.fire({
+                title: 'Are you sure?',
+                text: 'Do you want to submit this QC Washing data?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, Submit!',
+                cancelButtonText: 'No, Cancel',
+                reverseButtons: true
+              });
+
+              // If user clicked "No" or closed the dialog, return early
+              if (!result.isConfirmed) {
+                return;
+              }
+
               try {
                 // --- 1. Recalculate summary with the latest state ---
                 const defectDetails = {
@@ -1957,29 +2100,31 @@ const autoSaveOverallSummary = async (summary, recordId) => {
                     pcDefects,
                   })),
                 };
+
                 const measurementDetails = {
                   measurement: [
                     ...measurementData.beforeWash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
                     ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
                   ]
                 };
+
                 const summary = calculateSummaryData({
                   ...formData,
                   defectDetails,
                   measurementDetails,
                 });
 
-
-
                 // --- 2. Build the submitData payload ---
                 const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
                 const aql = formData.aql && formData.aql[0];
-              const submitAql = [{
-                sampleSize: Number(aql?.sampleSize) || 0,
-                acceptedDefect: Number(aql?.acceptedDefect) || 0,
-                rejectedDefect: Number(aql?.rejectedDefect) || 0,
-                levelUsed: Number(aql?.levelUsed) || 0
-              }];
+
+                const submitAql = [{
+                  sampleSize: Number(aql?.sampleSize) || 0,
+                  acceptedDefect: Number(aql?.acceptedDefect) || 0,
+                  rejectedDefect: Number(aql?.rejectedDefect) || 0,
+                  levelUsed: Number(aql?.levelUsed) || 0
+                }];
+
                 const submitData = {
                   orderNo: formData.orderNo || formData.style,
                   date: formData.date,
@@ -2064,6 +2209,7 @@ const autoSaveOverallSummary = async (summary, recordId) => {
                     },
                   },
                 };
+
                 // --- 3. Submit to the server ---
                 const response = await fetch(
                   `${API_BASE_URL}/api/qc-washing/submit`,
@@ -2074,35 +2220,43 @@ const autoSaveOverallSummary = async (summary, recordId) => {
                   }
                 );
 
-                const result = await response.json();
+                const submitResult = await response.json();
+                if (submitResult.success) {
+                  // Show success message
+                  await Swal.fire({
+                    icon: "success",
+                    title: "Success!",
+                    text: "QC Washing data submitted successfully!",
+                    confirmButtonText: "OK"
+                  });
 
-                if (result.success) {
-                  Swal.fire(
-                    "Success",
-                    "QC Washing data submitted successfully!",
-                    "success"
-                  );
-                  setAutoSaveId(null);
-                  setLastSaved(null);
-                  setTimeout(() => {
-                    window.location.reload();
-                  }, 500);
+                  // Clear form data and reset states
+                  clearFormData();
+                  
+                  
+                  // Optional: Reload the page after a short delay
+                  // setTimeout(() => {
+                  //   window.location.reload();
+                  // }, 500);
                 } else {
-                  Swal.fire(
-                    "Error",
-                    result.message || "Failed to submit data",
-                    "error"
-                  );
+                  Swal.fire({
+                    icon: "error",
+                    title: "Submission Failed",
+                    text: submitResult.message || "Failed to submit data",
+                  });
                 }
               } catch (error) {
                 console.error("Submit error:", error);
-                Swal.fire("Error", "Failed to submit data", "error");
+                Swal.fire({
+                  icon: "error",
+                  title: "Error",
+                  text: "Failed to submit data. Please try again.",
+                });
               }
             }}
           >
             Submit
           </button>
-
         </div>
         </>
         )}
