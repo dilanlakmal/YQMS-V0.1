@@ -49,7 +49,7 @@ const InspectionDataSection = ({
   processData,
   setProcessData,
   defectData,
-  isVisible,
+  isVisible = false,
   onToggle,
   machineType,
   setMachineType,
@@ -840,12 +840,12 @@ const InspectionDataSection = ({
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
             Inspection Data
           </h2>
-          {/* <button 
-          onClick={onToggle}
-          className="text-indigo-600 hover:text-indigo-800 font-medium"
-        >
-          {isVisible ? 'Hide' : 'Show'}
-        </button> */}
+          <button
+            onClick={onToggle}
+            className="text-indigo-600 hover:text-indigo-800 font-medium"
+          >
+            {isVisible ? "Hide" : "Show"}
+          </button>
         </div>
         {isVisible && (
           <>

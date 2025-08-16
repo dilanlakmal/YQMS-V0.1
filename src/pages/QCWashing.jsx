@@ -277,31 +277,26 @@ const QCWashingPage = () => {
   const [activeTab, setActiveTab] = useState("newInspection");
   const [overallSummary, setOverallSummary] = useState(null);
   const [colorOrderQty, setColorOrderQty] = useState(null);
-  const [sectionVisibility, setSectionVisibility] = useState({
-    orderDetails: true,
-    inspectionData: false,
-    defectDetails: false,
-    measurementDetails: false
-  });
+  //   const [sectionVisibility, setSectionVisibility] = useState({
+  //   orderDetails: true,
+  //   inspectionData: false,
+  //   defectDetails: false,
+  //   measurementDetails: false,
+  // });
   const [recordId, setRecordId] = useState(null);
   const aql = formData.aql && formData.aql[0];
 
   // Function to activate the next section
-  const activateNextSection = (currentSection) => {
-    setSectionVisibility((prev) => {
-      const order = [
-        "orderDetails",
-        "inspectionData",
-        "defectDetails",
-        "measurementDetails"
-      ];
-      const idx = order.indexOf(currentSection);
-      if (idx !== -1 && idx < order.length - 1) {
-        return { ...prev, [order[idx + 1]]: true };
-      }
-      return prev;
-    });
-  };
+  // const activateNextSection = (currentSection) => {
+  //   setSectionVisibility((prev) => {
+  //     const order = ['orderDetails', 'inspectionData', 'defectDetails', 'measurementDetails'];
+  //     const idx = order.indexOf(currentSection);
+  //     if (idx !== -1 && idx < order.length - 1) {
+  //       return { ...prev, [order[idx + 1]]: true };
+  //     }
+  //     return prev;
+  //   });
+  // };
 
   const fetchOverallSummary = async (recordId) => {
     if (!recordId) return;
@@ -383,6 +378,33 @@ const QCWashingPage = () => {
 
   // State: Cache for color-specific data to prevent data loss on switching
   const [colorDataCache, setColorDataCache] = useState({});
+  const [orderSectionVisible, setOrderSectionVisible] = useState(true);
+  const [defectSectionVisible, setDefectSectionVisible] = useState(false);
+  const [inspectionSectionVisible, setInspectionSectionVisible] =
+    useState(false);
+  const [measurementSectionVisible, setMeasurementSectionVisible] =
+    useState(false);
+  const activateAllSections = () => {
+    setDefectSectionVisible(true);
+    setInspectionSectionVisible(true);
+    setMeasurementSectionVisible(true);
+    setInspectionContentVisible(false);
+    setDefectContentVisible(false);
+    setMeasurementContentVisible(false);
+  };
+  const [inspectionContentVisible, setInspectionContentVisible] =
+    useState(false);
+  const [defectContentVisible, setDefectContentVisible] = useState(false);
+  const [measurementContentVisible, setMeasurementContentVisible] =
+    useState(false);
+
+  const toggleOrderSection = () => setOrderSectionVisible(!orderSectionVisible);
+  const toggleInspectionSection = () =>
+    setInspectionContentVisible(!inspectionContentVisible);
+  const toggleDefectSection = () =>
+    setDefectContentVisible(!defectContentVisible);
+  const toggleMeasurementSection = () =>
+    setMeasurementContentVisible(!measurementContentVisible);
 
   const [standardValues, setStandardValues] = useState({
     "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
@@ -444,9 +466,9 @@ const QCWashingPage = () => {
   };
 
   // Section Toggle
-  const toggleSection = (section) => {
-    setSectionVisibility((prev) => ({ ...prev, [section]: !prev[section] }));
-  };
+  // const toggleSection = (section) => {
+  //   setSectionVisibility((prev) => ({ ...prev, [section]: !prev[section] }));
+  // };
 
   const imageToBase64 = (imageObject) => {
     if (!imageObject) {
@@ -2046,8 +2068,9 @@ const QCWashingPage = () => {
               colorOptions={colorOptions}
               subFactories={subFactories}
               user={user}
-              isVisible={sectionVisibility.orderDetails}
-              onToggle={() => toggleSection("orderDetails")}
+              isVisible={orderSectionVisible}
+              onToggle={toggleOrderSection}
+              activateNextSection={activateAllSections}
               styleSuggestions={styleSuggestions}
               fetchMatchingStyles={fetchMatchingStyles}
               setStyleSuggestions={setStyleSuggestions}
@@ -2064,10 +2087,10 @@ const QCWashingPage = () => {
               comment={comment}
               measurementData={measurementData}
               uploadedImages={uploadedImages}
-              activateNextSection={() => activateNextSection("orderDetails")}
               setRecordId={setRecordId}
             />
-            {sectionVisibility.inspectionData && (
+
+            {inspectionSectionVisible && (
               <InspectionDataSection
                 onLoadSavedDataById={loadSavedDataById}
                 inspectionData={inspectionData}
@@ -2075,15 +2098,12 @@ const QCWashingPage = () => {
                 processData={processData}
                 setProcessData={setProcessData}
                 defectData={defectData}
-                isVisible={sectionVisibility.inspectionData}
-                onToggle={() => toggleSection("inspectionData")}
+                isVisible={inspectionContentVisible} // Use content visibility state
+                onToggle={toggleInspectionSection}
                 machineType={machineType}
                 setMachineType={setMachineType}
                 washQty={formData.washQty}
                 setDefectData={setDefectData}
-                activateNextSection={() =>
-                  activateNextSection("inspectionData")
-                }
                 recordId={recordId}
                 washType={formData.washType}
                 standardValues={standardValues}
@@ -2094,7 +2114,9 @@ const QCWashingPage = () => {
                 setMachineStatus={setMachineStatus}
               />
             )}
-            {sectionVisibility.defectDetails && (
+
+            {/* Only render when defectSectionVisible is true */}
+            {defectSectionVisible && (
               <DefectDetailsSection
                 onLoadSavedDataById={loadSavedDataById}
                 formData={formData}
@@ -2104,10 +2126,9 @@ const QCWashingPage = () => {
                 setAddedDefects={setAddedDefects}
                 uploadedImages={uploadedImages}
                 setUploadedImages={setUploadedImages}
-                isVisible={sectionVisibility.defectDetails}
-                onToggle={() => toggleSection("defectDetails")}
+                isVisible={defectContentVisible} // Use content visibility state
+                onToggle={toggleDefectSection}
                 defectStatus={formData.result}
-                activateNextSection={() => activateNextSection("defectDetails")}
                 recordId={recordId}
                 defectsByPc={defectsByPc}
                 setDefectsByPc={setDefectsByPc}
@@ -2116,14 +2137,16 @@ const QCWashingPage = () => {
                 normalizeImageSrc={normalizeImageSrc}
               />
             )}
-            {sectionVisibility.measurementDetails && (
+
+            {/* Only render when measurementSectionVisible is true */}
+            {measurementSectionVisible && (
               <MeasurementDetailsSection
                 onLoadSavedDataById={loadSavedDataById}
                 orderNo={formData.orderNo || formData.style}
                 color={formData.color}
                 before_after_wash={formData.before_after_wash}
-                isVisible={sectionVisibility.measurementDetails}
-                onToggle={() => toggleSection("measurementDetails")}
+                isVisible={measurementContentVisible} // Use content visibility state
+                onToggle={toggleMeasurementSection}
                 savedSizes={savedSizes}
                 setSavedSizes={setSavedSizes}
                 onSizeSubmit={handleSizeSubmit}
@@ -2131,7 +2154,6 @@ const QCWashingPage = () => {
                 showMeasurementTable={showMeasurementTable}
                 onMeasurementEdit={handleMeasurementEdit}
                 onMeasurementChange={handleMeasurementChange}
-                activateNextSection={() => activateNextSection("defectDetails")}
                 recordId={recordId}
               />
             )}
