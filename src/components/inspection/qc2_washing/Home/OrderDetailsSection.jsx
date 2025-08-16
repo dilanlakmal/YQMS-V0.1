@@ -143,6 +143,7 @@ const OrderDetailsSection = ({
     });
 
     const checkData = await checkRes.json();
+    
     if (checkData.success && checkData.exists) {
       const result = await Swal.fire({
         icon: 'info',
@@ -152,7 +153,7 @@ const OrderDetailsSection = ({
         confirmButtonText: 'Yes, edit',
         cancelButtonText: 'No, cancel'
       });
-
+      
       if (result.isConfirmed) {
         const record = checkData.record;
         setFormData({
@@ -167,6 +168,7 @@ const OrderDetailsSection = ({
           await onLoadSavedDataById(record._id);
         }
         
+        // Activate all sections when order details are saved/loaded
         if (activateNextSection) activateNextSection();
         
         Swal.fire({
@@ -198,6 +200,7 @@ const OrderDetailsSection = ({
     });
 
     const result = await response.json();
+    
     if (result.success) {
       Swal.fire({
         icon: 'success',
@@ -208,8 +211,12 @@ const OrderDetailsSection = ({
         position: 'top-end',
         toast: true
       });
+      
       setIsSaved(true);
+      
+      // Activate all sections when order details are saved
       if (activateNextSection) activateNextSection();
+      
       if (result.id && setRecordId) setRecordId(result.id);
     } else {
       Swal.fire({
@@ -235,6 +242,7 @@ const OrderDetailsSection = ({
     console.error("Save error:", error);
   }
 };
+
 
 
   const handleOrderNoChange = (e) => {
@@ -295,12 +303,12 @@ const OrderDetailsSection = ({
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-4 border-b pb-2">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Order Details</h2>
-        {/* <button 
+        <button 
           onClick={onToggle}
           className="text-indigo-600 hover:text-indigo-800 font-medium"
         >
           {isVisible ? 'Hide' : 'Show'}
-        </button> */}
+        </button>
       </div>
          {isVisible && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 dark:text-white">

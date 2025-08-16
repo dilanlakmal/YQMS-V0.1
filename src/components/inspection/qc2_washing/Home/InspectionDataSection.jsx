@@ -39,7 +39,7 @@ const InspectionDataSection = ({
   processData, 
   setProcessData,
   defectData,
-  isVisible,
+  isVisible = false,
   onToggle,
   machineType,        
   setMachineType,
@@ -754,12 +754,12 @@ useEffect(() => {
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-4 border-b pb-2">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Inspection Data</h2>
-        {/* <button 
+        <button 
           onClick={onToggle}
           className="text-indigo-600 hover:text-indigo-800 font-medium"
         >
           {isVisible ? 'Hide' : 'Show'}
-        </button> */}
+        </button>
       </div>
       {isVisible && (
         <>

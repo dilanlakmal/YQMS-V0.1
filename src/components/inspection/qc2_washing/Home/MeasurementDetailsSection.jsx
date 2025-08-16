@@ -9,7 +9,7 @@ import PropTypes from "prop-types";
 const MeasurementDetailsSection = ({
   orderNo,
   color,
-  isVisible,
+  isVisible = false,
   onToggle,
   savedSizes = [],
   setSavedSizes,
@@ -872,12 +872,12 @@ if (!lastPattern || !currentSelection || !lastKValue) return false;
       <div>
       <div className="flex justify-between items-center mb-4 border-b pb-2">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Measurement Details</h2>
-        {/* <button 
+        <button 
           onClick={onToggle}
           className="text-indigo-600 hover:text-indigo-800 font-medium"
         >
           {isVisible ? 'Hide' : 'Show'}
-        </button> */}
+        </button>
 
          
       </div>

@@ -263,27 +263,27 @@ const QCWashingPage = () => {
   const [activeTab, setActiveTab] = useState('newInspection');
   const [overallSummary, setOverallSummary] = useState(null);
   const [colorOrderQty, setColorOrderQty] = useState(null);
-  const [sectionVisibility, setSectionVisibility] = useState({
-  orderDetails: true,
-  inspectionData: false,
-  defectDetails: false,
-  measurementDetails: false,
-});
+//   const [sectionVisibility, setSectionVisibility] = useState({
+//   orderDetails: true,
+//   inspectionData: false,
+//   defectDetails: false,
+//   measurementDetails: false,
+// });
 const [recordId, setRecordId] = useState(null);
   const aql = formData.aql && formData.aql[0];
 
 
 // Function to activate the next section
-const activateNextSection = (currentSection) => {
-  setSectionVisibility((prev) => {
-    const order = ['orderDetails', 'inspectionData', 'defectDetails', 'measurementDetails'];
-    const idx = order.indexOf(currentSection);
-    if (idx !== -1 && idx < order.length - 1) {
-      return { ...prev, [order[idx + 1]]: true };
-    }
-    return prev;
-  });
-};
+// const activateNextSection = (currentSection) => {
+//   setSectionVisibility((prev) => {
+//     const order = ['orderDetails', 'inspectionData', 'defectDetails', 'measurementDetails'];
+//     const idx = order.indexOf(currentSection);
+//     if (idx !== -1 && idx < order.length - 1) {
+//       return { ...prev, [order[idx + 1]]: true };
+//     }
+//     return prev;
+//   });
+// };
 
   
 const fetchOverallSummary = async (recordId) => {
@@ -343,6 +343,26 @@ const fetchOverallSummary = async (recordId) => {
 
   // State: Cache for color-specific data to prevent data loss on switching
   const [colorDataCache, setColorDataCache] = useState({});
+  const [orderSectionVisible, setOrderSectionVisible] = useState(true);
+  const [defectSectionVisible, setDefectSectionVisible] = useState(false);
+  const [inspectionSectionVisible, setInspectionSectionVisible] = useState(false);
+  const [measurementSectionVisible, setMeasurementSectionVisible] = useState(false);
+  const activateAllSections = () => {
+    setDefectSectionVisible(true);
+    setInspectionSectionVisible(true);
+    setMeasurementSectionVisible(true);
+    setInspectionContentVisible(false);
+    setDefectContentVisible(false);
+    setMeasurementContentVisible(false);
+  };
+  const [inspectionContentVisible, setInspectionContentVisible] = useState(false);
+  const [defectContentVisible, setDefectContentVisible] = useState(false);
+  const [measurementContentVisible, setMeasurementContentVisible] = useState(false);
+
+  const toggleOrderSection = () => setOrderSectionVisible(!orderSectionVisible);
+  const toggleInspectionSection = () => setInspectionContentVisible(!inspectionContentVisible);
+  const toggleDefectSection = () => setDefectContentVisible(!defectContentVisible);
+  const toggleMeasurementSection = () => setMeasurementContentVisible(!measurementContentVisible);
 
   const [standardValues, setStandardValues] = useState({
     "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
@@ -405,9 +425,9 @@ const convertEnglishToCurrentLanguage = (englishRemark, t) => {
 
 
   // Section Toggle
-  const toggleSection = (section) => {
-    setSectionVisibility((prev) => ({ ...prev, [section]: !prev[section] }));
-  };
+  // const toggleSection = (section) => {
+  //   setSectionVisibility((prev) => ({ ...prev, [section]: !prev[section] }));
+  // };
 
   const imageToBase64 = (imageObject) => {
     if (!imageObject) {
@@ -1822,8 +1842,8 @@ const autoSaveOverallSummary = async (summary, recordId) => {
           showMeasurementTable={showMeasurementTable}
         />
         <OrderDetailsSection
-        onLoadSavedDataById={loadSavedDataById}
-        setSavedSizes={setSavedSizes}
+          onLoadSavedDataById={loadSavedDataById}
+          setSavedSizes={setSavedSizes}
           formData={formData}
           setFormData={setFormData}
           handleInputChange={handleInputChange}
@@ -1831,8 +1851,9 @@ const autoSaveOverallSummary = async (summary, recordId) => {
           colorOptions={colorOptions}
           subFactories={subFactories}
           user={user}
-          isVisible={sectionVisibility.orderDetails}
-          onToggle={() => toggleSection("orderDetails")}
+          isVisible={orderSectionVisible}
+          onToggle={toggleOrderSection}
+          activateNextSection={activateAllSections}
           styleSuggestions={styleSuggestions}
           fetchMatchingStyles={fetchMatchingStyles}
           setStyleSuggestions={setStyleSuggestions}
@@ -1849,74 +1870,75 @@ const autoSaveOverallSummary = async (summary, recordId) => {
           comment={comment}
           measurementData={measurementData}
           uploadedImages={uploadedImages}
-          activateNextSection={() => activateNextSection('orderDetails')}
-           setRecordId={setRecordId}
+          setRecordId={setRecordId}
         />
-        {sectionVisibility.inspectionData && (
-        <InspectionDataSection
-          onLoadSavedDataById={loadSavedDataById}
-          inspectionData={inspectionData}
-          setInspectionData={setInspectionData} 
-          processData={processData}
-          setProcessData={setProcessData}
-          defectData={defectData}
-          isVisible={sectionVisibility.inspectionData}
-          onToggle={() => toggleSection("inspectionData")}
-          machineType={machineType}
-          setMachineType={setMachineType}
-          washQty={formData.washQty}
-          setDefectData={setDefectData} 
-          activateNextSection={() => activateNextSection('inspectionData')}
-          recordId={recordId}
-          washType={formData.washType}
-          standardValues={standardValues}
-          setStandardValues={setStandardValues}
-          actualValues={actualValues}
-          setActualValues={setActualValues}
-          machineStatus={machineStatus}
-          setMachineStatus={setMachineStatus}
-        />
+
+        {inspectionSectionVisible && (
+          <InspectionDataSection
+            onLoadSavedDataById={loadSavedDataById}
+            inspectionData={inspectionData}
+            setInspectionData={setInspectionData} 
+            processData={processData}
+            setProcessData={setProcessData}
+            defectData={defectData}
+            isVisible={inspectionContentVisible} // Use content visibility state
+            onToggle={toggleInspectionSection}
+            machineType={machineType}
+            setMachineType={setMachineType}
+            washQty={formData.washQty}
+            setDefectData={setDefectData} 
+            recordId={recordId}
+            washType={formData.washType}
+            standardValues={standardValues}
+            setStandardValues={setStandardValues}
+            actualValues={actualValues}
+            setActualValues={setActualValues}
+            machineStatus={machineStatus}
+            setMachineStatus={setMachineStatus}
+          />
         )}
-        {sectionVisibility.defectDetails && (
-        <DefectDetailsSection
-          onLoadSavedDataById={loadSavedDataById}
-          formData={formData}
-          handleInputChange={handleInputChange}
-          defectOptions={defectOptions}
-          addedDefects={addedDefects}
-          setAddedDefects={setAddedDefects}
-          uploadedImages={uploadedImages}
-          setUploadedImages={setUploadedImages}
-          isVisible={sectionVisibility.defectDetails}
-          onToggle={() => toggleSection("defectDetails")}
-          defectStatus={formData.result} 
-          activateNextSection={() => activateNextSection('defectDetails')}
-          recordId={recordId}
-          defectsByPc={defectsByPc}
-          setDefectsByPc={setDefectsByPc}
-          comment={comment}
-          setComment={setComment}
-          normalizeImageSrc={normalizeImageSrc} 
-        />
+
+        {/* Only render when defectSectionVisible is true */}
+        {defectSectionVisible && (
+          <DefectDetailsSection
+            onLoadSavedDataById={loadSavedDataById}
+            formData={formData}
+            handleInputChange={handleInputChange}
+            defectOptions={defectOptions}
+            addedDefects={addedDefects}
+            setAddedDefects={setAddedDefects}
+            uploadedImages={uploadedImages}
+            setUploadedImages={setUploadedImages}
+            isVisible={defectContentVisible} // Use content visibility state
+            onToggle={toggleDefectSection}
+            defectStatus={formData.result} 
+            recordId={recordId}
+            defectsByPc={defectsByPc}
+            setDefectsByPc={setDefectsByPc}
+            comment={comment}
+            setComment={setComment}
+            normalizeImageSrc={normalizeImageSrc} 
+          />
         )}
-        {sectionVisibility.measurementDetails && (
-        <MeasurementDetailsSection
-          onLoadSavedDataById={loadSavedDataById}
-          orderNo={formData.orderNo || formData.style}
-          color={formData.color}
-          before_after_wash={formData.before_after_wash}
-          isVisible={sectionVisibility.measurementDetails}
-          onToggle={() => toggleSection("measurementDetails")}
-          savedSizes={savedSizes}
-          setSavedSizes={setSavedSizes}
-          onSizeSubmit={handleSizeSubmit}
-          measurementData={measurementData}
-          showMeasurementTable={showMeasurementTable}
-          onMeasurementEdit={handleMeasurementEdit}
-          onMeasurementChange={handleMeasurementChange}
-          activateNextSection={() => activateNextSection('defectDetails')}
-          recordId={recordId}
-        />
+
+        {/* Only render when measurementSectionVisible is true */}
+        {measurementSectionVisible && (
+          <MeasurementDetailsSection
+            onLoadSavedDataById={loadSavedDataById}
+            orderNo={formData.orderNo || formData.style}
+            color={formData.color}
+            before_after_wash={formData.before_after_wash}
+            isVisible={measurementContentVisible} // Use content visibility state
+            onToggle={toggleMeasurementSection}
+            savedSizes={savedSizes}
+            setSavedSizes={setSavedSizes}
+            onSizeSubmit={handleSizeSubmit}
+            measurementData={measurementData}
+            showMeasurementTable={showMeasurementTable}
+            onMeasurementEdit={handleMeasurementEdit}
+            onMeasurementChange={handleMeasurementChange}
+            recordId={recordId}
+          />
         )}
 
         <div className="flex justify-end space-x-4">
