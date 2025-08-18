@@ -13929,7 +13929,7 @@ const storage = multer.diskStorage({
       "../public/storage/profiles/",
       userId.toString()
     );
-    // fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
   filename: (req, file, cb) => {
