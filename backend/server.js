@@ -25854,6 +25854,7 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
   try {
     const { recordId } = req.params;
     const summary = req.body.summary || {};
+
     const qcRecord = await QCWashing.findById(recordId);
     if (!qcRecord) return res.status(404).json({ success: false, message: 'Record not found.' });
 
@@ -25862,7 +25863,7 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
     if (qcRecord.measurementDetails && qcRecord.measurementDetails.measurement) {
       // Sum up the qty from each size measurement
       qcRecord.measurementDetails.measurement.forEach(measurement => {
-        if (typeof measurement.qty === "number") {
+        if (typeof measurement.qty === "number" && measurement.qty > 0) {
           totalCheckedPcs += measurement.qty;
         }
       });
@@ -25877,6 +25878,7 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
     let rejectedDefectPcs = 0;
     let totalDefectCount = 0;
     const defectDetails = qcRecord.defectDetails || {};
+    
     if (Array.isArray(defectDetails.defectsByPc)) {
       rejectedDefectPcs = defectDetails.defectsByPc.length;
       totalDefectCount = defectDetails.defectsByPc.reduce(
@@ -25888,21 +25890,24 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
       );
     }
 
-    // Use summary values if present, fallback to calculated
-    qcRecord.totalCheckedPcs = summary.totalCheckedPcs ?? totalCheckedPcs;
-    qcRecord.rejectedDefectPcs = summary.rejectedDefectPcs ?? rejectedDefectPcs;
-    qcRecord.totalDefectCount = summary.totalDefectCount ?? totalDefectCount;
-    qcRecord.defectRate = summary.defectRate ?? (qcRecord.totalCheckedPcs > 0 ? (qcRecord.totalDefectCount / qcRecord.totalCheckedPcs) * 100 : 0);
-    qcRecord.defectRatio = summary.defectRatio ?? (qcRecord.totalCheckedPcs > 0 ? (qcRecord.rejectedDefectPcs / qcRecord.totalCheckedPcs) * 100 : 0);
+    // Always use calculated values to ensure consistency
+    qcRecord.totalCheckedPcs = totalCheckedPcs;
+    qcRecord.rejectedDefectPcs = rejectedDefectPcs;
+    qcRecord.totalDefectCount = totalDefectCount;
+    qcRecord.defectRate = totalCheckedPcs > 0 ? Number(((totalDefectCount / totalCheckedPcs) * 100).toFixed(1)) : 0;
+    qcRecord.defectRatio = totalCheckedPcs > 0 ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1)) : 0;
     qcRecord.overallFinalResult = summary.overallFinalResult ?? "N/A";
+
+    console.log('Backend save-summary - totalCheckedPcs:', totalCheckedPcs);
 
     await qcRecord.save();
     res.json({ success: true });
-
   } catch (error) {
+    console.error('Save summary error:', error);
     res.status(500).json({ success: false, message: 'Failed to save summary.' });
   }
 });
+
 
 
 const getAqlLevelForBuyer = (buyer) => {

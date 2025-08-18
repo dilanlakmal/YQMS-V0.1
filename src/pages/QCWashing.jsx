@@ -105,7 +105,7 @@ function normalizeImagePreview(img) {
 function calculateSummaryData(currentFormData) {
   const currentDefectDetails = currentFormData.defectDetails;
   const currentMeasurementDetails = currentFormData.measurementDetails;
-
+  
   let measurementArray = [];
   if (currentMeasurementDetails && typeof currentMeasurementDetails === "object") {
     measurementArray = currentMeasurementDetails.measurement || [];
@@ -117,7 +117,7 @@ function calculateSummaryData(currentFormData) {
   let totalCheckedPcs = 0;
   measurementArray.forEach(data => {
     // Use qty field which represents the number of pieces checked for each size
-    if (typeof data.qty === "number") {
+    if (typeof data.qty === "number" && data.qty > 0) {
       totalCheckedPcs += data.qty;
     }
   });
@@ -130,6 +130,7 @@ function calculateSummaryData(currentFormData) {
   // 2. Calculate measurement points and passes (for measurement statistics only)
   let measurementPoints = 0;
   let measurementPass = 0;
+  
   measurementArray.forEach(data => {
     if (Array.isArray(data.pcs)) {
       data.pcs.forEach(pc => {
@@ -193,6 +194,8 @@ function calculateSummaryData(currentFormData) {
     overallResult = "N/A";
   }
   
+  console.log('calculateSummaryData - totalCheckedPcs:', totalCheckedPcs, 'measurementPoints:', measurementPoints);
+  
   return {
     totalCheckedPcs: totalCheckedPcs || 0, // This should be the sum of qty from each size
     rejectedDefectPcs: rejectedDefectPcs || 0,
@@ -206,6 +209,7 @@ function calculateSummaryData(currentFormData) {
     measurementPass: measurementPass || 0,
   };
 }
+
 
 function machineProcessesToObject(machineProcesses) {
   const obj = {};
@@ -1394,6 +1398,7 @@ useEffect(() => {
   // Handle measurement size save with nested structure
   const handleSizeSubmit = async (transformedSizeData) => {
     try {
+      console.log('handleSizeSubmit - saving size:', transformedSizeData.size, 'qty:', transformedSizeData.qty);
       const before_after_wash =
         formData.before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
 
@@ -1688,49 +1693,58 @@ const autoSaveOverallSummary = async (summary, recordId) => {
   };
 
     useEffect(() => {
-      const defectDetails = {
-        ...formData.defectDetails,
-        checkedQty: formData.checkedQty,
-        washQty: formData.washQty,
-        result: formData.result,
-        defectsByPc: Object.entries(defectsByPc).map(([pcNumber, pcDefects]) => ({
-          pcNumber,
-          pcDefects,
-        })),
-      };
+  // Debounce the calculation to prevent multiple rapid calls
+  const timeoutId = setTimeout(() => {
+    const defectDetails = {
+      ...formData.defectDetails,
+      checkedQty: formData.checkedQty,
+      washQty: formData.washQty,
+      result: formData.result,
+      defectsByPc: Object.entries(defectsByPc).map(([pcNumber, pcDefects]) => ({
+        pcNumber,
+        pcDefects,
+      })),
+    };
 
-      const measurementDetails = {
-        measurement: [
-          ...measurementData.beforeWash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
-          ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
-        ],
-      };
+    const measurementDetails = {
+      measurement: [
+        ...measurementData.beforeWash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
+        ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
+      ],
+    };
 
-      // Calculate summary from the latest data
-      const summary = calculateSummaryData({
-        ...formData,
-        defectDetails,
-        measurementDetails, 
-      });
+    // Calculate summary from the latest data
+    const summary = calculateSummaryData({
+      ...formData,
+      defectDetails,
+      measurementDetails, 
+    });
 
-      setFormData((prev) => ({
-        ...prev,
-        defectDetails,
-        measurementDetails,
-        ...summary,
-      }));
+    console.log('useEffect summary calculation:', summary);
 
-      if (recordId) {
-        autoSaveSummary(summary, recordId);
-      }
-    }, [
-      defectsByPc,
-      measurementData,
-      formData.checkedQty,
-      formData.washQty,
-      formData.result,
-      recordId,
-    ]);
+    setFormData((prev) => ({
+      ...prev,
+      defectDetails,
+      measurementDetails,
+      ...summary,
+    }));
+
+    if (recordId) {
+      autoSaveSummary(summary, recordId);
+    }
+  }, 100); // 100ms debounce
+
+  return () => clearTimeout(timeoutId);
+}, [
+  defectsByPc,
+  measurementData.beforeWash,
+  measurementData.afterWash,
+  formData.checkedQty,
+  formData.washQty,
+  formData.result,
+  recordId,
+]);
+
 
   // Load color-specific data
   const loadColorSpecificData = async (orderNo, color) => {
