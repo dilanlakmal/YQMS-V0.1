@@ -194,7 +194,6 @@ function calculateSummaryData(currentFormData) {
     overallResult = "N/A";
   }
   
-  console.log('calculateSummaryData - totalCheckedPcs:', totalCheckedPcs, 'measurementPoints:', measurementPoints);
   
   return {
     totalCheckedPcs: totalCheckedPcs || 0, // This should be the sum of qty from each size
@@ -732,7 +731,6 @@ useEffect(() => {
   } catch (error) {
     setSubFactories([]);
     setFormData(prev => ({ ...prev, factoryName: "" }));
-    console.error("Error fetching Washing factories:", error);
   }
 };
 
@@ -1398,7 +1396,6 @@ useEffect(() => {
   // Handle measurement size save with nested structure
   const handleSizeSubmit = async (transformedSizeData) => {
     try {
-      console.log('handleSizeSubmit - saving size:', transformedSizeData.size, 'qty:', transformedSizeData.qty);
       const before_after_wash =
         formData.before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
 
@@ -1720,7 +1717,6 @@ const autoSaveOverallSummary = async (summary, recordId) => {
       measurementDetails, 
     });
 
-    console.log('useEffect summary calculation:', summary);
 
     setFormData((prev) => ({
       ...prev,

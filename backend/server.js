@@ -13644,7 +13644,7 @@ const storage = multer.diskStorage({
       "../public/storage/profiles/",
       userId.toString()
     );
-    fs.mkdirSync(dir, { recursive: true });
+    // fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
   filename: (req, file, cb) => {
@@ -25239,9 +25239,9 @@ app.get(
    End Points - Measurement Data In qcWashing
 ------------------------------ */
 const qcWashingDir = path.join(process.cwd(),"backend","public", "storage", "qc_washing_images");
-if (!fs.existsSync(qcWashingDir)) {
-  fs.mkdirSync(qcWashingDir, { recursive: true });
-}
+// if (!fs.existsSync(qcWashingDir)) {
+//   fs.mkdirSync(qcWashingDir, { recursive: true });
+// }
 
 function saveBase64Image(base64String, prefix = "image") {
   const matches = base64String.match(/^data:(image\/\w+);base64,(.+)$/);
@@ -25898,7 +25898,6 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
     qcRecord.defectRatio = totalCheckedPcs > 0 ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1)) : 0;
     qcRecord.overallFinalResult = summary.overallFinalResult ?? "N/A";
 
-    console.log('Backend save-summary - totalCheckedPcs:', totalCheckedPcs);
 
     await qcRecord.save();
     res.json({ success: true });
@@ -26894,9 +26893,9 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
 
     // Handle file uploads (existing code)
     const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/inspection');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
+    // if (!fs.existsSync(uploadDir)) {
+    //   fs.mkdirSync(uploadDir, { recursive: true });
+    // }
 
     const fileMap = {};
     for (const file of (req.files || [])) {
@@ -27000,9 +26999,9 @@ app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async
 
     // Handle file uploads (existing code)
     const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/inspection');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
+    // if (!fs.existsSync(uploadDir)) {
+    //   fs.mkdirSync(uploadDir, { recursive: true });
+    // }
 
     const fileMap = {};
     for (const file of (req.files || [])) {
@@ -27114,9 +27113,9 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
 
     // Ensure upload directory exists
     const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/defect');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
+    // if (!fs.existsSync(uploadDir)) {
+    //   fs.mkdirSync(uploadDir, { recursive: true });
+    // }
 
     // Map uploaded files by fieldname and write them to disk
     const fileMap = {};
@@ -27179,9 +27178,9 @@ app.post('/api/qc-washing/defect-details-update', uploadDefectImage.any(), async
 
     // Ensure upload directory exists
     const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/defect');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
+    // if (!fs.existsSync(uploadDir)) {
+    //   fs.mkdirSync(uploadDir, { recursive: true });
+    // }
 
     // Map uploaded files by fieldname and write them to disk
     const fileMap = {};
