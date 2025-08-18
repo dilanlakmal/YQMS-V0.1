@@ -1,7 +1,5 @@
 import mongoose from "mongoose";
 
-// --- Subschemas ---
-
 const MeasurementSizeSummarySchema = new mongoose.Schema(
   {
     size: String,
@@ -191,8 +189,8 @@ const QCWashingSchema = new mongoose.Schema(
     submittedAt: Date,
     status: {
       type: String,
-      enum: ["draft", "auto-saved", "submitted", "approved", "rejected"],
-      default: "draft"
+      enum: ["processing", "auto-saved", "submitted", "approved", "rejected"],
+      default: "processing"
     }
   },
   { timestamps: true }

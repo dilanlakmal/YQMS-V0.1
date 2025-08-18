@@ -402,7 +402,7 @@ const MeasurementDetailsSection = ({
   const addSize = (size) => {
     const sizeStr = String(size);
     if (!selectedSizes.find((s) => s.size === sizeStr)) {
-      const newSize = { size: sizeStr, qty: 5 };
+      const newSize = { size: sizeStr, qty: 3 };
       setSelectedSizes((prev) => [...prev, newSize]);
 
       // Get the wash type and corresponding saved pattern
@@ -475,8 +475,8 @@ const MeasurementDetailsSection = ({
           // Initialize values for selected rows
           lastPattern.forEach((isSelected, rowIndex) => {
             if (isSelected) {
-              for (let colIndex = 0; colIndex < 5; colIndex++) {
-                // Default qty is 5
+              for (let colIndex = 0; colIndex < 3; colIndex++) {
+                // Default qty is 3
                 const cellKey = `${sizeStr}-${tableType}-${rowIndex}-${colIndex}`;
                 if (!newValues[cellKey]) {
                   newValues[cellKey] = { decimal: 0, fraction: "0" };

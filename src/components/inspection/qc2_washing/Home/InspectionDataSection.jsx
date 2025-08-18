@@ -64,7 +64,8 @@ const InspectionDataSection = ({
   actualValues,
   setActualValues,
   machineStatus,
-  setMachineStatus
+  setMachineStatus,
+  normalizeImageSrc
 }) => {
   const uploadRefs = useRef([]);
   const captureRefs = useRef([]);
@@ -133,9 +134,42 @@ const InspectionDataSection = ({
               "Tumble Dry": tumbleDryValues
             });
 
-            setActualValues({
-              "Washing Machine": washingMachineValues,
-              "Tumble Dry": tumbleDryValues
+            // ONLY set actual values if they are currently empty/default
+            // Don't overwrite existing actual values with standard values
+            setActualValues((prev) => {
+              const newActualValues = { ...prev };
+
+              // Only update if the current actual value is empty or matches the old standard
+              Object.keys(washingMachineValues).forEach((key) => {
+                if (
+                  !prev["Washing Machine"] ||
+                  prev["Washing Machine"][key] === "" ||
+                  prev["Washing Machine"][key] === null ||
+                  prev["Washing Machine"][key] === undefined
+                ) {
+                  if (!newActualValues["Washing Machine"]) {
+                    newActualValues["Washing Machine"] = {};
+                  }
+                  newActualValues["Washing Machine"][key] =
+                    washingMachineValues[key];
+                }
+              });
+
+              Object.keys(tumbleDryValues).forEach((key) => {
+                if (
+                  !prev["Tumble Dry"] ||
+                  prev["Tumble Dry"][key] === "" ||
+                  prev["Tumble Dry"][key] === null ||
+                  prev["Tumble Dry"][key] === undefined
+                ) {
+                  if (!newActualValues["Tumble Dry"]) {
+                    newActualValues["Tumble Dry"] = {};
+                  }
+                  newActualValues["Tumble Dry"][key] = tumbleDryValues[key];
+                }
+              });
+
+              return newActualValues;
             });
           }
         }
@@ -143,7 +177,18 @@ const InspectionDataSection = ({
         console.error("Error fetching standard values:", error);
       }
     };
-    fetchStandardValues();
+
+    // Only fetch standards if we don't have actual values loaded yet
+    // This prevents overwriting loaded data
+    const hasLoadedActualValues =
+      actualValues["Washing Machine"] &&
+      Object.values(actualValues["Washing Machine"]).some(
+        (val) => val !== "" && val !== null && val !== undefined
+      );
+
+    if (!hasLoadedActualValues) {
+      fetchStandardValues();
+    }
   }, [washType, setStandardValues, setActualValues]);
 
   useEffect(() => {
@@ -452,6 +497,40 @@ const InspectionDataSection = ({
 
       const result = await response.json();
       if (result.success) {
+        // Update inspection data with saved image URLs
+        if (
+          result.data &&
+          result.data.inspectionDetails &&
+          result.data.inspectionDetails.checkedPoints
+        ) {
+          setInspectionData((prev) =>
+            prev.map((item) => {
+              const savedPoint =
+                result.data.inspectionDetails.checkedPoints.find(
+                  (p) => p.pointName === item.checkedList
+                );
+              if (
+                savedPoint &&
+                savedPoint.comparison &&
+                savedPoint.comparison.length > 0
+              ) {
+                const updatedImages = savedPoint.comparison.map((imgPath) => ({
+                  file: null,
+                  preview: normalizeImageSrc
+                    ? normalizeImageSrc(imgPath)
+                    : imgPath,
+                  name:
+                    typeof imgPath === "string"
+                      ? imgPath.split("/").pop()
+                      : "image.jpg"
+                }));
+                return { ...item, comparisonImages: updatedImages };
+              }
+              return item;
+            })
+          );
+        }
+
         Swal.fire({
           icon: "success",
           title: "Inspection data saved!",
@@ -461,7 +540,6 @@ const InspectionDataSection = ({
           position: "top-end",
           toast: true
         });
-        if (onLoadSavedDataById) onLoadSavedDataById(recordId);
         setIsSaved(true);
         setIsEditing(false);
         if (activateNextSection) activateNextSection();
@@ -575,6 +653,40 @@ const InspectionDataSection = ({
 
       const result = await response.json();
       if (result.success) {
+        // Update inspection data with saved image URLs
+        if (
+          result.data &&
+          result.data.inspectionDetails &&
+          result.data.inspectionDetails.checkedPoints
+        ) {
+          setInspectionData((prev) =>
+            prev.map((item) => {
+              const savedPoint =
+                result.data.inspectionDetails.checkedPoints.find(
+                  (p) => p.pointName === item.checkedList
+                );
+              if (
+                savedPoint &&
+                savedPoint.comparison &&
+                savedPoint.comparison.length > 0
+              ) {
+                const updatedImages = savedPoint.comparison.map((imgPath) => ({
+                  file: null,
+                  preview: normalizeImageSrc
+                    ? normalizeImageSrc(imgPath)
+                    : imgPath,
+                  name:
+                    typeof imgPath === "string"
+                      ? imgPath.split("/").pop()
+                      : "image.jpg"
+                }));
+                return { ...item, comparisonImages: updatedImages };
+              }
+              return item;
+            })
+          );
+        }
+
         Swal.fire({
           icon: "success",
           title: "Inspection data updated!",
@@ -584,7 +696,6 @@ const InspectionDataSection = ({
           position: "top-end",
           toast: true
         });
-        if (onLoadSavedDataById) onLoadSavedDataById(recordId);
         setIsSaved(true);
         setIsEditing(false);
       } else {
@@ -967,14 +1078,15 @@ const InspectionDataSection = ({
                           <input
                             type="file"
                             accept="image/*"
-                            className=" disabled:bg-gray-400"
+                            multiple
                             style={{ display: "none" }}
                             ref={(el) => (uploadRefs.current[idx] = el)}
                             onChange={(e) => {
-                              handleImageChange(idx, e.target.files);
-                              e.target.value = null; // allow re-upload of same file
+                              if (e.target.files && e.target.files.length > 0) {
+                                handleImageChange(idx, e.target.files);
+                              }
+                              e.target.value = ""; // allow re-upload of same file
                             }}
-                            disabled={!isEditing}
                           />
 
                           {/* Capture Button */}
@@ -994,15 +1106,15 @@ const InspectionDataSection = ({
                           <input
                             type="file"
                             accept="image/*"
-                            className=" disabled:bg-gray-400"
                             capture="environment"
                             style={{ display: "none" }}
                             ref={(el) => (captureRefs.current[idx] = el)}
                             onChange={(e) => {
-                              handleImageChange(idx, e.target.files);
-                              e.target.value = null;
+                              if (e.target.files && e.target.files.length > 0) {
+                                handleImageChange(idx, e.target.files);
+                              }
+                              e.target.value = "";
                             }}
-                            disabled={!isEditing}
                           />
                           {/* Thumbnails */}
                           <div className="flex mt-1">
@@ -1487,7 +1599,8 @@ InspectionDataSection.propTypes = {
   actualValues: PropTypes.object.isRequired,
   setActualValues: PropTypes.func.isRequired,
   machineStatus: PropTypes.object.isRequired,
-  setMachineStatus: PropTypes.func.isRequired
+  setMachineStatus: PropTypes.func.isRequired,
+  normalizeImageSrc: PropTypes.func
 };
 
 export default InspectionDataSection;
