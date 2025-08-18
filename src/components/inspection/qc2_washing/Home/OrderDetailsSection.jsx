@@ -26,9 +26,13 @@ const OrderDetailsSection = ({
   activateNextSection,
   setRecordId,
   setSavedSizes,
-  onLoadSavedDataById
+  onLoadSavedDataById,
+  isSaved: externalIsSaved,
+  setIsSaved: setExternalIsSaved
 }) => {
-  const [isSaved, setIsSaved] = useState(false);
+  // const [isSaved, setIsSaved] = useState(false);
+  const isSaved = externalIsSaved || false;
+  const setIsSaved = setExternalIsSaved || (() => {});
 
   const checkMeasurementDetails = async (orderNo) => {
     try {
@@ -183,6 +187,20 @@ const OrderDetailsSection = ({
             title: "Existing record loaded for editing.",
             showConfirmButton: false,
             timer: 1500,
+            position: "top-end",
+            toast: true
+          });
+          return;
+        } else if (result.isDismissed) {
+          // User clicked "No, cancel" or closed the popup
+          clearForm();
+
+          // Optional: Show a brief message that the form was cleared
+          Swal.fire({
+            icon: "info",
+            title: "Form cleared",
+            showConfirmButton: false,
+            timer: 1000,
             position: "top-end",
             toast: true
           });
