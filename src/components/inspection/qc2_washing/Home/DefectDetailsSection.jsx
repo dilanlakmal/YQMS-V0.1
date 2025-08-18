@@ -354,7 +354,28 @@ const DefectDetailsSection = ({
         }, {})
       );
 
-      setUploadedImages(additionalImages || []);
+      // Update additional images with proper preview URLs
+      setUploadedImages((additionalImages || []).map(imgStr => {
+        if (typeof imgStr === "string") {
+          return {
+            file: null,
+            preview: normalizeImageSrc(imgStr),
+            name: imgStr.split('/').pop() || "image.jpg"
+          };
+        } else if (typeof imgStr === "object" && imgStr !== null) {
+          return {
+            file: null,
+            preview: normalizeImageSrc(imgStr.preview || imgStr),
+            name: imgStr.name || "image.jpg"
+          };
+        }
+        return {
+          file: null,
+          preview: "",
+          name: "image.jpg"
+        };
+      }));
+      
       setIsSaved(true);
       setIsEditing(false);
       if (onLoadSavedDataById) onLoadSavedDataById(recordId);
@@ -457,7 +478,57 @@ const DefectDetailsSection = ({
         position: 'top-end', 
         showConfirmButton: false 
       });
-      stripFileFromDefectImages(defectsByPc, uploadedImages);
+      
+      // Update the state with the saved data if available
+      if (result.data) {
+        const { defectsByPc: backendDefectsByPc, additionalImages } = result.data;
+        if (backendDefectsByPc) {
+          setDefectsByPc(
+            (backendDefectsByPc || []).reduce((acc, pc) => {
+              acc[pc.pcNumber] = (pc.pcDefects || []).map((defect, index) => {
+                const defectObj = defectOptions.find(opt => opt.english === defect.defectName);
+                return {
+                  id: index + 1,
+                  selectedDefect: defect.defectId || "",
+                  defectName: defectObj ? getDefectNameForDisplay(defectObj) : defect.defectName,
+                  defectQty: defect.defectQty || "",
+                  isBodyVisible: true,
+                  defectImages: (defect.defectImages || []).map(imgStr => ({
+                    file: null,
+                    preview: normalizeImageSrc(imgStr),
+                    name: "image.jpg"
+                  }))
+                };
+              });
+              return acc;
+            }, {})
+          );
+        }
+        
+        if (additionalImages) {
+          setUploadedImages((additionalImages || []).map(imgStr => {
+            if (typeof imgStr === "string") {
+              return {
+                file: null,
+                preview: normalizeImageSrc(imgStr),
+                name: imgStr.split('/').pop() || "image.jpg"
+              };
+            } else if (typeof imgStr === "object" && imgStr !== null) {
+              return {
+                file: null,
+                preview: normalizeImageSrc(imgStr.preview || imgStr),
+                name: imgStr.name || "image.jpg"
+              };
+            }
+            return {
+              file: null,
+              preview: "",
+              name: "image.jpg"
+            };
+          }));
+        }
+      }
+      
       setIsSaved(true);
       setIsEditing(false);
     } else {
@@ -766,9 +837,9 @@ const DefectDetailsSection = ({
                         <img
                           src={
                                 typeof image === "object" && image !== null
-                                  ? image.preview || ""
+                                  ? (image.preview || "")
                                   : typeof image === "string"
-                                    ? image
+                                    ? (normalizeImageSrc ? normalizeImageSrc(image) : image)
                                     : ""
                               }
                               alt={
@@ -778,13 +849,19 @@ const DefectDetailsSection = ({
                               }
                           className="w-full h-24 object-cover rounded-md shadow-md dark:shadow-none cursor-pointer"
                           onClick={() => {
+                            const imageUrl = typeof image === "object" && image !== null
+                              ? (image.preview || "")
+                              : typeof image === "string"
+                                ? (normalizeImageSrc ? normalizeImageSrc(image) : image)
+                                : "";
                             Swal.fire({
-                              imageUrl: image.preview || image,
-                              imageAlt: image.name || "",
+                              imageUrl: imageUrl,
+                              imageAlt: (typeof image === "object" && image !== null ? image.name : "") || "",
                               imageWidth: 600,
                               imageHeight: 400,
                             });
                           }}
+                          onError={e => { e.target.src = "/no-image.png"; }}
                         />
                         <button
                           onClick={() => handleRemoveImage(index)}

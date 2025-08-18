@@ -55,6 +55,7 @@ const InspectionDataSection = ({
   setActualValues,
   machineStatus,
   setMachineStatus,
+  normalizeImageSrc,
 }) => {
 
   const uploadRefs = useRef([]);
@@ -434,6 +435,24 @@ const handleActualValueChange = (machineType, param, value) => {
 
     const result = await response.json();
     if (result.success) {
+      // Update inspection data with saved image URLs
+      if (result.data && result.data.inspectionDetails && result.data.inspectionDetails.checkedPoints) {
+        setInspectionData(prev => 
+          prev.map((item) => {
+            const savedPoint = result.data.inspectionDetails.checkedPoints.find(p => p.pointName === item.checkedList);
+            if (savedPoint && savedPoint.comparison && savedPoint.comparison.length > 0) {
+              const updatedImages = savedPoint.comparison.map(imgPath => ({
+                file: null,
+                preview: normalizeImageSrc ? normalizeImageSrc(imgPath) : imgPath,
+                name: typeof imgPath === "string" ? imgPath.split('/').pop() : "image.jpg"
+              }));
+              return { ...item, comparisonImages: updatedImages };
+            }
+            return item;
+          })
+        );
+      }
+      
       Swal.fire({
         icon: 'success',
         title: 'Inspection data saved!',
@@ -443,7 +462,6 @@ const handleActualValueChange = (machineType, param, value) => {
         position: 'top-end', 
         toast: true
       });
-      if (onLoadSavedDataById) onLoadSavedDataById(recordId);
       setIsSaved(true);
       setIsEditing(false);
       if (activateNextSection) activateNextSection();
@@ -546,6 +564,24 @@ const handleUpdateInspection = async () => {
 
     const result = await response.json();
     if (result.success) {
+      // Update inspection data with saved image URLs
+      if (result.data && result.data.inspectionDetails && result.data.inspectionDetails.checkedPoints) {
+        setInspectionData(prev => 
+          prev.map((item) => {
+            const savedPoint = result.data.inspectionDetails.checkedPoints.find(p => p.pointName === item.checkedList);
+            if (savedPoint && savedPoint.comparison && savedPoint.comparison.length > 0) {
+              const updatedImages = savedPoint.comparison.map(imgPath => ({
+                file: null,
+                preview: normalizeImageSrc ? normalizeImageSrc(imgPath) : imgPath,
+                name: typeof imgPath === "string" ? imgPath.split('/').pop() : "image.jpg"
+              }));
+              return { ...item, comparisonImages: updatedImages };
+            }
+            return item;
+          })
+        );
+      }
+      
       Swal.fire({
         icon: 'success',
         title: 'Inspection data updated!',
@@ -555,7 +591,6 @@ const handleUpdateInspection = async () => {
         position: 'top-end',
         toast: true
       });
-      if (onLoadSavedDataById) onLoadSavedDataById(recordId);
       setIsSaved(true);
       setIsEditing(false);
     } else {
@@ -885,14 +920,15 @@ useEffect(() => {
                     <input
                       type="file"
                       accept="image/*"
-                      className=" disabled:bg-gray-400"
+                      multiple
                       style={{ display: 'none' }}
                       ref={el => uploadRefs.current[idx] = el}
                       onChange={e => {
-                        handleImageChange(idx, e.target.files);
-                        e.target.value = null; // allow re-upload of same file
+                        if (e.target.files && e.target.files.length > 0) {
+                          handleImageChange(idx, e.target.files);
+                        }
+                        e.target.value = ''; // allow re-upload of same file
                       }}
-                      disabled={!isEditing}
                     />
 
                     {/* Capture Button */}
@@ -909,15 +945,15 @@ useEffect(() => {
                     <input
                       type="file"
                       accept="image/*"
-                      className=" disabled:bg-gray-400"
                       capture="environment"
                       style={{ display: 'none' }}
                       ref={el => captureRefs.current[idx] = el}
                       onChange={e => {
-                        handleImageChange(idx, e.target.files);
-                        e.target.value = null;
+                        if (e.target.files && e.target.files.length > 0) {
+                          handleImageChange(idx, e.target.files);
+                        }
+                        e.target.value = '';
                       }}
-                      disabled={!isEditing}
                     />
                     {/* Thumbnails */}
                     <div className="flex mt-1">
@@ -1279,6 +1315,7 @@ InspectionDataSection.propTypes = {
   setActualValues: PropTypes.func.isRequired,
   machineStatus: PropTypes.object.isRequired,
   setMachineStatus: PropTypes.func.isRequired,
+  normalizeImageSrc: PropTypes.func,
 };
 
 export default InspectionDataSection;

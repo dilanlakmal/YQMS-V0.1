@@ -25238,7 +25238,7 @@ app.get(
 /* ------------------------------
    End Points - Measurement Data In qcWashing
 ------------------------------ */
-const qcWashingDir = path.join(process.cwd(),"public", "storage", "qc_washing_images");
+const qcWashingDir = path.join(process.cwd(),"backend","public", "storage", "qc_washing_images");
 if (!fs.existsSync(qcWashingDir)) {
   fs.mkdirSync(qcWashingDir, { recursive: true });
 }
@@ -25257,14 +25257,14 @@ function saveBase64Image(base64String, prefix = "image") {
   if (!fs.existsSync(filePath)) {
     fs.writeFileSync(filePath, buffer);
   }
-  return `/storage/qc_washing_images/${filename}`;
+  return `./public/storage/qc_washing_images/${filename}`;
 }
 
 function saveUploadedFile(file) {
   const filename = `${Date.now()}-${file.originalname.replace(/\s+/g, "_")}`;
   const filePath = path.join(qcWashingDir, filename);
   fs.writeFileSync(filePath, file.buffer);
-  return `/storage/qc_washing_images/${filename}`;
+  return `./public/storage/qc_washing_images/${filename}`;
 }
 const qcWashingMemoryStorage = multer.memoryStorage();
 
@@ -26459,6 +26459,7 @@ app.put("/api/qc-washing-defects/:id/image",uploadQC2_washing_image.single("defe
       }
       const uploadPath = path.join(
         __dirname,
+        "backend",
         "public",
         "storage",
         "qc_washing_images"
@@ -26469,7 +26470,7 @@ app.put("/api/qc-washing-defects/:id/image",uploadQC2_washing_image.single("defe
       )}${fileExtension}`;
       const fullFilePath = path.join(uploadPath, newFilename);
       await fs.promises.writeFile(fullFilePath, req.file.buffer);
-      const newRelativeUrl = `/storage/qc_washing_images/${newFilename}`;
+      const newRelativeUrl = `./public/storage/qc_washing_images/${newFilename}`;
       defect.image = newRelativeUrl;
       const updatedDefect = await defect.save();
       res.status(200).json({
@@ -26838,11 +26839,11 @@ function normalizeInspectionImagePath(img) {
   if (!img) return "";
   // If new upload, img.file will be handled by fileMap logic in your code
   if (img.preview && typeof img.preview === "string") {
-    if (img.preview.startsWith("/public/")) {
+    if (img.preview.startsWith("./public/")) {
       return img.preview;
     }
     if (img.preview.startsWith("/storage/")) {
-      return "/public" + img.preview;
+      return "./public" + img.preview;
     }
     if (img.preview.startsWith("http")) {
       try {
@@ -26854,18 +26855,18 @@ function normalizeInspectionImagePath(img) {
     }
     // If it's just a filename (no slashes)
     if (!img.preview.includes("/")) {
-      return `/public/storage/qc_washing_images/inspection/${img.preview}`;
+      return `./public/storage/qc_washing_images/inspection/${img.preview}`;
     }
     // If it contains a slash but not at the start, treat as relative path
     if (img.preview[0] !== "/") {
-      return `/public/storage/qc_washing_images/inspection/${img.preview}`;
+      return `./public/storage/qc_washing_images/inspection/${img.preview}`;
     }
     // Fallback
     return img.preview;
   }
   // Fallback: if img.name exists, reconstruct path
   if (img.name && !img.name.includes("/")) {
-    return `/public/storage/qc_washing_images/inspection/${img.name}`;
+    return `./public/storage/qc_washing_images/inspection/${img.name}`;
   }
   return "";
 }
@@ -26887,7 +26888,7 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
     }
 
     // Handle file uploads (existing code)
-    const uploadDir = path.join(__dirname, '../public/storage/qc_washing_images/inspection');
+    const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/inspection');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -26898,7 +26899,7 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
       const newFilename = `inspection-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
       const fullFilePath = path.join(uploadDir, newFilename);
       await fs.promises.writeFile(fullFilePath, file.buffer);
-      fileMap[file.fieldname] = `/public/storage/qc_washing_images/inspection/${newFilename}`;
+      fileMap[file.fieldname] = `./public/storage/qc_washing_images/inspection/${newFilename}`;
     }
 
     // Find or create the record
@@ -26993,7 +26994,7 @@ app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async
     }
 
     // Handle file uploads (existing code)
-    const uploadDir = path.join(__dirname, '../public/storage/qc_washing_images/inspection');
+    const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/inspection');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -27107,7 +27108,7 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
     if (!recordId) return res.status(400).json({ success: false, message: "Missing recordId" });
 
     // Ensure upload directory exists
-    const uploadDir = path.join(__dirname, '../public/storage/qc_washing_images/defect');
+    const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/defect');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -27122,7 +27123,7 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
       const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
       const fullFilePath = path.join(uploadDir, newFilename);
       await fs.promises.writeFile(fullFilePath, file.buffer);
-      fileMap[file.fieldname] = `/public/storage/qc_washing_images/defect/${newFilename}`;
+      fileMap[file.fieldname] = `./public/storage/qc_washing_images/defect/${newFilename}`;
     }
 
     // Attach image URLs to defectDetails.defectsByPc and additionalImages
@@ -27172,7 +27173,7 @@ app.post('/api/qc-washing/defect-details-update', uploadDefectImage.any(), async
     if (!recordId) return res.status(400).json({ success: false, message: "Missing recordId" });
 
     // Ensure upload directory exists
-    const uploadDir = path.join(__dirname, '../public/storage/qc_washing_images/defect');
+    const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/defect');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -27188,7 +27189,7 @@ app.post('/api/qc-washing/defect-details-update', uploadDefectImage.any(), async
       const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
       const fullFilePath = path.join(uploadDir, newFilename);
       await fs.promises.writeFile(fullFilePath, file.buffer);
-      fileMap[file.fieldname] = `/public/storage/qc_washing_images/defect/${newFilename}`;
+      fileMap[file.fieldname] = `./public/storage/qc_washing_images/defect/${newFilename}`;
     }
 
     // Attach image URLs to defectDetails.defectsByPc and additionalImages

@@ -184,7 +184,21 @@ const OrderDetailsSection = ({
           toast: true
         });
         return;
-      }
+     } else if (result.isDismissed) {
+    // User clicked "No, cancel" or closed the popup
+    clearForm();
+    
+    // Optional: Show a brief message that the form was cleared
+    Swal.fire({
+      icon: 'info',
+      title: 'Form cleared',
+      showConfirmButton: false,
+      timer: 1000,
+      position: 'top-end',
+      toast: true
+    });
+    return;
+  }
     }
 
     // Save as new record

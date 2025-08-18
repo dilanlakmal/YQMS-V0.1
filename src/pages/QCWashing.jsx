@@ -13,12 +13,41 @@ import { useTranslation } from "react-i18next";
 
 const normalizeImageSrc = (src) => {
   if (!src) return "";
+  
+  // If it's already a data URL, return as is
   if (typeof src === "string" && src.startsWith("data:")) return src;
-  if (typeof src === "string" && src.startsWith("/public/")) return src.replace(/^\/public/, "");
-  if (typeof src === "string" && src.startsWith("/storage/")) return src;
-  if (/^[A-Za-z0-9+/=]+$/.test(src) && src.length > 100) return `data:image/jpeg;base64,${src}`;
+  
+  // If it's a blob URL, return as is
+  if (typeof src === "string" && src.startsWith("blob:")) return src;
+  
+  // Handle paths starting with ./public (backend format) - convert to /public
+  if (typeof src === "string" && src.startsWith("./public/")) {
+    return `${API_BASE_URL}${src.replace("./public", "")}`;
+  }
+  
+  // Handle paths starting with /public - this is what we have in the database
+  if (typeof src === "string" && src.startsWith("/public/")) {
+    return `${API_BASE_URL}${src}`;
+  }
+  
+  // Handle paths starting with /storage, add /public prefix
+  if (typeof src === "string" && src.startsWith("/storage/")) {
+    return `${API_BASE_URL}/public${src}`;
+  }
+  
+  // If it's already a full URL, return as is
+  if (typeof src === "string" && (src.startsWith("http://") || src.startsWith("https://"))) {
+    return src;
+  }
+  
+  // If it's a base64 string without data: prefix
+  if (typeof src === "string" && /^[A-Za-z0-9+/=]+$/.test(src) && src.length > 100) {
+    return `data:image/jpeg;base64,${src}`;
+  }
+  
   return src;
 };
+
 
 function transformDefectsByPc(savedDefectsByPc) {
   if (Array.isArray(savedDefectsByPc)) {
@@ -36,6 +65,7 @@ function transformDefectsByPc(savedDefectsByPc) {
             preview: normalizeImageSrc(imgStr),
             name: "image.jpg"
           }))
+          
         }));
       }
       return acc;
@@ -1042,12 +1072,24 @@ useEffect(() => {
         .filter(Boolean)
         .map(img => {
           if (typeof img === "object" && img !== null) {
-            return { preview: img.preview || "", name: img.name || "image.jpg" };
+            return { 
+              file: null,
+              preview: normalizeImageSrc(img.preview || img), 
+              name: img.name || "image.jpg" 
+            };
           }
           if (typeof img === "string") {
-            return { preview: img, name: "image.jpg" };
+            return { 
+              file: null,
+              preview: normalizeImageSrc(img), 
+              name: img.split('/').pop() || "image.jpg" 
+            };
           }
-          return { preview: "", name: "image.jpg" };
+          return { 
+            file: null,
+            preview: "", 
+            name: "image.jpg" 
+          };
         })
     );
     setComment(saved.defectDetails?.comment || "");
@@ -1826,11 +1868,26 @@ const autoSaveOverallSummary = async (summary, recordId) => {
         }
          if (colorData.defectDetails?.additionalImages) {
             setUploadedImages(
-              (colorData.defectDetails.additionalImages || []).map(img => ({
-                file: null,
-                preview: normalizeImagePreview(img),
-                name: "image.jpg"
-              }))
+              (colorData.defectDetails.additionalImages || []).map(img => {
+                if (typeof img === "string") {
+                  return {
+                    file: null,
+                    preview: normalizeImageSrc(img),
+                    name: img.split('/').pop() || "image.jpg"
+                  };
+                } else if (typeof img === "object" && img !== null) {
+                  return {
+                    file: null,
+                    preview: normalizeImageSrc(img.preview || img),
+                    name: img.name || "image.jpg"
+                  };
+                }
+                return {
+                  file: null,
+                  preview: "",
+                  name: "image.jpg"
+                };
+              })
             );
           }
 
@@ -2020,6 +2077,7 @@ const autoSaveOverallSummary = async (summary, recordId) => {
             setActualValues={setActualValues}
             machineStatus={machineStatus}
             setMachineStatus={setMachineStatus}
+            normalizeImageSrc={normalizeImageSrc}
           />
         )}
 
