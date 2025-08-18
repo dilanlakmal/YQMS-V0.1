@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { API_BASE_URL } from "../../config";
 import ExcelUploader from '../components/inspection/QC_upload_Data/ExcelUpload';
 import FinalResultTable from '../components/inspection/QC_upload_Data/FinalResultTable';
