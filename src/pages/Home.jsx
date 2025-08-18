@@ -258,7 +258,7 @@ function Home() {
           {
             path: "/qc2-upload-data",
             roles: ["Washing Clerk"],
-            image: "assets/Home/uploadspecs.png",
+            image: "assets/Home/qc2-workers-upload.png",
             title: t("home.qc2_upload_data"),
             description: "QC2 Upload Data"
           },
