@@ -271,28 +271,28 @@ app.use((req, res, next) => {
   next();
 });
 
-/* ------------------------------
-   YM DataSore SQL
------------------------------- */
+// /* ------------------------------
+//    YM DataSore SQL
+// ------------------------------ */
 
-// SQL Server Configuration for YMDataStore
-const sqlConfig = {
-  user: "ymdata",
-  password: "Kzw15947",
-  server: "192.167.1.13",
-  port: 1433,
-  database: "YMDataStore",
-  options: {
-    encrypt: false, // Use true if SSL is required
-    trustServerCertificate: true // For self-signed certificates
-  },
-  requestTimeout: 3000000, // Set timeout to 5 minutes (300,000 ms)
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
-  }
-};
+// // SQL Server Configuration for YMDataStore
+// const sqlConfig = {
+//   user: "ymdata",
+//   password: "Kzw15947",
+//   server: "192.167.1.13",
+//   port: 1433,
+//   database: "YMDataStore",
+//   options: {
+//     encrypt: false, // Use true if SSL is required
+//     trustServerCertificate: true // For self-signed certificates
+//   },
+//   requestTimeout: 3000000, // Set timeout to 5 minutes (300,000 ms)
+//   pool: {
+//     max: 10,
+//     min: 0,
+//     idleTimeoutMillis: 30000
+//   }
+// };
 
 // /* ------------------------------
 //    YMCE_SYSTEM SQL
@@ -337,66 +337,66 @@ const sqlConfig = {
 // };
 
 // Create connection pools
-const poolYMDataStore = new sql.ConnectionPool(sqlConfig);
+// const poolYMDataStore = new sql.ConnectionPool(sqlConfig);
 // const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
 // const poolYMWHSYS2 = new sql.ConnectionPool(sqlConfigYMWHSYS2);
 
 // MODIFICATION: Add a status tracker for SQL connections
-const sqlConnectionStatus = {
-  YMDataStore: false,
+// const sqlConnectionStatus = {
+  // YMDataStore: false,
   // YMCE_SYSTEM: false,
   // YMWHSYS2: false
-};
+// };
 
-// Function to connect to a pool, now it updates the status tracker
-async function connectPool(pool, poolName) {
-  try {
-    await pool.connect();
-    console.log(
-      `✅ Successfully connected to ${poolName} pool at ${pool.config.server}`
-    );
-    sqlConnectionStatus[poolName] = true; // Set status to true on success
+// // Function to connect to a pool, now it updates the status tracker
+// async function connectPool(pool, poolName) {
+//   try {
+//     await pool.connect();
+//     console.log(
+//       `✅ Successfully connected to ${poolName} pool at ${pool.config.server}`
+//     );
+//     sqlConnectionStatus[poolName] = true; // Set status to true on success
 
-    // Listen for errors on the pool to detect disconnections
-    pool.on("error", (err) => {
-      console.error(`SQL Pool Error for ${poolName}:`, err);
-      sqlConnectionStatus[poolName] = false; // Set status to false on error
-    });
-  } catch (err) {
-    console.error(`❌ FAILED to connect to ${poolName} pool:`, err.message);
-    sqlConnectionStatus[poolName] = false; // Ensure status is false on failure
-    // We throw the error so Promise.allSettled can catch it
-    throw new Error(`Failed to connect to ${poolName}`);
-  }
-}
+//     // Listen for errors on the pool to detect disconnections
+//     pool.on("error", (err) => {
+//       console.error(`SQL Pool Error for ${poolName}:`, err);
+//       sqlConnectionStatus[poolName] = false; // Set status to false on error
+//     });
+//   } catch (err) {
+//     console.error(`❌ FAILED to connect to ${poolName} pool:`, err.message);
+//     sqlConnectionStatus[poolName] = false; // Ensure status is false on failure
+//     // We throw the error so Promise.allSettled can catch it
+//     throw new Error(`Failed to connect to ${poolName}`);
+//   }
+// }
 
 // MODIFICATION: This function is now more critical for on-demand reconnections.
-async function ensurePoolConnected(pool, poolName) {
-  // If we know the connection is down, or the pool reports it's not connected
-  if (!sqlConnectionStatus[poolName] || !pool.connected) {
-    console.log(
-      `Pool ${poolName} is not connected. Attempting to reconnect...`
-    );
-    try {
-      // Attempt to close the pool if it's in a broken state before reconnecting
-      if (pool.connected || pool.connecting) {
-        await pool.close();
-      }
-      await connectPool(pool, poolName); // This will re-attempt connection and update the status
-    } catch (reconnectErr) {
-      console.error(
-        `Failed to reconnect to ${poolName}:`,
-        reconnectErr.message
-      );
-      sqlConnectionStatus[poolName] = false; // Ensure status is false
-      throw reconnectErr; // Throw error to be caught by the calling function
-    }
-  }
-  // If we reach here, the pool should be connected.
-  if (!sqlConnectionStatus[poolName]) {
-    throw new Error(`Database ${poolName} is unavailable.`);
-  }
-}
+// async function ensurePoolConnected(pool, poolName) {
+//   // If we know the connection is down, or the pool reports it's not connected
+//   if (!sqlConnectionStatus[poolName] || !pool.connected) {
+//     console.log(
+//       `Pool ${poolName} is not connected. Attempting to reconnect...`
+//     );
+//     try {
+//       // Attempt to close the pool if it's in a broken state before reconnecting
+//       if (pool.connected || pool.connecting) {
+//         await pool.close();
+//       }
+//       await connectPool(pool, poolName); // This will re-attempt connection and update the status
+//     } catch (reconnectErr) {
+//       console.error(
+//         `Failed to reconnect to ${poolName}:`,
+//         reconnectErr.message
+//       );
+//       sqlConnectionStatus[poolName] = false; // Ensure status is false
+//       throw reconnectErr; // Throw error to be caught by the calling function
+//     }
+//   }
+//   // If we reach here, the pool should be connected.
+//   if (!sqlConnectionStatus[poolName]) {
+//     throw new Error(`Database ${poolName} is unavailable.`);
+//   }
+// }
 
 // Drop the conflicting St_No_1 index if it exists
 // async function dropConflictingIndex() {
@@ -1450,264 +1450,264 @@ async function ensurePoolConnected(pool, poolName) {
 
 /*---------------------------------------------------------------------------------------
 
-* ------------------------------
-    Manual Sync Endpoint & Server Start
- ------------------------------ */
+// * ------------------------------
+//     Manual Sync Endpoint & Server Start
+//  ------------------------------ */
 
- const formatDateSQL = (date) => {
-  const d = new Date(date);
-  return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,"0")}-${d.getDate().toString().padStart(2,"0")}`;
-};
+//  const formatDateSQL = (date) => {
+//   const d = new Date(date);
+//   return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,"0")}-${d.getDate().toString().padStart(2,"0")}`;
+// };
 
-async function syncQC1WorkerData(startDate = "2025-07-01", endDate = new Date()) {
-  await ensurePoolConnected(poolYMDataStore, "YMDataStore");
-  const request = poolYMDataStore.request();
+// async function syncQC1WorkerData(startDate = "2025-07-01", endDate = new Date()) {
+//   await ensurePoolConnected(poolYMDataStore, "YMDataStore");
+//   const request = poolYMDataStore.request();
 
-  // Output Data
-  const outputQuery = `
-    SELECT
-      CONVERT(varchar, BillDate, 23) AS BillDate,
-      EmpID,
-      WorkLine,
-      MONo,
-      SeqNo,
-      ColorNo,
-      ColorName,
-      SizeName,
-      SUM(Qty) AS Qty
-    FROM YMDataStore.SunRise_G.tWork2025
-    WHERE TRY_CAST(SeqNo AS INT) IN (38,39)
-      AND BillDate >= '${formatDateSQL(startDate)}'
-      AND BillDate <= '${formatDateSQL(endDate)}'
-     AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
-    GROUP BY BillDate, EmpID, WorkLine, MONo, SeqNo, ColorNo, ColorName, SizeName
-  `;
-  const outputResult = await request.query(outputQuery);
+//   // Output Data
+//   const outputQuery = `
+//     SELECT
+//       CONVERT(varchar, BillDate, 23) AS BillDate,
+//       EmpID,
+//       WorkLine,
+//       MONo,
+//       SeqNo,
+//       ColorNo,
+//       ColorName,
+//       SizeName,
+//       SUM(Qty) AS Qty
+//     FROM YMDataStore.SunRise_G.tWork2025
+//     WHERE TRY_CAST(SeqNo AS INT) IN (38,39)
+//       AND BillDate >= '${formatDateSQL(startDate)}'
+//       AND BillDate <= '${formatDateSQL(endDate)}'
+//      AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+//     GROUP BY BillDate, EmpID, WorkLine, MONo, SeqNo, ColorNo, ColorName, SizeName
+//   `;
+//   const outputResult = await request.query(outputQuery);
 
-  // Defect Data
-  const defectQuery = `
-    SELECT
-      CONVERT(varchar, dDate, 23) AS dDate,
-      EmpID_QC,
-      WorkLine,
-      MONo,
-      ColorNo,
-      ColorName,
-      SizeName,
-      ReworkCode,
-      ReworkName,
-      SUM(QtyRework) AS Defect_Qty
-    FROM YMDataStore.SUNRISE.RS18
-    WHERE dDate >= '${formatDateSQL(startDate)}'
-      AND dDate <= '${formatDateSQL(endDate)}'
-      AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
-  AND TRY_CAST(ReworkCode AS INT) BETWEEN 1 AND 44
-    GROUP BY dDate, EmpID_QC, WorkLine, MONo,  ColorNo, ColorName, SizeName, ReworkCode, ReworkName
-  `;
-  const defectResult = await request.query(defectQuery);
+//   // Defect Data
+//   const defectQuery = `
+//     SELECT
+//       CONVERT(varchar, dDate, 23) AS dDate,
+//       EmpID_QC,
+//       WorkLine,
+//       MONo,
+//       ColorNo,
+//       ColorName,
+//       SizeName,
+//       ReworkCode,
+//       ReworkName,
+//       SUM(QtyRework) AS Defect_Qty
+//     FROM YMDataStore.SUNRISE.RS18
+//     WHERE dDate >= '${formatDateSQL(startDate)}'
+//       AND dDate <= '${formatDateSQL(endDate)}'
+//       AND TRY_CAST(WorkLine AS INT) BETWEEN 1 AND 30
+//   AND TRY_CAST(ReworkCode AS INT) BETWEEN 1 AND 44
+//     GROUP BY dDate, EmpID_QC, WorkLine, MONo,  ColorNo, ColorName, SizeName, ReworkCode, ReworkName
+//   `;
+//   const defectResult = await request.query(defectQuery);
 
-  // Standardize field names for easier mapping
-  const outputRows = outputResult.recordset.map(row => ({
-    ...row,
-    Inspection_date: row.BillDate,
-    QC_ID: row.EmpID
-  }));
+//   // Standardize field names for easier mapping
+//   const outputRows = outputResult.recordset.map(row => ({
+//     ...row,
+//     Inspection_date: row.BillDate,
+//     QC_ID: row.EmpID
+//   }));
 
-  const defectRows = defectResult.recordset.map(row => ({
-    ...row,
-    Inspection_date: row.dDate,
-    QC_ID: row.EmpID_QC
-  }));
+//   const defectRows = defectResult.recordset.map(row => ({
+//     ...row,
+//     Inspection_date: row.dDate,
+//     QC_ID: row.EmpID_QC
+//   }));
 
-  // Use a unified key for both output and defect data
-  function makeKey(row) {
-    return [
-      row.Inspection_date,
-      row.QC_ID
-    ].join("|");
-  }
+//   // Use a unified key for both output and defect data
+//   function makeKey(row) {
+//     return [
+//       row.Inspection_date,
+//       row.QC_ID
+//     ].join("|");
+//   }
 
-  // Build outputMap
-  const outputMap = new Map();
-  for (const row of outputRows) {
-    const key = makeKey(row);
-    if (!outputMap.has(key)) outputMap.set(key, []);
-    outputMap.get(key).push(row);
-  }
+//   // Build outputMap
+//   const outputMap = new Map();
+//   for (const row of outputRows) {
+//     const key = makeKey(row);
+//     if (!outputMap.has(key)) outputMap.set(key, []);
+//     outputMap.get(key).push(row);
+//   }
 
-  // Build defectMap
-  const defectMap = new Map();
-  for (const row of defectRows) {
-    const key = makeKey(row);
-    if (!defectMap.has(key)) defectMap.set(key, []);
-    defectMap.get(key).push(row);
-  }
+//   // Build defectMap
+//   const defectMap = new Map();
+//   for (const row of defectRows) {
+//     const key = makeKey(row);
+//     if (!defectMap.has(key)) defectMap.set(key, []);
+//     defectMap.get(key).push(row);
+//   }
 
-  // Merge and Build Documents
-  const docs = new Map();
-  const allKeys = new Set([...outputMap.keys(), ...defectMap.keys()]);
+//   // Merge and Build Documents
+//   const docs = new Map();
+//   const allKeys = new Set([...outputMap.keys(), ...defectMap.keys()]);
 
-  for (const key of allKeys) {
-    const outputRows = outputMap.get(key) || [];
-    const defectRows = defectMap.get(key) || [];
-    const [Inspection_date_str, QC_ID_raw] = key.split("|");
+//   for (const key of allKeys) {
+//     const outputRows = outputMap.get(key) || [];
+//     const defectRows = defectMap.get(key) || [];
+//     const [Inspection_date_str, QC_ID_raw] = key.split("|");
 
-    // 1. QC_ID renaming
-    const QC_ID = QC_ID_raw === "6335" ? "YM6335" : QC_ID_raw;
+//     // 1. QC_ID renaming
+//     const QC_ID = QC_ID_raw === "6335" ? "YM6335" : QC_ID_raw;
 
-    // 2. Date as Date object, time 00:00:00
-    const Inspection_date = new Date(Inspection_date_str + "T00:00:00Z");
+//     // 2. Date as Date object, time 00:00:00
+//     const Inspection_date = new Date(Inspection_date_str + "T00:00:00Z");
 
-    // Output grouping (group by line/mo/color/size)
-    const outputGroup = {};
-    for (const r of outputRows) {
-      const oKey = [r.WorkLine, r.MONo, r.ColorName, r.SizeName].join("|");
-      if (!outputGroup[oKey]) outputGroup[oKey] = [];
-      outputGroup[oKey].push(r);
-    }
-    const Output_data = Object.values(outputGroup).map(rows => ({
-      Line_no: rows[0].WorkLine,
-      MONo: rows[0].MONo,
-      Color: rows[0].ColorName,
-      Size: rows[0].SizeName,
-      Qty: rows.reduce((sum, r) => sum + Number(r.Qty), 0)
-    }));
-   // Group Output_data by (Line_no, MONo)
-      const outputSummaryMap = new Map();
-      for (const o of Output_data) {
-        const key = `${o.Line_no}|${o.MONo}`;
-        if (!outputSummaryMap.has(key)) {
-          outputSummaryMap.set(key, { Line: o.Line_no, MONo: o.MONo, Qty: 0 });
-        }
-        outputSummaryMap.get(key).Qty += o.Qty;
-      }
-      const Output_data_summary = Array.from(outputSummaryMap.values());
+//     // Output grouping (group by line/mo/color/size)
+//     const outputGroup = {};
+//     for (const r of outputRows) {
+//       const oKey = [r.WorkLine, r.MONo, r.ColorName, r.SizeName].join("|");
+//       if (!outputGroup[oKey]) outputGroup[oKey] = [];
+//       outputGroup[oKey].push(r);
+//     }
+//     const Output_data = Object.values(outputGroup).map(rows => ({
+//       Line_no: rows[0].WorkLine,
+//       MONo: rows[0].MONo,
+//       Color: rows[0].ColorName,
+//       Size: rows[0].SizeName,
+//       Qty: rows.reduce((sum, r) => sum + Number(r.Qty), 0)
+//     }));
+//    // Group Output_data by (Line_no, MONo)
+//       const outputSummaryMap = new Map();
+//       for (const o of Output_data) {
+//         const key = `${o.Line_no}|${o.MONo}`;
+//         if (!outputSummaryMap.has(key)) {
+//           outputSummaryMap.set(key, { Line: o.Line_no, MONo: o.MONo, Qty: 0 });
+//         }
+//         outputSummaryMap.get(key).Qty += o.Qty;
+//       }
+//       const Output_data_summary = Array.from(outputSummaryMap.values());
 
-    const TotalOutput = Output_data_summary.reduce((sum, o) => sum + o.Qty, 0);
+//     const TotalOutput = Output_data_summary.reduce((sum, o) => sum + o.Qty, 0);
 
-    // Defect grouping (group by line/mo/color/size)
-    const defectGroup = {};
-    for (const d of defectRows) {
-      const dKey = [d.WorkLine, d.MONo, d.ColorName, d.SizeName].join("|");
-      if (!defectGroup[dKey]) defectGroup[dKey] = [];
-      defectGroup[dKey].push(d);
-    }
-    const Defect_data = Object.entries(defectGroup).map(([dKey, rows]) => {
-      let TotalDefect = 0;
-      const defectDetailsMap = new Map();
-      for (const d of rows) {
-        const ddKey = d.ReworkCode + "|" + d.ReworkName;
-        if (!defectDetailsMap.has(ddKey)) {
-          defectDetailsMap.set(ddKey, {
-            Defect_code: Number(d.ReworkCode),
-            Defect_name: d.ReworkName,
-            Qty: 0
-          });
-        }
-        defectDetailsMap.get(ddKey).Qty += Number(d.Defect_Qty);
-        TotalDefect += Number(d.Defect_Qty);
-      }
-      const [Line_no, MONo, Color, Size] = dKey.split("|");
-      return {
-        Line_no,
-        MONo,
-        Color,
-        Size,
-        Defect_qty: TotalDefect,
-        DefectDetails: Array.from(defectDetailsMap.values())
-      };
-    });
-    // Group Defect_data by (Line_no, MONo)
-      const defectSummaryMap = new Map();
-      for (const d of Defect_data) {
-        const key = `${d.Line_no}|${d.MONo}`;
-        if (!defectSummaryMap.has(key)) {
-          defectSummaryMap.set(key, { Line_no: d.Line_no, MONo: d.MONo, Defect_Qty: 0, Defect_Details: [] });
-        }
-        // Sum defect qty
-        defectSummaryMap.get(key).Defect_Qty += d.Defect_qty;
+//     // Defect grouping (group by line/mo/color/size)
+//     const defectGroup = {};
+//     for (const d of defectRows) {
+//       const dKey = [d.WorkLine, d.MONo, d.ColorName, d.SizeName].join("|");
+//       if (!defectGroup[dKey]) defectGroup[dKey] = [];
+//       defectGroup[dKey].push(d);
+//     }
+//     const Defect_data = Object.entries(defectGroup).map(([dKey, rows]) => {
+//       let TotalDefect = 0;
+//       const defectDetailsMap = new Map();
+//       for (const d of rows) {
+//         const ddKey = d.ReworkCode + "|" + d.ReworkName;
+//         if (!defectDetailsMap.has(ddKey)) {
+//           defectDetailsMap.set(ddKey, {
+//             Defect_code: Number(d.ReworkCode),
+//             Defect_name: d.ReworkName,
+//             Qty: 0
+//           });
+//         }
+//         defectDetailsMap.get(ddKey).Qty += Number(d.Defect_Qty);
+//         TotalDefect += Number(d.Defect_Qty);
+//       }
+//       const [Line_no, MONo, Color, Size] = dKey.split("|");
+//       return {
+//         Line_no,
+//         MONo,
+//         Color,
+//         Size,
+//         Defect_qty: TotalDefect,
+//         DefectDetails: Array.from(defectDetailsMap.values())
+//       };
+//     });
+//     // Group Defect_data by (Line_no, MONo)
+//       const defectSummaryMap = new Map();
+//       for (const d of Defect_data) {
+//         const key = `${d.Line_no}|${d.MONo}`;
+//         if (!defectSummaryMap.has(key)) {
+//           defectSummaryMap.set(key, { Line_no: d.Line_no, MONo: d.MONo, Defect_Qty: 0, Defect_Details: [] });
+//         }
+//         // Sum defect qty
+//         defectSummaryMap.get(key).Defect_Qty += d.Defect_qty;
 
-        // Merge DefectDetails by code/name
-        const detailsMap = new Map(defectSummaryMap.get(key).Defect_Details.map(dd => [
-          `${dd.Defect_code}|${dd.Defect_name}`, { ...dd }
-        ]));
-        for (const dd of d.DefectDetails) {
-          const ddKey = `${dd.Defect_code}|${dd.Defect_name}`;
-          if (!detailsMap.has(ddKey)) {
-            detailsMap.set(ddKey, { ...dd });
-          } else {
-            detailsMap.get(ddKey).Qty += dd.Qty;
-          }
-        }
-        defectSummaryMap.get(key).Defect_Details = Array.from(detailsMap.values());
-      }
-      const Defect_data_summary = Array.from(defectSummaryMap.values());
+//         // Merge DefectDetails by code/name
+//         const detailsMap = new Map(defectSummaryMap.get(key).Defect_Details.map(dd => [
+//           `${dd.Defect_code}|${dd.Defect_name}`, { ...dd }
+//         ]));
+//         for (const dd of d.DefectDetails) {
+//           const ddKey = `${dd.Defect_code}|${dd.Defect_name}`;
+//           if (!detailsMap.has(ddKey)) {
+//             detailsMap.set(ddKey, { ...dd });
+//           } else {
+//             detailsMap.get(ddKey).Qty += dd.Qty;
+//           }
+//         }
+//         defectSummaryMap.get(key).Defect_Details = Array.from(detailsMap.values());
+//       }
+//       const Defect_data_summary = Array.from(defectSummaryMap.values());
 
-    const TotalDefect = Defect_data_summary.reduce((sum, d) => sum + d.Defect_Qty, 0);
+//     const TotalDefect = Defect_data_summary.reduce((sum, d) => sum + d.Defect_Qty, 0);
 
-    // 3. Add report_type
-    docs.set(key, {
-      Inspection_date,
-      QC_ID,
-      report_type: "Inline Sewing",
-      Seq_No: [
-        ...new Set(
-          outputRows.map(r => Number(r.SeqNo))
-        )
-      ],
+//     // 3. Add report_type
+//     docs.set(key, {
+//       Inspection_date,
+//       QC_ID,
+//       report_type: "Inline Sewing",
+//       Seq_No: [
+//         ...new Set(
+//           outputRows.map(r => Number(r.SeqNo))
+//         )
+//       ],
 
-      TotalOutput,
-      TotalDefect,
-      Output_data,
-      Output_data_summary,
-      Defect_data,
-      Defect_data_summary
-    });
-  }
+//       TotalOutput,
+//       TotalDefect,
+//       Output_data,
+//       Output_data_summary,
+//       Defect_data,
+//       Defect_data_summary
+//     });
+//   }
 
-  // Save to MongoDB
-  const finalDocs = Array.from(docs.values());
-  const bulkOps = finalDocs.map(doc => ({
-    updateOne: {
-      filter: {
-        Inspection_date: doc.Inspection_date,
-        QC_ID: doc.QC_ID
-      },
-      update: { $set: doc },
-      upsert: true
-    }
-  }));
-  if (bulkOps.length) {
-    const result = await QCWorkers.bulkWrite(bulkOps);
-    console.log(`QC1_Worker sync: Matched ${result.matchedCount}, Upserted ${result.upsertedCount}, Modified ${result.modifiedCount}`);
-  }
-}
-/*--------------------------------------------------------------------------------*/
+//   // Save to MongoDB
+//   const finalDocs = Array.from(docs.values());
+//   const bulkOps = finalDocs.map(doc => ({
+//     updateOne: {
+//       filter: {
+//         Inspection_date: doc.Inspection_date,
+//         QC_ID: doc.QC_ID
+//       },
+//       update: { $set: doc },
+//       upsert: true
+//     }
+//   }));
+//   if (bulkOps.length) {
+//     const result = await QCWorkers.bulkWrite(bulkOps);
+//     console.log(`QC1_Worker sync: Matched ${result.matchedCount}, Upserted ${result.upsertedCount}, Modified ${result.modifiedCount}`);
+//   }
+// }
+// /*--------------------------------------------------------------------------------*/
 
 
-// 1. On server start, fetch all data from 2025-07-10 to today
-// syncQC1WorkerData("2025-07-01", new Date())
-//   .then(() => {
-//     console.log("✅ Initial QC1 Worker Data Sync completed (all data).");
-//   })
-//   .catch((err) => {
-//     console.error("❌ Initial QC1 Worker Data Sync failed:", err);
-//   });
+// // 1. On server start, fetch all data from 2025-07-10 to today
+// // syncQC1WorkerData("2025-07-01", new Date())
+// //   .then(() => {
+// //     console.log("✅ Initial QC1 Worker Data Sync completed (all data).");
+// //   })
+// //   .catch((err) => {
+// //     console.error("❌ Initial QC1 Worker Data Sync failed:", err);
+// //   });
 
-// Schedule to run every day at 11:00 PM
-cron.schedule("0 23 * * *", () => {
-  const endDate = new Date();
-  const startDate = new Date();
-  startDate.setDate(endDate.getDate() - 2); // last 3 days: today, yesterday, day before
+// // Schedule to run every day at 11:00 PM
+// cron.schedule("0 23 * * *", () => {
+//   const endDate = new Date();
+//   const startDate = new Date();
+//   startDate.setDate(endDate.getDate() - 2); // last 3 days: today, yesterday, day before
 
-  syncQC1WorkerData(startDate, endDate)
-    .then(() => {
-      console.log("✅ QC1 Worker Data Sync completed (last 3 days, scheduled 11pm).");
-    })
-    .catch((err) => {
-      console.error("❌ QC1 Worker Data Sync failed (last 3 days, scheduled 11pm):", err);
-    });
-});
+//   syncQC1WorkerData(startDate, endDate)
+//     .then(() => {
+//       console.log("✅ QC1 Worker Data Sync completed (last 3 days, scheduled 11pm).");
+//     })
+//     .catch((err) => {
+//       console.error("❌ QC1 Worker Data Sync failed (last 3 days, scheduled 11pm):", err);
+//     });
+// });
 
 /* ------------------------------
    New Endpoints for CutPanelOrders
@@ -27425,6 +27425,202 @@ app.post('/api/qc-washing/measurement-summary-autosave/:recordId', async (req, r
     res.status(500).json({ success: false, message: 'Failed to autosave measurement summary.' });
   }
 });
+
+// Get all submitted QC washing data
+app.get("/api/qc-washing/all-submitted", async (req, res) => {
+  try {
+    const submittedData = await QCWashing.find({ status: ['submitted' , 'processing']})
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    // Return in the format expected by frontend
+    res.json({
+      success: true,
+      data: submittedData,
+      count: submittedData.length
+    });
+  } catch (error) {
+    console.error("Error fetching submitted QC washing data:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch submitted QC washing data", 
+      message: error.message 
+    });
+  }
+});
+
+// Get specific submitted QC washing data by ID
+app.get("/api/qc-washing/submitted/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Validate the ID format (assuming MongoDB ObjectId)
+    if (!id || id.length !== 24) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid ID format"
+      });
+    }
+
+    const reportData = await QCWashing.findById(id).lean();
+    
+    if (!reportData) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found"
+      });
+    }
+
+    // Transform the data to match the expected format for the modal
+    const transformedData = {
+      ...reportData,
+      colorName: reportData.color, // Map color to colorName for consistency
+      formData: {
+        result: reportData.overallFinalResult,
+        remarks: reportData.defectDetails?.comment || "",
+        measurements: reportData.measurementDetails?.measurement || []
+      }
+    };
+
+    res.json({
+      success: true,
+      data: transformedData
+    });
+
+  } catch (error) {
+    console.error("Error fetching QC washing report:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch report data",
+      error: error.message
+    });
+  }
+});
+
+app.get('/api/qc-washing/comparison', async (req, res) => {
+  const { orderNo, color, washType, reportType, factory, before_after_wash } = req.query;
+  
+  const filter = {
+    orderNo,
+    color,
+    washType,
+    reportType,
+    factoryName: factory,
+    before_after_wash: before_after_wash || 'Before Wash' 
+  };
+  
+  const comparisonRecord = await QCWashing.findOne(filter);
+  res.json(comparisonRecord);
+});
+
+app.get('/api/qc-washing/results', async (req, res) => {
+  try {
+    const { orderNo, color, washType, reportType, factory } = req.query;
+    
+    const query = {};
+    if (orderNo) query.orderNo = orderNo;
+    if (color) query.color = color;
+    if (washType) query.washType = washType;
+    if (reportType) query.reportType = reportType;
+    if (factory) query.factoryName = factory;
+    
+    const results = await QCWashing.find(query);
+    res.json(results);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Image proxy endpoint to convert images to base64
+app.get('/api/image-base64/*', async (req, res) => {
+  try {
+    const imagePath = req.params[0];
+    
+    // Security checks
+    if (imagePath.includes('..') || imagePath.includes('~')) {
+      return res.status(400).json({ success: false, error: 'Invalid path' });
+    }
+    
+    const fullPath = path.resolve(path.join(__dirname, 'public', 'storage', imagePath));
+    const allowedDir = path.resolve(path.join(__dirname, 'public', 'storage'));
+    
+    if (!fullPath.startsWith(allowedDir)) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+    
+    // Set CORS headers
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Content-Type', 'application/json');
+    
+    // Check if file exists
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ success: false, error: 'Image not found' });
+    }
+    
+    // Check file size
+    const stats = fs.statSync(fullPath);
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    
+    if (stats.size > maxSize) {
+      return res.status(413).json({ 
+        success: false, 
+        error: 'Image too large' 
+      });
+    }
+    
+    // Generate ETag for caching
+    const etag = `"${stats.mtime.getTime()}-${stats.size}"`;
+    res.set('ETag', etag);
+    res.set('Cache-Control', 'public, max-age=3600');
+    
+    // Check if client has cached version
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end();
+    }
+    
+    // Read and convert image
+    const imageBuffer = fs.readFileSync(fullPath);
+    const base64Image = imageBuffer.toString('base64');
+    const mimeType = getMimeType(fullPath);
+    const dataUrl = `data:${mimeType};base64,${base64Image}`;
+    
+    res.json({ 
+      success: true, 
+      dataUrl,
+      size: stats.size,
+      mimeType 
+    });
+    
+  } catch (error) {
+    console.error('Error serving image:', error);
+    res.status(500).json({ success: false, error: 'Error serving image' });
+  }
+});
+
+// Helper function for MIME types
+const getMimeType = (filePath) => {
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeTypes = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.bmp': 'image/bmp',
+    '.svg': 'image/svg+xml'
+  };
+  return mimeTypes[ext] || 'image/jpeg';
+};
+
+// Add this to your backend server configuration
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  next();
+});
+
+
 
 /* -------------------------------------------
    End Points - Supplier Issues Configuration

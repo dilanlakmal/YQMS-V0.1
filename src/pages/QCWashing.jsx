@@ -1993,30 +1993,38 @@ const autoSaveOverallSummary = async (summary, recordId) => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 p-2 sm:p-4 md:p-6">
       
         <PageTitle />
-        <div className="flex justify-center mb-6 mt-4">
-          <button
-            className={`px-6 py-2 rounded-l-md font-medium ${
-              activeTab === 'newInspection'
-                ? 'bg-indigo-600 text-white shadow-lg'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-            onClick={() => handleTabChange('newInspection')}
-          >
-            New Inspection
-          </button>
-          <button
-            className={`px-6 py-2 rounded-r-md font-medium ${
-              activeTab === 'submittedData'
-                ? 'bg-indigo-600 text-white shadow-lg'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-            onClick={() => handleTabChange('submittedData')}
-          >
-           Report
-          </button>
+        <div className=" border-b border-gray-300 dark:border-gray-700 mb-6 mt-4">
+          <nav className="-mb-px flex justify-center space-x-8" aria-label="Tabs">
+            <button
+              onClick={() => handleTabChange('newInspection')}
+              className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
+                          ${
+                            activeTab === 'newInspection'
+                              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500"
+                          }`}
+            >
+              New Inspection
+            </button>
+            <button
+              onClick={() => handleTabChange('submittedData')}
+              className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
+                          ${
+                            activeTab === 'submittedData'
+                              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500"
+                          }`}
+            >
+              Daily View
+            </button>
+          </nav>
         </div>
        
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-6 dark:bg-slate-900">
+      <main className={`mx-auto py-6 space-y-6 dark:bg-slate-900 ${
+          activeTab === 'submittedData' 
+            ? 'max-w-none px-2 sm:px-4 lg:px-6' 
+            : 'max-w-7xl px-4 sm:px-6 lg:px-8'
+        }`}>
          {activeTab === 'newInspection' && (
         <>
         <OverAllSummaryCard

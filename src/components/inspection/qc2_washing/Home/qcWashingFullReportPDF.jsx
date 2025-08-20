@@ -1,0 +1,1051 @@
+import {
+  Document,
+  Font,
+  Page,
+  StyleSheet,
+  Text,
+  View,
+  Image
+} from "@react-pdf/renderer";
+import React from "react";
+
+// --- FONT REGISTRATION ---
+Font.register({
+  family: "Roboto",
+  fonts: [
+    {
+      src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-regular-webfont.ttf",
+      fontWeight: "normal"
+    },
+    {
+      src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-bold-webfont.ttf",
+      fontWeight: "bold"
+    }
+  ]
+});
+
+// --- STYLESHEET ---
+const styles = StyleSheet.create({
+  page: {
+    fontFamily: "Roboto",
+    fontSize: 8,
+    backgroundColor: "#ffffff",
+    paddingTop: 60,
+    paddingBottom: 30,
+    paddingHorizontal: 30,
+    color: "#374151"
+  },
+  docHeader: {
+    position: "absolute",
+    top: 20,
+    left: 30,
+    right: 30,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderColor: "#e5e7eb",
+    paddingBottom: 5
+  },
+  docTitle: { fontSize: 11, fontWeight: "bold", color: "#111827" },
+  docSubtitle: { fontSize: 8, color: "#6b7280" },
+  pageHeader: {
+    fontSize: 14,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 15,
+    color: "#111827"
+  },
+  section: {
+    marginBottom: 15,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 6,
+    breakInside: "avoid"
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: "bold",
+    marginBottom: 10,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6"
+  },
+  infoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    columnGap: 12,
+    rowGap: 5,
+    marginBottom: 10
+  },
+  infoBlock: { width: "18%" },
+  infoLabel: { fontSize: 7, color: "#6b7280" },
+  infoValue: { fontWeight: "bold", fontSize: 9 },
+  table: { display: "table", width: "auto" },
+  tableRow: { flexDirection: "row" },
+  tableColHeader: {
+    backgroundColor: "#f9fafb",
+    padding: 4,
+    borderWidth: 0.5,
+    borderColor: "#e5e7eb",
+    fontWeight: "bold",
+    textAlign: "center",
+    fontSize: 7
+  },
+  tableCol: {
+    padding: 4,
+    borderWidth: 0.5,
+    borderColor: "#e5e7eb",
+    textAlign: "center"
+  },
+  textLeft: { textAlign: "left" },
+  summaryCardGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12
+  },
+  summaryCard: {
+    width: "16%",
+    padding: 6,
+    borderRadius: 4,
+    backgroundColor: "#f9fafb",
+    borderWidth: 1,
+    borderColor: "#e5e7eb"
+  },
+  summaryCardTitle: {
+    fontSize: 7,
+    color: "#6b7280",
+    textAlign: "center",
+    marginBottom: 3
+  },
+  summaryCardValue: { fontSize: 12, fontWeight: "bold", textAlign: "center" },
+  passStatus: {
+    padding: 2,
+    borderRadius: 2,
+    fontSize: 6,
+    fontWeight: "bold",
+    textAlign: "center"
+  },
+  passGreen: { backgroundColor: "#dcfce7", color: "#166534" },
+  failRed: { backgroundColor: "#fee2e2", color: "#991b1b" },
+  imageContainer: {
+    marginTop: 5,
+    marginBottom: 5
+  },
+  defectImage: {
+    width: 60,
+    height: 40,
+    objectFit: "cover",
+    borderRadius: 2,
+    marginRight: 5,
+    marginBottom: 3
+  },
+  inspectionImage: {
+    width: 80,
+    height: 60,
+    objectFit: "cover",
+    borderRadius: 2,
+    marginRight: 5,
+    marginBottom: 3
+  },
+  machineImage: {
+    width: 120,
+    height: 80,
+    objectFit: "cover",
+    borderRadius: 2,
+    marginTop: 5
+  }
+});
+
+// --- HELPER FUNCTIONS ---
+const safeString = (value) => {
+  if (value === null || value === undefined) return "N/A";
+  return String(value);
+};
+
+// Helper function to convert file paths to accessible URLs with validation
+const getImageUrl = (imagePath, API_BASE_URL) => {
+  if (!imagePath) return null;
+
+  // ✅ Allow base64 directly
+  if (imagePath.startsWith('data:image/')) {
+    return imagePath;
+  }
+
+  // ✅ Allow full HTTP(S) URLs
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+
+  // Otherwise, build from API
+  const cleanPath = imagePath.replace('./public', '').replace(/^\/+/, '');
+  return `${API_BASE_URL}/api/image-base64/${cleanPath}`;
+};
+
+
+// Enhanced helper function to validate image URLs and base64 data URLs
+const isValidImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  
+  // Check if it's a base64 data URL with proper format
+  if (url.startsWith('data:image/')) {
+    // Validate base64 format more thoroughly
+    const base64Pattern = /^data:image\/(jpeg|jpg|png|gif|bmp|webp);base64,([A-Za-z0-9+/=]+)$/;
+    return base64Pattern.test(url);
+  }
+  
+  // List of supported image extensions for react-pdf
+  const supportedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+  
+  try {
+    const urlObj = new URL(url);
+    const pathname = urlObj.pathname.toLowerCase();
+    
+    // Check if the URL ends with a supported image extension
+    return supportedExtensions.some(ext => pathname.endsWith(ext));
+  } catch (error) {
+    return false;
+  }
+};
+
+// Helper function to validate and process image data
+const processImageForPDF = (imageData) => {
+  if (!imageData) return null;
+  
+  // If it's already a valid base64 data URL, return it
+  if (isValidImageUrl(imageData)) {
+    return imageData;
+  }
+  
+  // If it's a string but not a valid URL, try to construct a proper data URL
+  if (typeof imageData === 'string' && imageData.length > 100) {
+    // Assume it's base64 data without the data URL prefix
+    const mimeTypes = ['jpeg', 'jpg', 'png', 'gif', 'bmp', 'webp'];
+    for (const mimeType of mimeTypes) {
+      const testUrl = `data:image/${mimeType};base64,${imageData}`;
+      if (isValidImageUrl(testUrl)) {
+        return testUrl;
+      }
+    }
+  }
+  
+  return null;
+};
+
+// Enhanced Safe Image component with better error handling
+const SafeImage = ({ src, style, alt = "Image" }) => {
+  // Process and validate the image source
+  const processedSrc = processImageForPDF(src);
+  
+  if (!processedSrc || !isValidImageUrl(processedSrc)) {
+    return (
+      <View style={[style, { backgroundColor: "#f3f4f6", justifyContent: "center", alignItems: "center" }]}>
+        <Text style={{ fontSize: 6, color: "#6b7280", textAlign: "center" }}>
+          {alt}: Not available
+        </Text>
+      </View>
+    );
+  }
+
+  try {
+    return (
+      <Image
+        src={processedSrc}
+        style={style}
+      />
+    );
+  } catch (error) {
+    console.warn('Image failed to load:', processedSrc, error);
+    return (
+      <View style={[style, { backgroundColor: "#f3f4f6", justifyContent: "center", alignItems: "center" }]}>
+        <Text style={{ fontSize: 6, color: "#6b7280", textAlign: "center" }}>
+          {alt}: Load failed
+        </Text>
+      </View>
+    );
+  }
+};
+
+// --- REUSABLE PDF COMPONENTS ---
+const PdfHeader = ({ orderNo, beforeAfterWash }) => (
+  <View style={styles.docHeader} fixed>
+    <View>
+      <Text style={styles.docTitle}>
+        {orderNo} - {beforeAfterWash} Washing Measurement Summary
+      </Text>
+      <Text style={styles.docSubtitle}>
+        Yorkmars (Cambodia) Garment MFG Co., LTD
+      </Text>
+    </View>
+    <Text style={{ fontSize: 8 }}>{new Date().toLocaleDateString()}</Text>
+  </View>
+);
+
+const OrderInfoSection = ({ recordData }) => (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Order Information</Text>
+    <View style={styles.infoGrid}>
+      <View style={styles.infoBlock}>
+        <Text style={styles.infoLabel}>Order No:</Text>
+        <Text style={styles.infoValue}>{safeString(recordData.orderNo)}</Text>
+      </View>
+      <View style={styles.infoBlock}>
+        <Text style={styles.infoLabel}>Order Qty:</Text>
+        <Text style={styles.infoValue}>{safeString(recordData.orderQty)}</Text>
+      </View>
+      <View style={styles.infoBlock}>
+        <Text style={styles.infoLabel}>Color:</Text>
+        <Text style={styles.infoValue}>{safeString(recordData.color)}</Text>
+      </View>
+      <View style={styles.infoBlock}>
+        <Text style={styles.infoLabel}>Color Qty:</Text>
+        <Text style={styles.infoValue}>{safeString(recordData.colorOrderQty)}</Text>
+      </View>
+      <View style={styles.infoBlock}>
+        <Text style={styles.infoLabel}>Wash Type:</Text>
+        <Text style={styles.infoValue}>{safeString(recordData.washType)}</Text>
+      </View>
+      <View style={styles.infoBlock}>
+        <Text style={styles.infoLabel}>Report Type:</Text>
+        <Text style={styles.infoValue}>{safeString(recordData.reportType)}</Text>
+      </View>
+      <View style={styles.infoBlock}>
+        <Text style={styles.infoLabel}>Factory:</Text>
+        <Text style={styles.infoValue}>{safeString(recordData.factoryName)}</Text>
+      </View>
+      <View style={styles.infoBlock}>
+        <Text style={styles.infoLabel}>Buyer:</Text>
+        <Text style={styles.infoValue}>{safeString(recordData.buyer)}</Text>
+      </View>
+    </View>
+  </View>
+);
+
+const QualitySummaryCards = ({ recordData }) => (
+  <View style={styles.summaryCardGrid}>
+    <View style={styles.summaryCard}>
+      <Text style={styles.summaryCardTitle}>Checked Qty</Text>
+      <Text style={styles.summaryCardValue}>{recordData.checkedQty || 0}</Text>
+    </View>
+    <View style={styles.summaryCard}>
+      <Text style={styles.summaryCardTitle}>Total Pcs</Text>
+      <Text style={styles.summaryCardValue}>{recordData.totalCheckedPcs || 0}</Text>
+    </View>
+    <View style={styles.summaryCard}>
+      <Text style={styles.summaryCardTitle}>Check Points</Text>
+      <Text style={styles.summaryCardValue}>{recordData.totalCheckedPoint || 0}</Text>
+    </View>
+    <View style={styles.summaryCard}>
+      <Text style={styles.summaryCardTitle}>Total Pass</Text>
+      <Text style={styles.summaryCardValue}>{recordData.totalPass || 0}</Text>
+    </View>
+    <View style={styles.summaryCard}>
+      <Text style={styles.summaryCardTitle}>Total Fail</Text>
+      <Text style={styles.summaryCardValue}>{recordData.totalFail || 0}</Text>
+    </View>
+    <View style={styles.summaryCard}>
+      <Text style={styles.summaryCardTitle}>Pass Rate</Text>
+      <Text style={styles.summaryCardValue}>{recordData.passRate || 0}%</Text>
+    </View>
+  </View>
+);
+
+const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], API_BASE_URL }) => {
+  console.log('DefectAnalysisTable received:');
+  console.log('- defectsByPc:', defectsByPc);
+  console.log('- additionalImages:', additionalImages);
+  
+  if (defectsByPc.length === 0 && (!additionalImages || additionalImages.length === 0)) {
+    console.log('No defects or additional images found');
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Defect Analysis</Text>
+        <Text style={{ textAlign: "center", color: "#6b7280", fontSize: 9 }}>
+          No defects recorded for this inspection
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.section} wrap={false}>
+      <Text style={styles.sectionTitle}>Defect Analysis</Text>
+      
+      {defectsByPc.map((pcDefect, pcIndex) => (
+        <View key={pcIndex} style={{ marginBottom: 15, border: "1px solid #e5e7eb", borderRadius: 4, padding: 10 }}>
+          <Text style={[styles.sectionTitle, { fontSize: 10, marginBottom: 8 }]}>
+            {pcDefect.garmentNo || pcDefect.pcNumber}
+          </Text>
+          
+          {pcDefect.pcDefects && pcDefect.pcDefects.length > 0 ? (
+            <View style={styles.table}>
+              <View style={styles.tableRow} fixed>
+                <Text style={[styles.tableColHeader, styles.textLeft, { width: "25%" }]}>Defect Name</Text>
+                <Text style={[styles.tableColHeader, { width: "10%" }]}>Count</Text>
+                <Text style={[styles.tableColHeader, styles.textLeft, { width: "35%" }]}>Remark</Text>
+                <Text style={[styles.tableColHeader, { width: "30%" }]}>Images</Text>
+              </View>
+              {pcDefect.pcDefects.map((defect, defectIndex) => (
+                <View key={defectIndex} style={styles.tableRow}>
+                  <Text style={[styles.tableCol, styles.textLeft, { width: "25%" }]}>
+                    {safeString(defect.defectName)}
+                  </Text>
+                  <Text style={[styles.tableCol, { width: "10%" }]}>
+                    {defect.defectCount || defect.defectQty || 1}
+                  </Text>
+                  <Text style={[styles.tableCol, styles.textLeft, { width: "35%" }]}>
+                    {safeString(defect.remark)}
+                  </Text>
+                  <View style={[styles.tableCol, { width: "30%", flexDirection: "row", flexWrap: "wrap" }]}>
+                    {defect.defectImages && defect.defectImages.length > 0 ? (
+                      defect.defectImages.map((img, imgIndex) => (
+                        <SafeImage
+                          key={imgIndex}
+                          src={img}
+                          style={styles.defectImage}
+                          alt={`Defect ${defect.defectName} Image ${imgIndex + 1}`}
+                        />
+                      ))
+                    ) : (
+                      <Text style={{ fontSize: 6, color: "#6b7280" }}>No images</Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={{ fontSize: 8, color: "#6b7280" }}>No defects found</Text>
+          )}
+          
+          {pcDefect.remark && (
+            <View style={{ marginTop: 8, padding: 8, backgroundColor: "#f9fafb", borderRadius: 4 }}>
+              <Text style={{ fontSize: 8, fontWeight: "bold", marginBottom: 4 }}>Garment Remark:</Text>
+              <Text style={{ fontSize: 8 }}>{pcDefect.remark}</Text>
+            </View>
+          )}
+        </View>
+      ))}
+
+      {/* Additional Images */}
+      {additionalImages && additionalImages.length > 0 && (
+        <View style={{ marginTop: 15, border: "1px solid #e5e7eb", borderRadius: 4, padding: 10 }}>
+          <Text style={[styles.sectionTitle, { fontSize: 10, marginBottom: 8 }]}>
+            Additional Images
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+            {additionalImages.map((img, imgIndex) => (
+              <SafeImage
+                key={imgIndex}
+                src={img}
+                style={[styles.defectImage, { width: 80, height: 60 }]}
+                alt={`Additional Image ${imgIndex + 1}`}
+              />
+            ))}
+          </View>
+        </View>
+      )}
+    </View>
+  );
+};
+
+const MeasurementDetailTable = ({ sizeData }) => {
+  const measurementPoints = sizeData.pcs[0]?.measurementPoints || [];
+  if (measurementPoints.length === 0) return null;
+
+  return (
+    <View style={styles.section} wrap={false}>
+      <Text style={styles.sectionTitle}>
+        Size: {sizeData.size} (K-Value: {sizeData.kvalue}) - Detailed Measurements
+      </Text>
+      <View style={styles.table}>
+        <View style={styles.tableRow} fixed>
+          <Text style={[styles.tableColHeader, styles.textLeft, { width: "25%" }]}>
+            Measurement Point
+          </Text>
+          <Text style={[styles.tableColHeader, { width: "10%" }]}>Spec</Text>
+          <Text style={[styles.tableColHeader, { width: "8%" }]}>Tol-</Text>
+          <Text style={[styles.tableColHeader, { width: "8%" }]}>Tol+</Text>
+          {sizeData.pcs.map((pc, index) => (
+            <Text key={index} style={[styles.tableColHeader, { width: `${49 / sizeData.pcs.length}%` }]}>
+              {safeString(pc.pcNumber)}
+            </Text>
+          ))}
+        </View>
+        {measurementPoints.map((point, pointIndex) => (
+          <View key={pointIndex} style={styles.tableRow}>
+            <Text style={[styles.tableCol, styles.textLeft, { width: "25%" }]}>
+              {safeString(point.pointName)}
+            </Text>
+            <Text style={[styles.tableCol, { width: "10%" }]}>
+              {safeString(point.specs)}
+            </Text>
+            <Text style={[styles.tableCol, { width: "8%" }]}>
+              {safeString(point.toleranceMinus)}
+            </Text>
+            <Text style={[styles.tableCol, { width: "8%" }]}>
+              +{safeString(point.tolerancePlus)}
+            </Text>
+            {sizeData.pcs.map((pc, pcIndex) => {
+              const pcMeasurement = pc.measurementPoints.find(mp => mp.rowNo === point.rowNo);
+              const isPass = pcMeasurement?.result === "pass";
+              const measuredValue = safeString(pcMeasurement?.measured_value_fraction);
+              
+              return (
+                <Text 
+                  key={pcIndex} 
+                  style={[
+                    styles.tableCol, 
+                    { width: `${49 / sizeData.pcs.length}%` },
+                    isPass ? styles.passGreen : styles.failRed
+                  ]}
+                >
+                  {measuredValue}
+                </Text>
+              );
+            })}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+const SizewiseSummaryTable = ({ measurementSizeSummary }) => (
+  <View style={styles.section} wrap={false}>
+    <Text style={styles.sectionTitle}>Size-wise Measurement Summary</Text>
+    <View style={styles.table}>
+      <View style={styles.tableRow} fixed>
+        <Text style={[styles.tableColHeader, styles.textLeft, { width: "15%" }]}>Size</Text>
+        <Text style={[styles.tableColHeader, { width: "12%" }]}>Checked Pcs</Text>
+        <Text style={[styles.tableColHeader, { width: "12%" }]}>Check Points</Text>
+        <Text style={[styles.tableColHeader, { width: "12%" }]}>Total Pass</Text>
+        <Text style={[styles.tableColHeader, { width: "12%" }]}>Total Fail</Text>
+        <Text style={[styles.tableColHeader, { width: "12%" }]}>Plus Tol Fail</Text>
+        <Text style={[styles.tableColHeader, { width: "12%" }]}>Minus Tol Fail</Text>
+        <Text style={[styles.tableColHeader, { width: "13%" }]}>Pass Rate</Text>
+      </View>
+      {measurementSizeSummary.map((sizeSummary, index) => {
+        const passRate = sizeSummary.checkedPoints > 0 
+          ? ((sizeSummary.totalPass / sizeSummary.checkedPoints) * 100).toFixed(1)
+          : "0";
+        return (
+          <View key={index} style={styles.tableRow}>
+            <Text style={[styles.tableCol, styles.textLeft, { width: "15%" }]}>
+              {safeString(sizeSummary.size)}
+            </Text>
+            <Text style={[styles.tableCol, { width: "12%" }]}>
+              {sizeSummary.checkedPcs || 0}
+            </Text>
+            <Text style={[styles.tableCol, { width: "12%" }]}>
+              {sizeSummary.checkedPoints || 0}
+            </Text>
+            <Text style={[styles.tableCol, { width: "12%" }]}>
+              {sizeSummary.totalPass || 0}
+            </Text>
+            <Text style={[styles.tableCol, { width: "12%" }]}>
+              {sizeSummary.totalFail || 0}
+            </Text>
+            <Text style={[styles.tableCol, { width: "12%" }]}>
+              {sizeSummary.plusToleranceFailCount || 0}
+            </Text>
+            <Text style={[styles.tableCol, { width: "12%" }]}>
+              {sizeSummary.minusToleranceFailCount || 0}
+            </Text>
+            <Text style={[styles.tableCol, { width: "13%" }]}>
+              {passRate}%
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  </View>
+);
+
+const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Inspection Details</Text>
+    
+    {/* Checked Points */}
+    {inspectionDetails.checkedPoints?.length > 0 && (
+      <View style={{ marginBottom: 15 }}>
+        <Text style={[styles.sectionTitle, { fontSize: 10 }]}>Checked Points</Text>
+        <View style={styles.table}>
+          <View style={styles.tableRow} fixed>
+            <Text style={[styles.tableColHeader, styles.textLeft, { width: "25%" }]}>Point Name</Text>
+            <Text style={[styles.tableColHeader, { width: "15%" }]}>Decision</Text>
+            <Text style={[styles.tableColHeader, { width: "15%" }]}>Status</Text>
+            <Text style={[styles.tableColHeader, styles.textLeft, { width: "25%" }]}>Remark</Text>
+            <Text style={[styles.tableColHeader, { width: "20%" }]}>Comparison</Text>
+          </View>
+          {inspectionDetails.checkedPoints.map((point, index) => (
+            <View key={index} style={styles.tableRow}>
+              <Text style={[styles.tableCol, styles.textLeft, { width: "25%" }]}>
+                {safeString(point.pointName)}
+              </Text>
+              <Text style={[styles.tableCol, { width: "15%" }]}>
+                {safeString(point.decision)}
+              </Text>
+              <Text style={[
+                styles.tableCol, 
+                { width: "15%" },
+                point.status === "Pass" || point.decision === "ok" ? styles.passGreen : styles.failRed
+              ]}>
+                {point.status || (point.decision === "ok" ? "Pass" : "Fail")}
+              </Text>
+              <Text style={[styles.tableCol, styles.textLeft, { width: "25%" }]}>
+                {safeString(point.remark)}
+              </Text>
+              <View style={[styles.tableCol, { width: "20%", flexDirection: "row", flexWrap: "wrap" }]}>
+                {/* Point Image */}
+                {point.image && (
+                  <SafeImage
+                    src={point.image}
+                    style={styles.inspectionImage}
+                    alt={`Point ${point.pointName} Image`}
+                  />
+                )}
+                {/* Comparison Images */}
+                {point.comparison && point.comparison.length > 0 && (
+                  point.comparison.map((img, imgIndex) => (
+                    <SafeImage
+                      key={imgIndex}
+                      src={img}
+                      style={styles.inspectionImage}
+                      alt={`Comparison ${imgIndex + 1}`}
+                    />
+                  ))
+                )}
+                {!point.image && (!point.comparison || point.comparison.length === 0) && (
+                  <Text style={{ fontSize: 6, color: "#6b7280" }}>No images</Text>
+                )}
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    )}
+
+    {/* Parameters section remains the same */}
+    {inspectionDetails.parameters?.length > 0 && (
+      <View style={{ marginBottom: 15 }}>
+        <Text style={[styles.sectionTitle, { fontSize: 10 }]}>Parameters</Text>
+        <View style={styles.table}>
+          <View style={styles.tableRow} fixed>
+            <Text style={[styles.tableColHeader, styles.textLeft, { width: "25%" }]}>Parameter Name</Text>
+            <Text style={[styles.tableColHeader, { width: "15%" }]}>Checked Qty</Text>
+            <Text style={[styles.tableColHeader, { width: "15%" }]}>Defect Qty</Text>
+            <Text style={[styles.tableColHeader, { width: "15%" }]}>Pass Rate</Text>
+            <Text style={[styles.tableColHeader, { width: "15%" }]}>Result</Text>
+            <Text style={[styles.tableColHeader, styles.textLeft, { width: "15%" }]}>Remark</Text>
+          </View>
+          {inspectionDetails.parameters.map((param, index) => (
+            <View key={index} style={styles.tableRow}>
+              <Text style={[styles.tableCol, styles.textLeft, { width: "25%" }]}>
+                {safeString(param.parameterName)}
+              </Text>
+              <Text style={[styles.tableCol, { width: "15%" }]}>
+                {param.checkedQty || 0}
+              </Text>
+              <Text style={[styles.tableCol, { width: "15%" }]}>
+                {param.defectQty || 0}
+              </Text>
+              <Text style={[styles.tableCol, { width: "15%" }]}>
+                {param.passRate || 0}%
+              </Text>
+              <Text style={[
+                styles.tableCol, 
+                { width: "15%" },
+                param.result === "Pass" ? styles.passGreen : styles.failRed
+              ]}>
+                {safeString(param.result)}
+              </Text>
+              <Text style={[styles.tableCol, styles.textLeft, { width: "15%" }]}>
+                {safeString(param.remark)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    )}
+
+    {/* Machine Processes */}
+    {inspectionDetails.machineProcesses?.length > 0 && (
+      <View style={{ marginBottom: 15 }}>
+        <Text style={[styles.sectionTitle, { fontSize: 10 }]}>Machine Processes</Text>
+        {inspectionDetails.machineProcesses.map((machine, index) => (
+          <View key={index} style={{ marginBottom: 10, border: "1px solid #e5e7eb", borderRadius: 4, padding: 8 }}>
+            <Text style={{ fontSize: 9, fontWeight: "bold", marginBottom: 5 }}>
+              Machine Type: {safeString(machine.machineType)}
+            </Text>
+            <View style={styles.table}>
+              <View style={styles.tableRow} fixed>
+                <Text style={[styles.tableColHeader, { width: "20%" }]}>Parameter</Text>
+                <Text style={[styles.tableColHeader, { width: "20%" }]}>Standard</Text>
+                <Text style={[styles.tableColHeader, { width: "20%" }]}>Actual</Text>
+                <Text style={[styles.tableColHeader, { width: "20%" }]}>Status</Text>
+                <Text style={[styles.tableColHeader, { width: "20%" }]}>Unit</Text>
+              </View>
+              {machine.temperature && (
+                <View style={styles.tableRow}>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>Temperature</Text>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>
+                    {machine.temperature.standardValue ?? "N/A"}
+                  </Text>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>
+                    {machine.temperature.actualValue ?? "N/A"}
+                  </Text>
+                  <Text style={[
+                    styles.tableCol, 
+                    { width: "20%" },
+                    machine.temperature.status?.ok ? styles.passGreen : styles.failRed
+                  ]}>
+                    {machine.temperature.status?.ok ? "OK" : "NG"}
+                  </Text>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>°C</Text>
+                </View>
+              )}
+              {machine.time && (
+                <View style={styles.tableRow}>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>Time</Text>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>
+                    {machine.time.standardValue ?? "N/A"}
+                  </Text>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>
+                    {machine.time.actualValue ?? "N/A"}
+                  </Text>
+                  <Text style={[
+                    styles.tableCol, 
+                    { width: "20%" },
+                    machine.time.status?.ok ? styles.passGreen : styles.failRed
+                  ]}>
+                    {machine.time.status?.ok ? "OK" : "NG"}
+                  </Text>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>min</Text>
+                </View>
+              )}
+              {machine.silicon?.actualValue && (
+                <View style={styles.tableRow}>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>Silicon</Text>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>
+                    {machine.silicon.standardValue ?? "N/A"}
+                  </Text>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>
+                    {machine.silicon.actualValue ?? "N/A"}
+                  </Text>
+                  <Text style={[
+                    styles.tableCol, 
+                    { width: "20%" },
+                    machine.silicon.status?.ok ? styles.passGreen : styles.failRed
+                  ]}>
+                    {machine.silicon.status?.ok ? "OK" : "NG"}
+                  </Text>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>-</Text>
+                </View>
+              )}
+              {machine.softener?.actualValue && (
+                <View style={styles.tableRow}>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>Softener</Text>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>
+                    {machine.softener.standardValue ?? "N/A"}
+                  </Text>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>
+                    {machine.softener.actualValue ?? "N/A"}
+                  </Text>
+                  <Text style={[
+                    styles.tableCol, 
+                    { width: "20%" },
+                    machine.softener.status?.ok ? styles.passGreen : styles.failRed
+                  ]}>
+                    {machine.softener.status?.ok ? "OK" : "NG"}
+                  </Text>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>-</Text>
+                </View>
+              )}
+            </View>
+            
+            {/* Machine Image with SafeImage */}
+            {machine.image && (
+              <View style={styles.imageContainer}>
+                <Text style={{ fontSize: 7, color: "#6b7280", marginBottom: 3 }}>Machine Image:</Text>
+                <SafeImage
+                  src={machine.image}
+                  style={styles.machineImage}
+                  alt={`Machine ${machine.machineType} Image`}
+                />
+              </View>
+            )}
+          </View>
+        ))}
+      </View>
+    )}
+  </View>
+);
+
+const BeforeAfterComparisonSection = ({ recordData, comparisonData }) => {
+  // Determine which data to use as primary and comparison based on wash type
+  const primaryData = recordData.before_after_wash === 'Before Wash' ? comparisonData : recordData;
+  const secondaryData = recordData.before_after_wash === 'Before Wash' ? recordData : comparisonData;
+  
+  const afterMeasurements = primaryData.measurementDetails?.measurement || [];
+  const beforeMeasurements = secondaryData.measurementDetails?.measurement || [];
+  
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Before vs After Wash Comparison</Text>
+      <View style={{ marginBottom: 10 }}>
+        <Text style={{ fontSize: 8, color: "#6b7280" }}>
+          Before: {secondaryData.before_after_wash} | After: {primaryData.before_after_wash}
+        </Text>
+      </View>
+      
+      {afterMeasurements.map((afterSizeData, index) => {
+        const beforeSizeData = beforeMeasurements.find(size => size.size === afterSizeData.size);
+        if (!beforeSizeData) {
+          return (
+            <View key={index} style={{ marginBottom: 10, padding: 8, backgroundColor: "#fef3c7", borderRadius: 4 }}>
+              <Text style={{ fontSize: 8, color: "#d97706" }}>
+                Size: {afterSizeData.size} - No comparison data available
+              </Text>
+            </View>
+          );
+        }
+        
+        const afterMeasurementPoints = afterSizeData.pcs[0]?.measurementPoints || [];
+        
+        return (
+          <View key={index} style={{ marginBottom: 20 }} wrap={false}>
+            <Text style={[styles.sectionTitle, { fontSize: 10 }]}>
+              Size: {afterSizeData.size} - Before vs After Comparison
+            </Text>
+            <View style={{ marginBottom: 8 }}>
+              <Text style={{ fontSize: 7, color: "#6b7280" }}>
+                Before: {beforeSizeData.pcs.length} pcs | After: {afterSizeData.pcs.length} pcs | 
+                K-Value Before: {beforeSizeData.kvalue} | K-Value After: {afterSizeData.kvalue}
+              </Text>
+            </View>
+            
+            <View style={styles.table}>
+              <View style={styles.tableRow} fixed>
+                <Text style={[styles.tableColHeader, styles.textLeft, { width: "20%" }]}>Point</Text>
+                <Text style={[styles.tableColHeader, { width: "8%" }]}>Spec</Text>
+                <Text style={[styles.tableColHeader, { width: "10%" }]}>Tolerance</Text>
+                {afterSizeData.pcs.map((pc, pcIndex) => (
+                  <Text key={pcIndex} style={[styles.tableColHeader, { width: `${62 / afterSizeData.pcs.length}%`, fontSize: 6 }]}>
+                    Garment {pc.pcNumber}{"\n"}Before | After | Diff
+                  </Text>
+                ))}
+              </View>
+              
+              {afterMeasurementPoints.map((afterPoint, pointIndex) => {
+                const beforePoint = beforeSizeData.pcs[0]?.measurementPoints.find(
+                  bp => bp.pointName === afterPoint.pointName
+                );
+                
+                return (
+                  <View key={pointIndex} style={styles.tableRow}>
+                    <Text style={[styles.tableCol, styles.textLeft, { width: "20%" }]}>
+                      {safeString(afterPoint.pointName)}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "8%" }]}>
+                      {safeString(afterPoint.specs)}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "10%" }]}>
+                      {afterPoint.toleranceMinus} / +{afterPoint.tolerancePlus}
+                    </Text>
+                    
+                    {afterSizeData.pcs.map((afterPc, pcIndex) => {
+                      const afterMeasurement = afterPc.measurementPoints.find(mp => mp.pointName === afterPoint.pointName);
+                      const beforePc = beforeSizeData.pcs[pcIndex];
+                      const beforeMeasurement = beforePc?.measurementPoints.find(mp => mp.pointName === afterPoint.pointName);
+                      
+                      const afterValue = afterMeasurement?.measured_value_fraction || "N/A";
+                      const beforeValue = beforeMeasurement?.measured_value_fraction || "N/A";
+                      const afterPass = afterMeasurement?.result === 'pass';
+                      const beforePass = beforeMeasurement?.result === 'pass';
+                      
+                      let differenceText = "N/A";
+                      let differenceColor = "#6b7280";
+                      if (afterMeasurement && beforeMeasurement && 
+                          afterMeasurement.measured_value_decimal !== undefined && 
+                          beforeMeasurement.measured_value_decimal !== undefined) {
+                        const difference = afterMeasurement.measured_value_decimal - beforeMeasurement.measured_value_decimal;
+                        if (Math.abs(difference) > 0.001) {
+                          differenceText = difference > 0 ? `+${difference.toFixed(3)}"` : `${difference.toFixed(3)}"`;
+                          differenceColor = difference > 0 ? "#dc2626" : "#16a34a";
+                        } else {
+                          differenceText = "0.000\"";
+                        }
+                      }
+                      
+                      return (
+                        <Text key={pcIndex} style={[styles.tableCol, { width: `${62 / afterSizeData.pcs.length}%`, fontSize: 5 }]}>
+                          <Text style={{ color: "#2563eb" }}>{beforeValue}</Text>{" | "}
+                          <Text style={{ color: afterPass ? "#16a34a" : "#dc2626" }}>{afterValue}</Text>{" | "}
+                          <Text style={{ color: differenceColor, fontWeight: "bold" }}>{differenceText}</Text>
+                        </Text>
+                      );
+                    })}
+                  </View>
+                );
+              })}
+            </View>
+            
+            {/* Summary for this size */}
+            <View style={{ marginTop: 8, padding: 6, backgroundColor: "#f9fafb", borderRadius: 4 }}>
+              <Text style={{ fontSize: 7 }}>
+                Before Pass: {beforeSizeData.pcs.reduce((total, pc) => 
+                  total + pc.measurementPoints.filter(mp => mp.result === 'pass').length, 0
+                )} / {beforeSizeData.pcs.reduce((total, pc) => total + pc.measurementPoints.length, 0)} | 
+                After Pass: {afterSizeData.pcs.reduce((total, pc) => 
+                  total + pc.measurementPoints.filter(mp => mp.result === 'pass').length, 0
+                )} / {afterSizeData.pcs.reduce((total, pc) => total + pc.measurementPoints.length, 0)}
+              </Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+};
+
+const ComparisonSection = ({ recordData, comparisonData }) => (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Comparison Analysis</Text>
+    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+      <View style={[styles.summaryCard, { width: "48%" }]}>
+        <Text style={styles.summaryCardTitle}>Current Report</Text>
+        <View style={{ marginTop: 5 }}>
+          <Text style={{ fontSize: 8 }}>Pass Rate: {recordData.passRate || 0}%</Text>
+          <Text style={{ fontSize: 8 }}>Total Pieces: {recordData.totalCheckedPcs || 0}</Text>
+          <Text style={{ fontSize: 8 }}>Result: {recordData.overallFinalResult || "N/A"}</Text>
+        </View>
+      </View>
+      <View style={[styles.summaryCard, { width: "48%" }]}>
+        <Text style={styles.summaryCardTitle}>Previous Report</Text>
+        <View style={{ marginTop: 5 }}>
+          <Text style={{ fontSize: 8 }}>Pass Rate: {comparisonData.passRate || 0}%</Text>
+          <Text style={{ fontSize: 8 }}>Total Pieces: {comparisonData.totalCheckedPcs || 0}</Text>
+          <Text style={{ fontSize: 8 }}>Result: {comparisonData.overallFinalResult || "N/A"}</Text>
+        </View>
+      </View>
+    </View>
+  </View>
+);
+
+// --- MAIN PDF DOCUMENT COMPONENT ---
+const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_URL }) => {
+  // Add fallback for API_BASE_URL
+  const baseUrl = API_BASE_URL || 'http://localhost:8000'; // Replace with your actual API URL
+  
+  if (!recordData) {
+    return (
+      <Document>
+        <Page style={styles.page}>
+          <Text>No report data available.</Text>
+        </Page>
+      </Document>
+    );
+  }
+
+  // Process measurement data
+  let measurements = [];
+  if (recordData.measurementDetails) {
+    if (Array.isArray(recordData.measurementDetails)) {
+      measurements = recordData.measurementDetails;
+    } else if (recordData.measurementDetails.measurement && Array.isArray(recordData.measurementDetails.measurement)) {
+      measurements = recordData.measurementDetails.measurement;
+    }
+  }
+
+  const defectsByPc = recordData.defectDetails?.defectsByPc || [];
+  const additionalImages = recordData.defectDetails?.additionalImages || [];
+  const inspectionDetails = recordData.inspectionDetails || {};
+  const measurementSizeSummary = recordData.measurementDetails?.measurementSizeSummary || [];
+
+  return (
+    <Document author="Yorkmars (Cambodia) Garment MFG Co., LTD">
+      {/* ======================= FIRST PAGE: SUMMARY ======================= */}
+      <Page style={styles.page} orientation="landscape">
+        <PdfHeader 
+          orderNo={recordData.orderNo || "N/A"} 
+          beforeAfterWash={recordData.before_after_wash || "Washing"}
+        />
+        <Text style={styles.pageHeader}>QC Washing Report Summary</Text>
+
+        <OrderInfoSection recordData={recordData} />
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quality Summary</Text>
+          <QualitySummaryCards recordData={recordData} />
+          <View style={{ textAlign: "center", marginTop: 10 }}>
+            <Text style={[
+              styles.summaryCardValue,
+              { fontSize: 16 },
+              recordData.overallFinalResult === "Pass" ? styles.passGreen : styles.failRed
+            ]}>
+              Final Result: {recordData.overallFinalResult || "N/A"}
+            </Text>
+          </View>
+        </View>
+
+        <DefectAnalysisTable 
+          defectsByPc={defectsByPc} 
+          additionalImages={additionalImages}
+          API_BASE_URL={baseUrl} // Use the fallback baseUrl
+        />
+        
+        {/* Size-wise Measurement Summary */}
+        {measurementSizeSummary.length > 0 && <SizewiseSummaryTable measurementSizeSummary={measurementSizeSummary} />}
+        
+        {comparisonData && <ComparisonSection recordData={recordData} comparisonData={comparisonData} />}
+      </Page>
+
+      {/* ============ INSPECTION DETAILS PAGE ============ */}
+      {(inspectionDetails.checkedPoints?.length > 0 || inspectionDetails.parameters?.length > 0 || inspectionDetails.machineProcesses?.length > 0) && (
+        <Page style={styles.page} orientation="landscape">
+          <PdfHeader 
+            orderNo={recordData.orderNo || "N/A"} 
+            beforeAfterWash={recordData.before_after_wash || "Washing"}
+          />
+          <Text style={styles.pageHeader}>Inspection Details</Text>
+          <InspectionDetailsSection 
+            inspectionDetails={inspectionDetails} 
+            API_BASE_URL={baseUrl} // Use the fallback baseUrl
+          />
+        </Page>
+      )}
+
+      {/* ============ DETAILED MEASUREMENTS PAGES ============ */}
+      {measurements.map((sizeData, index) => (
+        <Page key={index} style={styles.page} orientation="landscape">
+          <PdfHeader 
+            orderNo={recordData.orderNo || "N/A"} 
+            beforeAfterWash={recordData.before_after_wash || "Washing"}
+          />
+          <Text style={styles.pageHeader}>
+            Detailed Measurements - Size: {sizeData.size}
+          </Text>
+          <MeasurementDetailTable sizeData={sizeData} />
+        </Page>
+      ))}
+
+      {/* ============ BEFORE VS AFTER COMPARISON PAGE ============ */}
+      {comparisonData && comparisonData.measurementDetails?.measurement && 
+       recordData.measurementDetails?.measurement && (
+        <Page style={styles.page} orientation="landscape">
+          <PdfHeader 
+            orderNo={recordData.orderNo || "N/A"} 
+            beforeAfterWash={recordData.before_after_wash || "Washing"}
+          />
+          <Text style={styles.pageHeader}>Before vs After Wash Comparison</Text>
+          <BeforeAfterComparisonSection recordData={recordData} comparisonData={comparisonData} />
+        </Page>
+      )}
+    </Document>
+  );
+};
+
+
+export default QcWashingFullReportPDF;
+

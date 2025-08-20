@@ -14,6 +14,14 @@ export default defineConfig({
   optimizeDeps: {
     include: ["jspdf", "jspdf-autotable"]
   },
+  define: {
+    global: 'globalThis',
+  },
+  resolve: {
+    alias: {
+      buffer: 'buffer',
+    },
+  },
   server: {
     host: '0.0.0.0',
     port: 3001,
