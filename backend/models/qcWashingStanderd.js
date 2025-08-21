@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const MachineStandardSchema = new mongoose.Schema({
-  washType: { type: String, enum: ['Normal Wash', 'Acid Wash', 'Garment Dye'], required: true },
+  washType: { type: String, enum: ['Normal Wash', 'Acid Wash', 'Garment Dye','Soft Wash'], required: true },
   washingMachine: {
     temperature: Number,
     time: Number,

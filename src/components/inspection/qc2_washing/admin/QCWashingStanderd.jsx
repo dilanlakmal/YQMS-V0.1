@@ -3,7 +3,7 @@ import { API_BASE_URL } from "../../../../../config";
 import { FaThermometerHalf, FaClock, FaFlask, FaTint } from "react-icons/fa";
 import Swal from 'sweetalert2';
 
-const WASH_TYPES = ["Normal Wash", "Acid Wash", "Garment Dye"];
+const WASH_TYPES = ["Normal Wash", "Acid Wash", "Garment Dye", "Soft Wash"];
 
 const MACHINE_TYPES = [
   { key: "washingMachine", label: "Washing Machine", fields: ["temperature", "time", "silicon", "softener"] },
@@ -26,7 +26,8 @@ const FIELD_ICONS = {
 
 export default function QCWashingStandardTable() {
   const [standards, setStandards] = useState({});
-  const [loading, setLoading] = useState(false);
+  // Change loading to track each wash type separately
+  const [loadingStates, setLoadingStates] = useState({});
 
   // Fetch standards on mount
   const fetchStandards = async () => {
@@ -76,11 +77,13 @@ export default function QCWashingStandardTable() {
     }));
   };
 
-  // Save or update
+  // Save or update - now handles loading state per wash type
   const handleSave = async (washType) => {
     if (!washType) return;
     
-    setLoading(true);
+    // Set loading state for this specific wash type
+    setLoadingStates(prev => ({ ...prev, [washType]: true }));
+    
     try {
       const body = {
         washType,
@@ -132,7 +135,8 @@ export default function QCWashingStandardTable() {
         toast: true
       });
     } finally {
-      setLoading(false);
+      // Clear loading state for this specific wash type
+      setLoadingStates(prev => ({ ...prev, [washType]: false }));
     }
   };
 
@@ -180,9 +184,9 @@ export default function QCWashingStandardTable() {
           <button
             className="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
             onClick={() => handleSave(washType)}
-            disabled={loading}
+            disabled={loadingStates[washType]} // Check loading state for this specific wash type
           >
-            {loading ? 'Saving...' : `Save ${washType} Standards`}
+            {loadingStates[washType] ? 'Saving...' : `Save ${washType} Standards`}
           </button>
         </div>
       ))}
