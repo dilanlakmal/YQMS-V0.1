@@ -1901,17 +1901,29 @@ const sizeNamesQuery = `
       return sizeObject;
     }
 
-    function convertSizeObjectToArray(sizeObject) {
-      // Convert {"34B": 167, "34C": 493} to [{"34B": 167}, {"34C": 493}]
-      // Sort by size name
-      return Object.entries(sizeObject)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([sizeName, qty]) => {
-          const obj = {};
-          obj[sizeName] = qty;
-          return obj;
-        });
-    }
+    function convertSizeObjectToArray(sizeObject, orderNo) {
+  const sizeMapping = orderSizeMapping.get(orderNo) || {};
+  
+  // Create reverse mapping: sizeName -> sequence number
+  const sizeToSeqMapping = {};
+  Object.entries(sizeMapping).forEach(([seq, sizeName]) => {
+    sizeToSeqMapping[sizeName] = parseInt(seq);
+  });
+  
+  // Convert and sort by sequence number instead of alphabetically
+  return Object.entries(sizeObject)
+    .sort(([sizeNameA], [sizeNameB]) => {
+      const seqA = sizeToSeqMapping[sizeNameA] || 999;
+      const seqB = sizeToSeqMapping[sizeNameB] || 999;
+      return seqA - seqB;
+    })
+    .map(([sizeName, qty]) => {
+      const obj = {};
+      obj[sizeName] = qty;
+      return obj;
+    });
+}
+
 
     function extractSpecsDataAsArray(record, orderNo) {
       const sizeMapping = orderSizeMapping.get(orderNo) || {};
@@ -2081,19 +2093,21 @@ const sizeNamesQuery = `
     });
 
     // Convert color summaries to the desired format
-    const colorMap = new Map();
-    for (const [colorKey, colorSummary] of colorSummaryMap) {
-      const orderQtyArray = convertSizeObjectToArray(colorSummary.sizeTotals);
-      
-      colorMap.set(colorKey, {
-        ColorCode: colorSummary.ColorCode,
-        Color: colorSummary.Color,
-        ChnColor: colorSummary.ChnColor,
-        ColorKey: colorSummary.ColorKey,
-        OrderQty: orderQtyArray, 
-        CutQty: {}
-      });
-    }
+const colorMap = new Map();
+for (const [colorKey, colorSummary] of colorSummaryMap) {
+  const orderNo = colorKey.split('_')[0]; // Extract order number from colorKey
+  const orderQtyArray = convertSizeObjectToArray(colorSummary.sizeTotals, orderNo); // Pass orderNo
+  
+  colorMap.set(colorKey, {
+    ColorCode: colorSummary.ColorCode,
+    Color: colorSummary.Color,
+    ChnColor: colorSummary.ChnColor,
+    ColorKey: colorSummary.ColorKey,
+    OrderQty: orderQtyArray, 
+    CutQty: {}
+  });
+}
+
 
     // Add colors and shipping to orders
     for (const [orderNo, order] of orderMap) {
