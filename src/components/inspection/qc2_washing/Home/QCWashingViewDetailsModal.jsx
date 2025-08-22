@@ -373,7 +373,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                                   <div className={`w-2 h-2 rounded-full mr-2 ${
                                     machine.silicon.status?.ok ? 'bg-green-500' : 'bg-red-500'
                                   }`}></div>
-                                  <span>Silicon: {machine.silicon.actualValue}</span>
+                                  <span>Silicon: {machine.silicon.actualValue}g</span>
                                 </div>
                               )}
                               {machine.softener && machine.softener.actualValue && (
@@ -381,7 +381,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                                   <div className={`w-2 h-2 rounded-full mr-2 ${
                                     machine.softener.status?.ok ? 'bg-green-500' : 'bg-red-500'
                                   }`}></div>
-                                  <span>Softener: {machine.softener.actualValue}</span>
+                                  <span>Softener: {machine.softener.actualValue}g</span>
                                 </div>
                               )}
                             </div>

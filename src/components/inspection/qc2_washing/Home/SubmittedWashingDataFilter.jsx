@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Filter, X, RotateCcw, Calendar, FileText, Palette, User, Building, ClipboardList, Droplets, CheckCircle } from 'lucide-react';
+import { Filter, X, RotateCcw, Calendar, FileText, Palette, User, Building, ClipboardList, Droplets, CheckCircle, Search } from 'lucide-react';
+import { API_BASE_URL } from '../../../../../config';
 
 const SubmittedWashingDataFilter = ({ 
   data, 
@@ -23,6 +24,52 @@ const SubmittedWashingDataFilter = ({
     washType: ''
   });
 
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  
+  // Search states for searchable dropdowns
+  const [searchStates, setSearchStates] = useState({
+    orderNo: '',
+    qcId: ''
+  });
+  
+  // Dropdown visibility states
+  const [dropdownStates, setDropdownStates] = useState({
+    orderNo: false,
+    qcId: false
+  });
+
+  const getUniqueUsersWithNames = () => {
+    const uniqueUserIds = [...new Set(data.map(item => item.userId).filter(Boolean))];
+    return uniqueUserIds.map(userId => {
+      const user = users.find(u => u.emp_id === userId || u.userId === userId);
+      return {
+        id: userId,
+        display: user ? `${userId} - ${user.eng_name || user.name}` : userId
+      };
+    }).sort((a, b) => a.display.localeCompare(b.display));
+  };
+
+  // Fetch users on component mount
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoadingUsers(true);
+        const response = await fetch(`${API_BASE_URL}/api/users`);
+        if (response.ok) {
+          const data = await response.json();
+          setUsers(data.users || data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
   // Extract unique values for dropdown options
   const getUniqueValues = (field) => {
     const values = data
@@ -40,6 +87,8 @@ const SubmittedWashingDataFilter = ({
             return item.reportType;
           case 'washType':
             return item.washType;
+          case 'orderNo':
+            return item.orderNo;
           default:
             return null;
         }
@@ -49,6 +98,22 @@ const SubmittedWashingDataFilter = ({
       .sort();
     
     return values;
+  };
+
+  // Filter options based on search term
+  const getFilteredOptions = (field, searchTerm) => {
+    const options = field === 'qcId' ? getUniqueUsersWithNames() : getUniqueValues(field);
+    if (!searchTerm) return options;
+    
+    if (field === 'qcId') {
+      return options.filter(option => 
+        option.display.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    } else {
+      return options.filter(option => 
+        option.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
   };
 
   // Handle filter changes
@@ -63,6 +128,48 @@ const SubmittedWashingDataFilter = ({
     
     setFilters(newFilters);
     onFilterChange(newFilters);
+  };
+
+  // Handle search input changes
+  const handleSearchChange = (field, value) => {
+    setSearchStates(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    
+    // Also update the filter value
+    handleFilterChange(field, value);
+  };
+
+  // Handle dropdown toggle
+  const toggleDropdown = (field) => {
+    setDropdownStates(prev => ({
+      ...prev,
+      [field]: !prev[field]
+    }));
+  };
+
+  // Handle option selection
+  const handleOptionSelect = (field, value) => {
+    if (field === 'qcId') {
+      const selectedUser = getUniqueUsersWithNames().find(user => user.id === value);
+      setSearchStates(prev => ({
+        ...prev,
+        [field]: selectedUser ? selectedUser.display : value
+      }));
+      handleFilterChange(field, value);
+    } else {
+      setSearchStates(prev => ({
+        ...prev,
+        [field]: value
+      }));
+      handleFilterChange(field, value);
+    }
+    
+    setDropdownStates(prev => ({
+      ...prev,
+      [field]: false
+    }));
   };
 
   // Reset all filters
@@ -83,6 +190,14 @@ const SubmittedWashingDataFilter = ({
     };
     
     setFilters(resetFilters);
+    setSearchStates({
+      orderNo: '',
+      qcId: ''
+    });
+    setDropdownStates({
+      orderNo: false,
+      qcId: false
+    });
     onReset();
   };
 
@@ -101,6 +216,23 @@ const SubmittedWashingDataFilter = ({
       filters.washType
     );
   };
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.searchable-dropdown')) {
+        setDropdownStates({
+          orderNo: false,
+          qcId: false
+        });
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md">
@@ -123,7 +255,6 @@ const SubmittedWashingDataFilter = ({
       {/* Filter Content */}
       {isVisible && (
         <div className="p-6 bg-gray-50 dark:bg-gray-900">
-          {/* All Filters in One Grid */}
           <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
             
             {/* Date Range Filters */}
@@ -155,38 +286,107 @@ const SubmittedWashingDataFilter = ({
               <Calendar className="absolute left-3 top-10 w-4 h-4 text-gray-400" />
             </div>
 
-            {/* Search Filters */}
-            <div className="relative">
+            {/* Searchable MO Number Filter */}
+            <div className="relative searchable-dropdown">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <FileText className="w-4 h-4 mr-1" />
                 MO Number
               </label>
-              <input
-                type="text"
-                placeholder="Search by MO number..."
-                value={filters.orderNo}
-                onChange={(e) => handleFilterChange('orderNo', e.target.value)}
-                className="w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all"
-              />
-              <FileText className="absolute left-3 top-10 w-4 h-4 text-gray-400" />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchStates.orderNo}
+                  onChange={(e) => handleSearchChange('orderNo', e.target.value)}
+                  onFocus={() => toggleDropdown('orderNo')}
+                  placeholder="Type or select MO Number"
+                  className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all"
+                />
+                <FileText className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown('orderNo')}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3"
+                >
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                {/* Dropdown Options */}
+                {dropdownStates.orderNo && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <div
+                      className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm"
+                      onClick={() => handleOptionSelect('orderNo', '')}
+                    >
+                      All MO Numbers
+                    </div>
+                    {getFilteredOptions('orderNo', searchStates.orderNo).map(orderNo => (
+                      <div
+                        key={orderNo}
+                        className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm"
+                        onClick={() => handleOptionSelect('orderNo', orderNo)}
+                      >
+                        {orderNo}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="relative">
+            {/* Searchable QC ID Filter */}
+            <div className="relative searchable-dropdown">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <User className="w-4 h-4 mr-1" />
                 QC ID
               </label>
-              <input
-                type="text"
-                placeholder="Search by QC ID..."
-                value={filters.qcId}
-                onChange={(e) => handleFilterChange('qcId', e.target.value)}
-                className="w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all"
-              />
-              <User className="absolute left-3 top-10 w-4 h-4 text-gray-400" />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchStates.qcId}
+                  onChange={(e) => handleSearchChange('qcId', e.target.value)}
+                  onFocus={() => toggleDropdown('qcId')}
+                  placeholder={loadingUsers ? 'Loading...' : 'Type or select QC ID'}
+                  disabled={loadingUsers}
+                  className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all disabled:opacity-50"
+                />
+                <User className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown('qcId')}
+                  disabled={loadingUsers}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                {/* Dropdown Options */}
+                {dropdownStates.qcId && !loadingUsers && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <div
+                      className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm"
+                      onClick={() => handleOptionSelect('qcId', '')}
+                    >
+                      All QC IDs
+                    </div>
+                    {getFilteredOptions('qcId', searchStates.qcId).map(user => (
+                      <div
+                        key={user.id}
+                        className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm"
+                        onClick={() => handleOptionSelect('qcId', user.id)}
+                      >
+                        {user.display}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Dropdown Filters */}
+            {/* Regular Dropdown Filters */}
             <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <Palette className="w-4 h-4 mr-1" />
@@ -215,7 +415,7 @@ const SubmittedWashingDataFilter = ({
             <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <CheckCircle className="w-4 h-4 mr-1" />
-               Befor/After Wash
+                Before/After Wash
               </label>
               <div className="relative">
                 <select
@@ -223,7 +423,7 @@ const SubmittedWashingDataFilter = ({
                   onChange={(e) => handleFilterChange('before_after_wash', e.target.value)}
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all appearance-none"
                 >
-                  <option value="">All </option>
+                  <option value="">All</option>
                   {getUniqueValues('before_after_wash').map(before_after_wash => (
                     <option key={before_after_wash} value={before_after_wash}>{before_after_wash}</option>
                   ))}
@@ -237,6 +437,7 @@ const SubmittedWashingDataFilter = ({
               </div>
             </div>
 
+            {/* Continue with other regular dropdowns... */}
             <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <User className="w-4 h-4 mr-1" />
@@ -342,17 +543,6 @@ const SubmittedWashingDataFilter = ({
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pt-6 mt-6 border-t border-gray-200 dark:border-gray-700 space-y-3 sm:space-y-0">
             <div className="text-sm text-gray-500 dark:text-gray-400">
-              {/* {hasActiveFilters() ? (
-                <span className="flex items-center">
-                  <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
-                  {Object.values(filters).flat().filter(v => v).length} filters active
-                </span>
-              ) : (
-                <span className="flex items-center">
-                  <Filter className="w-4 h-4 mr-1" />
-                  No filters applied
-                </span>
-              )} */}
             </div>
             <button
               onClick={handleReset}

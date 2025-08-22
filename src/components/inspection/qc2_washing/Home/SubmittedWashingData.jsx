@@ -201,7 +201,12 @@ const handleCloseFullReport = () => {
 
 // Enhanced convert image to base64 using backend endpoint with retry mechanism
 const convertImageToBase64 = async (imagePath, API_BASE_URL, retries = 2) => {
-  if (!imagePath || !API_BASE_URL) return null;
+  if (!imagePath || !API_BASE_URL) {
+    console.log(`❌ convertImageToBase64: Missing imagePath (${!!imagePath}) or API_BASE_URL (${!!API_BASE_URL})`);
+    return null;
+  }
+  
+  console.log(`🔄 convertImageToBase64: Processing ${imagePath}`);
   
   // Check if it's already a base64 data URL
   if (imagePath.startsWith('data:image/')) {
@@ -209,6 +214,7 @@ const convertImageToBase64 = async (imagePath, API_BASE_URL, retries = 2) => {
       // Validate base64 format
       const base64Pattern = /^data:image\/(jpeg|jpg|png|gif|bmp|webp);base64,([A-Za-z0-9+/=]+)$/;
       if (base64Pattern.test(imagePath)) {
+        console.log(`✅ convertImageToBase64: Already valid base64 data URL`);
         return imagePath;
       }
     } catch (error) {
@@ -217,9 +223,23 @@ const convertImageToBase64 = async (imagePath, API_BASE_URL, retries = 2) => {
     }
   }
 
-  // Check if it's already a full HTTP URL
+  // Check if it's already a full HTTP URL - convert to base64 for PDF compatibility
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
+    console.log(`🔗 convertImageToBase64: Converting HTTP URL to base64`);
+    // For PDF generation, we need base64, so we'll fetch and convert
+    try {
+      const response = await fetch(imagePath);
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        const base64 = btoa(String.fromCharCode.apply(null, uint8Array));
+        const dataUrl = `data:image;base64,${base64}`;
+        console.log(`✅ convertImageToBase64: Successfully converted HTTP URL to base64`);
+        return dataUrl;
+      }
+    } catch (error) {
+      console.warn(`Failed to convert HTTP URL to base64: ${error.message}`);
+    }
   }
 
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -232,6 +252,7 @@ const convertImageToBase64 = async (imagePath, API_BASE_URL, retries = 2) => {
         .replace(/^\/+/, '');
 
       const apiUrl = `${API_BASE_URL}/api/image-base64/${cleanPath}`;
+      console.log(`🔗 convertImageToBase64: Fetching from API: ${apiUrl}`);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -246,27 +267,67 @@ const convertImageToBase64 = async (imagePath, API_BASE_URL, retries = 2) => {
       
       if (response.ok) {
         const data = await response.json();
+        console.log(`📊 convertImageToBase64: API response success: ${data.success}, has dataUrl: ${!!data.dataUrl}`);
         if (data.success && data.dataUrl) {
           // Validate the returned base64 data
           const base64Pattern = /^data:image\/(jpeg|jpg|png|gif|bmp|webp);base64,([A-Za-z0-9+/=]+)$/;
           if (base64Pattern.test(data.dataUrl)) {
+            // Add validation for image content, especially for JPEGs, to prevent rendering errors
+            try {
+              const mimeType = data.dataUrl.substring(5, data.dataUrl.indexOf(';')); // e.g., "image/jpeg"
+              if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
+                const base64String = data.dataUrl.split(',')[1];
+                const binaryString = atob(base64String);
+                // Check for JPEG Start Of Image (SOI) marker (0xFF, 0xD8)
+                if (binaryString.charCodeAt(0) !== 0xFF || binaryString.charCodeAt(1) !== 0xD8) {
+                   console.warn(`⚠️ Invalid JPEG header for ${imagePath}. Attempting to fix...`);
+                   
+                   // Find the actual SOI marker by searching the first 200 bytes
+                   let soi = -1;
+                   for (let i = 0; i < Math.min(200, binaryString.length - 1); i++) {
+                     if (binaryString.charCodeAt(i) === 0xFF && binaryString.charCodeAt(i+1) === 0xD8) {
+                       soi = i;
+                       break;
+                     }
+                   }
+
+                   if (soi > 0) {
+                     console.log(`✅ Found JPEG SOI at position: ${soi}. Slicing data.`);
+                     const correctedBinaryString = binaryString.substring(soi);
+                     const correctedBase64 = btoa(correctedBinaryString);
+                     return `data:${mimeType};base64,${correctedBase64}`;
+                   } else {
+                     console.warn(`❌ convertImageToBase64: Could not find valid SOI marker for ${imagePath}. Image is likely corrupt.`);
+                     return null;
+                   }
+                }
+              }
+            } catch (e) {
+              console.warn(`❌ convertImageToBase64: Error validating image content for ${imagePath}:`, e.message);
+              return null;
+            }
             return data.dataUrl;
           } else {
-            console.warn(`Invalid base64 format returned for ${imagePath}`);
+            console.warn(`❌ convertImageToBase64: Invalid base64 format returned for ${imagePath}`);
           }
+        } else {
+          console.warn(`❌ convertImageToBase64: API returned unsuccessful response:`, data);
         }
+      } else {
+        console.warn(`❌ convertImageToBase64: API request failed with status: ${response.status}`);
       }
     } catch (error) {
       if (error.name === 'AbortError') {
-        console.warn(`Request timeout for image: ${imagePath}`);
-      } else if (error.message.includes('SOI not found') || error.message.includes('Buffer is not defined')) {
-        console.warn(`Corrupted or invalid image data: ${imagePath}`);
+        console.warn(`⏰ convertImageToBase64: Request timeout for image: ${imagePath}`);
+      } else if (error.message.includes('SOI not found') || error.message.includes('Buffer is not defined') || error.message.includes('Invalid JPEG')) {
+        console.warn(`📁 convertImageToBase64: Corrupted or invalid image data: ${imagePath}`);
         return null; // Don't retry for corrupted images
       } else {
-        console.warn(`Error converting image (attempt ${attempt + 1}):`, error.message);
+        console.warn(`❌ convertImageToBase64: Error (attempt ${attempt + 1}):`, error.message);
       }
       
       if (attempt === retries) {
+        console.warn(`❌ convertImageToBase64: All retry attempts failed for ${imagePath}`);
         return null;
       }
       await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
@@ -282,37 +343,47 @@ const processImagesInRecord = async (record, API_BASE_URL) => {
   try {
     const processedRecord = JSON.parse(JSON.stringify(record)); // Deep clone
     
-    console.log('Processing images for record:', processedRecord._id);
-    console.log('DefectDetails structure:', processedRecord.defectDetails);
-
+    console.log('🔄 Processing images for record:', processedRecord._id);
+    console.log('📊 DefectDetails structure:', processedRecord.defectDetails);
+    
     // Process defect images
     if (processedRecord.defectDetails?.defectsByPc) {
-      console.log('Found defectsByPc:', processedRecord.defectDetails.defectsByPc.length);
+      console.log('📋 Found defectsByPc:', processedRecord.defectDetails.defectsByPc.length);
+      
       for (const pcDefect of processedRecord.defectDetails.defectsByPc) {
         if (pcDefect.pcDefects) {
-          console.log(`Processing ${pcDefect.pcDefects.length} defects for PC:`, pcDefect.garmentNo || pcDefect.pcNumber);
+          console.log(`🔍 Processing ${pcDefect.pcDefects.length} defects for PC:`, pcDefect.garmentNo || pcDefect.pcNumber);
+          
           for (const defect of pcDefect.pcDefects) {
             if (defect.defectImages && Array.isArray(defect.defectImages)) {
-              console.log(`Processing ${defect.defectImages.length} images for defect:`, defect.defectName);
-              console.log('Original defect images:', defect.defectImages);
+              console.log(`🖼️ Processing ${defect.defectImages.length} images for defect:`, defect.defectName);
+              console.log('📷 Original defect images:', defect.defectImages);
               
-              // Process each image with error handling
-              const validImages = [];
+              const processedImages = [];
               for (const imagePath of defect.defectImages) {
                 try {
+                  // Skip if already base64
+                  if (imagePath && imagePath.startsWith('data:image/')) {
+                    processedImages.push(imagePath);
+                    console.log('✅ Image already in base64 format');
+                    continue;
+                  }
+                  
                   const base64Image = await convertImageToBase64(imagePath, API_BASE_URL);
-                  if (base64Image) {
-                    validImages.push(base64Image);
-                    console.log(`Successfully processed image: ${imagePath.substring(0, 50)}...`);
+                  if (base64Image && base64Image.startsWith('data:image/')) {
+                    processedImages.push(base64Image);
                   } else {
-                    console.warn(`Failed to process image: ${imagePath}`);
+                    console.warn(`❌ Failed to convert defect image: ${imagePath}`);
+                    processedImages.push(null);
                   }
                 } catch (error) {
-                  console.warn(`Skipping corrupted image: ${imagePath}`, error.message);
+                  console.warn(`❌ Error processing defect image: ${imagePath}`, error.message);
+                  processedImages.push(null);
                 }
               }
-              defect.defectImages = validImages;
-              console.log(`Final processed images count: ${validImages.length}`);
+              
+              defect.defectImages = processedImages;
+              console.log(`📊 Final defect images count: ${processedImages.length}`);
             }
           }
         }
@@ -321,35 +392,46 @@ const processImagesInRecord = async (record, API_BASE_URL) => {
 
     // Process additional images
     if (processedRecord.defectDetails?.additionalImages && Array.isArray(processedRecord.defectDetails.additionalImages)) {
-      console.log(`Processing ${processedRecord.defectDetails.additionalImages.length} additional images`);
-      console.log('Original additional images:', processedRecord.defectDetails.additionalImages);
+      console.log(`🖼️ Processing ${processedRecord.defectDetails.additionalImages.length} additional images`);
+      console.log('📷 Original additional images:', processedRecord.defectDetails.additionalImages);
       
-      const validAdditionalImages = [];
+      const processedAdditionalImages = [];
       for (const imagePath of processedRecord.defectDetails.additionalImages) {
         try {
+          // Skip if already base64
+          if (imagePath && imagePath.startsWith('data:image/')) {
+            processedAdditionalImages.push(imagePath);
+            console.log('✅ Additional image already in base64 format');
+            continue;
+          }
+          
           const base64Image = await convertImageToBase64(imagePath, API_BASE_URL);
-          if (base64Image) {
-            validAdditionalImages.push(base64Image);
-            console.log(`Successfully processed additional image: ${imagePath.substring(0, 50)}...`);
+          if (base64Image && base64Image.startsWith('data:image/')) {
+            processedAdditionalImages.push(base64Image);
           } else {
-            console.warn(`Failed to process additional image: ${imagePath}`);
+            console.warn(`❌ Failed to convert additional image: ${imagePath}`);
+            processedAdditionalImages.push(null);
           }
         } catch (error) {
-          console.warn(`Skipping corrupted additional image: ${imagePath}`, error.message);
+          console.warn(`❌ Error processing additional image: ${imagePath}`, error.message);
+          processedAdditionalImages.push(null);
         }
       }
-      processedRecord.defectDetails.additionalImages = validAdditionalImages;
-      console.log(`Final additional images count: ${validAdditionalImages.length}`);
+      
+      processedRecord.defectDetails.additionalImages = processedAdditionalImages;
+      console.log(`📊 Final additional images count: ${processedAdditionalImages.length}`);
     }
 
-    // Process inspection images
+    // Process inspection images (keep existing logic)
     if (processedRecord.inspectionDetails?.checkedPoints) {
       for (const point of processedRecord.inspectionDetails.checkedPoints) {
         // Process point image
         if (point.image) {
           try {
-            const processedImage = await convertImageToBase64(point.image, API_BASE_URL);
-            point.image = processedImage || point.image;
+            if (!point.image.startsWith('data:image/')) {
+              const processedImage = await convertImageToBase64(point.image, API_BASE_URL);
+              point.image = processedImage || null;
+            }
           } catch (error) {
             console.warn(`Skipping corrupted point image: ${point.image}`, error.message);
             point.image = null;
@@ -361,9 +443,13 @@ const processImagesInRecord = async (record, API_BASE_URL) => {
           const validComparisonImages = [];
           for (const imagePath of point.comparison) {
             try {
-              const base64Image = await convertImageToBase64(imagePath, API_BASE_URL);
-              if (base64Image) {
-                validComparisonImages.push(base64Image);
+              if (imagePath && imagePath.startsWith('data:image/')) {
+                validComparisonImages.push(imagePath);
+              } else {
+                const base64Image = await convertImageToBase64(imagePath, API_BASE_URL);
+                if (base64Image) {
+                  validComparisonImages.push(base64Image);
+                }
               }
             } catch (error) {
               console.warn(`Skipping corrupted comparison image: ${imagePath}`, error.message);
@@ -374,13 +460,15 @@ const processImagesInRecord = async (record, API_BASE_URL) => {
       }
     }
 
-    // Process machine process images
+    // Process machine process images (keep existing logic)
     if (processedRecord.inspectionDetails?.machineProcesses) {
       for (const machine of processedRecord.inspectionDetails.machineProcesses) {
         if (machine.image) {
           try {
-            const processedImage = await convertImageToBase64(machine.image, API_BASE_URL);
-            machine.image = processedImage || machine.image;
+            if (!machine.image.startsWith('data:image/')) {
+              const processedImage = await convertImageToBase64(machine.image, API_BASE_URL);
+              machine.image = processedImage || null;
+            }
           } catch (error) {
             console.warn(`Skipping corrupted machine image: ${machine.image}`, error.message);
             machine.image = null;
@@ -390,18 +478,82 @@ const processImagesInRecord = async (record, API_BASE_URL) => {
     }
 
     return processedRecord;
-
   } catch (error) {
-    console.error('Error processing images in record:', error);
+    console.error('❌ Error processing images in record:', error);
     return record; // Return original record if processing fails
   }
 };
 
-
-// Enhanced helper function for image URL construction with better error handling
-const getImageUrl = async (imagePath, API_BASE_URL) => {
-  // Use the enhanced convertImageToBase64 function
-  return await convertImageToBase64(imagePath, API_BASE_URL);
+const processImageToBase64 = async (imagePath) => {
+  try {
+    console.log('🔄 Processing image:', imagePath);
+    
+    const cleanPath = imagePath.replace('./public/', '');
+    const response = await fetch(`${API_BASE_URL}/${cleanPath}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    // Validate JPEG header (SOI marker: 0xFF 0xD8)
+    if (uint8Array.length < 2) {
+      throw new Error('Image data too short');
+    }
+    
+    if (uint8Array[0] !== 0xFF || uint8Array[1] !== 0xD8) {
+      console.warn('⚠️ Invalid JPEG header detected, attempting to fix...');
+      // Sometimes the header gets corrupted, try to find the actual start
+      let soi = -1;
+      for (let i = 0; i < Math.min(100, uint8Array.length - 1); i++) {
+        if (uint8Array[i] === 0xFF && uint8Array[i + 1] === 0xD8) {
+          soi = i;
+          break;
+        }
+      }
+      
+      if (soi > 0) {
+        console.log('✅ Found JPEG SOI at position:', soi);
+        // Create new array starting from the actual SOI
+        const correctedArray = uint8Array.slice(soi);
+        const base64 = btoa(String.fromCharCode.apply(null, correctedArray));
+        return `data:image;base64,${base64}`;
+      } else {
+        throw new Error('No valid JPEG SOI marker found');
+      }
+    }
+    
+    // Convert to base64 using chunks to avoid call stack issues
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, chunk);
+    }
+    
+    const base64 = btoa(binary);
+    const dataUrl = `data:image/jpeg;base64,${base64}`;
+    
+    console.log('✅ Image processed successfully');
+    console.log('   Original size:', uint8Array.length, 'bytes');
+    console.log('   Base64 length:', base64.length);
+    
+    // Final validation
+    try {
+      atob(base64);
+      console.log('✅ Base64 validation passed');
+    } catch (e) {
+      console.error('❌ Base64 validation failed:', e);
+      return null;
+    }
+    
+    return dataUrl;
+  } catch (error) {
+    console.error('❌ Error processing image:', imagePath, error);
+    return null;
+  }
 };
 
   const handleDownloadPDF = async (record) => {
@@ -422,6 +574,31 @@ const getImageUrl = async (imagePath, API_BASE_URL) => {
     
     // Debug: Log processed record structure
     console.log('Processed record defectDetails:', processedRecord.defectDetails);
+    
+    // Final validation of processed images
+    if (processedRecord.defectDetails?.defectsByPc) {
+      processedRecord.defectDetails.defectsByPc.forEach((pcDefect, pcIndex) => {
+        if (pcDefect.pcDefects) {
+          pcDefect.pcDefects.forEach((defect, defectIndex) => {
+            if (defect.defectImages) {
+              console.log(`📊 Final validation - PC ${pcIndex + 1}, Defect ${defectIndex + 1} (${defect.defectName}): ${defect.defectImages.length} images`);
+              defect.defectImages.forEach((img, imgIndex) => {
+                const isBase64 = img && img.startsWith('data:image/');
+                console.log(`  Image ${imgIndex + 1}: ${isBase64 ? '✅ Valid base64' : '❌ Invalid/missing'} - ${img?.substring(0, 50)}...`);
+              });
+            }
+          });
+        }
+      });
+    }
+    
+    if (processedRecord.defectDetails?.additionalImages) {
+      console.log(`📊 Final validation - Additional images: ${processedRecord.defectDetails.additionalImages.length}`);
+      processedRecord.defectDetails.additionalImages.forEach((img, imgIndex) => {
+        const isBase64 = img && img.startsWith('data:image/');
+        console.log(`  Additional image ${imgIndex + 1}: ${isBase64 ? '✅ Valid base64' : '❌ Invalid/missing'} - ${img?.substring(0, 50)}...`);
+      });
+    }
     
     // Fetch comparison data if needed
     let comparisonData = null;
@@ -457,6 +634,21 @@ const getImageUrl = async (imagePath, API_BASE_URL) => {
         console.warn('Could not fetch comparison data:', error);
       }
     }
+    
+    // Debug actual image data being passed to PDF
+    console.log('📝 PDF Generation: Actual image data:');
+    if (processedRecord.defectDetails?.defectsByPc) {
+      processedRecord.defectDetails.defectsByPc.forEach((pc, i) => {
+        pc.pcDefects?.forEach((defect, j) => {
+          console.log(`PC${i+1} Defect${j+1} images:`, defect.defectImages?.map(img => 
+            `${img?.startsWith('data:image/') ? 'BASE64' : 'URL'} (${img?.length})`
+          ));
+        });
+      });
+    }
+    console.log('Additional images:', processedRecord.defectDetails?.additionalImages?.map(img => 
+      `${img?.startsWith('data:image/') ? 'BASE64' : 'URL'} (${img?.length})`
+    ));
     
     // Create and trigger download using react-pdf
     const { pdf } = await import('@react-pdf/renderer');

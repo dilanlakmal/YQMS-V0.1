@@ -857,11 +857,11 @@ const getImageUrl = (imagePath) => {
                                       <div className="text-xs space-y-1">
                                         <div className="flex justify-between">
                                           <span className="text-gray-600 dark:text-gray-400">Standard:</span>
-                                          <span className="font-medium text-gray-800 dark:text-gray-200">{machine.silicon.standardValue !== undefined && machine.silicon.standardValue !== null ? machine.silicon.standardValue : 'N/A'}</span>
+                                          <span className="font-medium text-gray-800 dark:text-gray-200">{machine.silicon.standardValue !== undefined && machine.silicon.standardValue !== null ? machine.silicon.standardValue : 'N/A'}g</span>
                                         </div>
                                         <div className="flex justify-between">
                                           <span className="text-gray-600 dark:text-gray-400">Actual:</span>
-                                          <span className="font-medium text-gray-800 dark:text-gray-200">{machine.silicon.actualValue !== undefined && machine.silicon.actualValue !== null ? machine.silicon.actualValue : 'N/A'}</span>
+                                          <span className="font-medium text-gray-800 dark:text-gray-200">{machine.silicon.actualValue !== undefined && machine.silicon.actualValue !== null ? machine.silicon.actualValue : 'N/A'}g</span>
                                         </div>
                                       </div>
                                     </div>
@@ -888,11 +888,11 @@ const getImageUrl = (imagePath) => {
                                       <div className="text-xs space-y-1">
                                         <div className="flex justify-between">
                                           <span className="text-gray-600 dark:text-gray-400">Standard:</span>
-                                          <span className="font-medium text-gray-800 dark:text-gray-200">{machine.softener.standardValue !== undefined && machine.softener.standardValue !== null ? machine.softener.standardValue : 'N/A'}</span>
+                                          <span className="font-medium text-gray-800 dark:text-gray-200">{machine.softener.standardValue !== undefined && machine.softener.standardValue !== null ? machine.softener.standardValue : 'N/A'}g</span>
                                         </div>
                                         <div className="flex justify-between">
                                           <span className="text-gray-600 dark:text-gray-400">Actual:</span>
-                                          <span className="font-medium text-gray-800 dark:text-gray-200">{machine.softener.actualValue !== undefined && machine.softener.actualValue !== null ? machine.softener.actualValue : 'N/A'}</span>
+                                          <span className="font-medium text-gray-800 dark:text-gray-200">{machine.softener.actualValue !== undefined && machine.softener.actualValue !== null ? machine.softener.actualValue : 'N/A'}g</span>
                                         </div>
                                       </div>
                                     </div>

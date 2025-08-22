@@ -5,9 +5,8 @@ import {
   StyleSheet,
   Text,
   View,
-  Image
+  Image,
 } from "@react-pdf/renderer";
-import React from "react";
 
 // --- FONT REGISTRATION ---
 Font.register({
@@ -136,7 +135,7 @@ const styles = StyleSheet.create({
   defectImage: {
     width: 60,
     height: 40,
-    objectFit: "cover",
+    // objectFit: "cover",
     borderRadius: 2,
     marginRight: 5,
     marginBottom: 3
@@ -164,108 +163,54 @@ const safeString = (value) => {
   return String(value);
 };
 
-// Helper function to convert file paths to accessible URLs with validation
-const getImageUrl = (imagePath, API_BASE_URL) => {
+const getImageSrc = (imagePath, API_BASE_URL) => {
   if (!imagePath) return null;
-
-  // ✅ Allow base64 directly
-  if (imagePath.startsWith('data:image/')) {
-    return imagePath;
+  
+  // If it's already a base64 data URL, return as is
+  if (imagePath.startsWith('data:image/')) return imagePath;
+  
+  // If it's already a full HTTP URL, return as is (shouldn't happen in PDF context)
+  if (imagePath.startsWith('http')) return imagePath;
+  
+  // For relative paths, construct the full URL
+  if (imagePath.startsWith('./public/')) {
+    return `${API_BASE_URL}/${imagePath.replace('./public/', '')}`;
   }
-
-  // ✅ Allow full HTTP(S) URLs
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-
-  // Otherwise, build from API
-  const cleanPath = imagePath.replace('./public', '').replace(/^\/+/, '');
-  return `${API_BASE_URL}/api/image-base64/${cleanPath}`;
+  
+  return `${API_BASE_URL}/${imagePath}`;
 };
 
+const SafeImage = ({ src, style, alt }) => {
+  if (!src) {
+    return (
+      <View style={[style, { backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ fontSize: 6, color: '#6b7280' }}>No Image</Text>
+      </View>
+    );
+  }
 
-// Enhanced helper function to validate image URLs and base64 data URLs
-const isValidImageUrl = (url) => {
-  if (!url || typeof url !== 'string') return false;
-  
-  // Check if it's a base64 data URL with proper format
-  if (url.startsWith('data:image/')) {
-    // Validate base64 format more thoroughly
-    const base64Pattern = /^data:image\/(jpeg|jpg|png|gif|bmp|webp);base64,([A-Za-z0-9+/=]+)$/;
-    return base64Pattern.test(url);
-  }
-  
-  // List of supported image extensions for react-pdf
-  const supportedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
-  
-  try {
-    const urlObj = new URL(url);
-    const pathname = urlObj.pathname.toLowerCase();
-    
-    // Check if the URL ends with a supported image extension
-    return supportedExtensions.some(ext => pathname.endsWith(ext));
-  } catch (error) {
-    return false;
-  }
-};
-
-// Helper function to validate and process image data
-const processImageForPDF = (imageData) => {
-  if (!imageData) return null;
-  
-  // If it's already a valid base64 data URL, return it
-  if (isValidImageUrl(imageData)) {
-    return imageData;
-  }
-  
-  // If it's a string but not a valid URL, try to construct a proper data URL
-  if (typeof imageData === 'string' && imageData.length > 100) {
-    // Assume it's base64 data without the data URL prefix
-    const mimeTypes = ['jpeg', 'jpg', 'png', 'gif', 'bmp', 'webp'];
-    for (const mimeType of mimeTypes) {
-      const testUrl = `data:image/${mimeType};base64,${imageData}`;
-      if (isValidImageUrl(testUrl)) {
-        return testUrl;
+  // Additional validation for base64 images
+  if (src.startsWith('data:image/')) {
+    try {
+      // Basic validation of base64 format
+      const base64Data = src.split(',')[1];
+      if (!base64Data || base64Data.length < 100) {
+        throw new Error('Invalid base64 data');
       }
+      return <Image src={src} style={style} />;
+    } catch (error) {
+      console.warn('Invalid base64 image data:', error.message);
+      return (
+        <View style={[style, { backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={{ fontSize: 6, color: '#6b7280' }}>Invalid Image</Text>
+        </View>
+      );
     }
   }
-  
-  return null;
+
+  return <Image src={src} style={style} />;
 };
 
-// Enhanced Safe Image component with better error handling
-const SafeImage = ({ src, style, alt = "Image" }) => {
-  // Process and validate the image source
-  const processedSrc = processImageForPDF(src);
-  
-  if (!processedSrc || !isValidImageUrl(processedSrc)) {
-    return (
-      <View style={[style, { backgroundColor: "#f3f4f6", justifyContent: "center", alignItems: "center" }]}>
-        <Text style={{ fontSize: 6, color: "#6b7280", textAlign: "center" }}>
-          {alt}: Not available
-        </Text>
-      </View>
-    );
-  }
-
-  try {
-    return (
-      <Image
-        src={processedSrc}
-        style={style}
-      />
-    );
-  } catch (error) {
-    console.warn('Image failed to load:', processedSrc, error);
-    return (
-      <View style={[style, { backgroundColor: "#f3f4f6", justifyContent: "center", alignItems: "center" }]}>
-        <Text style={{ fontSize: 6, color: "#6b7280", textAlign: "center" }}>
-          {alt}: Load failed
-        </Text>
-      </View>
-    );
-  }
-};
 
 // --- REUSABLE PDF COMPONENTS ---
 const PdfHeader = ({ orderNo, beforeAfterWash }) => (
@@ -352,12 +297,13 @@ const QualitySummaryCards = ({ recordData }) => (
 );
 
 const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], API_BASE_URL }) => {
-  console.log('DefectAnalysisTable received:');
-  console.log('- defectsByPc:', defectsByPc);
-  console.log('- additionalImages:', additionalImages);
-  
+  console.log('📝 DefectAnalysisTable received:', {
+    defectsByPc: defectsByPc.length,
+    additionalImages: additionalImages.length,
+    firstDefectImages: defectsByPc[0]?.pcDefects?.[0]?.defectImages?.length || 0
+  });
+
   if (defectsByPc.length === 0 && (!additionalImages || additionalImages.length === 0)) {
-    console.log('No defects or additional images found');
     return (
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Defect Analysis</Text>
@@ -375,7 +321,7 @@ const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], API_BASE
       {defectsByPc.map((pcDefect, pcIndex) => (
         <View key={pcIndex} style={{ marginBottom: 15, border: "1px solid #e5e7eb", borderRadius: 4, padding: 10 }}>
           <Text style={[styles.sectionTitle, { fontSize: 10, marginBottom: 8 }]}>
-            {pcDefect.garmentNo || pcDefect.pcNumber}
+            PC {pcDefect.garmentNo || pcDefect.pcNumber}
           </Text>
           
           {pcDefect.pcDefects && pcDefect.pcDefects.length > 0 ? (
@@ -383,7 +329,6 @@ const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], API_BASE
               <View style={styles.tableRow} fixed>
                 <Text style={[styles.tableColHeader, styles.textLeft, { width: "25%" }]}>Defect Name</Text>
                 <Text style={[styles.tableColHeader, { width: "10%" }]}>Count</Text>
-                <Text style={[styles.tableColHeader, styles.textLeft, { width: "35%" }]}>Remark</Text>
                 <Text style={[styles.tableColHeader, { width: "30%" }]}>Images</Text>
               </View>
               {pcDefect.pcDefects.map((defect, defectIndex) => (
@@ -392,21 +337,26 @@ const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], API_BASE
                     {safeString(defect.defectName)}
                   </Text>
                   <Text style={[styles.tableCol, { width: "10%" }]}>
-                    {defect.defectCount || defect.defectQty || 1}
-                  </Text>
-                  <Text style={[styles.tableCol, styles.textLeft, { width: "35%" }]}>
-                    {safeString(defect.remark)}
+                    {defect.defectQty || defect.defectCount || 1}
                   </Text>
                   <View style={[styles.tableCol, { width: "30%", flexDirection: "row", flexWrap: "wrap" }]}>
                     {defect.defectImages && defect.defectImages.length > 0 ? (
-                      defect.defectImages.map((img, imgIndex) => (
-                        <SafeImage
-                          key={imgIndex}
-                          src={img}
-                          style={styles.defectImage}
-                          alt={`Defect ${defect.defectName} Image ${imgIndex + 1}`}
-                        />
-                      ))
+                      defect.defectImages.map((img, imgIndex) => {
+                        console.log(`🖼️ Processing defect image ${imgIndex + 1}:`, {
+                          type: typeof img,
+                          startsWithData: img?.startsWith('data:image/'),
+                          length: img?.length,
+                          preview: img?.substring(0, 50)
+                        });
+                        
+                        return (
+                          <SafeImage
+                            key={imgIndex}
+                            src={getImageSrc(img, API_BASE_URL)}
+                            style={styles.defectImage}
+                          />
+                        );
+                      })
                     ) : (
                       <Text style={{ fontSize: 6, color: "#6b7280" }}>No images</Text>
                     )}
@@ -417,31 +367,36 @@ const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], API_BASE
           ) : (
             <Text style={{ fontSize: 8, color: "#6b7280" }}>No defects found</Text>
           )}
-          
-          {pcDefect.remark && (
-            <View style={{ marginTop: 8, padding: 8, backgroundColor: "#f9fafb", borderRadius: 4 }}>
-              <Text style={{ fontSize: 8, fontWeight: "bold", marginBottom: 4 }}>Garment Remark:</Text>
-              <Text style={{ fontSize: 8 }}>{pcDefect.remark}</Text>
-            </View>
-          )}
         </View>
       ))}
-
+      
       {/* Additional Images */}
       {additionalImages && additionalImages.length > 0 && (
         <View style={{ marginTop: 15, border: "1px solid #e5e7eb", borderRadius: 4, padding: 10 }}>
           <Text style={[styles.sectionTitle, { fontSize: 10, marginBottom: 8 }]}>
-            Additional Images
+            Additional Images ({additionalImages.length})
           </Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-            {additionalImages.map((img, imgIndex) => (
-              <SafeImage
-                key={imgIndex}
-                src={img}
-                style={[styles.defectImage, { width: 80, height: 60 }]}
-                alt={`Additional Image ${imgIndex + 1}`}
-              />
-            ))}
+            {additionalImages.map((img, imgIndex) => {
+              console.log(`🖼️ Processing additional image ${imgIndex + 1}:`, {
+                type: typeof img,
+                startsWithData: img?.startsWith('data:image/'),
+                length: img?.length,
+                preview: img?.substring(0, 50)
+              });
+              
+              return (
+                <View key={imgIndex} style={{ margin: 2 }}>
+                  <SafeImage
+                    src={getImageSrc(img, API_BASE_URL)}
+                    style={[styles.defectImage, { width: 80, height: 60 }]}
+                  />
+                  <Text style={{ fontSize: 4, color: "#999" }}>
+                    Add {imgIndex + 1}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         </View>
       )}
@@ -600,7 +555,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => (
                 {/* Point Image */}
                 {point.image && (
                   <SafeImage
-                    src={point.image}
+                    src={getImageSrc(point.image, API_BASE_URL)}
                     style={styles.inspectionImage}
                     alt={`Point ${point.pointName} Image`}
                   />
@@ -610,7 +565,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => (
                   point.comparison.map((img, imgIndex) => (
                     <SafeImage
                       key={imgIndex}
-                      src={img}
+                      src={getImageSrc(img, API_BASE_URL)}
                       style={styles.inspectionImage}
                       alt={`Comparison ${imgIndex + 1}`}
                     />
@@ -632,16 +587,16 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => (
         <Text style={[styles.sectionTitle, { fontSize: 10 }]}>Parameters</Text>
         <View style={styles.table}>
           <View style={styles.tableRow} fixed>
-            <Text style={[styles.tableColHeader, styles.textLeft, { width: "25%" }]}>Parameter Name</Text>
+            <Text style={[styles.tableColHeader, { width: "20%" }]}>Parameter Name</Text>
             <Text style={[styles.tableColHeader, { width: "15%" }]}>Checked Qty</Text>
             <Text style={[styles.tableColHeader, { width: "15%" }]}>Defect Qty</Text>
             <Text style={[styles.tableColHeader, { width: "15%" }]}>Pass Rate</Text>
             <Text style={[styles.tableColHeader, { width: "15%" }]}>Result</Text>
-            <Text style={[styles.tableColHeader, styles.textLeft, { width: "15%" }]}>Remark</Text>
+            <Text style={[styles.tableColHeader, styles.textLeft, { width: "20%" }]}>Remark</Text>
           </View>
           {inspectionDetails.parameters.map((param, index) => (
             <View key={index} style={styles.tableRow}>
-              <Text style={[styles.tableCol, styles.textLeft, { width: "25%" }]}>
+              <Text style={[styles.tableCol, styles.textLeft, { width: "20%" }]}>
                 {safeString(param.parameterName)}
               </Text>
               <Text style={[styles.tableCol, { width: "15%" }]}>
@@ -660,7 +615,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => (
               ]}>
                 {safeString(param.result)}
               </Text>
-              <Text style={[styles.tableCol, styles.textLeft, { width: "15%" }]}>
+              <Text style={[styles.tableCol, styles.textLeft, { width: "20%" }]}>
                 {safeString(param.remark)}
               </Text>
             </View>
@@ -740,7 +695,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => (
                   ]}>
                     {machine.silicon.status?.ok ? "OK" : "NG"}
                   </Text>
-                  <Text style={[styles.tableCol, { width: "20%" }]}>-</Text>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>g</Text>
                 </View>
               )}
               {machine.softener?.actualValue && (
@@ -759,7 +714,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => (
                   ]}>
                     {machine.softener.status?.ok ? "OK" : "NG"}
                   </Text>
-                  <Text style={[styles.tableCol, { width: "20%" }]}>-</Text>
+                  <Text style={[styles.tableCol, { width: "20%" }]}>g</Text>
                 </View>
               )}
             </View>
@@ -769,7 +724,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => (
               <View style={styles.imageContainer}>
                 <Text style={{ fontSize: 7, color: "#6b7280", marginBottom: 3 }}>Machine Image:</Text>
                 <SafeImage
-                  src={machine.image}
+                  src={getImageSrc(machine.image, API_BASE_URL)}
                   style={styles.machineImage}
                   alt={`Machine ${machine.machineType} Image`}
                 />
@@ -782,8 +737,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => (
   </View>
 );
 
-const BeforeAfterComparisonSection = ({ recordData, comparisonData }) => {
-  // Determine which data to use as primary and comparison based on wash type
+const BeforeAfterComparisonSection = ({ recordData, comparisonData, API_BASE_URL }) => {
   const primaryData = recordData.before_after_wash === 'Before Wash' ? comparisonData : recordData;
   const secondaryData = recordData.before_after_wash === 'Before Wash' ? recordData : comparisonData;
   
@@ -812,6 +766,7 @@ const BeforeAfterComparisonSection = ({ recordData, comparisonData }) => {
         }
         
         const afterMeasurementPoints = afterSizeData.pcs[0]?.measurementPoints || [];
+        const maxPcs = Math.max(afterSizeData.pcs.length, beforeSizeData.pcs.length);
         
         return (
           <View key={index} style={{ marginBottom: 20 }} wrap={false}>
@@ -826,17 +781,64 @@ const BeforeAfterComparisonSection = ({ recordData, comparisonData }) => {
             </View>
             
             <View style={styles.table}>
+              {/* Main Header Row */}
               <View style={styles.tableRow} fixed>
                 <Text style={[styles.tableColHeader, styles.textLeft, { width: "20%" }]}>Point</Text>
                 <Text style={[styles.tableColHeader, { width: "8%" }]}>Spec</Text>
                 <Text style={[styles.tableColHeader, { width: "10%" }]}>Tolerance</Text>
-                {afterSizeData.pcs.map((pc, pcIndex) => (
-                  <Text key={pcIndex} style={[styles.tableColHeader, { width: `${62 / afterSizeData.pcs.length}%`, fontSize: 6 }]}>
-                    Garment {pc.pcNumber}{"\n"}Before | After | Diff
+                {Array.from({ length: maxPcs }, (_, pcIndex) => (
+                  <Text key={pcIndex} style={[styles.tableColHeader, { width: `${62 / maxPcs}%`, fontSize: 8 }]}>
+                    Garment {pcIndex + 1}
                   </Text>
                 ))}
               </View>
               
+              {/* Sub Header Row for Before/After/Difference */}
+              <View style={styles.tableRow} fixed>
+                <Text style={[styles.tableColHeader, { width: "20%" }]}></Text>
+                <Text style={[styles.tableColHeader, { width: "8%" }]}></Text>
+                <Text style={[styles.tableColHeader, { width: "10%" }]}></Text>
+                {Array.from({ length: maxPcs }, (_, pcIndex) => (
+                  <View key={pcIndex} style={[{ width: `${62 / maxPcs}%`, flexDirection: "row" }]}>
+                    <Text style={[
+                      styles.tableColHeader, 
+                      { 
+                        width: "33.33%", 
+                        fontSize: 6, 
+                        backgroundColor: "#e0f2fe",
+                        borderRightWidth: 0.5,
+                        borderRightColor: "#e5e7eb"
+                      }
+                    ]}>
+                      Before
+                    </Text>
+                    <Text style={[
+                      styles.tableColHeader, 
+                      { 
+                        width: "33.33%", 
+                        fontSize: 6, 
+                        backgroundColor: "#f0f9ff",
+                        borderRightWidth: 0.5,
+                        borderRightColor: "#e5e7eb"
+                      }
+                    ]}>
+                      After
+                    </Text>
+                    <Text style={[
+                      styles.tableColHeader, 
+                      { 
+                        width: "33.34%", 
+                        fontSize: 6, 
+                        backgroundColor: "#fef3c7"
+                      }
+                    ]}>
+                      Diff
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              
+              {/* Data Rows */}
               {afterMeasurementPoints.map((afterPoint, pointIndex) => {
                 const beforePoint = beforeSizeData.pcs[0]?.measurementPoints.find(
                   bp => bp.pointName === afterPoint.pointName
@@ -854,9 +856,11 @@ const BeforeAfterComparisonSection = ({ recordData, comparisonData }) => {
                       {afterPoint.toleranceMinus} / +{afterPoint.tolerancePlus}
                     </Text>
                     
-                    {afterSizeData.pcs.map((afterPc, pcIndex) => {
-                      const afterMeasurement = afterPc.measurementPoints.find(mp => mp.pointName === afterPoint.pointName);
+                    {Array.from({ length: maxPcs }, (_, pcIndex) => {
+                      const afterPc = afterSizeData.pcs[pcIndex];
                       const beforePc = beforeSizeData.pcs[pcIndex];
+                      
+                      const afterMeasurement = afterPc?.measurementPoints.find(mp => mp.pointName === afterPoint.pointName);
                       const beforeMeasurement = beforePc?.measurementPoints.find(mp => mp.pointName === afterPoint.pointName);
                       
                       const afterValue = afterMeasurement?.measured_value_fraction || "N/A";
@@ -866,6 +870,7 @@ const BeforeAfterComparisonSection = ({ recordData, comparisonData }) => {
                       
                       let differenceText = "N/A";
                       let differenceColor = "#6b7280";
+                      
                       if (afterMeasurement && beforeMeasurement && 
                           afterMeasurement.measured_value_decimal !== undefined && 
                           beforeMeasurement.measured_value_decimal !== undefined) {
@@ -875,15 +880,61 @@ const BeforeAfterComparisonSection = ({ recordData, comparisonData }) => {
                           differenceColor = difference > 0 ? "#dc2626" : "#16a34a";
                         } else {
                           differenceText = "0.000\"";
+                          differenceColor = "#6b7280";
                         }
                       }
                       
                       return (
-                        <Text key={pcIndex} style={[styles.tableCol, { width: `${62 / afterSizeData.pcs.length}%`, fontSize: 5 }]}>
-                          <Text style={{ color: "#2563eb" }}>{beforeValue}</Text>{" | "}
-                          <Text style={{ color: afterPass ? "#16a34a" : "#dc2626" }}>{afterValue}</Text>{" | "}
-                          <Text style={{ color: differenceColor, fontWeight: "bold" }}>{differenceText}</Text>
-                        </Text>
+                        <View key={pcIndex} style={[{ width: `${62 / maxPcs}%`, flexDirection: "row" }]}>
+                          {/* Before Value */}
+                          <Text style={[
+                            styles.tableCol, 
+                            styles.textLeft,
+                            { 
+                              width: "33.33%", 
+                              fontSize: 8,
+                              backgroundColor: "#e0f2fe",
+                              color: beforePass ? "#16a34a" : "#dc2626",
+                              fontWeight: "bold",
+                              borderRightWidth: 0.5,
+                              borderRightColor: "#e5e7eb"
+                            }
+                          ]}>
+                            {beforeValue}
+                          </Text>
+                          
+                          {/* After Value */}
+                          <Text style={[
+                            styles.tableCol, 
+                            styles.textLeft,
+                            { 
+                              width: "33.33%", 
+                              fontSize: 8,
+                              backgroundColor: "#f0f9ff",
+                              color: afterPass ? "#16a34a" : "#dc2626",
+                              fontWeight: "bold",
+                              borderRightWidth: 0.5,
+                              borderRightColor: "#e5e7eb"
+                            }
+                          ]}>
+                            {afterValue}
+                          </Text>
+                          
+                          {/* Difference */}
+                          <Text style={[
+                            styles.tableCol, 
+                            styles.textLeft,
+                            { 
+                              width: "33.34%", 
+                              fontSize: 8,
+                              backgroundColor: "#fef3c7",
+                              color: differenceColor,
+                              fontWeight: "bold"
+                            }
+                          ]}>
+                            {differenceText}
+                          </Text>
+                        </View>
                       );
                     })}
                   </View>
@@ -891,16 +942,41 @@ const BeforeAfterComparisonSection = ({ recordData, comparisonData }) => {
               })}
             </View>
             
-            {/* Summary for this size */}
-            <View style={{ marginTop: 8, padding: 6, backgroundColor: "#f9fafb", borderRadius: 4 }}>
-              <Text style={{ fontSize: 7 }}>
-                Before Pass: {beforeSizeData.pcs.reduce((total, pc) => 
-                  total + pc.measurementPoints.filter(mp => mp.result === 'pass').length, 0
-                )} / {beforeSizeData.pcs.reduce((total, pc) => total + pc.measurementPoints.length, 0)} | 
-                After Pass: {afterSizeData.pcs.reduce((total, pc) => 
-                  total + pc.measurementPoints.filter(mp => mp.result === 'pass').length, 0
-                )} / {afterSizeData.pcs.reduce((total, pc) => total + pc.measurementPoints.length, 0)}
-              </Text>
+            {/* Enhanced Summary for this size */}
+            <View style={{ marginTop: 8, padding: 8, backgroundColor: "#f9fafb", borderRadius: 4 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <View style={{ width: "48%" }}>
+                  <Text style={{ fontSize: 8, fontWeight: "bold", color: "#2563eb" }}>Before Wash Summary:</Text>
+                  <Text style={{ fontSize: 7 }}>
+                    Pass: {beforeSizeData.pcs.reduce((total, pc) => 
+                      total + pc.measurementPoints.filter(mp => mp.result === 'pass').length, 0
+                    )} / {beforeSizeData.pcs.reduce((total, pc) => total + pc.measurementPoints.length, 0)}
+                  </Text>
+                  <Text style={{ fontSize: 7 }}>
+                    Pass Rate: {(
+                      (beforeSizeData.pcs.reduce((total, pc) => 
+                        total + pc.measurementPoints.filter(mp => mp.result === 'pass').length, 0
+                      ) / beforeSizeData.pcs.reduce((total, pc) => total + pc.measurementPoints.length, 0)) * 100
+                    ).toFixed(1)}%
+                  </Text>
+                </View>
+                
+                <View style={{ width: "48%" }}>
+                  <Text style={{ fontSize: 8, fontWeight: "bold", color: "#16a34a" }}>After Wash Summary:</Text>
+                  <Text style={{ fontSize: 7 }}>
+                    Pass: {afterSizeData.pcs.reduce((total, pc) => 
+                      total + pc.measurementPoints.filter(mp => mp.result === 'pass').length, 0
+                    )} / {afterSizeData.pcs.reduce((total, pc) => total + pc.measurementPoints.length, 0)}
+                  </Text>
+                  <Text style={{ fontSize: 7 }}>
+                    Pass Rate: {(
+                      (afterSizeData.pcs.reduce((total, pc) => 
+                        total + pc.measurementPoints.filter(mp => mp.result === 'pass').length, 0
+                      ) / afterSizeData.pcs.reduce((total, pc) => total + pc.measurementPoints.length, 0)) * 100
+                    ).toFixed(1)}%
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
         );
@@ -908,6 +984,7 @@ const BeforeAfterComparisonSection = ({ recordData, comparisonData }) => {
     </View>
   );
 };
+
 
 const ComparisonSection = ({ recordData, comparisonData }) => (
   <View style={styles.section}>
@@ -935,8 +1012,7 @@ const ComparisonSection = ({ recordData, comparisonData }) => (
 
 // --- MAIN PDF DOCUMENT COMPONENT ---
 const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_URL }) => {
-  // Add fallback for API_BASE_URL
-  const baseUrl = API_BASE_URL || 'http://localhost:8000'; // Replace with your actual API URL
+  const baseUrl = API_BASE_URL || 'http://localhost:8000';
   
   if (!recordData) {
     return (
@@ -948,7 +1024,6 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
     );
   }
 
-  // Process measurement data
   let measurements = [];
   if (recordData.measurementDetails) {
     if (Array.isArray(recordData.measurementDetails)) {
@@ -965,16 +1040,13 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
 
   return (
     <Document author="Yorkmars (Cambodia) Garment MFG Co., LTD">
-      {/* ======================= FIRST PAGE: SUMMARY ======================= */}
       <Page style={styles.page} orientation="landscape">
         <PdfHeader 
           orderNo={recordData.orderNo || "N/A"} 
           beforeAfterWash={recordData.before_after_wash || "Washing"}
         />
         <Text style={styles.pageHeader}>QC Washing Report Summary</Text>
-
         <OrderInfoSection recordData={recordData} />
-
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quality Summary</Text>
           <QualitySummaryCards recordData={recordData} />
@@ -988,20 +1060,14 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
             </Text>
           </View>
         </View>
-
         <DefectAnalysisTable 
           defectsByPc={defectsByPc} 
           additionalImages={additionalImages}
-          API_BASE_URL={baseUrl} // Use the fallback baseUrl
+          API_BASE_URL={baseUrl}
         />
-        
-        {/* Size-wise Measurement Summary */}
         {measurementSizeSummary.length > 0 && <SizewiseSummaryTable measurementSizeSummary={measurementSizeSummary} />}
-        
         {comparisonData && <ComparisonSection recordData={recordData} comparisonData={comparisonData} />}
       </Page>
-
-      {/* ============ INSPECTION DETAILS PAGE ============ */}
       {(inspectionDetails.checkedPoints?.length > 0 || inspectionDetails.parameters?.length > 0 || inspectionDetails.machineProcesses?.length > 0) && (
         <Page style={styles.page} orientation="landscape">
           <PdfHeader 
@@ -1011,12 +1077,10 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
           <Text style={styles.pageHeader}>Inspection Details</Text>
           <InspectionDetailsSection 
             inspectionDetails={inspectionDetails} 
-            API_BASE_URL={baseUrl} // Use the fallback baseUrl
+            API_BASE_URL={baseUrl}
           />
         </Page>
       )}
-
-      {/* ============ DETAILED MEASUREMENTS PAGES ============ */}
       {measurements.map((sizeData, index) => (
         <Page key={index} style={styles.page} orientation="landscape">
           <PdfHeader 
@@ -1029,8 +1093,6 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
           <MeasurementDetailTable sizeData={sizeData} />
         </Page>
       ))}
-
-      {/* ============ BEFORE VS AFTER COMPARISON PAGE ============ */}
       {comparisonData && comparisonData.measurementDetails?.measurement && 
        recordData.measurementDetails?.measurement && (
         <Page style={styles.page} orientation="landscape">
@@ -1039,13 +1101,11 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
             beforeAfterWash={recordData.before_after_wash || "Washing"}
           />
           <Text style={styles.pageHeader}>Before vs After Wash Comparison</Text>
-          <BeforeAfterComparisonSection recordData={recordData} comparisonData={comparisonData} />
+          <BeforeAfterComparisonSection recordData={recordData} comparisonData={comparisonData} API_BASE_URL={baseUrl} />
         </Page>
       )}
     </Document>
   );
 };
 
-
 export default QcWashingFullReportPDF;
-

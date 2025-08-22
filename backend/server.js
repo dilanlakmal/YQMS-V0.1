@@ -27620,6 +27620,49 @@ app.use((req, res, next) => {
   next();
 });
 
+// GET /api/users endpoint
+app.get('/api/users', async (req, res) => {
+  try {
+    const userList = await UserMain.find(
+      { working_status: "Working" }, // Optional: only get active users
+      {
+        _id: 1,
+        emp_id: 1,
+        eng_name: 1,
+        name: 1,
+        dept_name: 1,
+        sect_name: 1,
+        job_title: 1
+      }
+    ).sort({ eng_name: 1 });
+
+    // Transform the data to match what your frontend expects
+    const transformedUsers = userList.map(user => ({
+      userId: user.emp_id,        // Map emp_id to userId
+      _id: user._id,
+      name: user.eng_name,        // Use eng_name as the display name
+      username: user.name,        // Keep original name as username
+      emp_id: user.emp_id,
+      eng_name: user.eng_name,
+      dept_name: user.dept_name,
+      sect_name: user.sect_name,
+      job_title: user.job_title
+    }));
+
+    res.json({
+      success: true,
+      users: transformedUsers
+    });
+
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch users',
+      error: error.message
+    });
+  }
+});
 
 
 /* -------------------------------------------
