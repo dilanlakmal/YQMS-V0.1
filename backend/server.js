@@ -86,6 +86,7 @@ import createSupplierIssueReportModel from "./models/SupplierIssueReport.js";
 import createQC2OlderDefectModel from "./models/QC2_Older_Defects.js";
 import createQCWashingMachineStandard from "./models/qcWashingStanderd.js";
 import createQCWashingQtyOldSchema from "./models/QCWashingQtyOld.js";
+import createDTOrdersSchema from "./models/dt_orders.js";
 
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
@@ -264,6 +265,7 @@ const SupplierIssueReport = createSupplierIssueReportModel(ymProdConnection);
 const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
 const QCWashingMachineStandard = createQCWashingMachineStandard(ymProdConnection);
 const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
+const DtOrder = createDTOrdersSchema(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -336,67 +338,87 @@ app.use((req, res, next) => {
 //   pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
 // };
 
+/* ------------------------------
+   DTrade SQL Configuration
+------------------------------ */
+
+const sqlConfigDTrade = {
+  user: "user01",
+  password: "Ur@12323",
+  server: "192.167.1.14",
+  database: "DTrade_CONN", // This should be DTrade_CONN, not FC_SYSTEM
+  options: {
+    encrypt: false,
+    trustServerCertificate: true
+  },
+  requestTimeout: 18000000,
+  connectionTimeout: 18000000,
+  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
+};
+
 // Create connection pools
 // const poolYMDataStore = new sql.ConnectionPool(sqlConfig);
 // const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
 // const poolYMWHSYS2 = new sql.ConnectionPool(sqlConfigYMWHSYS2);
+const poolDTrade = new sql.ConnectionPool(sqlConfigDTrade);
 
 // MODIFICATION: Add a status tracker for SQL connections
-// const sqlConnectionStatus = {
+const sqlConnectionStatus = {
   // YMDataStore: false,
   // YMCE_SYSTEM: false,
-  // YMWHSYS2: false
-// };
+  // YMWHSYS2: false,
+  DTrade_CONN: false 
+};
 
 // // Function to connect to a pool, now it updates the status tracker
-// async function connectPool(pool, poolName) {
-//   try {
-//     await pool.connect();
-//     console.log(
-//       `✅ Successfully connected to ${poolName} pool at ${pool.config.server}`
-//     );
-//     sqlConnectionStatus[poolName] = true; // Set status to true on success
+async function connectPool(pool, poolName) {
+  try {
+    await pool.connect();
+    console.log(
+      `✅ Successfully connected to ${poolName} pool at ${pool.config.server}`
+    );
+    sqlConnectionStatus[poolName] = true; // Set status to true on success
 
-//     // Listen for errors on the pool to detect disconnections
-//     pool.on("error", (err) => {
-//       console.error(`SQL Pool Error for ${poolName}:`, err);
-//       sqlConnectionStatus[poolName] = false; // Set status to false on error
-//     });
-//   } catch (err) {
-//     console.error(`❌ FAILED to connect to ${poolName} pool:`, err.message);
-//     sqlConnectionStatus[poolName] = false; // Ensure status is false on failure
-//     // We throw the error so Promise.allSettled can catch it
-//     throw new Error(`Failed to connect to ${poolName}`);
-//   }
-// }
+    // Listen for errors on the pool to detect disconnections
+    pool.on("error", (err) => {
+      console.error(`SQL Pool Error for ${poolName}:`, err);
+      sqlConnectionStatus[poolName] = false; // Set status to false on error
+    });
+  } catch (err) {
+    console.error(`❌ FAILED to connect to ${poolName} pool:`, err.message);
+    sqlConnectionStatus[poolName] = false; // Ensure status is false on failure
+    // We throw the error so Promise.allSettled can catch it
+    throw new Error(`Failed to connect to ${poolName}`);
+  }
+}
 
 // MODIFICATION: This function is now more critical for on-demand reconnections.
-// async function ensurePoolConnected(pool, poolName) {
-//   // If we know the connection is down, or the pool reports it's not connected
-//   if (!sqlConnectionStatus[poolName] || !pool.connected) {
-//     console.log(
-//       `Pool ${poolName} is not connected. Attempting to reconnect...`
-//     );
-//     try {
-//       // Attempt to close the pool if it's in a broken state before reconnecting
-//       if (pool.connected || pool.connecting) {
-//         await pool.close();
-//       }
-//       await connectPool(pool, poolName); // This will re-attempt connection and update the status
-//     } catch (reconnectErr) {
-//       console.error(
-//         `Failed to reconnect to ${poolName}:`,
-//         reconnectErr.message
-//       );
-//       sqlConnectionStatus[poolName] = false; // Ensure status is false
-//       throw reconnectErr; // Throw error to be caught by the calling function
-//     }
-//   }
-//   // If we reach here, the pool should be connected.
-//   if (!sqlConnectionStatus[poolName]) {
-//     throw new Error(`Database ${poolName} is unavailable.`);
-//   }
-// }
+async function ensurePoolConnected(pool, poolName) {
+  // If we know the connection is down, or the pool reports it's not connected
+  if (!sqlConnectionStatus[poolName] || !pool.connected) {
+    console.log(
+      `Pool ${poolName} is not connected. Attempting to reconnect...`
+    );
+    try {
+      // Attempt to close the pool if it's in a broken state before reconnecting
+      if (pool.connected || pool.connecting) {
+        await pool.close();
+      }
+      await connectPool(pool, poolName); // This will re-attempt connection and update the status
+    } catch (reconnectErr) {
+      console.error(
+        `Failed to reconnect to ${poolName}:`,
+        reconnectErr.message
+      );
+      sqlConnectionStatus[poolName] = false; // Ensure status is false
+      throw reconnectErr; // Throw error to be caught by the calling function
+    }
+  }
+  // If we reach here, the pool should be connected.
+  if (!sqlConnectionStatus[poolName]) {
+    throw new Error(`Database ${poolName} is unavailable.`);
+  }
+}
 
 // Drop the conflicting St_No_1 index if it exists
 // async function dropConflictingIndex() {
@@ -1709,6 +1731,547 @@ app.use((req, res, next) => {
 //     });
 // });
 
+
+// DT Orders Data Migration Function
+async function syncDTOrdersData() {
+  try {
+    console.log("🔄 Starting DT Orders data migration...");
+    
+    // Ensure DTrade connection
+    await ensurePoolConnected(poolDTrade, "DTrade_CONN");
+    
+    const request = poolDTrade.request();
+
+    // 1. Fetch Order Headers WITH actual size names
+    console.log("📊 Fetching order headers with size names...");
+    const orderHeaderQuery = `
+      SELECT 
+        [SC_Heading], [Factory], [SalesTeamName], [Cust_Code], [ShortName],
+        [EngName], [Order_No], [Ccy], [Style], [CustStyle], [NoOfCol],
+        [Size_Seq10], [Size_Seq20], [Size_Seq30], [Size_Seq40], [Size_Seq50],
+        [Size_Seq60], [Size_Seq70], [Size_Seq80], [Size_Seq90], [Size_Seq100],
+        [Size_Seq110], [Size_Seq120], [Size_Seq130], [Size_Seq140], [Size_Seq150],
+        [Size_Seq160], [Size_Seq170], [Size_Seq180], [Size_Seq190], [Size_Seq200],
+        [Size_Seq210], [Size_Seq220], [Size_Seq230], [Size_Seq240], [Size_Seq250],
+        [Size_Seq260], [Size_Seq270], [Size_Seq280], [Size_Seq290], [Size_Seq300],
+        [Size_Seq310], [Size_Seq320], [Size_Seq330], [Size_Seq340], [Size_Seq350],
+        [Size_Seq360], [Size_Seq370], [Size_Seq380], [Size_Seq390], [Size_Seq400],
+        [OrderQuantity], [Det_ID]
+      FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
+      ORDER BY [Order_No]
+    `;
+    const orderHeaderResult = await request.query(orderHeaderQuery);
+
+    // 2. Fetch Size Names for each order (separate query to get the size names)
+    // 2. Fetch Size Names for each order (FIXED query)
+console.log("📏 Fetching size names for each order...");
+const sizeNamesQuery = `
+  SELECT DISTINCT
+    [Order_No],
+    CASE WHEN [Size_Seq10] IS NOT NULL AND [Size_Seq10] != '' THEN [Size_Seq10] END as Size_10_Name,
+    CASE WHEN [Size_Seq20] IS NOT NULL AND [Size_Seq20] != '' THEN [Size_Seq20] END as Size_20_Name,
+    CASE WHEN [Size_Seq30] IS NOT NULL AND [Size_Seq30] != '' THEN [Size_Seq30] END as Size_30_Name,
+    CASE WHEN [Size_Seq40] IS NOT NULL AND [Size_Seq40] != '' THEN [Size_Seq40] END as Size_40_Name,
+    CASE WHEN [Size_Seq50] IS NOT NULL AND [Size_Seq50] != '' THEN [Size_Seq50] END as Size_50_Name,
+    CASE WHEN [Size_Seq60] IS NOT NULL AND [Size_Seq60] != '' THEN [Size_Seq60] END as Size_60_Name,
+    CASE WHEN [Size_Seq70] IS NOT NULL AND [Size_Seq70] != '' THEN [Size_Seq70] END as Size_70_Name,
+    CASE WHEN [Size_Seq80] IS NOT NULL AND [Size_Seq80] != '' THEN [Size_Seq80] END as Size_80_Name,
+    CASE WHEN [Size_Seq90] IS NOT NULL AND [Size_Seq90] != '' THEN [Size_Seq90] END as Size_90_Name,
+    CASE WHEN [Size_Seq100] IS NOT NULL AND [Size_Seq100] != '' THEN [Size_Seq100] END as Size_100_Name,
+    CASE WHEN [Size_Seq110] IS NOT NULL AND [Size_Seq110] != '' THEN [Size_Seq110] END as Size_110_Name,
+    CASE WHEN [Size_Seq120] IS NOT NULL AND [Size_Seq120] != '' THEN [Size_Seq120] END as Size_120_Name,
+    CASE WHEN [Size_Seq130] IS NOT NULL AND [Size_Seq130] != '' THEN [Size_Seq130] END as Size_130_Name,
+    CASE WHEN [Size_Seq140] IS NOT NULL AND [Size_Seq140] != '' THEN [Size_Seq140] END as Size_140_Name,
+    CASE WHEN [Size_Seq150] IS NOT NULL AND [Size_Seq150] != '' THEN [Size_Seq150] END as Size_150_Name,
+    CASE WHEN [Size_Seq160] IS NOT NULL AND [Size_Seq160] != '' THEN [Size_Seq160] END as Size_160_Name,
+    CASE WHEN [Size_Seq170] IS NOT NULL AND [Size_Seq170] != '' THEN [Size_Seq170] END as Size_170_Name,
+    CASE WHEN [Size_Seq180] IS NOT NULL AND [Size_Seq180] != '' THEN [Size_Seq180] END as Size_180_Name,
+    CASE WHEN [Size_Seq190] IS NOT NULL AND [Size_Seq190] != '' THEN [Size_Seq190] END as Size_190_Name,
+    CASE WHEN [Size_Seq200] IS NOT NULL AND [Size_Seq200] != '' THEN [Size_Seq200] END as Size_200_Name,
+    CASE WHEN [Size_Seq210] IS NOT NULL AND [Size_Seq210] != '' THEN [Size_Seq210] END as Size_210_Name,
+    CASE WHEN [Size_Seq220] IS NOT NULL AND [Size_Seq220] != '' THEN [Size_Seq220] END as Size_220_Name,
+    CASE WHEN [Size_Seq230] IS NOT NULL AND [Size_Seq230] != '' THEN [Size_Seq230] END as Size_230_Name,
+    CASE WHEN [Size_Seq240] IS NOT NULL AND [Size_Seq240] != '' THEN [Size_Seq240] END as Size_240_Name,
+    CASE WHEN [Size_Seq250] IS NOT NULL AND [Size_Seq250] != '' THEN [Size_Seq250] END as Size_250_Name,
+    CASE WHEN [Size_Seq260] IS NOT NULL AND [Size_Seq260] != '' THEN [Size_Seq260] END as Size_260_Name,
+    CASE WHEN [Size_Seq270] IS NOT NULL AND [Size_Seq270] != '' THEN [Size_Seq270] END as Size_270_Name,
+    CASE WHEN [Size_Seq280] IS NOT NULL AND [Size_Seq280] != '' THEN [Size_Seq280] END as Size_280_Name,
+    CASE WHEN [Size_Seq290] IS NOT NULL AND [Size_Seq290] != '' THEN [Size_Seq290] END as Size_290_Name,
+    CASE WHEN [Size_Seq300] IS NOT NULL AND [Size_Seq300] != '' THEN [Size_Seq300] END as Size_300_Name,
+    CASE WHEN [Size_Seq310] IS NOT NULL AND [Size_Seq310] != '' THEN [Size_Seq310] END as Size_310_Name,
+    CASE WHEN [Size_Seq320] IS NOT NULL AND [Size_Seq320] != '' THEN [Size_Seq320] END as Size_320_Name,
+    CASE WHEN [Size_Seq330] IS NOT NULL AND [Size_Seq330] != '' THEN [Size_Seq330] END as Size_330_Name,
+    CASE WHEN [Size_Seq340] IS NOT NULL AND [Size_Seq340] != '' THEN [Size_Seq340] END as Size_340_Name,
+    CASE WHEN [Size_Seq350] IS NOT NULL AND [Size_Seq350] != '' THEN [Size_Seq350] END as Size_350_Name,
+    CASE WHEN [Size_Seq360] IS NOT NULL AND [Size_Seq360] != '' THEN [Size_Seq360] END as Size_360_Name,
+    CASE WHEN [Size_Seq370] IS NOT NULL AND [Size_Seq370] != '' THEN [Size_Seq370] END as Size_370_Name,
+    CASE WHEN [Size_Seq380] IS NOT NULL AND [Size_Seq380] != '' THEN [Size_Seq380] END as Size_380_Name,
+    CASE WHEN [Size_Seq390] IS NOT NULL AND [Size_Seq390] != '' THEN [Size_Seq390] END as Size_390_Name,
+    CASE WHEN [Size_Seq400] IS NOT NULL AND [Size_Seq400] != '' THEN [Size_Seq400] END as Size_400_Name
+  FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
+  WHERE [Order_No] IS NOT NULL
+`;
+
+    const sizeNamesResult = await request.query(sizeNamesQuery);
+
+    // 3. Fetch Order Colors and Shipping
+    console.log("🎨 Fetching order colors and shipping data...");
+    const orderColorsQuery = `
+      SELECT 
+        [Order_No], [ColorCode], [Color], [ChnColor], [Color_Seq], [ship_seq_no],
+        [Mode], [Country], [Origin], [CustPORef],
+        [Size_Seq10], [Size_Seq20], [Size_Seq30], [Size_Seq40], [Size_Seq50], [Size_Seq60],
+        [Size_Seq70], [Size_Seq80], [Size_Seq90], [Size_Seq100], [Size_Seq110], [Size_Seq120],
+        [Size_Seq130], [Size_Seq140], [Size_Seq150], [Size_Seq160], [Size_Seq170], [Size_Seq180],
+        [Size_Seq190], [Size_Seq200], [Size_Seq210], [Size_Seq220], [Size_Seq230], [Size_Seq240],
+        [Size_Seq250], [Size_Seq260], [Size_Seq270], [Size_Seq280], [Size_Seq290], [Size_Seq300],
+        [Size_Seq310], [Size_Seq320], [Size_Seq330], [Size_Seq340], [Size_Seq350], [Size_Seq360],
+        [Size_Seq370], [Size_Seq380], [Size_Seq390], [Size_Seq400]
+      FROM [DTrade_CONN].[dbo].[vBuyerPOColQty_BySz]
+      ORDER BY [Order_No], [ColorCode], [ship_seq_no]
+    `;
+    const orderColorsResult = await request.query(orderColorsQuery);
+
+    // 4. Fetch Size Specifications
+    console.log("📏 Fetching size specifications...");
+    const sizeSpecsQuery = `
+      SELECT 
+        [JobNo], [SizeSpecId], [DetId], [Seq], [AtoZ], [Area],
+        [ChineseArea], [EnglishRemark], [ChineseRemark], [AreaCode],
+        [IsMiddleCalc], [Tolerance], [Tolerance2], [SpecMemo], [SizeSpecMeasUnit],
+        [Size1], [Size2], [Size3], [Size4], [Size5], [Size6], [Size7], [Size8], [Size9], [Size10],
+        [Size11], [Size12], [Size13], [Size14], [Size15], [Size16], [Size17], [Size18], [Size19], [Size20],
+        [Size21], [Size22], [Size23], [Size24], [Size25], [Size26], [Size27], [Size28], [Size29], [Size30],
+        [Size31], [Size32], [Size33], [Size34], [Size35], [Size36], [Size37], [Size38], [Size39], [Size40]
+      FROM [DTrade_CONN].[dbo].[vTx_JobSizeSpec_Fty]
+      ORDER BY [JobNo], [Seq]
+    `;
+    
+    const sizeSpecsResult = await request.query(sizeSpecsQuery);
+
+
+    // Create size mapping from database for each order
+    const orderSizeMapping = new Map();
+
+    sizeNamesResult.recordset.forEach(sizeRecord => {
+      const orderNo = sizeRecord.Order_No;
+      const sizeMapping = {};
+      
+      // Map size sequences to actual size names from database
+      const sizeColumns = [
+        '10', '20', '30', '40', '50', '60', '70', '80', '90', '100',
+        '110', '120', '130', '140', '150', '160', '170', '180', '190', '200',
+        '210', '220', '230', '240', '250', '260', '270', '280', '290', '300',
+        '310', '320', '330', '340', '350', '360', '370', '380', '390', '400'
+      ];
+
+      sizeColumns.forEach(seq => {
+        const sizeNameColumn = `Size_${seq}_Name`;
+        if (sizeRecord[sizeNameColumn] && sizeRecord[sizeNameColumn] !== null) {
+          // Use the actual size name from database (like "34B", "34C", etc.)
+          sizeMapping[seq] = sizeRecord[sizeNameColumn].toString();
+        }
+      });
+
+      orderSizeMapping.set(orderNo, sizeMapping);
+    });
+
+    // Helper Functions
+    function extractSizeDataAsObject(record, prefix = 'Size_Seq', orderNo) {
+      const sizeMapping = orderSizeMapping.get(orderNo) || {};
+      const sizeObject = {};
+      
+      // Use all possible size columns
+      const allSizeColumns = [
+        '10', '20', '30', '40', '50', '60', '70', '80', '90', '100',
+        '110', '120', '130', '140', '150', '160', '170', '180', '190', '200',
+        '210', '220', '230', '240', '250', '260', '270', '280', '290', '300',
+        '310', '320', '330', '340', '350', '360', '370', '380', '390', '400'
+      ];
+
+      allSizeColumns.forEach(seq => {
+        const columnName = `${prefix}${seq}`;
+        if (record[columnName] && record[columnName] !== null && record[columnName] !== 0) {
+          // Use the actual size name from database mapping
+          const sizeName = sizeMapping[seq] || `Size${seq}`;
+          sizeObject[sizeName] = Number(record[columnName]);
+        }
+      });
+
+      return sizeObject;
+    }
+
+    function convertSizeObjectToArray(sizeObject) {
+      // Convert {"34B": 167, "34C": 493} to [{"34B": 167}, {"34C": 493}]
+      // Sort by size name
+      return Object.entries(sizeObject)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([sizeName, qty]) => {
+          const obj = {};
+          obj[sizeName] = qty;
+          return obj;
+        });
+    }
+
+    function extractSpecsDataAsArray(record, orderNo) {
+      const sizeMapping = orderSizeMapping.get(orderNo) || {};
+      const specsArray = [];
+      
+      for (let i = 1; i <= 40; i++) {
+        const sizeColumn = `Size${i}`;
+        if (record[sizeColumn] && record[sizeColumn] !== null) {
+          const value = record[sizeColumn].toString();
+          const seqNumber = (i * 10).toString();
+          // Use actual size name from database mapping
+          const sizeName = sizeMapping[seqNumber] || `Size${i}`;
+          
+          const specObject = {};
+          specObject[sizeName] = {
+            fraction: value,
+            decimal: parseFloat(value) || 0
+          };
+          specsArray.push(specObject);
+        }
+      }
+      return specsArray;
+    }
+
+    function parseToleranceValue(toleranceStr) {
+      if (!toleranceStr) return { fraction: '', decimal: 0 };
+      
+      let str = toleranceStr.toString().trim();
+      let decimal = 0;
+      
+      // Clean up the string - remove extra quotes and spaces
+      str = str.replace(/['"]/g, '').trim();
+      
+      // Handle negative fractions
+      let isNegative = false;
+      if (str.startsWith('-')) {
+        isNegative = true;
+        str = str.substring(1);
+      }
+      
+      // Parse fractions like "3/8" to decimal
+      if (str.includes('/')) {
+        const parts = str.split('/');
+        if (parts.length === 2) {
+          const numerator = parseFloat(parts[0]);
+          const denominator = parseFloat(parts[1]);
+          if (!isNaN(numerator) && !isNaN(denominator) && denominator !== 0) {
+            decimal = numerator / denominator;
+            if (isNegative) decimal = -decimal;
+          }
+        }
+      } else if (!isNaN(parseFloat(str))) {
+        decimal = parseFloat(str);
+        if (isNegative) decimal = -decimal;
+      }
+      
+      // Ensure decimal is a valid number, default to 0 if NaN
+      if (isNaN(decimal)) {
+        decimal = 0;
+      }
+      
+      return {
+        fraction: toleranceStr.toString(),
+        decimal: decimal
+      };
+    }
+    
+
+    // Process Data
+    console.log("🔄 Processing and organizing data...");
+    const orderMap = new Map();
+
+    // 1. Process Order Headers
+    orderHeaderResult.recordset.forEach(header => {
+      const orderNo = header.Order_No;
+      if (!orderMap.has(orderNo)) {
+        const sizeData = extractSizeDataAsObject(header, 'Size_Seq', orderNo);
+        
+        orderMap.set(orderNo, {
+          SC_Heading: header.SC_Heading,
+          Factory: header.Factory,
+          SalesTeamName: header.SalesTeamName,
+          Cust_Code: header.Cust_Code,
+          ShortName: header.ShortName,
+          EngName: header.EngName,
+          Order_No: header.Order_No,
+          Ccy: header.Ccy,
+          Style: header.Style,
+          CustStyle: header.CustStyle,
+          TotalQty: Number(header.OrderQuantity) || 0,
+          NoOfSize: Object.keys(sizeData).length,
+          OrderColors: [],
+          OrderColorShip: [],
+          SizeSpecs: []
+        });
+      }
+    });
+
+    // 2. Process Order Colors and Shipping
+    const colorSummaryMap = new Map();
+    const shipMap = new Map();
+
+    orderColorsResult.recordset.forEach(record => {
+      const orderNo = record.Order_No;
+      const colorCode = record.ColorCode;
+      const shipSeqNo = record.ship_seq_no;
+
+      if (orderMap.has(orderNo)) {
+        const order = orderMap.get(orderNo);
+        
+        // Update order details from shipping data
+        order.Mode = record.Mode;
+        order.Country = record.Country;
+        order.Origin = record.Origin;
+        order.CusPORef = record.CustPORef;
+
+        // Sum quantities for OrderColors
+        const colorKey = `${orderNo}_${colorCode}`;
+        if (!colorSummaryMap.has(colorKey)) {
+          colorSummaryMap.set(colorKey, {
+            ColorCode: record.ColorCode,
+            Color: record.Color,
+            ChnColor: record.ChnColor,
+            ColorKey: Number(record.Color_Seq) || 0,
+            sizeTotals: {}
+          });
+        }
+
+        const colorSummary = colorSummaryMap.get(colorKey);
+        const sizes = extractSizeDataAsObject(record, 'Size_Seq', orderNo);
+        
+        // Sum up quantities for each size
+        Object.entries(sizes).forEach(([sizeName, qty]) => {
+          if (!colorSummary.sizeTotals[sizeName]) {
+            colorSummary.sizeTotals[sizeName] = 0;
+          }
+          colorSummary.sizeTotals[sizeName] += qty;
+        });
+
+        // Process OrderColorShip
+        const shipKey = `${orderNo}_${colorCode}`;
+        if (!shipMap.has(shipKey)) {
+          shipMap.set(shipKey, {
+            ColorCode: record.ColorCode,
+            Color: record.Color,
+            ChnColor: record.ChnColor,
+            ColorKey: Number(record.Color_Seq) || 0,
+            ShipSeqNo: []
+          });
+        }
+
+        const shipRecord = shipMap.get(shipKey);
+        const existingSeq = shipRecord.ShipSeqNo.find(seq => seq.seqNo === shipSeqNo);
+        
+        if (!existingSeq && shipSeqNo) {
+          const sizesArray = Object.entries(sizes).map(([sizeName, qty]) => ({
+            size: sizeName,
+            qty: qty
+          }));
+          
+          shipRecord.ShipSeqNo.push({
+            seqNo: Number(shipSeqNo),
+            sizes: sizesArray
+          });
+        }
+      }
+    });
+
+    // Convert color summaries to the desired format
+    const colorMap = new Map();
+    for (const [colorKey, colorSummary] of colorSummaryMap) {
+      const orderQtyArray = convertSizeObjectToArray(colorSummary.sizeTotals);
+      
+      colorMap.set(colorKey, {
+        ColorCode: colorSummary.ColorCode,
+        Color: colorSummary.Color,
+        ChnColor: colorSummary.ChnColor,
+        ColorKey: colorSummary.ColorKey,
+        OrderQty: orderQtyArray, 
+        CutQty: {}
+      });
+    }
+
+    // Add colors and shipping to orders
+    for (const [orderNo, order] of orderMap) {
+      // Add OrderColors
+      for (const [colorKey, colorData] of colorMap) {
+        if (colorKey.startsWith(orderNo + '_')) {
+          order.OrderColors.push(colorData);
+        }
+      }
+
+      // Add OrderColorShip
+      for (const [shipKey, shipData] of shipMap) {
+        if (shipKey.startsWith(orderNo + '_')) {
+          order.OrderColorShip.push(shipData);
+        }
+      }
+    }
+
+    // 3. Process Size Specifications
+    sizeSpecsResult.recordset.forEach(spec => {
+      const jobNo = spec.JobNo;
+      
+      if (orderMap.has(jobNo)) {
+        const order = orderMap.get(jobNo);
+        
+        try {
+          const toleranceMin = parseToleranceValue(spec.Tolerance);
+          const tolerancePlus = parseToleranceValue(spec.Tolerance2);
+          const specs = extractSpecsDataAsArray(spec, jobNo);
+
+          const sizeSpecData = {
+            Seq: Number(spec.Seq) || 0,
+            AtoZ: spec.AtoZ,
+            Area: spec.Area,
+            ChineseArea: spec.ChineseArea,
+            EnglishRemark: spec.EnglishRemark,
+            ChineseRemark: spec.ChineseRemark,
+            ChineseName: spec.ChineseArea,
+            AreaCode: spec.AreaCode,
+            IsMiddleCalc: spec.IsMiddleCalc,
+            ToleranceMin: {
+              fraction: toleranceMin.fraction || '',
+              decimal: isNaN(toleranceMin.decimal) ? 0 : toleranceMin.decimal
+            },
+            TolerancePlus: {
+              fraction: tolerancePlus.fraction || '',
+              decimal: isNaN(tolerancePlus.decimal) ? 0 : tolerancePlus.decimal
+            },
+            SpecMemo: spec.SpecMemo,
+            SizeSpecMeasUnit: spec.SizeSpecMeasUnit,
+            Specs: specs || []
+          };
+
+          order.SizeSpecs.push(sizeSpecData);
+          
+        } catch (error) {
+          console.error(`Error processing spec for job ${jobNo}, seq ${spec.Seq}:`, error.message);
+        }
+      }
+    });
+
+    // 4. Save to MongoDB
+    console.log("💾 Saving to MongoDB...");
+    const finalDocs = Array.from(orderMap.values());
+    
+    // Clean and validate data before saving
+    const cleanedDocs = finalDocs.map(doc => {
+      if (doc.SizeSpecs) {
+        doc.SizeSpecs = doc.SizeSpecs.filter(spec => {
+          return spec.Seq && !isNaN(spec.Seq) && 
+                 !isNaN(spec.ToleranceMin.decimal) && 
+                 !isNaN(spec.TolerancePlus.decimal);
+        });
+      }
+      return doc;
+    });
+
+    const bulkOps = cleanedDocs.map(doc => ({
+      updateOne: {
+        filter: { Order_No: doc.Order_No },
+        update: { $set: doc },
+        upsert: true
+      }
+    }));
+
+    if (bulkOps.length > 0) {
+      try {
+        const result = await DtOrder.bulkWrite(bulkOps);
+        console.log(`✅ DT Orders sync completed: Matched ${result.matchedCount}, Upserted ${result.upsertedCount}, Modified ${result.modifiedCount}`);
+        
+        return {
+          success: true,
+          totalOrders: cleanedDocs.length,
+          matched: result.matchedCount,
+          upserted: result.upsertedCount,
+          modified: result.modifiedCount
+        };
+      } catch (bulkError) {
+        console.error("Bulk write error:", bulkError);
+        
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (const doc of cleanedDocs) {
+          try {
+            await DtOrder.findOneAndUpdate(
+              { Order_No: doc.Order_No },
+              doc,
+              { upsert: true, new: true }
+            );
+            successCount++;
+          } catch (singleError) {
+            console.error(`Error saving order ${doc.Order_No}:`, singleError.message);
+            errorCount++;
+          }
+        }
+        
+        return {
+          success: true,
+          totalOrders: cleanedDocs.length,
+          successCount,
+          errorCount,
+          message: `Completed with ${successCount} successes and ${errorCount} errors`
+        };
+      }
+    } else {
+      console.log("⚠️ No data to sync");
+      return { success: true, message: "No data to sync" };
+    }
+
+  } catch (error) {
+    console.error("❌ DT Orders sync failed:", error);
+    throw error;
+  }
+}
+
+// Add API endpoint for manual sync
+app.get("/api/sync-dt-orders", async (req, res) => {
+  try {
+    const result = await syncDTOrdersData();
+    res.json({
+      success: true,
+      message: "DT Orders data sync completed successfully",
+      data: result
+    });
+  } catch (error) {
+    console.error("DT Orders sync API error:", error);
+    res.status(500).json({
+      success: false,
+      message: "DT Orders data sync failed",
+      error: error.message
+    });
+  }
+});
+
+// Initial sync on server start (uncomment when ready)
+syncDTOrdersData()
+  .then((result) => {
+    console.log("✅ Initial DT Orders Data Sync completed:", result);
+  })
+  .catch((err) => {
+    console.error("❌ Initial DT Orders Data Sync failed:", err);
+  });
+
+// Schedule to run every day at 2:00 AM
+cron.schedule("0 2 * * *", () => {
+  syncDTOrdersData()
+    .then((result) => {
+      console.log("✅ DT Orders Data Sync completed (scheduled 2am):", result);
+    })
+    .catch((err) => {
+      console.error("❌ DT Orders Data Sync failed (scheduled 2am):", err);
+    });
+});
+
+// Update your initialization to include DTrade connection
+// initializeConnections();
+// 
 /* ------------------------------
    New Endpoints for CutPanelOrders
 ------------------------------ */
@@ -27535,16 +28098,22 @@ app.get('/api/qc-washing/results', async (req, res) => {
 app.get('/api/image-base64/*', async (req, res) => {
   try {
     const imagePath = req.params[0];
+    console.log('📥 Image request received for:', imagePath);
     
     // Security checks
     if (imagePath.includes('..') || imagePath.includes('~')) {
+      console.log('❌ Security check failed: Invalid path characters');
       return res.status(400).json({ success: false, error: 'Invalid path' });
     }
     
     const fullPath = path.resolve(path.join(__dirname, 'public', 'storage', imagePath));
     const allowedDir = path.resolve(path.join(__dirname, 'public', 'storage'));
     
+    console.log('📁 Full path:', fullPath);
+    console.log('📁 Allowed dir:', allowedDir);
+    
     if (!fullPath.startsWith(allowedDir)) {
+      console.log('❌ Security check failed: Path outside allowed directory');
       return res.status(403).json({ success: false, error: 'Access denied' });
     }
     
@@ -27554,6 +28123,7 @@ app.get('/api/image-base64/*', async (req, res) => {
     
     // Check if file exists
     if (!fs.existsSync(fullPath)) {
+      console.log('❌ File not found:', fullPath);
       return res.status(404).json({ success: false, error: 'Image not found' });
     }
     
@@ -27561,7 +28131,10 @@ app.get('/api/image-base64/*', async (req, res) => {
     const stats = fs.statSync(fullPath);
     const maxSize = 10 * 1024 * 1024; // 10MB
     
+    console.log('📊 File stats:', { size: stats.size, modified: stats.mtime });
+    
     if (stats.size > maxSize) {
+      console.log('❌ File too large:', stats.size);
       return res.status(413).json({ 
         success: false, 
         error: 'Image too large' 
@@ -27575,14 +28148,22 @@ app.get('/api/image-base64/*', async (req, res) => {
     
     // Check if client has cached version
     if (req.headers['if-none-match'] === etag) {
+      console.log('✅ Returning cached version (304)');
       return res.status(304).end();
     }
     
     // Read and convert image
+    console.log('🔄 Reading and converting image...');
     const imageBuffer = fs.readFileSync(fullPath);
     const base64Image = imageBuffer.toString('base64');
     const mimeType = getMimeType(fullPath);
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
+    
+    console.log('✅ Image converted successfully:', {
+      mimeType,
+      originalSize: stats.size,
+      base64Length: base64Image.length
+    });
     
     res.json({ 
       success: true, 
@@ -27592,7 +28173,7 @@ app.get('/api/image-base64/*', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error serving image:', error);
+    console.error('❌ Error serving image:', error);
     res.status(500).json({ success: false, error: 'Error serving image' });
   }
 });
@@ -27611,6 +28192,7 @@ const getMimeType = (filePath) => {
   };
   return mimeTypes[ext] || 'image/jpeg';
 };
+
 
 // Add this to your backend server configuration
 app.use((req, res, next) => {
