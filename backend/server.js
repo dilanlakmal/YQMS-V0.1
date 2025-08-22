@@ -1762,7 +1762,6 @@ async function syncDTOrdersData() {
     `;
     const orderHeaderResult = await request.query(orderHeaderQuery);
 
-    // 2. Fetch Size Names for each order (separate query to get the size names)
     // 2. Fetch Size Names for each order (FIXED query)
 console.log("📏 Fetching size names for each order...");
 const sizeNamesQuery = `
@@ -1925,6 +1924,7 @@ const sizeNamesQuery = `
 }
 
 
+    // Fixed extractSpecsDataAsArray function
     function extractSpecsDataAsArray(record, orderNo) {
       const sizeMapping = orderSizeMapping.get(orderNo) || {};
       const specsArray = [];
@@ -1932,15 +1932,52 @@ const sizeNamesQuery = `
       for (let i = 1; i <= 40; i++) {
         const sizeColumn = `Size${i}`;
         if (record[sizeColumn] && record[sizeColumn] !== null) {
-          const value = record[sizeColumn].toString();
+          const value = record[sizeColumn].toString().trim();
           const seqNumber = (i * 10).toString();
           // Use actual size name from database mapping
           const sizeName = sizeMapping[seqNumber] || `Size${i}`;
           
+          // Convert fraction to decimal
+          let decimal = 0;
+          try {
+            // Handle mixed numbers with dash like "13-3/8" or space like "13 3/8"
+            if ((value.includes('-') || value.includes(' ')) && value.includes('/')) {
+              // Split by dash or space
+              const parts = value.includes('-') ? value.split('-') : value.split(' ');
+              const wholePart = parseFloat(parts[0]) || 0;
+              const fractionPart = parts[1];
+              
+              if (fractionPart && fractionPart.includes('/')) {
+                const [numerator, denominator] = fractionPart.split('/');
+                const fractionDecimal = parseFloat(numerator) / parseFloat(denominator);
+                decimal = wholePart + fractionDecimal;
+              } else {
+                decimal = wholePart;
+              }
+            }
+            // Handle simple fractions like "3/8"
+            else if (value.includes('/')) {
+              const [numerator, denominator] = value.split('/');
+              decimal = parseFloat(numerator) / parseFloat(denominator);
+            }
+            // Handle whole numbers or decimals
+            else {
+              decimal = parseFloat(value) || 0;
+            }
+          } catch (error) {
+            console.error(`Error parsing spec value "${value}":`, error);
+            decimal = parseFloat(value) || 0;
+          }
+          
+          // Ensure decimal is a valid number
+          if (isNaN(decimal)) {
+            decimal = 0;
+          }
+          
           const specObject = {};
           specObject[sizeName] = {
             fraction: value,
-            decimal: parseFloat(value) || 0
+            decimal: Math.round(decimal * 10000) / 10000 // Round to 4 decimal places
           };
           specsArray.push(specObject);
         }
@@ -1948,6 +1985,7 @@ const sizeNamesQuery = `
       return specsArray;
     }
 
+    // Fixed parseToleranceValue function
     function parseToleranceValue(toleranceStr) {
       if (!toleranceStr) return { fraction: '', decimal: 0 };
       
@@ -1957,40 +1995,59 @@ const sizeNamesQuery = `
       // Clean up the string - remove extra quotes and spaces
       str = str.replace(/['"]/g, '').trim();
       
-      // Handle negative fractions
+      // Handle negative values
       let isNegative = false;
       if (str.startsWith('-')) {
         isNegative = true;
         str = str.substring(1);
       }
       
-      // Parse fractions like "3/8" to decimal
-      if (str.includes('/')) {
-        const parts = str.split('/');
-        if (parts.length === 2) {
-          const numerator = parseFloat(parts[0]);
-          const denominator = parseFloat(parts[1]);
-          if (!isNaN(numerator) && !isNaN(denominator) && denominator !== 0) {
-            decimal = numerator / denominator;
-            if (isNegative) decimal = -decimal;
+      try {
+        // Handle mixed numbers with dash like "13-3/8" or space like "13 3/8"
+        if ((str.includes('-') || str.includes(' ')) && str.includes('/')) {
+          // Split by dash or space
+          const parts = str.includes('-') ? str.split('-') : str.split(' ');
+          const wholePart = parseFloat(parts[0]) || 0;
+          const fractionPart = parts[1];
+          
+          if (fractionPart && fractionPart.includes('/')) {
+            const [numerator, denominator] = fractionPart.split('/');
+            const fractionDecimal = parseFloat(numerator) / parseFloat(denominator);
+            decimal = wholePart + fractionDecimal;
+          } else {
+            decimal = wholePart;
           }
         }
-      } else if (!isNaN(parseFloat(str))) {
-        decimal = parseFloat(str);
-        if (isNegative) decimal = -decimal;
+        // Handle simple fractions like "3/8"
+        else if (str.includes('/')) {
+          const [numerator, denominator] = str.split('/');
+          decimal = parseFloat(numerator) / parseFloat(denominator);
+        }
+        // Handle whole numbers or decimals
+        else {
+          decimal = parseFloat(str) || 0;
+        }
+        
+        // Apply negative sign if needed
+        if (isNegative) {
+          decimal = -decimal;
+        }
+        
+      } catch (error) {
+        console.error(`Error parsing tolerance value "${toleranceStr}":`, error);
+        decimal = 0;
       }
       
-      // Ensure decimal is a valid number, default to 0 if NaN
+      // Ensure decimal is a valid number
       if (isNaN(decimal)) {
         decimal = 0;
       }
       
       return {
         fraction: toleranceStr.toString(),
-        decimal: decimal
+        decimal: Math.round(decimal * 10000) / 10000 // Round to 4 decimal places
       };
     }
-    
 
     // Process Data
     console.log("🔄 Processing and organizing data...");
@@ -2038,7 +2095,7 @@ const sizeNamesQuery = `
         order.Mode = record.Mode;
         order.Country = record.Country;
         order.Origin = record.Origin;
-        order.CusPORef = record.CustPORef;
+        order.CustPORef = record.CustPORef;
 
         // Sum quantities for OrderColors
         const colorKey = `${orderNo}_${colorCode}`;
@@ -2064,31 +2121,30 @@ const sizeNamesQuery = `
         });
 
         // Process OrderColorShip
-        const shipKey = `${orderNo}_${colorCode}`;
-        if (!shipMap.has(shipKey)) {
-          shipMap.set(shipKey, {
-            ColorCode: record.ColorCode,
-            Color: record.Color,
-            ChnColor: record.ChnColor,
-            ColorKey: Number(record.Color_Seq) || 0,
-            ShipSeqNo: []
-          });
-        }
+          const shipKey = `${orderNo}_${colorCode}`;
+          if (!shipMap.has(shipKey)) {
+            shipMap.set(shipKey, {
+              ColorCode: record.ColorCode,
+              Color: record.Color,
+              ChnColor: record.ChnColor,
+              ColorKey: Number(record.Color_Seq) || 0,
+              ShipSeqNo: []
+            });
+          }
 
-        const shipRecord = shipMap.get(shipKey);
-        const existingSeq = shipRecord.ShipSeqNo.find(seq => seq.seqNo === shipSeqNo);
-        
-        if (!existingSeq && shipSeqNo) {
-          const sizesArray = Object.entries(sizes).map(([sizeName, qty]) => ({
-            size: sizeName,
-            qty: qty
-          }));
-          
-          shipRecord.ShipSeqNo.push({
-            seqNo: Number(shipSeqNo),
-            sizes: sizesArray
-          });
-        }
+          const shipRecord = shipMap.get(shipKey);
+          const existingSeq = shipRecord.ShipSeqNo.find(seq => seq.seqNo === shipSeqNo);
+
+          if (!existingSeq && shipSeqNo) {
+            // Convert sizes object to array format like OrderQty
+            const sizesArray = convertSizeObjectToArray(sizes, orderNo);
+            
+            shipRecord.ShipSeqNo.push({
+              seqNo: Number(shipSeqNo),
+              sizes: sizesArray  // Now this will be in format [{"XS": 44}, {"S": 130}, ...]
+            });
+          }
+
       }
     });
 
@@ -2128,46 +2184,52 @@ for (const [colorKey, colorSummary] of colorSummaryMap) {
 
     // 3. Process Size Specifications
     sizeSpecsResult.recordset.forEach(spec => {
-      const jobNo = spec.JobNo;
+  const jobNo = spec.JobNo;
+  
+  if (orderMap.has(jobNo)) {
+    const order = orderMap.get(jobNo);
+    
+    try {
+      // Use the fixed parseToleranceValue function
+      const toleranceMin = parseToleranceValue(spec.Tolerance);
+      const tolerancePlus = parseToleranceValue(spec.Tolerance2);
+      const specs = extractSpecsDataAsArray(spec, jobNo);
       
-      if (orderMap.has(jobNo)) {
-        const order = orderMap.get(jobNo);
-        
-        try {
-          const toleranceMin = parseToleranceValue(spec.Tolerance);
-          const tolerancePlus = parseToleranceValue(spec.Tolerance2);
-          const specs = extractSpecsDataAsArray(spec, jobNo);
-
-          const sizeSpecData = {
-            Seq: Number(spec.Seq) || 0,
-            AtoZ: spec.AtoZ,
-            Area: spec.Area,
-            ChineseArea: spec.ChineseArea,
-            EnglishRemark: spec.EnglishRemark,
-            ChineseRemark: spec.ChineseRemark,
-            ChineseName: spec.ChineseArea,
-            AreaCode: spec.AreaCode,
-            IsMiddleCalc: spec.IsMiddleCalc,
-            ToleranceMin: {
-              fraction: toleranceMin.fraction || '',
-              decimal: isNaN(toleranceMin.decimal) ? 0 : toleranceMin.decimal
-            },
-            TolerancePlus: {
-              fraction: tolerancePlus.fraction || '',
-              decimal: isNaN(tolerancePlus.decimal) ? 0 : tolerancePlus.decimal
-            },
-            SpecMemo: spec.SpecMemo,
-            SizeSpecMeasUnit: spec.SizeSpecMeasUnit,
-            Specs: specs || []
-          };
-
-          order.SizeSpecs.push(sizeSpecData);
-          
-        } catch (error) {
-          console.error(`Error processing spec for job ${jobNo}, seq ${spec.Seq}:`, error.message);
-        }
-      }
-    });
+      const sizeSpecData = {
+        Seq: Number(spec.Seq) || 0,
+        AtoZ: spec.AtoZ || '',
+        Area: spec.Area || '',
+        ChineseArea: spec.ChineseArea || '',
+        EnglishRemark: spec.EnglishRemark || '',
+        ChineseRemark: spec.ChineseRemark || '',
+        ChineseName: spec.ChineseArea || '',
+        AreaCode: spec.AreaCode || '',
+        IsMiddleCalc: spec.IsMiddleCalc,
+        ToleranceMin: {
+          fraction: toleranceMin.fraction || '',
+          decimal: toleranceMin.decimal
+        },
+        TolerancePlus: {
+          fraction: tolerancePlus.fraction || '',
+          decimal: tolerancePlus.decimal
+        },
+        SpecMemo: spec.SpecMemo,
+        SizeSpecMeasUnit: spec.SizeSpecMeasUnit || '',
+        Specs: specs || []
+      };
+      
+      order.SizeSpecs.push(sizeSpecData);
+      
+    } catch (error) {
+      console.error(`Error processing spec for job ${jobNo}, seq ${spec.Seq}:`, error.message);
+      console.error('Spec data:', {
+        Tolerance: spec.Tolerance,
+        Tolerance2: spec.Tolerance2,
+        Seq: spec.Seq
+      });
+    }
+  }
+});
 
     // 4. Save to MongoDB
     console.log("💾 Saving to MongoDB...");

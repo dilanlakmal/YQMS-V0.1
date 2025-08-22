@@ -112,17 +112,7 @@ const ShipSeqNoSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  sizes: [{
-    size: {
-      type: String,
-      required: true
-    },
-    qty: {
-      type: Number,
-      required: true,
-      default: 0
-    }
-  }]
+   sizes: [OrderQtyItemSchema]
 }, { _id: false });
 
 const OrderColorShipSchema = new mongoose.Schema({
