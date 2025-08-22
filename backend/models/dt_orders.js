@@ -228,7 +228,7 @@ const DtOrderSchema = new mongoose.Schema({
   },
   
   // Nested Arrays
-  SizeSpecs: [SizeSpecSchema],
+  SizeSpec: [SizeSpecSchema],
   OrderColors: [OrderColorsSchema],
   OrderColorShip: [OrderColorShipSchema]
 }, {

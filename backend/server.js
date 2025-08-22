@@ -1833,7 +1833,7 @@ const sizeNamesQuery = `
 
     // 4. Fetch Size Specifications
     console.log("📏 Fetching size specifications...");
-    const sizeSpecsQuery = `
+    const sizeSpecQuery = `
       SELECT 
         [JobNo], [SizeSpecId], [DetId], [Seq], [AtoZ], [Area],
         [ChineseArea], [EnglishRemark], [ChineseRemark], [AreaCode],
@@ -1846,7 +1846,7 @@ const sizeNamesQuery = `
       ORDER BY [JobNo], [Seq]
     `;
     
-    const sizeSpecsResult = await request.query(sizeSpecsQuery);
+    const sizeSpecResult = await request.query(sizeSpecQuery);
 
 
     // Create size mapping from database for each order
@@ -2049,35 +2049,59 @@ const sizeNamesQuery = `
       };
     }
 
+    function isEmptyOrContainsNumbers(value) {
+  if (!value || value === null || value === undefined || value === '') {
+    return true;
+  }
+  
+  const str = value.toString().trim();
+  if (str === '') {
+    return true;
+  }
+  
+  // Check if string contains any numbers (0-9)
+  return /^\d+$/.test(str);
+}
+
+// Helper function to convert empty strings to null
+function convertEmptyToNull(value) {
+  if (!value || value === null || value === undefined || value === '') {
+    return null;
+  }
+  
+  const str = value.toString().trim();
+  return str === '' ? null : str;
+}
+
     // Process Data
     console.log("🔄 Processing and organizing data...");
     const orderMap = new Map();
 
     // 1. Process Order Headers
     orderHeaderResult.recordset.forEach(header => {
-      const orderNo = header.Order_No;
-      if (!orderMap.has(orderNo)) {
-        const sizeData = extractSizeDataAsObject(header, 'Size_Seq', orderNo);
-        
-        orderMap.set(orderNo, {
-          SC_Heading: header.SC_Heading,
-          Factory: header.Factory,
-          SalesTeamName: header.SalesTeamName,
-          Cust_Code: header.Cust_Code,
-          ShortName: header.ShortName,
-          EngName: header.EngName,
-          Order_No: header.Order_No,
-          Ccy: header.Ccy,
-          Style: header.Style,
-          CustStyle: header.CustStyle,
-          TotalQty: Number(header.OrderQuantity) || 0,
-          NoOfSize: Object.keys(sizeData).length,
-          OrderColors: [],
-          OrderColorShip: [],
-          SizeSpecs: []
-        });
-      }
+  const orderNo = header.Order_No;
+  if (!orderMap.has(orderNo)) {
+    const sizeData = extractSizeDataAsObject(header, 'Size_Seq', orderNo);
+    
+    orderMap.set(orderNo, {
+      SC_Heading: convertEmptyToNull(header.SC_Heading),
+      Factory: convertEmptyToNull(header.Factory),
+      SalesTeamName: convertEmptyToNull(header.SalesTeamName),
+      Cust_Code: convertEmptyToNull(header.Cust_Code),
+      ShortName: convertEmptyToNull(header.ShortName),
+      EngName: convertEmptyToNull(header.EngName),
+      Order_No: header.Order_No,
+      Ccy: convertEmptyToNull(header.Ccy),
+      Style: convertEmptyToNull(header.Style),
+      CustStyle: convertEmptyToNull(header.CustStyle),
+      TotalQty: Number(header.OrderQuantity) || 0,
+      NoOfSize: Object.keys(sizeData).length,
+      OrderColors: [],
+      OrderColorShip: [],
+      SizeSpec: []
     });
+  }
+});
 
     // 2. Process Order Colors and Shipping
     const colorSummaryMap = new Map();
@@ -2087,15 +2111,14 @@ const sizeNamesQuery = `
       const orderNo = record.Order_No;
       const colorCode = record.ColorCode;
       const shipSeqNo = record.ship_seq_no;
-
       if (orderMap.has(orderNo)) {
         const order = orderMap.get(orderNo);
         
         // Update order details from shipping data
-        order.Mode = record.Mode;
-        order.Country = record.Country;
-        order.Origin = record.Origin;
-        order.CustPORef = record.CustPORef;
+        order.Mode = convertEmptyToNull(record.Mode);
+        order.Country = convertEmptyToNull(record.Country);
+        order.Origin = convertEmptyToNull(record.Origin);
+        order.CustPORef = convertEmptyToNull(record.CustPORef);
 
         // Sum quantities for OrderColors
         const colorKey = `${orderNo}_${colorCode}`;
@@ -2183,7 +2206,7 @@ for (const [colorKey, colorSummary] of colorSummaryMap) {
     }
 
     // 3. Process Size Specifications
-    sizeSpecsResult.recordset.forEach(spec => {
+    sizeSpecResult.recordset.forEach(spec => {
   const jobNo = spec.JobNo;
   
   if (orderMap.has(jobNo)) {
@@ -2195,16 +2218,34 @@ for (const [colorKey, colorSummary] of colorSummaryMap) {
       const tolerancePlus = parseToleranceValue(spec.Tolerance2);
       const specs = extractSpecsDataAsArray(spec, jobNo);
       
+      // Handle ChineseName logic
+      let chineseName = null;
+        const chineseArea = convertEmptyToNull(spec.ChineseArea);
+        const chineseRemark = convertEmptyToNull(spec.ChineseRemark);
+
+        // If ChineseArea is null/empty/only numbers, use ChineseRemark
+        if (isEmptyOrContainsNumbers(spec.ChineseArea)) {
+          chineseName = chineseRemark;
+        }
+        // If ChineseRemark is null/empty/only numbers, use ChineseArea
+        else if (isEmptyOrContainsNumbers(spec.ChineseRemark)) {
+          chineseName = chineseArea;
+        }
+        // If both are valid, prefer ChineseArea
+        else {
+          chineseName = chineseArea;
+        }
+      
       const sizeSpecData = {
         Seq: Number(spec.Seq) || 0,
-        AtoZ: spec.AtoZ || '',
-        Area: spec.Area || '',
-        ChineseArea: spec.ChineseArea || '',
-        EnglishRemark: spec.EnglishRemark || '',
-        ChineseRemark: spec.ChineseRemark || '',
-        ChineseName: spec.ChineseArea || '',
-        AreaCode: spec.AreaCode || '',
-        IsMiddleCalc: spec.IsMiddleCalc,
+        AtoZ: convertEmptyToNull(spec.AtoZ),
+        Area: convertEmptyToNull(spec.Area),
+        ChineseArea: chineseArea,
+        EnglishRemark: convertEmptyToNull(spec.EnglishRemark),
+        ChineseRemark: chineseRemark,
+        ChineseName: chineseName,
+        AreaCode: convertEmptyToNull(spec.AreaCode),
+        IsMiddleCalc: spec.IsMiddleCalc || null,
         ToleranceMin: {
           fraction: toleranceMin.fraction || '',
           decimal: toleranceMin.decimal
@@ -2213,19 +2254,21 @@ for (const [colorKey, colorSummary] of colorSummaryMap) {
           fraction: tolerancePlus.fraction || '',
           decimal: tolerancePlus.decimal
         },
-        SpecMemo: spec.SpecMemo,
-        SizeSpecMeasUnit: spec.SizeSpecMeasUnit || '',
+        SpecMemo: convertEmptyToNull(spec.SpecMemo),
+        SizeSpecMeasUnit: convertEmptyToNull(spec.SizeSpecMeasUnit),
         Specs: specs || []
       };
       
-      order.SizeSpecs.push(sizeSpecData);
+      order.SizeSpec.push(sizeSpecData);
       
     } catch (error) {
       console.error(`Error processing spec for job ${jobNo}, seq ${spec.Seq}:`, error.message);
       console.error('Spec data:', {
         Tolerance: spec.Tolerance,
         Tolerance2: spec.Tolerance2,
-        Seq: spec.Seq
+        Seq: spec.Seq,
+        ChineseArea: spec.ChineseArea,
+        ChineseRemark: spec.ChineseRemark
       });
     }
   }
@@ -2237,8 +2280,8 @@ for (const [colorKey, colorSummary] of colorSummaryMap) {
     
     // Clean and validate data before saving
     const cleanedDocs = finalDocs.map(doc => {
-      if (doc.SizeSpecs) {
-        doc.SizeSpecs = doc.SizeSpecs.filter(spec => {
+      if (doc.SizeSpec) {
+        doc.SizeSpec = doc.SizeSpec.filter(spec => {
           return spec.Seq && !isNaN(spec.Seq) && 
                  !isNaN(spec.ToleranceMin.decimal) && 
                  !isNaN(spec.TolerancePlus.decimal);
