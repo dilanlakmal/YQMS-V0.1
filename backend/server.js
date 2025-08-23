@@ -324,19 +324,19 @@ app.use((req, res, next) => {
 //    YMWHSYS2 SQL Configuration
 // ------------------------------ */
 
-// const sqlConfigYMWHSYS2 = {
-//   user: "user01",
-//   password: "Ur@12323",
-//   server: "192.167.1.14", //"YM-WHSYS",
-//   database: "FC_SYSTEM",
-//   options: {
-//     encrypt: false,
-//     trustServerCertificate: true
-//   },
-//   requestTimeout: 18000000,
-//   connectionTimeout: 18000000,
-//   pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
-// };
+const sqlConfigYMWHSYS2 = {
+  user: "user01",
+  password: "Ur@12323",
+  server: "192.167.1.14", //"YM-WHSYS",
+  database: "FC_SYSTEM",
+  options: {
+    encrypt: false,
+    trustServerCertificate: true
+  },
+  requestTimeout: 18000000,
+  connectionTimeout: 18000000,
+  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
+};
 
 /* ------------------------------
    DTrade SQL Configuration
@@ -359,14 +359,14 @@ const sqlConfigDTrade = {
 // Create connection pools
 // const poolYMDataStore = new sql.ConnectionPool(sqlConfig);
 // const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
-// const poolYMWHSYS2 = new sql.ConnectionPool(sqlConfigYMWHSYS2);
+const poolYMWHSYS2 = new sql.ConnectionPool(sqlConfigYMWHSYS2);
 const poolDTrade = new sql.ConnectionPool(sqlConfigDTrade);
 
 // MODIFICATION: Add a status tracker for SQL connections
 const sqlConnectionStatus = {
   // YMDataStore: false,
   // YMCE_SYSTEM: false,
-  // YMWHSYS2: false,
+  YMWHSYS2: false,
   DTrade_CONN: false 
 };
 
@@ -1740,7 +1740,11 @@ async function syncDTOrdersData() {
     // Ensure DTrade connection
     await ensurePoolConnected(poolDTrade, "DTrade_CONN");
     
+    // Ensure FC_SYSTEM connection
+    await ensurePoolConnected(poolYMWHSYS2, "FC_SYSTEM");
+
     const request = poolDTrade.request();
+    const requestFC = poolYMWHSYS2.request();
 
     // 1. Fetch Order Headers WITH actual size names
     console.log("📊 Fetching order headers with size names...");
@@ -1760,56 +1764,57 @@ async function syncDTOrdersData() {
       FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
       ORDER BY [Order_No]
     `;
+
     const orderHeaderResult = await request.query(orderHeaderQuery);
 
     // 2. Fetch Size Names for each order (FIXED query)
-console.log("📏 Fetching size names for each order...");
-const sizeNamesQuery = `
-  SELECT DISTINCT
-    [Order_No],
-    CASE WHEN [Size_Seq10] IS NOT NULL AND [Size_Seq10] != '' THEN [Size_Seq10] END as Size_10_Name,
-    CASE WHEN [Size_Seq20] IS NOT NULL AND [Size_Seq20] != '' THEN [Size_Seq20] END as Size_20_Name,
-    CASE WHEN [Size_Seq30] IS NOT NULL AND [Size_Seq30] != '' THEN [Size_Seq30] END as Size_30_Name,
-    CASE WHEN [Size_Seq40] IS NOT NULL AND [Size_Seq40] != '' THEN [Size_Seq40] END as Size_40_Name,
-    CASE WHEN [Size_Seq50] IS NOT NULL AND [Size_Seq50] != '' THEN [Size_Seq50] END as Size_50_Name,
-    CASE WHEN [Size_Seq60] IS NOT NULL AND [Size_Seq60] != '' THEN [Size_Seq60] END as Size_60_Name,
-    CASE WHEN [Size_Seq70] IS NOT NULL AND [Size_Seq70] != '' THEN [Size_Seq70] END as Size_70_Name,
-    CASE WHEN [Size_Seq80] IS NOT NULL AND [Size_Seq80] != '' THEN [Size_Seq80] END as Size_80_Name,
-    CASE WHEN [Size_Seq90] IS NOT NULL AND [Size_Seq90] != '' THEN [Size_Seq90] END as Size_90_Name,
-    CASE WHEN [Size_Seq100] IS NOT NULL AND [Size_Seq100] != '' THEN [Size_Seq100] END as Size_100_Name,
-    CASE WHEN [Size_Seq110] IS NOT NULL AND [Size_Seq110] != '' THEN [Size_Seq110] END as Size_110_Name,
-    CASE WHEN [Size_Seq120] IS NOT NULL AND [Size_Seq120] != '' THEN [Size_Seq120] END as Size_120_Name,
-    CASE WHEN [Size_Seq130] IS NOT NULL AND [Size_Seq130] != '' THEN [Size_Seq130] END as Size_130_Name,
-    CASE WHEN [Size_Seq140] IS NOT NULL AND [Size_Seq140] != '' THEN [Size_Seq140] END as Size_140_Name,
-    CASE WHEN [Size_Seq150] IS NOT NULL AND [Size_Seq150] != '' THEN [Size_Seq150] END as Size_150_Name,
-    CASE WHEN [Size_Seq160] IS NOT NULL AND [Size_Seq160] != '' THEN [Size_Seq160] END as Size_160_Name,
-    CASE WHEN [Size_Seq170] IS NOT NULL AND [Size_Seq170] != '' THEN [Size_Seq170] END as Size_170_Name,
-    CASE WHEN [Size_Seq180] IS NOT NULL AND [Size_Seq180] != '' THEN [Size_Seq180] END as Size_180_Name,
-    CASE WHEN [Size_Seq190] IS NOT NULL AND [Size_Seq190] != '' THEN [Size_Seq190] END as Size_190_Name,
-    CASE WHEN [Size_Seq200] IS NOT NULL AND [Size_Seq200] != '' THEN [Size_Seq200] END as Size_200_Name,
-    CASE WHEN [Size_Seq210] IS NOT NULL AND [Size_Seq210] != '' THEN [Size_Seq210] END as Size_210_Name,
-    CASE WHEN [Size_Seq220] IS NOT NULL AND [Size_Seq220] != '' THEN [Size_Seq220] END as Size_220_Name,
-    CASE WHEN [Size_Seq230] IS NOT NULL AND [Size_Seq230] != '' THEN [Size_Seq230] END as Size_230_Name,
-    CASE WHEN [Size_Seq240] IS NOT NULL AND [Size_Seq240] != '' THEN [Size_Seq240] END as Size_240_Name,
-    CASE WHEN [Size_Seq250] IS NOT NULL AND [Size_Seq250] != '' THEN [Size_Seq250] END as Size_250_Name,
-    CASE WHEN [Size_Seq260] IS NOT NULL AND [Size_Seq260] != '' THEN [Size_Seq260] END as Size_260_Name,
-    CASE WHEN [Size_Seq270] IS NOT NULL AND [Size_Seq270] != '' THEN [Size_Seq270] END as Size_270_Name,
-    CASE WHEN [Size_Seq280] IS NOT NULL AND [Size_Seq280] != '' THEN [Size_Seq280] END as Size_280_Name,
-    CASE WHEN [Size_Seq290] IS NOT NULL AND [Size_Seq290] != '' THEN [Size_Seq290] END as Size_290_Name,
-    CASE WHEN [Size_Seq300] IS NOT NULL AND [Size_Seq300] != '' THEN [Size_Seq300] END as Size_300_Name,
-    CASE WHEN [Size_Seq310] IS NOT NULL AND [Size_Seq310] != '' THEN [Size_Seq310] END as Size_310_Name,
-    CASE WHEN [Size_Seq320] IS NOT NULL AND [Size_Seq320] != '' THEN [Size_Seq320] END as Size_320_Name,
-    CASE WHEN [Size_Seq330] IS NOT NULL AND [Size_Seq330] != '' THEN [Size_Seq330] END as Size_330_Name,
-    CASE WHEN [Size_Seq340] IS NOT NULL AND [Size_Seq340] != '' THEN [Size_Seq340] END as Size_340_Name,
-    CASE WHEN [Size_Seq350] IS NOT NULL AND [Size_Seq350] != '' THEN [Size_Seq350] END as Size_350_Name,
-    CASE WHEN [Size_Seq360] IS NOT NULL AND [Size_Seq360] != '' THEN [Size_Seq360] END as Size_360_Name,
-    CASE WHEN [Size_Seq370] IS NOT NULL AND [Size_Seq370] != '' THEN [Size_Seq370] END as Size_370_Name,
-    CASE WHEN [Size_Seq380] IS NOT NULL AND [Size_Seq380] != '' THEN [Size_Seq380] END as Size_380_Name,
-    CASE WHEN [Size_Seq390] IS NOT NULL AND [Size_Seq390] != '' THEN [Size_Seq390] END as Size_390_Name,
-    CASE WHEN [Size_Seq400] IS NOT NULL AND [Size_Seq400] != '' THEN [Size_Seq400] END as Size_400_Name
-  FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
-  WHERE [Order_No] IS NOT NULL
-`;
+    console.log("📏 Fetching size names for each order...");
+    const sizeNamesQuery = `
+      SELECT DISTINCT
+        [Order_No],
+        CASE WHEN [Size_Seq10] IS NOT NULL AND [Size_Seq10] != '' THEN [Size_Seq10] END as Size_10_Name,
+        CASE WHEN [Size_Seq20] IS NOT NULL AND [Size_Seq20] != '' THEN [Size_Seq20] END as Size_20_Name,
+        CASE WHEN [Size_Seq30] IS NOT NULL AND [Size_Seq30] != '' THEN [Size_Seq30] END as Size_30_Name,
+        CASE WHEN [Size_Seq40] IS NOT NULL AND [Size_Seq40] != '' THEN [Size_Seq40] END as Size_40_Name,
+        CASE WHEN [Size_Seq50] IS NOT NULL AND [Size_Seq50] != '' THEN [Size_Seq50] END as Size_50_Name,
+        CASE WHEN [Size_Seq60] IS NOT NULL AND [Size_Seq60] != '' THEN [Size_Seq60] END as Size_60_Name,
+        CASE WHEN [Size_Seq70] IS NOT NULL AND [Size_Seq70] != '' THEN [Size_Seq70] END as Size_70_Name,
+        CASE WHEN [Size_Seq80] IS NOT NULL AND [Size_Seq80] != '' THEN [Size_Seq80] END as Size_80_Name,
+        CASE WHEN [Size_Seq90] IS NOT NULL AND [Size_Seq90] != '' THEN [Size_Seq90] END as Size_90_Name,
+        CASE WHEN [Size_Seq100] IS NOT NULL AND [Size_Seq100] != '' THEN [Size_Seq100] END as Size_100_Name,
+        CASE WHEN [Size_Seq110] IS NOT NULL AND [Size_Seq110] != '' THEN [Size_Seq110] END as Size_110_Name,
+        CASE WHEN [Size_Seq120] IS NOT NULL AND [Size_Seq120] != '' THEN [Size_Seq120] END as Size_120_Name,
+        CASE WHEN [Size_Seq130] IS NOT NULL AND [Size_Seq130] != '' THEN [Size_Seq130] END as Size_130_Name,
+        CASE WHEN [Size_Seq140] IS NOT NULL AND [Size_Seq140] != '' THEN [Size_Seq140] END as Size_140_Name,
+        CASE WHEN [Size_Seq150] IS NOT NULL AND [Size_Seq150] != '' THEN [Size_Seq150] END as Size_150_Name,
+        CASE WHEN [Size_Seq160] IS NOT NULL AND [Size_Seq160] != '' THEN [Size_Seq160] END as Size_160_Name,
+        CASE WHEN [Size_Seq170] IS NOT NULL AND [Size_Seq170] != '' THEN [Size_Seq170] END as Size_170_Name,
+        CASE WHEN [Size_Seq180] IS NOT NULL AND [Size_Seq180] != '' THEN [Size_Seq180] END as Size_180_Name,
+        CASE WHEN [Size_Seq190] IS NOT NULL AND [Size_Seq190] != '' THEN [Size_Seq190] END as Size_190_Name,
+        CASE WHEN [Size_Seq200] IS NOT NULL AND [Size_Seq200] != '' THEN [Size_Seq200] END as Size_200_Name,
+        CASE WHEN [Size_Seq210] IS NOT NULL AND [Size_Seq210] != '' THEN [Size_Seq210] END as Size_210_Name,
+        CASE WHEN [Size_Seq220] IS NOT NULL AND [Size_Seq220] != '' THEN [Size_Seq220] END as Size_220_Name,
+        CASE WHEN [Size_Seq230] IS NOT NULL AND [Size_Seq230] != '' THEN [Size_Seq230] END as Size_230_Name,
+        CASE WHEN [Size_Seq240] IS NOT NULL AND [Size_Seq240] != '' THEN [Size_Seq240] END as Size_240_Name,
+        CASE WHEN [Size_Seq250] IS NOT NULL AND [Size_Seq250] != '' THEN [Size_Seq250] END as Size_250_Name,
+        CASE WHEN [Size_Seq260] IS NOT NULL AND [Size_Seq260] != '' THEN [Size_Seq260] END as Size_260_Name,
+        CASE WHEN [Size_Seq270] IS NOT NULL AND [Size_Seq270] != '' THEN [Size_Seq270] END as Size_270_Name,
+        CASE WHEN [Size_Seq280] IS NOT NULL AND [Size_Seq280] != '' THEN [Size_Seq280] END as Size_280_Name,
+        CASE WHEN [Size_Seq290] IS NOT NULL AND [Size_Seq290] != '' THEN [Size_Seq290] END as Size_290_Name,
+        CASE WHEN [Size_Seq300] IS NOT NULL AND [Size_Seq300] != '' THEN [Size_Seq300] END as Size_300_Name,
+        CASE WHEN [Size_Seq310] IS NOT NULL AND [Size_Seq310] != '' THEN [Size_Seq310] END as Size_310_Name,
+        CASE WHEN [Size_Seq320] IS NOT NULL AND [Size_Seq320] != '' THEN [Size_Seq320] END as Size_320_Name,
+        CASE WHEN [Size_Seq330] IS NOT NULL AND [Size_Seq330] != '' THEN [Size_Seq330] END as Size_330_Name,
+        CASE WHEN [Size_Seq340] IS NOT NULL AND [Size_Seq340] != '' THEN [Size_Seq340] END as Size_340_Name,
+        CASE WHEN [Size_Seq350] IS NOT NULL AND [Size_Seq350] != '' THEN [Size_Seq350] END as Size_350_Name,
+        CASE WHEN [Size_Seq360] IS NOT NULL AND [Size_Seq360] != '' THEN [Size_Seq360] END as Size_360_Name,
+        CASE WHEN [Size_Seq370] IS NOT NULL AND [Size_Seq370] != '' THEN [Size_Seq370] END as Size_370_Name,
+        CASE WHEN [Size_Seq380] IS NOT NULL AND [Size_Seq380] != '' THEN [Size_Seq380] END as Size_380_Name,
+        CASE WHEN [Size_Seq390] IS NOT NULL AND [Size_Seq390] != '' THEN [Size_Seq390] END as Size_390_Name,
+        CASE WHEN [Size_Seq400] IS NOT NULL AND [Size_Seq400] != '' THEN [Size_Seq400] END as Size_400_Name
+      FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
+      WHERE [Order_No] IS NOT NULL
+    `;
 
     const sizeNamesResult = await request.query(sizeNamesQuery);
 
@@ -1829,6 +1834,7 @@ const sizeNamesQuery = `
       FROM [DTrade_CONN].[dbo].[vBuyerPOColQty_BySz]
       ORDER BY [Order_No], [ColorCode], [ship_seq_no]
     `;
+
     const orderColorsResult = await request.query(orderColorsQuery);
 
     // 4. Fetch Size Specifications
@@ -1848,10 +1854,27 @@ const sizeNamesQuery = `
     
     const sizeSpecResult = await request.query(sizeSpecQuery);
 
+    // 5. NEW: Fetch Cut Quantity data from FC_SYSTEM
+    console.log("✂️ Fetching cut quantity data from FC_SYSTEM...");
+      const cutQtyQuery = `
+        SELECT 
+          [BuyerStyle], [StyleNo], [ColorCode], [ChColor], [EngColor], [SIZE],
+          SUM(CAST([PlanQty] AS INT)) as TotalPlanQty, 
+          SUM(CAST([CutQty] AS INT)) as TotalCutQty
+        FROM [FC_SYSTEM].[dbo].[ViewOrderPlanQty]
+        WHERE [StyleNo] IS NOT NULL 
+          AND [ColorCode] IS NOT NULL 
+          AND [SIZE] IS NOT NULL
+          AND [PlanQty] IS NOT NULL 
+          AND [CutQty] IS NOT NULL
+        GROUP BY [BuyerStyle], [StyleNo], [ColorCode], [ChColor], [EngColor], [SIZE]
+        ORDER BY [StyleNo], [ColorCode], [SIZE]
+      `;
+
+      const cutQtyResult = await requestFC.query(cutQtyQuery);
 
     // Create size mapping from database for each order
     const orderSizeMapping = new Map();
-
     sizeNamesResult.recordset.forEach(sizeRecord => {
       const orderNo = sizeRecord.Order_No;
       const sizeMapping = {};
@@ -1863,7 +1886,6 @@ const sizeNamesQuery = `
         '210', '220', '230', '240', '250', '260', '270', '280', '290', '300',
         '310', '320', '330', '340', '350', '360', '370', '380', '390', '400'
       ];
-
       sizeColumns.forEach(seq => {
         const sizeNameColumn = `Size_${seq}_Name`;
         if (sizeRecord[sizeNameColumn] && sizeRecord[sizeNameColumn] !== null) {
@@ -1871,11 +1893,70 @@ const sizeNamesQuery = `
           sizeMapping[seq] = sizeRecord[sizeNameColumn].toString();
         }
       });
-
       orderSizeMapping.set(orderNo, sizeMapping);
     });
 
-    // Helper Functions
+    // NEW: Process Cut Quantity data and create mapping
+    console.log("🔄 Processing cut quantity data...");
+      const cutQtyMapping = new Map();
+
+      cutQtyResult.recordset.forEach(record => {
+        const styleNo = record.StyleNo;        // This should match Order_No in MongoDB
+        const colorCode = record.ColorCode;    // This should match ColorCode in MongoDB
+        const size = record.SIZE;              // Size like "XS", "S", "M", etc.
+        const planQty = Number(record.TotalPlanQty) || 0;
+        const cutQty = Number(record.TotalCutQty) || 0;
+        
+        // Create mapping key: StyleNo_ColorCode
+        const key = `${styleNo}_${colorCode}`;
+        
+        if (!cutQtyMapping.has(key)) {
+          cutQtyMapping.set(key, {});
+        }
+        
+        const colorCutData = cutQtyMapping.get(key);
+        
+        // Set the aggregated quantities for this size
+        colorCutData[size] = {
+          PlanCutQty: planQty,
+          ActualCutQty: cutQty
+        };
+      });
+
+      // // DEBUG: Check mapping creation
+      // console.log("🔍 Analyzing cut quantity mapping...");
+
+      // if (cutQtyResult.recordset.length > 0) {
+      //   // Check for the specific order from your MongoDB document
+      //   const testOrder = "PTCOM257";
+      //   const testColor = "CBK001";
+      //   const testKey = `${testOrder}_${testColor}`;
+        
+      //   if (cutQtyMapping.has(testKey)) {
+      //     const testData = cutQtyMapping.get(testKey);
+          
+      //     // Show all sizes for this order/color
+      //     Object.entries(testData).forEach(([size, qty]) => {
+      //       // console.log(`   ${size}: Plan=${qty.PlanCutQty}, Cut=${qty.ActualCutQty}`);
+      //     });
+      //   } else {
+      //     console.log("❌ No matching cut quantity data found");
+          
+      //     // Show what StyleNo values we actually have
+      //     const availableStyleNos = [...new Set(cutQtyResult.recordset.map(r => r.StyleNo))];
+      //     // console.log("📋 Available StyleNo values:", availableStyleNos.slice(0, 10));
+          
+      //     // Show available keys that might match
+      //     const availableKeys = Array.from(cutQtyMapping.keys()).filter(key => 
+      //       key.includes(testOrder) || key.includes(testColor)
+      //     );
+      //     console.log("🔍 Available keys containing order/color:", availableKeys);
+      //   }
+      // }
+
+      // console.log(`📊 Cut quantity mapping created with ${cutQtyMapping.size} entries`);
+
+    // Helper Functions (keeping all existing helper functions)
     function extractSizeDataAsObject(record, prefix = 'Size_Seq', orderNo) {
       const sizeMapping = orderSizeMapping.get(orderNo) || {};
       const sizeObject = {};
@@ -1887,7 +1968,6 @@ const sizeNamesQuery = `
         '210', '220', '230', '240', '250', '260', '270', '280', '290', '300',
         '310', '320', '330', '340', '350', '360', '370', '380', '390', '400'
       ];
-
       allSizeColumns.forEach(seq => {
         const columnName = `${prefix}${seq}`;
         if (record[columnName] && record[columnName] !== null && record[columnName] !== 0) {
@@ -1896,33 +1976,31 @@ const sizeNamesQuery = `
           sizeObject[sizeName] = Number(record[columnName]);
         }
       });
-
       return sizeObject;
     }
 
     function convertSizeObjectToArray(sizeObject, orderNo) {
-  const sizeMapping = orderSizeMapping.get(orderNo) || {};
-  
-  // Create reverse mapping: sizeName -> sequence number
-  const sizeToSeqMapping = {};
-  Object.entries(sizeMapping).forEach(([seq, sizeName]) => {
-    sizeToSeqMapping[sizeName] = parseInt(seq);
-  });
-  
-  // Convert and sort by sequence number instead of alphabetically
-  return Object.entries(sizeObject)
-    .sort(([sizeNameA], [sizeNameB]) => {
-      const seqA = sizeToSeqMapping[sizeNameA] || 999;
-      const seqB = sizeToSeqMapping[sizeNameB] || 999;
-      return seqA - seqB;
-    })
-    .map(([sizeName, qty]) => {
-      const obj = {};
-      obj[sizeName] = qty;
-      return obj;
-    });
-}
-
+      const sizeMapping = orderSizeMapping.get(orderNo) || {};
+      
+      // Create reverse mapping: sizeName -> sequence number
+      const sizeToSeqMapping = {};
+      Object.entries(sizeMapping).forEach(([seq, sizeName]) => {
+        sizeToSeqMapping[sizeName] = parseInt(seq);
+      });
+      
+      // Convert and sort by sequence number instead of alphabetically
+      return Object.entries(sizeObject)
+        .sort(([sizeNameA], [sizeNameB]) => {
+          const seqA = sizeToSeqMapping[sizeNameA] || 999;
+          const seqB = sizeToSeqMapping[sizeNameB] || 999;
+          return seqA - seqB;
+        })
+        .map(([sizeName, qty]) => {
+          const obj = {};
+          obj[sizeName] = qty;
+          return obj;
+        });
+    }
 
     // Fixed extractSpecsDataAsArray function
     function extractSpecsDataAsArray(record, orderNo) {
@@ -2050,28 +2128,28 @@ const sizeNamesQuery = `
     }
 
     function isEmptyOrContainsNumbers(value) {
-  if (!value || value === null || value === undefined || value === '') {
-    return true;
-  }
-  
-  const str = value.toString().trim();
-  if (str === '') {
-    return true;
-  }
-  
-  // Check if string contains any numbers (0-9)
-  return /^\d+$/.test(str);
-}
+      if (!value || value === null || value === undefined || value === '') {
+        return true;
+      }
+      
+      const str = value.toString().trim();
+      if (str === '') {
+        return true;
+      }
+      
+      // Check if string contains any numbers (0-9)
+      return /^\d+$/.test(str);
+    }
 
-// Helper function to convert empty strings to null
-function convertEmptyToNull(value) {
-  if (!value || value === null || value === undefined || value === '') {
-    return null;
-  }
-  
-  const str = value.toString().trim();
-  return str === '' ? null : str;
-}
+    // Helper function to convert empty strings to null
+    function convertEmptyToNull(value) {
+      if (!value || value === null || value === undefined || value === '') {
+        return null;
+      }
+      
+      const str = value.toString().trim();
+      return str === '' ? null : str;
+    }
 
     // Process Data
     console.log("🔄 Processing and organizing data...");
@@ -2079,34 +2157,33 @@ function convertEmptyToNull(value) {
 
     // 1. Process Order Headers
     orderHeaderResult.recordset.forEach(header => {
-  const orderNo = header.Order_No;
-  if (!orderMap.has(orderNo)) {
-    const sizeData = extractSizeDataAsObject(header, 'Size_Seq', orderNo);
-    
-    orderMap.set(orderNo, {
-      SC_Heading: convertEmptyToNull(header.SC_Heading),
-      Factory: convertEmptyToNull(header.Factory),
-      SalesTeamName: convertEmptyToNull(header.SalesTeamName),
-      Cust_Code: convertEmptyToNull(header.Cust_Code),
-      ShortName: convertEmptyToNull(header.ShortName),
-      EngName: convertEmptyToNull(header.EngName),
-      Order_No: header.Order_No,
-      Ccy: convertEmptyToNull(header.Ccy),
-      Style: convertEmptyToNull(header.Style),
-      CustStyle: convertEmptyToNull(header.CustStyle),
-      TotalQty: Number(header.OrderQuantity) || 0,
-      NoOfSize: Object.keys(sizeData).length,
-      OrderColors: [],
-      OrderColorShip: [],
-      SizeSpec: []
+      const orderNo = header.Order_No;
+      if (!orderMap.has(orderNo)) {
+        const sizeData = extractSizeDataAsObject(header, 'Size_Seq', orderNo);
+        
+        orderMap.set(orderNo, {
+          SC_Heading: convertEmptyToNull(header.SC_Heading),
+          Factory: convertEmptyToNull(header.Factory),
+          SalesTeamName: convertEmptyToNull(header.SalesTeamName),
+          Cust_Code: convertEmptyToNull(header.Cust_Code),
+          ShortName: convertEmptyToNull(header.ShortName),
+          EngName: convertEmptyToNull(header.EngName),
+          Order_No: header.Order_No,
+          Ccy: convertEmptyToNull(header.Ccy),
+          Style: convertEmptyToNull(header.Style),
+          CustStyle: convertEmptyToNull(header.CustStyle),
+          TotalQty: Number(header.OrderQuantity) || 0,
+          NoOfSize: Object.keys(sizeData).length,
+          OrderColors: [],
+          OrderColorShip: [],
+          SizeSpec: []
+        });
+      }
     });
-  }
-});
 
     // 2. Process Order Colors and Shipping
     const colorSummaryMap = new Map();
     const shipMap = new Map();
-
     orderColorsResult.recordset.forEach(record => {
       const orderNo = record.Order_No;
       const colorCode = record.ColorCode;
@@ -2144,49 +2221,367 @@ function convertEmptyToNull(value) {
         });
 
         // Process OrderColorShip
-          const shipKey = `${orderNo}_${colorCode}`;
-          if (!shipMap.has(shipKey)) {
-            shipMap.set(shipKey, {
-              ColorCode: record.ColorCode,
-              Color: record.Color,
-              ChnColor: record.ChnColor,
-              ColorKey: Number(record.Color_Seq) || 0,
-              ShipSeqNo: []
-            });
-          }
-
-          const shipRecord = shipMap.get(shipKey);
-          const existingSeq = shipRecord.ShipSeqNo.find(seq => seq.seqNo === shipSeqNo);
-
-          if (!existingSeq && shipSeqNo) {
-            // Convert sizes object to array format like OrderQty
-            const sizesArray = convertSizeObjectToArray(sizes, orderNo);
-            
-            shipRecord.ShipSeqNo.push({
-              seqNo: Number(shipSeqNo),
-              sizes: sizesArray  // Now this will be in format [{"XS": 44}, {"S": 130}, ...]
-            });
-          }
-
+        const shipKey = `${orderNo}_${colorCode}`;
+        if (!shipMap.has(shipKey)) {
+          shipMap.set(shipKey, {
+            ColorCode: record.ColorCode,
+            Color: record.Color,
+            ChnColor: record.ChnColor,
+            ColorKey: Number(record.Color_Seq) || 0,
+            ShipSeqNo: []
+          });
+        }
+        const shipRecord = shipMap.get(shipKey);
+        const existingSeq = shipRecord.ShipSeqNo.find(seq => seq.seqNo === shipSeqNo);
+        if (!existingSeq && shipSeqNo) {
+          // Convert sizes object to array format like OrderQty
+          const sizesArray = convertSizeObjectToArray(sizes, orderNo);
+          
+          shipRecord.ShipSeqNo.push({
+            seqNo: Number(shipSeqNo),
+            sizes: sizesArray  // Now this will be in format [{"XS": 44}, {"S": 130}, ...]
+          });
+        }
       }
     });
 
     // Convert color summaries to the desired format
-const colorMap = new Map();
-for (const [colorKey, colorSummary] of colorSummaryMap) {
-  const orderNo = colorKey.split('_')[0]; // Extract order number from colorKey
-  const orderQtyArray = convertSizeObjectToArray(colorSummary.sizeTotals, orderNo); // Pass orderNo
-  
-  colorMap.set(colorKey, {
-    ColorCode: colorSummary.ColorCode,
-    Color: colorSummary.Color,
-    ChnColor: colorSummary.ChnColor,
-    ColorKey: colorSummary.ColorKey,
-    OrderQty: orderQtyArray, 
-    CutQty: {}
-  });
-}
+    const colorMap = new Map();
+    for (const [colorKey, colorSummary] of colorSummaryMap) {
+      const orderNo = colorKey.split('_')[0]; // Extract order number from colorKey
+      const orderQtyArray = convertSizeObjectToArray(colorSummary.sizeTotals, orderNo); // Pass orderNo
+      
+      colorMap.set(colorKey, {
+        ColorCode: colorSummary.ColorCode,
+        Color: colorSummary.Color,
+        ChnColor: colorSummary.ChnColor,
+        ColorKey: colorSummary.ColorKey,
+        OrderQty: orderQtyArray, 
+        CutQty: {} // Will be populated with cut quantity data
+      });
+    }
 
+    // DEBUG: Analyze FC_SYSTEM data structure
+      // console.log("🔍 Analyzing FC_SYSTEM data structure...");
+      // console.log(`📊 Cut quantity records fetched: ${cutQtyResult.recordset.length}`);
+      // if (cutQtyResult.recordset.length > 0) {
+      //   const sampleRecord = cutQtyResult.recordset[0];
+      //   console.log("📋 Sample FC_SYSTEM record:", sampleRecord);
+        
+      //   // Check for the specific style from your MongoDB document
+      //   const testStyle = "3AFESHAS2-617";
+      //   const matchingRecords = cutQtyResult.recordset.filter(r => 
+      //     r.StyleNo === testStyle || r.BuyerStyle === testStyle
+      //   );
+      //   console.log(`🔍 Records matching style ${testStyle}:`, matchingRecords.length);
+      //   if (matchingRecords.length > 0) {
+      //     console.log("📋 Sample matching record:", matchingRecords[0]);
+      //   }
+      // }
+
+      // DEBUG: Check cut quantity mapping
+      // console.log(`📊 Cut quantity mapping created with ${cutQtyMapping.size} entries`);
+      // if (cutQtyMapping.size > 0) {
+      //   const sampleKeys = Array.from(cutQtyMapping.keys()).slice(0, 5);
+      //   console.log("📋 Sample mapping keys:", sampleKeys);
+      //   if (sampleKeys.length > 0) {
+      //     console.log("📋 Sample mapping data:", cutQtyMapping.get(sampleKeys[0]));
+      //   }
+      // }
+
+      // NEW: Add cut quantity data to colors - ENHANCED VERSION
+      console.log("🔄 Mapping cut quantity data to orders...");
+        let cutQtyMatchCount = 0;
+        let totalColorProcessed = 0;
+        let debugMatches = [];
+
+        for (const [orderNo, order] of orderMap) {
+          for (const [colorKey, colorData] of colorMap) {
+            if (colorKey.startsWith(orderNo + '_')) {
+              totalColorProcessed++;
+              const colorCode = colorData.ColorCode;
+              
+              // Create the mapping key: Order_No_ColorCode
+              const cutKey = `${orderNo}_${colorCode}`;
+              
+              if (cutQtyMapping.has(cutKey)) {
+                const cutData = cutQtyMapping.get(cutKey);
+                
+                // // DEBUG: Log successful match
+                // // console.log(`✅ Cut quantity match found: ${cutKey}`);
+                
+                // debugMatches.push({
+                //   orderNo,
+                //   colorCode,
+                //   cutKey,
+                //   sizesCount: Object.keys(cutData).length
+                // });
+                
+                // Clear existing CutQty data and set new data
+                colorData.CutQty = {};
+                
+                // Set the cut data for each size
+                Object.entries(cutData).forEach(([size, quantities]) => {
+                  colorData.CutQty[size] = {
+                    ActualCutQty: quantities.ActualCutQty,
+                    PlanCutQty: quantities.PlanCutQty
+                  };
+                });
+                
+                cutQtyMatchCount++;
+              } else {
+                //
+              }
+            }
+          }
+        }
+
+        console.log(`📊 Cut quantity matching results:`);
+
+        
+
+        // CRITICAL: Verify CutQty data is actually in the colorData objects
+        console.log("🔍 Verifying CutQty data in colorMap...");
+        let colorsWithCutQty = 0;
+        for (const [colorKey, colorData] of colorMap) {
+          if (Object.keys(colorData.CutQty).length > 0) {
+            colorsWithCutQty++;
+            if (colorsWithCutQty <= 3) { // Log first 3 examples
+              console.log(`✅ Color ${colorKey} has CutQty:`, colorData.CutQty);
+            }
+          }
+        }
+
+//         // 6. NEW: Fetch AfterWashSpecs and BeforeWashSpecs from old dt-order collection
+// console.log("🔄 Fetching wash specs from old dt-order collection...");
+
+// // Use the existing ymEcoConnection instead of creating a new one
+// // Define schema for old dt-order collection
+// const oldDtOrderSchema = new mongoose.Schema({}, { strict: false, collection: 'dt_orders' });
+// const OldDtOrder = ymEcoConnection.model('OldDtOrder', oldDtOrderSchema);
+
+// try {
+//   // First, let's check if the connection is working and what collections exist
+//   console.log("🔍 Checking database connection and collections...");
+  
+//   // Check connection state
+//   console.log(`📡 Connection state: ${ymEcoConnection.readyState}`);
+//   console.log(`📡 Connection name: ${ymEcoConnection.name}`);
+  
+//   // List all collections to verify the collection name
+//   const collections = await ymEcoConnection.db.listCollections().toArray();
+//   console.log("📋 Available collections:", collections.map(c => c.name));
+  
+//   // Check if dt-orders collection exists
+//   const dtOrdersExists = collections.some(c => c.name === 'dt_orders');
+//   console.log(`📋 dt_orders collection exists: ${dtOrdersExists}`);
+  
+//   if (!dtOrdersExists) {
+//     // Try alternative collection names
+//     const possibleNames = collections.filter(c => 
+//       c.name.toLowerCase().includes('order') || 
+//       c.name.toLowerCase().includes('dt')
+//     );
+//     console.log("🔍 Possible order-related collections:", possibleNames.map(c => c.name));
+//   }
+  
+//   // Get total count of documents in the collection
+//   const totalCount = await OldDtOrder.countDocuments();
+//   console.log(`📊 Total documents in dt-orders collection: ${totalCount}`);
+  
+//   if (totalCount === 0) {
+//     console.log("⚠️ No documents found in dt-orders collection");
+    
+//     // Initialize empty arrays for all orders
+//     for (const [orderNo, order] of orderMap) {
+//       order.AfterWashSpecs = [];
+//       order.BeforeWashSpecs = [];
+//     }
+    
+//     console.log("✅ Initialized empty wash specs for all orders");
+//     return; // Exit early
+//   }
+  
+//   // Check a few sample documents to understand the structure
+//   console.log("🔍 Checking sample documents structure...");
+//   const sampleDocs = await OldDtOrder.find({}).limit(5).lean();
+  
+//   if (sampleDocs.length > 0) {
+//     console.log(`📋 Sample document keys:`, Object.keys(sampleDocs[0]));
+    
+//     // Check if any documents have wash specs
+//     const docsWithAfterWash = await OldDtOrder.countDocuments({
+//       AfterWashSpecs: { $exists: true, $ne: null }
+//     });
+//     const docsWithBeforeWash = await OldDtOrder.countDocuments({
+//       BeforeWashSpecs: { $exists: true, $ne: null }
+//     });
+    
+//     console.log(`📊 Documents with AfterWashSpecs: ${docsWithAfterWash}`);
+//     console.log(`📊 Documents with BeforeWashSpecs: ${docsWithBeforeWash}`);
+    
+//     // Check for non-empty arrays
+//     const docsWithNonEmptyAfterWash = await OldDtOrder.countDocuments({
+//       AfterWashSpecs: { $exists: true, $ne: null, $not: { $size: 0 } }
+//     });
+//     const docsWithNonEmptyBeforeWash = await OldDtOrder.countDocuments({
+//       BeforeWashSpecs: { $exists: true, $ne: null, $not: { $size: 0 } }
+//     });
+    
+//     console.log(`📊 Documents with non-empty AfterWashSpecs: ${docsWithNonEmptyAfterWash}`);
+//     console.log(`📊 Documents with non-empty BeforeWashSpecs: ${docsWithNonEmptyBeforeWash}`);
+    
+//     // Show sample document with Order_No
+//     const sampleWithOrderNo = sampleDocs.find(doc => doc.Order_No);
+//     if (sampleWithOrderNo) {
+//       console.log(`📋 Sample Order_No: ${sampleWithOrderNo.Order_No}`);
+//       console.log(`📋 Sample has AfterWashSpecs: ${!!sampleWithOrderNo.AfterWashSpecs}`);
+//       console.log(`📋 Sample has BeforeWashSpecs: ${!!sampleWithOrderNo.BeforeWashSpecs}`);
+      
+//       if (sampleWithOrderNo.AfterWashSpecs) {
+//         console.log(`📋 AfterWashSpecs length: ${sampleWithOrderNo.AfterWashSpecs.length}`);
+//       }
+//       if (sampleWithOrderNo.BeforeWashSpecs) {
+//         console.log(`📋 BeforeWashSpecs length: ${sampleWithOrderNo.BeforeWashSpecs.length}`);
+//       }
+//     }
+//   }
+  
+//   // Fetch all records with AfterWashSpecs and BeforeWashSpecs using a simpler query first
+//   console.log("🔍 Trying simpler query for wash specs...");
+  
+//   const oldOrdersWithWashSpecs = await OldDtOrder.find(
+//     {
+//       $or: [
+//         { AfterWashSpecs: { $exists: true, $ne: null } },
+//         { BeforeWashSpecs: { $exists: true, $ne: null } }
+//       ]
+//     },
+//     {
+//       Order_No: 1,
+//       AfterWashSpecs: 1,
+//       BeforeWashSpecs: 1
+//     }
+//   ).lean();
+
+//   console.log(`📊 Found ${oldOrdersWithWashSpecs.length} orders with wash specs in old collection`);
+  
+//   if (oldOrdersWithWashSpecs.length === 0) {
+//     console.log("⚠️ No orders found with wash specs. Trying alternative approach...");
+    
+//     // Try to find any documents that have these fields, even if they're empty
+//     const anyWithWashFields = await OldDtOrder.find(
+//       {
+//         $or: [
+//           { AfterWashSpecs: { $exists: true } },
+//           { BeforeWashSpecs: { $exists: true } }
+//         ]
+//       }
+//     ).limit(5).lean();
+    
+//     console.log(`📊 Found ${anyWithWashFields.length} documents with wash spec fields (including empty)`);
+    
+//     if (anyWithWashFields.length > 0) {
+//       anyWithWashFields.forEach((doc, index) => {
+//         console.log(`📋 Doc ${index + 1} - Order_No: ${doc.Order_No}`);
+//         console.log(`   AfterWashSpecs: ${doc.AfterWashSpecs ? `Array(${doc.AfterWashSpecs.length})` : 'null/undefined'}`);
+//         console.log(`   BeforeWashSpecs: ${doc.BeforeWashSpecs ? `Array(${doc.BeforeWashSpecs.length})` : 'null/undefined'}`);
+//       });
+//     }
+//   }
+
+//   // Create mapping for wash specs
+//   const washSpecsMapping = new Map();
+//   oldOrdersWithWashSpecs.forEach(oldOrder => {
+//     if (oldOrder.Order_No) {
+//       const afterWashSpecs = oldOrder.AfterWashSpecs || [];
+//       const beforeWashSpecs = oldOrder.BeforeWashSpecs || [];
+      
+//       // Only add to mapping if there's actual data
+//       if (afterWashSpecs.length > 0 || beforeWashSpecs.length > 0) {
+//         washSpecsMapping.set(oldOrder.Order_No, {
+//           AfterWashSpecs: afterWashSpecs,
+//           BeforeWashSpecs: beforeWashSpecs
+//         });
+//       }
+//     }
+//   });
+
+//   console.log(`📊 Wash specs mapping created with ${washSpecsMapping.size} entries`);
+
+//   // Debug: Show sample wash specs data
+//   if (washSpecsMapping.size > 0) {
+//     const sampleOrderNo = Array.from(washSpecsMapping.keys())[0];
+//     const sampleWashSpecs = washSpecsMapping.get(sampleOrderNo);
+//     console.log(`📋 Sample wash specs for order ${sampleOrderNo}:`);
+//     console.log(`   - AfterWashSpecs count: ${sampleWashSpecs.AfterWashSpecs.length}`);
+//     console.log(`   - BeforeWashSpecs count: ${sampleWashSpecs.BeforeWashSpecs.length}`);
+    
+//     // Show structure of first AfterWashSpec entry
+//     if (sampleWashSpecs.AfterWashSpecs.length > 0) {
+//       console.log(`📋 Sample AfterWashSpec entry:`, {
+//         no: sampleWashSpecs.AfterWashSpecs[0].no,
+//         kValue: sampleWashSpecs.AfterWashSpecs[0].kValue,
+//         MeasurementPointEngName: sampleWashSpecs.AfterWashSpecs[0].MeasurementPointEngName,
+//         specsCount: sampleWashSpecs.AfterWashSpecs[0].Specs?.length || 0
+//       });
+//     }
+    
+//     // Check if any of our current orders match the wash specs orders
+//     const currentOrderNos = Array.from(orderMap.keys());
+//     const washSpecOrderNos = Array.from(washSpecsMapping.keys());
+//     const matchingOrders = currentOrderNos.filter(orderNo => washSpecOrderNos.includes(orderNo));
+    
+//     console.log(`🔍 Current orders that have wash specs: ${matchingOrders.length}`);
+//     if (matchingOrders.length > 0) {
+//       console.log(`📋 Sample matching orders: ${matchingOrders.slice(0, 5).join(', ')}`);
+//     }
+//   }
+
+//   // Add wash specs to orders
+//   console.log("🔄 Adding wash specs to orders...");
+//   let washSpecsMatchCount = 0;
+
+//   for (const [orderNo, order] of orderMap) {
+//     if (washSpecsMapping.has(orderNo)) {
+//       const washSpecs = washSpecsMapping.get(orderNo);
+      
+//       // Add AfterWashSpecs and BeforeWashSpecs to the order
+//       order.AfterWashSpecs = washSpecs.AfterWashSpecs;
+//       order.BeforeWashSpecs = washSpecs.BeforeWashSpecs;
+      
+//       washSpecsMatchCount++;
+      
+//       // Debug: Log first few matches
+//       if (washSpecsMatchCount <= 5) {
+//         console.log(`✅ Added wash specs to order ${orderNo}:`);
+//         console.log(`   - AfterWashSpecs: ${order.AfterWashSpecs.length} entries`);
+//         console.log(`   - BeforeWashSpecs: ${order.BeforeWashSpecs.length} entries`);
+//       }
+//     } else {
+//       // Initialize empty arrays if no wash specs found
+//       order.AfterWashSpecs = [];
+//       order.BeforeWashSpecs = [];
+//     }
+//   }
+
+//   console.log(`📊 Wash specs matching results:`);
+//   console.log(`   - Total orders processed: ${orderMap.size}`);
+//   console.log(`   - Orders with wash specs: ${washSpecsMatchCount}`);
+//   console.log(`   - Match rate: ${((washSpecsMatchCount / orderMap.size) * 100).toFixed(2)}%`);
+
+// } catch (washSpecError) {
+//   console.error("❌ Error fetching wash specs:", washSpecError);
+//   console.log("⚠️ Continuing without wash specs data...");
+  
+//   // Initialize empty arrays for all orders if wash specs fetch fails
+//   for (const [orderNo, order] of orderMap) {
+//     order.AfterWashSpecs = [];
+//     order.BeforeWashSpecs = [];
+//   }
+// }
+
+// console.log("✅ Wash specs processing completed");
 
     // Add colors and shipping to orders
     for (const [orderNo, order] of orderMap) {
@@ -2205,149 +2600,265 @@ for (const [colorKey, colorSummary] of colorSummaryMap) {
       }
     }
 
-    // 3. Process Size Specifications
+    // 3. Process Size Specifications (keeping existing logic)
     sizeSpecResult.recordset.forEach(spec => {
-  const jobNo = spec.JobNo;
-  
-  if (orderMap.has(jobNo)) {
-    const order = orderMap.get(jobNo);
-    
-    try {
-      // Use the fixed parseToleranceValue function
-      const toleranceMin = parseToleranceValue(spec.Tolerance);
-      const tolerancePlus = parseToleranceValue(spec.Tolerance2);
-      const specs = extractSpecsDataAsArray(spec, jobNo);
+      const jobNo = spec.JobNo;
       
-      // Handle ChineseName logic
-      let chineseName = null;
-        const chineseArea = convertEmptyToNull(spec.ChineseArea);
-        const chineseRemark = convertEmptyToNull(spec.ChineseRemark);
-
-        // If ChineseArea is null/empty/only numbers, use ChineseRemark
-        if (isEmptyOrContainsNumbers(spec.ChineseArea)) {
-          chineseName = chineseRemark;
+      if (orderMap.has(jobNo)) {
+        const order = orderMap.get(jobNo);
+        
+        try {
+          // Use the fixed parseToleranceValue function
+          const toleranceMin = parseToleranceValue(spec.Tolerance);
+          const tolerancePlus = parseToleranceValue(spec.Tolerance2);
+          const specs = extractSpecsDataAsArray(spec, jobNo);
+          
+          // Handle ChineseName logic - DEFINE THE VARIABLES FIRST
+          const chineseArea = convertEmptyToNull(spec.ChineseArea);
+          const chineseRemark = convertEmptyToNull(spec.ChineseRemark);
+          let chineseName = null;
+          
+          // If ChineseArea is null/empty/only numbers, use ChineseRemark
+          if (isEmptyOrContainsNumbers(spec.ChineseArea)) {
+            chineseName = chineseRemark;
+          }
+          // If ChineseRemark is null/empty/only numbers, use ChineseArea
+          else if (isEmptyOrContainsNumbers(spec.ChineseRemark)) {
+            chineseName = chineseArea;
+          }
+          // If both are valid, prefer ChineseArea
+          else {
+            chineseName = chineseArea;
+          }
+          
+          const sizeSpecData = {
+            Seq: Number(spec.Seq) || 0,
+            AtoZ: convertEmptyToNull(spec.AtoZ),
+            Area: convertEmptyToNull(spec.Area),
+            ChineseArea: chineseArea,
+            EnglishRemark: convertEmptyToNull(spec.EnglishRemark),
+            ChineseRemark: chineseRemark,
+            ChineseName: chineseName,
+            AreaCode: convertEmptyToNull(spec.AreaCode),
+            IsMiddleCalc: spec.IsMiddleCalc || null,
+            ToleranceMin: {
+              fraction: toleranceMin.fraction || '',
+              decimal: toleranceMin.decimal
+            },
+            TolerancePlus: {
+              fraction: tolerancePlus.fraction || '',
+              decimal: tolerancePlus.decimal
+            },
+            SpecMemo: convertEmptyToNull(spec.SpecMemo),
+            SizeSpecMeasUnit: convertEmptyToNull(spec.SizeSpecMeasUnit),
+            Specs: specs || []
+          };
+          
+          order.SizeSpec.push(sizeSpecData);
+          
+        } catch (error) {
+          console.error(`Error processing spec for job ${jobNo}, seq ${spec.Seq}:`, error.message); 
         }
-        // If ChineseRemark is null/empty/only numbers, use ChineseArea
-        else if (isEmptyOrContainsNumbers(spec.ChineseRemark)) {
-          chineseName = chineseArea;
-        }
-        // If both are valid, prefer ChineseArea
-        else {
-          chineseName = chineseArea;
-        }
-      
-      const sizeSpecData = {
-        Seq: Number(spec.Seq) || 0,
-        AtoZ: convertEmptyToNull(spec.AtoZ),
-        Area: convertEmptyToNull(spec.Area),
-        ChineseArea: chineseArea,
-        EnglishRemark: convertEmptyToNull(spec.EnglishRemark),
-        ChineseRemark: chineseRemark,
-        ChineseName: chineseName,
-        AreaCode: convertEmptyToNull(spec.AreaCode),
-        IsMiddleCalc: spec.IsMiddleCalc || null,
-        ToleranceMin: {
-          fraction: toleranceMin.fraction || '',
-          decimal: toleranceMin.decimal
-        },
-        TolerancePlus: {
-          fraction: tolerancePlus.fraction || '',
-          decimal: tolerancePlus.decimal
-        },
-        SpecMemo: convertEmptyToNull(spec.SpecMemo),
-        SizeSpecMeasUnit: convertEmptyToNull(spec.SizeSpecMeasUnit),
-        Specs: specs || []
-      };
-      
-      order.SizeSpec.push(sizeSpecData);
-      
-    } catch (error) {
-      console.error(`Error processing spec for job ${jobNo}, seq ${spec.Seq}:`, error.message);
-      console.error('Spec data:', {
-        Tolerance: spec.Tolerance,
-        Tolerance2: spec.Tolerance2,
-        Seq: spec.Seq,
-        ChineseArea: spec.ChineseArea,
-        ChineseRemark: spec.ChineseRemark
-      });
-    }
-  }
-});
-
-    // 4. Save to MongoDB
-    console.log("💾 Saving to MongoDB...");
-    const finalDocs = Array.from(orderMap.values());
-    
-    // Clean and validate data before saving
-    const cleanedDocs = finalDocs.map(doc => {
-      if (doc.SizeSpec) {
-        doc.SizeSpec = doc.SizeSpec.filter(spec => {
-          return spec.Seq && !isNaN(spec.Seq) && 
-                 !isNaN(spec.ToleranceMin.decimal) && 
-                 !isNaN(spec.TolerancePlus.decimal);
-        });
       }
-      return doc;
     });
 
-    const bulkOps = cleanedDocs.map(doc => ({
-      updateOne: {
-        filter: { Order_No: doc.Order_No },
-        update: { $set: doc },
-        upsert: true
-      }
-    }));
+    // 4. Save to MongoDB
+      console.log("💾 Saving to MongoDB...");
+      const finalDocs = Array.from(orderMap.values());
 
-    if (bulkOps.length > 0) {
-      try {
-        const result = await DtOrder.bulkWrite(bulkOps);
-        console.log(`✅ DT Orders sync completed: Matched ${result.matchedCount}, Upserted ${result.upsertedCount}, Modified ${result.modifiedCount}`);
-        
-        return {
-          success: true,
-          totalOrders: cleanedDocs.length,
-          matched: result.matchedCount,
-          upserted: result.upsertedCount,
-          modified: result.modifiedCount
-        };
-      } catch (bulkError) {
-        console.error("Bulk write error:", bulkError);
-        
-        let successCount = 0;
-        let errorCount = 0;
-        
-        for (const doc of cleanedDocs) {
-          try {
-            await DtOrder.findOneAndUpdate(
-              { Order_No: doc.Order_No },
-              doc,
-              { upsert: true, new: true }
-            );
-            successCount++;
-          } catch (singleError) {
-            console.error(`Error saving order ${doc.Order_No}:`, singleError.message);
-            errorCount++;
-          }
+      // Clean and validate data before saving
+      const cleanedDocs = finalDocs.map(doc => {
+        if (doc.SizeSpec) {
+          doc.SizeSpec = doc.SizeSpec.filter(spec => {
+            return spec.Seq && !isNaN(spec.Seq) && 
+                  !isNaN(spec.ToleranceMin.decimal) && 
+                  !isNaN(spec.TolerancePlus.decimal);
+          });
         }
-        
-        return {
-          success: true,
-          totalOrders: cleanedDocs.length,
-          successCount,
-          errorCount,
-          message: `Completed with ${successCount} successes and ${errorCount} errors`
-        };
-      }
-    } else {
-      console.log("⚠️ No data to sync");
-      return { success: true, message: "No data to sync" };
-    }
+        return doc;
+      });
 
+      const bulkOps = cleanedDocs.map(doc => ({
+        updateOne: {
+          filter: { Order_No: doc.Order_No },
+          update: { $set: doc },
+          upsert: true
+        }
+      }));
+
+      if (bulkOps.length > 0) {
+        try {
+          const result = await DtOrder.bulkWrite(bulkOps);
+          
+          console.log("✅ DT Orders data migration completed successfully!");// if uncomment below parts then need to commet Const Clean untill this line.
+
+      // // First, save all the regular data (without wash specs)
+      // console.log("💾 Saving regular order data first...");
+      // const regularBulkOps = finalDocs.map(doc => {
+      //   // Create a copy without wash specs for the initial save
+      //   const { AfterWashSpecs, BeforeWashSpecs, ...regularDoc } = doc;
+      //   return {
+      //     updateOne: {
+      //       filter: { Order_No: doc.Order_No },
+      //       update: { $set: regularDoc },
+      //       upsert: true
+      //     }
+      //   };
+      // });
+
+      // if (regularBulkOps.length > 0) {
+      //   try {
+      //     const regularResult = await DtOrder.bulkWrite(regularBulkOps);
+      //     console.log(`✅ Regular data saved: ${regularResult.modifiedCount + regularResult.upsertedCount} documents`);
+          
+      //     // Now, separately add the wash specs fields
+      //     console.log("🔄 Adding wash specs as additional fields...");
+          
+      //     // Get wash specs data from old collection again for direct updates
+      //     const oldDtOrderSchema = new mongoose.Schema({}, { strict: false, collection: 'dt_orders' });
+      //     const OldDtOrder = ymEcoConnection.model('OldDtOrderForWashSpecs', oldDtOrderSchema);
+          
+      //     const oldOrdersWithWashSpecs = await OldDtOrder.find(
+      //       {
+      //         $or: [
+      //           { AfterWashSpecs: { $exists: true, $ne: null, $not: { $size: 0 } } },
+      //           { BeforeWashSpecs: { $exists: true, $ne: null, $not: { $size: 0 } } }
+      //         ]
+      //       },
+      //       {
+      //         Order_No: 1,
+      //         AfterWashSpecs: 1,
+      //         BeforeWashSpecs: 1
+      //       }
+      //     ).lean();
+          
+      //     console.log(`🔄 Processing wash specs for ${oldOrdersWithWashSpecs.length} orders...`);
+          
+      //     // Create bulk operations specifically for wash specs
+      //     const washSpecsBulkOps = oldOrdersWithWashSpecs.map(oldOrder => ({
+      //       updateOne: {
+      //         filter: { Order_No: oldOrder.Order_No },
+      //         update: {
+      //           $set: {
+      //             AfterWashSpecs: oldOrder.AfterWashSpecs || [],
+      //             BeforeWashSpecs: oldOrder.BeforeWashSpecs || []
+      //           }
+      //         }
+      //       }
+      //     }));
+          
+      //     if (washSpecsBulkOps.length > 0) {
+      //       const washSpecsResult = await DtOrder.bulkWrite(washSpecsBulkOps);
+      //       console.log(`✅ Wash specs bulk update completed: ${washSpecsResult.modifiedCount} documents updated`);
+      //     }
+          
+      //     // Verify the wash specs were saved
+      //     console.log("🔍 Verifying wash specs were saved...");
+      //     const savedAfterWashCount = await DtOrder.countDocuments({
+      //       AfterWashSpecs: { $exists: true, $not: { $size: 0 } }
+      //     });
+      //     const savedBeforeWashCount = await DtOrder.countDocuments({
+      //       BeforeWashSpecs: { $exists: true, $not: { $size: 0 } }
+      //     });
+          
+      //     console.log(`📊 Final verification:`);
+      //     console.log(`   - Documents with AfterWashSpecs: ${savedAfterWashCount}`);
+      //     console.log(`   - Documents with BeforeWashSpecs: ${savedBeforeWashCount}`);
+          
+      //     // If still not working, try individual updates with raw MongoDB operations
+      //     if (savedAfterWashCount === 0 && savedBeforeWashCount === 0) {
+      //       console.log("⚠️ Bulk wash specs update failed. Trying individual raw updates...");
+            
+      //       let individualUpdateCount = 0;
+      //       for (const oldOrder of oldOrdersWithWashSpecs) {
+      //         try {
+      //           // Use raw MongoDB update operation
+      //           const updateResult = await DtOrder.collection.updateOne(
+      //             { Order_No: oldOrder.Order_No },
+      //             {
+      //               $set: {
+      //                 AfterWashSpecs: oldOrder.AfterWashSpecs || [],
+      //                 BeforeWashSpecs: oldOrder.BeforeWashSpecs || []
+      //               }
+      //             }
+      //           );
+                
+      //           if (updateResult.modifiedCount > 0) {
+      //             individualUpdateCount++;
+      //           }
+      //         } catch (error) {
+      //           console.error(`Error updating ${oldOrder.Order_No}:`, error.message);
+      //         }
+      //       }
+            
+      //       console.log(`✅ Individual raw updates completed: ${individualUpdateCount} documents`);
+            
+      //       // Final verification after raw updates
+      //       const finalAfterWashCount = await DtOrder.countDocuments({
+      //         AfterWashSpecs: { $exists: true, $not: { $size: 0 } }
+      //       });
+      //       const finalBeforeWashCount = await DtOrder.countDocuments({
+      //         BeforeWashSpecs: { $exists: true, $not: { $size: 0 } }
+      //       });
+            
+      //       console.log(`📊 After raw updates:`);
+      //       console.log(`   - Documents with AfterWashSpecs: ${finalAfterWashCount}`);
+      //       console.log(`   - Documents with BeforeWashSpecs: ${finalBeforeWashCount}`);
+      //     }
+          
+      //     // Show a sample document to verify the structure
+      //     const sampleDoc = await DtOrder.findOne({
+      //       $or: [
+      //         { AfterWashSpecs: { $exists: true, $not: { $size: 0 } } },
+      //         { BeforeWashSpecs: { $exists: true, $not: { $size: 0 } } }
+      //       ]
+      //     }).lean();
+          
+      //     if (sampleDoc) {
+      //       console.log(`✅ Sample document structure for ${sampleDoc.Order_No}:`);
+      //       console.log(`   - Has AfterWashSpecs: ${!!sampleDoc.AfterWashSpecs}`);
+      //       console.log(`   - Has BeforeWashSpecs: ${!!sampleDoc.BeforeWashSpecs}`);
+      //       if (sampleDoc.AfterWashSpecs) {
+      //         console.log(`   - AfterWashSpecs count: ${sampleDoc.AfterWashSpecs.length}`);
+      //       }
+      //       if (sampleDoc.BeforeWashSpecs) {
+      //         console.log(`   - BeforeWashSpecs count: ${sampleDoc.BeforeWashSpecs.length}`);
+      //       }
+            
+      //       // Show the top-level keys to confirm wash specs are at the right level
+      //       console.log(`📋 Top-level document keys:`, Object.keys(sampleDoc));
+      //     } else {
+      //       console.log("❌ No documents found with wash specs after all attempts");
+      //     }
+          
+          return {
+            success: true,
+            totalOrders: finalDocs.length,
+            matched: result.matchedCount,
+            upserted: result.upsertedCount,
+            modified: result.modifiedCount,
+            cutQtyRecords: cutQtyResult.recordset.length,
+            // washSpecsProcessed: oldOrdersWithWashSpecs.length,
+            // washSpecsSaved: {
+              // afterWash: savedAfterWashCount,
+              // beforeWash: savedBeforeWashCount
+            }
+          // };
+          
+        } catch (bulkError) {
+          console.error("❌ Bulk operation failed:", bulkError);
+          throw bulkError;
+        }
+      } else {
+        console.log("⚠️ No data to sync");
+        return { success: true, message: "No data to sync" };
+      }
   } catch (error) {
     console.error("❌ DT Orders sync failed:", error);
     throw error;
   }
 }
+
 
 // Add API endpoint for manual sync
 app.get("/api/sync-dt-orders", async (req, res) => {
@@ -3610,8 +4121,7 @@ app.post("/api/washing-specs/save", async (req, res) => {
   }
 
   try {
-    const collection = ymEcoConnection.db.collection("dt_orders");
-    const orderDocument = await collection.findOne({ Order_No: moNo });
+    const orderDocument = await DtOrder.findOne({ Order_No: moNo });
 
     if (!orderDocument) {
       return res.status(404).json({

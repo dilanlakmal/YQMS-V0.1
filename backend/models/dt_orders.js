@@ -6,10 +6,40 @@ const OrderQtyItemSchema = new mongoose.Schema({}, {
   _id: false 
 });
 
+// Schema for individual size cut quantity data
+const SizeCutQtySchema = new mongoose.Schema({
+  ActualCutQty: {
+    type: Number,
+    required: false,
+    default: 0
+  },
+  PlanCutQty: {
+    type: Number,
+    required: false,
+    default: 0
+  }
+}, { _id: false });
+
+// Updated CutQty Schema - more explicit structure
 const CutQtySchema = new mongoose.Schema({}, { 
-  strict: false, // Allow dynamic keys with nested objects
+  strict: false, // Allow dynamic size keys like "XS", "S", "M", etc.
   _id: false 
 });
+
+// Alternative approach - if you want to be more explicit about the structure
+// You can also define it this way, but the above approach is more flexible
+/*
+const CutQtySchema = new mongoose.Schema({
+  // This would require you to know all possible size names in advance
+  // XS: SizeCutQtySchema,
+  // S: SizeCutQtySchema,
+  // M: SizeCutQtySchema,
+  // etc...
+}, { 
+  strict: false, // Still allow other dynamic keys
+  _id: false 
+});
+*/
 
 const SpecsSchema = new mongoose.Schema({}, { 
   strict: false, // Allow dynamic size keys
@@ -112,7 +142,7 @@ const ShipSeqNoSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-   sizes: [OrderQtyItemSchema]
+  sizes: [OrderQtyItemSchema]
 }, { _id: false });
 
 const OrderColorShipSchema = new mongoose.Schema({
@@ -153,7 +183,7 @@ const OrderColorsSchema = new mongoose.Schema({
     required: false
   },
   OrderQty: [OrderQtyItemSchema], // Array of objects like [{"XS": 167}, {"S": 493}]
-  CutQty: CutQtySchema // Single object with dynamic keys
+  CutQty: CutQtySchema // Object with dynamic size keys, each containing ActualCutQty and PlanCutQty
 }, { _id: false });
 
 // Main Schema
@@ -239,6 +269,7 @@ const DtOrderSchema = new mongoose.Schema({
 // Indexes for better performance
 DtOrderSchema.index({ Factory: 1 });
 DtOrderSchema.index({ Cust_Code: 1 });
+DtOrderSchema.index({ Style: 1 }); // Added index for Style since we're using it for mapping
 DtOrderSchema.index({ createdAt: -1 });
 
 export default (connection) => connection.model("DtOrder", DtOrderSchema);
