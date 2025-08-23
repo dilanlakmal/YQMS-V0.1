@@ -1,30 +1,21 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
-import { API_BASE_URL } from "../../config";
-import { useAuth } from "../components/authentication/AuthContext";
-import { useTranslation } from "react-i18next";
-import {
-  XCircle,
-  Database,
-  QrCode,
-  Eye,
-  EyeOff,
-  Camera,
-  Languages,
-  X
-} from "lucide-react";
-import Swal from "sweetalert2";
+import i18next from "i18next";
+import { Database, Eye, EyeOff, QrCode, XCircle } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { useTranslation } from "react-i18next";
+import Swal from "sweetalert2";
+import { API_BASE_URL } from "../../config";
+import { useAuth } from "../components/authentication/AuthContext";
 import CEDatabase from "../components/inspection/qc_roving/CEDatabase";
 import EmpQRCodeScanner from "../components/inspection/qc_roving/EmpQRCodeScanner";
+import ImageCaptureUpload from "../components/inspection/qc_roving/ImageCaptureupload";
+import InlineWorkers from "../components/inspection/qc_roving/InlineWorkers";
 import PreviewRoving from "../components/inspection/qc_roving/PreviewRoving";
 import RovingData from "../components/inspection/qc_roving/RovingData";
-import InlineWorkers from "../components/inspection/qc_roving/InlineWorkers";
-import ImageCaptureUpload from "../components/inspection/qc_roving/ImageCaptureupload";
 import RovingPairing from "../components/inspection/qc_roving/RovingPairing";
 import RovingPairingData from "../components/inspection/qc_roving/RovingPairingData";
-import i18next from "i18next";
 
 const RovingPage = () => {
   const { t } = useTranslation();
@@ -91,6 +82,14 @@ const RovingPage = () => {
   const [defects, setDefects] = useState([]);
   const [isLoadingDefects, setIsLoadingDefects] = useState(true);
   const [defectsError, setDefectsError] = useState(null);
+
+  // --- NEW STATES FOR MANUAL WORKER ID SEARCH ---
+  const [isManualMode, setIsManualMode] = useState(false);
+  const [manualWorkerIdSearch, setManualWorkerIdSearch] = useState("");
+  const [manualWorkerIdOptions, setManualWorkerIdOptions] = useState([]);
+  const [isSearchingWorkerId, setIsSearchingWorkerId] = useState(false);
+  const [showWorkerIdDropdown, setShowWorkerIdDropdown] = useState(false);
+  const workerIdDropdownRef = useRef(null);
 
   const getNumericLineValue = useCallback((value) => {
     if (value === null || value === undefined || String(value).trim() === "")
@@ -257,6 +256,45 @@ const RovingPage = () => {
     fetchMoNumbers();
   }, [moNoSearch]);
 
+  // --- NEW USEEFFECT FOR WORKER ID SEARCH ---
+  useEffect(() => {
+    const fetchWorkerIds = async () => {
+      if (manualWorkerIdSearch.trim() === "") {
+        setManualWorkerIdOptions([]);
+        setShowWorkerIdDropdown(false);
+        return;
+      }
+      setIsSearchingWorkerId(true);
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/api/users/search-by-empid`,
+          {
+            params: { term: manualWorkerIdSearch }
+          }
+        );
+        setManualWorkerIdOptions(response.data);
+        setShowWorkerIdDropdown(response.data.length > 0);
+      } catch (error) {
+        console.error("Error fetching worker IDs:", error);
+        setManualWorkerIdOptions([]);
+        setShowWorkerIdDropdown(false);
+      } finally {
+        setIsSearchingWorkerId(false);
+      }
+    };
+
+    if (isManualMode) {
+      // Use a timeout to avoid sending requests on every keystroke
+      const handler = setTimeout(() => {
+        fetchWorkerIds();
+      }, 500);
+
+      return () => {
+        clearTimeout(handler);
+      };
+    }
+  }, [manualWorkerIdSearch, isManualMode]);
+
   useEffect(() => {
     const fetchOperationData = async () => {
       if (!moNo) {
@@ -301,12 +339,39 @@ const RovingPage = () => {
       ) {
         setShowMoNoDropdown(false);
       }
+      // --- NEW: LOGIC TO CLOSE WORKER ID DROPDOWN ---
+      if (
+        workerIdDropdownRef.current &&
+        !workerIdDropdownRef.current.contains(event.target)
+      ) {
+        setShowWorkerIdDropdown(false);
+      }
+      // --- END OF NEW LOGIC ---
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // --- NEW HANDLER FOR SELECTING A WORKER FROM DROPDOWN ---
+  const handleWorkerIdSelect = async (empId) => {
+    setManualWorkerIdSearch(empId);
+    setShowWorkerIdDropdown(false);
+    try {
+      // Use the new endpoint to get all required details
+      const response = await axios.get(`${API_BASE_URL}/api/users/${empId}`);
+      handleUserDataFetched(response.data);
+    } catch (error) {
+      console.error("Error fetching full user details:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to fetch worker details."
+      });
+      setScannedUserData(null); // Clear data on error
+    }
+  };
 
   const addDefect = (defectEnglishName) => {
     if (defectEnglishName && selectedOperationId && defects.length > 0) {
@@ -450,6 +515,10 @@ const RovingPage = () => {
     // setSelectedManualInspectionRep("");
     setImageUploaderKey(Date.now());
     setRemarkText("");
+    // --- NEW: Also reset manual search fields ---
+    setIsManualMode(false);
+    setManualWorkerIdSearch("");
+    setManualWorkerIdOptions([]);
   };
 
   const handleSubmit = async (e) => {
@@ -1281,20 +1350,93 @@ const RovingPage = () => {
                     </div>
                   )}
                 </div>
+                {/* --- MODIFIED SECTION FOR QR SCANNER AND MANUAL ID --- */}
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
-                    {t("qcRoving.scanQR")}
+                    {t("qcRoving.operatorId", "Operator ID")}
                   </label>
-                  <button
-                    onClick={() => setShowScanner(true)}
-                    className="mt-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 w-full justify-center"
-                  >
-                    <QrCode className="w-5 h-5" />
-                    {t("qcRoving.scanQR")}
-                  </button>
+                  <div className="flex items-center gap-4 mt-1">
+                    <button
+                      onClick={() => setShowScanner(true)}
+                      disabled={isManualMode}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 w-full justify-center disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                      <QrCode className="w-5 h-5" />
+                      {t("qcRoving.scanQR")}
+                    </button>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="manualMode"
+                        checked={isManualMode}
+                        onChange={(e) => {
+                          setIsManualMode(e.target.checked);
+                          if (!e.target.checked) {
+                            setManualWorkerIdSearch("");
+                            setManualWorkerIdOptions([]);
+                            // Optionally clear scanned user data if you switch back
+                            // setScannedUserData(null);
+                          }
+                        }}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label
+                        htmlFor="manualMode"
+                        className="ml-2 text-sm text-gray-900"
+                      >
+                        {t("qcRoving.manual", "Manual")}
+                      </label>
+                    </div>
+                  </div>
+
+                  {isManualMode && (
+                    <div className="relative mt-2" ref={workerIdDropdownRef}>
+                      <input
+                        type="text"
+                        value={manualWorkerIdSearch}
+                        onChange={(e) =>
+                          setManualWorkerIdSearch(e.target.value)
+                        }
+                        placeholder={t(
+                          "qcRoving.search_worker_id",
+                          "Search Worker ID..."
+                        )}
+                        className="w-full p-2 border border-gray-300 rounded-lg"
+                        disabled={!isManualMode}
+                      />
+                      {showWorkerIdDropdown && (
+                        <ul className="absolute z-20 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto shadow-lg">
+                          {isSearchingWorkerId ? (
+                            <li className="p-2 text-gray-500">
+                              {t("qcRoving.searching", "Searching...")}
+                            </li>
+                          ) : (
+                            manualWorkerIdOptions.map((user) => (
+                              <li
+                                key={user.emp_id}
+                                onClick={() =>
+                                  handleWorkerIdSelect(user.emp_id)
+                                }
+                                className="p-2 hover:bg-blue-100 cursor-pointer"
+                              >
+                                {user.emp_id} - {user.eng_name}
+                              </li>
+                            ))
+                          )}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
                   {scannedUserData && (
                     <div className="mt-2 flex items-center gap-2">
-                      <p className="text-sm"></p>
+                      <p className="text-sm font-semibold text-green-700">
+                        {t(
+                          "qcRoving.operatorSelected",
+                          "Operator Selected: {{emp_id}}",
+                          { emp_id: scannedUserData.emp_id }
+                        )}
+                      </p>
                       <button
                         onClick={() =>
                           setShowOperatorDetails(!showOperatorDetails)
@@ -1340,6 +1482,7 @@ const RovingPage = () => {
                     </div>
                   )}
                 </div>
+
                 <div className="flex-1 min-w-[150px]">
                   <label className="block text-sm font-medium text-gray-700">
                     {t("qcRoving.inspectionType")}

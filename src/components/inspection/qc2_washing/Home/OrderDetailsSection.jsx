@@ -441,6 +441,7 @@ const OrderDetailsSection = ({
               <option value="Normal Wash">Normal Wash</option>
               <option value="Acid Wash">Acid Wash</option>
               <option value="Garment Dye">Garment Dye</option>
+              <option value="Soft Wash">Soft Wash</option>
             </select>
           </div>
 

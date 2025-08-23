@@ -7097,7 +7097,7 @@ app.get("/api/users/:emp_id", async (req, res) => {
     const { emp_id } = req.params;
     const user = await UserMain.findOne(
       { emp_id },
-      "emp_id eng_name face_photo"
+      "emp_id eng_name kh_name job_title dept_name sect_name face_photo"
     ).lean();
     if (!user) {
       return res.status(404).json({ error: "User not found" });
