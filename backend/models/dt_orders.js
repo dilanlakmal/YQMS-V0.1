@@ -92,7 +92,7 @@ const SizeSpecSchema = new mongoose.Schema({
     required: false,
     default: null
   },
-  ToleranceMin: {
+  ToleranceMinus: {
     fraction: {
       type: String,
       default: ''
@@ -141,6 +141,11 @@ const ShipSeqNoSchema = new mongoose.Schema({
   seqNo: {
     type: Number,
     required: true
+  },
+  Ship_ID: {
+    type: Number,
+    required: false,
+    default: null
   },
   sizes: [OrderQtyItemSchema]
 }, { _id: false });

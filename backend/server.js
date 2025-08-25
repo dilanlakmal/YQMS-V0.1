@@ -1742,29 +1742,27 @@ async function syncDTOrdersData() {
     
     // Ensure FC_SYSTEM connection
     await ensurePoolConnected(poolYMWHSYS2, "FC_SYSTEM");
-
     const request = poolDTrade.request();
     const requestFC = poolYMWHSYS2.request();
 
-    // 1. Fetch Order Headers WITH actual size names
-    console.log("📊 Fetching order headers with size names...");
+    // 1. Fetch Order Headers WITH actual size names AND Order Colors and Shipping in one query
+    console.log("📊 Fetching order headers with size names and shipping data...");
     const orderHeaderQuery = `
       SELECT 
-        [SC_Heading], [Factory], [SalesTeamName], [Cust_Code], [ShortName],
-        [EngName], [Order_No], [Ccy], [Style], [CustStyle], [NoOfCol],
-        [Size_Seq10], [Size_Seq20], [Size_Seq30], [Size_Seq40], [Size_Seq50],
-        [Size_Seq60], [Size_Seq70], [Size_Seq80], [Size_Seq90], [Size_Seq100],
-        [Size_Seq110], [Size_Seq120], [Size_Seq130], [Size_Seq140], [Size_Seq150],
-        [Size_Seq160], [Size_Seq170], [Size_Seq180], [Size_Seq190], [Size_Seq200],
-        [Size_Seq210], [Size_Seq220], [Size_Seq230], [Size_Seq240], [Size_Seq250],
-        [Size_Seq260], [Size_Seq270], [Size_Seq280], [Size_Seq290], [Size_Seq300],
-        [Size_Seq310], [Size_Seq320], [Size_Seq330], [Size_Seq340], [Size_Seq350],
-        [Size_Seq360], [Size_Seq370], [Size_Seq380], [Size_Seq390], [Size_Seq400],
-        [OrderQuantity], [Det_ID]
-      FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
-      ORDER BY [Order_No]
+        h.[SC_Heading], h.[Factory], h.[SalesTeamName], h.[Cust_Code], h.[ShortName],
+        h.[EngName], h.[Order_No], h.[Ccy], h.[Style], h.[CustStyle], h.[NoOfCol],
+        h.[Size_Seq10], h.[Size_Seq20], h.[Size_Seq30], h.[Size_Seq40], h.[Size_Seq50],
+        h.[Size_Seq60], h.[Size_Seq70], h.[Size_Seq80], h.[Size_Seq90], h.[Size_Seq100],
+        h.[Size_Seq110], h.[Size_Seq120], h.[Size_Seq130], h.[Size_Seq140], h.[Size_Seq150],
+        h.[Size_Seq160], h.[Size_Seq170], h.[Size_Seq180], h.[Size_Seq190], h.[Size_Seq200],
+        h.[Size_Seq210], h.[Size_Seq220], h.[Size_Seq230], h.[Size_Seq240], h.[Size_Seq250],
+        h.[Size_Seq260], h.[Size_Seq270], h.[Size_Seq280], h.[Size_Seq290], h.[Size_Seq300],
+        h.[Size_Seq310], h.[Size_Seq320], h.[Size_Seq330], h.[Size_Seq340], h.[Size_Seq350],
+        h.[Size_Seq360], h.[Size_Seq370], h.[Size_Seq380], h.[Size_Seq390], h.[Size_Seq400],
+        h.[OrderQuantity], h.[Det_ID]
+      FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr] h
+      ORDER BY h.[Order_No]
     `;
-
     const orderHeaderResult = await request.query(orderHeaderQuery);
 
     // 2. Fetch Size Names for each order (FIXED query)
@@ -1815,15 +1813,14 @@ async function syncDTOrdersData() {
       FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
       WHERE [Order_No] IS NOT NULL
     `;
-
     const sizeNamesResult = await request.query(sizeNamesQuery);
 
-    // 3. Fetch Order Colors and Shipping
-    console.log("🎨 Fetching order colors and shipping data...");
+    // 3. Fetch Order Colors and Shipping WITH Ship_ID
+    console.log("🎨 Fetching order colors and shipping data with Ship_ID...");
     const orderColorsQuery = `
       SELECT 
         [Order_No], [ColorCode], [Color], [ChnColor], [Color_Seq], [ship_seq_no],
-        [Mode], [Country], [Origin], [CustPORef],
+        [Ship_ID], [Mode], [Country], [Origin], [CustPORef],
         [Size_Seq10], [Size_Seq20], [Size_Seq30], [Size_Seq40], [Size_Seq50], [Size_Seq60],
         [Size_Seq70], [Size_Seq80], [Size_Seq90], [Size_Seq100], [Size_Seq110], [Size_Seq120],
         [Size_Seq130], [Size_Seq140], [Size_Seq150], [Size_Seq160], [Size_Seq170], [Size_Seq180],
@@ -1834,7 +1831,6 @@ async function syncDTOrdersData() {
       FROM [DTrade_CONN].[dbo].[vBuyerPOColQty_BySz]
       ORDER BY [Order_No], [ColorCode], [ship_seq_no]
     `;
-
     const orderColorsResult = await request.query(orderColorsQuery);
 
     // 4. Fetch Size Specifications
@@ -1851,27 +1847,25 @@ async function syncDTOrdersData() {
       FROM [DTrade_CONN].[dbo].[vTx_JobSizeSpec_Fty]
       ORDER BY [JobNo], [Seq]
     `;
-    
     const sizeSpecResult = await request.query(sizeSpecQuery);
 
-    // 5. NEW: Fetch Cut Quantity data from FC_SYSTEM
+    // 5. Fetch Cut Quantity data from FC_SYSTEM
     console.log("✂️ Fetching cut quantity data from FC_SYSTEM...");
-      const cutQtyQuery = `
-        SELECT 
-          [BuyerStyle], [StyleNo], [ColorCode], [ChColor], [EngColor], [SIZE],
-          SUM(CAST([PlanQty] AS INT)) as TotalPlanQty, 
-          SUM(CAST([CutQty] AS INT)) as TotalCutQty
-        FROM [FC_SYSTEM].[dbo].[ViewOrderPlanQty]
-        WHERE [StyleNo] IS NOT NULL 
-          AND [ColorCode] IS NOT NULL 
-          AND [SIZE] IS NOT NULL
-          AND [PlanQty] IS NOT NULL 
-          AND [CutQty] IS NOT NULL
-        GROUP BY [BuyerStyle], [StyleNo], [ColorCode], [ChColor], [EngColor], [SIZE]
-        ORDER BY [StyleNo], [ColorCode], [SIZE]
-      `;
-
-      const cutQtyResult = await requestFC.query(cutQtyQuery);
+    const cutQtyQuery = `
+      SELECT 
+        [BuyerStyle], [StyleNo], [ColorCode], [ChColor], [EngColor], [SIZE],
+        SUM(CAST([PlanQty] AS INT)) as TotalPlanQty, 
+        SUM(CAST([CutQty] AS INT)) as TotalCutQty
+      FROM [FC_SYSTEM].[dbo].[ViewOrderPlanQty]
+      WHERE [StyleNo] IS NOT NULL 
+        AND [ColorCode] IS NOT NULL 
+        AND [SIZE] IS NOT NULL
+        AND [PlanQty] IS NOT NULL 
+        AND [CutQty] IS NOT NULL
+      GROUP BY [BuyerStyle], [StyleNo], [ColorCode], [ChColor], [EngColor], [SIZE]
+      ORDER BY [StyleNo], [ColorCode], [SIZE]
+    `;
+    const cutQtyResult = await requestFC.query(cutQtyQuery);
 
     // Create size mapping from database for each order
     const orderSizeMapping = new Map();
@@ -1896,65 +1890,31 @@ async function syncDTOrdersData() {
       orderSizeMapping.set(orderNo, sizeMapping);
     });
 
-    // NEW: Process Cut Quantity data and create mapping
+    // Process Cut Quantity data and create mapping
     console.log("🔄 Processing cut quantity data...");
-      const cutQtyMapping = new Map();
-
-      cutQtyResult.recordset.forEach(record => {
-        const styleNo = record.StyleNo;        // This should match Order_No in MongoDB
-        const colorCode = record.ColorCode;    // This should match ColorCode in MongoDB
-        const size = record.SIZE;              // Size like "XS", "S", "M", etc.
-        const planQty = Number(record.TotalPlanQty) || 0;
-        const cutQty = Number(record.TotalCutQty) || 0;
-        
-        // Create mapping key: StyleNo_ColorCode
-        const key = `${styleNo}_${colorCode}`;
-        
-        if (!cutQtyMapping.has(key)) {
-          cutQtyMapping.set(key, {});
-        }
-        
-        const colorCutData = cutQtyMapping.get(key);
-        
-        // Set the aggregated quantities for this size
-        colorCutData[size] = {
-          PlanCutQty: planQty,
-          ActualCutQty: cutQty
-        };
-      });
-
-      // // DEBUG: Check mapping creation
-      // console.log("🔍 Analyzing cut quantity mapping...");
-
-      // if (cutQtyResult.recordset.length > 0) {
-      //   // Check for the specific order from your MongoDB document
-      //   const testOrder = "PTCOM257";
-      //   const testColor = "CBK001";
-      //   const testKey = `${testOrder}_${testColor}`;
-        
-      //   if (cutQtyMapping.has(testKey)) {
-      //     const testData = cutQtyMapping.get(testKey);
-          
-      //     // Show all sizes for this order/color
-      //     Object.entries(testData).forEach(([size, qty]) => {
-      //       // console.log(`   ${size}: Plan=${qty.PlanCutQty}, Cut=${qty.ActualCutQty}`);
-      //     });
-      //   } else {
-      //     console.log("❌ No matching cut quantity data found");
-          
-      //     // Show what StyleNo values we actually have
-      //     const availableStyleNos = [...new Set(cutQtyResult.recordset.map(r => r.StyleNo))];
-      //     // console.log("📋 Available StyleNo values:", availableStyleNos.slice(0, 10));
-          
-      //     // Show available keys that might match
-      //     const availableKeys = Array.from(cutQtyMapping.keys()).filter(key => 
-      //       key.includes(testOrder) || key.includes(testColor)
-      //     );
-      //     console.log("🔍 Available keys containing order/color:", availableKeys);
-      //   }
-      // }
-
-      // console.log(`📊 Cut quantity mapping created with ${cutQtyMapping.size} entries`);
+    const cutQtyMapping = new Map();
+    cutQtyResult.recordset.forEach(record => {
+      const styleNo = record.StyleNo;        // This should match Order_No in MongoDB
+      const colorCode = record.ColorCode;    // This should match ColorCode in MongoDB
+      const size = record.SIZE;              // Size like "XS", "S", "M", etc.
+      const planQty = Number(record.TotalPlanQty) || 0;
+      const cutQty = Number(record.TotalCutQty) || 0;
+      
+      // Create mapping key: StyleNo_ColorCode
+      const key = `${styleNo}_${colorCode}`;
+      
+      if (!cutQtyMapping.has(key)) {
+        cutQtyMapping.set(key, {});
+      }
+      
+      const colorCutData = cutQtyMapping.get(key);
+      
+      // Set the aggregated quantities for this size
+      colorCutData[size] = {
+        PlanCutQty: planQty,
+        ActualCutQty: cutQty
+      };
+    });
 
     // Helper Functions (keeping all existing helper functions)
     function extractSizeDataAsObject(record, prefix = 'Size_Seq', orderNo) {
@@ -2002,118 +1962,153 @@ async function syncDTOrdersData() {
         });
     }
 
-    // Fixed extractSpecsDataAsArray function
-    function extractSpecsDataAsArray(record, orderNo) {
-      const sizeMapping = orderSizeMapping.get(orderNo) || {};
-      const specsArray = [];
-      
-      for (let i = 1; i <= 40; i++) {
-        const sizeColumn = `Size${i}`;
-        if (record[sizeColumn] && record[sizeColumn] !== null) {
-          const value = record[sizeColumn].toString().trim();
-          const seqNumber = (i * 10).toString();
-          // Use actual size name from database mapping
-          const sizeName = sizeMapping[seqNumber] || `Size${i}`;
-          
-          // Convert fraction to decimal
-          let decimal = 0;
-          try {
-            // Handle mixed numbers with dash like "13-3/8" or space like "13 3/8"
-            if ((value.includes('-') || value.includes(' ')) && value.includes('/')) {
-              // Split by dash or space
-              const parts = value.includes('-') ? value.split('-') : value.split(' ');
-              const wholePart = parseFloat(parts[0]) || 0;
-              const fractionPart = parts[1];
-              
-              if (fractionPart && fractionPart.includes('/')) {
-                const [numerator, denominator] = fractionPart.split('/');
-                const fractionDecimal = parseFloat(numerator) / parseFloat(denominator);
-                decimal = wholePart + fractionDecimal;
-              } else {
-                decimal = wholePart;
-              }
-            }
-            // Handle simple fractions like "3/8"
-            else if (value.includes('/')) {
-              const [numerator, denominator] = value.split('/');
-              decimal = parseFloat(numerator) / parseFloat(denominator);
-            }
-            // Handle whole numbers or decimals
-            else {
-              decimal = parseFloat(value) || 0;
-            }
-          } catch (error) {
-            console.error(`Error parsing spec value "${value}":`, error);
-            decimal = parseFloat(value) || 0;
-          }
-          
-          // Ensure decimal is a valid number
-          if (isNaN(decimal)) {
-            decimal = 0;
-          }
-          
-          const specObject = {};
-          specObject[sizeName] = {
-            fraction: value,
-            decimal: Math.round(decimal * 10000) / 10000 // Round to 4 decimal places
-          };
-          specsArray.push(specObject);
-        }
-      }
-      return specsArray;
-    }
-
-    // Fixed parseToleranceValue function
     function parseToleranceValue(toleranceStr) {
-      if (!toleranceStr) return { fraction: '', decimal: 0 };
+  if (!toleranceStr) return { fraction: '', decimal: 0 };
+  
+  let str = toleranceStr.toString().trim();
+  let decimal = 0;
+  
+  // Clean up the string - remove extra quotes and spaces
+  str = str.replace(/['"]/g, '').trim();
+  
+  // Replace all types of fraction slashes with regular slash
+  str = str.replace(/[⁄∕／]/g, '/'); // Unicode: U+2044, U+2215, U+FF0F
+  
+  // Handle negative values
+  let isNegative = false;
+  if (str.startsWith('-')) {
+    isNegative = true;
+    str = str.substring(1);
+  }
+  
+  try {
+    // Handle mixed numbers with various separators
+    // Match patterns like: "12 3/4", "12-3/4", "12　3/4" (with different spaces)
+    const mixedNumberPattern = /^(\d+(?:\.\d+)?)\s*[-\s　]\s*(\d+)\s*\/\s*(\d+)$/;
+    const mixedMatch = str.match(mixedNumberPattern);
+    
+    if (mixedMatch) {
+      const wholePart = parseFloat(mixedMatch[1]) || 0;
+      const numerator = parseFloat(mixedMatch[2]) || 0;
+      const denominator = parseFloat(mixedMatch[3]) || 1;
+      decimal = wholePart + (numerator / denominator);
+    }
+    // Handle simple fractions like "3/4"
+    else if (str.includes('/')) {
+      const fractionPattern = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/;
+      const fractionMatch = str.match(fractionPattern);
       
-      let str = toleranceStr.toString().trim();
-      let decimal = 0;
-      
-      // Clean up the string - remove extra quotes and spaces
-      str = str.replace(/['"]/g, '').trim();
-      
-      // Handle negative values
-      let isNegative = false;
-      if (str.startsWith('-')) {
-        isNegative = true;
-        str = str.substring(1);
-      }
-      
-      try {
-        // Handle mixed numbers with dash like "13-3/8" or space like "13 3/8"
-        if ((str.includes('-') || str.includes(' ')) && str.includes('/')) {
-          // Split by dash or space
-          const parts = str.includes('-') ? str.split('-') : str.split(' ');
-          const wholePart = parseFloat(parts[0]) || 0;
-          const fractionPart = parts[1];
-          
-          if (fractionPart && fractionPart.includes('/')) {
-            const [numerator, denominator] = fractionPart.split('/');
-            const fractionDecimal = parseFloat(numerator) / parseFloat(denominator);
-            decimal = wholePart + fractionDecimal;
-          } else {
-            decimal = wholePart;
-          }
+      if (fractionMatch) {
+        const numerator = parseFloat(fractionMatch[1]) || 0;
+        const denominator = parseFloat(fractionMatch[2]) || 1;
+        decimal = numerator / denominator;
+      } else {
+        // Fallback: split by / and try to parse
+        const parts = str.split('/');
+        if (parts.length === 2) {
+          const numerator = parseFloat(parts[0].trim()) || 0;
+          const denominator = parseFloat(parts[1].trim()) || 1;
+          decimal = numerator / denominator;
+        } else {
+          decimal = parseFloat(str) || 0;
         }
-        // Handle simple fractions like "3/8"
-        else if (str.includes('/')) {
-          const [numerator, denominator] = str.split('/');
-          decimal = parseFloat(numerator) / parseFloat(denominator);
+      }
+    }
+    // Handle whole numbers or decimals
+    else {
+      decimal = parseFloat(str) || 0;
+    }
+    
+    // Apply negative sign if needed
+    if (isNegative) {
+      decimal = -decimal;
+    }
+    
+  } catch (error) {
+    console.error(`Error parsing tolerance value "${toleranceStr}":`, error);
+    // Fallback: try to extract any numbers and make a reasonable guess
+    const numbers = str.match(/\d+(?:\.\d+)?/g);
+    if (numbers && numbers.length >= 1) {
+      decimal = parseFloat(numbers[0]) || 0;
+    } else {
+      decimal = 0;
+    }
+  }
+  
+  // Ensure decimal is a valid number
+  if (isNaN(decimal)) {
+    decimal = 0;
+  }
+  
+  return {
+    fraction: toleranceStr.toString(),
+    decimal: Math.round(decimal * 10000) / 10000 // Round to 4 decimal places
+  };
+}
+
+// Enhanced extractSpecsDataAsArray function
+function extractSpecsDataAsArray(record, orderNo) {
+  const sizeMapping = orderSizeMapping.get(orderNo) || {};
+  const specsArray = [];
+  
+  for (let i = 1; i <= 40; i++) {
+    const sizeColumn = `Size${i}`;
+    if (record[sizeColumn] && record[sizeColumn] !== null) {
+      const value = record[sizeColumn].toString().trim();
+      const seqNumber = (i * 10).toString();
+      // Use actual size name from database mapping
+      const sizeName = sizeMapping[seqNumber] || `Size${i}`;
+      
+      // Convert fraction to decimal using the enhanced parsing
+      let decimal = 0;
+      try {
+        // Replace all types of fraction slashes with regular slash
+        let cleanValue = value.replace(/[⁄∕／]/g, '/');
+        
+        // Handle mixed numbers with various separators
+        const mixedNumberPattern = /^(\d+(?:\.\d+)?)\s*[-\s　]\s*(\d+)\s*\/\s*(\d+)$/;
+        const mixedMatch = cleanValue.match(mixedNumberPattern);
+        
+        if (mixedMatch) {
+          const wholePart = parseFloat(mixedMatch[1]) || 0;
+          const numerator = parseFloat(mixedMatch[2]) || 0;
+          const denominator = parseFloat(mixedMatch[3]) || 1;
+          decimal = wholePart + (numerator / denominator);
+        }
+        // Handle simple fractions like "3/4"
+        else if (cleanValue.includes('/')) {
+          const fractionPattern = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/;
+          const fractionMatch = cleanValue.match(fractionPattern);
+          
+          if (fractionMatch) {
+            const numerator = parseFloat(fractionMatch[1]) || 0;
+            const denominator = parseFloat(fractionMatch[2]) || 1;
+            decimal = numerator / denominator;
+          } else {
+            // Fallback: split by / and try to parse
+            const parts = cleanValue.split('/');
+            if (parts.length === 2) {
+              const numerator = parseFloat(parts[0].trim()) || 0;
+              const denominator = parseFloat(parts[1].trim()) || 1;
+              decimal = numerator / denominator;
+            } else {
+              decimal = parseFloat(cleanValue) || 0;
+            }
+          }
         }
         // Handle whole numbers or decimals
         else {
-          decimal = parseFloat(str) || 0;
+          decimal = parseFloat(cleanValue) || 0;
         }
-        
-        // Apply negative sign if needed
-        if (isNegative) {
-          decimal = -decimal;
-        }
-        
       } catch (error) {
-        console.error(`Error parsing tolerance value "${toleranceStr}":`, error);
-        decimal = 0;
+        console.error(`Error parsing spec value "${value}":`, error);
+        // Fallback: try to extract any numbers and make a reasonable guess
+        const numbers = value.match(/\d+(?:\.\d+)?/g);
+        if (numbers && numbers.length >= 1) {
+          decimal = parseFloat(numbers[0]) || 0;
+        } else {
+          decimal = 0;
+        }
       }
       
       // Ensure decimal is a valid number
@@ -2121,11 +2116,16 @@ async function syncDTOrdersData() {
         decimal = 0;
       }
       
-      return {
-        fraction: toleranceStr.toString(),
+      const specObject = {};
+      specObject[sizeName] = {
+        fraction: value,
         decimal: Math.round(decimal * 10000) / 10000 // Round to 4 decimal places
       };
+      specsArray.push(specObject);
     }
+  }
+  return specsArray;
+}
 
     function isEmptyOrContainsNumbers(value) {
       if (!value || value === null || value === undefined || value === '') {
@@ -2188,6 +2188,8 @@ async function syncDTOrdersData() {
       const orderNo = record.Order_No;
       const colorCode = record.ColorCode;
       const shipSeqNo = record.ship_seq_no;
+      const shipId = record.Ship_ID; // Added Ship_ID
+      
       if (orderMap.has(orderNo)) {
         const order = orderMap.get(orderNo);
         
@@ -2220,7 +2222,7 @@ async function syncDTOrdersData() {
           colorSummary.sizeTotals[sizeName] += qty;
         });
 
-        // Process OrderColorShip
+        // Process OrderColorShip WITH Ship_ID
         const shipKey = `${orderNo}_${colorCode}`;
         if (!shipMap.has(shipKey)) {
           shipMap.set(shipKey, {
@@ -2231,6 +2233,7 @@ async function syncDTOrdersData() {
             ShipSeqNo: []
           });
         }
+
         const shipRecord = shipMap.get(shipKey);
         const existingSeq = shipRecord.ShipSeqNo.find(seq => seq.seqNo === shipSeqNo);
         if (!existingSeq && shipSeqNo) {
@@ -2239,6 +2242,7 @@ async function syncDTOrdersData() {
           
           shipRecord.ShipSeqNo.push({
             seqNo: Number(shipSeqNo),
+            Ship_ID: convertEmptyToNull(shipId), // Added Ship_ID here
             sizes: sizesArray  // Now this will be in format [{"XS": 44}, {"S": 130}, ...]
           });
         }
@@ -2261,327 +2265,53 @@ async function syncDTOrdersData() {
       });
     }
 
-    // DEBUG: Analyze FC_SYSTEM data structure
-      // console.log("🔍 Analyzing FC_SYSTEM data structure...");
-      // console.log(`📊 Cut quantity records fetched: ${cutQtyResult.recordset.length}`);
-      // if (cutQtyResult.recordset.length > 0) {
-      //   const sampleRecord = cutQtyResult.recordset[0];
-      //   console.log("📋 Sample FC_SYSTEM record:", sampleRecord);
-        
-      //   // Check for the specific style from your MongoDB document
-      //   const testStyle = "3AFESHAS2-617";
-      //   const matchingRecords = cutQtyResult.recordset.filter(r => 
-      //     r.StyleNo === testStyle || r.BuyerStyle === testStyle
-      //   );
-      //   console.log(`🔍 Records matching style ${testStyle}:`, matchingRecords.length);
-      //   if (matchingRecords.length > 0) {
-      //     console.log("📋 Sample matching record:", matchingRecords[0]);
-      //   }
-      // }
-
-      // DEBUG: Check cut quantity mapping
-      // console.log(`📊 Cut quantity mapping created with ${cutQtyMapping.size} entries`);
-      // if (cutQtyMapping.size > 0) {
-      //   const sampleKeys = Array.from(cutQtyMapping.keys()).slice(0, 5);
-      //   console.log("📋 Sample mapping keys:", sampleKeys);
-      //   if (sampleKeys.length > 0) {
-      //     console.log("📋 Sample mapping data:", cutQtyMapping.get(sampleKeys[0]));
-      //   }
-      // }
-
-      // NEW: Add cut quantity data to colors - ENHANCED VERSION
-      console.log("🔄 Mapping cut quantity data to orders...");
-        let cutQtyMatchCount = 0;
-        let totalColorProcessed = 0;
-        let debugMatches = [];
-
-        for (const [orderNo, order] of orderMap) {
-          for (const [colorKey, colorData] of colorMap) {
-            if (colorKey.startsWith(orderNo + '_')) {
-              totalColorProcessed++;
-              const colorCode = colorData.ColorCode;
-              
-              // Create the mapping key: Order_No_ColorCode
-              const cutKey = `${orderNo}_${colorCode}`;
-              
-              if (cutQtyMapping.has(cutKey)) {
-                const cutData = cutQtyMapping.get(cutKey);
-                
-                // // DEBUG: Log successful match
-                // // console.log(`✅ Cut quantity match found: ${cutKey}`);
-                
-                // debugMatches.push({
-                //   orderNo,
-                //   colorCode,
-                //   cutKey,
-                //   sizesCount: Object.keys(cutData).length
-                // });
-                
-                // Clear existing CutQty data and set new data
-                colorData.CutQty = {};
-                
-                // Set the cut data for each size
-                Object.entries(cutData).forEach(([size, quantities]) => {
-                  colorData.CutQty[size] = {
-                    ActualCutQty: quantities.ActualCutQty,
-                    PlanCutQty: quantities.PlanCutQty
-                  };
-                });
-                
-                cutQtyMatchCount++;
-              } else {
-                //
-              }
-            }
+    // Add cut quantity data to colors
+    console.log("🔄 Mapping cut quantity data to orders...");
+    let cutQtyMatchCount = 0;
+    let totalColorProcessed = 0;
+    
+    for (const [orderNo, order] of orderMap) {
+      for (const [colorKey, colorData] of colorMap) {
+        if (colorKey.startsWith(orderNo + '_')) {
+          totalColorProcessed++;
+          const colorCode = colorData.ColorCode;
+          
+          // Create the mapping key: Order_No_ColorCode
+          const cutKey = `${orderNo}_${colorCode}`;
+          
+          if (cutQtyMapping.has(cutKey)) {
+            const cutData = cutQtyMapping.get(cutKey);
+            
+            // Clear existing CutQty data and set new data
+            colorData.CutQty = {};
+            
+            // Set the cut data for each size
+            Object.entries(cutData).forEach(([size, quantities]) => {
+              colorData.CutQty[size] = {
+                ActualCutQty: quantities.ActualCutQty,
+                PlanCutQty: quantities.PlanCutQty
+              };
+            });
+            
+            cutQtyMatchCount++;
           }
         }
+      }
+    }
 
-        console.log(`📊 Cut quantity matching results:`);
-
-        
-
-        // CRITICAL: Verify CutQty data is actually in the colorData objects
-        console.log("🔍 Verifying CutQty data in colorMap...");
-        let colorsWithCutQty = 0;
-        for (const [colorKey, colorData] of colorMap) {
-          if (Object.keys(colorData.CutQty).length > 0) {
-            colorsWithCutQty++;
-            if (colorsWithCutQty <= 3) { // Log first 3 examples
-              console.log(`✅ Color ${colorKey} has CutQty:`, colorData.CutQty);
-            }
-          }
+    console.log(`📊 Cut quantity matching results:`);
+    
+    // Verify CutQty data is actually in the colorData objects
+    console.log("🔍 Verifying CutQty data in colorMap...");
+    let colorsWithCutQty = 0;
+    for (const [colorKey, colorData] of colorMap) {
+      if (Object.keys(colorData.CutQty).length > 0) {
+        colorsWithCutQty++;
+        if (colorsWithCutQty <= 3) { // Log first 3 examples
+          console.log(`✅ Color ${colorKey} has CutQty:`, colorData.CutQty);
         }
-
-//         // 6. NEW: Fetch AfterWashSpecs and BeforeWashSpecs from old dt-order collection
-// console.log("🔄 Fetching wash specs from old dt-order collection...");
-
-// // Use the existing ymEcoConnection instead of creating a new one
-// // Define schema for old dt-order collection
-// const oldDtOrderSchema = new mongoose.Schema({}, { strict: false, collection: 'dt_orders' });
-// const OldDtOrder = ymEcoConnection.model('OldDtOrder', oldDtOrderSchema);
-
-// try {
-//   // First, let's check if the connection is working and what collections exist
-//   console.log("🔍 Checking database connection and collections...");
-  
-//   // Check connection state
-//   console.log(`📡 Connection state: ${ymEcoConnection.readyState}`);
-//   console.log(`📡 Connection name: ${ymEcoConnection.name}`);
-  
-//   // List all collections to verify the collection name
-//   const collections = await ymEcoConnection.db.listCollections().toArray();
-//   console.log("📋 Available collections:", collections.map(c => c.name));
-  
-//   // Check if dt-orders collection exists
-//   const dtOrdersExists = collections.some(c => c.name === 'dt_orders');
-//   console.log(`📋 dt_orders collection exists: ${dtOrdersExists}`);
-  
-//   if (!dtOrdersExists) {
-//     // Try alternative collection names
-//     const possibleNames = collections.filter(c => 
-//       c.name.toLowerCase().includes('order') || 
-//       c.name.toLowerCase().includes('dt')
-//     );
-//     console.log("🔍 Possible order-related collections:", possibleNames.map(c => c.name));
-//   }
-  
-//   // Get total count of documents in the collection
-//   const totalCount = await OldDtOrder.countDocuments();
-//   console.log(`📊 Total documents in dt-orders collection: ${totalCount}`);
-  
-//   if (totalCount === 0) {
-//     console.log("⚠️ No documents found in dt-orders collection");
-    
-//     // Initialize empty arrays for all orders
-//     for (const [orderNo, order] of orderMap) {
-//       order.AfterWashSpecs = [];
-//       order.BeforeWashSpecs = [];
-//     }
-    
-//     console.log("✅ Initialized empty wash specs for all orders");
-//     return; // Exit early
-//   }
-  
-//   // Check a few sample documents to understand the structure
-//   console.log("🔍 Checking sample documents structure...");
-//   const sampleDocs = await OldDtOrder.find({}).limit(5).lean();
-  
-//   if (sampleDocs.length > 0) {
-//     console.log(`📋 Sample document keys:`, Object.keys(sampleDocs[0]));
-    
-//     // Check if any documents have wash specs
-//     const docsWithAfterWash = await OldDtOrder.countDocuments({
-//       AfterWashSpecs: { $exists: true, $ne: null }
-//     });
-//     const docsWithBeforeWash = await OldDtOrder.countDocuments({
-//       BeforeWashSpecs: { $exists: true, $ne: null }
-//     });
-    
-//     console.log(`📊 Documents with AfterWashSpecs: ${docsWithAfterWash}`);
-//     console.log(`📊 Documents with BeforeWashSpecs: ${docsWithBeforeWash}`);
-    
-//     // Check for non-empty arrays
-//     const docsWithNonEmptyAfterWash = await OldDtOrder.countDocuments({
-//       AfterWashSpecs: { $exists: true, $ne: null, $not: { $size: 0 } }
-//     });
-//     const docsWithNonEmptyBeforeWash = await OldDtOrder.countDocuments({
-//       BeforeWashSpecs: { $exists: true, $ne: null, $not: { $size: 0 } }
-//     });
-    
-//     console.log(`📊 Documents with non-empty AfterWashSpecs: ${docsWithNonEmptyAfterWash}`);
-//     console.log(`📊 Documents with non-empty BeforeWashSpecs: ${docsWithNonEmptyBeforeWash}`);
-    
-//     // Show sample document with Order_No
-//     const sampleWithOrderNo = sampleDocs.find(doc => doc.Order_No);
-//     if (sampleWithOrderNo) {
-//       console.log(`📋 Sample Order_No: ${sampleWithOrderNo.Order_No}`);
-//       console.log(`📋 Sample has AfterWashSpecs: ${!!sampleWithOrderNo.AfterWashSpecs}`);
-//       console.log(`📋 Sample has BeforeWashSpecs: ${!!sampleWithOrderNo.BeforeWashSpecs}`);
-      
-//       if (sampleWithOrderNo.AfterWashSpecs) {
-//         console.log(`📋 AfterWashSpecs length: ${sampleWithOrderNo.AfterWashSpecs.length}`);
-//       }
-//       if (sampleWithOrderNo.BeforeWashSpecs) {
-//         console.log(`📋 BeforeWashSpecs length: ${sampleWithOrderNo.BeforeWashSpecs.length}`);
-//       }
-//     }
-//   }
-  
-//   // Fetch all records with AfterWashSpecs and BeforeWashSpecs using a simpler query first
-//   console.log("🔍 Trying simpler query for wash specs...");
-  
-//   const oldOrdersWithWashSpecs = await OldDtOrder.find(
-//     {
-//       $or: [
-//         { AfterWashSpecs: { $exists: true, $ne: null } },
-//         { BeforeWashSpecs: { $exists: true, $ne: null } }
-//       ]
-//     },
-//     {
-//       Order_No: 1,
-//       AfterWashSpecs: 1,
-//       BeforeWashSpecs: 1
-//     }
-//   ).lean();
-
-//   console.log(`📊 Found ${oldOrdersWithWashSpecs.length} orders with wash specs in old collection`);
-  
-//   if (oldOrdersWithWashSpecs.length === 0) {
-//     console.log("⚠️ No orders found with wash specs. Trying alternative approach...");
-    
-//     // Try to find any documents that have these fields, even if they're empty
-//     const anyWithWashFields = await OldDtOrder.find(
-//       {
-//         $or: [
-//           { AfterWashSpecs: { $exists: true } },
-//           { BeforeWashSpecs: { $exists: true } }
-//         ]
-//       }
-//     ).limit(5).lean();
-    
-//     console.log(`📊 Found ${anyWithWashFields.length} documents with wash spec fields (including empty)`);
-    
-//     if (anyWithWashFields.length > 0) {
-//       anyWithWashFields.forEach((doc, index) => {
-//         console.log(`📋 Doc ${index + 1} - Order_No: ${doc.Order_No}`);
-//         console.log(`   AfterWashSpecs: ${doc.AfterWashSpecs ? `Array(${doc.AfterWashSpecs.length})` : 'null/undefined'}`);
-//         console.log(`   BeforeWashSpecs: ${doc.BeforeWashSpecs ? `Array(${doc.BeforeWashSpecs.length})` : 'null/undefined'}`);
-//       });
-//     }
-//   }
-
-//   // Create mapping for wash specs
-//   const washSpecsMapping = new Map();
-//   oldOrdersWithWashSpecs.forEach(oldOrder => {
-//     if (oldOrder.Order_No) {
-//       const afterWashSpecs = oldOrder.AfterWashSpecs || [];
-//       const beforeWashSpecs = oldOrder.BeforeWashSpecs || [];
-      
-//       // Only add to mapping if there's actual data
-//       if (afterWashSpecs.length > 0 || beforeWashSpecs.length > 0) {
-//         washSpecsMapping.set(oldOrder.Order_No, {
-//           AfterWashSpecs: afterWashSpecs,
-//           BeforeWashSpecs: beforeWashSpecs
-//         });
-//       }
-//     }
-//   });
-
-//   console.log(`📊 Wash specs mapping created with ${washSpecsMapping.size} entries`);
-
-//   // Debug: Show sample wash specs data
-//   if (washSpecsMapping.size > 0) {
-//     const sampleOrderNo = Array.from(washSpecsMapping.keys())[0];
-//     const sampleWashSpecs = washSpecsMapping.get(sampleOrderNo);
-//     console.log(`📋 Sample wash specs for order ${sampleOrderNo}:`);
-//     console.log(`   - AfterWashSpecs count: ${sampleWashSpecs.AfterWashSpecs.length}`);
-//     console.log(`   - BeforeWashSpecs count: ${sampleWashSpecs.BeforeWashSpecs.length}`);
-    
-//     // Show structure of first AfterWashSpec entry
-//     if (sampleWashSpecs.AfterWashSpecs.length > 0) {
-//       console.log(`📋 Sample AfterWashSpec entry:`, {
-//         no: sampleWashSpecs.AfterWashSpecs[0].no,
-//         kValue: sampleWashSpecs.AfterWashSpecs[0].kValue,
-//         MeasurementPointEngName: sampleWashSpecs.AfterWashSpecs[0].MeasurementPointEngName,
-//         specsCount: sampleWashSpecs.AfterWashSpecs[0].Specs?.length || 0
-//       });
-//     }
-    
-//     // Check if any of our current orders match the wash specs orders
-//     const currentOrderNos = Array.from(orderMap.keys());
-//     const washSpecOrderNos = Array.from(washSpecsMapping.keys());
-//     const matchingOrders = currentOrderNos.filter(orderNo => washSpecOrderNos.includes(orderNo));
-    
-//     console.log(`🔍 Current orders that have wash specs: ${matchingOrders.length}`);
-//     if (matchingOrders.length > 0) {
-//       console.log(`📋 Sample matching orders: ${matchingOrders.slice(0, 5).join(', ')}`);
-//     }
-//   }
-
-//   // Add wash specs to orders
-//   console.log("🔄 Adding wash specs to orders...");
-//   let washSpecsMatchCount = 0;
-
-//   for (const [orderNo, order] of orderMap) {
-//     if (washSpecsMapping.has(orderNo)) {
-//       const washSpecs = washSpecsMapping.get(orderNo);
-      
-//       // Add AfterWashSpecs and BeforeWashSpecs to the order
-//       order.AfterWashSpecs = washSpecs.AfterWashSpecs;
-//       order.BeforeWashSpecs = washSpecs.BeforeWashSpecs;
-      
-//       washSpecsMatchCount++;
-      
-//       // Debug: Log first few matches
-//       if (washSpecsMatchCount <= 5) {
-//         console.log(`✅ Added wash specs to order ${orderNo}:`);
-//         console.log(`   - AfterWashSpecs: ${order.AfterWashSpecs.length} entries`);
-//         console.log(`   - BeforeWashSpecs: ${order.BeforeWashSpecs.length} entries`);
-//       }
-//     } else {
-//       // Initialize empty arrays if no wash specs found
-//       order.AfterWashSpecs = [];
-//       order.BeforeWashSpecs = [];
-//     }
-//   }
-
-//   console.log(`📊 Wash specs matching results:`);
-//   console.log(`   - Total orders processed: ${orderMap.size}`);
-//   console.log(`   - Orders with wash specs: ${washSpecsMatchCount}`);
-//   console.log(`   - Match rate: ${((washSpecsMatchCount / orderMap.size) * 100).toFixed(2)}%`);
-
-// } catch (washSpecError) {
-//   console.error("❌ Error fetching wash specs:", washSpecError);
-//   console.log("⚠️ Continuing without wash specs data...");
-  
-//   // Initialize empty arrays for all orders if wash specs fetch fails
-//   for (const [orderNo, order] of orderMap) {
-//     order.AfterWashSpecs = [];
-//     order.BeforeWashSpecs = [];
-//   }
-// }
-
-// console.log("✅ Wash specs processing completed");
+      }
+    }
 
     // Add colors and shipping to orders
     for (const [orderNo, order] of orderMap) {
@@ -2595,7 +2325,7 @@ async function syncDTOrdersData() {
       // Add OrderColorShip
       for (const [shipKey, shipData] of shipMap) {
         if (shipKey.startsWith(orderNo + '_')) {
-          order.OrderColorShip.push(shipData);
+                   order.OrderColorShip.push(shipData);
         }
       }
     }
@@ -2609,7 +2339,7 @@ async function syncDTOrdersData() {
         
         try {
           // Use the fixed parseToleranceValue function
-          const toleranceMin = parseToleranceValue(spec.Tolerance);
+          const toleranceMinus = parseToleranceValue(spec.Tolerance);
           const tolerancePlus = parseToleranceValue(spec.Tolerance2);
           const specs = extractSpecsDataAsArray(spec, jobNo);
           
@@ -2641,9 +2371,9 @@ async function syncDTOrdersData() {
             ChineseName: chineseName,
             AreaCode: convertEmptyToNull(spec.AreaCode),
             IsMiddleCalc: spec.IsMiddleCalc || null,
-            ToleranceMin: {
-              fraction: toleranceMin.fraction || '',
-              decimal: toleranceMin.decimal
+            ToleranceMinus: {
+              fraction: toleranceMinus.fraction || '',
+              decimal: toleranceMinus.decimal
             },
             TolerancePlus: {
               fraction: tolerancePlus.fraction || '',
@@ -2663,202 +2393,60 @@ async function syncDTOrdersData() {
     });
 
     // 4. Save to MongoDB
-      console.log("💾 Saving to MongoDB...");
-      const finalDocs = Array.from(orderMap.values());
-
-      // Clean and validate data before saving
-      const cleanedDocs = finalDocs.map(doc => {
-        if (doc.SizeSpec) {
-          doc.SizeSpec = doc.SizeSpec.filter(spec => {
-            return spec.Seq && !isNaN(spec.Seq) && 
-                  !isNaN(spec.ToleranceMin.decimal) && 
-                  !isNaN(spec.TolerancePlus.decimal);
-          });
-        }
-        return doc;
-      });
-
-      const bulkOps = cleanedDocs.map(doc => ({
-        updateOne: {
-          filter: { Order_No: doc.Order_No },
-          update: { $set: doc },
-          upsert: true
-        }
-      }));
-
-      if (bulkOps.length > 0) {
-        try {
-          const result = await DtOrder.bulkWrite(bulkOps);
-          
-          console.log("✅ DT Orders data migration completed successfully!");// if uncomment below parts then need to commet Const Clean untill this line.
-
-      // // First, save all the regular data (without wash specs)
-      // console.log("💾 Saving regular order data first...");
-      // const regularBulkOps = finalDocs.map(doc => {
-      //   // Create a copy without wash specs for the initial save
-      //   const { AfterWashSpecs, BeforeWashSpecs, ...regularDoc } = doc;
-      //   return {
-      //     updateOne: {
-      //       filter: { Order_No: doc.Order_No },
-      //       update: { $set: regularDoc },
-      //       upsert: true
-      //     }
-      //   };
-      // });
-
-      // if (regularBulkOps.length > 0) {
-      //   try {
-      //     const regularResult = await DtOrder.bulkWrite(regularBulkOps);
-      //     console.log(`✅ Regular data saved: ${regularResult.modifiedCount + regularResult.upsertedCount} documents`);
-          
-      //     // Now, separately add the wash specs fields
-      //     console.log("🔄 Adding wash specs as additional fields...");
-          
-      //     // Get wash specs data from old collection again for direct updates
-      //     const oldDtOrderSchema = new mongoose.Schema({}, { strict: false, collection: 'dt_orders' });
-      //     const OldDtOrder = ymEcoConnection.model('OldDtOrderForWashSpecs', oldDtOrderSchema);
-          
-      //     const oldOrdersWithWashSpecs = await OldDtOrder.find(
-      //       {
-      //         $or: [
-      //           { AfterWashSpecs: { $exists: true, $ne: null, $not: { $size: 0 } } },
-      //           { BeforeWashSpecs: { $exists: true, $ne: null, $not: { $size: 0 } } }
-      //         ]
-      //       },
-      //       {
-      //         Order_No: 1,
-      //         AfterWashSpecs: 1,
-      //         BeforeWashSpecs: 1
-      //       }
-      //     ).lean();
-          
-      //     console.log(`🔄 Processing wash specs for ${oldOrdersWithWashSpecs.length} orders...`);
-          
-      //     // Create bulk operations specifically for wash specs
-      //     const washSpecsBulkOps = oldOrdersWithWashSpecs.map(oldOrder => ({
-      //       updateOne: {
-      //         filter: { Order_No: oldOrder.Order_No },
-      //         update: {
-      //           $set: {
-      //             AfterWashSpecs: oldOrder.AfterWashSpecs || [],
-      //             BeforeWashSpecs: oldOrder.BeforeWashSpecs || []
-      //           }
-      //         }
-      //       }
-      //     }));
-          
-      //     if (washSpecsBulkOps.length > 0) {
-      //       const washSpecsResult = await DtOrder.bulkWrite(washSpecsBulkOps);
-      //       console.log(`✅ Wash specs bulk update completed: ${washSpecsResult.modifiedCount} documents updated`);
-      //     }
-          
-      //     // Verify the wash specs were saved
-      //     console.log("🔍 Verifying wash specs were saved...");
-      //     const savedAfterWashCount = await DtOrder.countDocuments({
-      //       AfterWashSpecs: { $exists: true, $not: { $size: 0 } }
-      //     });
-      //     const savedBeforeWashCount = await DtOrder.countDocuments({
-      //       BeforeWashSpecs: { $exists: true, $not: { $size: 0 } }
-      //     });
-          
-      //     console.log(`📊 Final verification:`);
-      //     console.log(`   - Documents with AfterWashSpecs: ${savedAfterWashCount}`);
-      //     console.log(`   - Documents with BeforeWashSpecs: ${savedBeforeWashCount}`);
-          
-      //     // If still not working, try individual updates with raw MongoDB operations
-      //     if (savedAfterWashCount === 0 && savedBeforeWashCount === 0) {
-      //       console.log("⚠️ Bulk wash specs update failed. Trying individual raw updates...");
-            
-      //       let individualUpdateCount = 0;
-      //       for (const oldOrder of oldOrdersWithWashSpecs) {
-      //         try {
-      //           // Use raw MongoDB update operation
-      //           const updateResult = await DtOrder.collection.updateOne(
-      //             { Order_No: oldOrder.Order_No },
-      //             {
-      //               $set: {
-      //                 AfterWashSpecs: oldOrder.AfterWashSpecs || [],
-      //                 BeforeWashSpecs: oldOrder.BeforeWashSpecs || []
-      //               }
-      //             }
-      //           );
-                
-      //           if (updateResult.modifiedCount > 0) {
-      //             individualUpdateCount++;
-      //           }
-      //         } catch (error) {
-      //           console.error(`Error updating ${oldOrder.Order_No}:`, error.message);
-      //         }
-      //       }
-            
-      //       console.log(`✅ Individual raw updates completed: ${individualUpdateCount} documents`);
-            
-      //       // Final verification after raw updates
-      //       const finalAfterWashCount = await DtOrder.countDocuments({
-      //         AfterWashSpecs: { $exists: true, $not: { $size: 0 } }
-      //       });
-      //       const finalBeforeWashCount = await DtOrder.countDocuments({
-      //         BeforeWashSpecs: { $exists: true, $not: { $size: 0 } }
-      //       });
-            
-      //       console.log(`📊 After raw updates:`);
-      //       console.log(`   - Documents with AfterWashSpecs: ${finalAfterWashCount}`);
-      //       console.log(`   - Documents with BeforeWashSpecs: ${finalBeforeWashCount}`);
-      //     }
-          
-      //     // Show a sample document to verify the structure
-      //     const sampleDoc = await DtOrder.findOne({
-      //       $or: [
-      //         { AfterWashSpecs: { $exists: true, $not: { $size: 0 } } },
-      //         { BeforeWashSpecs: { $exists: true, $not: { $size: 0 } } }
-      //       ]
-      //     }).lean();
-          
-      //     if (sampleDoc) {
-      //       console.log(`✅ Sample document structure for ${sampleDoc.Order_No}:`);
-      //       console.log(`   - Has AfterWashSpecs: ${!!sampleDoc.AfterWashSpecs}`);
-      //       console.log(`   - Has BeforeWashSpecs: ${!!sampleDoc.BeforeWashSpecs}`);
-      //       if (sampleDoc.AfterWashSpecs) {
-      //         console.log(`   - AfterWashSpecs count: ${sampleDoc.AfterWashSpecs.length}`);
-      //       }
-      //       if (sampleDoc.BeforeWashSpecs) {
-      //         console.log(`   - BeforeWashSpecs count: ${sampleDoc.BeforeWashSpecs.length}`);
-      //       }
-            
-      //       // Show the top-level keys to confirm wash specs are at the right level
-      //       console.log(`📋 Top-level document keys:`, Object.keys(sampleDoc));
-      //     } else {
-      //       console.log("❌ No documents found with wash specs after all attempts");
-      //     }
-          
-          return {
-            success: true,
-            totalOrders: finalDocs.length,
-            matched: result.matchedCount,
-            upserted: result.upsertedCount,
-            modified: result.modifiedCount,
-            cutQtyRecords: cutQtyResult.recordset.length,
-            // washSpecsProcessed: oldOrdersWithWashSpecs.length,
-            // washSpecsSaved: {
-              // afterWash: savedAfterWashCount,
-              // beforeWash: savedBeforeWashCount
-            }
-          // };
-          
-        } catch (bulkError) {
-          console.error("❌ Bulk operation failed:", bulkError);
-          throw bulkError;
-        }
-      } else {
-        console.log("⚠️ No data to sync");
-        return { success: true, message: "No data to sync" };
+    console.log("💾 Saving to MongoDB...");
+    const finalDocs = Array.from(orderMap.values());
+    
+    // Clean and validate data before saving
+    const cleanedDocs = finalDocs.map(doc => {
+      if (doc.SizeSpec) {
+        doc.SizeSpec = doc.SizeSpec.filter(spec => {
+          return spec.Seq && !isNaN(spec.Seq) && 
+                !isNaN(spec.ToleranceMinus.decimal) && 
+                !isNaN(spec.TolerancePlus.decimal);
+        });
       }
+      return doc;
+    });
+
+    const bulkOps = cleanedDocs.map(doc => ({
+      updateOne: {
+        filter: { Order_No: doc.Order_No },
+        update: { $set: doc },
+        upsert: true
+      }
+    }));
+
+    if (bulkOps.length > 0) {
+      try {
+        const result = await DtOrder.bulkWrite(bulkOps);
+        
+        console.log("✅ DT Orders data migration completed successfully!");
+        
+        return {
+          success: true,
+          totalOrders: finalDocs.length,
+          matched: result.matchedCount,
+          upserted: result.upsertedCount,
+          modified: result.modifiedCount,
+          cutQtyRecords: cutQtyResult.recordset.length,
+          cutQtyMatchCount: cutQtyMatchCount,
+          colorsWithCutQty: colorsWithCutQty
+        };
+        
+      } catch (bulkError) {
+        console.error("❌ Bulk operation failed:", bulkError);
+        throw bulkError;
+      }
+    } else {
+      console.log("⚠️ No data to sync");
+      return { success: true, message: "No data to sync" };
+    }
+
   } catch (error) {
     console.error("❌ DT Orders sync failed:", error);
     throw error;
   }
 }
-
 
 // Add API endpoint for manual sync
 app.get("/api/sync-dt-orders", async (req, res) => {
@@ -2880,13 +2468,13 @@ app.get("/api/sync-dt-orders", async (req, res) => {
 });
 
 // Initial sync on server start (uncomment when ready)
-syncDTOrdersData()
-  .then((result) => {
-    console.log("✅ Initial DT Orders Data Sync completed:", result);
-  })
-  .catch((err) => {
-    console.error("❌ Initial DT Orders Data Sync failed:", err);
-  });
+// syncDTOrdersData()
+//   .then((result) => {
+//     console.log("✅ Initial DT Orders Data Sync completed:", result);
+//   })
+//   .catch((err) => {
+//     console.error("❌ Initial DT Orders Data Sync failed:", err);
+//   });
 
 // Schedule to run every day at 2:00 AM
 cron.schedule("0 2 * * *", () => {
@@ -3868,7 +3456,7 @@ app.get("/api/search-mono", async (req, res) => {
       return res.status(400).json({ error: "Search term is required" });
     }
 
-    const collection = ymEcoConnection.db.collection("dt_orders");
+    const collection = ymProdConnection.db.collection("dt_orders");
 
     // Use a case-insensitive regex to match the term anywhere in Order_No
     const regexPattern = new RegExp(term, "i");
@@ -3894,7 +3482,7 @@ app.get("/api/search-mono", async (req, res) => {
 // Update /api/order-details endpoint
 app.get("/api/order-details/:mono", async (req, res) => {
   try {
-    const collection = ymEcoConnection.db.collection("dt_orders");
+    const collection = ymProdConnection.db.collection("dt_orders");
     const order = await collection.findOne({
       Order_No: req.params.mono
     });
@@ -3964,7 +3552,7 @@ app.get("/api/order-details/:mono", async (req, res) => {
 // Update /api/order-sizes endpoint
 app.get("/api/order-sizes/:mono/:color", async (req, res) => {
   try {
-    const collection = ymEcoConnection.db.collection("dt_orders");
+    const collection = ymProdConnection.db.collection("dt_orders");
     const order = await collection.findOne({ Order_No: req.params.mono });
 
     if (!order) return res.status(404).json({ error: "Order not found" });
@@ -4071,7 +3659,7 @@ app.get("/api/total-garments-count/:mono/:color/:size", async (req, res) => {
 
 // This endpoint is unused
 async function fetchOrderDetails(mono) {
-  const collection = ymEcoConnection.db.collection("dt_orders");
+  const collection = ymProdConnection.db.collection("dt_orders");
   const order = await collection.findOne({ Order_No: mono });
 
   const colorMap = new Map();
@@ -4121,7 +3709,9 @@ app.post("/api/washing-specs/save", async (req, res) => {
   }
 
   try {
-    const orderDocument = await DtOrder.findOne({ Order_No: moNo });
+   const collection = ymProdConnection.db.collection("dt_orders");
+    const orderDocument = await collection.findOne({ Order_No: moNo });
+    // const orderDocument = await DtOrder.findOne({ Order_No: moNo });
 
     if (!orderDocument) {
       return res.status(404).json({
@@ -15681,39 +15271,39 @@ app.get("/api/filter-options", async (req, res) => {
     if (country) orderFilter.Country = country;
     if (origin) orderFilter.Origin = origin;
 
-    const factories = await ymEcoConnection.db
+    const factories = await ymProdConnection.db
       .collection("dt_orders")
       .distinct("Factory", orderFilter);
-    const monos = await ymEcoConnection.db
+    const monos = await ymProdConnection.db
       .collection("dt_orders")
       .distinct("Order_No", orderFilter);
-    const custStyles = await ymEcoConnection.db
+    const custStyles = await ymProdConnection.db
       .collection("dt_orders")
       .distinct("CustStyle", orderFilter);
-    const buyers = await ymEcoConnection.db
+    const buyers = await ymProdConnection.db
       .collection("dt_orders")
       .distinct("ShortName", orderFilter);
-    const modes = await ymEcoConnection.db
+    const modes = await ymProdConnection.db
       .collection("dt_orders")
       .distinct("Mode", orderFilter);
-    const countries = await ymEcoConnection.db
+    const countries = await ymProdConnection.db
       .collection("dt_orders")
       .distinct("Country", orderFilter);
-    const origins = await ymEcoConnection.db
+    const origins = await ymProdConnection.db
       .collection("dt_orders")
       .distinct("Origin", orderFilter);
 
     // Fetch distinct stages from measurement_data, filtered by dt_orders
     let measurementFilter = {};
     if (mono) {
-      const order = await ymEcoConnection.db
+      const order = await ymProdConnection.db
         .collection("dt_orders")
         .findOne({ Order_No: mono }, { projection: { _id: 1 } });
       if (order) {
         measurementFilter.style_id = order._id.toString();
       }
     } else {
-      const filteredOrders = await ymEcoConnection.db
+      const filteredOrders = await ymProdConnection.db
         .collection("dt_orders")
         .find(orderFilter, { projection: { _id: 1 } })
         .toArray();
@@ -15772,7 +15362,7 @@ app.get("/api/filter-options", async (req, res) => {
 // New endpoint for buyer spec order details
 app.get("/api/buyer-spec-order-details/:mono", async (req, res) => {
   try {
-    const collection = ymEcoConnection.db.collection("dt_orders");
+    const collection = ymProdConnection.db.collection("dt_orders");
     const order = await collection.findOne({ Order_No: req.params.mono });
 
     if (!order) return res.status(404).json({ error: "Order not found" });
@@ -15839,6 +15429,7 @@ app.get("/api/buyer-spec-order-details/:mono", async (req, res) => {
   }
 });
 
+
 // New endpoint for paginated MO Nos
 app.get("/api/paginated-monos", async (req, res) => {
   try {
@@ -15862,10 +15453,10 @@ app.get("/api/paginated-monos", async (req, res) => {
     if (country) filter.Country = country;
     if (origin) filter.Origin = origin;
 
-    const total = await ymEcoConnection.db
+    const total = await ymProdConnection.db
       .collection("dt_orders")
       .countDocuments(filter);
-    const monos = await ymEcoConnection.db
+    const monos = await ymProdConnection.db
       .collection("dt_orders")
       .find(filter)
       .project({ Order_No: 1, _id: 0 })
@@ -15903,7 +15494,7 @@ app.get("/api/measurement-summary", async (req, res) => {
     if (custStyle) orderFilter.CustStyle = custStyle;
     if (buyer) orderFilter.ShortName = buyer;
 
-    const selectedOrders = await ymEcoConnection.db
+    const selectedOrders = await ymProdConnection.db
       .collection("dt_orders")
       .find(orderFilter)
       .toArray();
@@ -16068,7 +15659,7 @@ app.get("/api/measurement-summary-per-mono", async (req, res) => {
       }
     ];
 
-    const result = await ymEcoConnection.db
+    const result = await ymProdConnection.db
       .collection("dt_orders")
       .aggregate(pipeline)
       .toArray();
@@ -16178,7 +15769,7 @@ app.get("/api/measurement-summary-per-mono", async (req, res) => {
 app.get("/api/measurement-details/:mono", async (req, res) => {
   try {
     const { startDate, endDate, empId, stage } = req.query;
-    const order = await ymEcoConnection.db
+    const order = await ymProdConnection.db
       .collection("dt_orders")
       .findOne({ Order_No: req.params.mono });
     if (!order) return res.status(404).json({ error: "Order not found" });
@@ -16323,7 +15914,7 @@ app.put("/api/update-measurement-value", async (req, res) => {
     }
 
     // Find the dt_orders record to get its _id
-    const order = await ymEcoConnection.db
+    const order = await ymProdConnection.db
       .collection("dt_orders")
       .findOne({ Order_No: moNo });
     if (!order) {
@@ -16394,7 +15985,7 @@ app.delete("/api/delete-measurement-record", async (req, res) => {
     }
 
     // Find the dt_orders record to get style_id
-    const order = await ymEcoConnection.db
+    const order = await ymProdConnection.db
       .collection("dt_orders")
       .findOne({ Order_No: moNo }, { projection: { _id: 1 } });
 
@@ -24231,7 +23822,7 @@ app.get("/api/qa-accuracy/report/:reportId", async (req, res) => {
       UserMain.findOne({ emp_id: report.scannedQc.empId })
         .select("face_photo eng_name")
         .lean(),
-      ymEcoConnection.db
+      ymProdConnection.db
         .collection("dt_orders")
         .findOne({ Order_No: report.moNo })
     ]);
@@ -25233,7 +24824,7 @@ app.get("/api/edit-specs-data/:moNo", async (req, res) => {
     const templateData = await BuyerSpecTemplate.findOne({ moNo: moNo }).lean();
 
     // 2. Fetch AfterWashSpecs from dt_orders collection
-    const orderData = await ymEcoConnection.db
+    const orderData = await ymProdConnection.db
       .collection("dt_orders")
       .findOne(
         { Order_No: moNo },
@@ -25348,7 +24939,8 @@ app.get("/api/anf-measurement/order-details/:moNo", async (req, res) => {
   try {
     const { moNo } = req.params;
     // Querying the dt_orders collection using the ymEcoConnection
-    const order = await ymEcoConnection.db
+    
+    const order = await ymProdConnection.db
       .collection("dt_orders")
       .findOne({ Order_No: moNo });
 
@@ -26214,7 +25806,7 @@ app.get(
       }
 
       // --- Part 1: Fetch Order Details from dt_orders (No Change) ---
-      const orderDetails = await ymEcoConnection.db
+      const orderDetails = await ymProdConnection.db
         .collection("dt_orders")
         .findOne({ Order_No: moNo });
 
@@ -26472,7 +26064,7 @@ export const uploadQcWashingFiles = multer({
 // Get order details by style number
 app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
   const { orderNo } = req.params;
-  const collection = ymEcoConnection.db.collection("dt_orders");
+  const collection = ymProdConnection.db.collection("dt_orders");
 
   try {
     const orders = await collection.find({ Order_No: orderNo }).toArray();
@@ -26514,7 +26106,7 @@ app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
 // GET - Get total order qty for a specific orderNo and color
 app.get('/api/qc-washing/order-color-qty/:orderNo/:color', async (req, res) => {
   const { orderNo, color } = req.params;
-  const collection = ymEcoConnection.db.collection("dt_orders");
+  const collection = ymProdConnection.db.collection("dt_orders");
   try {
     const orders = await collection.find({ Order_No: orderNo }).toArray();
     if (!orders || orders.length === 0) {
@@ -26547,7 +26139,7 @@ app.get('/api/qc-washing/order-color-qty/:orderNo/:color', async (req, res) => {
 // Get sizes for a specific order and color
 app.get('/api/qc-washing/order-sizes/:orderNo/:color', async (req, res) => {
   const { orderNo, color } = req.params;
-  const collection = ymEcoConnection.db.collection("dt_orders");
+  const collection = ymProdConnection.db.collection("dt_orders");
 
   try {
     const orders = await collection.find({ Order_No: orderNo }).toArray();
@@ -26588,7 +26180,7 @@ app.get('/api/qc-washing/order-sizes/:orderNo/:color', async (req, res) => {
 // Get measurement specifications for a specific order and color
 app.get('/api/qc-washing/measurement-specs/:orderNo/:color', async (req, res) => {
   const { orderNo, color } = req.params;
-  const collection = ymEcoConnection.db.collection("dt_orders");
+  const collection = ymProdConnection.db.collection("dt_orders");
   
   try {
     const orders = await collection.find({ Order_No: orderNo }).toArray();
@@ -27871,7 +27463,7 @@ app.get('/api/qc-washing/check-measurement-details/:orderNo', async (req, res) =
       });
     }
 
-    const collection = ymEcoConnection.db.collection("dt_orders");
+    const collection = ymProdConnection.db.collection("dt_orders");
 
     // Find the order first
     const order = await collection.findOne({
@@ -27957,7 +27549,7 @@ app.get(
         });
       }
 
-      const collection = ymEcoConnection.db.collection("dt_orders");
+      const collection = ymProdConnection.db.collection("dt_orders");
 
       // Find the order first
       const order = await collection.findOne({
