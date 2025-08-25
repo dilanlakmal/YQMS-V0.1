@@ -30,6 +30,7 @@ import createSubconFactoryModel from "./models/SubconFactory.js";
 import createQC2DefectsModel from "./models/QC2DefectsModel.js";
 import createQC2WorkersDataModel from "./models/QC2WorkersData.js";
 import createQC2BGradeModel from "./models/QC2BGrade.js";
+import createQC2TaskModel from "./models/QC2Task.js";
 
 import createInlineOrdersModel from "./models/InlineOrders.js"; 
 import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
@@ -204,6 +205,7 @@ const SubconFactory = createSubconFactoryModel(ymProdConnection);
 const QC2Defects = createQC2DefectsModel(ymProdConnection);
 const QC2WorkersData = createQC2WorkersDataModel(ymProdConnection);
 const QC2BGrade = createQC2BGradeModel(ymProdConnection);
+const QC2Task = createQC2TaskModel(ymProdConnection);
 const QCWashingDefects = createQCWashingDefectsModel(ymProdConnection);
 const QCWashingCheckList = createQCWashingCheckpointsModel(ymProdConnection);
 const QCWashingFirstOutput = createQCWashingFirstOutputModel(ymProdConnection);
