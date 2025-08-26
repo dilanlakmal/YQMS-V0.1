@@ -275,11 +275,11 @@ app.use((req, res, next) => {
   next();
 });
 
-/* ------------------------------
-   YM DataSore SQL
------------------------------- */
+// /* ------------------------------
+//    YM DataSore SQL
+// ------------------------------ */
 
-// SQL Server Configuration for YMDataStore
+// // SQL Server Configuration for YMDataStore
 // const sqlConfig = {
 //   user: "ymdata",
 //   password: "Kzw15947",
@@ -302,7 +302,7 @@ app.use((req, res, next) => {
 //    YMCE_SYSTEM SQL
 // ------------------------------ */
 
-// SQL Server Configuration for YMCE_SYSTEM
+// // SQL Server Configuration for YMCE_SYSTEM
 // const sqlConfigYMCE = {
 //   user: "visitor",
 //   password: "visitor",
@@ -322,107 +322,107 @@ app.use((req, res, next) => {
 //   }
 // };
 
+// // /* ------------------------------
+// //    YMWHSYS2 SQL Configuration
+// // ------------------------------ */
+
+// const sqlConfigYMWHSYS2 = {
+//   user: "user01",
+//   password: "Ur@12323",
+//   server: "192.167.1.14", //"YM-WHSYS",
+//   database: "FC_SYSTEM",
+//   options: {
+//     encrypt: false,
+//     trustServerCertificate: true
+//   },
+//   requestTimeout: 18000000,
+//   connectionTimeout: 18000000,
+//   pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
+// };
+
 // /* ------------------------------
-//    YMWHSYS2 SQL Configuration
+//    DTrade SQL Configuration
 // ------------------------------ */
 
-const sqlConfigYMWHSYS2 = {
-  user: "user01",
-  password: "Ur@12323",
-  server: "192.167.1.14", //"YM-WHSYS",
-  database: "FC_SYSTEM",
-  options: {
-    encrypt: false,
-    trustServerCertificate: true
-  },
-  requestTimeout: 18000000,
-  connectionTimeout: 18000000,
-  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
-};
+// const sqlConfigDTrade = {
+//   user: "user01",
+//   password: "Ur@12323",
+//   server: "192.167.1.14",
+//   database: "DTrade_CONN", // This should be DTrade_CONN, not FC_SYSTEM
+//   options: {
+//     encrypt: false,
+//     trustServerCertificate: true
+//   },
+//   requestTimeout: 18000000,
+//   connectionTimeout: 18000000,
+//   pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
+// };
 
-/* ------------------------------
-   DTrade SQL Configuration
------------------------------- */
-
-const sqlConfigDTrade = {
-  user: "user01",
-  password: "Ur@12323",
-  server: "192.167.1.14",
-  database: "DTrade_CONN", // This should be DTrade_CONN, not FC_SYSTEM
-  options: {
-    encrypt: false,
-    trustServerCertificate: true
-  },
-  requestTimeout: 18000000,
-  connectionTimeout: 18000000,
-  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
-};
-
-// Create connection pools
+// // Create connection pools
 // const poolYMDataStore = new sql.ConnectionPool(sqlConfig);
 // const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
-const poolYMWHSYS2 = new sql.ConnectionPool(sqlConfigYMWHSYS2);
-const poolDTrade = new sql.ConnectionPool(sqlConfigDTrade);
+// const poolYMWHSYS2 = new sql.ConnectionPool(sqlConfigYMWHSYS2);
+// const poolDTrade = new sql.ConnectionPool(sqlConfigDTrade);
 
-// MODIFICATION: Add a status tracker for SQL connections
-const sqlConnectionStatus = {
-  // YMDataStore: false,
-  // YMCE_SYSTEM: false,
-  YMWHSYS2: false,
-  DTrade_CONN: false 
-};
+// // MODIFICATION: Add a status tracker for SQL connections
+// const sqlConnectionStatus = {
+//   YMDataStore: false,
+//   YMCE_SYSTEM: false,
+//   YMWHSYS2: false,
+//   DTrade_CONN: false 
+// };
 
-// // Function to connect to a pool, now it updates the status tracker
-async function connectPool(pool, poolName) {
-  try {
-    await pool.connect();
-    console.log(
-      `✅ Successfully connected to ${poolName} pool at ${pool.config.server}`
-    );
-    sqlConnectionStatus[poolName] = true; // Set status to true on success
+// // // Function to connect to a pool, now it updates the status tracker
+// async function connectPool(pool, poolName) {
+//   try {
+//     await pool.connect();
+//     console.log(
+//       `✅ Successfully connected to ${poolName} pool at ${pool.config.server}`
+//     );
+//     sqlConnectionStatus[poolName] = true; // Set status to true on success
 
-    // Listen for errors on the pool to detect disconnections
-    pool.on("error", (err) => {
-      console.error(`SQL Pool Error for ${poolName}:`, err);
-      sqlConnectionStatus[poolName] = false; // Set status to false on error
-    });
-  } catch (err) {
-    console.error(`❌ FAILED to connect to ${poolName} pool:`, err.message);
-    sqlConnectionStatus[poolName] = false; // Ensure status is false on failure
-    // We throw the error so Promise.allSettled can catch it
-    throw new Error(`Failed to connect to ${poolName}`);
-  }
-}
+//     // Listen for errors on the pool to detect disconnections
+//     pool.on("error", (err) => {
+//       console.error(`SQL Pool Error for ${poolName}:`, err);
+//       sqlConnectionStatus[poolName] = false; // Set status to false on error
+//     });
+//   } catch (err) {
+//     console.error(`❌ FAILED to connect to ${poolName} pool:`, err.message);
+//     sqlConnectionStatus[poolName] = false; // Ensure status is false on failure
+//     // We throw the error so Promise.allSettled can catch it
+//     throw new Error(`Failed to connect to ${poolName}`);
+//   }
+// }
 
-// MODIFICATION: This function is now more critical for on-demand reconnections.
-async function ensurePoolConnected(pool, poolName) {
-  // If we know the connection is down, or the pool reports it's not connected
-  if (!sqlConnectionStatus[poolName] || !pool.connected) {
-    console.log(
-      `Pool ${poolName} is not connected. Attempting to reconnect...`
-    );
-    try {
-      // Attempt to close the pool if it's in a broken state before reconnecting
-      if (pool.connected || pool.connecting) {
-        await pool.close();
-      }
-      await connectPool(pool, poolName); // This will re-attempt connection and update the status
-    } catch (reconnectErr) {
-      console.error(
-        `Failed to reconnect to ${poolName}:`,
-        reconnectErr.message
-      );
-      sqlConnectionStatus[poolName] = false; // Ensure status is false
-      throw reconnectErr; // Throw error to be caught by the calling function
-    }
-  }
-  // If we reach here, the pool should be connected.
-  if (!sqlConnectionStatus[poolName]) {
-    throw new Error(`Database ${poolName} is unavailable.`);
-  }
-}
+// // MODIFICATION: This function is now more critical for on-demand reconnections.
+// async function ensurePoolConnected(pool, poolName) {
+//   // If we know the connection is down, or the pool reports it's not connected
+//   if (!sqlConnectionStatus[poolName] || !pool.connected) {
+//     console.log(
+//       `Pool ${poolName} is not connected. Attempting to reconnect...`
+//     );
+//     try {
+//       // Attempt to close the pool if it's in a broken state before reconnecting
+//       if (pool.connected || pool.connecting) {
+//         await pool.close();
+//       }
+//       await connectPool(pool, poolName); // This will re-attempt connection and update the status
+//     } catch (reconnectErr) {
+//       console.error(
+//         `Failed to reconnect to ${poolName}:`,
+//         reconnectErr.message
+//       );
+//       sqlConnectionStatus[poolName] = false; // Ensure status is false
+//       throw reconnectErr; // Throw error to be caught by the calling function
+//     }
+//   }
+//   // If we reach here, the pool should be connected.
+//   if (!sqlConnectionStatus[poolName]) {
+//     throw new Error(`Database ${poolName} is unavailable.`);
+//   }
+// }
 
-// Drop the conflicting St_No_1 index if it exists
+// // Drop the conflicting St_No_1 index if it exists
 // async function dropConflictingIndex() {
 //   try {
 //     const indexes = await InlineOrders.collection.getIndexes();
@@ -454,7 +454,7 @@ async function ensurePoolConnected(pool, poolName) {
 //     connectPool(poolYMDataStore, "YMDataStore"),
 //     // connectPool(poolYMCE, "YMCE_SYSTEM"),
 //     // connectPool(poolYMWHSYS2, "YMWHSYS2")
-       // connectPool(poolDTrade, "DTrade_CONN")
+//        connectPool(poolDTrade, "DTrade_CONN")
 //   ];
 
 //   // Promise.allSettled will not short-circuit. It waits for all promises.
@@ -479,7 +479,7 @@ async function ensurePoolConnected(pool, poolName) {
 //   await syncInlineOrders();
 //   await syncCutPanelOrders();
 //   await syncQC1SunriseData();
-//   await syncDTOrdersData()
+//   await syncDTOrdersData();
 
 //   console.log("--- Server Initialization Complete ---");
 // }
@@ -1472,9 +1472,9 @@ async function ensurePoolConnected(pool, poolName) {
 //   });
 // });
 
-/* 
+// /* 
 
-/*---------------------------------------------------------------------------------------
+// /*---------------------------------------------------------------------------------------
 
 // * ------------------------------
 //     Manual Sync Endpoint & Server Start
@@ -1712,13 +1712,13 @@ async function ensurePoolConnected(pool, poolName) {
 
 
 // // 1. On server start, fetch all data from 2025-07-10 to today
-// // syncQC1WorkerData("2025-07-01", new Date())
-// //   .then(() => {
-// //     console.log("✅ Initial QC1 Worker Data Sync completed (all data).");
-// //   })
-// //   .catch((err) => {
-// //     console.error("❌ Initial QC1 Worker Data Sync failed:", err);
-// //   });
+// syncQC1WorkerData("2025-07-01", new Date())
+//   .then(() => {
+//     console.log("✅ Initial QC1 Worker Data Sync completed (all data).");
+//   })
+//   .catch((err) => {
+//     console.error("❌ Initial QC1 Worker Data Sync failed:", err);
+//   });
 
 // // Schedule to run every day at 11:00 PM
 // cron.schedule("0 23 * * *", () => {
@@ -1736,764 +1736,761 @@ async function ensurePoolConnected(pool, poolName) {
 // });
 
 
-// DT Orders Data Migration Function
-async function syncDTOrdersData() {
-  try {
-    console.log("🔄 Starting DT Orders data migration...");
+// // DT Orders Data Migration Function
+// async function syncDTOrdersData() {
+//   try {
+//     console.log("🔄 Starting DT Orders data migration...");
     
-    // Ensure DTrade connection
-    await ensurePoolConnected(poolDTrade, "DTrade_CONN");
+//     // Ensure DTrade connection
+//     await ensurePoolConnected(poolDTrade, "DTrade_CONN");
     
-    // Ensure FC_SYSTEM connection
-    await ensurePoolConnected(poolYMWHSYS2, "FC_SYSTEM");
-    const request = poolDTrade.request();
-    const requestFC = poolYMWHSYS2.request();
+//     // Ensure FC_SYSTEM connection
+//     await ensurePoolConnected(poolYMWHSYS2, "FC_SYSTEM");
+//     const request = poolDTrade.request();
+//     const requestFC = poolYMWHSYS2.request();
 
-    // 1. Fetch Order Headers WITH actual size names AND Order Colors and Shipping in one query
-    // console.log("📊 Fetching order headers with size names and shipping data...");
-    const orderHeaderQuery = `
-      SELECT 
-        h.[SC_Heading], h.[Factory], h.[SalesTeamName], h.[Cust_Code], h.[ShortName],
-        h.[EngName], h.[Order_No], h.[Ccy], h.[Style], h.[CustStyle], h.[NoOfCol],
-        h.[Size_Seq10], h.[Size_Seq20], h.[Size_Seq30], h.[Size_Seq40], h.[Size_Seq50],
-        h.[Size_Seq60], h.[Size_Seq70], h.[Size_Seq80], h.[Size_Seq90], h.[Size_Seq100],
-        h.[Size_Seq110], h.[Size_Seq120], h.[Size_Seq130], h.[Size_Seq140], h.[Size_Seq150],
-        h.[Size_Seq160], h.[Size_Seq170], h.[Size_Seq180], h.[Size_Seq190], h.[Size_Seq200],
-        h.[Size_Seq210], h.[Size_Seq220], h.[Size_Seq230], h.[Size_Seq240], h.[Size_Seq250],
-        h.[Size_Seq260], h.[Size_Seq270], h.[Size_Seq280], h.[Size_Seq290], h.[Size_Seq300],
-        h.[Size_Seq310], h.[Size_Seq320], h.[Size_Seq330], h.[Size_Seq340], h.[Size_Seq350],
-        h.[Size_Seq360], h.[Size_Seq370], h.[Size_Seq380], h.[Size_Seq390], h.[Size_Seq400],
-        h.[OrderQuantity], h.[Det_ID]
-      FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr] h
-      ORDER BY h.[Order_No]
-    `;
-    const orderHeaderResult = await request.query(orderHeaderQuery);
+//     // 1. Fetch Order Headers WITH actual size names AND Order Colors and Shipping in one query
+//     // console.log("📊 Fetching order headers with size names and shipping data...");
+//     const orderHeaderQuery = `
+//       SELECT 
+//         h.[SC_Heading], h.[Factory], h.[SalesTeamName], h.[Cust_Code], h.[ShortName],
+//         h.[EngName], h.[Order_No], h.[Ccy], h.[Style], h.[CustStyle], h.[NoOfCol],
+//         h.[Size_Seq10], h.[Size_Seq20], h.[Size_Seq30], h.[Size_Seq40], h.[Size_Seq50],
+//         h.[Size_Seq60], h.[Size_Seq70], h.[Size_Seq80], h.[Size_Seq90], h.[Size_Seq100],
+//         h.[Size_Seq110], h.[Size_Seq120], h.[Size_Seq130], h.[Size_Seq140], h.[Size_Seq150],
+//         h.[Size_Seq160], h.[Size_Seq170], h.[Size_Seq180], h.[Size_Seq190], h.[Size_Seq200],
+//         h.[Size_Seq210], h.[Size_Seq220], h.[Size_Seq230], h.[Size_Seq240], h.[Size_Seq250],
+//         h.[Size_Seq260], h.[Size_Seq270], h.[Size_Seq280], h.[Size_Seq290], h.[Size_Seq300],
+//         h.[Size_Seq310], h.[Size_Seq320], h.[Size_Seq330], h.[Size_Seq340], h.[Size_Seq350],
+//         h.[Size_Seq360], h.[Size_Seq370], h.[Size_Seq380], h.[Size_Seq390], h.[Size_Seq400],
+//         h.[OrderQuantity], h.[Det_ID]
+//       FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr] h
+//       ORDER BY h.[Order_No]
+//     `;
+//     const orderHeaderResult = await request.query(orderHeaderQuery);
 
-    // 2. Fetch Size Names for each order (FIXED query)
-    // console.log("📏 Fetching size names for each order...");
-    const sizeNamesQuery = `
-      SELECT DISTINCT
-        [Order_No],
-        CASE WHEN [Size_Seq10] IS NOT NULL AND [Size_Seq10] != '' THEN [Size_Seq10] END as Size_10_Name,
-        CASE WHEN [Size_Seq20] IS NOT NULL AND [Size_Seq20] != '' THEN [Size_Seq20] END as Size_20_Name,
-        CASE WHEN [Size_Seq30] IS NOT NULL AND [Size_Seq30] != '' THEN [Size_Seq30] END as Size_30_Name,
-        CASE WHEN [Size_Seq40] IS NOT NULL AND [Size_Seq40] != '' THEN [Size_Seq40] END as Size_40_Name,
-        CASE WHEN [Size_Seq50] IS NOT NULL AND [Size_Seq50] != '' THEN [Size_Seq50] END as Size_50_Name,
-        CASE WHEN [Size_Seq60] IS NOT NULL AND [Size_Seq60] != '' THEN [Size_Seq60] END as Size_60_Name,
-        CASE WHEN [Size_Seq70] IS NOT NULL AND [Size_Seq70] != '' THEN [Size_Seq70] END as Size_70_Name,
-        CASE WHEN [Size_Seq80] IS NOT NULL AND [Size_Seq80] != '' THEN [Size_Seq80] END as Size_80_Name,
-        CASE WHEN [Size_Seq90] IS NOT NULL AND [Size_Seq90] != '' THEN [Size_Seq90] END as Size_90_Name,
-        CASE WHEN [Size_Seq100] IS NOT NULL AND [Size_Seq100] != '' THEN [Size_Seq100] END as Size_100_Name,
-        CASE WHEN [Size_Seq110] IS NOT NULL AND [Size_Seq110] != '' THEN [Size_Seq110] END as Size_110_Name,
-        CASE WHEN [Size_Seq120] IS NOT NULL AND [Size_Seq120] != '' THEN [Size_Seq120] END as Size_120_Name,
-        CASE WHEN [Size_Seq130] IS NOT NULL AND [Size_Seq130] != '' THEN [Size_Seq130] END as Size_130_Name,
-        CASE WHEN [Size_Seq140] IS NOT NULL AND [Size_Seq140] != '' THEN [Size_Seq140] END as Size_140_Name,
-        CASE WHEN [Size_Seq150] IS NOT NULL AND [Size_Seq150] != '' THEN [Size_Seq150] END as Size_150_Name,
-        CASE WHEN [Size_Seq160] IS NOT NULL AND [Size_Seq160] != '' THEN [Size_Seq160] END as Size_160_Name,
-        CASE WHEN [Size_Seq170] IS NOT NULL AND [Size_Seq170] != '' THEN [Size_Seq170] END as Size_170_Name,
-        CASE WHEN [Size_Seq180] IS NOT NULL AND [Size_Seq180] != '' THEN [Size_Seq180] END as Size_180_Name,
-        CASE WHEN [Size_Seq190] IS NOT NULL AND [Size_Seq190] != '' THEN [Size_Seq190] END as Size_190_Name,
-        CASE WHEN [Size_Seq200] IS NOT NULL AND [Size_Seq200] != '' THEN [Size_Seq200] END as Size_200_Name,
-        CASE WHEN [Size_Seq210] IS NOT NULL AND [Size_Seq210] != '' THEN [Size_Seq210] END as Size_210_Name,
-        CASE WHEN [Size_Seq220] IS NOT NULL AND [Size_Seq220] != '' THEN [Size_Seq220] END as Size_220_Name,
-        CASE WHEN [Size_Seq230] IS NOT NULL AND [Size_Seq230] != '' THEN [Size_Seq230] END as Size_230_Name,
-        CASE WHEN [Size_Seq240] IS NOT NULL AND [Size_Seq240] != '' THEN [Size_Seq240] END as Size_240_Name,
-        CASE WHEN [Size_Seq250] IS NOT NULL AND [Size_Seq250] != '' THEN [Size_Seq250] END as Size_250_Name,
-        CASE WHEN [Size_Seq260] IS NOT NULL AND [Size_Seq260] != '' THEN [Size_Seq260] END as Size_260_Name,
-        CASE WHEN [Size_Seq270] IS NOT NULL AND [Size_Seq270] != '' THEN [Size_Seq270] END as Size_270_Name,
-        CASE WHEN [Size_Seq280] IS NOT NULL AND [Size_Seq280] != '' THEN [Size_Seq280] END as Size_280_Name,
-        CASE WHEN [Size_Seq290] IS NOT NULL AND [Size_Seq290] != '' THEN [Size_Seq290] END as Size_290_Name,
-        CASE WHEN [Size_Seq300] IS NOT NULL AND [Size_Seq300] != '' THEN [Size_Seq300] END as Size_300_Name,
-        CASE WHEN [Size_Seq310] IS NOT NULL AND [Size_Seq310] != '' THEN [Size_Seq310] END as Size_310_Name,
-        CASE WHEN [Size_Seq320] IS NOT NULL AND [Size_Seq320] != '' THEN [Size_Seq320] END as Size_320_Name,
-        CASE WHEN [Size_Seq330] IS NOT NULL AND [Size_Seq330] != '' THEN [Size_Seq330] END as Size_330_Name,
-        CASE WHEN [Size_Seq340] IS NOT NULL AND [Size_Seq340] != '' THEN [Size_Seq340] END as Size_340_Name,
-        CASE WHEN [Size_Seq350] IS NOT NULL AND [Size_Seq350] != '' THEN [Size_Seq350] END as Size_350_Name,
-        CASE WHEN [Size_Seq360] IS NOT NULL AND [Size_Seq360] != '' THEN [Size_Seq360] END as Size_360_Name,
-        CASE WHEN [Size_Seq370] IS NOT NULL AND [Size_Seq370] != '' THEN [Size_Seq370] END as Size_370_Name,
-        CASE WHEN [Size_Seq380] IS NOT NULL AND [Size_Seq380] != '' THEN [Size_Seq380] END as Size_380_Name,
-        CASE WHEN [Size_Seq390] IS NOT NULL AND [Size_Seq390] != '' THEN [Size_Seq390] END as Size_390_Name,
-        CASE WHEN [Size_Seq400] IS NOT NULL AND [Size_Seq400] != '' THEN [Size_Seq400] END as Size_400_Name
-      FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
-      WHERE [Order_No] IS NOT NULL
-    `;
-    const sizeNamesResult = await request.query(sizeNamesQuery);
+//     // 2. Fetch Size Names for each order (FIXED query)
+//     // console.log("📏 Fetching size names for each order...");
+//     const sizeNamesQuery = `
+//       SELECT DISTINCT
+//         [Order_No],
+//         CASE WHEN [Size_Seq10] IS NOT NULL AND [Size_Seq10] != '' THEN [Size_Seq10] END as Size_10_Name,
+//         CASE WHEN [Size_Seq20] IS NOT NULL AND [Size_Seq20] != '' THEN [Size_Seq20] END as Size_20_Name,
+//         CASE WHEN [Size_Seq30] IS NOT NULL AND [Size_Seq30] != '' THEN [Size_Seq30] END as Size_30_Name,
+//         CASE WHEN [Size_Seq40] IS NOT NULL AND [Size_Seq40] != '' THEN [Size_Seq40] END as Size_40_Name,
+//         CASE WHEN [Size_Seq50] IS NOT NULL AND [Size_Seq50] != '' THEN [Size_Seq50] END as Size_50_Name,
+//         CASE WHEN [Size_Seq60] IS NOT NULL AND [Size_Seq60] != '' THEN [Size_Seq60] END as Size_60_Name,
+//         CASE WHEN [Size_Seq70] IS NOT NULL AND [Size_Seq70] != '' THEN [Size_Seq70] END as Size_70_Name,
+//         CASE WHEN [Size_Seq80] IS NOT NULL AND [Size_Seq80] != '' THEN [Size_Seq80] END as Size_80_Name,
+//         CASE WHEN [Size_Seq90] IS NOT NULL AND [Size_Seq90] != '' THEN [Size_Seq90] END as Size_90_Name,
+//         CASE WHEN [Size_Seq100] IS NOT NULL AND [Size_Seq100] != '' THEN [Size_Seq100] END as Size_100_Name,
+//         CASE WHEN [Size_Seq110] IS NOT NULL AND [Size_Seq110] != '' THEN [Size_Seq110] END as Size_110_Name,
+//         CASE WHEN [Size_Seq120] IS NOT NULL AND [Size_Seq120] != '' THEN [Size_Seq120] END as Size_120_Name,
+//         CASE WHEN [Size_Seq130] IS NOT NULL AND [Size_Seq130] != '' THEN [Size_Seq130] END as Size_130_Name,
+//         CASE WHEN [Size_Seq140] IS NOT NULL AND [Size_Seq140] != '' THEN [Size_Seq140] END as Size_140_Name,
+//         CASE WHEN [Size_Seq150] IS NOT NULL AND [Size_Seq150] != '' THEN [Size_Seq150] END as Size_150_Name,
+//         CASE WHEN [Size_Seq160] IS NOT NULL AND [Size_Seq160] != '' THEN [Size_Seq160] END as Size_160_Name,
+//         CASE WHEN [Size_Seq170] IS NOT NULL AND [Size_Seq170] != '' THEN [Size_Seq170] END as Size_170_Name,
+//         CASE WHEN [Size_Seq180] IS NOT NULL AND [Size_Seq180] != '' THEN [Size_Seq180] END as Size_180_Name,
+//         CASE WHEN [Size_Seq190] IS NOT NULL AND [Size_Seq190] != '' THEN [Size_Seq190] END as Size_190_Name,
+//         CASE WHEN [Size_Seq200] IS NOT NULL AND [Size_Seq200] != '' THEN [Size_Seq200] END as Size_200_Name,
+//         CASE WHEN [Size_Seq210] IS NOT NULL AND [Size_Seq210] != '' THEN [Size_Seq210] END as Size_210_Name,
+//         CASE WHEN [Size_Seq220] IS NOT NULL AND [Size_Seq220] != '' THEN [Size_Seq220] END as Size_220_Name,
+//         CASE WHEN [Size_Seq230] IS NOT NULL AND [Size_Seq230] != '' THEN [Size_Seq230] END as Size_230_Name,
+//         CASE WHEN [Size_Seq240] IS NOT NULL AND [Size_Seq240] != '' THEN [Size_Seq240] END as Size_240_Name,
+//         CASE WHEN [Size_Seq250] IS NOT NULL AND [Size_Seq250] != '' THEN [Size_Seq250] END as Size_250_Name,
+//         CASE WHEN [Size_Seq260] IS NOT NULL AND [Size_Seq260] != '' THEN [Size_Seq260] END as Size_260_Name,
+//         CASE WHEN [Size_Seq270] IS NOT NULL AND [Size_Seq270] != '' THEN [Size_Seq270] END as Size_270_Name,
+//         CASE WHEN [Size_Seq280] IS NOT NULL AND [Size_Seq280] != '' THEN [Size_Seq280] END as Size_280_Name,
+//         CASE WHEN [Size_Seq290] IS NOT NULL AND [Size_Seq290] != '' THEN [Size_Seq290] END as Size_290_Name,
+//         CASE WHEN [Size_Seq300] IS NOT NULL AND [Size_Seq300] != '' THEN [Size_Seq300] END as Size_300_Name,
+//         CASE WHEN [Size_Seq310] IS NOT NULL AND [Size_Seq310] != '' THEN [Size_Seq310] END as Size_310_Name,
+//         CASE WHEN [Size_Seq320] IS NOT NULL AND [Size_Seq320] != '' THEN [Size_Seq320] END as Size_320_Name,
+//         CASE WHEN [Size_Seq330] IS NOT NULL AND [Size_Seq330] != '' THEN [Size_Seq330] END as Size_330_Name,
+//         CASE WHEN [Size_Seq340] IS NOT NULL AND [Size_Seq340] != '' THEN [Size_Seq340] END as Size_340_Name,
+//         CASE WHEN [Size_Seq350] IS NOT NULL AND [Size_Seq350] != '' THEN [Size_Seq350] END as Size_350_Name,
+//         CASE WHEN [Size_Seq360] IS NOT NULL AND [Size_Seq360] != '' THEN [Size_Seq360] END as Size_360_Name,
+//         CASE WHEN [Size_Seq370] IS NOT NULL AND [Size_Seq370] != '' THEN [Size_Seq370] END as Size_370_Name,
+//         CASE WHEN [Size_Seq380] IS NOT NULL AND [Size_Seq380] != '' THEN [Size_Seq380] END as Size_380_Name,
+//         CASE WHEN [Size_Seq390] IS NOT NULL AND [Size_Seq390] != '' THEN [Size_Seq390] END as Size_390_Name,
+//         CASE WHEN [Size_Seq400] IS NOT NULL AND [Size_Seq400] != '' THEN [Size_Seq400] END as Size_400_Name
+//       FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
+//       WHERE [Order_No] IS NOT NULL
+//     `;
+//     const sizeNamesResult = await request.query(sizeNamesQuery);
 
-    // 3. Fetch Order Colors and Shipping WITH Ship_ID
-    // console.log("🎨 Fetching order colors and shipping data with Ship_ID...");
-    const orderColorsQuery = `
-      SELECT 
-        [Order_No], [ColorCode], [Color], [ChnColor], [Color_Seq], [ship_seq_no],
-        [Ship_ID], [Mode], [Country], [Origin], [CustPORef],
-        [Size_Seq10], [Size_Seq20], [Size_Seq30], [Size_Seq40], [Size_Seq50], [Size_Seq60],
-        [Size_Seq70], [Size_Seq80], [Size_Seq90], [Size_Seq100], [Size_Seq110], [Size_Seq120],
-        [Size_Seq130], [Size_Seq140], [Size_Seq150], [Size_Seq160], [Size_Seq170], [Size_Seq180],
-        [Size_Seq190], [Size_Seq200], [Size_Seq210], [Size_Seq220], [Size_Seq230], [Size_Seq240],
-        [Size_Seq250], [Size_Seq260], [Size_Seq270], [Size_Seq280], [Size_Seq290], [Size_Seq300],
-        [Size_Seq310], [Size_Seq320], [Size_Seq330], [Size_Seq340], [Size_Seq350], [Size_Seq360],
-        [Size_Seq370], [Size_Seq380], [Size_Seq390], [Size_Seq400]
-      FROM [DTrade_CONN].[dbo].[vBuyerPOColQty_BySz]
-      ORDER BY [Order_No], [ColorCode], [ship_seq_no]
-    `;
-    const orderColorsResult = await request.query(orderColorsQuery);
+//     // 3. Fetch Order Colors and Shipping WITH Ship_ID
+//     // console.log("🎨 Fetching order colors and shipping data with Ship_ID...");
+//     const orderColorsQuery = `
+//       SELECT 
+//         [Order_No], [ColorCode], [Color], [ChnColor], [Color_Seq], [ship_seq_no],
+//         [Ship_ID], [Mode], [Country], [Origin], [CustPORef],
+//         [Size_Seq10], [Size_Seq20], [Size_Seq30], [Size_Seq40], [Size_Seq50], [Size_Seq60],
+//         [Size_Seq70], [Size_Seq80], [Size_Seq90], [Size_Seq100], [Size_Seq110], [Size_Seq120],
+//         [Size_Seq130], [Size_Seq140], [Size_Seq150], [Size_Seq160], [Size_Seq170], [Size_Seq180],
+//         [Size_Seq190], [Size_Seq200], [Size_Seq210], [Size_Seq220], [Size_Seq230], [Size_Seq240],
+//         [Size_Seq250], [Size_Seq260], [Size_Seq270], [Size_Seq280], [Size_Seq290], [Size_Seq300],
+//         [Size_Seq310], [Size_Seq320], [Size_Seq330], [Size_Seq340], [Size_Seq350], [Size_Seq360],
+//         [Size_Seq370], [Size_Seq380], [Size_Seq390], [Size_Seq400]
+//       FROM [DTrade_CONN].[dbo].[vBuyerPOColQty_BySz]
+//       ORDER BY [Order_No], [ColorCode], [ship_seq_no]
+//     `;
+//     const orderColorsResult = await request.query(orderColorsQuery);
 
-    // 4. Fetch Size Specifications
-    // console.log("📏 Fetching size specifications...");
-    const sizeSpecQuery = `
-      SELECT 
-        [JobNo], [SizeSpecId], [DetId], [Seq], [AtoZ], [Area],
-        [ChineseArea], [EnglishRemark], [ChineseRemark], [AreaCode],
-        [IsMiddleCalc], [Tolerance], [Tolerance2], [SpecMemo], [SizeSpecMeasUnit],
-        [Size1], [Size2], [Size3], [Size4], [Size5], [Size6], [Size7], [Size8], [Size9], [Size10],
-        [Size11], [Size12], [Size13], [Size14], [Size15], [Size16], [Size17], [Size18], [Size19], [Size20],
-        [Size21], [Size22], [Size23], [Size24], [Size25], [Size26], [Size27], [Size28], [Size29], [Size30],
-        [Size31], [Size32], [Size33], [Size34], [Size35], [Size36], [Size37], [Size38], [Size39], [Size40]
-      FROM [DTrade_CONN].[dbo].[vTx_JobSizeSpec_Fty]
-      ORDER BY [JobNo], [Seq]
-    `;
-    const sizeSpecResult = await request.query(sizeSpecQuery);
+//     // 4. Fetch Size Specifications
+//     // console.log("📏 Fetching size specifications...");
+//     const sizeSpecQuery = `
+//       SELECT 
+//         [JobNo], [SizeSpecId], [DetId], [Seq], [AtoZ], [Area],
+//         [ChineseArea], [EnglishRemark], [ChineseRemark], [AreaCode],
+//         [IsMiddleCalc], [Tolerance], [Tolerance2], [SpecMemo], [SizeSpecMeasUnit],
+//         [Size1], [Size2], [Size3], [Size4], [Size5], [Size6], [Size7], [Size8], [Size9], [Size10],
+//         [Size11], [Size12], [Size13], [Size14], [Size15], [Size16], [Size17], [Size18], [Size19], [Size20],
+//         [Size21], [Size22], [Size23], [Size24], [Size25], [Size26], [Size27], [Size28], [Size29], [Size30],
+//         [Size31], [Size32], [Size33], [Size34], [Size35], [Size36], [Size37], [Size38], [Size39], [Size40]
+//       FROM [DTrade_CONN].[dbo].[vTx_JobSizeSpec_Fty]
+//       ORDER BY [JobNo], [Seq]
+//     `;
+//     const sizeSpecResult = await request.query(sizeSpecQuery);
 
-    // 5. Fetch Cut Quantity data from FC_SYSTEM
-    // console.log("✂️ Fetching cut quantity data from FC_SYSTEM...");
-    const cutQtyQuery = `
-      SELECT 
-        [BuyerStyle], [StyleNo], [ColorCode], [ChColor], [EngColor], [SIZE],
-        SUM(CAST([PlanQty] AS INT)) as TotalPlanQty, 
-        SUM(CAST([CutQty] AS INT)) as TotalCutQty
-      FROM [FC_SYSTEM].[dbo].[ViewOrderPlanQty]
-      WHERE [StyleNo] IS NOT NULL 
-        AND [ColorCode] IS NOT NULL 
-        AND [SIZE] IS NOT NULL
-        AND [PlanQty] IS NOT NULL 
-        AND [CutQty] IS NOT NULL
-      GROUP BY [BuyerStyle], [StyleNo], [ColorCode], [ChColor], [EngColor], [SIZE]
-      ORDER BY [StyleNo], [ColorCode], [SIZE]
-    `;
-    const cutQtyResult = await requestFC.query(cutQtyQuery);
+//     // 5. Fetch Cut Quantity data from FC_SYSTEM
+//     // console.log("✂️ Fetching cut quantity data from FC_SYSTEM...");
+//     const cutQtyQuery = `
+//       SELECT 
+//         [BuyerStyle], [StyleNo], [ColorCode], [ChColor], [EngColor], [SIZE],
+//         SUM(CAST([PlanQty] AS INT)) as TotalPlanQty, 
+//         SUM(CAST([CutQty] AS INT)) as TotalCutQty
+//       FROM [FC_SYSTEM].[dbo].[ViewOrderPlanQty]
+//       WHERE [StyleNo] IS NOT NULL 
+//         AND [ColorCode] IS NOT NULL 
+//         AND [SIZE] IS NOT NULL
+//         AND [PlanQty] IS NOT NULL 
+//         AND [CutQty] IS NOT NULL
+//       GROUP BY [BuyerStyle], [StyleNo], [ColorCode], [ChColor], [EngColor], [SIZE]
+//       ORDER BY [StyleNo], [ColorCode], [SIZE]
+//     `;
+//     const cutQtyResult = await requestFC.query(cutQtyQuery);
 
-    // Create size mapping from database for each order
-    const orderSizeMapping = new Map();
-    sizeNamesResult.recordset.forEach(sizeRecord => {
-      const orderNo = sizeRecord.Order_No;
-      const sizeMapping = {};
+//     // Create size mapping from database for each order
+//     const orderSizeMapping = new Map();
+//     sizeNamesResult.recordset.forEach(sizeRecord => {
+//       const orderNo = sizeRecord.Order_No;
+//       const sizeMapping = {};
       
-      // Map size sequences to actual size names from database
-      const sizeColumns = [
-        '10', '20', '30', '40', '50', '60', '70', '80', '90', '100',
-        '110', '120', '130', '140', '150', '160', '170', '180', '190', '200',
-        '210', '220', '230', '240', '250', '260', '270', '280', '290', '300',
-        '310', '320', '330', '340', '350', '360', '370', '380', '390', '400'
-      ];
-      sizeColumns.forEach(seq => {
-        const sizeNameColumn = `Size_${seq}_Name`;
-        if (sizeRecord[sizeNameColumn] && sizeRecord[sizeNameColumn] !== null) {
-          // Use the actual size name from database (like "34B", "34C", etc.)
-          sizeMapping[seq] = sizeRecord[sizeNameColumn].toString();
-        }
-      });
-      orderSizeMapping.set(orderNo, sizeMapping);
-    });
+//       // Map size sequences to actual size names from database
+//       const sizeColumns = [
+//         '10', '20', '30', '40', '50', '60', '70', '80', '90', '100',
+//         '110', '120', '130', '140', '150', '160', '170', '180', '190', '200',
+//         '210', '220', '230', '240', '250', '260', '270', '280', '290', '300',
+//         '310', '320', '330', '340', '350', '360', '370', '380', '390', '400'
+//       ];
+//       sizeColumns.forEach(seq => {
+//         const sizeNameColumn = `Size_${seq}_Name`;
+//         if (sizeRecord[sizeNameColumn] && sizeRecord[sizeNameColumn] !== null) {
+//           // Use the actual size name from database (like "34B", "34C", etc.)
+//           sizeMapping[seq] = sizeRecord[sizeNameColumn].toString();
+//         }
+//       });
+//       orderSizeMapping.set(orderNo, sizeMapping);
+//     });
 
-    // Process Cut Quantity data and create mapping
-    // console.log("🔄 Processing cut quantity data...");
-    const cutQtyMapping = new Map();
-    cutQtyResult.recordset.forEach(record => {
-      const styleNo = record.StyleNo;        // This should match Order_No in MongoDB
-      const colorCode = record.ColorCode;    // This should match ColorCode in MongoDB
-      const size = record.SIZE;              // Size like "XS", "S", "M", etc.
-      const planQty = Number(record.TotalPlanQty) || 0;
-      const cutQty = Number(record.TotalCutQty) || 0;
+//     // Process Cut Quantity data and create mapping
+//     // console.log("🔄 Processing cut quantity data...");
+//     const cutQtyMapping = new Map();
+//     cutQtyResult.recordset.forEach(record => {
+//       const styleNo = record.StyleNo;        // This should match Order_No in MongoDB
+//       const colorCode = record.ColorCode;    // This should match ColorCode in MongoDB
+//       const size = record.SIZE;              // Size like "XS", "S", "M", etc.
+//       const planQty = Number(record.TotalPlanQty) || 0;
+//       const cutQty = Number(record.TotalCutQty) || 0;
       
-      // Create mapping key: StyleNo_ColorCode
-      const key = `${styleNo}_${colorCode}`;
+//       // Create mapping key: StyleNo_ColorCode
+//       const key = `${styleNo}_${colorCode}`;
       
-      if (!cutQtyMapping.has(key)) {
-        cutQtyMapping.set(key, {});
-      }
+//       if (!cutQtyMapping.has(key)) {
+//         cutQtyMapping.set(key, {});
+//       }
       
-      const colorCutData = cutQtyMapping.get(key);
+//       const colorCutData = cutQtyMapping.get(key);
       
-      // Set the aggregated quantities for this size
-      colorCutData[size] = {
-        PlanCutQty: planQty,
-        ActualCutQty: cutQty
-      };
-    });
+//       // Set the aggregated quantities for this size
+//       colorCutData[size] = {
+//         PlanCutQty: planQty,
+//         ActualCutQty: cutQty
+//       };
+//     });
 
-    // Helper Functions (keeping all existing helper functions)
-    function extractSizeDataAsObject(record, prefix = 'Size_Seq', orderNo) {
-      const sizeMapping = orderSizeMapping.get(orderNo) || {};
-      const sizeObject = {};
+//     // Helper Functions (keeping all existing helper functions)
+//     function extractSizeDataAsObject(record, prefix = 'Size_Seq', orderNo) {
+//       const sizeMapping = orderSizeMapping.get(orderNo) || {};
+//       const sizeObject = {};
       
-      // Use all possible size columns
-      const allSizeColumns = [
-        '10', '20', '30', '40', '50', '60', '70', '80', '90', '100',
-        '110', '120', '130', '140', '150', '160', '170', '180', '190', '200',
-        '210', '220', '230', '240', '250', '260', '270', '280', '290', '300',
-        '310', '320', '330', '340', '350', '360', '370', '380', '390', '400'
-      ];
-      allSizeColumns.forEach(seq => {
-        const columnName = `${prefix}${seq}`;
-        if (record[columnName] && record[columnName] !== null && record[columnName] !== 0) {
-          // Use the actual size name from database mapping
-          const sizeName = sizeMapping[seq] || `Size${seq}`;
-          sizeObject[sizeName] = Number(record[columnName]);
-        }
-      });
-      return sizeObject;
-    }
+//       // Use all possible size columns
+//       const allSizeColumns = [
+//         '10', '20', '30', '40', '50', '60', '70', '80', '90', '100',
+//         '110', '120', '130', '140', '150', '160', '170', '180', '190', '200',
+//         '210', '220', '230', '240', '250', '260', '270', '280', '290', '300',
+//         '310', '320', '330', '340', '350', '360', '370', '380', '390', '400'
+//       ];
+//       allSizeColumns.forEach(seq => {
+//         const columnName = `${prefix}${seq}`;
+//         if (record[columnName] && record[columnName] !== null && record[columnName] !== 0) {
+//           // Use the actual size name from database mapping
+//           const sizeName = sizeMapping[seq] || `Size${seq}`;
+//           sizeObject[sizeName] = Number(record[columnName]);
+//         }
+//       });
+//       return sizeObject;
+//     }
 
-    function convertSizeObjectToArray(sizeObject, orderNo) {
-      const sizeMapping = orderSizeMapping.get(orderNo) || {};
+//     function convertSizeObjectToArray(sizeObject, orderNo) {
+//       const sizeMapping = orderSizeMapping.get(orderNo) || {};
       
-      // Create reverse mapping: sizeName -> sequence number
-      const sizeToSeqMapping = {};
-      Object.entries(sizeMapping).forEach(([seq, sizeName]) => {
-        sizeToSeqMapping[sizeName] = parseInt(seq);
-      });
+//       // Create reverse mapping: sizeName -> sequence number
+//       const sizeToSeqMapping = {};
+//       Object.entries(sizeMapping).forEach(([seq, sizeName]) => {
+//         sizeToSeqMapping[sizeName] = parseInt(seq);
+//       });
       
-      // Convert and sort by sequence number instead of alphabetically
-      return Object.entries(sizeObject)
-        .sort(([sizeNameA], [sizeNameB]) => {
-          const seqA = sizeToSeqMapping[sizeNameA] || 999;
-          const seqB = sizeToSeqMapping[sizeNameB] || 999;
-          return seqA - seqB;
-        })
-        .map(([sizeName, qty]) => {
-          const obj = {};
-          obj[sizeName] = qty;
-          return obj;
-        });
-    }
+//       // Convert and sort by sequence number instead of alphabetically
+//       return Object.entries(sizeObject)
+//         .sort(([sizeNameA], [sizeNameB]) => {
+//           const seqA = sizeToSeqMapping[sizeNameA] || 999;
+//           const seqB = sizeToSeqMapping[sizeNameB] || 999;
+//           return seqA - seqB;
+//         })
+//         .map(([sizeName, qty]) => {
+//           const obj = {};
+//           obj[sizeName] = qty;
+//           return obj;
+//         });
+//     }
 
-    function parseToleranceValue(toleranceStr) {
-  if (!toleranceStr) return { fraction: '', decimal: 0 };
+//     function parseToleranceValue(toleranceStr) {
+//   if (!toleranceStr) return { fraction: '', decimal: 0 };
   
-  let str = toleranceStr.toString().trim();
-  let decimal = 0;
+//   let str = toleranceStr.toString().trim();
+//   let decimal = 0;
   
-  // Clean up the string - remove extra quotes and spaces
-  str = str.replace(/['"]/g, '').trim();
+//   // Clean up the string - remove extra quotes and spaces
+//   str = str.replace(/['"]/g, '').trim();
   
-  // Replace all types of fraction slashes with regular slash
-  str = str.replace(/[⁄∕／]/g, '/'); // Unicode: U+2044, U+2215, U+FF0F
+//   // Replace all types of fraction slashes with regular slash
+//   str = str.replace(/[⁄∕／]/g, '/'); // Unicode: U+2044, U+2215, U+FF0F
   
-  // Handle negative values
-  let isNegative = false;
-  if (str.startsWith('-')) {
-    isNegative = true;
-    str = str.substring(1);
-  }
+//   // Handle negative values
+//   let isNegative = false;
+//   if (str.startsWith('-')) {
+//     isNegative = true;
+//     str = str.substring(1);
+//   }
   
-  try {
-    // Handle mixed numbers with various separators
-    // Match patterns like: "12 3/4", "12-3/4", "12　3/4" (with different spaces)
-    const mixedNumberPattern = /^(\d+(?:\.\d+)?)\s*[-\s　]\s*(\d+)\s*\/\s*(\d+)$/;
-    const mixedMatch = str.match(mixedNumberPattern);
+//   try {
+//     // Handle mixed numbers with various separators
+//     // Match patterns like: "12 3/4", "12-3/4", "12　3/4" (with different spaces)
+//     const mixedNumberPattern = /^(\d+(?:\.\d+)?)\s*[-\s　]\s*(\d+)\s*\/\s*(\d+)$/;
+//     const mixedMatch = str.match(mixedNumberPattern);
     
-    if (mixedMatch) {
-      const wholePart = parseFloat(mixedMatch[1]) || 0;
-      const numerator = parseFloat(mixedMatch[2]) || 0;
-      const denominator = parseFloat(mixedMatch[3]) || 1;
-      decimal = wholePart + (numerator / denominator);
-    }
-    // Handle simple fractions like "3/4"
-    else if (str.includes('/')) {
-      const fractionPattern = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/;
-      const fractionMatch = str.match(fractionPattern);
+//     if (mixedMatch) {
+//       const wholePart = parseFloat(mixedMatch[1]) || 0;
+//       const numerator = parseFloat(mixedMatch[2]) || 0;
+//       const denominator = parseFloat(mixedMatch[3]) || 1;
+//       decimal = wholePart + (numerator / denominator);
+//     }
+//     // Handle simple fractions like "3/4"
+//     else if (str.includes('/')) {
+//       const fractionPattern = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/;
+//       const fractionMatch = str.match(fractionPattern);
       
-      if (fractionMatch) {
-        const numerator = parseFloat(fractionMatch[1]) || 0;
-        const denominator = parseFloat(fractionMatch[2]) || 1;
-        decimal = numerator / denominator;
-      } else {
-        // Fallback: split by / and try to parse
-        const parts = str.split('/');
-        if (parts.length === 2) {
-          const numerator = parseFloat(parts[0].trim()) || 0;
-          const denominator = parseFloat(parts[1].trim()) || 1;
-          decimal = numerator / denominator;
-        } else {
-          decimal = parseFloat(str) || 0;
-        }
-      }
-    }
-    // Handle whole numbers or decimals
-    else {
-      decimal = parseFloat(str) || 0;
-    }
+//       if (fractionMatch) {
+//         const numerator = parseFloat(fractionMatch[1]) || 0;
+//         const denominator = parseFloat(fractionMatch[2]) || 1;
+//         decimal = numerator / denominator;
+//       } else {
+//         // Fallback: split by / and try to parse
+//         const parts = str.split('/');
+//         if (parts.length === 2) {
+//           const numerator = parseFloat(parts[0].trim()) || 0;
+//           const denominator = parseFloat(parts[1].trim()) || 1;
+//           decimal = numerator / denominator;
+//         } else {
+//           decimal = parseFloat(str) || 0;
+//         }
+//       }
+//     }
+//     // Handle whole numbers or decimals
+//     else {
+//       decimal = parseFloat(str) || 0;
+//     }
     
-    // Apply negative sign if needed
-    if (isNegative) {
-      decimal = -decimal;
-    }
+//     // Apply negative sign if needed
+//     if (isNegative) {
+//       decimal = -decimal;
+//     }
     
-  } catch (error) {
-    console.error(`Error parsing tolerance value "${toleranceStr}":`, error);
-    // Fallback: try to extract any numbers and make a reasonable guess
-    const numbers = str.match(/\d+(?:\.\d+)?/g);
-    if (numbers && numbers.length >= 1) {
-      decimal = parseFloat(numbers[0]) || 0;
-    } else {
-      decimal = 0;
-    }
-  }
+//   } catch (error) {
+//     console.error(`Error parsing tolerance value "${toleranceStr}":`, error);
+//     // Fallback: try to extract any numbers and make a reasonable guess
+//     const numbers = str.match(/\d+(?:\.\d+)?/g);
+//     if (numbers && numbers.length >= 1) {
+//       decimal = parseFloat(numbers[0]) || 0;
+//     } else {
+//       decimal = 0;
+//     }
+//   }
   
-  // Ensure decimal is a valid number
-  if (isNaN(decimal)) {
-    decimal = 0;
-  }
+//   // Ensure decimal is a valid number
+//   if (isNaN(decimal)) {
+//     decimal = 0;
+//   }
   
-  return {
-    fraction: toleranceStr.toString(),
-    decimal: Math.round(decimal * 10000) / 10000 // Round to 4 decimal places
-  };
-}
+//   return {
+//     fraction: toleranceStr.toString(),
+//     decimal: Math.round(decimal * 10000) / 10000 // Round to 4 decimal places
+//   };
+// }
 
-// Enhanced extractSpecsDataAsArray function
-function extractSpecsDataAsArray(record, orderNo) {
-  const sizeMapping = orderSizeMapping.get(orderNo) || {};
-  const specsArray = [];
+// // Enhanced extractSpecsDataAsArray function
+// function extractSpecsDataAsArray(record, orderNo) {
+//   const sizeMapping = orderSizeMapping.get(orderNo) || {};
+//   const specsArray = [];
   
-  for (let i = 1; i <= 40; i++) {
-    const sizeColumn = `Size${i}`;
-    if (record[sizeColumn] && record[sizeColumn] !== null) {
-      const value = record[sizeColumn].toString().trim();
-      const seqNumber = (i * 10).toString();
-      // Use actual size name from database mapping
-      const sizeName = sizeMapping[seqNumber] || `Size${i}`;
+//   for (let i = 1; i <= 40; i++) {
+//     const sizeColumn = `Size${i}`;
+//     if (record[sizeColumn] && record[sizeColumn] !== null) {
+//       const value = record[sizeColumn].toString().trim();
+//       const seqNumber = (i * 10).toString();
+//       // Use actual size name from database mapping
+//       const sizeName = sizeMapping[seqNumber] || `Size${i}`;
       
-      // Convert fraction to decimal using the enhanced parsing
-      let decimal = 0;
-      try {
-        // Replace all types of fraction slashes with regular slash
-        let cleanValue = value.replace(/[⁄∕／]/g, '/');
+//       // Convert fraction to decimal using the enhanced parsing
+//       let decimal = 0;
+//       try {
+//         // Replace all types of fraction slashes with regular slash
+//         let cleanValue = value.replace(/[⁄∕／]/g, '/');
         
-        // Handle mixed numbers with various separators
-        const mixedNumberPattern = /^(\d+(?:\.\d+)?)\s*[-\s　]\s*(\d+)\s*\/\s*(\d+)$/;
-        const mixedMatch = cleanValue.match(mixedNumberPattern);
+//         // Handle mixed numbers with various separators
+//         const mixedNumberPattern = /^(\d+(?:\.\d+)?)\s*[-\s　]\s*(\d+)\s*\/\s*(\d+)$/;
+//         const mixedMatch = cleanValue.match(mixedNumberPattern);
         
-        if (mixedMatch) {
-          const wholePart = parseFloat(mixedMatch[1]) || 0;
-          const numerator = parseFloat(mixedMatch[2]) || 0;
-          const denominator = parseFloat(mixedMatch[3]) || 1;
-          decimal = wholePart + (numerator / denominator);
-        }
-        // Handle simple fractions like "3/4"
-        else if (cleanValue.includes('/')) {
-          const fractionPattern = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/;
-          const fractionMatch = cleanValue.match(fractionPattern);
+//         if (mixedMatch) {
+//           const wholePart = parseFloat(mixedMatch[1]) || 0;
+//           const numerator = parseFloat(mixedMatch[2]) || 0;
+//           const denominator = parseFloat(mixedMatch[3]) || 1;
+//           decimal = wholePart + (numerator / denominator);
+//         }
+//         // Handle simple fractions like "3/4"
+//         else if (cleanValue.includes('/')) {
+//           const fractionPattern = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/;
+//           const fractionMatch = cleanValue.match(fractionPattern);
           
-          if (fractionMatch) {
-            const numerator = parseFloat(fractionMatch[1]) || 0;
-            const denominator = parseFloat(fractionMatch[2]) || 1;
-            decimal = numerator / denominator;
-          } else {
-            // Fallback: split by / and try to parse
-            const parts = cleanValue.split('/');
-            if (parts.length === 2) {
-              const numerator = parseFloat(parts[0].trim()) || 0;
-              const denominator = parseFloat(parts[1].trim()) || 1;
-              decimal = numerator / denominator;
-            } else {
-              decimal = parseFloat(cleanValue) || 0;
-            }
-          }
-        }
-        // Handle whole numbers or decimals
-        else {
-          decimal = parseFloat(cleanValue) || 0;
-        }
-      } catch (error) {
-        console.error(`Error parsing spec value "${value}":`, error);
-        // Fallback: try to extract any numbers and make a reasonable guess
-        const numbers = value.match(/\d+(?:\.\d+)?/g);
-        if (numbers && numbers.length >= 1) {
-          decimal = parseFloat(numbers[0]) || 0;
-        } else {
-          decimal = 0;
-        }
-      }
+//           if (fractionMatch) {
+//             const numerator = parseFloat(fractionMatch[1]) || 0;
+//             const denominator = parseFloat(fractionMatch[2]) || 1;
+//             decimal = numerator / denominator;
+//           } else {
+//             // Fallback: split by / and try to parse
+//             const parts = cleanValue.split('/');
+//             if (parts.length === 2) {
+//               const numerator = parseFloat(parts[0].trim()) || 0;
+//               const denominator = parseFloat(parts[1].trim()) || 1;
+//               decimal = numerator / denominator;
+//             } else {
+//               decimal = parseFloat(cleanValue) || 0;
+//             }
+//           }
+//         }
+//         // Handle whole numbers or decimals
+//         else {
+//           decimal = parseFloat(cleanValue) || 0;
+//         }
+//       } catch (error) {
+//         console.error(`Error parsing spec value "${value}":`, error);
+//         // Fallback: try to extract any numbers and make a reasonable guess
+//         const numbers = value.match(/\d+(?:\.\d+)?/g);
+//         if (numbers && numbers.length >= 1) {
+//           decimal = parseFloat(numbers[0]) || 0;
+//         } else {
+//           decimal = 0;
+//         }
+//       }
       
-      // Ensure decimal is a valid number
-      if (isNaN(decimal)) {
-        decimal = 0;
-      }
+//       // Ensure decimal is a valid number
+//       if (isNaN(decimal)) {
+//         decimal = 0;
+//       }
       
-      const specObject = {};
-      specObject[sizeName] = {
-        fraction: value,
-        decimal: Math.round(decimal * 10000) / 10000 // Round to 4 decimal places
-      };
-      specsArray.push(specObject);
-    }
-  }
-  return specsArray;
-}
+//       const specObject = {};
+//       specObject[sizeName] = {
+//         fraction: value,
+//         decimal: Math.round(decimal * 10000) / 10000 // Round to 4 decimal places
+//       };
+//       specsArray.push(specObject);
+//     }
+//   }
+//   return specsArray;
+// }
 
-    function isEmptyOrContainsNumbers(value) {
-      if (!value || value === null || value === undefined || value === '') {
-        return true;
-      }
+//     function isEmptyOrContainsNumbers(value) {
+//       if (!value || value === null || value === undefined || value === '') {
+//         return true;
+//       }
       
-      const str = value.toString().trim();
-      if (str === '') {
-        return true;
-      }
+//       const str = value.toString().trim();
+//       if (str === '') {
+//         return true;
+//       }
       
-      // Check if string contains any numbers (0-9)
-      return /^\d+$/.test(str);
-    }
+//       // Check if string contains any numbers (0-9)
+//       return /^\d+$/.test(str);
+//     }
 
-    // Helper function to convert empty strings to null
-    function convertEmptyToNull(value) {
-      if (!value || value === null || value === undefined || value === '') {
-        return null;
-      }
+//     // Helper function to convert empty strings to null
+//     function convertEmptyToNull(value) {
+//       if (!value || value === null || value === undefined || value === '') {
+//         return null;
+//       }
       
-      const str = value.toString().trim();
-      return str === '' ? null : str;
-    }
+//       const str = value.toString().trim();
+//       return str === '' ? null : str;
+//     }
 
-    // Process Data
-    // console.log("🔄 Processing and organizing data...");
-    const orderMap = new Map();
+//     // Process Data
+//     // console.log("🔄 Processing and organizing data...");
+//     const orderMap = new Map();
 
-    // 1. Process Order Headers
-    orderHeaderResult.recordset.forEach(header => {
-      const orderNo = header.Order_No;
-      if (!orderMap.has(orderNo)) {
-        const sizeData = extractSizeDataAsObject(header, 'Size_Seq', orderNo);
+//     // 1. Process Order Headers
+//     orderHeaderResult.recordset.forEach(header => {
+//       const orderNo = header.Order_No;
+//       if (!orderMap.has(orderNo)) {
+//         const sizeData = extractSizeDataAsObject(header, 'Size_Seq', orderNo);
         
-        orderMap.set(orderNo, {
-          SC_Heading: convertEmptyToNull(header.SC_Heading),
-          Factory: convertEmptyToNull(header.Factory),
-          SalesTeamName: convertEmptyToNull(header.SalesTeamName),
-          Cust_Code: convertEmptyToNull(header.Cust_Code),
-          ShortName: convertEmptyToNull(header.ShortName),
-          EngName: convertEmptyToNull(header.EngName),
-          Order_No: header.Order_No,
-          Ccy: convertEmptyToNull(header.Ccy),
-          Style: convertEmptyToNull(header.Style),
-          CustStyle: convertEmptyToNull(header.CustStyle),
-          TotalQty: Number(header.OrderQuantity) || 0,
-          NoOfSize: Object.keys(sizeData).length,
-          OrderColors: [],
-          OrderColorShip: [],
-          SizeSpec: []
-        });
-      }
-    });
+//         orderMap.set(orderNo, {
+//           SC_Heading: convertEmptyToNull(header.SC_Heading),
+//           Factory: convertEmptyToNull(header.Factory),
+//           SalesTeamName: convertEmptyToNull(header.SalesTeamName),
+//           Cust_Code: convertEmptyToNull(header.Cust_Code),
+//           ShortName: convertEmptyToNull(header.ShortName),
+//           EngName: convertEmptyToNull(header.EngName),
+//           Order_No: header.Order_No,
+//           Ccy: convertEmptyToNull(header.Ccy),
+//           Style: convertEmptyToNull(header.Style),
+//           CustStyle: convertEmptyToNull(header.CustStyle),
+//           TotalQty: Number(header.OrderQuantity) || 0,
+//           NoOfSize: Object.keys(sizeData).length,
+//           OrderColors: [],
+//           OrderColorShip: [],
+//           SizeSpec: []
+//         });
+//       }
+//     });
 
-    // 2. Process Order Colors and Shipping
-    const colorSummaryMap = new Map();
-    const shipMap = new Map();
-    orderColorsResult.recordset.forEach(record => {
-      const orderNo = record.Order_No;
-      const colorCode = record.ColorCode;
-      const shipSeqNo = record.ship_seq_no;
-      const shipId = record.Ship_ID; // Added Ship_ID
+//     // 2. Process Order Colors and Shipping
+//     const colorSummaryMap = new Map();
+//     const shipMap = new Map();
+//     orderColorsResult.recordset.forEach(record => {
+//       const orderNo = record.Order_No;
+//       const colorCode = record.ColorCode;
+//       const shipSeqNo = record.ship_seq_no;
+//       const shipId = record.Ship_ID; // Added Ship_ID
       
-      if (orderMap.has(orderNo)) {
-        const order = orderMap.get(orderNo);
+//       if (orderMap.has(orderNo)) {
+//         const order = orderMap.get(orderNo);
         
-        // Update order details from shipping data
-        order.Mode = convertEmptyToNull(record.Mode);
-        order.Country = convertEmptyToNull(record.Country);
-        order.Origin = convertEmptyToNull(record.Origin);
-        order.CustPORef = convertEmptyToNull(record.CustPORef);
+//         // Update order details from shipping data
+//         order.Mode = convertEmptyToNull(record.Mode);
+//         order.Country = convertEmptyToNull(record.Country);
+//         order.Origin = convertEmptyToNull(record.Origin);
+//         order.CustPORef = convertEmptyToNull(record.CustPORef);
 
-        // Sum quantities for OrderColors
-        const colorKey = `${orderNo}_${colorCode}`;
-        if (!colorSummaryMap.has(colorKey)) {
-          colorSummaryMap.set(colorKey, {
-            ColorCode: record.ColorCode,
-            Color: record.Color,
-            ChnColor: record.ChnColor,
-            ColorKey: Number(record.Color_Seq) || 0,
-            sizeTotals: {}
-          });
-        }
+//         // Sum quantities for OrderColors
+//         const colorKey = `${orderNo}_${colorCode}`;
+//         if (!colorSummaryMap.has(colorKey)) {
+//           colorSummaryMap.set(colorKey, {
+//             ColorCode: record.ColorCode,
+//             Color: record.Color,
+//             ChnColor: record.ChnColor,
+//             ColorKey: Number(record.Color_Seq) || 0,
+//             sizeTotals: {}
+//           });
+//         }
 
-        const colorSummary = colorSummaryMap.get(colorKey);
-        const sizes = extractSizeDataAsObject(record, 'Size_Seq', orderNo);
+//         const colorSummary = colorSummaryMap.get(colorKey);
+//         const sizes = extractSizeDataAsObject(record, 'Size_Seq', orderNo);
         
-        // Sum up quantities for each size
-        Object.entries(sizes).forEach(([sizeName, qty]) => {
-          if (!colorSummary.sizeTotals[sizeName]) {
-            colorSummary.sizeTotals[sizeName] = 0;
-          }
-          colorSummary.sizeTotals[sizeName] += qty;
-        });
+//         // Sum up quantities for each size
+//         Object.entries(sizes).forEach(([sizeName, qty]) => {
+//           if (!colorSummary.sizeTotals[sizeName]) {
+//             colorSummary.sizeTotals[sizeName] = 0;
+//           }
+//           colorSummary.sizeTotals[sizeName] += qty;
+//         });
 
-        // Process OrderColorShip WITH Ship_ID
-        const shipKey = `${orderNo}_${colorCode}`;
-        if (!shipMap.has(shipKey)) {
-          shipMap.set(shipKey, {
-            ColorCode: record.ColorCode,
-            Color: record.Color,
-            ChnColor: record.ChnColor,
-            ColorKey: Number(record.Color_Seq) || 0,
-            ShipSeqNo: []
-          });
-        }
+//         // Process OrderColorShip WITH Ship_ID
+//         const shipKey = `${orderNo}_${colorCode}`;
+//         if (!shipMap.has(shipKey)) {
+//           shipMap.set(shipKey, {
+//             ColorCode: record.ColorCode,
+//             Color: record.Color,
+//             ChnColor: record.ChnColor,
+//             ColorKey: Number(record.Color_Seq) || 0,
+//             ShipSeqNo: []
+//           });
+//         }
 
-        const shipRecord = shipMap.get(shipKey);
-        const existingSeq = shipRecord.ShipSeqNo.find(seq => seq.seqNo === shipSeqNo);
-        if (!existingSeq && shipSeqNo) {
-          // Convert sizes object to array format like OrderQty
-          const sizesArray = convertSizeObjectToArray(sizes, orderNo);
+//         const shipRecord = shipMap.get(shipKey);
+//         const existingSeq = shipRecord.ShipSeqNo.find(seq => seq.seqNo === shipSeqNo);
+//         if (!existingSeq && shipSeqNo) {
+//           // Convert sizes object to array format like OrderQty
+//           const sizesArray = convertSizeObjectToArray(sizes, orderNo);
           
-          shipRecord.ShipSeqNo.push({
-            seqNo: Number(shipSeqNo),
-            Ship_ID: convertEmptyToNull(shipId), // Added Ship_ID here
-            sizes: sizesArray  // Now this will be in format [{"XS": 44}, {"S": 130}, ...]
-          });
-        }
-      }
-    });
+//           shipRecord.ShipSeqNo.push({
+//             seqNo: Number(shipSeqNo),
+//             Ship_ID: convertEmptyToNull(shipId), // Added Ship_ID here
+//             sizes: sizesArray  // Now this will be in format [{"XS": 44}, {"S": 130}, ...]
+//           });
+//         }
+//       }
+//     });
 
-    // Convert color summaries to the desired format
-    const colorMap = new Map();
-    for (const [colorKey, colorSummary] of colorSummaryMap) {
-      const orderNo = colorKey.split('_')[0]; // Extract order number from colorKey
-      const orderQtyArray = convertSizeObjectToArray(colorSummary.sizeTotals, orderNo); // Pass orderNo
+//     // Convert color summaries to the desired format
+//     const colorMap = new Map();
+//     for (const [colorKey, colorSummary] of colorSummaryMap) {
+//       const orderNo = colorKey.split('_')[0]; // Extract order number from colorKey
+//       const orderQtyArray = convertSizeObjectToArray(colorSummary.sizeTotals, orderNo); // Pass orderNo
       
-      colorMap.set(colorKey, {
-        ColorCode: colorSummary.ColorCode,
-        Color: colorSummary.Color,
-        ChnColor: colorSummary.ChnColor,
-        ColorKey: colorSummary.ColorKey,
-        OrderQty: orderQtyArray, 
-        CutQty: {} // Will be populated with cut quantity data
-      });
-    }
+//       colorMap.set(colorKey, {
+//         ColorCode: colorSummary.ColorCode,
+//         Color: colorSummary.Color,
+//         ChnColor: colorSummary.ChnColor,
+//         ColorKey: colorSummary.ColorKey,
+//         OrderQty: orderQtyArray, 
+//         CutQty: {} // Will be populated with cut quantity data
+//       });
+//     }
 
-    // Add cut quantity data to colors
-    // console.log("🔄 Mapping cut quantity data to orders...");
-    let cutQtyMatchCount = 0;
-    let totalColorProcessed = 0;
+//     // Add cut quantity data to colors
+//     // console.log("🔄 Mapping cut quantity data to orders...");
+//     let cutQtyMatchCount = 0;
+//     let totalColorProcessed = 0;
     
-    for (const [orderNo, order] of orderMap) {
-      for (const [colorKey, colorData] of colorMap) {
-        if (colorKey.startsWith(orderNo + '_')) {
-          totalColorProcessed++;
-          const colorCode = colorData.ColorCode;
+//     for (const [orderNo, order] of orderMap) {
+//       for (const [colorKey, colorData] of colorMap) {
+//         if (colorKey.startsWith(orderNo + '_')) {
+//           totalColorProcessed++;
+//           const colorCode = colorData.ColorCode;
           
-          // Create the mapping key: Order_No_ColorCode
-          const cutKey = `${orderNo}_${colorCode}`;
+//           // Create the mapping key: Order_No_ColorCode
+//           const cutKey = `${orderNo}_${colorCode}`;
           
-          if (cutQtyMapping.has(cutKey)) {
-            const cutData = cutQtyMapping.get(cutKey);
+//           if (cutQtyMapping.has(cutKey)) {
+//             const cutData = cutQtyMapping.get(cutKey);
             
-            // Clear existing CutQty data and set new data
-            colorData.CutQty = {};
+//             // Clear existing CutQty data and set new data
+//             colorData.CutQty = {};
             
-            // Set the cut data for each size
-            Object.entries(cutData).forEach(([size, quantities]) => {
-              colorData.CutQty[size] = {
-                ActualCutQty: quantities.ActualCutQty,
-                PlanCutQty: quantities.PlanCutQty
-              };
-            });
+//             // Set the cut data for each size
+//             Object.entries(cutData).forEach(([size, quantities]) => {
+//               colorData.CutQty[size] = {
+//                 ActualCutQty: quantities.ActualCutQty,
+//                 PlanCutQty: quantities.PlanCutQty
+//               };
+//             });
             
-            cutQtyMatchCount++;
-          }
-        }
-      }
-    }
+//             cutQtyMatchCount++;
+//           }
+//         }
+//       }
+//     }
 
-    // console.log(`📊 Cut quantity matching results:`);
+//     // console.log(`📊 Cut quantity matching results:`);
     
-    // Verify CutQty data is actually in the colorData objects
-    // console.log("🔍 Verifying CutQty data in colorMap...");
-    let colorsWithCutQty = 0;
-    for (const [colorKey, colorData] of colorMap) {
-      if (Object.keys(colorData.CutQty).length > 0) {
-        colorsWithCutQty++;
-    //     if (colorsWithCutQty <= 3) { // Log first 3 examples
-    //       console.log(`✅ Color ${colorKey} has CutQty:`, colorData.CutQty);
-        }
-      }
-    // }
+//     // Verify CutQty data is actually in the colorData objects
+//     // console.log("🔍 Verifying CutQty data in colorMap...");
+//     let colorsWithCutQty = 0;
+//     for (const [colorKey, colorData] of colorMap) {
+//       if (Object.keys(colorData.CutQty).length > 0) {
+//         colorsWithCutQty++;
+//     //     if (colorsWithCutQty <= 3) { // Log first 3 examples
+//     //       console.log(`✅ Color ${colorKey} has CutQty:`, colorData.CutQty);
+//         }
+//       }
+//     // }
 
-    // Add colors and shipping to orders
-    for (const [orderNo, order] of orderMap) {
-      // Add OrderColors
-      for (const [colorKey, colorData] of colorMap) {
-        if (colorKey.startsWith(orderNo + '_')) {
-          order.OrderColors.push(colorData);
-        }
-      }
+//     // Add colors and shipping to orders
+//     for (const [orderNo, order] of orderMap) {
+//       // Add OrderColors
+//       for (const [colorKey, colorData] of colorMap) {
+//         if (colorKey.startsWith(orderNo + '_')) {
+//           order.OrderColors.push(colorData);
+//         }
+//       }
 
-      // Add OrderColorShip
-      for (const [shipKey, shipData] of shipMap) {
-        if (shipKey.startsWith(orderNo + '_')) {
-                   order.OrderColorShip.push(shipData);
-        }
-      }
-    }
+//       // Add OrderColorShip
+//       for (const [shipKey, shipData] of shipMap) {
+//         if (shipKey.startsWith(orderNo + '_')) {
+//                    order.OrderColorShip.push(shipData);
+//         }
+//       }
+//     }
 
-    // 3. Process Size Specifications (keeping existing logic)
-    sizeSpecResult.recordset.forEach(spec => {
-      const jobNo = spec.JobNo;
+//     // 3. Process Size Specifications (keeping existing logic)
+//     sizeSpecResult.recordset.forEach(spec => {
+//       const jobNo = spec.JobNo;
       
-      if (orderMap.has(jobNo)) {
-        const order = orderMap.get(jobNo);
+//       if (orderMap.has(jobNo)) {
+//         const order = orderMap.get(jobNo);
         
-        try {
-          // Use the fixed parseToleranceValue function
-          const toleranceMinus = parseToleranceValue(spec.Tolerance);
-          const tolerancePlus = parseToleranceValue(spec.Tolerance2);
-          const specs = extractSpecsDataAsArray(spec, jobNo);
+//         try {
+//           // Use the fixed parseToleranceValue function
+//           const toleranceMinus = parseToleranceValue(spec.Tolerance);
+//           const tolerancePlus = parseToleranceValue(spec.Tolerance2);
+//           const specs = extractSpecsDataAsArray(spec, jobNo);
           
-          // Handle ChineseName logic - DEFINE THE VARIABLES FIRST
-          const chineseArea = convertEmptyToNull(spec.ChineseArea);
-          const chineseRemark = convertEmptyToNull(spec.ChineseRemark);
-          let chineseName = null;
+//           // Handle ChineseName logic - DEFINE THE VARIABLES FIRST
+//           const chineseArea = convertEmptyToNull(spec.ChineseArea);
+//           const chineseRemark = convertEmptyToNull(spec.ChineseRemark);
+//           let chineseName = null;
           
-          // If ChineseArea is null/empty/only numbers, use ChineseRemark
-          if (isEmptyOrContainsNumbers(spec.ChineseArea)) {
-            chineseName = chineseRemark;
-          }
-          // If ChineseRemark is null/empty/only numbers, use ChineseArea
-          else if (isEmptyOrContainsNumbers(spec.ChineseRemark)) {
-            chineseName = chineseArea;
-          }
-          // If both are valid, prefer ChineseArea
-          else {
-            chineseName = chineseArea;
-          }
+//           // If ChineseArea is null/empty/only numbers, use ChineseRemark
+//           if (isEmptyOrContainsNumbers(spec.ChineseArea)) {
+//             chineseName = chineseRemark;
+//           }
+//           // If ChineseRemark is null/empty/only numbers, use ChineseArea
+//           else if (isEmptyOrContainsNumbers(spec.ChineseRemark)) {
+//             chineseName = chineseArea;
+//           }
+//           // If both are valid, prefer ChineseArea
+//           else {
+//             chineseName = chineseArea;
+//           }
           
-          const sizeSpecData = {
-            Seq: Number(spec.Seq) || 0,
-            AtoZ: convertEmptyToNull(spec.AtoZ),
-            Area: convertEmptyToNull(spec.Area),
-            ChineseArea: chineseArea,
-            EnglishRemark: convertEmptyToNull(spec.EnglishRemark),
-            ChineseRemark: chineseRemark,
-            ChineseName: chineseName,
-            AreaCode: convertEmptyToNull(spec.AreaCode),
-            IsMiddleCalc: spec.IsMiddleCalc || null,
-            ToleranceMinus: {
-              fraction: toleranceMinus.fraction || '',
-              decimal: toleranceMinus.decimal
-            },
-            TolerancePlus: {
-              fraction: tolerancePlus.fraction || '',
-              decimal: tolerancePlus.decimal
-            },
-            SpecMemo: convertEmptyToNull(spec.SpecMemo),
-            SizeSpecMeasUnit: convertEmptyToNull(spec.SizeSpecMeasUnit),
-            Specs: specs || []
-          };
+//           const sizeSpecData = {
+//             Seq: Number(spec.Seq) || 0,
+//             AtoZ: convertEmptyToNull(spec.AtoZ),
+//             Area: convertEmptyToNull(spec.Area),
+//             ChineseArea: chineseArea,
+//             EnglishRemark: convertEmptyToNull(spec.EnglishRemark),
+//             ChineseRemark: chineseRemark,
+//             ChineseName: chineseName,
+//             AreaCode: convertEmptyToNull(spec.AreaCode),
+//             IsMiddleCalc: spec.IsMiddleCalc || null,
+//             ToleranceMinus: {
+//               fraction: toleranceMinus.fraction || '',
+//               decimal: toleranceMinus.decimal
+//             },
+//             TolerancePlus: {
+//               fraction: tolerancePlus.fraction || '',
+//               decimal: tolerancePlus.decimal
+//             },
+//             SpecMemo: convertEmptyToNull(spec.SpecMemo),
+//             SizeSpecMeasUnit: convertEmptyToNull(spec.SizeSpecMeasUnit),
+//             Specs: specs || []
+//           };
           
-          order.SizeSpec.push(sizeSpecData);
+//           order.SizeSpec.push(sizeSpecData);
           
-        } catch (error) {
-          console.error(`Error processing spec for job ${jobNo}, seq ${spec.Seq}:`, error.message); 
-        }
-      }
-    });
+//         } catch (error) {
+//           console.error(`Error processing spec for job ${jobNo}, seq ${spec.Seq}:`, error.message); 
+//         }
+//       }
+//     });
 
-    // 4. Save to MongoDB
-    console.log("💾 Saving to MongoDB...");
-    const finalDocs = Array.from(orderMap.values());
+//     // 4. Save to MongoDB
+//     console.log("💾 Saving to MongoDB...");
+//     const finalDocs = Array.from(orderMap.values());
     
-    // Clean and validate data before saving
-    const cleanedDocs = finalDocs.map(doc => {
-      if (doc.SizeSpec) {
-        doc.SizeSpec = doc.SizeSpec.filter(spec => {
-          return spec.Seq && !isNaN(spec.Seq) && 
-                !isNaN(spec.ToleranceMinus.decimal) && 
-                !isNaN(spec.TolerancePlus.decimal);
-        });
-      }
-      return doc;
-    });
+//     // Clean and validate data before saving
+//     const cleanedDocs = finalDocs.map(doc => {
+//       if (doc.SizeSpec) {
+//         doc.SizeSpec = doc.SizeSpec.filter(spec => {
+//           return spec.Seq && !isNaN(spec.Seq) && 
+//                 !isNaN(spec.ToleranceMinus.decimal) && 
+//                 !isNaN(spec.TolerancePlus.decimal);
+//         });
+//       }
+//       return doc;
+//     });
 
-    const bulkOps = cleanedDocs.map(doc => ({
-      updateOne: {
-        filter: { Order_No: doc.Order_No },
-        update: { $set: doc },
-        upsert: true
-      }
-    }));
+//     const bulkOps = cleanedDocs.map(doc => ({
+//       updateOne: {
+//         filter: { Order_No: doc.Order_No },
+//         update: { $set: doc },
+//         upsert: true
+//       }
+//     }));
 
-    if (bulkOps.length > 0) {
-      try {
-        const result = await DtOrder.bulkWrite(bulkOps);
+//     if (bulkOps.length > 0) {
+//       try {
+//         const result = await DtOrder.bulkWrite(bulkOps);
         
-        console.log("✅ DT Orders data migration completed successfully!");
+//         console.log("✅ DT Orders data migration completed successfully!");
         
-        return {
-          success: true,
-          totalOrders: finalDocs.length,
-          // matched: result.matchedCount,
-          // upserted: result.upsertedCount,
-          modified: result.modifiedCount,
-          cutQtyRecords: cutQtyResult.recordset.length,
-          cutQtyMatchCount: cutQtyMatchCount,
-          colorsWithCutQty: colorsWithCutQty
-        };
+//         return {
+//           success: true,
+//           totalOrders: finalDocs.length,
+//           // matched: result.matchedCount,
+//           // upserted: result.upsertedCount,
+//           modified: result.modifiedCount,
+//           cutQtyRecords: cutQtyResult.recordset.length,
+//           cutQtyMatchCount: cutQtyMatchCount,
+//           colorsWithCutQty: colorsWithCutQty
+//         };
         
-      } catch (bulkError) {
-        console.error("❌ Bulk operation failed:", bulkError);
-        throw bulkError;
-      }
-    } else {
-      console.log("⚠️ No data to sync");
-      return { success: true, message: "No data to sync" };
-    }
+//       } catch (bulkError) {
+//         console.error("❌ Bulk operation failed:", bulkError);
+//         throw bulkError;
+//       }
+//     } else {
+//       console.log("⚠️ No data to sync");
+//       return { success: true, message: "No data to sync" };
+//     }
 
-  } catch (error) {
-    console.error("❌ DT Orders sync failed:", error);
-    throw error;
-  }
-}
+//   } catch (error) {
+//     console.error("❌ DT Orders sync failed:", error);
+//     throw error;
+//   }
+// }
 
-// Add API endpoint for manual sync
-app.get("/api/sync-dt-orders", async (req, res) => {
-  try {
-    const result = await syncDTOrdersData();
-    res.json({
-      success: true,
-      message: "DT Orders data sync completed successfully",
-      data: result
-    });
-  } catch (error) {
-    console.error("DT Orders sync API error:", error);
-    res.status(500).json({
-      success: false,
-      message: "DT Orders data sync failed",
-      error: error.message
-    });
-  }
-});
+// // Add API endpoint for manual sync
+// app.get("/api/sync-dt-orders", async (req, res) => {
+//   try {
+//     const result = await syncDTOrdersData();
+//     res.json({
+//       success: true,
+//       message: "DT Orders data sync completed successfully",
+//       data: result
+//     });
+//   } catch (error) {
+//     console.error("DT Orders sync API error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "DT Orders data sync failed",
+//       error: error.message
+//     });
+//   }
+// });
 
-// // Initial sync on server start (uncomment when ready)
-// syncDTOrdersData()
-//   .then((result) => {
-//     console.log("✅ Initial DT Orders Data Sync completed:", result);
-//   })
-//   .catch((err) => {
-//     console.error("❌ Initial DT Orders Data Sync failed:", err);
-//   });
+// // // Initial sync on server start (uncomment when ready)
+// // syncDTOrdersData()
+// //   .then((result) => {
+// //     console.log("✅ Initial DT Orders Data Sync completed:", result);
+// //   })
+// //   .catch((err) => {
+// //     console.error("❌ Initial DT Orders Data Sync failed:", err);
+// //   });
 
-// Schedule to run every day at 2:00 AM
-  cron.schedule("0 */2 * * *", () => {
-  syncDTOrdersData()
-    .then((result) => {
-      console.log("✅ DT Orders Data Sync completed ", result);
-    })
-    .catch((err) => {
-      console.error("❌ DT Orders Data Sync failed", err);
-    });
-});
-
-// Update your initialization to include DTrade connection
-// initializeConnections();
-// 
+// // Schedule to run every day at 2:00 AM
+//   cron.schedule("*/5 * * * *", async() => {
+//    await syncDTOrdersData()
+//     .then((result) => {
+//       console.log("✅ DT Orders Data Sync completed ", result);
+//     })
+//     .catch((err) => {
+//       console.error("❌ DT Orders Data Sync failed", err);
+//     });
+// });
+ 
 /* ------------------------------
    New Endpoints for CutPanelOrders
 ------------------------------ */
