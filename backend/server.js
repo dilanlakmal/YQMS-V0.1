@@ -491,7 +491,6 @@ async function initializeServer() {
   await syncInlineOrders();
   await syncCutPanelOrders();
   await syncQC1SunriseData();
-  await syncDTOrdersData();
 
   console.log("--- Server Initialization Complete ---");
 }
@@ -2605,8 +2604,8 @@ app.get("/api/sync-dt-orders", async (req, res) => {
 //   });
 
 // Schedule to run every 2 hours
-cron.schedule("0 */2 * * *", async () => {
-  await syncDTOrdersData()
+cron.schedule("0 */2 * * *", () => {
+  syncDTOrdersData()
     .then((result) => {
       console.log("✅ DT Orders Data Sync completed", result);
     })
