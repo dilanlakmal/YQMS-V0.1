@@ -275,11 +275,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// /* ------------------------------
-//    YM DataSore SQL
-// ------------------------------ */
+/* ------------------------------
+   YM DataSore SQL
+------------------------------ */
 
-// // SQL Server Configuration for YMDataStore
+// SQL Server Configuration for YMDataStore
 // const sqlConfig = {
 //   user: "ymdata",
 //   password: "Kzw15947",
@@ -302,7 +302,7 @@ app.use((req, res, next) => {
 //    YMCE_SYSTEM SQL
 // ------------------------------ */
 
-// // SQL Server Configuration for YMCE_SYSTEM
+// SQL Server Configuration for YMCE_SYSTEM
 // const sqlConfigYMCE = {
 //   user: "visitor",
 //   password: "visitor",
@@ -454,6 +454,7 @@ async function ensurePoolConnected(pool, poolName) {
 //     connectPool(poolYMDataStore, "YMDataStore"),
 //     // connectPool(poolYMCE, "YMCE_SYSTEM"),
 //     // connectPool(poolYMWHSYS2, "YMWHSYS2")
+       // connectPool(poolDTrade, "DTrade_CONN")
 //   ];
 
 //   // Promise.allSettled will not short-circuit. It waits for all promises.
@@ -478,6 +479,7 @@ async function ensurePoolConnected(pool, poolName) {
 //   await syncInlineOrders();
 //   await syncCutPanelOrders();
 //   await syncQC1SunriseData();
+//   await syncDTOrdersData()
 
 //   console.log("--- Server Initialization Complete ---");
 // }
@@ -1748,7 +1750,7 @@ async function syncDTOrdersData() {
     const requestFC = poolYMWHSYS2.request();
 
     // 1. Fetch Order Headers WITH actual size names AND Order Colors and Shipping in one query
-    console.log("📊 Fetching order headers with size names and shipping data...");
+    // console.log("📊 Fetching order headers with size names and shipping data...");
     const orderHeaderQuery = `
       SELECT 
         h.[SC_Heading], h.[Factory], h.[SalesTeamName], h.[Cust_Code], h.[ShortName],
@@ -1768,7 +1770,7 @@ async function syncDTOrdersData() {
     const orderHeaderResult = await request.query(orderHeaderQuery);
 
     // 2. Fetch Size Names for each order (FIXED query)
-    console.log("📏 Fetching size names for each order...");
+    // console.log("📏 Fetching size names for each order...");
     const sizeNamesQuery = `
       SELECT DISTINCT
         [Order_No],
@@ -1818,7 +1820,7 @@ async function syncDTOrdersData() {
     const sizeNamesResult = await request.query(sizeNamesQuery);
 
     // 3. Fetch Order Colors and Shipping WITH Ship_ID
-    console.log("🎨 Fetching order colors and shipping data with Ship_ID...");
+    // console.log("🎨 Fetching order colors and shipping data with Ship_ID...");
     const orderColorsQuery = `
       SELECT 
         [Order_No], [ColorCode], [Color], [ChnColor], [Color_Seq], [ship_seq_no],
@@ -1836,7 +1838,7 @@ async function syncDTOrdersData() {
     const orderColorsResult = await request.query(orderColorsQuery);
 
     // 4. Fetch Size Specifications
-    console.log("📏 Fetching size specifications...");
+    // console.log("📏 Fetching size specifications...");
     const sizeSpecQuery = `
       SELECT 
         [JobNo], [SizeSpecId], [DetId], [Seq], [AtoZ], [Area],
@@ -1852,7 +1854,7 @@ async function syncDTOrdersData() {
     const sizeSpecResult = await request.query(sizeSpecQuery);
 
     // 5. Fetch Cut Quantity data from FC_SYSTEM
-    console.log("✂️ Fetching cut quantity data from FC_SYSTEM...");
+    // console.log("✂️ Fetching cut quantity data from FC_SYSTEM...");
     const cutQtyQuery = `
       SELECT 
         [BuyerStyle], [StyleNo], [ColorCode], [ChColor], [EngColor], [SIZE],
@@ -1893,7 +1895,7 @@ async function syncDTOrdersData() {
     });
 
     // Process Cut Quantity data and create mapping
-    console.log("🔄 Processing cut quantity data...");
+    // console.log("🔄 Processing cut quantity data...");
     const cutQtyMapping = new Map();
     cutQtyResult.recordset.forEach(record => {
       const styleNo = record.StyleNo;        // This should match Order_No in MongoDB
@@ -2154,7 +2156,7 @@ function extractSpecsDataAsArray(record, orderNo) {
     }
 
     // Process Data
-    console.log("🔄 Processing and organizing data...");
+    // console.log("🔄 Processing and organizing data...");
     const orderMap = new Map();
 
     // 1. Process Order Headers
@@ -2268,7 +2270,7 @@ function extractSpecsDataAsArray(record, orderNo) {
     }
 
     // Add cut quantity data to colors
-    console.log("🔄 Mapping cut quantity data to orders...");
+    // console.log("🔄 Mapping cut quantity data to orders...");
     let cutQtyMatchCount = 0;
     let totalColorProcessed = 0;
     
@@ -2301,19 +2303,19 @@ function extractSpecsDataAsArray(record, orderNo) {
       }
     }
 
-    console.log(`📊 Cut quantity matching results:`);
+    // console.log(`📊 Cut quantity matching results:`);
     
     // Verify CutQty data is actually in the colorData objects
-    console.log("🔍 Verifying CutQty data in colorMap...");
+    // console.log("🔍 Verifying CutQty data in colorMap...");
     let colorsWithCutQty = 0;
     for (const [colorKey, colorData] of colorMap) {
       if (Object.keys(colorData.CutQty).length > 0) {
         colorsWithCutQty++;
-        if (colorsWithCutQty <= 3) { // Log first 3 examples
-          console.log(`✅ Color ${colorKey} has CutQty:`, colorData.CutQty);
+    //     if (colorsWithCutQty <= 3) { // Log first 3 examples
+    //       console.log(`✅ Color ${colorKey} has CutQty:`, colorData.CutQty);
         }
       }
-    }
+    // }
 
     // Add colors and shipping to orders
     for (const [orderNo, order] of orderMap) {
@@ -2427,8 +2429,8 @@ function extractSpecsDataAsArray(record, orderNo) {
         return {
           success: true,
           totalOrders: finalDocs.length,
-          matched: result.matchedCount,
-          upserted: result.upsertedCount,
+          // matched: result.matchedCount,
+          // upserted: result.upsertedCount,
           modified: result.modifiedCount,
           cutQtyRecords: cutQtyResult.recordset.length,
           cutQtyMatchCount: cutQtyMatchCount,
@@ -2469,7 +2471,7 @@ app.get("/api/sync-dt-orders", async (req, res) => {
   }
 });
 
-// Initial sync on server start (uncomment when ready)
+// // Initial sync on server start (uncomment when ready)
 // syncDTOrdersData()
 //   .then((result) => {
 //     console.log("✅ Initial DT Orders Data Sync completed:", result);
@@ -2479,13 +2481,13 @@ app.get("/api/sync-dt-orders", async (req, res) => {
 //   });
 
 // Schedule to run every day at 2:00 AM
-cron.schedule("0 2 * * *", () => {
+  cron.schedule("0 */2 * * *", () => {
   syncDTOrdersData()
     .then((result) => {
-      console.log("✅ DT Orders Data Sync completed (scheduled 2am):", result);
+      console.log("✅ DT Orders Data Sync completed ", result);
     })
     .catch((err) => {
-      console.error("❌ DT Orders Data Sync failed (scheduled 2am):", err);
+      console.error("❌ DT Orders Data Sync failed", err);
     });
 });
 
