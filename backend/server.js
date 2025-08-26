@@ -322,9 +322,9 @@ app.use((req, res, next) => {
 //   }
 // };
 
-// // /* ------------------------------
-// //    YMWHSYS2 SQL Configuration
-// // ------------------------------ */
+// /* ------------------------------
+//    YMWHSYS2 SQL Configuration
+// ------------------------------ */
 
 // const sqlConfigYMWHSYS2 = {
 //   user: "user01",
@@ -452,9 +452,9 @@ app.use((req, res, next) => {
 //   console.log("Initializing SQL connection pools...");
 //   const connectionPromises = [
 //     connectPool(poolYMDataStore, "YMDataStore"),
-//     // connectPool(poolYMCE, "YMCE_SYSTEM"),
-//     // connectPool(poolYMWHSYS2, "YMWHSYS2")
-//        connectPool(poolDTrade, "DTrade_CONN")
+//     connectPool(poolYMCE, "YMCE_SYSTEM"),
+//     connectPool(poolYMWHSYS2, "YMWHSYS2"),
+//     connectPool(poolDTrade, "DTrade_CONN")
 //   ];
 
 //   // Promise.allSettled will not short-circuit. It waits for all promises.
@@ -479,7 +479,7 @@ app.use((req, res, next) => {
 //   await syncInlineOrders();
 //   await syncCutPanelOrders();
 //   await syncQC1SunriseData();
-//   await syncDTOrdersData();
+
 
 //   console.log("--- Server Initialization Complete ---");
 // }
@@ -2481,8 +2481,8 @@ app.use((req, res, next) => {
 // //   });
 
 // // Schedule to run every day at 2:00 AM
-//   cron.schedule("*/5 * * * *", async() => {
-//    await syncDTOrdersData()
+//   cron.schedule("*/5 * * * *", () => {
+//    syncDTOrdersData()
 //     .then((result) => {
 //       console.log("✅ DT Orders Data Sync completed ", result);
 //     })
@@ -27395,62 +27395,68 @@ app.get('/api/qc-washing/standards', async (req, res) => {
 });
 
 //New QC_Washing Endpoints
-
 app.post("/api/qc-washing/orderData-save", async (req, res) => {
   try {
     const { formData, userId, savedAt } = req.body;
+
     if (!formData || !formData.orderNo) {
       return res.status(400).json({ success: false, message: "Order No is required." });
     }
+
     const dateValue = formData.date
-    ? new Date(formData.date.length === 10 ? formData.date + "T00:00:00.000Z" : formData.date)
-    : undefined;
+      ? new Date(formData.date.length === 10 ? formData.date + "T00:00:00.000Z" : formData.date)
+      : undefined;
 
-
-    // Build the query for uniqueness
+    // Build the query for uniqueness - same as find-existing
     const query = {
       orderNo: formData.orderNo,
       date: dateValue,
       color: formData.color,
       washType: formData.washType,
       before_after_wash: formData.before_after_wash,
-      factoryName: formData.factoryName, 
+      factoryName: formData.factoryName,
       reportType: formData.reportType,
-      inline: formData.inline,
-      washQty: formData.washQty,
-      "inspector.empId": userId || formData.inspector?.empId
+      "inspector.empId": userId
     };
+
     Object.keys(query).forEach(
       (key) => (query[key] === undefined || query[key] === "") && delete query[key]
     );
 
-    // Find existing record
+
+    // Find existing record for THIS specific inspector
     let record = await QCWashing.findOne(query);
 
     if (!record) {
-      // Create new record
       record = new QCWashing({
         ...formData,
+        inspector: {
+          empId: userId
+        },
         colorOrderQty: formData.colorOrderQty,
         userId,
         savedAt,
         status: "processing"
       });
     } else {
-      // Update existing record
+      // Update existing record for this inspector
+      console.log("Updating existing record:", record._id); // Add this for debugging
       Object.assign(record, formData);
+      record.inspector.empId = userId;
       record.userId = userId;
       record.savedAt = savedAt;
       record.status = "processing";
     }
 
     await record.save();
+
     res.json({ success: true, id: record._id });
   } catch (err) {
     console.error("OrderData-save error:", err);
     res.status(500).json({ success: false, message: "Server error while saving order data." });
   }
 });
+
 
 app.get('/api/qc-washing/check-measurement-details/:orderNo', async (req, res) => {
   try {
@@ -27623,8 +27629,8 @@ app.get(
   }
 );
 
+// Simpler version using only userId
 app.post("/api/qc-washing/find-existing", async (req, res) => {
- 
   try {
     const {
       orderNo,
@@ -27634,7 +27640,6 @@ app.post("/api/qc-washing/find-existing", async (req, res) => {
       before_after_wash,
       factoryName,
       reportType,
-      washQty,
       inspectorId
     } = req.body;
 
@@ -27642,7 +27647,7 @@ app.post("/api/qc-washing/find-existing", async (req, res) => {
       ? new Date(date.length === 10 ? date + "T00:00:00.000Z" : date)
       : undefined;
 
-    // Build the query to match ALL fields
+    // Build the query to match core identifying fields INCLUDING inspector
     const query = {
       orderNo,
       date: dateValue,
@@ -27650,9 +27655,8 @@ app.post("/api/qc-washing/find-existing", async (req, res) => {
       washType,
       before_after_wash,
       factoryName,
-      washQty,
-      "inspector.empId": inspectorId,
       reportType,
+      "inspector.empId": inspectorId  // This should match the specific inspector
     };
 
     // Remove undefined or empty string fields from query
@@ -27660,14 +27664,18 @@ app.post("/api/qc-washing/find-existing", async (req, res) => {
       (key) => (query[key] === undefined || query[key] === "") && delete query[key]
     );
 
+
     const record = await QCWashing.findOne(query);
 
     if (record) {
       res.json({ success: true, exists: true, record });
     } else {
+      console.log("No existing record found"); 
       res.json({ success: true, exists: false });
     }
+
   } catch (err) {
+    console.error("Find-existing error:", err);
     res.status(500).json({ success: false, message: "Server error." });
   }
 });
@@ -27708,7 +27716,23 @@ function normalizeInspectionImagePath(img) {
   if (!img) return "";
 
   // If new upload, img.file will be handled by fileMap logic in your code
+
   if (img.preview && typeof img.preview === "string") {
+    // If it's already a full URL, return as-is
+    if (img.preview.startsWith("http")) {
+      return img.preview;
+    }
+    
+    // Convert relative paths to full URLs
+    if (img.preview.startsWith("./public/storage/")) {
+      const relativePath = img.preview.replace("./public/storage/", "");
+      return `${process.env.BASE_URL || 'http://localhost:3000'}/storage/${relativePath}`;
+    }
+    
+    if (img.preview.startsWith("/storage/")) {
+      return `${process.env.BASE_URL || 'http://localhost:3000'}${img.preview}`;
+    }
+
     if (img.preview.startsWith("./public/")) {
       return img.preview; // Keep the ./public format for consistency with defect images
     }

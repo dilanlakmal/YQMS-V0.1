@@ -112,7 +112,7 @@ const OrderDetailsSection = ({
     }
 
     const measurementCheck = await checkMeasurementDetails(formData.orderNo);
-    
+   
     if (!measurementCheck.success || !measurementCheck.hasMeasurement) {
       const result = await Swal.fire({
         icon: 'error',
@@ -127,17 +127,16 @@ const OrderDetailsSection = ({
       return;
     }
 
+    // FIX: Include inspectorId in the request body
     const uniqueKey = {
       orderNo: formData.orderNo,
       date: formData.date,
       color: formData.color,
       washType: formData.washType,
-      before_after_wash: formData.before_after_wash, 
+      before_after_wash: formData.before_after_wash,
       factoryName: formData.factoryName,
       reportType: formData.reportType,
-      inspector: {
-        empId: user?.emp_id
-      }
+      inspectorId: user?.emp_id 
     };
 
     const checkRes = await fetch(`${API_BASE_URL}/api/qc-washing/find-existing`, {
@@ -147,7 +146,7 @@ const OrderDetailsSection = ({
     });
 
     const checkData = await checkRes.json();
-    
+   
     if (checkData.success && checkData.exists) {
       const result = await Swal.fire({
         icon: 'info',
@@ -157,7 +156,7 @@ const OrderDetailsSection = ({
         confirmButtonText: 'Yes, edit',
         cancelButtonText: 'No, cancel'
       });
-      
+     
       if (result.isConfirmed) {
         const record = checkData.record;
         setFormData({
@@ -166,15 +165,15 @@ const OrderDetailsSection = ({
         });
         setRecordId(record._id);
         setIsSaved(true);
-        
+       
         // Load the existing record data
         if (onLoadSavedDataById) {
           await onLoadSavedDataById(record._id);
         }
-        
+       
         // Activate all sections when order details are saved/loaded
         if (activateNextSection) activateNextSection();
-        
+       
         Swal.fire({
           icon: 'success',
           title: 'Existing record loaded for editing.',
@@ -184,21 +183,21 @@ const OrderDetailsSection = ({
           toast: true
         });
         return;
-     } else if (result.isDismissed) {
-    // User clicked "No, cancel" or closed the popup
-    clearForm();
-    
-    // Optional: Show a brief message that the form was cleared
-    Swal.fire({
-      icon: 'info',
-      title: 'Form cleared',
-      showConfirmButton: false,
-      timer: 1000,
-      position: 'top-end',
-      toast: true
-    });
-    return;
-  }
+      } else if (result.isDismissed) {
+        // User clicked "No, cancel" or closed the popup
+        clearForm();
+       
+        // Optional: Show a brief message that the form was cleared
+        Swal.fire({
+          icon: 'info',
+          title: 'Form cleared',
+          showConfirmButton: false,
+          timer: 1000,
+          position: 'top-end',
+          toast: true
+        });
+        return;
+      }
     }
 
     // Save as new record
@@ -218,7 +217,7 @@ const OrderDetailsSection = ({
     });
 
     const result = await response.json();
-    
+   
     if (result.success) {
       Swal.fire({
         icon: 'success',
@@ -229,12 +228,12 @@ const OrderDetailsSection = ({
         position: 'top-end',
         toast: true
       });
-      
+     
       setIsSaved(true);
-      
+     
       // Activate all sections when order details are saved
       if (activateNextSection) activateNextSection();
-      
+     
       if (result.id && setRecordId) setRecordId(result.id);
     } else {
       Swal.fire({
@@ -260,8 +259,6 @@ const OrderDetailsSection = ({
     console.error("Save error:", error);
   }
 };
-
-
 
   const handleOrderNoChange = (e) => {
     handleInputChange("orderNo", e.target.value);
@@ -418,7 +415,8 @@ const OrderDetailsSection = ({
               <option value="Normal Wash">Normal Wash</option>
               <option value="Acid Wash">Acid Wash</option>
               <option value="Garment Dye">Garment Dye</option>
-               <option value="Soft Wash">Soft Wash</option>
+              <option value="Soft Wash">Soft Wash</option>
+              <option value="Acid Wash + Garment Dye">Acid Wash + Garment Dye</option>
             </select>
           </div>
           
