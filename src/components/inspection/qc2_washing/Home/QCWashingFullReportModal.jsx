@@ -3,6 +3,7 @@ import { X, FileText, Palette, Building, User, Hash, Droplets, ClipboardCheck, P
 import axios from "axios";
 
 import { API_BASE_URL } from "../../../../../config";
+import { getToleranceAsFraction } from "../Home/fractionConverter";
 
 const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
   const [reportData, setReportData] = useState(null);
@@ -10,13 +11,25 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
   const [isLoadingComparison, setIsLoadingComparison] = useState(false);
 
   // Helper function to convert file paths to accessible URLs
+// Helper function to convert file paths to accessible URLs
 const getImageUrl = (imagePath) => {
   if (!imagePath) return null;
   
-  // Remove the "./public" prefix and create a proper URL
-  const cleanPath = imagePath.replace('./public', '');
-  return `${API_BASE_URL}${cleanPath}`;
+  // If it's already a full URL, return as-is
+  if (imagePath.startsWith('http')) {
+    return imagePath;
+  }
+  
+  // If it starts with "./public", remove the prefix and create a proper URL
+  if (imagePath.startsWith('./public')) {
+    const cleanPath = imagePath.replace('./public', '');
+    return `${API_BASE_URL}${cleanPath}`;
+  }
+  
+  // For other cases, assume it's a relative path and prepend API_BASE_URL
+  return `${API_BASE_URL}${imagePath}`;
 };
+
 
 // Fetch comparison data (opposite wash type measurements)
   const fetchComparisonData = async (orderNo, color, washType, reportType, factory, currentWashType) => {
@@ -534,149 +547,166 @@ const getImageUrl = (imagePath) => {
 
               {/* Inspection Details */}
               {(() => {
-                const inspectionDetails = reportData.inspectionDetails || {};
-                return (
-                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 flex items-center">
-                        <div className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg mr-3">
-                          <Activity className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                  const inspectionDetails = reportData.inspectionDetails || {};
+                  return (
+                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-6">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 flex items-center">
+                          <div className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg mr-3">
+                            <Activity className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                          </div>
+                          Inspection Details
+                        </h3>
+                        <div className="bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1 rounded-full">
+                          <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">Quality Checks</span>
                         </div>
-                        Inspection Details
-                      </h3>
-                      <div className="bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1 rounded-full">
-                        <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">Quality Checks</span>
                       </div>
-                    </div>
-                    <div className="space-y-6">
-                      {/* Checked Points */}
-                      {inspectionDetails.checkedPoints && inspectionDetails.checkedPoints.length > 0 && (
-                        <div>
-                          <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">Checked Points</h4>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            {inspectionDetails.checkedPoints.map((point, index) => (
-                              <div key={index} className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 rounded-xl p-5 hover:shadow-md transition-shadow">
-                                <div className="flex items-center justify-between mb-4">
-                                  <div className="flex items-center space-x-3">
-                                    <div className={`p-2 rounded-lg ${
-                                      point.decision === 'ok' || point.status === 'Pass' 
-                                        ? 'bg-green-500'
-                                        : 'bg-red-500'
-                                    }`}>
-                                      <Target className="w-4 h-4 text-white" />
+                      <div className="space-y-6">
+                        {/* Checked Points */}
+                        {inspectionDetails.checkedPoints && inspectionDetails.checkedPoints.length > 0 && (
+                          <div>
+                            <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">Checked Points</h4>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                              {inspectionDetails.checkedPoints.map((point, index) => (
+                                <div key={index} className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 rounded-xl p-5 hover:shadow-md transition-shadow">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center space-x-3">
+                                      <div className={`p-2 rounded-lg ${
+                                        point.decision === 'ok' || point.status === 'Pass' 
+                                          ? 'bg-green-500'
+                                          : 'bg-red-500'
+                                      }`}>
+                                        <Target className="w-4 h-4 text-white" />
+                                      </div>
+                                      <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{point.pointName}</span>
                                     </div>
-                                    <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{point.pointName}</span>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    {/* {point.decision === 'ok' || point.status === 'Pass' ? (
-                                      <CheckCircle className="w-4 h-4 text-green-500" />
-                                    ) : (
-                                      <XCircle className="w-4 h-4 text-red-500" />
-                                    )} */}
-                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                      point.decision === 'ok' || point.status === 'Pass' 
-                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
-                                        : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
-                                    }`}>
-                                      {point.status || (point.decision === 'ok' ? 'Pass' : 'Fail')}
-                                    </span>
-                                  </div>
-                                </div>
-                                
-                                {/* Point Details */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div>
-                                    {point.expectedValue && (
-                                      <div className="mb-2">
-                                        <span className="text-xs text-gray-600 dark:text-gray-400">Expected: </span>
-                                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{point.expectedValue}</span>
-                                      </div>
-                                    )}
-                                    {point.actualValue && (
-                                      <div className="mb-2">
-                                        <span className="text-xs text-gray-600 dark:text-gray-400">Actual: </span>
-                                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{point.actualValue}</span>
-                                      </div>
-                                    )}
-                                    {point.tolerance && (
-                                      <div className="mb-2">
-                                        <span className="text-xs text-gray-600 dark:text-gray-400">Tolerance: </span>
-                                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">±{point.tolerance}</span>
-                                      </div>
-                                    )}
-                                    {point.decision && (
-                                      <div className="mb-2">
-                                        <span className="text-xs text-gray-600 dark:text-gray-400">Decision: </span>
-                                        <span className={`text-sm font-bold ${
-                                          point.decision.toLowerCase() === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                                        }`}>{point.decision.toUpperCase()}</span>
-                                      </div>
-                                    )}
+                                    <div className="flex items-center space-x-2">
+                                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                        point.decision === 'ok' || point.status === 'Pass' 
+                                          ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                                          : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+                                      }`}>
+                                        {point.status || (point.decision === 'ok' ? 'Pass' : 'Fail')}
+                                      </span>
+                                    </div>
                                   </div>
                                   
-                                  {/* Images */}
-                                  <div>
-                                    {/* Point Image */}
-                                    {point.image && (
-                                      <div className="mb-3">
-                                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Point Image:</p>
-                                        <img 
-                                          src={point.image} 
-                                          alt={`Point: ${point.pointName}`}
-                                          className="w-full h-24 object-cover rounded border border-gray-200 dark:border-gray-600"
-                                        />
-                                      </div>
-                                    )}
+                                  {/* Point Details */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                      {point.expectedValue && (
+                                        <div className="mb-2">
+                                          <span className="text-xs text-gray-600 dark:text-gray-400">Expected: </span>
+                                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{point.expectedValue}</span>
+                                        </div>
+                                      )}
+                                      {point.actualValue && (
+                                        <div className="mb-2">
+                                          <span className="text-xs text-gray-600 dark:text-gray-400">Actual: </span>
+                                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{point.actualValue}</span>
+                                        </div>
+                                      )}
+                                      {point.tolerance && (
+                                        <div className="mb-2">
+                                          <span className="text-xs text-gray-600 dark:text-gray-400">Tolerance: </span>
+                                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200">±{point.tolerance}</span>
+                                        </div>
+                                      )}
+                                      {point.decision && (
+                                        <div className="mb-2">
+                                          <span className="text-xs text-gray-600 dark:text-gray-400">Decision: </span>
+                                          <span className={`text-sm font-bold ${
+                                            point.decision.toLowerCase() === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                                          }`}>{point.decision.toUpperCase()}</span>
+                                        </div>
+                                      )}
+                                    </div>
                                     
-                                    {/* Comparison Images */}
-                                   {point.comparison && point.comparison.length > 0 && (
-                                      <div>
-                                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Comparison Images:</p>
-                                        <div className="grid grid-cols-2 gap-2">
-                                          {point.comparison.map((img, imgIndex) => {
-                                            const imageUrl = getImageUrl(img);
-                                            return (
-                                              <div key={imgIndex} className="w-full h-20 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
-                                                {imageUrl ? (
-                                                  <img 
-                                                    src={imageUrl}
-                                                    alt={`Comparison ${imgIndex + 1}`}
-                                                    className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                                                    onClick={() => window.open(imageUrl, '_blank')}
-                                                    onError={(e) => {
-                                                      e.target.style.display = 'none';
-                                                      e.target.nextSibling.style.display = 'flex';
-                                                    }}
-                                                  />
-                                                ) : null}
-                                                <div className="w-full h-full flex items-center justify-center text-center" style={{display: 'none'}}>
-                                                  <div>
-                                                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">📷</div>
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400">Image not available</div>
+                                    {/* Images */}
+                                    <div>
+                                      {/* Point Image */}
+                                      {point.image && (
+                                        <div className="mb-3">
+                                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Point Image:</p>
+                                          <div className="w-full h-24 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
+                                            {(() => {
+                                              const imageUrl = getImageUrl(point.image);
+                                              console.log('Point Image URL:', imageUrl); // Debug log
+                                              return imageUrl ? (
+                                                <img 
+                                                  src={imageUrl}
+                                                  alt={`Point: ${point.pointName}`}
+                                                  className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                                  onClick={() => window.open(imageUrl, '_blank')}
+                                                  onError={(e) => {
+                                                    console.error('Failed to load point image:', imageUrl);
+                                                    e.target.style.display = 'none';
+                                                    e.target.nextSibling.style.display = 'flex';
+                                                  }}
+                                                />
+                                              ) : null;
+                                            })()}
+                                            <div className="w-full h-full flex items-center justify-center text-center" style={{display: 'none'}}>
+                                              <div>
+                                                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">📷</div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">Image not available</div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+                                      
+                                      {/* Comparison Images */}
+                                      {point.comparison && point.comparison.length > 0 && (
+                                        <div>
+                                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Comparison Images:</p>
+                                          <div className="grid grid-cols-2 gap-2">
+                                            {point.comparison.map((img, imgIndex) => {
+                                              const imageUrl = getImageUrl(img);
+                                              console.log(`Comparison Image ${imgIndex} URL:`, imageUrl); // Debug log
+                                              return (
+                                                <div key={imgIndex} className="w-full h-20 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
+                                                  {imageUrl ? (
+                                                    <img 
+                                                      src={imageUrl}
+                                                      alt={`Comparison ${imgIndex + 1}`}
+                                                      className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                                      onClick={() => window.open(imageUrl, '_blank')}
+                                                      onError={(e) => {
+                                                        console.error('Failed to load comparison image:', imageUrl);
+                                                        e.target.style.display = 'none';
+                                                        e.target.nextSibling.style.display = 'flex';
+                                                      }}
+                                                    />
+                                                  ) : null}
+                                                  <div className="w-full h-full flex items-center justify-center text-center" style={{display: 'none'}}>
+                                                    <div>
+                                                      <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">📷</div>
+                                                      <div className="text-xs text-gray-500 dark:text-gray-400">Image not available</div>
+                                                    </div>
                                                   </div>
                                                 </div>
-                                              </div>
-                                            );
-                                          })}
+                                              );
+                                            })}
+                                          </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
+                                    </div>
                                   </div>
+                                  
+                                  {/* Remark */}
+                                  {point.remark && (
+                                    <div className="mt-3 bg-white dark:bg-gray-800 rounded p-3 border border-gray-200 dark:border-gray-600">
+                                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Remark:</p>
+                                      <p className="text-sm text-gray-800 dark:text-gray-200">{point.remark}</p>
+                                    </div>
+                                  )}
                                 </div>
-                                
-                                {/* Remark */}
-                                {point.remark && (
-                                  <div className="mt-3 bg-white dark:bg-gray-800 rounded p-3 border border-gray-200 dark:border-gray-600">
-                                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Remark:</p>
-                                    <p className="text-sm text-gray-800 dark:text-gray-200">{point.remark}</p>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      
+                        )}
+                                      
                       {/* Parameters */}
                       {inspectionDetails.parameters && inspectionDetails.parameters.length > 0 && (
                         <div>
@@ -903,11 +933,29 @@ const getImageUrl = (imagePath) => {
                                 {machine.image && (
                                   <div className="mt-3">
                                     <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Machine Image:</p>
-                                    <img 
-                                      src={machine.image} 
-                                      alt={`Machine: ${machine.machineType}`}
-                                      className="w-full h-32 object-cover rounded border border-gray-200 dark:border-gray-600"
-                                    />
+                                    <div className="w-full h-32 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
+                                      {(() => {
+                                        const imageUrl = getImageUrl(machine.image);
+                                        return imageUrl ? (
+                                          <img 
+                                            src={imageUrl}
+                                            alt={`Machine: ${machine.machineType}`}
+                                            className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                            onClick={() => window.open(imageUrl, '_blank')}
+                                            onError={(e) => {
+                                              e.target.style.display = 'none';
+                                              e.target.nextSibling.style.display = 'flex';
+                                            }}
+                                          />
+                                        ) : null;
+                                      })()}
+                                      <div className="w-full h-full flex items-center justify-center text-center" style={{display: 'none'}}>
+                                        <div>
+                                          <div className="text-lg text-gray-500 dark:text-gray-400 mb-1">📷</div>
+                                          <div className="text-xs text-gray-500 dark:text-gray-400">Image not available</div>
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -1174,11 +1222,11 @@ const getImageUrl = (imagePath) => {
                                       <td className="px-4 py-3 text-center text-sm font-medium text-blue-800 dark:text-blue-200 border-r border-gray-200 dark:border-gray-600">
                                         {point.specs}
                                       </td>
-                                      <td className="px-4 py-3 text-center text-sm font-medium text-red-800 dark:text-red-200 border-r border-gray-200 dark:border-gray-600">
-                                        {point.toleranceMinus}
+                                     <td className="px-4 py-3 text-center text-sm font-medium text-red-800 dark:text-red-200 border-r border-gray-200 dark:border-gray-600">
+                                       {getToleranceAsFraction(point, 'minus')}
                                       </td>
-                                      <td className="px-4 py-3 text-center text-sm font-medium text-green-800 dark:text-green-200 border-r border-gray-200 dark:border-gray-600">
-                                        +{point.tolerancePlus}
+                                     <td className="px-4 py-3 text-center text-sm font-medium text-green-800 dark:text-green-200 border-r border-gray-200 dark:border-gray-600">
+                                       +{getToleranceAsFraction(point, 'plus')}
                                       </td>
                                       {sizeData.pcs.map((pc, pcIndex) => {
                                         // Find the corresponding measurement point for this piece
@@ -1323,8 +1371,11 @@ const getImageUrl = (imagePath) => {
                                       <th className="px-4 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
                                         Spec
                                       </th>
-                                      <th className="px-4 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
-                                        Tolerance
+                                      <th className="px-2 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
+                                        Tol-
+                                      </th>
+                                      <th className="px-2 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
+                                        Tol+
                                       </th>
                                       {displayAfterData.pcs.map((pc, pcIndex) => (
                                         <th key={pcIndex} className="px-2 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
@@ -1369,8 +1420,11 @@ const getImageUrl = (imagePath) => {
                                             <td className="px-4 py-3 text-center text-sm font-medium text-blue-800 dark:text-blue-200 border-r border-gray-200 dark:border-gray-600">
                                               {afterPoint.specs}
                                             </td>
-                                            <td className="px-4 py-3 text-center text-sm font-medium text-gray-800 dark:text-gray-200 border-r border-gray-200 dark:border-gray-600">
-                                              {afterPoint.toleranceMinus} / +{afterPoint.tolerancePlus}
+                                            <td className="px-2 py-3 text-center text-sm font-medium text-red-800 dark:text-red-200 border-r border-gray-200 dark:border-gray-600">
+                                              {getToleranceAsFraction(afterPoint, 'minus')}
+                                            </td>
+                                            <td className="px-2 py-3 text-center text-sm font-medium text-green-800 dark:text-green-200 border-r border-gray-200 dark:border-gray-600">
+                                              +{getToleranceAsFraction(afterPoint, 'plus')}
                                             </td>
                                             {displayAfterData.pcs.map((afterPc, pcIndex) => {
                                               const afterMeasurement = afterPc.measurementPoints.find(mp => mp.pointName === afterPoint.pointName);

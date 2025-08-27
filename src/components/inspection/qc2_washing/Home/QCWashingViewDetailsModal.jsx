@@ -1,7 +1,175 @@
-import React from "react";
-import { X, Package, Droplets, Target, CheckCircle, XCircle, TrendingUp, BarChart3, FileText, Palette, Building, User, Hash, AlertTriangle, ClipboardCheck } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, Package, Droplets, Target, CheckCircle, XCircle, TrendingUp, BarChart3, FileText, Palette, Building, User, Hash, AlertTriangle, ClipboardCheck, Calculator } from "lucide-react";
+import { getToleranceAsFraction } from "./fractionConverter";
 
-const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
+const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] }) => {
+  const [washQuantityData, setWashQuantityData] = useState({
+    alreadyWashedQty: 0,
+    remainingQty: 0,
+    totalRecords: 0,
+    currentRecordPosition: 0
+  });
+
+  const [selectedRecords, setSelectedRecords] = useState([]);
+  const [showRecordsList, setShowRecordsList] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && itemData && allRecords.length > 0) {
+      calculateWashQuantities();
+    }
+  }, [isOpen, itemData, allRecords]);
+
+  const calculateWashQuantities = () => {
+  if (!itemData) return;
+
+  console.log('=== Wash Quantity Calculation Debug ===');
+  console.log('itemData:', {
+    id: itemData._id,
+    orderNo: itemData.orderNo,
+    color: itemData.color,
+    washType: itemData.washType,
+    reportType: itemData.reportType,
+    factoryName: itemData.factoryName,
+    before_after_wash: itemData.before_after_wash,
+    washQty: itemData.washQty,
+    colorOrderQty: itemData.colorOrderQty
+  });
+  console.log('allRecords length:', allRecords.length);
+
+  // If no allRecords, treat current record as the only record
+  if (!allRecords || allRecords.length === 0) {
+    console.log('No allRecords available, using current record only');
+    const alreadyWashedQty = parseInt(itemData.washQty) || 0;
+    const remainingQty = Math.max(0, (parseInt(itemData.colorOrderQty) || 0) - alreadyWashedQty);
+    
+    setWashQuantityData({
+      alreadyWashedQty,
+      remainingQty,
+      totalRecords: 1,
+      currentRecordPosition: 1
+    });
+    return;
+  }
+
+  // Filter records with matching criteria
+  const matchingRecords = allRecords.filter(record => {
+    const matches = record.orderNo === itemData.orderNo &&
+      record.before_after_wash === itemData.before_after_wash &&
+      record.color === itemData.color &&
+      record.washType === itemData.washType &&
+      record.reportType === itemData.reportType &&
+      record.factoryName === itemData.factoryName;
+    
+    if (matches) {
+      console.log('Matching record found:', {
+        id: record._id,
+        washQty: record.washQty,
+        createdAt: record.createdAt
+      });
+    }
+    return matches;
+  });
+
+  console.log('Matching records count:', matchingRecords.length);
+
+  // If no matching records found, treat current record as the only record
+  if (matchingRecords.length === 0) {
+    console.log('No matching records found, using current record only');
+    const alreadyWashedQty = parseInt(itemData.washQty) || 0;
+    const remainingQty = Math.max(0, (parseInt(itemData.colorOrderQty) || 0) - alreadyWashedQty);
+    
+    setWashQuantityData({
+      alreadyWashedQty,
+      remainingQty,
+      totalRecords: 1,
+      currentRecordPosition: 1
+    });
+    return;
+  }
+
+  // Sort by date or creation time to get chronological order
+  const sortedRecords = matchingRecords.sort((a, b) => {
+    const dateA = new Date(a.createdAt || a.date || a.submittedAt);
+    const dateB = new Date(b.createdAt || b.date || b.submittedAt);
+    return dateA - dateB;
+  });
+
+  console.log('Sorted records:', sortedRecords.map(r => ({
+    id: r._id,
+    washQty: r.washQty,
+    createdAt: r.createdAt,
+    date: r.date
+  })));
+
+  // Find current record position - try multiple matching strategies
+  let currentRecordIndex = -1;
+
+  // Strategy 1: Direct ID match
+  currentRecordIndex = sortedRecords.findIndex(record => {
+    if (typeof record._id === 'string' && typeof itemData._id === 'string') {
+      return record._id === itemData._id;
+    }
+    if (record._id?.$oid && itemData._id?.$oid) {
+      return record._id.$oid === itemData._id.$oid;
+    }
+    if (record._id?.$oid && typeof itemData._id === 'string') {
+      return record._id.$oid === itemData._id;
+    }
+    if (typeof record._id === 'string' && itemData._id?.$oid) {
+      return record._id === itemData._id.$oid;
+    }
+    return false;
+  });
+
+  console.log('Direct ID match index:', currentRecordIndex);
+
+  // Strategy 2: Match by washQty and approximate date if ID match fails
+  if (currentRecordIndex === -1) {
+    currentRecordIndex = sortedRecords.findIndex(record => {
+      const washQtyMatch = record.washQty === itemData.washQty;
+      const dateA = new Date(record.createdAt || record.date || record.submittedAt);
+      const dateB = new Date(itemData.createdAt || itemData.date || itemData.submittedAt);
+      const timeDiff = Math.abs(dateA - dateB);
+      const dateMatch = timeDiff < 5000; // within 5 seconds
+      
+      return washQtyMatch && dateMatch;
+    });
+    console.log('WashQty + Date match index:', currentRecordIndex);
+  }
+
+  // Strategy 3: If still not found, assume it's the latest record
+  if (currentRecordIndex === -1) {
+    currentRecordIndex = sortedRecords.length - 1;
+    console.log('Using latest record index:', currentRecordIndex);
+  }
+
+  // Calculate cumulative wash quantity up to current record (inclusive)
+  const recordsUpToCurrent = sortedRecords.slice(0, currentRecordIndex + 1);
+  const alreadyWashedQty = recordsUpToCurrent.reduce((sum, record) => {
+    const washQty = parseInt(record.washQty) || 0;
+    console.log(`Adding washQty: ${washQty} from record:`, record._id);
+    return sum + washQty;
+  }, 0);
+
+  const remainingQty = Math.max(0, (parseInt(itemData.colorOrderQty) || 0) - alreadyWashedQty);
+
+  console.log('Final calculation:', {
+    recordsUpToCurrent: recordsUpToCurrent.length,
+    alreadyWashedQty,
+    remainingQty,
+    currentRecordIndex,
+    totalRecords: sortedRecords.length
+  });
+
+  setWashQuantityData({
+    alreadyWashedQty,
+    remainingQty,
+    totalRecords: sortedRecords.length,
+    currentRecordPosition: currentRecordIndex + 1
+  });
+};
+
+
   if (!isOpen || !itemData) return null;
 
   const measurementSummary = itemData.measurementDetails?.measurementSizeSummary?.[0] || {};
@@ -19,6 +187,8 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
             specs: point.specs,
             toleranceMinus: point.toleranceMinus,
             tolerancePlus: point.tolerancePlus,
+            toleranceMinus_fraction: point.toleranceMinus_fraction,
+            tolerancePlus_fraction: point.tolerancePlus_fraction,
             measurements: []
           };
         }
@@ -47,6 +217,158 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
   // Get inspection details
   const inspectionDetails = itemData.inspectionDetails || {};
 
+  const handleRecordCardClick = () => {
+  if (!itemData || !allRecords || allRecords.length === 0) {
+    setSelectedRecords([]);
+    setShowRecordsList(true);
+    return;
+  }
+
+  // Filter records with matching criteria (same as in calculateWashQuantities)
+  const matchingRecords = allRecords.filter(record => {
+    return record.orderNo === itemData.orderNo &&
+      record.before_after_wash === itemData.before_after_wash &&
+      record.color === itemData.color &&
+      record.washType === itemData.washType &&
+      record.reportType === itemData.reportType &&
+      record.factoryName === itemData.factoryName;
+  });
+
+  // Sort by date or creation time to get chronological order
+  const sortedRecords = matchingRecords.sort((a, b) => {
+    const dateA = new Date(a.createdAt || a.date || a.submittedAt);
+    const dateB = new Date(b.createdAt || b.date || b.submittedAt);
+    return dateA - dateB;
+  });
+
+  setSelectedRecords(sortedRecords);
+  setShowRecordsList(true);
+};
+
+
+// Modal or list component
+// Modal or list component
+const RecordsListModal = () => (
+  showRecordsList && (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold dark:text-white">
+            Related Records ({selectedRecords.length})
+          </h3>
+          <button 
+            onClick={() => setShowRecordsList(false)}
+            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl"
+          >
+            ×
+          </button>
+        </div>
+        
+        <div className="max-h-96 overflow-y-auto">
+          {selectedRecords.length > 0 ? (
+            <table className="w-full border-collapse border border-gray-300 dark:border-gray-600">
+              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                <tr>
+                  <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
+                    #
+                  </th>
+                  <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
+                    Date
+                  </th>
+                  <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
+                    Wash Qty
+                  </th>
+                  <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
+                    Inspector
+                  </th>
+                  <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedRecords.map((record, index) => {
+                  // Check if this is the current record
+                  const isCurrentRecord = 
+                    (typeof record._id === 'string' && typeof itemData._id === 'string' && record._id === itemData._id) ||
+                    (record._id?.$oid && itemData._id?.$oid && record._id.$oid === itemData._id.$oid) ||
+                    (record._id?.$oid && typeof itemData._id === 'string' && record._id.$oid === itemData._id) ||
+                    (typeof record._id === 'string' && itemData._id?.$oid && record._id === itemData._id.$oid);
+
+                  return (
+                    <tr 
+                      key={index} 
+                      className={`${isCurrentRecord ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                    >
+                      <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 dark:text-white text-sm">
+                        {index + 1}
+                        {isCurrentRecord && (
+                          <span className="ml-2 text-xs bg-blue-500 text-white px-2 py-1 rounded">
+                            Current
+                          </span>
+                        )}
+                      </td>
+                      <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 dark:text-white text-sm">
+                        {new Date(record.date || record.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 dark:text-white text-sm font-semibold">
+                        {record.washQty}
+                      </td>
+                      <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 dark:text-white text-sm">
+                        {record.inspector?.empId || record.userId || 'N/A'}
+                      </td>
+                      <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          record.overallFinalResult === 'Pass' 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                            : record.overallFinalResult === 'Fail'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-900/50 dark:text-gray-300'
+                        }`}>
+                          {record.overallFinalResult || record.status || 'N/A'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              No related records found
+            </div>
+          )}
+        </div>
+
+        {/* Summary at the bottom */}
+        {selectedRecords.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="text-center">
+                <p className="text-gray-600 dark:text-gray-400">Total Records</p>
+                <p className="font-semibold text-lg dark:text-white">{selectedRecords.length}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-gray-600 dark:text-gray-400">Total Washed</p>
+                <p className="font-semibold text-lg dark:text-white">
+                  {selectedRecords.reduce((sum, record) => sum + (parseInt(record.washQty) || 0), 0)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-gray-600 dark:text-gray-400">Current Position</p>
+                <p className="font-semibold text-lg dark:text-white">
+                  {washQuantityData.currentRecordPosition} / {washQuantityData.totalRecords}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+);
+
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
@@ -64,6 +386,81 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
         </div>
 
         <div className="p-6">
+          {/* Wash Quantity Tracking Section */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100 flex items-center">
+              <Calculator className="w-5 h-5 mr-2" />
+              Wash Quantity Tracking
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center">
+                  <Package className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-blue-600 dark:text-blue-300">Total Order Qty</p>
+                    <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{itemData.colorOrderQty}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                <div className="flex items-center">
+                  <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-green-600 dark:text-green-300">Already Washed Qty</p>
+                    <p className="text-2xl font-bold text-green-900 dark:text-green-100">{washQuantityData.alreadyWashedQty}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
+                <div className="flex items-center">
+                  <Target className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-orange-600 dark:text-orange-300">Remaining Qty</p>
+                    <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">{washQuantityData.remainingQty}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+               <div 
+                  className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800 cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                  onClick={handleRecordCardClick}
+                  title="Click to view all related records"
+                >
+                  <div className="flex items-center">
+                    <Hash className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-purple-600 dark:text-purple-300">Record Position</p>
+                      <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                        {washQuantityData.currentRecordPosition} / {washQuantityData.totalRecords}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="mt-4">
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
+                <span>Progress: {washQuantityData.alreadyWashedQty} / {itemData.colorOrderQty}</span>
+                <span>{((washQuantityData.alreadyWashedQty / itemData.colorOrderQty) * 100).toFixed(1)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                <div 
+                  className="bg-gradient-to-r from-green-500 to-blue-500 h-3 rounded-full transition-all duration-300"
+                  style={{ 
+                    width: `${Math.min(100, (washQuantityData.alreadyWashedQty / itemData.colorOrderQty) * 100)}%` 
+                  }}
+                ></div>
+              </div>
+            </div>
+            <RecordsListModal />
+          </div>
+
           {/* First Row: Order Details and Summary Data */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Left Column - Order Details */}
@@ -82,6 +479,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     </div>
                   </div>
                 </div>
+
                 <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
                   <div className="flex items-center">
                     <Hash className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
@@ -91,6 +489,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     </div>
                   </div>
                 </div>
+
                 <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
                   <div className="flex items-center">
                     <Palette className="w-8 h-8 text-purple-600 dark:text-purple-400" />
@@ -100,6 +499,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     </div>
                   </div>
                 </div>
+
                 <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
                   <div className="flex items-center">
                     <Hash className="w-8 h-8 text-pink-600 dark:text-pink-400" />
@@ -109,6 +509,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     </div>
                   </div>
                 </div>
+
                 <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
                   <div className="flex items-center">
                     <Droplets className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
@@ -118,6 +519,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     </div>
                   </div>
                 </div>
+
                 <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
                   <div className="flex items-center">
                     <ClipboardCheck className="w-8 h-8 text-teal-600 dark:text-teal-400" />
@@ -127,6 +529,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     </div>
                   </div>
                 </div>
+
                 <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
                   <div className="flex items-center">
                     <Building className="w-8 h-8 text-orange-600 dark:text-orange-400" />
@@ -136,6 +539,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     </div>
                   </div>
                 </div>
+
                 <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
                   <div className="flex items-center">
                     <User className="w-8 h-8 text-green-600 dark:text-green-400" />
@@ -164,6 +568,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     </div>
                   </div>
                 </div>
+
                 <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
                   <div className="flex items-center">
                     <Hash className="w-8 h-8 text-purple-600 dark:text-purple-400" />
@@ -173,6 +578,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     </div>
                   </div>
                 </div>
+
                 <div className="bg-cyan-50 dark:bg-cyan-900/20 rounded-lg p-4 border border-cyan-200 dark:border-cyan-800">
                   <div className="flex items-center">
                     <Droplets className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
@@ -182,6 +588,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     </div>
                   </div>
                 </div>
+
                 <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4 border border-indigo-200 dark:border-indigo-800">
                   <div className="flex items-center">
                     <Target className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
@@ -191,6 +598,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     </div>
                   </div>
                 </div>
+
                 <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
                   <div className="flex items-center">
                     <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
@@ -200,6 +608,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     </div>
                   </div>
                 </div>
+
                 <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 border border-red-200 dark:border-red-800">
                   <div className="flex items-center">
                     <XCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
@@ -209,6 +618,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     </div>
                   </div>
                 </div>
+
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
                   <div className="flex items-center">
                     <TrendingUp className="w-8 h-8 text-gray-600 dark:text-gray-400" />
@@ -218,6 +628,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     </div>
                   </div>
                 </div>
+
                 <div className={`rounded-lg p-4 border ${
                   itemData.overallFinalResult === 'Pass'
                     ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
@@ -247,6 +658,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
             </div>
           </div>
 
+          {/* Rest of your existing sections... */}
           {/* Second Row: Defect Details and Inspection Details */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Left Column - Defect Details */}
@@ -370,7 +782,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                               )}
                               {machine.silicon && machine.silicon.actualValue && (
                                 <div className="flex items-center">
-                                  <div className={`w-2 h-2 rounded-full mr-2 ${
+                                                                    <div className={`w-2 h-2 rounded-full mr-2 ${
                                     machine.silicon.status?.ok ? 'bg-green-500' : 'bg-red-500'
                                   }`}></div>
                                   <span>Silicon: {machine.silicon.actualValue}g</span>
@@ -412,6 +824,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                     allMeasurementValues.add(value);
                   });
                 });
+
                 const sortedValues = Array.from(allMeasurementValues).sort();
 
                 return (
@@ -463,10 +876,10 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
                               {point.specs}
                             </td>
                             <td className="px-4 py-3 text-sm text-center text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
-                              {point.toleranceMinus}
+                              {getToleranceAsFraction(point, 'minus')}
                             </td>
                             <td className="px-4 py-3 text-sm text-center text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
-                              {point.tolerancePlus}
+                              +{getToleranceAsFraction(point, 'plus')}
                             </td>
                             {sortedValues.map((value, idx) => {
                               const valueData = valueCounts[value];
@@ -519,3 +932,5 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData }) => {
 };
 
 export default QCWashingViewDetailsModal;
+
+                                  

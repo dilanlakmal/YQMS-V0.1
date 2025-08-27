@@ -412,37 +412,6 @@ const handleActualValueChange = (machineType, param, value) => {
   }
 };
 
-// Add this helper function at the top of your component, after the existing helper functions
-const convertImagePathToUrl = (imagePath) => {
-  if (!imagePath) return null;
-  
-  // If it's already a full URL, return as-is
-  if (imagePath.startsWith('http')) {
-    return imagePath;
-  }
-  
-  // Convert database path format to URL format
-  if (imagePath.startsWith('./public/storage/')) {
-    const relativePath = imagePath.replace('./public/storage/', '');
-    return `${API_BASE_URL}/storage/${relativePath}`;
-  } else if (imagePath.startsWith('./public/')) {
-    const relativePath = imagePath.replace('./public/', '');
-    return `${API_BASE_URL}/public/${relativePath}`;
-  } else if (imagePath.startsWith('/storage/')) {
-    return `${API_BASE_URL}${imagePath}`;
-  } else if (imagePath.startsWith('storage/')) {
-    return `${API_BASE_URL}/${imagePath}`;
-  } else if (imagePath.startsWith('/public/')) {
-    return `${API_BASE_URL}${imagePath}`;
-  } else if (imagePath.startsWith('public/')) {
-    return `${API_BASE_URL}/${imagePath}`;
-  } else {
-    // For any other case, assume it's a relative path
-    const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
-    return `${API_BASE_URL}${cleanPath}`;
-  }
-};
-
 
   const handleSaveInspection = async () => {
   if (!recordId) {
@@ -521,21 +490,21 @@ const convertImagePathToUrl = (imagePath) => {
     if (result.success) {
       // Update inspection data with saved image URLs
       if (result.data && result.data.inspectionDetails && result.data.inspectionDetails.checkedPoints) {
-          setInspectionData(prev => 
-            prev.map((item) => {
-              const savedPoint = result.data.inspectionDetails.checkedPoints.find(p => p.pointName === item.checkedList);
-              if (savedPoint && savedPoint.comparison && savedPoint.comparison.length > 0) {
-                const updatedImages = savedPoint.comparison.map(imgPath => ({
-                  file: null,
-                  preview: convertImagePathToUrl(imgPath), // Use the new conversion function
-                  name: typeof imgPath === "string" ? imgPath.split('/').pop() : "image.jpg"
-                }));
-                return { ...item, comparisonImages: updatedImages };
-              }
-              return item;
-            })
-          );
-        }
+        setInspectionData(prev => 
+          prev.map((item) => {
+            const savedPoint = result.data.inspectionDetails.checkedPoints.find(p => p.pointName === item.checkedList);
+            if (savedPoint && savedPoint.comparison && savedPoint.comparison.length > 0) {
+              const updatedImages = savedPoint.comparison.map(imgPath => ({
+                file: null,
+                preview: normalizeImageSrc ? normalizeImageSrc(imgPath) : imgPath,
+                name: typeof imgPath === "string" ? imgPath.split('/').pop() : "image.jpg"
+              }));
+              return { ...item, comparisonImages: updatedImages };
+            }
+            return item;
+          })
+        );
+      }
       
       Swal.fire({
         icon: 'success',
@@ -656,7 +625,7 @@ const handleUpdateInspection = async () => {
             if (savedPoint && savedPoint.comparison && savedPoint.comparison.length > 0) {
               const updatedImages = savedPoint.comparison.map(imgPath => ({
                 file: null,
-                preview: convertImagePathToUrl(imgPath), // Use the new conversion function
+                preview: normalizeImageSrc ? normalizeImageSrc(imgPath) : imgPath,
                 name: typeof imgPath === "string" ? imgPath.split('/').pop() : "image.jpg"
               }));
               return { ...item, comparisonImages: updatedImages };
@@ -822,37 +791,6 @@ useEffect(() => {
     })
   );
 }, [t]); 
-
-// Add this useEffect to handle loaded data conversion
-useEffect(() => {
-  // Convert any existing comparison image paths to proper URLs when data is loaded
-  setInspectionData(prev => 
-    prev.map(item => {
-      if (item.comparisonImages && item.comparisonImages.length > 0) {
-        const updatedImages = item.comparisonImages.map(img => {
-          if (typeof img === 'string') {
-            // If it's just a string path, convert it
-            return {
-              file: null,
-              preview: convertImagePathToUrl(img),
-              name: img.split('/').pop() || "image.jpg"
-            };
-          } else if (img && typeof img === 'object' && img.preview) {
-            // If it's already an object but preview might need conversion
-            return {
-              ...img,
-              preview: convertImagePathToUrl(img.preview)
-            };
-          }
-          return img;
-        });
-        return { ...item, comparisonImages: updatedImages };
-      }
-      return item;
-    })
-  );
-}, [inspectionData.length]); // Only run when inspectionData length changes to avoid infinite loops
-
 
   // Remove image
   const handleRemoveImage = (index, imgIdx) => {

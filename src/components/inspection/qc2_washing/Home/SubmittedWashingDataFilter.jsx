@@ -298,7 +298,7 @@ const SubmittedWashingDataFilter = ({
                   value={searchStates.orderNo}
                   onChange={(e) => handleSearchChange('orderNo', e.target.value)}
                   onFocus={() => toggleDropdown('orderNo')}
-                  placeholder="Type or select MO Number"
+                  placeholder="MO Number"
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all"
                 />
                 <FileText className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
@@ -339,7 +339,7 @@ const SubmittedWashingDataFilter = ({
             <div className="relative searchable-dropdown">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <User className="w-4 h-4 mr-1" />
-                QC ID
+                QC / QA ID
               </label>
               <div className="relative">
                 <input
@@ -347,7 +347,7 @@ const SubmittedWashingDataFilter = ({
                   value={searchStates.qcId}
                   onChange={(e) => handleSearchChange('qcId', e.target.value)}
                   onFocus={() => toggleDropdown('qcId')}
-                  placeholder={loadingUsers ? 'Loading...' : 'Type or select QC ID'}
+                  placeholder={loadingUsers ? 'Loading...' : ' QC/QA ID'}
                   disabled={loadingUsers}
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all disabled:opacity-50"
                 />

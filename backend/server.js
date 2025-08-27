@@ -98,6 +98,8 @@ import crypto from "crypto";
 
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "./config.js";
+import { URL } from "url";
+import { Buffer } from "buffer";
 
 /* ------------------------------
    Connection String
@@ -141,7 +143,7 @@ app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 app.use(bodyParser.json());
 app.use(express.json());
 
-const allowedOrigins = ["https://192.167.12.85:3001", "http://localhost:3001", "https://localhost:3001"];
+const allowedOrigins = ["https://192.167.12.85:3001", "http://localhost:3001", "https://localhost:3001", "https://yqms.yaikh.com","https://192.167.12.162:3001"];
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -153,8 +155,16 @@ app.use(
       return callback(null, true);
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
+    allowedHeaders: ["Content-Type", "Authorization", "Cache-Control","Origin", "X-Requested-With","Accept", "Pragma","Expires", "Last-Modified", "If-Modified-Since","If-None-Match","ETag"],
+    exposedHeaders: [
+      "Content-Length",
+      "Content-Type",
+      "Cache-Control",
+      "Last-Modified",
+      "ETag"
+    ],
+    credentials: true,
+    optionsSuccessStatus: 200
   })
 );
 
@@ -368,11 +378,11 @@ app.use((req, res, next) => {
 // const sqlConnectionStatus = {
 //   YMDataStore: false,
 //   YMCE_SYSTEM: false,
-//   YMWHSYS2: false,
-//   DTrade_CONN: false 
+  // YMWHSYS2: false,
+  // DTrade_CONN: false 
 // };
 
-// // // Function to connect to a pool, now it updates the status tracker
+// // Function to connect to a pool, now it updates the status tracker
 // async function connectPool(pool, poolName) {
 //   try {
 //     await pool.connect();
@@ -1380,7 +1390,7 @@ app.use((req, res, next) => {
 //       FROM [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS v
 //       LEFT JOIN LotData AS ld ON v.Style = ld.Style AND v.TableNo = ld.TableNo
 //       LEFT JOIN OrderData AS od ON v.Style = od.Style AND v.EngColor = od.EngColor
-//       WHERE v.TableNo IS NOT NULL AND v.TableNo <> '' AND v.Create_Date >= @StartDate
+//       WHERE v.TableNo IS NOT NULL AND v.TableNo <> '' AND v.Create_Date >= @StartDate  AND v.Fabric_Type = 'A'
 //       ORDER BY v.Create_Date DESC;
 //     `;
 
@@ -27712,69 +27722,52 @@ const uploadInspectionImage = multer({
   }
 });
 
-function normalizeInspectionImagePath(img) {
-  if (!img) return "";
+// function normalizeInspectionImagePath(img) {
+//   if (!img) return "";
 
-  // If new upload, img.file will be handled by fileMap logic in your code
+//   // If new upload, img.file will be handled by fileMap logic in your code
+//   if (img.preview && typeof img.preview === "string") {
+//     if (img.preview.startsWith("./public/")) {
+//       return img.preview; // Keep the ./public format for consistency with defect images
+//     }
+//     if (img.preview.startsWith("/public/")) {
+//       return "." + img.preview; // Convert /public to ./public
+//     }
+//     if (img.preview.startsWith("/storage/")) {
+//       return "./public" + img.preview; // Convert /storage to ./public/storage
+//     }
+//     if (img.preview.startsWith("http")) {
+//       try {
+//         const url = new URL(img.preview);
+//         return "./public" + url.pathname; // Convert full URL to ./public path
+//       } catch (e) {
+//         return img.preview;
+//       }
+//     }
 
-  if (img.preview && typeof img.preview === "string") {
-    // If it's already a full URL, return as-is
-    if (img.preview.startsWith("http")) {
-      return img.preview;
-    }
-    
-    // Convert relative paths to full URLs
-    if (img.preview.startsWith("./public/storage/")) {
-      const relativePath = img.preview.replace("./public/storage/", "");
-      return `${process.env.BASE_URL || 'http://localhost:3000'}/storage/${relativePath}`;
-    }
-    
-    if (img.preview.startsWith("/storage/")) {
-      return `${process.env.BASE_URL || 'http://localhost:3000'}${img.preview}`;
-    }
+//     // If it's just a filename (no slashes)
+//     if (!img.preview.includes("/")) {
+//       return `./public/storage/qc_washing_images/inspection/${img.preview}`;
+//     }
 
-    if (img.preview.startsWith("./public/")) {
-      return img.preview; // Keep the ./public format for consistency with defect images
-    }
-    if (img.preview.startsWith("/public/")) {
-      return "." + img.preview; // Convert /public to ./public
-    }
-    if (img.preview.startsWith("/storage/")) {
-      return "./public" + img.preview; // Convert /storage to ./public/storage
-    }
-    if (img.preview.startsWith("http")) {
-      try {
-        const url = new URL(img.preview);
-        return "./public" + url.pathname; // Convert full URL to ./public path
-      } catch (e) {
-        return img.preview;
-      }
-    }
+//     // If it contains a slash but not at the start, treat as relative path
+//     if (img.preview[0] !== "/") {
+//       return `./public/storage/qc_washing_images/inspection/${img.preview}`;
+//     }
 
-    // If it's just a filename (no slashes)
-    if (!img.preview.includes("/")) {
-      return `./public/storage/qc_washing_images/inspection/${img.preview}`;
-    }
+//     // Fallback
+//     return img.preview;
+//   }
 
-    // If it contains a slash but not at the start, treat as relative path
-    if (img.preview[0] !== "/") {
-      return `./public/storage/qc_washing_images/inspection/${img.preview}`;
-    }
+//   // Fallback: if img.name exists, reconstruct path
+//   if (img.name && !img.name.includes("/")) {
+//     return `./public/storage/qc_washing_images/inspection/${img.name}`;
+//   }
 
-    // Fallback
-    return img.preview;
-  }
-
-  // Fallback: if img.name exists, reconstruct path
-  if (img.name && !img.name.includes("/")) {
-    return `./public/storage/qc_washing_images/inspection/${img.name}`;
-  }
-
-  return "";
-}
-
-
-
+//   return "";
+// }
+// Updated inspection save endpoint
+// Updated inspection save endpoint - with full URL like defect images
 app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (req, res) => {
   const standardValues = JSON.parse(req.body.standardValues || '{}');
   const actualValues = JSON.parse(req.body.actualValues || '{}');
@@ -27790,18 +27783,21 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
       return res.status(400).json({ success: false, message: "recordId is required" });
     }
 
-    // Handle file uploads
+    // Handle file uploads - SAME AS DEFECT IMAGES
     const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/inspection');
-
     const fileMap = {};
+
     for (const file of (req.files || [])) {
-      const fileExtension = path.extname(file.originalname);
+      let fileExtension = path.extname(file.originalname);
+      if (!fileExtension) {
+        fileExtension = '.jpg';
+      }
       const newFilename = `inspection-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
       const fullFilePath = path.join(uploadDir, newFilename);
       await fs.promises.writeFile(fullFilePath, file.buffer);
       
-      // Use the same format as defect images - with ./public prefix
-      fileMap[file.fieldname] = `./public/storage/qc_washing_images/inspection/${newFilename}`;
+      // *** FIXED: Use full URL like defect images ***
+      fileMap[file.fieldname] = `https://192.167.12.85:5000/storage/qc_washing_images/inspection/${newFilename}`;
     }
 
     // Find or create the record
@@ -27810,10 +27806,8 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
       record = new QCWashing({ _id: recordId });
     }
 
-    // Build machine processes with the new structure
+    // Build machine processes
     const machineProcesses = [];
-    
-    // Define the machine types and their parameters
     const machineTypes = {
       "Washing Machine": ["temperature", "time", "silicon", "softener"],
       "Tumble Dry": ["temperature", "time"]
@@ -27839,18 +27833,26 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
       machineProcesses.push(machineProcess);
     });
 
+    // *** FIXED: Handle inspection images like defect images ***
+    if (inspectionData) {
+      inspectionData.forEach((item, idx) => {
+        if (item.comparisonImages) {
+          item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
+            return fileMap[`comparisonImages_${idx}_${imgIdx}`] || 
+                   (typeof img === "object" && img !== null && img.name ? img.name : img) || 
+                   "";
+          });
+        }
+      });
+    }
+
     // Build the inspection details
     record.inspectionDetails = {
       ...record.inspectionDetails,
       checkedPoints: (inspectionData || []).map((item, idx) => ({
         pointName: item.checkedList,
         decision: item.decision,
-        comparison: (item.comparisonImages || []).map((img, imgIdx) => {
-          if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
-            return fileMap[`comparisonImages_${idx}_${imgIdx}`];
-          }
-          return normalizeInspectionImagePath(img);
-        }),
+        comparison: item.comparisonImages || [],
         remark: item.remark,
       })),
       
@@ -27871,12 +27873,12 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
 
     res.json({ success: true, message: "Inspection data saved", data: record });
   } catch (err) {
-    console.error(err);
+    console.error('Inspection save error:', err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
-
+// Updated inspection update endpoint - with full URL like defect images
 app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async (req, res) => {
   const standardValues = JSON.parse(req.body.standardValues || '{}');
   const actualValues = JSON.parse(req.body.actualValues || '{}');
@@ -27892,18 +27894,21 @@ app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async
       return res.status(400).json({ success: false, message: "recordId is required" });
     }
 
-    // Handle file uploads
+    // Handle file uploads - SAME AS DEFECT IMAGES
     const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/inspection');
-
     const fileMap = {};
+
     for (const file of (req.files || [])) {
-      const fileExtension = path.extname(file.originalname);
+      let fileExtension = path.extname(file.originalname);
+      if (!fileExtension) {
+        fileExtension = '.jpg';
+      }
       const newFilename = `inspection-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
       const fullFilePath = path.join(uploadDir, newFilename);
       await fs.promises.writeFile(fullFilePath, file.buffer);
       
-      // Use the same format as defect images - with ./public prefix
-      fileMap[file.fieldname] = `./public/storage/qc_washing_images/inspection/${newFilename}`;
+      // *** FIXED: Use full URL like defect images ***
+      fileMap[file.fieldname] = `https://192.167.12.85:5000/storage/qc_washing_images/inspection/${newFilename}`;
     }
 
     // Find the record
@@ -27912,10 +27917,8 @@ app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async
       return res.status(404).json({ success: false, message: "Record not found for update" });
     }
 
-    // Build machine processes with the new structure
+    // Build machine processes
     const machineProcesses = [];
-    
-    // Define the machine types and their parameters
     const machineTypes = {
       "Washing Machine": ["temperature", "time", "silicon", "softener"],
       "Tumble Dry": ["temperature", "time"]
@@ -27941,24 +27944,26 @@ app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async
       machineProcesses.push(machineProcess);
     });
 
+    // *** FIXED: Handle inspection images like defect images ***
+    if (inspectionData) {
+      inspectionData.forEach((item, idx) => {
+        if (item.comparisonImages) {
+          item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
+            return fileMap[`comparisonImages_${idx}_${imgIdx}`] || img;
+          });
+        }
+      });
+    }
+
     // Build the inspection details
     record.inspectionDetails = {
       ...record.inspectionDetails,
-      checkedPoints: (inspectionData || []).map((item, idx) => {
-        const images = (item.comparisonImages || []).map((img, imgIdx) => {
-          if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
-            return fileMap[`comparisonImages_${idx}_${imgIdx}`];
-          }
-          return normalizeInspectionImagePath(img);
-        });
-
-        return {
-          pointName: item.checkedList,
-          decision: item.decision,
-          comparison: images,
-          remark: item.remark,
-        };
-      }),
+      checkedPoints: (inspectionData || []).map((item, idx) => ({
+        pointName: item.checkedList,
+        decision: item.decision,
+        comparison: item.comparisonImages || [],
+        remark: item.remark,
+      })),
       
       machineProcesses: machineProcesses,
       parameters: (defectData || []).map(item => ({
@@ -27976,11 +27981,10 @@ app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async
 
     res.json({ success: true, message: "Inspection data updated", data: record });
   } catch (err) {
-    console.error(err);
+    console.error('Inspection update error:', err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
 
 const defectMemoryStorage = multer.memoryStorage();
 const uploadDefectImage = multer({
@@ -28340,89 +28344,420 @@ app.get('/api/qc-washing/results', async (req, res) => {
   }
 });
 
+// Enhanced image serving endpoint
+// app.get('/storage/qc_washing_images/:type/:filename', async (req, res) => {
+//   try {
+//     const { type, filename } = req.params;
+//     console.log(`🖼️ Image request: ${type}/${filename}`);
+    
+//     // Try multiple possible paths
+//     const possiblePaths = [
+//       path.join(__dirname, 'public/storage/qc_washing_images', type, filename),
+//       path.join(__dirname, 'storage/qc_washing_images', type, filename),
+//       path.join(__dirname, 'public', 'qc_washing_images', type, filename),
+//       path.join(__dirname, 'uploads/qc_washing_images', type, filename),
+//       path.join(__dirname, 'files/qc_washing_images', type, filename)
+//     ];
+    
+//     let foundPath = null;
+//     for (const testPath of possiblePaths) {
+//       console.log(`🔍 Testing path: ${testPath}`);
+//       if (fs.existsSync(testPath)) {
+//         foundPath = testPath;
+//         console.log(`✅ Found file at: ${foundPath}`);
+//         break;
+//       }
+//     }
+    
+//     if (!foundPath) {
+//       console.warn(`❌ File not found: ${filename}`);
+//       console.warn('Searched paths:', possiblePaths);
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Image not found',
+//         filename,
+//         searchedPaths: possiblePaths
+//       });
+//     }
+    
+//     // Get file stats and set appropriate headers
+//     const stats = fs.statSync(foundPath);
+//     const ext = path.extname(filename).toLowerCase();
+    
+//     const mimeTypes = {
+//       '.jpg': 'image/jpeg',
+//       '.jpeg': 'image/jpeg',
+//       '.png': 'image/png',
+//       '.gif': 'image/gif',
+//       '.webp': 'image/webp',
+//       '.bmp': 'image/bmp'
+//     };
+    
+//     const mimeType = mimeTypes[ext] || 'image/jpeg';
+    
+//     // Set headers
+//     res.setHeader('Content-Type', mimeType);
+//     res.setHeader('Content-Length', stats.size);
+//     res.setHeader('Access-Control-Allow-Origin', '*');
+//     res.setHeader('Access-Control-Allow-Methods', 'GET');
+//     res.setHeader('Cache-Control', 'public, max-age=31536000');
+//     res.setHeader('Last-Modified', stats.mtime.toUTCString());
+    
+//     // Stream the file
+//     const readStream = fs.createReadStream(foundPath);
+//     readStream.pipe(res);
+    
+//     console.log(`✅ Successfully served: ${filename}`);
+    
+//   } catch (error) {
+//     console.error(`❌ Error serving image:`, error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Internal server error',
+//       error: error.message
+//     });
+//   }
+// });
+
+// Enhanced image serving with CORS
+// // Enhanced image serving with proper 304 handling
+// app.get('/storage/qc_washing_images/:type/:filename', async (req, res) => {
+//   try {
+//     const { type, filename } = req.params;
+//     console.log(`🖼️ Image request: ${type}/${filename}`);
+    
+//     // ALWAYS set CORS headers first - even for 304 responses
+//     res.header('Access-Control-Allow-Origin', '*');
+//     res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+//     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cache-Control');
+//     res.header('Access-Control-Expose-Headers', 'Content-Length, Content-Type, Last-Modified, ETag');
+    
+//     // Handle OPTIONS request
+//     if (req.method === 'OPTIONS') {
+//       return res.status(200).end();
+//     }
+    
+//     // Try multiple possible paths
+//     const possiblePaths = [
+//       path.join(__dirname, 'public/storage/qc_washing_images', type, filename),
+//       path.join(__dirname, 'storage/qc_washing_images', type, filename),
+//       path.join(__dirname, 'public', 'qc_washing_images', type, filename),
+//       path.join(__dirname, 'uploads/qc_washing_images', type, filename),
+//       path.join(__dirname, 'files/qc_washing_images', type, filename)
+//     ];
+    
+//     let foundPath = null;
+//     for (const testPath of possiblePaths) {
+//       console.log(`🔍 Testing path: ${testPath}`);
+//       if (fs.existsSync(testPath)) {
+//         foundPath = testPath;
+//         console.log(`✅ Found file at: ${foundPath}`);
+//         break;
+//       }
+//     }
+    
+//     if (!foundPath) {
+//       console.warn(`❌ File not found: ${filename}`);
+      
+//       // Return a 1x1 transparent pixel instead of 404
+//       const transparentPixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+//       res.setHeader('Content-Type', 'image/png');
+//       res.setHeader('Content-Length', transparentPixel.length);
+//       res.setHeader('Cache-Control', 'no-cache'); // Don't cache 404 fallbacks
+//       return res.send(transparentPixel);
+//     }
+    
+//     // Get file stats
+//     const stats = fs.statSync(foundPath);
+//     const ext = path.extname(filename).toLowerCase();
+    
+//     const mimeTypes = {
+//       '.jpg': 'image/jpeg',
+//       '.jpeg': 'image/jpeg',
+//       '.png': 'image/png',
+//       '.gif': 'image/gif',
+//       '.webp': 'image/webp',
+//       '.bmp': 'image/bmp'
+//     };
+    
+//     const mimeType = mimeTypes[ext] || 'image/jpeg';
+//     const etag = `"${stats.mtime.getTime()}-${stats.size}"`;
+//     const lastModified = stats.mtime.toUTCString();
+    
+//     // Set content headers
+//     res.setHeader('Content-Type', mimeType);
+//     res.setHeader('Content-Length', stats.size);
+//     res.setHeader('Last-Modified', lastModified);
+//     res.setHeader('ETag', etag);
+    
+//     // Set cache headers but ensure CORS works
+//     res.setHeader('Cache-Control', 'public, max-age=3600'); // Shorter cache time
+    
+//     // Handle conditional requests (If-Modified-Since, If-None-Match)
+//     const ifModifiedSince = req.headers['if-modified-since'];
+//     const ifNoneMatch = req.headers['if-none-match'];
+    
+//     // Check if client has current version
+//     if ((ifModifiedSince && ifModifiedSince === lastModified) || 
+//         (ifNoneMatch && ifNoneMatch === etag)) {
+      
+//       console.log(`📦 Sending 304 Not Modified for: ${filename}`);
+      
+//       // IMPORTANT: Set CORS headers even for 304 responses
+//       res.header('Access-Control-Allow-Origin', '*');
+//       res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+//       res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+      
+//       return res.status(304).end();
+//     }
+    
+//     // Stream the file
+//     const readStream = fs.createReadStream(foundPath);
+//     readStream.pipe(res);
+    
+//     console.log(`✅ Successfully served: ${filename}`);
+    
+//   } catch (error) {
+//     console.error(`❌ Error serving image:`, error);
+    
+//     // Return transparent pixel on error
+//     const transparentPixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+//     res.setHeader('Content-Type', 'image/png');
+//     res.setHeader('Access-Control-Allow-Origin', '*');
+//     res.setHeader('Cache-Control', 'no-cache');
+//     res.send(transparentPixel);
+//   }
+// });
+
 // Image proxy endpoint to convert images to base64
-app.get('/api/image-base64/*', async (req, res) => {
+// // Add this endpoint to your backend
+// app.get('/api/image-base64/:imagePath(*)', async (req, res) => {
+//   try {
+//     const imagePath = req.params.imagePath;
+//     const fullPath = path.join(__dirname, './public/storage', imagePath);
+
+    
+//     // Check if file exists
+//     if (!fs.existsSync(fullPath)) {
+//       return res.status(404).json({ 
+//         success: false, 
+//         message: 'Image not found',
+//         path: imagePath 
+//       });
+//     }
+    
+//     // Read file and convert to base64
+//     const imageBuffer = fs.readFileSync(fullPath);
+//     const mimeType = path.extname(imagePath).toLowerCase() === '.png' ? 'image/png' : 'image/jpeg';
+//     const base64Image = `data:${mimeType};base64,${imageBuffer.toString('base64')}`;
+    
+    
+//     res.json({
+//       success: true,
+//       dataUrl: base64Image,
+//       originalPath: imagePath
+//     });
+    
+//   } catch (error) {
+//     console.error('❌ Error converting image to base64:', error);
+//     res.status(500).json({ 
+//       success: false, 
+//       message: 'Failed to convert image',
+//       error: error.message 
+//     });
+//   }
+// });
+// Base64 image conversion endpoint for PDF generation
+// app.get('/api/pdf-image-base64/:type/:filename', async (req, res) => {
+//   const { type, filename } = req.params;
+//   console.log(`🔄 Base64 conversion request: ${type}/${filename}`);
+  
+//   // Set CORS headers
+//   res.header('Access-Control-Allow-Origin', '*');
+//   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+//   res.header('Cache-Control', 'no-cache');
+  
+//   if (req.method === 'OPTIONS') {
+//     return res.status(200).end();
+//   }
+  
+//   try {
+//     // First, try to find the file locally
+//     const possiblePaths = [
+//       path.join(process.cwd(), 'public/storage/qc_washing_images', type, filename),
+//       path.join(process.cwd(), 'storage/qc_washing_images', type, filename),
+//       path.join(process.cwd(), 'public', 'qc_washing_images', type, filename),
+//       path.join(process.cwd(), 'uploads/qc_washing_images', type, filename),
+//       path.join(process.cwd(), 'files/qc_washing_images', type, filename)
+//     ];
+    
+//     let foundPath = null;
+//     let imageBuffer = null;
+    
+//     // Check local files first
+//     for (const testPath of possiblePaths) {
+//       if (fs.existsSync(testPath)) {
+//         foundPath = testPath;
+//         imageBuffer = fs.readFileSync(foundPath);
+//         console.log(`✅ Found local file: ${foundPath} (${imageBuffer.length} bytes)`);
+//         break;
+//       }
+//     }
+    
+//     // If not found locally, try to fetch from yqms.yaikh.com
+//     if (!imageBuffer) {
+//       console.log(`🔄 File not found locally, fetching from yqms.yaikh.com`);
+      
+//       const proxyUrl = `https://yqms.yaikh.com/storage/qc_washing_images/${type}/${filename}`;
+//       console.log(`📡 Fetching from: ${proxyUrl}`);
+      
+//       try {
+//         // Use axios if available, otherwise use https
+//         if (typeof axios !== 'undefined') {
+//           const response = await axios.get(proxyUrl, {
+//             responseType: 'arraybuffer',
+//             timeout: 10000,
+//             headers: {
+//               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+//             }
+//           });
+//           imageBuffer = Buffer.from(response.data);
+//         } else {
+//           // Fallback to https module
+//           const https = await import('https');
+//           const { URL } = await import('url');
+          
+//           imageBuffer = await new Promise((resolve, reject) => {
+//             const urlObj = new URL(proxyUrl);
+//             const options = {
+//               hostname: urlObj.hostname,
+//               port: urlObj.port || 443,
+//               path: urlObj.pathname,
+//               method: 'GET',
+//               headers: {
+//                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+//               }
+//             };
+            
+//             const req = https.request(options, (response) => {
+//               if (response.statusCode !== 200) {
+//                 reject(new Error(`HTTP ${response.statusCode}`));
+//                 return;
+//               }
+              
+//               const chunks = [];
+//               response.on('data', chunk => chunks.push(chunk));
+//               response.on('end', () => resolve(Buffer.concat(chunks)));
+//             });
+            
+//             req.on('error', reject);
+//             req.setTimeout(10000, () => {
+//               req.destroy();
+//               reject(new Error('Request timeout'));
+//             });
+//             req.end();
+//           });
+//         }
+        
+//         console.log(`✅ Successfully fetched from remote: ${imageBuffer.length} bytes`);
+//       } catch (fetchError) {
+//         console.warn(`❌ Failed to fetch from remote: ${fetchError.message}`);
+//         throw new Error(`Image not found locally or remotely`);
+//       }
+//     }
+    
+//     if (!imageBuffer || imageBuffer.length === 0) {
+//       throw new Error('Empty image buffer');
+//     }
+    
+//     // Determine MIME type from filename
+//     const ext = path.extname(filename).toLowerCase();
+//     const mimeTypes = {
+//       '.jpg': 'image/jpeg',
+//       '.jpeg': 'image/jpeg',
+//       '.png': 'image/png',
+//       '.gif': 'image/gif',
+//       '.webp': 'image/webp',
+//       '.bmp': 'image/bmp'
+//     };
+//     const mimeType = mimeTypes[ext] || 'image/jpeg';
+    
+//     // Convert to base64
+//     const base64 = imageBuffer.toString('base64');
+//     const dataUrl = `data:${mimeType};base64,${base64}`;
+    
+//     console.log(`✅ Successfully converted to base64: ${filename} (${base64.length} chars)`);
+    
+//     res.json({
+//       success: true,
+//       dataUrl,
+//       originalPath: `${type}/${filename}`,
+//       size: imageBuffer.length,
+//       mimeType
+//     });
+    
+//   } catch (error) {
+//     console.error(`❌ Error converting image to base64: ${type}/${filename}`, error.message);
+    
+//     // Return a colored placeholder as base64
+//     const createPlaceholderBase64 = (color, text) => {
+//       const svg = `<svg width="100" height="60" xmlns="http://www.w3.org/2000/svg">
+//         <rect width="100%" height="100%" fill="${color}"/>
+//         <text x="50%" y="50%" text-anchor="middle" dy=".3em" font-family="Arial" font-size="10" fill="#666">
+//           ${text}
+//         </text>
+//       </svg>`;
+//       const base64 = Buffer.from(svg).toString('base64');
+//       return `data:image/svg+xml;base64,${base64}`;
+//     };
+    
+//     let placeholderColor = '#f3f4f6';
+//     let placeholderText = 'Image Error';
+    
+//     if (type === 'defect') {
+//       placeholderColor = '#fee2e2';
+//       placeholderText = 'Defect Image';
+//     } else if (type === 'inspection') {
+//       placeholderColor = '#dbeafe';
+//       placeholderText = 'Inspection Image';
+//     }
+    
+//     const placeholderDataUrl = createPlaceholderBase64(placeholderColor, placeholderText);
+    
+//     res.json({
+//       success: false,
+//       dataUrl: placeholderDataUrl,
+//       originalPath: `${type}/${filename}`,
+//       error: error.message,
+//       isPlaceholder: true
+//     });
+//   }
+// });
+
+app.get('/api/pdf-image-base64/:type/:filename', async (req, res) => {
+  const { type, filename } = req.params;
+  const localPath = path.join(__dirname, 'public/storage/qc_washing_images', type, filename);
+
   try {
-    const imagePath = req.params[0];
-    console.log('📥 Image request received for:', imagePath);
-    
-    // Security checks
-    if (imagePath.includes('..') || imagePath.includes('~')) {
-      console.log('❌ Security check failed: Invalid path characters');
-      return res.status(400).json({ success: false, error: 'Invalid path' });
+    let imageData;
+
+    if (fs.existsSync(localPath)) {
+      imageData = fs.readFileSync(localPath);
+    } else {
+      const remoteUrl = `https://yqms.yaikh.com/storage/qc_washing_images/${type}/${filename}`;
+      const response = await axios.get(remoteUrl, { responseType: 'arraybuffer' });
+      imageData = response.data;
     }
-    
-    const fullPath = path.resolve(path.join(__dirname, 'public', 'storage', imagePath));
-    const allowedDir = path.resolve(path.join(__dirname, 'public', 'storage'));
-    
-    console.log('📁 Full path:', fullPath);
-    console.log('📁 Allowed dir:', allowedDir);
-    
-    if (!fullPath.startsWith(allowedDir)) {
-      console.log('❌ Security check failed: Path outside allowed directory');
-      return res.status(403).json({ success: false, error: 'Access denied' });
-    }
-    
-    // Set CORS headers
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Content-Type', 'application/json');
-    
-    // Check if file exists
-    if (!fs.existsSync(fullPath)) {
-      console.log('❌ File not found:', fullPath);
-      return res.status(404).json({ success: false, error: 'Image not found' });
-    }
-    
-    // Check file size
-    const stats = fs.statSync(fullPath);
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    
-    console.log('📊 File stats:', { size: stats.size, modified: stats.mtime });
-    
-    if (stats.size > maxSize) {
-      console.log('❌ File too large:', stats.size);
-      return res.status(413).json({ 
-        success: false, 
-        error: 'Image too large' 
-      });
-    }
-    
-    // Generate ETag for caching
-    const etag = `"${stats.mtime.getTime()}-${stats.size}"`;
-    res.set('ETag', etag);
-    res.set('Cache-Control', 'public, max-age=3600');
-    
-    // Check if client has cached version
-    if (req.headers['if-none-match'] === etag) {
-      console.log('✅ Returning cached version (304)');
-      return res.status(304).end();
-    }
-    
-    // Read and convert image
-    console.log('🔄 Reading and converting image...');
-    const imageBuffer = fs.readFileSync(fullPath);
-    const base64Image = imageBuffer.toString('base64');
-    const mimeType = getMimeType(fullPath);
-    const dataUrl = `data:${mimeType};base64,${base64Image}`;
-    
-    console.log('✅ Image converted successfully:', {
-      mimeType,
-      originalSize: stats.size,
-      base64Length: base64Image.length
-    });
-    
-    res.json({ 
-      success: true, 
-      dataUrl,
-      size: stats.size,
-      mimeType 
-    });
-    
+
+    const base64 = Buffer.from(imageData, 'binary').toString('base64');
+    res.json({ base64: `data:image/jpeg;base64,${base64}` });
   } catch (error) {
-    console.error('❌ Error serving image:', error);
-    res.status(500).json({ success: false, error: 'Error serving image' });
+    console.error('Error converting image:', error.message);
+    res.status(500).json({ error: 'Failed to convert image to base64' });
   }
 });
+
+
 
 // Helper function for MIME types
 const getMimeType = (filePath) => {
@@ -28440,13 +28775,151 @@ const getMimeType = (filePath) => {
 };
 
 
-// Add this to your backend server configuration
-app.use((req, res, next) => {
+// Additional middleware for image serving
+app.use('/storage', (req, res, next) => {
+  // Set CORS headers specifically for image requests
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cache-Control');
+  res.header('Access-Control-Max-Age', '86400'); // 24 hours
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
   next();
 });
+
+// Replace your current image serving endpoint with this ES module version
+app.get('/storage/qc_washing_images/:type/:filename', async (req, res) => {
+  const { type, filename } = req.params;
+  console.log(`🖼️ Image request: ${type}/${filename}`);
+  
+  // Set CORS headers
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Cache-Control', 'public, max-age=3600');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  try {
+    // First, try to find the file locally
+    const possiblePaths = [
+      path.join(process.cwd(), 'public/storage/qc_washing_images', type, filename),
+      path.join(process.cwd(), 'storage/qc_washing_images', type, filename),
+      path.join(process.cwd(), 'public', 'qc_washing_images', type, filename),
+      path.join(process.cwd(), 'uploads/qc_washing_images', type, filename),
+      path.join(process.cwd(), 'files/qc_washing_images', type, filename)
+    ];
+    
+    let foundPath = null;
+    for (const testPath of possiblePaths) {
+      if (fs.existsSync(testPath)) {
+        foundPath = testPath;
+        console.log(`✅ Found local file at: ${foundPath}`);
+        break;
+      }
+    }
+    
+    if (foundPath) {
+      // Serve local file
+      const ext = path.extname(filename).toLowerCase();
+      const mimeTypes = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp'
+      };
+      
+      res.setHeader('Content-Type', mimeTypes[ext] || 'image/jpeg');
+      res.sendFile(foundPath);
+      console.log(`✅ Successfully served local file: ${type}/${filename}`);
+      return;
+    }
+    
+    // If not found locally, try to proxy from yqms.yaikh.com
+    console.log(`🔄 File not found locally, trying to proxy from yqms.yaikh.com`);
+    
+    const proxyUrl = `https://yqms.yaikh.com/storage/qc_washing_images/${type}/${filename}`;
+    console.log(`📡 Proxying from: ${proxyUrl}`);
+    
+    const urlObj = new URL(proxyUrl);
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || 443,
+      path: urlObj.pathname,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    };
+    
+    const proxyReq = https.request(options, (proxyRes) => {
+      if (proxyRes.statusCode !== 200) {
+        console.warn(`❌ Proxy request failed with status: ${proxyRes.statusCode}`);
+        throw new Error(`HTTP error! status: ${proxyRes.statusCode}`);
+      }
+      
+      // Set content type
+      const contentType = proxyRes.headers['content-type'] || 'image/jpeg';
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Length', proxyRes.headers['content-length']);
+      
+      // Pipe the response
+      proxyRes.pipe(res);
+      console.log(`✅ Successfully proxied: ${type}/${filename}`);
+    });
+    
+    proxyReq.on('error', (error) => {
+      console.error(`❌ Proxy request error:`, error);
+      throw error;
+    });
+    
+    proxyReq.setTimeout(10000, () => {
+      proxyReq.destroy();
+      throw new Error('Request timeout');
+    });
+    
+    proxyReq.end();
+    
+  } catch (error) {
+    console.error(`❌ Error serving/proxying image: ${type}/${filename}`, error);
+    
+    // Return a colored placeholder SVG
+    const createPlaceholder = (color, text) => {
+      const svg = `<svg width="100" height="60" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100%" height="100%" fill="${color}"/>
+        <text x="50%" y="50%" text-anchor="middle" dy=".3em" font-family="Arial" font-size="10" fill="#666">
+          ${text}
+        </text>
+      </svg>`;
+      return Buffer.from(svg);
+    };
+    
+    let placeholderColor = '#f3f4f6';
+    let placeholderText = 'Image Error';
+    
+    if (type === 'defect') {
+      placeholderColor = '#fee2e2';
+      placeholderText = 'Defect Image';
+    } else if (type === 'inspection') {
+      placeholderColor = '#dbeafe';
+      placeholderText = 'Inspection Image';
+    }
+    
+    const placeholder = createPlaceholder(placeholderColor, placeholderText);
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Content-Length', placeholder.length);
+    res.send(placeholder);
+  }
+});
+
 
 // GET /api/users endpoint
 app.get('/api/users', async (req, res) => {
