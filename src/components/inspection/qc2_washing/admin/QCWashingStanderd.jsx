@@ -3,7 +3,13 @@ import { API_BASE_URL } from "../../../../../config";
 import { FaThermometerHalf, FaClock, FaFlask, FaTint } from "react-icons/fa";
 import Swal from "sweetalert2";
 
-const WASH_TYPES = ["Normal Wash", "Acid Wash", "Garment Dye", "Soft Wash"];
+const WASH_TYPES = [
+  "Normal Wash",
+  "Acid Wash",
+  "Garment Dye",
+  "Soft Wash",
+  "Acid Wash + Garment Dye"
+];
 
 const MACHINE_TYPES = [
   {
