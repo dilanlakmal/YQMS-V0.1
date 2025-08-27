@@ -131,6 +131,7 @@ const OrderDetailsSection = ({
         return;
       }
 
+      // FIX: Include inspectorId in the request body
       const uniqueKey = {
         orderNo: formData.orderNo,
         date: formData.date,
@@ -139,9 +140,7 @@ const OrderDetailsSection = ({
         before_after_wash: formData.before_after_wash,
         factoryName: formData.factoryName,
         reportType: formData.reportType,
-        inspector: {
-          empId: user?.emp_id
-        }
+        inspectorId: user?.emp_id
       };
 
       const checkRes = await fetch(
@@ -442,6 +441,9 @@ const OrderDetailsSection = ({
               <option value="Acid Wash">Acid Wash</option>
               <option value="Garment Dye">Garment Dye</option>
               <option value="Soft Wash">Soft Wash</option>
+              <option value="Acid Wash + Garment Dye">
+                Acid Wash + Garment Dye
+              </option>
             </select>
           </div>
 

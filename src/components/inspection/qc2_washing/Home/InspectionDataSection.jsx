@@ -344,18 +344,34 @@ const InspectionDataSection = ({
 
     if (status === "ok") {
       const standardVal = standardValues[machineType][param];
-      // Ensure 0 values are preserved as "0" string
-      const valueToSet =
-        standardVal === null || standardVal === undefined
-          ? ""
-          : String(standardVal);
-      setActualValues((prev) => ({
-        ...prev,
-        [machineType]: {
-          ...prev[machineType],
-          [param]: valueToSet
-        }
-      }));
+
+      // For temperature, if user manually selects OK, use the standard value
+      if (param === "temperature") {
+        const valueToSet =
+          standardVal === null || standardVal === undefined
+            ? ""
+            : String(standardVal);
+        setActualValues((prev) => ({
+          ...prev,
+          [machineType]: {
+            ...prev[machineType],
+            [param]: valueToSet
+          }
+        }));
+      } else {
+        // For other parameters, use existing logic
+        const valueToSet =
+          standardVal === null || standardVal === undefined
+            ? ""
+            : String(standardVal);
+        setActualValues((prev) => ({
+          ...prev,
+          [machineType]: {
+            ...prev[machineType],
+            [param]: valueToSet
+          }
+        }));
+      }
     } else if (status === "no") {
       setActualValues((prev) => ({
         ...prev,
@@ -386,6 +402,45 @@ const InspectionDataSection = ({
     const actualStr =
       value === null || value === undefined ? "" : String(value).trim();
 
+    // Special handling for temperature parameter
+    if (param === "temperature" && actualStr !== "" && standardStr !== "") {
+      const standardNum = parseFloat(standardStr);
+      const actualNum = parseFloat(actualStr);
+
+      // Check if both values are valid numbers
+      if (!isNaN(standardNum) && !isNaN(actualNum)) {
+        const difference = Math.abs(standardNum - actualNum);
+
+        // If temperature difference is within 5 degrees, consider it OK
+        if (difference <= 5) {
+          setMachineStatus((prev) => ({
+            ...prev,
+            [machineType]: {
+              ...prev[machineType],
+              [param]: {
+                ok: true,
+                no: false
+              }
+            }
+          }));
+        } else {
+          // Temperature difference is more than 5 degrees
+          setMachineStatus((prev) => ({
+            ...prev,
+            [machineType]: {
+              ...prev[machineType],
+              [param]: {
+                ok: false,
+                no: true
+              }
+            }
+          }));
+        }
+        return; // Exit early for temperature
+      }
+    }
+
+    // Original logic for all other parameters (time, silicon, softener)
     if (actualStr !== "" && actualStr === standardStr) {
       setMachineStatus((prev) => ({
         ...prev,
@@ -408,6 +463,37 @@ const InspectionDataSection = ({
           }
         }
       }));
+    }
+  };
+
+  // Add this helper function at the top of your component, after the existing helper functions
+  const convertImagePathToUrl = (imagePath) => {
+    if (!imagePath) return null;
+
+    // If it's already a full URL, return as-is
+    if (imagePath.startsWith("http")) {
+      return imagePath;
+    }
+
+    // Convert database path format to URL format
+    if (imagePath.startsWith("./public/storage/")) {
+      const relativePath = imagePath.replace("./public/storage/", "");
+      return `${API_BASE_URL}/storage/${relativePath}`;
+    } else if (imagePath.startsWith("./public/")) {
+      const relativePath = imagePath.replace("./public/", "");
+      return `${API_BASE_URL}/public/${relativePath}`;
+    } else if (imagePath.startsWith("/storage/")) {
+      return `${API_BASE_URL}${imagePath}`;
+    } else if (imagePath.startsWith("storage/")) {
+      return `${API_BASE_URL}/${imagePath}`;
+    } else if (imagePath.startsWith("/public/")) {
+      return `${API_BASE_URL}${imagePath}`;
+    } else if (imagePath.startsWith("public/")) {
+      return `${API_BASE_URL}/${imagePath}`;
+    } else {
+      // For any other case, assume it's a relative path
+      const cleanPath = imagePath.startsWith("/") ? imagePath : `/${imagePath}`;
+      return `${API_BASE_URL}${cleanPath}`;
     }
   };
 
@@ -516,9 +602,7 @@ const InspectionDataSection = ({
               ) {
                 const updatedImages = savedPoint.comparison.map((imgPath) => ({
                   file: null,
-                  preview: normalizeImageSrc
-                    ? normalizeImageSrc(imgPath)
-                    : imgPath,
+                  preview: convertImagePathToUrl(imgPath), // Use the new conversion function
                   name:
                     typeof imgPath === "string"
                       ? imgPath.split("/").pop()
@@ -672,9 +756,7 @@ const InspectionDataSection = ({
               ) {
                 const updatedImages = savedPoint.comparison.map((imgPath) => ({
                   file: null,
-                  preview: normalizeImageSrc
-                    ? normalizeImageSrc(imgPath)
-                    : imgPath,
+                  preview: convertImagePathToUrl(imgPath), // Use the new conversion function
                   name:
                     typeof imgPath === "string"
                       ? imgPath.split("/").pop()
@@ -853,6 +935,36 @@ const InspectionDataSection = ({
       })
     );
   }, [t]);
+
+  // Add this useEffect to handle loaded data conversion
+  useEffect(() => {
+    // Convert any existing comparison image paths to proper URLs when data is loaded
+    setInspectionData((prev) =>
+      prev.map((item) => {
+        if (item.comparisonImages && item.comparisonImages.length > 0) {
+          const updatedImages = item.comparisonImages.map((img) => {
+            if (typeof img === "string") {
+              // If it's just a string path, convert it
+              return {
+                file: null,
+                preview: convertImagePathToUrl(img),
+                name: img.split("/").pop() || "image.jpg"
+              };
+            } else if (img && typeof img === "object" && img.preview) {
+              // If it's already an object but preview might need conversion
+              return {
+                ...img,
+                preview: convertImagePathToUrl(img.preview)
+              };
+            }
+            return img;
+          });
+          return { ...item, comparisonImages: updatedImages };
+        }
+        return item;
+      })
+    );
+  }, [inspectionData.length]); // Only run when inspectionData length changes to avoid infinite loops
 
   // Remove image
   const handleRemoveImage = (index, imgIdx) => {
