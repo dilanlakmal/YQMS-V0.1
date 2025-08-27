@@ -91,6 +91,10 @@ import createQCWashingModel from "./models/QCWashing.js";
 import createSupplierIssuesDefectModel from "./models/SupplierIssuesDefect.js";
 import createSupplierIssueReportModel from "./models/SupplierIssueReport.js";
 
+import createSubConDefectsModel from "./models/sub_con_defects.js";
+import createSubconSewingFactoryModel from "./models/subcon_sewing_factory.js";
+import createSubconSewingQc1ReportModel from "./models/subcon_sewing_qc1_report.js";
+
 import createQCWashingMachineStandard from "./models/qcWashingStanderd.js";
 import createQC2OlderDefectModel from "./models/QC2_Older_Defects.js";
 import createQCWashingQtyOldSchema from "./models/QCWashingQtyOld.js";
@@ -273,6 +277,11 @@ const QCWashing = createQCWashingModel(ymProdConnection);
 
 const SupplierIssuesDefect = createSupplierIssuesDefectModel(ymProdConnection);
 const SupplierIssueReport = createSupplierIssueReportModel(ymProdConnection);
+
+const SubConDefect = createSubConDefectsModel(ymProdConnection);
+const SubconSewingFactory = createSubconSewingFactoryModel(ymProdConnection);
+const SubconSewingQc1Report =
+  createSubconSewingQc1ReportModel(ymProdConnection);
 
 const QCWashingMachineStandard =
   createQCWashingMachineStandard(ymProdConnection);
@@ -491,6 +500,7 @@ async function initializeServer() {
   await syncInlineOrders();
   await syncCutPanelOrders();
   await syncQC1SunriseData();
+  await syncDTOrdersData();
 
   console.log("--- Server Initialization Complete ---");
 }
@@ -2604,8 +2614,8 @@ app.get("/api/sync-dt-orders", async (req, res) => {
 //   });
 
 // Schedule to run every 2 hours
-cron.schedule("0 */2 * * *", () => {
-  syncDTOrdersData()
+cron.schedule("0 */2 * * *", async () => {
+  await syncDTOrdersData()
     .then((result) => {
       console.log("✅ DT Orders Data Sync completed", result);
     })
@@ -29995,6 +30005,248 @@ app.post("/api/ai/ask", async (req, res) => {
       answer:
         "Sorry, I'm having trouble connecting to my brain right now. Please try again later."
     });
+  }
+});
+
+/* ------------------------------
+   End Points - NEW for Sub-Con QC
+------------------------------ */
+
+// ENDPOINT FOR FACTORIES ---
+app.get("/api/subcon-sewing-factories", async (req, res) => {
+  try {
+    const factories = await SubconSewingFactory.find({}).sort({ factory: 1 });
+    res.json(factories);
+  } catch (error) {
+    console.error("Error fetching sub-con factories:", error);
+    res.status(500).json({ error: "Failed to fetch sub-con factories" });
+  }
+});
+
+app.get("/api/subcon-defects", async (req, res) => {
+  try {
+    // Fetch all defects and sort by DisplayCode
+    const defects = await SubConDefect.find({}).sort({ DisplayCode: 1 });
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching sub-con defects:", error);
+    res.status(500).json({ error: "Failed to fetch sub-con defects" });
+  }
+});
+
+// Helper function to generate a unique Report ID
+const generateSubconReportID = async () => {
+  const date = new Date();
+  const year = date.getFullYear().toString().slice(-2);
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+
+  // Generate a 4-digit random number
+  const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
+
+  let reportID = `SC${year}${month}${day}${randomPart}`;
+
+  // Check if the ID already exists to ensure uniqueness
+  let existingReport = await SubconSewingQc1Report.findOne({ reportID });
+  while (existingReport) {
+    const newRandomPart = Math.floor(1000 + Math.random() * 9000).toString();
+    reportID = `SC${year}${month}${day}${newRandomPart}`;
+    existingReport = await SubconSewingQc1Report.findOne({ reportID });
+  }
+
+  return reportID;
+};
+
+// ADD NEW POST ENDPOINT FOR SAVING REPORTS ---
+app.post("/api/subcon-sewing-qc1-reports", async (req, res) => {
+  try {
+    const reportData = req.body;
+
+    // Generate a unique report ID
+    const reportID = await generateSubconReportID();
+
+    const buyer = getBuyerFromMoNumber(reportData.moNo);
+
+    const newReport = new SubconSewingQc1Report({
+      ...reportData,
+      reportID: reportID,
+      buyer: buyer
+    });
+
+    await newReport.save();
+
+    res.status(201).json({
+      message: "Report saved successfully!",
+      reportID: reportID
+    });
+  } catch (error) {
+    console.error("Error saving Sub-Con QC report:", error);
+    // Provide more detailed error message if validation fails
+    if (error.name === "ValidationError") {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", details: error.message });
+    }
+    res.status(500).json({ error: "Failed to save report" });
+  }
+});
+
+/* ------------------------------
+   End Points - Sub-Con QC Reports
+------------------------------ */
+
+// --- NEW, ENHANCED, UNIFIED ENDPOINT FOR THE ENTIRE REPORT PAGE ---
+app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
+  try {
+    const { startDate, endDate, factory, lineNo, moNo, color } = req.query;
+
+    const matchQuery = {};
+    if (startDate && endDate) {
+      matchQuery.inspectionDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      };
+    }
+    if (factory) matchQuery.factory = factory;
+    if (lineNo) matchQuery.lineNo = lineNo;
+    if (moNo) matchQuery.moNo = moNo;
+    if (color) matchQuery.color = color;
+
+    // --- Main Aggregation Pipeline ---
+
+    const result = await SubconSewingQc1Report.aggregate([
+      { $match: matchQuery },
+      // Use $facet to run multiple aggregations on the filtered data in parallel
+      {
+        $facet: {
+          // --- 1. Get the report data for the main table ---
+          reports: [{ $sort: { inspectionDate: -1, _id: -1 } }],
+          // --- 2. Calculate summary statistics for the cards ---
+          summary: [
+            {
+              $group: {
+                _id: null,
+                totalCheckedQty: { $sum: "$checkedQty" },
+                totalDefectQty: { $sum: "$totalDefectQty" },
+                allDefects: { $push: "$defectList" }
+              }
+            },
+            { $unwind: "$allDefects" },
+            { $unwind: "$allDefects" },
+            {
+              $group: {
+                _id: "$allDefects.defectName",
+                totalQty: { $sum: "$allDefects.qty" },
+                totalCheckedQty: { $first: "$totalCheckedQty" },
+                totalDefectQty: { $first: "$totalDefectQty" }
+              }
+            },
+            { $sort: { totalQty: -1 } },
+            {
+              $group: {
+                _id: null,
+                totalCheckedQty: { $first: "$totalCheckedQty" },
+                totalDefectQty: { $first: "$totalDefectQty" },
+                topDefects: { $push: { defectName: "$_id", qty: "$totalQty" } }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                totalCheckedQty: { $ifNull: ["$totalCheckedQty", 0] },
+                totalDefectQty: { $ifNull: ["$totalDefectQty", 0] },
+                overallDefectRate: {
+                  $cond: [
+                    { $eq: [{ $ifNull: ["$totalCheckedQty", 0] }, 0] },
+                    0,
+                    {
+                      $multiply: [
+                        { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                        100
+                      ]
+                    }
+                  ]
+                },
+                topDefects: {
+                  $map: {
+                    input: { $slice: ["$topDefects", 3] },
+                    as: "d",
+                    in: {
+                      name: "$$d.defectName",
+                      qty: "$$d.qty",
+                      rate: {
+                        $cond: [
+                          { $eq: [{ $ifNull: ["$totalCheckedQty", 0] }, 0] },
+                          0,
+                          {
+                            $multiply: [
+                              { $divide: ["$$d.qty", "$totalCheckedQty"] },
+                              100
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          // --- 3. Get available options for cascading filters ---
+          filterOptions: [
+            {
+              $group: {
+                _id: null,
+                factories: { $addToSet: "$factory" },
+                lineNos: { $addToSet: "$lineNo" },
+                moNos: { $addToSet: "$moNo" },
+                colors: { $addToSet: "$color" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                factories: { $sortArray: { input: "$factories", sortBy: 1 } },
+                lineNos: { $sortArray: { input: "$lineNos", sortBy: 1 } },
+                moNos: { $sortArray: { input: "$moNos", sortBy: 1 } },
+                colors: { $sortArray: { input: "$colors", sortBy: 1 } }
+              }
+            }
+          ]
+        }
+      },
+      // --- Reshape the final output ---
+      {
+        $project: {
+          reports: "$reports",
+          summary: { $arrayElemAt: ["$summary", 0] },
+          filterOptions: { $arrayElemAt: ["$filterOptions", 0] }
+        }
+      }
+    ]);
+
+    // --- GUARANTEE A SAFE RESPONSE STRUCTURE ---
+    const rawData = result[0];
+    const responseData = {
+      reports: rawData?.reports || [],
+      summary: rawData?.summary || {
+        totalCheckedQty: 0,
+        totalDefectQty: 0,
+        overallDefectRate: 0,
+        topDefects: []
+      },
+      filterOptions: rawData?.filterOptions || {
+        factories: [],
+        lineNos: [],
+        moNos: [],
+        colors: []
+      }
+    };
+
+    res.json(responseData);
+  } catch (error) {
+    console.error("Error fetching Sub-Con QC report data:", error);
+    res.status(500).json({ error: "Failed to fetch report data" });
   }
 });
 
