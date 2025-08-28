@@ -1,13 +1,23 @@
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
 
-import {
-  QC1Sunrise,
-  InlineOrders,
-  CutPanelOrders,
-  QCWorkers,
-  DtOrder,
-} from "../../server.js"; 
+let InlineOrders, CutPanelOrders, QCWorkers, DtOrder, QC1Sunrise;
+
+// Function to initialize models after they're imported
+const initializeModels = async () => {
+  try {
+    const models = await import("../../server.js");
+    InlineOrders = models.InlineOrders;
+    CutPanelOrders = models.CutPanelOrders;
+    QCWorkers = models.QCWorkers;
+    DtOrder = models.DtOrder;
+    QC1Sunrise = models.QC1Sunrise;
+    console.log("✅ Models initialized successfully");
+  } catch (error) {
+    console.error("❌ Failed to initialize models:", error);
+    throw error;
+  }
+};
 /* ------------------------------
    YM DataSore SQL
 ------------------------------ */
@@ -177,6 +187,8 @@ async function dropConflictingIndex() {
 // MODIFICATION: Rewritten initializePools and server startup logic
 async function initializeServer() {
   console.log("--- Initializing Server ---");
+
+   await initializeModels();
 
   // 1. Handle MongoDB Index
   await dropConflictingIndex();
