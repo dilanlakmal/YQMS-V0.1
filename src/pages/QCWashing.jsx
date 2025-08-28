@@ -1725,8 +1725,11 @@ const autoSaveOverallSummary = async (summary, recordId) => {
       ...summary,
     }));
 
-    if (recordId) {
-      autoSaveSummary(summary, recordId);
+    // Re-initialize inspection data with master checklist
+    if (masterChecklist && masterChecklist.length > 0) {
+      setInspectionData(initializeInspectionData(masterChecklist));
+    } else {
+      setInspectionData([]);
     }
   }, 100); // 100ms debounce
 

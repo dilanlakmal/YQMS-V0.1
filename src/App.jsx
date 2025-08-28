@@ -76,6 +76,7 @@ import QAAudit from "./pages/QAAudit.jsx";
 import QC2UploadData from "./pages/QC2UploadData.jsx";
 
 import SupplierIssues from "./pages/SupplierIssues.jsx";
+import SubConQC from "./pages/SubConQC.jsx";
 
 export const BluetoothContext = createContext(null);
 
@@ -442,6 +443,7 @@ function AppContent() {
               <Route path="/training" element={<YQMSTrainingSchedule />} />
               <Route path="/exam" element={<YQMSExam />} />
               <Route path="/cutting-inline" element={<CuttingInline />} />
+              <Route path="/sub-con-qc1" element={<SubConQC />} />
               <Route path="/qc2-upload-data" element={<QC2UploadData />} />
             </>
           ) : (
