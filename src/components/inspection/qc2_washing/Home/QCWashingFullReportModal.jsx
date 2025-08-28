@@ -3,7 +3,7 @@ import { X, FileText, Palette, Building, User, Hash, Droplets, ClipboardCheck, P
 import axios from "axios";
 
 import { API_BASE_URL } from "../../../../../config";
-import { getToleranceAsFraction } from "../Home/fractionConverter";
+import { getToleranceAsFraction, decimalToFraction } from "../Home/fractionConverter";
 
 const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
   const [reportData, setReportData] = useState(null);
@@ -1446,10 +1446,11 @@ const getImageUrl = (imagePath) => {
                                                   beforeMeasurement.measured_value_decimal !== undefined) {
                                                 difference = afterMeasurement.measured_value_decimal - beforeMeasurement.measured_value_decimal;
                                                 if (Math.abs(difference) > 0.001) { // Only show if significant difference
-                                                  differenceText = difference > 0 ? `+${difference.toFixed(3)}"` : `${difference.toFixed(3)}"`;
+                                                  const fractionDiff = decimalToFraction(Math.abs(difference));
+                                                  differenceText = difference > 0 ? `+${fractionDiff}"` : `-${fractionDiff}"`;
                                                   differenceColor = difference > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
                                                 } else {
-                                                  differenceText = '0.000"';
+                                                  differenceText = '0"';
                                                   differenceColor = 'text-gray-600 dark:text-gray-400';
                                                 }
                                               }
